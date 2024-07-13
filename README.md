@@ -1,4 +1,4 @@
-# Kodenames backend API
+# Auth proxy backend API
 
 Auth proxy backend
 
