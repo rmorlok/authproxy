@@ -46,7 +46,7 @@ func GetGinServer() *gin.Engine {
 	router.GET("/auth/*auth", authService.AuthHandler())
 	router.GET("/avatar", authService.Optional(), authService.AvatarHandler())
 
-	api := router.Group("/api", authService.Required())
+	api := router.Group("/api" /*, authService.Required()*/)
 	{
 		mw := ratelimit.RateLimiter(rlstore, &ratelimit.Options{
 			ErrorHandler: rateErrorHandler,
@@ -58,10 +58,7 @@ func GetGinServer() *gin.Engine {
 				"message": "pong",
 			})
 		})
-		api.GET("/me", mw, GetMe)
-		api.GET("/albums", mw, GetAlbums)
-		api.GET("/albums/:id", mw, GetAlbumByID)
-		api.POST("/albums", mw, PostAlbums)
+		api.GET("/domains", mw, ListDomains)
 	}
 
 	return router

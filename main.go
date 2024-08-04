@@ -22,7 +22,7 @@ func main() {
 		},
 	}
 
-	var rootCmd = &cobra.Command{Use: "kodenames2"}
+	var rootCmd = &cobra.Command{Use: "authproxy"}
 	rootCmd.AddCommand(cmdRoutes)
 	rootCmd.AddCommand(cmdServe)
 	rootCmd.Execute()
