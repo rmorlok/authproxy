@@ -13,6 +13,20 @@ type Secret interface {
 	GetValue() (secret string, present bool)
 }
 
+func UnmarshallYamlSecretString(data string) (Secret, error) {
+	return UnmarshallYamlSecret([]byte(data))
+}
+
+func UnmarshallYamlSecret(data []byte) (Secret, error) {
+	var rootNode yaml.Node
+
+	if err := yaml.Unmarshal(data, &rootNode); err != nil {
+		return nil, err
+	}
+
+	return secretUnmarshalYAML(rootNode.Content[0])
+}
+
 // secretUnmarshalYAML handles unmarshalling from YAML while allowing us to make decisions
 // about how the data is unmarshalled based on the concrete type being represented
 func secretUnmarshalYAML(value *yaml.Node) (Secret, error) {
