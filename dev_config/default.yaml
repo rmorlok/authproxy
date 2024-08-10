@@ -1,3 +1,9 @@
+system_auth:
+  jwt_signing_key:
+    public_key:
+      path: ./foo.pem
+    private_key:
+      path: ./foo.pem
 integrations:
   - id: google-drive
     version: 1
@@ -19,7 +25,7 @@ integrations:
       scopes:
         - id: https://www.googleapis.com/auth/drive.readonly
           reason: |
-            We nee to be able to view the files
+            We need to be able to view the files
         - id: https://www.googleapis.com/auth/drive.activity.readonly
           required: false
           reason: |

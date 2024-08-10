@@ -72,4 +72,5 @@ require (
 	google.golang.org/protobuf v1.33.0 // indirect
 	gopkg.in/oauth2.v3 v3.12.0 // indirect
 	gopkg.in/yaml.v3 v3.0.1 // indirect
+	k8s.io/utils v0.0.0-20240711033017-18e509b52bc8 // indirect
 )

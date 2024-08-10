@@ -16,6 +16,20 @@ type Auth interface {
 	GetType() AuthType
 }
 
+func UnmarshallYamlAuthString(data string) (Auth, error) {
+	return UnmarshallYamlAuth([]byte(data))
+}
+
+func UnmarshallYamlAuth(data []byte) (Auth, error) {
+	var rootNode yaml.Node
+
+	if err := yaml.Unmarshal(data, &rootNode); err != nil {
+		return nil, err
+	}
+
+	return authUnmarshalYAML(rootNode.Content[0])
+}
+
 // authUnmarshalYAML handles unmarshalling from YAML while allowing us to make decisions
 // about how the data is unmarshalled based on the concrete type being represented
 func authUnmarshalYAML(value *yaml.Node) (Auth, error) {

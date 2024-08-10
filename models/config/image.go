@@ -9,6 +9,20 @@ type Image interface {
 	GetUrl() string
 }
 
+func UnmarshallYamlImageString(data string) (Image, error) {
+	return UnmarshallYamlImage([]byte(data))
+}
+
+func UnmarshallYamlImage(data []byte) (Image, error) {
+	var rootNode yaml.Node
+
+	if err := yaml.Unmarshal(data, &rootNode); err != nil {
+		return nil, err
+	}
+
+	return imageUnmarshalYAML(rootNode.Content[0])
+}
+
 // imageUnmarshalYAML handles unmarshalling from YAML while allowing us to make decisions
 // about how the data is unmarshalled based on the concrete type being represented
 func imageUnmarshalYAML(value *yaml.Node) (Image, error) {

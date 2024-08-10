@@ -139,7 +139,7 @@ func MustGetUserInfo(r *http.Request) User {
 	return user
 }
 
-// GetUserInfo returns user info from request context
+// GetUserInfo returns user info from request common
 func GetUserInfo(r *http.Request) (user User, err error) {
 
 	ctx := r.Context()
@@ -153,7 +153,7 @@ func GetUserInfo(r *http.Request) (user User, err error) {
 	return User{}, errors.New("user can't be parsed")
 }
 
-// SetUserInfo sets user into request context
+// SetUserInfo sets user into request common
 func SetUserInfo(r *http.Request, user User) *http.Request {
 	ctx := r.Context()
 	ctx = context.WithValue(ctx, contextKey("user"), user)

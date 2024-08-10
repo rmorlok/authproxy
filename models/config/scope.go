@@ -8,6 +8,19 @@ type Scope struct {
 	Reason   string `json:"reason" yaml:"reason"`
 }
 
+func UnmarshallYamlScopeString(data string) (*Scope, error) {
+	return UnmarshallYamlScope([]byte(data))
+}
+
+func UnmarshallYamlScope(data []byte) (*Scope, error) {
+	var scope Scope
+	if err := yaml.Unmarshal(data, &scope); err != nil {
+		return nil, err
+	}
+
+	return &scope, nil
+}
+
 func (s *Scope) UnmarshalYAML(value *yaml.Node) error {
 	type Raw Scope // Type alias to avoid recursion
 	raw := Raw{

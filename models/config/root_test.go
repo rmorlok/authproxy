@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-func TestFullConfig(t *testing.T) {
+func TestRootFullConfig(t *testing.T) {
 	assert := require.New(t)
 
 	data := `
@@ -30,7 +30,7 @@ integrations:
       scopes:
         - id: https://www.googleapis.com/auth/drive.readonly
           reason: |
-            We nee to be able to view the files
+            We need to be able to view the files
         - id: https://www.googleapis.com/auth/drive.activity.readonly
           required: false
           reason: |
@@ -67,7 +67,7 @@ integrations:
 						{
 							Id:       "https://www.googleapis.com/auth/drive.readonly",
 							Required: true,
-							Reason:   "We nee to be able to view the files\n",
+							Reason:   "We need to be able to view the files\n",
 						},
 						{
 							Id:       "https://www.googleapis.com/auth/drive.activity.readonly",
@@ -92,7 +92,7 @@ integrations:
 		},
 	}
 
-	root, err := LoadConfig([]byte(data))
+	root, err := UnmarshallYamlRootString(data)
 	assert.NoError(err)
 	assert.Equal(expected, root)
 }
