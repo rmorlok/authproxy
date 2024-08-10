@@ -1,39 +1,42 @@
 package config
 
+import (
+	"fmt"
+	"gopkg.in/yaml.v3"
+)
+
 type KeyPublicPrivate struct {
-	PublicKey  string `json:"public_key" yaml:"public_key"`
-	PrivateKey string `json:"private_key" yaml:"private_key"`
+	PublicKey  KeyData `json:"public_key" yaml:"public_key"`
+	PrivateKey KeyData `json:"private_key" yaml:"private_key"`
 }
 
-// keyPublicPrivateUnmarshalYAML handles unmarshalling from YAML while allowing us to make decisions
-// about how the data is unmarshalled based on the concrete type being represented
-/*func keyPublicPrivateUnmarshalYAML(value *yaml.Node) (Key, error) {
+func (kpp *KeyPublicPrivate) UnmarshalYAML(value *yaml.Node) error {
 	// Ensure the node is a mapping node
 	if value.Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("expected a mapping node, got %v", value.Kind)
+		return fmt.Errorf("expected a mapping node, got %v", value.Kind)
 	}
 
-	var publicKeyData KeyData
-	var privateKeyData KeyData
-	var err error
+	var publicKey KeyData
+	var privateKey KeyData
 
+	// Handle custom unmarshalling for some attributes. Iterate through the mapping node's content,
+	// which will be sequences of keys, then values.
 	for i := 0; i < len(value.Content); i += 2 {
 		keyNode := value.Content[i]
 		valueNode := value.Content[i+1]
 
+		var err error
 		matched := false
 
 		switch keyNode.Value {
 		case "public_key":
-			publicKeyData, err = keyDataUnmarshalYAML(valueNode)
-			if err != nil {
-				return nil, err
+			if publicKey, err = keyDataUnmarshalYAML(valueNode); err != nil {
+				return err
 			}
 			matched = true
 		case "private_key":
-			privateKeyData, err = keyDataUnmarshalYAML(valueNode)
-			if err != nil {
-				return nil, err
+			if privateKey, err = keyDataUnmarshalYAML(valueNode); err != nil {
+				return err
 			}
 			matched = true
 		}
@@ -46,19 +49,19 @@ type KeyPublicPrivate struct {
 		}
 	}
 
-	if publicKeyData == nil && privateKeyData == nil {
-		return nil, fmt.Errorf("invalid structure for public private key; must have at least public or private key data")
-	}
-
 	// Let the rest unmarshall normally
 	type RawType KeyPublicPrivate
-	raw := (*RawType)(i)
+	raw := (*RawType)(kpp)
 	if err := value.Decode(raw); err != nil {
 		return err
 	}
 
-	return keyData, nil
-}*/
+	// Set the custom unmarshalled types
+	raw.PublicKey = publicKey
+	raw.PrivateKey = privateKey
+
+	return nil
+}
 
 func (kpp *KeyPublicPrivate) CanSign() bool {
 	return false

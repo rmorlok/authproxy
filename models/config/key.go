@@ -12,6 +12,20 @@ type Key interface {
 	CanVerifySignature() bool
 }
 
+func UnmarshallYamlKeyString(data string) (Key, error) {
+	return UnmarshallYamlKey([]byte(data))
+}
+
+func UnmarshallYamlKey(data []byte) (Key, error) {
+	var rootNode yaml.Node
+
+	if err := yaml.Unmarshal(data, &rootNode); err != nil {
+		return nil, err
+	}
+
+	return keyUnmarshalYAML(rootNode.Content[0])
+}
+
 // keyUnmarshalYAML handles unmarshalling from YAML while allowing us to make decisions
 // about how the data is unmarshalled based on the concrete type being represented
 func keyUnmarshalYAML(value *yaml.Node) (Key, error) {

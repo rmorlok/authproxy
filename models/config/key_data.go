@@ -41,14 +41,14 @@ fieldLoop:
 		case "env_var":
 			keyData = &KeyDataEnvVar{}
 			break fieldLoop
-		case "file":
+		case "path":
 			keyData = &KeyDataFile{}
 			break fieldLoop
 		}
 	}
 
 	if keyData == nil {
-		return nil, fmt.Errorf("invalid structure for keyData type; does not match value, public_key/private_key or shared_key")
+		return nil, fmt.Errorf("invalid structure for key data type; does not match value, value, base64, env_var, file")
 	}
 
 	if err := value.Decode(keyData); err != nil {
@@ -105,7 +105,7 @@ func (kev *KeyDataEnvVar) GetData(ctx common.Context) ([]byte, error) {
 }
 
 type KeyDataFile struct {
-	Path string `json:"file" yaml:"file"`
+	Path string `json:"path" yaml:"path"`
 }
 
 func (kf *KeyDataFile) HasData(ctx common.Context) bool {
