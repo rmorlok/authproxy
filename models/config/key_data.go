@@ -17,6 +17,20 @@ type KeyData interface {
 	GetData(ctx common.Context) ([]byte, error)
 }
 
+func UnmarshallYamlKeyDataString(data string) (Auth, error) {
+	return UnmarshallYamlKeyData([]byte(data))
+}
+
+func UnmarshallYamlKeyData(data []byte) (Auth, error) {
+	var rootNode yaml.Node
+
+	if err := yaml.Unmarshal(data, &rootNode); err != nil {
+		return nil, err
+	}
+
+	return authUnmarshalYAML(rootNode.Content[0])
+}
+
 // keyUnmarshalYAML handles unmarshalling from YAML while allowing us to make decisions
 // about how the data is unmarshalled based on the concrete type being represented
 func keyDataUnmarshalYAML(value *yaml.Node) (KeyData, error) {
