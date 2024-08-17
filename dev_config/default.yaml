@@ -1,3 +1,5 @@
+admin_api:
+  port: 8080
 system_auth:
   jwt_signing_key:
     public_key:

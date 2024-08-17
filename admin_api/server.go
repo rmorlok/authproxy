@@ -1,0 +1,87 @@
+package admin_api
+
+import (
+	"fmt"
+	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
+	"github.com/gin-gonic/contrib/static"
+	"github.com/gin-gonic/gin"
+	"github.com/rmorlok/authproxy/api_common"
+	"github.com/rmorlok/authproxy/config"
+	"net/http"
+	"time"
+)
+
+func rateKeyFunc(c *gin.Context) string {
+	return c.ClientIP()
+}
+
+func rateErrorHandler(c *gin.Context, info ratelimit.Info) {
+	c.String(429, "Too many requests. Try again in "+time.Until(info.ResetTime).String())
+}
+
+//func GetCorsConfig() cors.Config {
+//	config := cors.DefaultConfig()
+//
+//	config.AllowOrigins = GetEnvironmentVariables().CorsAllowedOrigins
+//	config.AllowCredentials = true
+//
+//	return config
+//}
+
+func GetGinServer(cfg config.Config) *gin.Engine {
+	// authService := GetAuthService()
+	//rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
+	//	Rate:  1 * time.Minute,
+	//	Limit: 3,
+	//})
+
+	router := api_common.GinForService("admin-api", &cfg.GetRoot().AdminApi)
+
+	//router.Use(authService.Optional())
+	//router.Use(cors.New(GetCorsConfig()))
+
+	// Static content
+	router.Use(static.Serve("/", static.LocalFile("./client/build", true)))
+
+	router.GET("/ping", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"service": "admin-api",
+			"message": "pong",
+		})
+	})
+
+	router.GET("/healthz", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{
+			"service": "admin-api",
+			"ok":      true,
+		})
+	})
+
+	// setup auth routes
+	//router.GET("/login", authService.LoginHandler())
+	//router.GET("/auth/*auth", authService.AuthHandler())
+	//router.GET("/avatar", authService.Optional(), authService.AvatarHandler())
+
+	//api := router.Group("/api" /*, authService.Required()*/)
+	//{
+	//	mw := ratelimit.RateLimiter(rlstore, &ratelimit.Options{
+	//		ErrorHandler: rateErrorHandler,
+	//		KeyFunc:      rateKeyFunc,
+	//	})
+	//
+	//
+	//
+	//	// api.GET("/domains", mw, ListDomains)
+	//}
+
+	return router
+}
+
+func Serve(cfg config.Config) {
+	if !cfg.IsDebugMode() {
+		gin.SetMode(gin.ReleaseMode)
+	}
+
+	r := GetGinServer(cfg)
+	r.Run(fmt.Sprintf(":%d", cfg.GetRoot().AdminApi.Port))
+}

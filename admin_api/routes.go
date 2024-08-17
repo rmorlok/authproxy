@@ -1,4 +1,4 @@
-package server
+package admin_api
 
 import (
 	"github.com/gin-gonic/gin"
