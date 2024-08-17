@@ -1,6 +1,7 @@
 package main
 
 import (
+	"github.com/fatih/color"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/admin_api"
@@ -29,7 +30,7 @@ func loadConfig() error {
 	return errors.Wrapf(err, "failed to load configuration from '%s'", cfgFile)
 }
 
-func runServices(servicesList string) error {
+func runServices(noBanner bool, servicesList string) error {
 	services := strings.Split(servicesList, ",")
 	servers := make([]func(cfg config.Config), 0, len(services))
 
@@ -43,6 +44,10 @@ func runServices(servicesList string) error {
 		default:
 			return errors.New("unknown service: " + service)
 		}
+	}
+
+	if !noBanner {
+		banner()
 	}
 
 	wg := new(sync.WaitGroup)
@@ -59,26 +64,48 @@ func runServices(servicesList string) error {
 	return nil
 }
 
-func main() {
-	// Optionally load environment variables from a .env file.
-	_ = godotenv.Load()
+func banner() {
+	banner := `
+    ___         __  __       ____                       
+   /   | __  __/ /_/ /_     / __ \_________  _  ____  __
+  / /| |/ / / / __/ __ \   / /_/ / ___/ __ \| |/_/ / / /
+ / ___ / /_/ / /_/ / / /  / ____/ /  / /_/ />  </ /_/ / 
+/_/  |_\__,_/\__/_/ /_/  /_/   /_/   \____/_/|_|\__, /  
+                                               /____/   
+`
+	color.Green(banner)
+}
 
-	var cmdRoutes = &cobra.Command{
+func cmdRoutes() *cobra.Command {
+	return &cobra.Command{
 		Use:   "routes",
 		Short: "Print routes exposed by app",
 		Run: func(cmd *cobra.Command, args []string) {
 			api_common.PrintRoutes(admin_api.GetGinServer(cfg))
 		},
 	}
+}
 
-	var cmdServe = &cobra.Command{
+func cmdServe() *cobra.Command {
+	var noBanner bool
+
+	cmd := &cobra.Command{
 		Use:   "serve",
 		Short: "Start services",
 		Args:  cobra.ExactArgs(1), // Expect exactly one argument
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runServices(args[0])
+			return runServices(noBanner, args[0])
 		},
 	}
+
+	cmd.Flags().BoolVar(&noBanner, "no-banner", false, "Don't show banner")
+
+	return cmd
+}
+
+func main() {
+	// Optionally load environment variables from a .env file.
+	_ = godotenv.Load()
 
 	var rootCmd = &cobra.Command{
 		Use: "authproxy",
@@ -89,7 +116,7 @@ func main() {
 
 	rootCmd.PersistentFlags().StringVar(&cfgFile, "config", "", "config file; may also be specified in AUTHPROXY_CONFIG")
 
-	rootCmd.AddCommand(cmdRoutes)
-	rootCmd.AddCommand(cmdServe)
+	rootCmd.AddCommand(cmdRoutes())
+	rootCmd.AddCommand(cmdServe())
 	rootCmd.Execute()
 }
