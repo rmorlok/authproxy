@@ -1,9 +1,10 @@
 // Package token wraps jwt-go library and provides higher level abstraction to work with JWT.
-package token
+package auth
 
 import (
 	"encoding/json"
 	"fmt"
+	"github.com/rmorlok/authproxy/common"
 	"net/http"
 	"strings"
 	"time"
@@ -12,96 +13,14 @@ import (
 	"github.com/pkg/errors"
 )
 
-// Service wraps jwt operations
-// supports both header and cookie tokens
-type Service struct {
-	Opts
-}
-
-// Claims stores user info for token and state & from from login
+// Claims stores actor info for token and state & from login
 type Claims struct {
-	jwt.StandardClaims
-	User        *User      `json:"user,omitempty"` // user info
-	SessionOnly bool       `json:"sess_only,omitempty"`
-	Handshake   *Handshake `json:"handshake,omitempty"` // used for oauth handshake
-	NoAva       bool       `json:"no-ava,omitempty"`    // disable avatar, always use identicon
+	jwt.RegisteredClaims
+	Actor       *Actor `json:"user,omitempty"`
+	SessionOnly bool   `json:"sess_only,omitempty"`
 }
 
-// Handshake used for oauth handshake
-type Handshake struct {
-	State string `json:"state,omitempty"`
-	From  string `json:"from,omitempty"`
-	ID    string `json:"id,omitempty"`
-}
-
-const (
-	// default names for cookies and headers
-	defaultJWTCookieName   = "JWT"
-	defaultJWTCookieDomain = ""
-	defaultJWTHeaderKey    = "X-JWT"
-	defaultXSRFCookieName  = "XSRF-TOKEN"
-	defaultXSRFHeaderKey   = "X-XSRF-TOKEN"
-	defaultTokenQuery      = "token"
-
-	// We don't normally issues tokens ourselves except through CLI tools for testing.
-	defaultIssuer         = "authproxy/auth"
-	defaultTokenDuration  = time.Minute * 15
-	defaultCookieDuration = time.Hour * 24 * 31
-)
-
-// Opts holds constructor params
-type Opts struct {
-	SecretReader   Secret
-	ClaimsUpd      ClaimsUpdater
-	SecureCookies  bool
-	TokenDuration  time.Duration
-	CookieDuration time.Duration
-	DisableXSRF    bool
-	DisableIAT     bool // disable IssuedAt claim
-	// optional (custom) names for cookies and headers
-	JWTCookieName   string
-	JWTCookieDomain string
-	JWTHeaderKey    string
-	XSRFCookieName  string
-	XSRFHeaderKey   string
-	JWTQuery        string
-	AudienceReader  Audience      // allowed aud values
-	Issuer          string        // optional value for iss claim, usually application name
-	AudSecrets      bool          // uses different secret for differed auds. important: adds pre-parsing of unverified token
-	SendJWTHeader   bool          // if enabled send JWT as a header instead of cookie
-	SameSite        http.SameSite // define a cookie attribute making it impossible for the browser to send this cookie cross-site
-}
-
-// NewService makes JWT service
-func NewService(opts Opts) *Service {
-	res := Service{Opts: opts}
-
-	setDefault := func(fld *string, def string) {
-		if *fld == "" {
-			*fld = def
-		}
-	}
-
-	setDefault(&res.JWTCookieName, defaultJWTCookieName)
-	setDefault(&res.JWTHeaderKey, defaultJWTHeaderKey)
-	setDefault(&res.XSRFCookieName, defaultXSRFCookieName)
-	setDefault(&res.XSRFHeaderKey, defaultXSRFHeaderKey)
-	setDefault(&res.JWTQuery, defaultTokenQuery)
-	setDefault(&res.Issuer, defaultIssuer)
-	setDefault(&res.JWTCookieDomain, defaultJWTCookieDomain)
-
-	if opts.TokenDuration == 0 {
-		res.TokenDuration = defaultTokenDuration
-	}
-
-	if opts.CookieDuration == 0 {
-		res.CookieDuration = defaultCookieDuration
-	}
-
-	return &res
-}
-
-// Token makes token with claims
+// Token mints a signed JWT with the specified claims
 func (j *Service) Token(claims Claims) (string, error) {
 
 	// make token for allowed aud values only, rejects others
@@ -121,7 +40,19 @@ func (j *Service) Token(claims Claims) (string, error) {
 		return "", errors.Wrap(err, "aud rejected")
 	}
 
-	secret, err := j.SecretReader.Get(claims.Audience) // get secret via consumer defined SecretReader
+	audiences, err := claims.GetAudience()
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get aud")
+	}
+
+	var secret string
+	for _, aud := range audiences {
+		secret, err = j.SecretReader.GetForAudience(aud) // get secret via consumer defined SecretReader
+		if err == nil {
+			break
+		}
+	}
+
 	if err != nil {
 		return "", errors.Wrap(err, "can't get secret")
 	}
@@ -135,22 +66,33 @@ func (j *Service) Token(claims Claims) (string, error) {
 
 // Parse token string and verify. Not checking for expiration
 func (j *Service) Parse(tokenString string) (Claims, error) {
-	parser := jwt.Parser{SkipClaimsValidation: true} // allow parsing of expired tokens
+	parser := jwt.NewParser(
+		jwt.WithoutClaimsValidation(), // allow parsing of expired tokens
+	)
 
 	if j.SecretReader == nil {
 		return Claims{}, errors.New("secret reader not defined")
 	}
 
-	aud := "ignore"
+	var err error
+
+	audiences := []string{"ignore"}
 	if j.AudSecrets {
-		var err error
-		aud, err = j.aud(tokenString)
+
+		audiences, err = j.aud(tokenString)
 		if err != nil {
 			return Claims{}, errors.New("can't retrieve audience from the token")
 		}
 	}
 
-	secret, err := j.SecretReader.Get(aud)
+	var secret string
+	for _, aud := range audiences {
+		secret, err = j.SecretReader.GetForAudience(aud) // get secret via consumer defined SecretReader
+		if err == nil {
+			break
+		}
+	}
+
 	if err != nil {
 		return Claims{}, errors.Wrap(err, "can't get secret")
 	}
@@ -178,33 +120,42 @@ func (j *Service) Parse(tokenString string) (Claims, error) {
 
 // aud pre-parse token and extracts aud from the claim
 // important! this step ignores token verification, should not be used for any validations
-func (j *Service) aud(tokenString string) (string, error) {
-	parser := jwt.Parser{}
+func (j *Service) aud(tokenString string) ([]string, error) {
+	parser := jwt.NewParser(
+		jwt.WithoutClaimsValidation(),
+	)
 	token, _, err := parser.ParseUnverified(tokenString, &Claims{})
 	if err != nil {
-		return "", errors.Wrap(err, "can't pre-parse token")
+		return nil, errors.Wrap(err, "can't pre-parse token")
 	}
 	claims, ok := token.Claims.(*Claims)
 	if !ok {
-		return "", errors.New("invalid token")
+		return nil, errors.New("invalid token")
 	}
-	if strings.TrimSpace(claims.Audience) == "" {
-		return "", errors.New("empty aud")
+
+	aud, err := claims.GetAudience()
+	if err != nil {
+		return nil, errors.Wrap(err, "can't get audience")
+	}
+
+	if len(aud) == 0 {
+		return nil, errors.New("empty aud")
 	}
 	return claims.Audience, nil
 }
 
 func (j *Service) validate(claims *Claims) error {
-	cerr := claims.Valid()
+	v := jwt.NewValidator()
+
+	cerr := v.Validate(claims)
 
 	if cerr == nil {
 		return nil
 	}
 
-	if e, ok := cerr.(*jwt.ValidationError); ok {
-		if e.Errors == jwt.ValidationErrorExpired {
-			return nil // allow expired tokens
-		}
+	// TODO: this is probably wrong
+	if cerr == jwt.ErrTokenExpired {
+		return nil
 	}
 
 	return cerr
@@ -213,9 +164,14 @@ func (j *Service) validate(claims *Claims) error {
 // Set creates token cookie with xsrf cookie and put it to ResponseWriter
 // accepts claims and sets expiration if none defined. permanent flag means long-living cookie,
 // false makes it session only.
-func (j *Service) Set(w http.ResponseWriter, claims Claims) (Claims, error) {
-	if claims.ExpiresAt == 0 {
-		claims.ExpiresAt = time.Now().Add(j.TokenDuration).Unix()
+func (j *Service) Set(ctx common.Context, w http.ResponseWriter, claims Claims) (Claims, error) {
+	expiresAt, err := claims.GetExpirationTime()
+	if err != nil {
+		return Claims{}, errors.Wrap(err, "can't get expiration time")
+	}
+
+	if expiresAt == nil {
+		claims.ExpiresAt = jwt.NewNumericDate(ctx.Clock().Now().Add(j.TokenDuration))
 	}
 
 	if claims.Issuer == "" {
@@ -223,7 +179,7 @@ func (j *Service) Set(w http.ResponseWriter, claims Claims) (Claims, error) {
 	}
 
 	if !j.DisableIAT {
-		claims.IssuedAt = time.Now().Unix()
+		claims.IssuedAt = jwt.NewNumericDate(ctx.Clock().Now())
 	}
 
 	tokenString, err := j.Token(claims)
@@ -237,7 +193,7 @@ func (j *Service) Set(w http.ResponseWriter, claims Claims) (Claims, error) {
 	}
 
 	cookieExpiration := 0 // session cookie
-	if !claims.SessionOnly && claims.Handshake == nil {
+	if !claims.SessionOnly {
 		cookieExpiration = int(j.CookieDuration.Seconds())
 	}
 
@@ -245,7 +201,7 @@ func (j *Service) Set(w http.ResponseWriter, claims Claims) (Claims, error) {
 		MaxAge: cookieExpiration, Secure: j.SecureCookies, SameSite: j.SameSite}
 	http.SetCookie(w, &jwtCookie)
 
-	xsrfCookie := http.Cookie{Name: j.XSRFCookieName, Value: claims.Id, HttpOnly: false, Path: "/", Domain: j.JWTCookieDomain,
+	xsrfCookie := http.Cookie{Name: j.XSRFCookieName, Value: claims.ID, HttpOnly: false, Path: "/", Domain: j.JWTCookieDomain,
 		MaxAge: cookieExpiration, Secure: j.SecureCookies, SameSite: j.SameSite}
 	http.SetCookie(w, &xsrfCookie)
 
@@ -254,7 +210,7 @@ func (j *Service) Set(w http.ResponseWriter, claims Claims) (Claims, error) {
 
 // Get token from url, header or cookie
 // if cookie used, verify xsrf token to match
-func (j *Service) Get(r *http.Request) (Claims, string, error) {
+func (j *Service) Get(ctx common.Context, r *http.Request) (Claims, string, error) {
 
 	fromCookie := false
 	tokenString := ""
@@ -285,11 +241,11 @@ func (j *Service) Get(r *http.Request) (Claims, string, error) {
 	}
 
 	// promote claim's aud to User.Audience
-	if claims.User != nil {
-		claims.User.Audience = claims.Audience
+	if claims.Actor != nil {
+		claims.Actor.Audience = claims.Audience
 	}
 
-	if !fromCookie && j.IsExpired(claims) {
+	if !fromCookie && j.IsExpired(ctx, claims) {
 		return Claims{}, "", errors.New("token expired")
 	}
 
@@ -297,9 +253,9 @@ func (j *Service) Get(r *http.Request) (Claims, string, error) {
 		return claims, tokenString, nil
 	}
 
-	if fromCookie && claims.User != nil {
+	if fromCookie && claims.Actor != nil {
 		xsrf := r.Header.Get(j.XSRFHeaderKey)
-		if claims.Id != xsrf {
+		if claims.ID != xsrf {
 			return Claims{}, "", errors.New("xsrf mismatch")
 		}
 	}
@@ -308,8 +264,8 @@ func (j *Service) Get(r *http.Request) (Claims, string, error) {
 }
 
 // IsExpired returns true if claims expired
-func (j *Service) IsExpired(claims Claims) bool {
-	return !claims.VerifyExpiresAt(time.Now().Unix(), true)
+func (j *Service) IsExpired(ctx common.Context, claims Claims) bool {
+	return claims.ExpiresAt != nil && claims.ExpiresAt.Before(ctx.Clock().Now())
 }
 
 // Reset token's cookies
@@ -333,8 +289,10 @@ func (j *Service) checkAuds(claims *Claims, audReader Audience) error {
 		return errors.Wrap(err, "failed to get auds")
 	}
 	for _, a := range auds {
-		if strings.EqualFold(a, claims.Audience) {
-			return nil
+		for _, claimAud := range claims.Audience {
+			if strings.EqualFold(a, claimAud) {
+				return nil
+			}
 		}
 	}
 	return errors.Errorf("aud %q not allowed", claims.Audience)
@@ -343,52 +301,23 @@ func (j *Service) checkAuds(claims *Claims, audReader Audience) error {
 func (c Claims) String() string {
 	b, err := json.Marshal(c)
 	if err != nil {
-		return fmt.Sprintf("%+v %+v", c.StandardClaims, c.User)
+		return fmt.Sprintf("%+v %+v", c.RegisteredClaims, c.Actor)
 	}
 	return string(b)
 }
 
-// Secret defines interface returning secret key for given id (aud)
-type Secret interface {
-	Get(aud string) (string, error) // aud matching is optional. Implementation may decide if supported or ignored
+// SecretReader defines interface returning secret key for given id (aud)
+type SecretReader interface {
+	GetForAudience(aud string) (string, error) // aud matching is optional. Implementation may decide if supported or ignored
 }
 
 // SecretFunc type is an adapter to allow the use of ordinary functions as Secret. If f is a function
 // with the appropriate signature, SecretFunc(f) is a Handler that calls f.
 type SecretFunc func(aud string) (string, error)
 
-// Get calls f()
-func (f SecretFunc) Get(aud string) (string, error) {
+// GetForAudience calls f()
+func (f SecretFunc) GetForAudience(aud string) (string, error) {
 	return f(aud)
-}
-
-// ClaimsUpdater defines interface adding extras to claims
-type ClaimsUpdater interface {
-	Update(claims Claims) Claims
-}
-
-// ClaimsUpdFunc type is an adapter to allow the use of ordinary functions as ClaimsUpdater. If f is a function
-// with the appropriate signature, ClaimsUpdFunc(f) is a Handler that calls f.
-type ClaimsUpdFunc func(claims Claims) Claims
-
-// Update calls f(id)
-func (f ClaimsUpdFunc) Update(claims Claims) Claims {
-	return f(claims)
-}
-
-// Validator defines interface to accept o reject claims with consumer defined logic
-// It works with valid token and allows to reject some, based on token match or user's fields
-type Validator interface {
-	Validate(token string, claims Claims) bool
-}
-
-// ValidatorFunc type is an adapter to allow the use of ordinary functions as Validator. If f is a function
-// with the appropriate signature, ValidatorFunc(f) is a Validator that calls f.
-type ValidatorFunc func(token string, claims Claims) bool
-
-// Validate calls f(id)
-func (f ValidatorFunc) Validate(token string, claims Claims) bool {
-	return f(token, claims)
 }
 
 // Audience defines interface returning list of allowed audiences

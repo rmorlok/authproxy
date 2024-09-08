@@ -1,4 +1,4 @@
-package token
+package auth
 
 import (
 	"crypto/sha1" //nolint
@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestUser_HashID(t *testing.T) {
+func TestActor_HashID(t *testing.T) {
 	tbl := []struct {
 		id   string
 		hash string
@@ -34,7 +34,7 @@ func (m *mockBadHasher) Reset()                            {}
 func (m *mockBadHasher) Size() int                         { return 0 }
 func (m *mockBadHasher) BlockSize() int                    { return 0 }
 
-func TestUser_HashIDWithCRC(t *testing.T) {
+func TestActor_HashIDWithCRC(t *testing.T) {
 	tbl := []struct {
 		id   string
 		hash string
@@ -51,8 +51,8 @@ func TestUser_HashIDWithCRC(t *testing.T) {
 	}
 }
 
-func TestUser_Attrs(t *testing.T) {
-	u := User{Name: "test", IP: "127.0.0.1"}
+func TestActor_Attrs(t *testing.T) {
+	u := Actor{Name: "test", IP: "127.0.0.1"}
 
 	u.SetBoolAttr("k1", true)
 	v := u.BoolAttr("k1")
@@ -80,8 +80,8 @@ func TestUser_Attrs(t *testing.T) {
 	assert.Equal(t, []string{}, u.SliceAttr("k2"), "not a slice")
 }
 
-func TestUser_Admin(t *testing.T) {
-	u := User{Name: "test", IP: "127.0.0.1"}
+func TestActor_Admin(t *testing.T) {
+	u := Actor{Name: "test", IP: "127.0.0.1"}
 	assert.False(t, u.IsAdmin())
 	u.SetAdmin(true)
 	assert.True(t, u.IsAdmin())
@@ -89,8 +89,8 @@ func TestUser_Admin(t *testing.T) {
 	assert.False(t, u.IsAdmin())
 }
 
-func TestUser_PaidSubscriber(t *testing.T) {
-	u := User{Name: "test"}
+func TestActor_PaidSubscriber(t *testing.T) {
+	u := Actor{Name: "test"}
 	assert.False(t, u.IsPaidSub())
 	u.SetPaidSub(true)
 	assert.True(t, u.IsPaidSub())
@@ -98,19 +98,19 @@ func TestUser_PaidSubscriber(t *testing.T) {
 	assert.False(t, u.IsPaidSub())
 }
 
-func TestUser_GetUserInfo(t *testing.T) {
+func TestActor_GetActorInfo(t *testing.T) {
 	r, err := http.NewRequest("GET", "http://blah.com", nil)
 	assert.Nil(t, err)
-	_, err = GetUserInfo(r)
-	assert.EqualError(t, err, "user can't be parsed")
+	_, err = GetActorInfo(r)
+	assert.EqualError(t, err, "actor can't be parsed")
 
-	r = SetUserInfo(r, User{Name: "test", ID: "id"})
-	u, err := GetUserInfo(r)
+	r = SetActorInfo(r, Actor{Name: "test", ID: "id"})
+	u, err := GetActorInfo(r)
 	assert.Nil(t, err)
-	assert.Equal(t, User{Name: "test", ID: "id"}, u)
+	assert.Equal(t, Actor{Name: "test", ID: "id"}, u)
 }
 
-func TestUser_MustGetUserInfo(t *testing.T) {
+func TestActor_MustGetActorInfo(t *testing.T) {
 	defer func() {
 		if r := recover(); r != nil {
 			t.Log("recovered from panic")
@@ -119,11 +119,11 @@ func TestUser_MustGetUserInfo(t *testing.T) {
 
 	r, err := http.NewRequest("GET", "http://blah.com", nil)
 	assert.Nil(t, err)
-	_ = MustGetUserInfo(r)
+	_ = MustGetActorInfo(r)
 	assert.Fail(t, "should panic")
 
-	r = SetUserInfo(r, User{Name: "test", ID: "id"})
-	u := MustGetUserInfo(r)
+	r = SetActorInfo(r, Actor{Name: "test", ID: "id"})
+	u := MustGetActorInfo(r)
 	assert.Nil(t, err)
-	assert.Equal(t, User{Name: "test", ID: "id"}, u)
+	assert.Equal(t, Actor{Name: "test", ID: "id"}, u)
 }

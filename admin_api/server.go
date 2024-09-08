@@ -29,11 +29,11 @@ func rateErrorHandler(c *gin.Context, info ratelimit.Info) {
 //}
 
 func GetGinServer(cfg config.Config) *gin.Engine {
-	// authService := GetAuthService()
-	//rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
-	//	Rate:  1 * time.Minute,
-	//	Limit: 3,
-	//})
+	authService := GetAuthService()
+	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
+		Rate:  1 * time.Minute,
+		Limit: 3,
+	})
 
 	router := api_common.GinForService("admin-api", &cfg.GetRoot().AdminApi)
 
@@ -62,17 +62,15 @@ func GetGinServer(cfg config.Config) *gin.Engine {
 	//router.GET("/auth/*auth", authService.AuthHandler())
 	//router.GET("/avatar", authService.Optional(), authService.AvatarHandler())
 
-	//api := router.Group("/api" /*, authService.Required()*/)
-	//{
-	//	mw := ratelimit.RateLimiter(rlstore, &ratelimit.Options{
-	//		ErrorHandler: rateErrorHandler,
-	//		KeyFunc:      rateKeyFunc,
-	//	})
-	//
-	//
-	//
-	//	// api.GET("/domains", mw, ListDomains)
-	//}
+	api := router.Group("/api", authService.Required())
+	{
+		mw := ratelimit.RateLimiter(rlstore, &ratelimit.Options{
+			ErrorHandler: rateErrorHandler,
+			KeyFunc:      rateKeyFunc,
+		})
+
+		api.GET("/domains", mw, ListDomains)
+	}
 
 	return router
 }
