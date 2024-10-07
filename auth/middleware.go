@@ -3,7 +3,7 @@ package auth
 import (
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/rmorlok/authproxy/common"
+	"github.com/rmorlok/authproxy/context"
 	"net/http"
 	"strings"
 	"time"
@@ -37,7 +37,7 @@ func (j *Service) auth(reqAuth bool) func(http.Handler) http.Handler {
 
 	f := func(h http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			ctx := common.AsContext(r.Context())
+			ctx := context.AsContext(r.Context())
 			claims, tkn, err := j.Get(ctx, r)
 			if err != nil {
 				onError(h, w, r, fmt.Errorf("can't get token: %w", err))
@@ -76,7 +76,7 @@ func (j *Service) auth(reqAuth bool) func(http.Handler) http.Handler {
 }
 
 // refreshExpiredToken makes a new token with passed claims
-func (j *Service) refreshExpiredToken(ctx common.Context, w http.ResponseWriter, claims Claims, tkn string) (Claims, error) {
+func (j *Service) refreshExpiredToken(ctx context.Context, w http.ResponseWriter, claims Claims, tkn string) (Claims, error) {
 
 	// cache refreshed claims for given token in order to eliminate multiple refreshes for concurrent requests
 	if j.RefreshCache != nil {

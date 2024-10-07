@@ -1,11 +1,17 @@
 admin_api:
   port: 8080
 system_auth:
+  cookie_domain: localhost:8080
   jwt_signing_key:
     public_key:
       path: ./foo.pem
     private_key:
       path: ./foo.pem
+  admin_users:
+    - username: rmorlok
+      key:
+        public_key:
+          path: /Users/rmorlok/.ssh/id_rsa.pub
 integrations:
   - id: google-drive
     version: 1

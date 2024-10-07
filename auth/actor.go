@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/rmorlok/authproxy/common"
+	context2 "github.com/rmorlok/authproxy/context"
 	"hash"
 	"hash/crc64"
 	"io"
@@ -31,9 +31,10 @@ const (
 // system, an admin from the calling system, a devops admin from the cli, etc.
 type Actor struct {
 	// set by service
-	ID       string           `json:"id"`
-	Audience jwt.ClaimStrings `json:"aud,omitempty"`
-
+	ID         string           `json:"id"`
+	Audience   jwt.ClaimStrings `json:"aud,omitempty"`
+	Admin      bool             `json:"admin,omitempty"`
+	SuperAdmin bool             `json:"super_admin,omitempty"`
 	// set by client
 	IP         string                 `json:"ip,omitempty"`
 	Email      string                 `json:"email,omitempty"`
@@ -75,24 +76,14 @@ func (a *Actor) StrAttr(key string) string {
 	return r
 }
 
-// SetAdmin is a shortcut to set "admin" attribute
-func (a *Actor) SetAdmin(val bool) {
-	a.SetBoolAttr(adminAttr, val)
-}
-
-// IsAdmin is a shortcut to get admin attribute
+// IsAdmin is a helper to wrap the Admin attribute
 func (a *Actor) IsAdmin() bool {
-	return a.BoolAttr(adminAttr)
+	return a.Admin
 }
 
-// SetSuperAdmin is a shortcut to set "superAdminAttr" attribute
-func (a *Actor) SetSuperAdmin(val bool) {
-	a.SetBoolAttr(superAdminAttr, val)
-}
-
-// IsSuperAdmin is a shortcut to get "superAdminAttr" attribute
+// IsSuperAdmin is a helper to wrap the SuuperAdmin attribute
 func (a *Actor) IsSuperAdmin() bool {
-	return a.BoolAttr(superAdminAttr)
+	return a.SuperAdmin
 }
 
 // SliceAttr gets slice attribute
@@ -128,7 +119,7 @@ func (a *Actor) ContextWith(ctx context.Context) context.Context {
 }
 
 // MustGetActorFromContext always returns an actor, or panics if an actor is not present on the context.
-func MustGetActorFromContext(ctx common.Context) Actor {
+func MustGetActorFromContext(ctx context2.Context) Actor {
 	a := GetActorFromContext(ctx)
 	if a == nil {
 		panic("actor not present on context")
@@ -138,7 +129,7 @@ func MustGetActorFromContext(ctx common.Context) Actor {
 }
 
 // GetActorFromContext gets an actor from the context, or returns nil if one is not present
-func GetActorFromContext(ctx common.Context) *Actor {
+func GetActorFromContext(ctx context2.Context) *Actor {
 	if a, ok := ctx.Value(actorContextKey).(*Actor); ok {
 		return a
 	}
@@ -184,10 +175,10 @@ func GetActorInfoFromRequest(r *http.Request) *Actor {
 		return nil
 	}
 
-	return GetActorFromContext(common.AsContext(ctx))
+	return GetActorFromContext(context2.AsContext(ctx))
 }
 
-// SetActorInfoOnRequest sets actor into request common
+// SetActorInfoOnRequest sets actor into request util
 func SetActorInfoOnRequest(r *http.Request, actor *Actor) *http.Request {
 	ctx := r.Context()
 	ctx = actor.ContextWith(ctx)

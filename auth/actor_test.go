@@ -2,7 +2,6 @@ package auth
 
 import (
 	"crypto/sha1" //nolint
-	"net/http"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -52,7 +51,7 @@ func TestActor_HashIDWithCRC(t *testing.T) {
 }
 
 func TestActor_Attrs(t *testing.T) {
-	u := Actor{Name: "test", IP: "127.0.0.1"}
+	u := Actor{IP: "127.0.0.1"}
 
 	u.SetBoolAttr("k1", true)
 	v := u.BoolAttr("k1")
@@ -81,49 +80,19 @@ func TestActor_Attrs(t *testing.T) {
 }
 
 func TestActor_Admin(t *testing.T) {
-	u := Actor{Name: "test", IP: "127.0.0.1"}
+	u := Actor{IP: "127.0.0.1"}
 	assert.False(t, u.IsAdmin())
-	u.SetAdmin(true)
+	u.Admin = true
 	assert.True(t, u.IsAdmin())
-	u.SetAdmin(false)
+	u.Admin = false
 	assert.False(t, u.IsAdmin())
 }
 
-func TestActor_PaidSubscriber(t *testing.T) {
-	u := Actor{Name: "test"}
-	assert.False(t, u.IsPaidSub())
-	u.SetPaidSub(true)
-	assert.True(t, u.IsPaidSub())
-	u.SetPaidSub(false)
-	assert.False(t, u.IsPaidSub())
-}
-
-func TestActor_GetActorInfo(t *testing.T) {
-	r, err := http.NewRequest("GET", "http://blah.com", nil)
-	assert.Nil(t, err)
-	_, err = GetActorInfo(r)
-	assert.EqualError(t, err, "actor can't be parsed")
-
-	r = SetActorInfo(r, Actor{Name: "test", ID: "id"})
-	u, err := GetActorInfo(r)
-	assert.Nil(t, err)
-	assert.Equal(t, Actor{Name: "test", ID: "id"}, u)
-}
-
-func TestActor_MustGetActorInfo(t *testing.T) {
-	defer func() {
-		if r := recover(); r != nil {
-			t.Log("recovered from panic")
-		}
-	}()
-
-	r, err := http.NewRequest("GET", "http://blah.com", nil)
-	assert.Nil(t, err)
-	_ = MustGetActorInfo(r)
-	assert.Fail(t, "should panic")
-
-	r = SetActorInfo(r, Actor{Name: "test", ID: "id"})
-	u := MustGetActorInfo(r)
-	assert.Nil(t, err)
-	assert.Equal(t, Actor{Name: "test", ID: "id"}, u)
+func TestActor_SuperAdmin(t *testing.T) {
+	u := Actor{IP: "127.0.0.1"}
+	assert.False(t, u.IsSuperAdmin())
+	u.SuperAdmin = true
+	assert.True(t, u.IsSuperAdmin())
+	u.SuperAdmin = false
+	assert.False(t, u.IsSuperAdmin())
 }

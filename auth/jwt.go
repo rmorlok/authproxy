@@ -4,7 +4,7 @@ package auth
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/rmorlok/authproxy/common"
+	"github.com/rmorlok/authproxy/context"
 	"net/http"
 	"strings"
 	"time"
@@ -64,10 +64,12 @@ func (j *Service) Token(claims Claims) (string, error) {
 	return tokenString, nil
 }
 
-// Parse token string and verify. Not checking for expiration
-func (j *Service) Parse(tokenString string) (Claims, error) {
+// Parse token string and verify.
+func (j *Service) Parse(ctx context.Context, tokenString string) (Claims, error) {
 	parser := jwt.NewParser(
-		jwt.WithoutClaimsValidation(), // allow parsing of expired tokens
+		jwt.WithTimeFunc(func() time.Time {
+			return ctx.Clock().Now()
+		}),
 	)
 
 	if j.SecretReader == nil {
@@ -78,7 +80,6 @@ func (j *Service) Parse(tokenString string) (Claims, error) {
 
 	audiences := []string{"ignore"}
 	if j.AudSecrets {
-
 		audiences, err = j.aud(tokenString)
 		if err != nil {
 			return Claims{}, errors.New("can't retrieve audience from the token")
@@ -115,7 +116,7 @@ func (j *Service) Parse(tokenString string) (Claims, error) {
 	if err = j.checkAuds(claims, j.AudienceReader); err != nil {
 		return Claims{}, errors.Wrap(err, "aud rejected")
 	}
-	return *claims, j.validate(claims)
+	return *claims, j.validate(ctx, claims)
 }
 
 // aud pre-parse token and extracts aud from the claim
@@ -144,43 +145,34 @@ func (j *Service) aud(tokenString string) ([]string, error) {
 	return claims.Audience, nil
 }
 
-func (j *Service) validate(claims *Claims) error {
-	v := jwt.NewValidator()
+func (j *Service) validate(ctx context.Context, claims *Claims) error {
+	v := jwt.NewValidator(
+		jwt.WithTimeFunc(func() time.Time {
+			return ctx.Clock().Now()
+		}),
+	)
 
-	cerr := v.Validate(claims)
-
-	if cerr == nil {
-		return nil
-	}
-
-	// TODO: this is probably wrong
-	if cerr == jwt.ErrTokenExpired {
-		return nil
-	}
-
-	return cerr
+	return v.Validate(claims)
 }
 
 // Set creates token cookie with xsrf cookie and put it to ResponseWriter
 // accepts claims and sets expiration if none defined. permanent flag means long-living cookie,
 // false makes it session only.
-func (j *Service) Set(ctx common.Context, w http.ResponseWriter, claims Claims) (Claims, error) {
+func (j *Service) Set(ctx context.Context, w http.ResponseWriter, claims Claims) (Claims, error) {
 	expiresAt, err := claims.GetExpirationTime()
 	if err != nil {
 		return Claims{}, errors.Wrap(err, "can't get expiration time")
 	}
 
 	if expiresAt == nil {
-		claims.ExpiresAt = jwt.NewNumericDate(ctx.Clock().Now().Add(j.TokenDuration))
+		claims.ExpiresAt = jwt.NewNumericDate(ctx.Clock().Now().Add(j.Config.SystemAuth.JwtTokenDuration()))
 	}
 
 	if claims.Issuer == "" {
-		claims.Issuer = j.Issuer
+		claims.Issuer = j.Config.SystemAuth.JwtIssuer()
 	}
 
-	if !j.DisableIAT {
-		claims.IssuedAt = jwt.NewNumericDate(ctx.Clock().Now())
-	}
+	claims.IssuedAt = jwt.NewNumericDate(ctx.Clock().Now())
 
 	tokenString, err := j.Token(claims)
 	if err != nil {
@@ -188,21 +180,37 @@ func (j *Service) Set(ctx common.Context, w http.ResponseWriter, claims Claims) 
 	}
 
 	if j.SendJWTHeader {
-		w.Header().Set(j.JWTHeaderKey, tokenString)
+		w.Header().Set(jwtHeaderKey, tokenString)
 		return claims, nil
 	}
 
 	cookieExpiration := 0 // session cookie
 	if !claims.SessionOnly {
-		cookieExpiration = int(j.CookieDuration.Seconds())
+		cookieExpiration = int(j.Config.SystemAuth.CookieDuration().Seconds())
 	}
 
-	jwtCookie := http.Cookie{Name: j.JWTCookieName, Value: tokenString, HttpOnly: true, Path: "/", Domain: j.JWTCookieDomain,
-		MaxAge: cookieExpiration, Secure: j.SecureCookies, SameSite: j.SameSite}
+	jwtCookie := http.Cookie{
+		Name:     jwtCookieName,
+		Value:    tokenString,
+		HttpOnly: true,
+		Path:     "/",
+		Domain:   j.Config.SystemAuth.CookieDomain,
+		MaxAge:   cookieExpiration,
+		Secure:   j.ApiHost.IsHttps(),
+		SameSite: cookieSameSite,
+	}
 	http.SetCookie(w, &jwtCookie)
 
-	xsrfCookie := http.Cookie{Name: j.XSRFCookieName, Value: claims.ID, HttpOnly: false, Path: "/", Domain: j.JWTCookieDomain,
-		MaxAge: cookieExpiration, Secure: j.SecureCookies, SameSite: j.SameSite}
+	xsrfCookie := http.Cookie{
+		Name:     xsrfCookieName,
+		Value:    claims.ID,
+		HttpOnly: false,
+		Path:     "/",
+		Domain:   j.Config.SystemAuth.CookieDomain,
+		MaxAge:   cookieExpiration,
+		Secure:   j.ApiHost.IsHttps(),
+		SameSite: cookieSameSite,
+	}
 	http.SetCookie(w, &xsrfCookie)
 
 	return claims, nil
@@ -210,32 +218,32 @@ func (j *Service) Set(ctx common.Context, w http.ResponseWriter, claims Claims) 
 
 // Get token from url, header or cookie
 // if cookie used, verify xsrf token to match
-func (j *Service) Get(ctx common.Context, r *http.Request) (Claims, string, error) {
+func (j *Service) Get(ctx context.Context, r *http.Request) (Claims, string, error) {
 
 	fromCookie := false
 	tokenString := ""
 
 	// try to get from "token" query param
-	if tkQuery := r.URL.Query().Get(j.JWTQuery); tkQuery != "" {
+	if tkQuery := r.URL.Query().Get(jwtQueryParam); tkQuery != "" {
 		tokenString = tkQuery
 	}
 
 	// try to get from JWT header
-	if tokenHeader := r.Header.Get(j.JWTHeaderKey); tokenHeader != "" && tokenString == "" {
+	if tokenHeader := r.Header.Get(jwtHeaderKey); tokenHeader != "" && tokenString == "" {
 		tokenString = tokenHeader
 	}
 
 	// try to get from JWT cookie
 	if tokenString == "" {
 		fromCookie = true
-		jc, err := r.Cookie(j.JWTCookieName)
+		jc, err := r.Cookie(jwtCookieName)
 		if err != nil {
 			return Claims{}, "", errors.Wrap(err, "token cookie was not presented")
 		}
 		tokenString = jc.Value
 	}
 
-	claims, err := j.Parse(tokenString)
+	claims, err := j.Parse(ctx, tokenString)
 	if err != nil {
 		return Claims{}, "", errors.Wrap(err, "failed to get token")
 	}
@@ -245,16 +253,12 @@ func (j *Service) Get(ctx common.Context, r *http.Request) (Claims, string, erro
 		claims.Actor.Audience = claims.Audience
 	}
 
-	if !fromCookie && j.IsExpired(ctx, claims) {
-		return Claims{}, "", errors.New("token expired")
-	}
-
-	if j.DisableXSRF {
+	if j.Config.SystemAuth.DisableXSRF {
 		return claims, tokenString, nil
 	}
 
 	if fromCookie && claims.Actor != nil {
-		xsrf := r.Header.Get(j.XSRFHeaderKey)
+		xsrf := r.Header.Get(xsrfHeaderKey)
 		if claims.ID != xsrf {
 			return Claims{}, "", errors.New("xsrf mismatch")
 		}
@@ -264,19 +268,33 @@ func (j *Service) Get(ctx common.Context, r *http.Request) (Claims, string, erro
 }
 
 // IsExpired returns true if claims expired
-func (j *Service) IsExpired(ctx common.Context, claims Claims) bool {
+func (j *Service) IsExpired(ctx context.Context, claims Claims) bool {
 	return claims.ExpiresAt != nil && claims.ExpiresAt.Before(ctx.Clock().Now())
 }
 
 // Reset token's cookies
 func (j *Service) Reset(w http.ResponseWriter) {
-	jwtCookie := http.Cookie{Name: j.JWTCookieName, Value: "", HttpOnly: false, Path: "/", Domain: j.JWTCookieDomain,
-		MaxAge: -1, Expires: time.Unix(0, 0), Secure: j.SecureCookies, SameSite: j.SameSite}
+	jwtCookie := http.Cookie{Name: jwtCookieName, Value: "", HttpOnly: false, Path: "/", Domain: j.Config.SystemAuth.CookieDomain,
+		MaxAge: -1, Expires: time.Unix(0, 0), Secure: j.ApiHost.IsHttps(), SameSite: cookieSameSite}
 	http.SetCookie(w, &jwtCookie)
 
-	xsrfCookie := http.Cookie{Name: j.XSRFCookieName, Value: "", HttpOnly: false, Path: "/", Domain: j.JWTCookieDomain,
-		MaxAge: -1, Expires: time.Unix(0, 0), Secure: j.SecureCookies, SameSite: j.SameSite}
+	xsrfCookie := http.Cookie{Name: xsrfCookieName, Value: "", HttpOnly: false, Path: "/", Domain: j.Config.SystemAuth.CookieDomain,
+		MaxAge: -1, Expires: time.Unix(0, 0), Secure: j.ApiHost.IsHttps(), SameSite: cookieSameSite}
 	http.SetCookie(w, &xsrfCookie)
+}
+
+// claimStringsVal returns a string for used in errors/logging for claims string that accounts for the fact
+// that often it will be a single string and we don't need to print an array when that is the case.
+func claimStringsVal(cs jwt.ClaimStrings) string {
+	if len(cs) == 0 {
+		return "''"
+	}
+
+	if len(cs) == 1 {
+		return cs[0]
+	}
+
+	return fmt.Sprintf("%q", cs)
 }
 
 // checkAuds verifies if claims.Audience in the list of allowed by audReader
@@ -295,7 +313,7 @@ func (j *Service) checkAuds(claims *Claims, audReader Audience) error {
 			}
 		}
 	}
-	return errors.Errorf("aud %q not allowed", claims.Audience)
+	return errors.Errorf("aud %s not allowed", claimStringsVal(claims.Audience))
 }
 
 func (c Claims) String() string {

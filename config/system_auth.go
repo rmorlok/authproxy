@@ -3,10 +3,40 @@ package config
 import (
 	"fmt"
 	"gopkg.in/yaml.v3"
+	"time"
 )
 
 type SystemAuth struct {
-	JwtSigningKey Key `json:"jwt_signing_key" yaml:"jwt_signing_key"`
+	JwtSigningKey       Key           `json:"jwt_signing_key" yaml:"jwt_signing_key"`
+	JwtIssuerVal        string        `json:"jwt_issuer" yaml:"jwt_issuer"`
+	JwtTokenDurationVal time.Duration `json:"jwt_token_duration" yaml:"jwt_token_duration"`
+	CookieDomain        string        `json:"cookie_domain" yaml:"cookie_domain"`
+	CookieDurationVal   time.Duration `json:"cookie_duration" yaml:"cookie_duration"`
+	DisableXSRF         bool          `json:"disable_xsrf" yaml:"disable_xsrf"`
+}
+
+func (sa *SystemAuth) JwtIssuer() string {
+	if sa.JwtIssuerVal == "" {
+		return "auth-proxy"
+	}
+
+	return sa.JwtIssuerVal
+}
+
+func (sa *SystemAuth) JwtTokenDuration() time.Duration {
+	if sa.JwtTokenDurationVal == 0 {
+		return 1 * time.Hour
+	}
+
+	return sa.JwtTokenDurationVal
+}
+
+func (sa *SystemAuth) CookieDuration() time.Duration {
+	if sa.CookieDurationVal == 0 {
+		return 1 * time.Hour
+	}
+
+	return sa.CookieDurationVal
 }
 
 func (sa *SystemAuth) UnmarshalYAML(value *yaml.Node) error {

@@ -5,19 +5,18 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type KeyPublicPrivate struct {
-	PublicKey  KeyData `json:"public_key" yaml:"public_key"`
-	PrivateKey KeyData `json:"private_key" yaml:"private_key"`
+type AdminUser struct {
+	Username string `json:"username" yaml:"username"`
+	Key      Key    `json:"key" yaml:"key"`
 }
 
-func (kpp *KeyPublicPrivate) UnmarshalYAML(value *yaml.Node) error {
+func (au *AdminUser) UnmarshalYAML(value *yaml.Node) error {
 	// Ensure the node is a mapping node
 	if value.Kind != yaml.MappingNode {
 		return fmt.Errorf("expected a mapping node, got %v", value.Kind)
 	}
 
-	var publicKey KeyData
-	var privateKey KeyData
+	var key Key
 
 	// Handle custom unmarshalling for some attributes. Iterate through the mapping node's content,
 	// which will be sequences of keys, then values.
@@ -29,13 +28,8 @@ func (kpp *KeyPublicPrivate) UnmarshalYAML(value *yaml.Node) error {
 		matched := false
 
 		switch keyNode.Value {
-		case "public_key":
-			if publicKey, err = keyDataUnmarshalYAML(valueNode); err != nil {
-				return err
-			}
-			matched = true
-		case "private_key":
-			if privateKey, err = keyDataUnmarshalYAML(valueNode); err != nil {
+		case "key":
+			if key, err = keyUnmarshalYAML(valueNode); err != nil {
 				return err
 			}
 			matched = true
@@ -50,23 +44,27 @@ func (kpp *KeyPublicPrivate) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	// Let the rest unmarshall normally
-	type RawType KeyPublicPrivate
-	raw := (*RawType)(kpp)
+	type RawType AdminUser
+	raw := (*RawType)(au)
 	if err := value.Decode(raw); err != nil {
 		return err
 	}
 
 	// Set the custom unmarshalled types
-	raw.PublicKey = publicKey
-	raw.PrivateKey = privateKey
+	raw.Key = key
 
 	return nil
 }
 
-func (kpp *KeyPublicPrivate) CanSign() bool {
-	return kpp.PrivateKey != nil
+func UnmarshallYamlAdminUserString(data string) (*AdminUser, error) {
+	return UnmarshallYamlAdminUser([]byte(data))
 }
 
-func (kpp *KeyPublicPrivate) CanVerifySignature() bool {
-	return kpp.PublicKey != nil
+func UnmarshallYamlAdminUser(data []byte) (*AdminUser, error) {
+	var au AdminUser
+	if err := yaml.Unmarshal(data, &au); err != nil {
+		return nil, err
+	}
+
+	return &au, nil
 }

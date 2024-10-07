@@ -7,29 +7,15 @@ type Service struct {
 
 // NewService makes an auth service
 func NewService(opts Opts) *Service {
+	if opts.Config == nil {
+		panic("Ops.Config is required")
+	}
+
+	if opts.ApiHost == nil {
+		panic("Opts.ApiHost is required")
+	}
+
 	res := Service{Opts: opts}
-
-	setDefault := func(fld *string, def string) {
-		if *fld == "" {
-			*fld = def
-		}
-	}
-
-	setDefault(&res.JWTCookieName, defaultJWTCookieName)
-	setDefault(&res.JWTHeaderKey, defaultJWTHeaderKey)
-	setDefault(&res.XSRFCookieName, defaultXSRFCookieName)
-	setDefault(&res.XSRFHeaderKey, defaultXSRFHeaderKey)
-	setDefault(&res.JWTQuery, defaultTokenQuery)
-	setDefault(&res.Issuer, defaultIssuer)
-	setDefault(&res.JWTCookieDomain, defaultJWTCookieDomain)
-
-	if opts.TokenDuration == 0 {
-		res.TokenDuration = defaultTokenDuration
-	}
-
-	if opts.CookieDuration == 0 {
-		res.CookieDuration = defaultCookieDuration
-	}
 
 	return &res
 }

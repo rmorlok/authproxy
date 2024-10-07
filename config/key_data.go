@@ -4,17 +4,17 @@ import (
 	"encoding/base64"
 	"fmt"
 	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/common"
+	"github.com/rmorlok/authproxy/context"
 	"gopkg.in/yaml.v3"
 	"os"
 )
 
 type KeyData interface {
 	// HasData checks if this value has data.
-	HasData(ctx common.Context) bool
+	HasData(ctx context.Context) bool
 
 	// GetData retrieves the bytes of the key
-	GetData(ctx common.Context) ([]byte, error)
+	GetData(ctx context.Context) ([]byte, error)
 }
 
 func UnmarshallYamlKeyDataString(data string) (Auth, error) {
@@ -76,11 +76,11 @@ type KeyDataValue struct {
 	Value string `json:"value" yaml:"value"`
 }
 
-func (kv *KeyDataValue) HasData(ctx common.Context) bool {
+func (kv *KeyDataValue) HasData(ctx context.Context) bool {
 	return len(kv.Value) > 0
 }
 
-func (kv *KeyDataValue) GetData(ctx common.Context) ([]byte, error) {
+func (kv *KeyDataValue) GetData(ctx context.Context) ([]byte, error) {
 	return []byte(kv.Value), nil
 }
 
@@ -88,11 +88,11 @@ type KeyDataBase64Val struct {
 	Base64 string `json:"base64" yaml:"base64"`
 }
 
-func (kb *KeyDataBase64Val) HasData(ctx common.Context) bool {
+func (kb *KeyDataBase64Val) HasData(ctx context.Context) bool {
 	return len(kb.Base64) > 0
 }
 
-func (kb *KeyDataBase64Val) GetData(ctx common.Context) ([]byte, error) {
+func (kb *KeyDataBase64Val) GetData(ctx context.Context) ([]byte, error) {
 	decodedBytes, err := base64.StdEncoding.DecodeString(kb.Base64)
 	if err != nil {
 		return nil, err
@@ -105,12 +105,12 @@ type KeyDataEnvVar struct {
 	EnvVar string `json:"env_var" yaml:"env_var"`
 }
 
-func (kev *KeyDataEnvVar) HasData(ctx common.Context) bool {
+func (kev *KeyDataEnvVar) HasData(ctx context.Context) bool {
 	val, present := os.LookupEnv(kev.EnvVar)
 	return present && len(val) > 0
 }
 
-func (kev *KeyDataEnvVar) GetData(ctx common.Context) ([]byte, error) {
+func (kev *KeyDataEnvVar) GetData(ctx context.Context) ([]byte, error) {
 	val, present := os.LookupEnv(kev.EnvVar)
 	if !present || len(val) == 0 {
 		return nil, errors.Errorf("environment variable '%s' does not have value", kev.EnvVar)
@@ -122,7 +122,7 @@ type KeyDataFile struct {
 	Path string `json:"path" yaml:"path"`
 }
 
-func (kf *KeyDataFile) HasData(ctx common.Context) bool {
+func (kf *KeyDataFile) HasData(ctx context.Context) bool {
 	if _, err := os.Stat(kf.Path); os.IsNotExist(err) {
 		return false
 	}
@@ -130,7 +130,7 @@ func (kf *KeyDataFile) HasData(ctx common.Context) bool {
 	return true
 }
 
-func (kf *KeyDataFile) GetData(ctx common.Context) ([]byte, error) {
+func (kf *KeyDataFile) GetData(ctx context.Context) ([]byte, error) {
 	if _, err := os.Stat(kf.Path); os.IsNotExist(err) {
 		return nil, errors.Errorf("key file '%s' does not exist", kf.Path)
 	}
