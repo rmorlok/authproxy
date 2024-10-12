@@ -5,7 +5,6 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/rmorlok/authproxy/context"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -98,53 +97,4 @@ func (j *Service) refreshExpiredToken(ctx context.Context, w http.ResponseWriter
 
 	j.logf("[DEBUG] token refreshed for %+v", claims.Actor)
 	return c, nil
-}
-
-// AdminOnly middleware allows access for admins only
-// this handler internally wrapped with auth(true) to avoid situation if AdminOnly defined without prior Auth
-func (j *Service) AdminOnly(next http.Handler) http.Handler {
-	fn := func(w http.ResponseWriter, r *http.Request) {
-		actor := GetActorInfoFromRequest(r)
-		if actor == nil {
-			http.Error(w, "Unauthorized", http.StatusUnauthorized)
-			return
-		}
-
-		if !actor.IsAdmin() {
-			http.Error(w, "Access denied", http.StatusForbidden)
-			return
-		}
-		next.ServeHTTP(w, r)
-	}
-	return j.auth(true)(http.HandlerFunc(fn)) // enforce auth
-}
-
-// RBAC middleware allows role based control for routes
-// this handler internally wrapped with auth(true) to avoid situation if RBAC defined without prior Auth
-func (j *Service) RBAC(roles ...string) func(http.Handler) http.Handler {
-
-	f := func(h http.Handler) http.Handler {
-		fn := func(w http.ResponseWriter, r *http.Request) {
-			actor := GetActorInfoFromRequest(r)
-			if actor == nil {
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				return
-			}
-
-			var matched bool
-			for _, role := range roles {
-				if strings.EqualFold(role, actor.Role) {
-					matched = true
-					break
-				}
-			}
-			if !matched {
-				http.Error(w, "Access denied", http.StatusForbidden)
-				return
-			}
-			h.ServeHTTP(w, r)
-		}
-		return j.auth(true)(http.HandlerFunc(fn)) // enforce auth
-	}
-	return f
 }

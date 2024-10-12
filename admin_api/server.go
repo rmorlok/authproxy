@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/api_common"
+	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"net/http"
 	"time"
@@ -29,7 +30,8 @@ func rateErrorHandler(c *gin.Context, info ratelimit.Info) {
 //}
 
 func GetGinServer(cfg config.Config) *gin.Engine {
-	authService := GetAuthService()
+	authService := auth.StandardAuthService(cfg.GetRoot(), &cfg.GetRoot().AdminApi)
+
 	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
 		Rate:  1 * time.Minute,
 		Limit: 3,
@@ -57,12 +59,7 @@ func GetGinServer(cfg config.Config) *gin.Engine {
 		})
 	})
 
-	// setup auth routes
-	//router.GET("/login", authService.LoginHandler())
-	//router.GET("/auth/*auth", authService.AuthHandler())
-	//router.GET("/avatar", authService.Optional(), authService.AvatarHandler())
-
-	api := router.Group("/api", authService.Required())
+	api := router.Group("/api", authService.AdminOnly())
 	{
 		mw := ratelimit.RateLimiter(rlstore, &ratelimit.Options{
 			ErrorHandler: rateErrorHandler,
