@@ -350,3 +350,8 @@ type AudienceFunc func() ([]string, error)
 func (f AudienceFunc) Get() ([]string, error) {
 	return f()
 }
+
+// ClaimsString converts a singular string into a claims string.
+func ClaimString(s string) jwt.ClaimStrings {
+	return jwt.ClaimStrings{s}
+}
