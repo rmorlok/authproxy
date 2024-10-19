@@ -1,0 +1,81 @@
+package config
+
+import (
+	"github.com/stretchr/testify/require"
+	"testing"
+)
+
+func TestSystemAuth(t *testing.T) {
+	assert := require.New(t)
+
+	t.Run("yaml parse", func(t *testing.T) {
+		t.Run("admin users path", func(t *testing.T) {
+			data := `
+  cookie_domain: localhost:8080
+  jwt_signing_key:
+    public_key:
+      path: ./dev_config/keys/system.pub
+    private_key:
+      path: ./dev_config/keys/system
+  admin_users:
+    keys_path: ./dev_config/keys/admin
+`
+			expected := &SystemAuth{
+				CookieDomain: "localhost:8080",
+				JwtSigningKey: &KeyPublicPrivate{
+					PublicKey: &KeyDataFile{
+						Path: "./dev_config/keys/system.pub",
+					},
+					PrivateKey: &KeyDataFile{
+						Path: "./dev_config/keys/system",
+					},
+				},
+				AdminUsers: &AdminUsersExternalSource{
+					KeysPath: "./dev_config/keys/admin",
+				},
+			}
+
+			sa, err := UnmarshallYamlSystemAuthString(data)
+			assert.NoError(err)
+			assert.Equal(expected, sa)
+		})
+		t.Run("admin users list", func(t *testing.T) {
+			data := `
+  cookie_domain: localhost:8080
+  jwt_signing_key:
+    public_key:
+      path: ./dev_config/keys/system.pub
+    private_key:
+      path: ./dev_config/keys/system
+  admin_users:
+    - username: bobdole
+      key: ./dev_config/keys/admin/bobdole.pub
+`
+			expected := &SystemAuth{
+				CookieDomain: "localhost:8080",
+				JwtSigningKey: &KeyPublicPrivate{
+					PublicKey: &KeyDataFile{
+						Path: "./dev_config/keys/system.pub",
+					},
+					PrivateKey: &KeyDataFile{
+						Path: "./dev_config/keys/system",
+					},
+				},
+				AdminUsers: &AdminUsersList{
+					&AdminUser{
+						Username: "bobdole",
+						Key: &KeyPublicPrivate{
+							PublicKey: &KeyDataFile{
+								Path: "./dev_config/keys/admin/bobdole.pub",
+							},
+						},
+					},
+				},
+			}
+
+			sa, err := UnmarshallYamlSystemAuthString(data)
+			assert.NoError(err)
+			assert.Equal(expected, sa)
+		})
+	})
+}

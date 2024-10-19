@@ -7,12 +7,12 @@ import (
 
 // RefreshCache defines interface storing and retrieving refreshed tokens
 type RefreshCache interface {
-	Get(key string) (value Claims, ok bool)
-	Set(key string, value Claims)
+	Get(key string) (value JwtTokenClaims, ok bool)
+	Set(key string, value JwtTokenClaims)
 }
 
 type memoryRefreshCache struct {
-	data map[string]Claims
+	data map[string]JwtTokenClaims
 	sync.RWMutex
 	hits, misses int32
 }
@@ -22,10 +22,10 @@ func NewMemoryRefreshCache() RefreshCache {
 }
 
 func newMemoryRefreshCache() *memoryRefreshCache {
-	return &memoryRefreshCache{data: make(map[string]Claims)}
+	return &memoryRefreshCache{data: make(map[string]JwtTokenClaims)}
 }
 
-func (c *memoryRefreshCache) Get(key string) (value Claims, ok bool) {
+func (c *memoryRefreshCache) Get(key string) (value JwtTokenClaims, ok bool) {
 	c.RLock()
 	defer c.RUnlock()
 	value, ok = c.data[key]
@@ -37,7 +37,7 @@ func (c *memoryRefreshCache) Get(key string) (value Claims, ok bool) {
 	return value, ok
 }
 
-func (c *memoryRefreshCache) Set(key string, value Claims) {
+func (c *memoryRefreshCache) Set(key string, value JwtTokenClaims) {
 	c.Lock()
 	defer c.Unlock()
 	c.data[key] = value

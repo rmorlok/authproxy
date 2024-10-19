@@ -41,7 +41,7 @@ func cmdSignJwt() *cobra.Command {
 				return err
 			}
 
-			print(token)
+			fmt.Print(token)
 
 			return nil
 		},

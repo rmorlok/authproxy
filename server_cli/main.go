@@ -14,7 +14,7 @@ import (
 )
 
 var cfgFile string
-var cfg config.Config
+var cfg config.C
 
 func loadConfig() error {
 	if cfgFile == "" {
@@ -32,7 +32,7 @@ func loadConfig() error {
 
 func runServices(noBanner bool, servicesList string) error {
 	services := strings.Split(servicesList, ",")
-	servers := make([]func(cfg config.Config), 0, len(services))
+	servers := make([]func(cfg config.C), 0, len(services))
 
 	if len(services) == 0 {
 		return errors.New("no services provided")
@@ -53,7 +53,7 @@ func runServices(noBanner bool, servicesList string) error {
 	wg := new(sync.WaitGroup)
 	for _, server := range servers {
 		wg.Add(1)
-		go func(server func(cfg config.Config)) {
+		go func(server func(cfg config.C)) {
 			defer wg.Done()
 			server(cfg)
 		}(server)

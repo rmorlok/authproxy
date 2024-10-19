@@ -13,6 +13,7 @@ type SystemAuth struct {
 	CookieDomain        string        `json:"cookie_domain" yaml:"cookie_domain"`
 	CookieDurationVal   time.Duration `json:"cookie_duration" yaml:"cookie_duration"`
 	DisableXSRF         bool          `json:"disable_xsrf" yaml:"disable_xsrf"`
+	AdminUsers          AdminUsers    `json:"admin_users" yaml:"admin_users"`
 }
 
 func (sa *SystemAuth) JwtIssuer() string {
@@ -46,6 +47,7 @@ func (sa *SystemAuth) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	var jwtSigngingKey Key
+	var adminUsers AdminUsers
 
 	// Handle custom unmarshalling for some attributes. Iterate through the mapping node's content,
 	// which will be sequences of keys, then values.
@@ -59,6 +61,11 @@ func (sa *SystemAuth) UnmarshalYAML(value *yaml.Node) error {
 		switch keyNode.Value {
 		case "jwt_signing_key":
 			if jwtSigngingKey, err = keyUnmarshalYAML(valueNode); err != nil {
+				return err
+			}
+			matched = true
+		case "admin_users":
+			if adminUsers, err = adminUsersUnmarshalYAML(valueNode); err != nil {
 				return err
 			}
 			matched = true
@@ -81,6 +88,19 @@ func (sa *SystemAuth) UnmarshalYAML(value *yaml.Node) error {
 
 	// Set the custom unmarshalled types
 	raw.JwtSigningKey = jwtSigngingKey
+	raw.AdminUsers = adminUsers
 
 	return nil
+}
+func UnmarshallYamlSystemAuthString(data string) (*SystemAuth, error) {
+	return UnmarshallYamlSystemAuth([]byte(data))
+}
+
+func UnmarshallYamlSystemAuth(data []byte) (*SystemAuth, error) {
+	var systemAuth SystemAuth
+	if err := yaml.Unmarshal(data, &systemAuth); err != nil {
+		return nil, err
+	}
+
+	return &systemAuth, nil
 }

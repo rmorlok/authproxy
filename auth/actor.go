@@ -78,12 +78,30 @@ func (a *Actor) StrAttr(key string) string {
 
 // IsAdmin is a helper to wrap the Admin attribute
 func (a *Actor) IsAdmin() bool {
+	if a == nil {
+		return false
+	}
+
 	return a.Admin
 }
 
-// IsSuperAdmin is a helper to wrap the SuuperAdmin attribute
+// IsSuperAdmin is a helper to wrap the SuperAdmin attribute
 func (a *Actor) IsSuperAdmin() bool {
+	if a == nil {
+		return false
+	}
+
 	return a.SuperAdmin
+}
+
+// IsNormalActor indicates that an actor is not an admin or superadmin
+func (a *Actor) IsNormalActor() bool {
+	if a == nil {
+		// actors default to normal
+		return true
+	}
+
+	return !a.IsSuperAdmin() && !a.IsAdmin()
 }
 
 // SliceAttr gets slice attribute

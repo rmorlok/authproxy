@@ -4,14 +4,11 @@ system_auth:
   cookie_domain: localhost:8080
   jwt_signing_key:
     public_key:
-      path: ./foo.pem
+      path: ./dev_config/keys/system.pub
     private_key:
-      path: ./foo.pem
+      path: ./dev_config/keys/system
   admin_users:
-    - username: rmorlok
-      key:
-        public_key:
-          path: /Users/rmorlok/.ssh/id_rsa.pub
+    keys_path: ./dev_config/keys/admin
 integrations:
   - id: google-drive
     version: 1

@@ -2,7 +2,6 @@ package auth
 
 import (
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
 	"github.com/stretchr/testify/assert"
@@ -38,45 +37,21 @@ func mockKeyStore(aud string) (string, error) {
 }
 
 func TestJWT_Token(t *testing.T) {
-	cfg := testConfig
+	cfg := config.ConfigFromRoot(&testConfig)
 	j := NewService(Opts{
-		SecretReader: SecretFunc(mockKeyStore),
-		ClaimsUpd: ClaimsUpdFunc(func(claims Claims) Claims {
-			claims.Actor.SetStrAttr("stra", "stra-val")
-			claims.Actor.SetBoolAttr("boola", true)
-			return claims
-		}),
-		Config:  &cfg,
-		ApiHost: &cfg.AdminApi,
+		Config:    cfg,
+		ServiceId: config.ServiceIdAdminApi,
 	})
 
 	claims := testClaims
 	res, err := j.Token(claims)
 	assert.Nil(t, err)
 	assert.Equal(t, testJwtValid, res)
-
-	j.SecretReader = nil
-	_, err = j.Token(claims)
-	assert.EqualError(t, err, "secret reader not defined")
-
-	j.SecretReader = SecretFunc(func(string) (string, error) { return "", errors.New("err blah") })
-	_, err = j.Token(claims)
-	assert.EqualError(t, err, "can't get secret: err blah")
-
-	j.SecretReader = SecretFunc(mockKeyStore)
-	j.AudienceReader = AudienceFunc(func() ([]string, error) { return []string{"a1", "aa2"}, nil })
-	_, err = j.Token(claims)
-	assert.EqualError(t, err, `aud rejected: aud test_sys not allowed`)
-
-	j.AudienceReader = AudienceFunc(func() ([]string, error) { return []string{"a1", "test_sys", "aa2"}, nil })
-	_, err = j.Token(claims)
-	assert.NoError(t, err, "aud test_sys allowed")
-
 }
 
 func TestJWT_Parse(t *testing.T) {
-	cfg := testConfig
-	j := NewService(Opts{SecretReader: SecretFunc(mockKeyStore), Config: &cfg, ApiHost: &cfg.AdminApi})
+	cfg := config.ConfigFromRoot(&testConfig)
+	j := NewService(Opts{Config: cfg, ServiceId: config.ServiceIdAdminApi})
 	claims, err := j.Parse(testContext, testJwtValid)
 	assert.NoError(t, err)
 	assert.False(t, j.IsExpired(testContext, claims))
@@ -99,17 +74,15 @@ func TestJWT_Parse(t *testing.T) {
 	assert.EqualError(t, err, "can't parse token: token is unverifiable: error while executing keyfunc: unexpected signing method: none")
 
 	j = NewService(Opts{
-		SecretReader: SecretFunc(func(string) (string, error) { return "bad 12345", nil }),
-		Config:       &cfg,
-		ApiHost:      &cfg.AdminApi,
+		Config:    cfg,
+		ServiceId: config.ServiceIdAdminApi,
 	})
 	_, err = j.Parse(testContext, testJwtValid)
 	assert.NotNil(t, err, "bad token", "valid token parsed with wrong secret")
 
 	j = NewService(Opts{
-		SecretReader: SecretFunc(func(string) (string, error) { return "", errors.New("err blah") }),
-		Config:       &cfg,
-		ApiHost:      &cfg.AdminApi,
+		Config:    cfg,
+		ServiceId: config.ServiceIdAdminApi,
 	})
 	_, err = j.Parse(testContext, testJwtValid)
 	assert.EqualError(t, err, "can't get secret: err blah")
@@ -117,16 +90,11 @@ func TestJWT_Parse(t *testing.T) {
 }
 
 func TestJWT_Set(t *testing.T) {
-	cfg := testConfig
+	cfg := config.ConfigFromRoot(&testConfig)
 
-	j := NewService(Opts{SecretReader: SecretFunc(mockKeyStore),
-		ClaimsUpd: ClaimsUpdFunc(func(claims Claims) Claims {
-			claims.Actor.SetStrAttr("stra", "stra-val")
-			claims.Actor.SetBoolAttr("boola", true)
-			return claims
-		}),
-		Config:  &cfg,
-		ApiHost: &cfg.AdminApi,
+	j := NewService(Opts{
+		Config:    cfg,
+		ServiceId: config.ServiceIdAdminApi,
 	})
 
 	claims := testClaims
@@ -172,15 +140,9 @@ func TestJWT_Set(t *testing.T) {
 }
 
 func TestJWT_SetWithDomain(t *testing.T) {
-	cfg := testConfig
-	j := NewService(Opts{SecretReader: SecretFunc(mockKeyStore),
-		ClaimsUpd: ClaimsUpdFunc(func(claims Claims) Claims {
-			claims.Actor.SetStrAttr("stra", "stra-val")
-			claims.Actor.SetBoolAttr("boola", true)
-			return claims
-		}),
-		Config:  &cfg,
-		ApiHost: &cfg.AdminApi,
+	cfg := config.ConfigFromRoot(&testConfig)
+	j := NewService(Opts{
+		Config: cfg,
 	})
 
 	claims := testClaims
@@ -202,17 +164,11 @@ func TestJWT_SetWithDomain(t *testing.T) {
 }
 
 func TestJWT_SendJWTHeader(t *testing.T) {
-	cfg := testConfig
+	cfg := config.ConfigFromRoot(&testConfig)
 	j := NewService(Opts{
-		SecretReader: SecretFunc(mockKeyStore),
-		ClaimsUpd: ClaimsUpdFunc(func(claims Claims) Claims {
-			claims.Actor.SetStrAttr("stra", "stra-val")
-			claims.Actor.SetBoolAttr("boola", true)
-			return claims
-		}),
 		SendJWTHeader: true,
-		Config:        &cfg,
-		ApiHost:       &cfg.AdminApi,
+		Config:        cfg,
+		ServiceId:     config.ServiceIdAdminApi,
 	})
 
 	rr := httptest.NewRecorder()
@@ -225,15 +181,10 @@ func TestJWT_SendJWTHeader(t *testing.T) {
 }
 
 func TestJWT_SetProlonged(t *testing.T) {
-	cfg := testConfig
-	j := NewService(Opts{SecretReader: SecretFunc(mockKeyStore),
-		ClaimsUpd: ClaimsUpdFunc(func(claims Claims) Claims {
-			claims.Actor.SetStrAttr("stra", "stra-val")
-			claims.Actor.SetBoolAttr("boola", true)
-			return claims
-		}),
-		Config:  &cfg,
-		ApiHost: &cfg.AdminApi,
+	cfg := config.ConfigFromRoot(&testConfig)
+	j := NewService(Opts{
+		Config:    cfg,
+		ServiceId: config.ServiceIdAdminApi,
 	})
 
 	claims := testClaims
@@ -252,15 +203,9 @@ func TestJWT_SetProlonged(t *testing.T) {
 }
 
 func TestJWT_NoIssuer(t *testing.T) {
-	cfg := testConfig
-	j := NewService(Opts{SecretReader: SecretFunc(mockKeyStore),
-		ClaimsUpd: ClaimsUpdFunc(func(claims Claims) Claims {
-			claims.Actor.SetStrAttr("stra", "stra-val")
-			claims.Actor.SetBoolAttr("boola", true)
-			return claims
-		}),
-		Config:  &cfg,
-		ApiHost: &cfg.AdminApi,
+	cfg := config.ConfigFromRoot(&testConfig)
+	j := NewService(Opts{
+		Config: cfg,
 	})
 
 	claims := testClaims
@@ -279,15 +224,9 @@ func TestJWT_NoIssuer(t *testing.T) {
 }
 
 func TestJWT_GetFromHeader(t *testing.T) {
-	cfg := testConfig
-	j := NewService(Opts{SecretReader: SecretFunc(mockKeyStore),
-		ClaimsUpd: ClaimsUpdFunc(func(claims Claims) Claims {
-			claims.Actor.SetStrAttr("stra", "stra-val")
-			claims.Actor.SetBoolAttr("boola", true)
-			return claims
-		}),
-		Config:  &cfg,
-		ApiHost: &cfg.AdminApi,
+	cfg := config.ConfigFromRoot(&testConfig)
+	j := NewService(Opts{
+		Config: cfg,
 	})
 
 	req := httptest.NewRequest("GET", "/", nil)
@@ -314,15 +253,9 @@ func TestJWT_GetFromHeader(t *testing.T) {
 }
 
 func TestJWT_GetFromQuery(t *testing.T) {
-	cfg := testConfig
-	j := NewService(Opts{SecretReader: SecretFunc(mockKeyStore),
-		ClaimsUpd: ClaimsUpdFunc(func(claims Claims) Claims {
-			claims.Actor.SetStrAttr("stra", "stra-val")
-			claims.Actor.SetBoolAttr("boola", true)
-			return claims
-		}),
-		Config:  &cfg,
-		ApiHost: &cfg.AdminApi,
+	cfg := config.ConfigFromRoot(&testConfig)
+	j := NewService(Opts{
+		Config: cfg,
 	})
 
 	req := httptest.NewRequest("GET", "/blah?jwt="+testJwtValid, nil)
@@ -346,23 +279,17 @@ func TestJWT_GetFromQuery(t *testing.T) {
 }
 
 func TestJWT_GetFailed(t *testing.T) {
-	cfg := testConfig
-	j := NewService(Opts{SecretReader: SecretFunc(mockKeyStore), Config: &cfg, ApiHost: &cfg.AdminApi})
+	cfg := config.ConfigFromRoot(&testConfig)
+	j := NewService(Opts{Config: &cfg, ApiHost: &cfg.AdminApi})
 	req := httptest.NewRequest("GET", "/", nil)
 	_, _, err := j.Get(testContext, req)
 	assert.Error(t, err, "token cookie was not presented")
 }
 
 func TestJWT_SetAndGetWithCookies(t *testing.T) {
-	cfg := testConfig
-	j := NewService(Opts{SecretReader: SecretFunc(mockKeyStore),
-		ClaimsUpd: ClaimsUpdFunc(func(claims Claims) Claims {
-			claims.Actor.SetStrAttr("stra", "stra-val")
-			claims.Actor.SetBoolAttr("boola", true)
-			return claims
-		}),
-		Config:  &cfg,
-		ApiHost: &cfg.AdminApi,
+	cfg := config.ConfigFromRoot(&testConfig)
+	j := NewService(Opts{
+		Config: cfg,
 	})
 
 	claims := testClaims
@@ -395,15 +322,9 @@ func TestJWT_SetAndGetWithCookies(t *testing.T) {
 }
 
 func TestJWT_SetAndGetWithXsrfMismatch(t *testing.T) {
-	cfg := testConfig
-	j := NewService(Opts{SecretReader: SecretFunc(mockKeyStore),
-		ClaimsUpd: ClaimsUpdFunc(func(claims Claims) Claims {
-			claims.Actor.SetStrAttr("stra", "stra-val")
-			claims.Actor.SetBoolAttr("boola", true)
-			return claims
-		}),
-		Config:  &cfg,
-		ApiHost: &cfg.AdminApi,
+	cfg := config.ConfigFromRoot(&testConfig)
+	j := NewService(Opts{
+		Config: cfg,
 	})
 
 	claims := testClaims
@@ -427,7 +348,7 @@ func TestJWT_SetAndGetWithXsrfMismatch(t *testing.T) {
 	_, _, err = j.Get(testContext, req)
 	assert.EqualError(t, err, "xsrf mismatch")
 
-	cfg.SystemAuth.DisableXSRF = true
+	cfg.GetRoot().SystemAuth.DisableXSRF = true
 	req = httptest.NewRequest("GET", "/valid", nil)
 	req.AddCookie(resp.Cookies()[0])
 	req.Header.Add(xsrfHeaderKey, "random id wrong")
@@ -444,15 +365,9 @@ func TestJWT_SetAndGetWithXsrfMismatch(t *testing.T) {
 }
 
 func TestJWT_SetAndGetWithCookiesExpired(t *testing.T) {
-	cfg := testConfig
-	j := NewService(Opts{SecretReader: SecretFunc(mockKeyStore),
-		ClaimsUpd: ClaimsUpdFunc(func(claims Claims) Claims {
-			claims.Actor.SetStrAttr("stra", "stra-val")
-			claims.Actor.SetBoolAttr("boola", true)
-			return claims
-		}),
-		Config:  &cfg,
-		ApiHost: &cfg.AdminApi,
+	cfg := config.ConfigFromRoot(&testConfig)
+	j := NewService(Opts{
+		Config: cfg,
 	})
 
 	claims := testClaims
@@ -482,8 +397,8 @@ func TestJWT_SetAndGetWithCookiesExpired(t *testing.T) {
 }
 
 func TestJWT_Reset(t *testing.T) {
-	cfg := testConfig
-	j := NewService(Opts{SecretReader: SecretFunc(mockKeyStore), Config: &cfg, ApiHost: &cfg.AdminApi})
+	cfg := config.ConfigFromRoot(&testConfig)
+	j := NewService(Opts{Config: cfg})
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/valid" {
@@ -502,11 +417,11 @@ func TestJWT_Reset(t *testing.T) {
 }
 
 func TestJWT_Validator(t *testing.T) {
-	ch := ValidatorFunc(func(token string, claims Claims) bool {
+	ch := ValidatorFunc(func(token string, claims JwtTokenClaims) bool {
 		return token == "good"
 	})
-	assert.True(t, ch.Validate("good", Claims{}))
-	assert.False(t, ch.Validate("bad", Claims{}))
+	assert.True(t, ch.Validate("good", JwtTokenClaims{}))
+	assert.False(t, ch.Validate("bad", JwtTokenClaims{}))
 }
 
 func TestClaims_String(t *testing.T) {
@@ -519,48 +434,9 @@ func TestClaims_String(t *testing.T) {
 	assert.True(t, strings.Contains(s, `"user":`))
 }
 
-func TestAudience(t *testing.T) {
-	cfg := testConfig
-	j := NewService(Opts{SecretReader: SecretFunc(mockKeyStore), Config: &cfg, ApiHost: &cfg.AdminApi})
-
-	c := Claims{
-		RegisteredClaims: jwt.RegisteredClaims{
-			Audience: []string{"au1"},
-			Issuer:   "test iss",
-		},
-	}
-
-	assert.NoError(t, j.checkAuds(&c, nil), "any aud allowed")
-
-	err := j.checkAuds(&c, AudienceFunc(func() ([]string, error) { return []string{"xxx", "yyy"}, nil }))
-	assert.EqualError(t, err, `aud au1 not allowed`)
-
-	err = j.checkAuds(&c, AudienceFunc(func() ([]string, error) { return []string{"xxx", "yyy", "au1"}, nil }))
-	assert.Nil(t, err, `au1 allowed`)
-}
-
-func TestAudReader(t *testing.T) {
-	cfg := testConfig
-	j := NewService(Opts{SecretReader: SecretFunc(mockKeyStore), AudSecrets: true, Config: &cfg, ApiHost: &cfg.AdminApi})
-
-	a, err := j.aud(testJwtValid)
-	require.NoError(t, err)
-	assert.Equal(t, []string{"test_sys"}, a)
-
-	a, err = j.aud(testJwtBadSign)
-	require.NoError(t, err)
-	assert.Equal(t, []string{"test_sys"}, a)
-
-	_, err = j.aud(testJwtNoAud)
-	assert.EqualError(t, err, "empty aud")
-
-	_, err = j.aud("blah bad bad")
-	assert.EqualError(t, err, "can't pre-parse token: token is malformed: token contains an invalid number of segments")
-}
-
 func TestParseWithAud(t *testing.T) {
-	cfg := testConfig
-	j := NewService(Opts{SecretReader: SecretFunc(mockKeyStore), AudSecrets: true, Config: &cfg, ApiHost: &cfg.AdminApi})
+	cfg := config.ConfigFromRoot(&testConfig)
+	j := NewService(Opts{AudSecrets: true, Config: cfg, ServiceId: config.ServiceIdAdminApi})
 
 	claims, err := j.Parse(testContext, testJwtValid)
 	assert.NoError(t, err)
@@ -576,9 +452,19 @@ func TestParseWithAud(t *testing.T) {
 	assert.EqualError(t, err, "can't parse token: token signature is invalid: signature is invalid")
 }
 
+func TestExtractTokenFromBearer(t *testing.T) {
+	tok, err := extractTokenFromBearer("Bearer foo")
+	assert.NoError(t, err)
+	assert.Equal(t, "foo", tok)
+
+	tok, err = extractTokenFromBearer("Bearer ")
+	assert.NoError(t, err)
+	assert.Equal(t, "", tok)
+}
+
 var testContext = context.Background().WithClock(test_clock.NewFakeClock(time.Date(2024, 10, 1, 0, 0, 0, 0, time.UTC)))
 
-var testClaims = Claims{
+var testClaims = JwtTokenClaims{
 	RegisteredClaims: jwt.RegisteredClaims{
 		ID:        "random id",
 		Issuer:    "remark42",

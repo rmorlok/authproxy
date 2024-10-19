@@ -29,8 +29,8 @@ func rateErrorHandler(c *gin.Context, info ratelimit.Info) {
 //	return config
 //}
 
-func GetGinServer(cfg config.Config) *gin.Engine {
-	authService := auth.StandardAuthService(cfg.GetRoot(), &cfg.GetRoot().AdminApi)
+func GetGinServer(cfg config.C) *gin.Engine {
+	authService := auth.StandardAuthService(cfg, config.ServiceIdAdminApi)
 
 	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
 		Rate:  1 * time.Minute,
@@ -72,7 +72,7 @@ func GetGinServer(cfg config.Config) *gin.Engine {
 	return router
 }
 
-func Serve(cfg config.Config) {
+func Serve(cfg config.C) {
 	if !cfg.IsDebugMode() {
 		gin.SetMode(gin.ReleaseMode)
 	}

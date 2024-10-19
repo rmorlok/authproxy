@@ -3,6 +3,7 @@ package auth
 import (
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/context"
 	"net/http"
 	"time"
@@ -49,12 +50,6 @@ func (j *Service) auth(reqAuth bool) func(http.Handler) http.Handler {
 			}
 
 			if claims.Actor != nil { // if uinfo in token populate it to context
-				// validator passed by client and performs check on token or/and claims
-				if j.Validator != nil && !j.Validator.Validate(tkn, claims) {
-					onError(h, w, r, fmt.Errorf("actor %s blocked", claims.Actor.ID))
-					j.Reset(w)
-					return
-				}
 
 				if j.IsExpired(ctx, claims) {
 					if claims, err = j.refreshExpiredToken(ctx, w, claims, tkn); err != nil {
@@ -75,24 +70,27 @@ func (j *Service) auth(reqAuth bool) func(http.Handler) http.Handler {
 }
 
 // refreshExpiredToken makes a new token with passed claims
-func (j *Service) refreshExpiredToken(ctx context.Context, w http.ResponseWriter, claims Claims, tkn string) (Claims, error) {
+func (j *Service) refreshExpiredToken(ctx context.Context, w http.ResponseWriter, claims *JwtTokenClaims, tkn string) (*JwtTokenClaims, error) {
+	if claims.IsAdmin() || claims.IsSuperAdmin() {
+		return nil, errors.New("cannot refresh admin tokens")
+	}
 
 	// cache refreshed claims for given token in order to eliminate multiple refreshes for concurrent requests
 	if j.RefreshCache != nil {
 		if c, ok := j.RefreshCache.Get(tkn); ok {
 			// already in cache
-			return c, nil
+			return &c, nil
 		}
 	}
 
 	claims.ExpiresAt = jwt.NewNumericDate(time.Time{}) // this will cause now+duration for refreshed token
 	c, err := j.Set(ctx, w, claims)                    // Set changes token
 	if err != nil {
-		return Claims{}, err
+		return nil, err
 	}
 
 	if j.RefreshCache != nil {
-		j.RefreshCache.Set(tkn, c)
+		j.RefreshCache.Set(tkn, *c)
 	}
 
 	j.logf("[DEBUG] token refreshed for %+v", claims.Actor)

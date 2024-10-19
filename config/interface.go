@@ -2,9 +2,10 @@ package config
 
 import "os"
 
-type Config interface {
+type C interface {
 	GetRoot() *Root
 	IsDebugMode() bool
+	MustApiHostForService(serviceName ServiceId) *ApiHost
 }
 
 type config struct {
@@ -12,14 +13,27 @@ type config struct {
 }
 
 func (c *config) GetRoot() *Root {
+	if c == nil {
+		return nil
+	}
+
 	return c.root
+}
+
+func (c *config) MustApiHostForService(serviceName ServiceId) *ApiHost {
+	r := c.GetRoot()
+	if r == nil {
+		panic("root config not present")
+	}
+
+	return r.MustApiHostForService(serviceName)
 }
 
 func (c *config) IsDebugMode() bool {
 	return os.Getenv("AUTHPROXY_DEBUG_MODE") == "true"
 }
 
-func LoadConfig(path string) (Config, error) {
+func LoadConfig(path string) (C, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
 		return nil, err
@@ -31,4 +45,8 @@ func LoadConfig(path string) (Config, error) {
 	}
 
 	return &config{root: root}, nil
+}
+
+func ConfigFromRoot(root *Root) C {
+	return &config{root: root}
 }

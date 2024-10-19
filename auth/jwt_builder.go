@@ -22,10 +22,10 @@ type JwtBuilder interface {
 	WithActorEmail(email string) JwtBuilder
 	WithActorId(id string) JwtBuilder
 	WithSessionOnly() JwtBuilder
-	BuildCtx(context.Context) (*Claims, error)
-	Build() (*Claims, error)
-	MustBuild() Claims
-	MustBuildCtx(context.Context) Claims
+	BuildCtx(context.Context) (*JwtTokenClaims, error)
+	Build() (*JwtTokenClaims, error)
+	MustBuild() JwtTokenClaims
+	MustBuildCtx(context.Context) JwtTokenClaims
 }
 
 type jwtBuilder struct {
@@ -91,7 +91,7 @@ func (b *jwtBuilder) WithSessionOnly() JwtBuilder {
 	return b
 }
 
-func (b *jwtBuilder) BuildCtx(ctx context.Context) (*Claims, error) {
+func (b *jwtBuilder) BuildCtx(ctx context.Context) (*JwtTokenClaims, error) {
 	if util.CoerceBool(b.admin) && util.CoerceBool(b.superAdmin) {
 		return nil, errors.New("cannot be both an admin and superadmin")
 	}
@@ -108,7 +108,7 @@ func (b *jwtBuilder) BuildCtx(ctx context.Context) (*Claims, error) {
 		b.id = util.ToPtr(fmt.Sprintf("admin/%s", *b.id))
 	}
 
-	c := Claims{
+	c := JwtTokenClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:  util.CoerceString(b.id),
 			IssuedAt: &jwt.NumericDate{ctx.Clock().Now()},
@@ -138,11 +138,11 @@ func (b *jwtBuilder) BuildCtx(ctx context.Context) (*Claims, error) {
 	return &c, nil
 }
 
-func (b *jwtBuilder) Build() (*Claims, error) {
+func (b *jwtBuilder) Build() (*JwtTokenClaims, error) {
 	return b.BuildCtx(context.Background())
 }
 
-func (b *jwtBuilder) MustBuildCtx(ctx context.Context) Claims {
+func (b *jwtBuilder) MustBuildCtx(ctx context.Context) JwtTokenClaims {
 	c, err := b.BuildCtx(ctx)
 	if err != nil {
 		panic(err)
@@ -151,7 +151,7 @@ func (b *jwtBuilder) MustBuildCtx(ctx context.Context) Claims {
 	return *c
 }
 
-func (b *jwtBuilder) MustBuild() Claims {
+func (b *jwtBuilder) MustBuild() JwtTokenClaims {
 	return b.MustBuildCtx(context.Background())
 }
 

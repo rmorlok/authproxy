@@ -5,7 +5,7 @@ import (
 	"github.com/rmorlok/authproxy/logger"
 )
 
-// Auth service that wraps operations for validating JWTs from both headers and cookies.
+// Service service that wraps operations for validating JWTs from both headers and cookies.
 type Service struct {
 	Opts
 }
@@ -16,8 +16,8 @@ func NewService(opts Opts) *Service {
 		panic("Ops.Config is required")
 	}
 
-	if opts.ApiHost == nil {
-		panic("Opts.ApiHost is required")
+	if opts.ServiceId == "" {
+		panic("Opts.ServiceId is required")
 	}
 
 	res := Service{Opts: opts}
@@ -25,14 +25,11 @@ func NewService(opts Opts) *Service {
 	return &res
 }
 
-func StandardAuthService(cfg *config.Root, apiHost *config.ApiHost) *Service {
+func StandardAuthService(cfg config.C, serviceId config.ServiceId) *Service {
 	return NewService(Opts{
-		Config:  cfg,
-		ApiHost: apiHost,
-		SecretReader: SecretFunc(func(id string) (string, error) { // secret key for JWT
-			return "some-secret", nil
-		}),
-		Logger: logger.Std,
+		Config:    cfg,
+		ServiceId: serviceId,
+		Logger:    logger.Std,
 	})
 }
 
@@ -42,4 +39,8 @@ func (s *Service) logf(format string, args ...interface{}) {
 	}
 
 	s.Opts.Logger.Logf(format, args...)
+}
+
+func (s *Service) apiHost() *config.ApiHost {
+	return s.Config.MustApiHostForService(s.ServiceId)
 }
