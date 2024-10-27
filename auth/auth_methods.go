@@ -73,7 +73,7 @@ func (s *Service) Token(ctx context.Context, claims *JwtTokenClaims) (string, er
 	}
 
 	if !key.CanSign() {
-		return "", errors.New("key cannot to sign tokens")
+		return "", errors.New("key cannot be used to sign tokens")
 	}
 
 	keyData := signingKeyData(key)
@@ -96,45 +96,6 @@ func (s *Service) Token(ctx context.Context, claims *JwtTokenClaims) (string, er
 
 // Parse token string and verify.
 func (s *Service) Parse(ctx context.Context, tokenString string) (*JwtTokenClaims, error) {
-	unverifiedParser := jwt.NewParser(
-		jwt.WithTimeFunc(func() time.Time {
-			return ctx.Clock().Now()
-		}),
-	)
-
-	unverified, err := unverifiedParser.ParseWithClaims(tokenString, &JwtTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
-		// Return nil since no signature verification is done
-		return nil, nil
-	})
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to parse token")
-	}
-
-	unverifiedClaims, ok := unverified.Claims.(*JwtTokenClaims)
-	if !ok {
-		return nil, errors.New("invalid token")
-	}
-
-	key, err := s.keyForToken(unverifiedClaims)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get key")
-	}
-
-	if !key.CanSign() {
-		return nil, errors.New("key cannot to sign tokens")
-	}
-
-	keyData := verificationKeyData(key)
-
-	if !keyData.HasData(ctx) {
-		return nil, errors.New("no data found in signing key")
-	}
-
-	secret, err := keyData.GetData(ctx)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to get key data for signing")
-	}
-
 	parser := jwt.NewParser(
 		jwt.WithTimeFunc(func() time.Time {
 			return ctx.Clock().Now()
@@ -142,11 +103,47 @@ func (s *Service) Parse(ctx context.Context, tokenString string) (*JwtTokenClaim
 	)
 
 	// Now parse with verification, using the key for this actor
-	token, err := parser.ParseWithClaims(tokenString, &JwtTokenClaims{}, func(token *jwt.Token) (interface{}, error) {
-		if _, ok := token.Method.(*jwt.SigningMethodHMAC); !ok {
-			return nil, errors.Errorf("unexpected signing method: %v", token.Header["alg"])
+	token, err := parser.ParseWithClaims(tokenString, &JwtTokenClaims{}, func(unverified *jwt.Token) (interface{}, error) {
+		isSecretKey := false
+		switch unverified.Method.(type) {
+		case *jwt.SigningMethodHMAC:
+			isSecretKey = true
+		case *jwt.SigningMethodRSA:
+			isSecretKey = false
+		default:
+			return nil, errors.Errorf("unexpected signing method: %v", unverified.Header["alg"])
 		}
-		return []byte(secret), nil
+
+		unverifiedClaims, ok := unverified.Claims.(*JwtTokenClaims)
+		if !ok {
+			return nil, errors.New("invalid token")
+		}
+
+		key, err := s.keyForToken(unverifiedClaims)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get key")
+		}
+
+		if !key.CanVerifySignature() {
+			return nil, errors.New("key cannot be used to verify signatures")
+		}
+
+		keyData := verificationKeyData(key)
+
+		if !keyData.HasData(ctx) {
+			return nil, errors.New("no data found in signing key")
+		}
+
+		rawKeyData, err := keyData.GetData(ctx)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to get key data for signing")
+		}
+
+		if isSecretKey {
+			return rawKeyData, nil
+		}
+
+		return loadRSAPublicKeyFromPEMOrOpenSSH(rawKeyData)
 	})
 	if err != nil {
 		return nil, errors.Wrap(err, "can't parse token")

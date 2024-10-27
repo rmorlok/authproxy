@@ -1,10 +1,15 @@
 package auth
 
 import (
+	"crypto/rsa"
+	"crypto/x509"
+	"encoding/pem"
+	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/context"
+	"golang.org/x/crypto/ssh"
 	"os"
 	"time"
 )
@@ -25,6 +30,9 @@ type JwtTokenBuilder interface {
 	WithPrivateKeyPath(string) JwtTokenBuilder
 	WithPrivateKeyString(string) JwtTokenBuilder
 	WithPrivateKey([]byte) JwtTokenBuilder
+	WithSecretKeyPath(string) JwtTokenBuilder
+	WithSecretKeyString(string) JwtTokenBuilder
+	WithSecretKey([]byte) JwtTokenBuilder
 
 	TokenCtx(context.Context) (string, error)
 	Token() (string, error)
@@ -36,6 +44,8 @@ type jwtTokenBuilder struct {
 	jwtBuilder     jwtBuilder
 	privateKeyPath *string
 	privateKeyData []byte
+	secretKeyPath  *string
+	secretKeyData  []byte
 }
 
 func (tb *jwtTokenBuilder) WithIssuer(issuer string) JwtTokenBuilder {
@@ -102,36 +112,112 @@ func (tb *jwtTokenBuilder) WithPrivateKey(privateKey []byte) JwtTokenBuilder {
 	return tb
 }
 
-func (tb *jwtTokenBuilder) getPrivateKeyData() ([]byte, error) {
+func (tb *jwtTokenBuilder) WithSecretKeyPath(secretKeyPath string) JwtTokenBuilder {
+	tb.secretKeyPath = &secretKeyPath
+	return tb
+}
+
+func (tb *jwtTokenBuilder) WithSecretKeyString(secretKey string) JwtTokenBuilder {
+	return tb.WithSecretKey([]byte(secretKey))
+}
+
+func (tb *jwtTokenBuilder) WithSecretKey(secretKey []byte) JwtTokenBuilder {
+	tb.secretKeyData = secretKey
+	return tb
+}
+
+func (tb *jwtTokenBuilder) getSigningMethod() jwt.SigningMethod {
+	if tb.privateKeyData != nil || tb.privateKeyPath != nil {
+		return jwt.SigningMethodRS256
+	}
+
+	return jwt.SigningMethodHS256
+}
+
+// loadRSAPrivateKeyFromPEM loads an RSA private key from a PEM file data
+func loadRSAPrivateKeyFromPEMOrOpenSSH(keyData []byte) (*rsa.PrivateKey, error) {
+	parsedKey, err := ssh.ParseRawPrivateKey(keyData)
+	if err == nil {
+		rsaKey, ok := parsedKey.(*rsa.PrivateKey)
+		if !ok {
+			return nil, fmt.Errorf("not an RSA private key")
+		}
+
+		return rsaKey, nil
+	}
+
+	// Decode the PEM block
+	block, _ := pem.Decode(keyData)
+	if block == nil || block.Type != "RSA PRIVATE KEY" {
+		return nil, fmt.Errorf("failed to decode key as OpenSSH RSA and failed to decode PEM block containing private key")
+	}
+
+	// Parse the DER-encoded RSA private key
+	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse RSA private key: %w", err)
+	}
+
+	return privateKey, nil
+}
+
+func (tb *jwtTokenBuilder) getSigningKeyData() (interface{}, error) {
 	if tb.privateKeyData != nil && tb.privateKeyPath != nil {
-		return nil, errors.New("cannot specify private key data and path")
+		return nil, errors.New("cannot specify secret key data and path")
+	}
+
+	if tb.secretKeyPath != nil && tb.secretKeyData != nil {
+		return nil, errors.New("cannot specify secret key data and path")
+	}
+
+	if tb.privateKeyData == nil && tb.privateKeyPath == nil &&
+		tb.secretKeyPath == nil && tb.secretKeyData == nil {
+		return nil, errors.New("key material must be specified in some form")
 	}
 
 	if tb.privateKeyData != nil {
-		return tb.privateKeyData, nil
+		return loadRSAPrivateKeyFromPEMOrOpenSSH(tb.privateKeyData)
 	}
 
-	privateKeyPath := *tb.privateKeyPath
-	_, err := os.Stat(privateKeyPath)
+	if tb.secretKeyData != nil {
+		return tb.secretKeyData, nil
+	}
+
+	pathType := "private"
+	isPrivate := true
+	pathPtr := tb.privateKeyPath
+
+	if tb.secretKeyPath != nil {
+		pathType = "secret"
+		isPrivate = false
+		pathPtr = tb.secretKeyPath
+	}
+
+	path := *pathPtr
+	_, err := os.Stat(path)
 	if err != nil {
 		// attempt home path expansion
-		privateKeyPath, err = homedir.Expand(privateKeyPath)
+		path, err = homedir.Expand(path)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	_, err = os.Stat(privateKeyPath)
+	_, err = os.Stat(path)
 	if err != nil {
-		return nil, errors.Wrap(err, "invalid private key path")
+		return nil, errors.Wrapf(err, "invalid %s key path", pathType)
 	}
 
-	privateKeyData, err := os.ReadFile(privateKeyPath)
+	keyData, err := os.ReadFile(path)
 	if err != nil {
-		return nil, errors.Wrap(err, "error reading private key")
+		return nil, errors.Wrapf(err, "error reading %s key", pathType)
 	}
 
-	return privateKeyData, nil
+	if isPrivate {
+		return loadRSAPrivateKeyFromPEMOrOpenSSH(keyData)
+	}
+
+	return keyData, nil
 }
 
 func (tb *jwtTokenBuilder) TokenCtx(ctx context.Context) (string, error) {
@@ -140,13 +226,13 @@ func (tb *jwtTokenBuilder) TokenCtx(ctx context.Context) (string, error) {
 		return "", err
 	}
 
-	privateKeyData, err := tb.getPrivateKeyData()
+	keyData, err := tb.getSigningKeyData()
 	if err != nil {
 		return "", err
 	}
 
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
-	tokenString, err := token.SignedString(privateKeyData)
+	token := jwt.NewWithClaims(tb.getSigningMethod(), claims)
+	tokenString, err := token.SignedString(keyData)
 	if err != nil {
 		return "", errors.Wrap(err, "error signing jwt")
 	}

@@ -13,6 +13,7 @@ func cmdSignJwt() *cobra.Command {
 		admin          bool
 		userId         string
 		privateKeyPath string
+		secretKeyPath  string
 	)
 
 	cmd := &cobra.Command{
@@ -36,7 +37,20 @@ func cmdSignJwt() *cobra.Command {
 				return fmt.Errorf("must specify private key to sign JWT")
 			}
 
-			token, err := signJwt(userId, privateKeyPath, admin)
+			b := auth.NewJwtTokenBuilder().
+				WithActorId(userId)
+
+			if privateKeyPath != "" {
+				b = b.WithPrivateKeyPath(privateKeyPath)
+			} else {
+				b = b.WithSecretKeyPath(secretKeyPath)
+			}
+
+			if admin {
+				b = b.WithAdmin()
+			}
+
+			token, err := b.Token()
 			if err != nil {
 				return err
 			}
@@ -48,20 +62,11 @@ func cmdSignJwt() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&admin, "admin", false, "Sign the request as an admin")
-	cmd.Flags().StringVar(&userId, "userId", "", "Username to sign the request as. For admin requests, defaults to current OS user")
+	cmd.Flags().StringVar(&userId, "actorId", "", "ActorID/username to sign the request as. For admin requests, defaults to current OS user")
+
 	cmd.Flags().StringVar(&privateKeyPath, "privateKeyPath", "", "Private key to use to sign request")
+	cmd.Flags().StringVar(&secretKeyPath, "secretKeyPath", "", "Secret key to use to sign request")
+	cmd.MarkFlagsMutuallyExclusive("privateKeyPath", "secretKeyPath")
 
 	return cmd
-}
-
-func signJwt(userId string, privateKeyPath string, isAdmin bool) (string, error) {
-	b := auth.NewJwtTokenBuilder().
-		WithActorId(userId).
-		WithPrivateKeyPath(privateKeyPath)
-
-	if isAdmin {
-		b = b.WithAdmin()
-	}
-
-	return b.Token()
 }
