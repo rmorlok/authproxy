@@ -49,7 +49,8 @@ func (j *Service) auth(reqAuth bool) func(http.Handler) http.Handler {
 				return
 			}
 
-			if claims.Actor != nil { // if uinfo in token populate it to context
+			// If actor info is present, populate it to the context
+			if claims.Actor != nil {
 
 				if j.IsExpired(ctx, claims) {
 					if claims, err = j.refreshExpiredToken(ctx, w, claims, tkn); err != nil {

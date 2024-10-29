@@ -8,6 +8,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
 	"golang.org/x/crypto/ssh"
 	"os"
@@ -18,6 +19,8 @@ import (
 type JwtTokenBuilder interface {
 	WithIssuer(issuer string) JwtTokenBuilder
 	WithAudience(audience string) JwtTokenBuilder
+	WithServiceId(serviceId config.ServiceId) JwtTokenBuilder
+	WithServiceIds(serviceId []config.ServiceId) JwtTokenBuilder
 	WithExpiration(expiration time.Time) JwtTokenBuilder
 	WithExpiresIn(expiresIn time.Duration) JwtTokenBuilder
 	WithExpiresInCtx(ctx context.Context, expiresIn time.Duration) JwtTokenBuilder
@@ -55,6 +58,16 @@ func (tb *jwtTokenBuilder) WithIssuer(issuer string) JwtTokenBuilder {
 
 func (tb *jwtTokenBuilder) WithAudience(audience string) JwtTokenBuilder {
 	tb.jwtBuilder.WithAudience(audience)
+	return tb
+}
+
+func (tb *jwtTokenBuilder) WithServiceId(serviceId config.ServiceId) JwtTokenBuilder {
+	tb.jwtBuilder.WithServiceId(serviceId)
+	return tb
+}
+
+func (tb *jwtTokenBuilder) WithServiceIds(serviceIds []config.ServiceId) JwtTokenBuilder {
+	tb.jwtBuilder.WithServiceIds(serviceIds)
 	return tb
 }
 

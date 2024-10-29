@@ -44,7 +44,7 @@ func (j *Service) AdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		success := false
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			actor := GetActorInfoFromRequest(c.Request)
+			actor := GetActorInfoFromRequest(r)
 			if actor == nil {
 				http.Error(c.Writer, "Unauthorized", http.StatusUnauthorized)
 				return

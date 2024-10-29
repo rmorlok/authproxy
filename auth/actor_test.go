@@ -2,6 +2,8 @@ package auth
 
 import (
 	"crypto/sha1" //nolint
+	"github.com/rmorlok/authproxy/util"
+	"net/http"
 	"testing"
 
 	"github.com/pkg/errors"
@@ -115,4 +117,16 @@ func TestActor(t *testing.T) {
 		var nila *Actor
 		assert.True(t, nila.IsNormalActor())
 	})
+}
+
+func TestActorOnRequest(t *testing.T) {
+	assert.Nil(t, GetActorInfoFromRequest(util.Must(http.NewRequest("GET", "https://example.com", nil))))
+
+	a := Actor{
+		ID: "bobdole",
+	}
+
+	r := util.Must(http.NewRequest("GET", "https://example.com", nil))
+	r = SetActorInfoOnRequest(r, &a)
+	assert.Equal(t, &a, GetActorInfoFromRequest(r))
 }

@@ -44,7 +44,7 @@ func TestJWT_Token(t *testing.T) {
 	})
 
 	claims := testClaims
-	res, err := j.Token(claims)
+	res, err := j.Token(context.Background(), &claims)
 	assert.Nil(t, err)
 	assert.Equal(t, testJwtValid, res)
 }
@@ -100,7 +100,7 @@ func TestJWT_Set(t *testing.T) {
 	claims := testClaims
 
 	rr := httptest.NewRecorder()
-	c, err := j.Set(testContext, rr, claims)
+	c, err := j.Set(testContext, rr, &claims)
 	assert.Nil(t, err)
 	assert.Equal(t, claims, c)
 	cookies := rr.Result().Cookies()
@@ -114,7 +114,7 @@ func TestJWT_Set(t *testing.T) {
 
 	claims.SessionOnly = true
 	rr = httptest.NewRecorder()
-	_, err = j.Set(testContext, rr, claims)
+	_, err = j.Set(testContext, rr, &claims)
 	assert.Nil(t, err)
 	cookies = rr.Result().Cookies()
 	t.Log(cookies)
@@ -129,7 +129,7 @@ func TestJWT_Set(t *testing.T) {
 	rr = httptest.NewRecorder()
 
 	// Check below looks at issued at changing, so we need a different time than the test context
-	_, err = j.Set(context.Background().WithClock(test_clock.NewFakeClock(time.Date(2024, 11, 2, 0, 0, 0, 0, time.UTC))), rr, claims)
+	_, err = j.Set(context.Background().WithClock(test_clock.NewFakeClock(time.Date(2024, 11, 2, 0, 0, 0, 0, time.UTC))), rr, &claims)
 	assert.Nil(t, err)
 	cookies = rr.Result().Cookies()
 	t.Log(cookies)
@@ -148,7 +148,7 @@ func TestJWT_SetWithDomain(t *testing.T) {
 	claims := testClaims
 
 	rr := httptest.NewRecorder()
-	c, err := j.Set(testContext, rr, claims)
+	c, err := j.Set(testContext, rr, &claims)
 	assert.Nil(t, err)
 	assert.Equal(t, claims, c)
 	cookies := rr.Result().Cookies()
@@ -172,7 +172,7 @@ func TestJWT_SendJWTHeader(t *testing.T) {
 	})
 
 	rr := httptest.NewRecorder()
-	_, err := j.Set(testContext, rr, testClaims)
+	_, err := j.Set(testContext, rr, &testClaims)
 	assert.Nil(t, err)
 	cookies := rr.Result().Cookies()
 	t.Log(cookies)
@@ -191,7 +191,7 @@ func TestJWT_SetProlonged(t *testing.T) {
 	claims.ExpiresAt = nil
 
 	rr := httptest.NewRecorder()
-	_, err := j.Set(testContext, rr, claims)
+	_, err := j.Set(testContext, rr, &claims)
 	assert.NoError(t, err)
 	cookies := rr.Result().Cookies()
 	t.Log(cookies)
@@ -212,7 +212,7 @@ func TestJWT_NoIssuer(t *testing.T) {
 	claims.Issuer = ""
 
 	rr := httptest.NewRecorder()
-	_, err := j.Set(testContext, rr, claims)
+	_, err := j.Set(testContext, rr, &claims)
 	assert.NoError(t, err)
 	cookies := rr.Result().Cookies()
 	t.Log(cookies)
@@ -220,7 +220,7 @@ func TestJWT_NoIssuer(t *testing.T) {
 
 	cc, err := j.Parse(testContext, cookies[0].Value)
 	assert.NoError(t, err)
-	assert.Equal(t, cfg.SystemAuth.JwtIssuer(), cc.Issuer)
+	assert.Equal(t, cfg.GetRoot().SystemAuth.JwtIssuer(), cc.Issuer)
 }
 
 func TestJWT_GetFromHeader(t *testing.T) {
@@ -280,7 +280,7 @@ func TestJWT_GetFromQuery(t *testing.T) {
 
 func TestJWT_GetFailed(t *testing.T) {
 	cfg := config.ConfigFromRoot(&testConfig)
-	j := NewService(Opts{Config: &cfg, ApiHost: &cfg.AdminApi})
+	j := NewService(Opts{Config: cfg})
 	req := httptest.NewRequest("GET", "/", nil)
 	_, _, err := j.Get(testContext, req)
 	assert.Error(t, err, "token cookie was not presented")
@@ -297,7 +297,7 @@ func TestJWT_SetAndGetWithCookies(t *testing.T) {
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/valid" {
-			_, e := j.Set(testContext, w, claims)
+			_, e := j.Set(testContext, w, &claims)
 			require.NoError(t, e)
 			w.WriteHeader(200)
 		}
@@ -331,7 +331,7 @@ func TestJWT_SetAndGetWithXsrfMismatch(t *testing.T) {
 	claims.SessionOnly = true
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/valid" {
-			_, e := j.Set(testContext, w, claims)
+			_, e := j.Set(testContext, w, &claims)
 			require.NoError(t, e)
 			w.WriteHeader(200)
 		}
@@ -377,7 +377,7 @@ func TestJWT_SetAndGetWithCookiesExpired(t *testing.T) {
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/expired" {
-			_, e := j.Set(testContext, w, claims)
+			_, e := j.Set(testContext, w, &claims)
 			require.NoError(t, e)
 			w.WriteHeader(200)
 		}

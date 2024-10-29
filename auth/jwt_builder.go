@@ -4,8 +4,10 @@ import (
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/util"
+	"strings"
 	"time"
 )
 
@@ -14,6 +16,8 @@ import (
 type JwtBuilder interface {
 	WithIssuer(issuer string) JwtBuilder
 	WithAudience(audience string) JwtBuilder
+	WithServiceId(serviceId config.ServiceId) JwtBuilder
+	WithServiceIds(serviceIds []config.ServiceId) JwtBuilder
 	WithExpiration(expiration time.Time) JwtBuilder
 	WithExpiresIn(expiresIn time.Duration) JwtBuilder
 	WithExpiresInCtx(ctx context.Context, expiresIn time.Duration) JwtBuilder
@@ -47,6 +51,16 @@ func (b *jwtBuilder) WithIssuer(issuer string) JwtBuilder {
 func (b *jwtBuilder) WithAudience(audience string) JwtBuilder {
 	b.audience = &audience
 	return b
+}
+
+func (b *jwtBuilder) WithServiceId(serviceId config.ServiceId) JwtBuilder {
+	return b.WithAudience(string(serviceId))
+}
+
+func (b *jwtBuilder) WithServiceIds(serviceIds []config.ServiceId) JwtBuilder {
+	return b.WithAudience(strings.Join(util.Map(serviceIds, func(serviceId config.ServiceId) string {
+		return string(serviceId)
+	}), ","))
 }
 
 func (b *jwtBuilder) WithExpiration(expiration time.Time) JwtBuilder {

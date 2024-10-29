@@ -12,7 +12,7 @@ import (
 // (user or system taking the action) as well as standard JWT information.
 type JwtTokenClaims struct {
 	jwt.RegisteredClaims
-	Actor       *Actor `json:"user,omitempty"`
+	Actor       *Actor `json:"actor,omitempty"`
 	SessionOnly bool   `json:"sess_only,omitempty"`
 }
 
