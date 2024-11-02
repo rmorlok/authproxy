@@ -7,6 +7,8 @@ import (
 
 type Root struct {
 	AdminApi     ApiHost       `json:"admin_api" yaml:"admin_api"`
+	Api          ApiHost       `json:"api" yaml:"api"`
+	Auth         ApiHost       `json:"auth" yaml:"auth"`
 	SystemAuth   SystemAuth    `json:"system_auth" yaml:"system_auth"`
 	Integrations []Integration `json:"integrations" yaml:"integrations"`
 }

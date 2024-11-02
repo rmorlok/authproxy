@@ -4,9 +4,11 @@ import (
 	"github.com/fatih/color"
 	"github.com/joho/godotenv"
 	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/admin_api"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/service/admin_api"
+	api "github.com/rmorlok/authproxy/service/api"
+	auth "github.com/rmorlok/authproxy/service/auth"
 	"github.com/spf13/cobra"
 	"os"
 	"strings"
@@ -41,6 +43,12 @@ func runServices(noBanner bool, servicesList string) error {
 		switch service {
 		case "admin-api":
 			servers = append(servers, admin_api.Serve)
+		case "api":
+			servers = append(servers, api.Serve)
+		case "auth":
+			servers = append(servers, auth.Serve)
+		case "all":
+			servers = append(servers, admin_api.Serve, api.Serve, auth.Serve)
 		default:
 			return errors.New("unknown service: " + service)
 		}

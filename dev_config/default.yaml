@@ -1,5 +1,9 @@
-admin_api:
+auth:
   port: 8080
+api:
+  port: 8081
+admin_api:
+  port: 8082
 system_auth:
   cookie_domain: localhost:8080
   jwt_signing_key:
