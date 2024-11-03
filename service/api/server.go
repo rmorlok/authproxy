@@ -3,11 +3,11 @@ package admin_api
 import (
 	"fmt"
 	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
-	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/service/api/routes"
 	"net/http"
 	"time"
 )
@@ -20,17 +20,8 @@ func rateErrorHandler(c *gin.Context, info ratelimit.Info) {
 	c.String(429, "Too many requests. Try again in "+time.Until(info.ResetTime).String())
 }
 
-//func GetCorsConfig() cors.Config {
-//	config := cors.DefaultConfig()
-//
-//	config.AllowOrigins = GetEnvironmentVariables().CorsAllowedOrigins
-//	config.AllowCredentials = true
-//
-//	return config
-//}
-
 func GetGinServer(cfg config.C) *gin.Engine {
-	authService := auth.StandardAuthService(cfg, config.ServiceIdAdminApi)
+	authService := auth.StandardAuthService(cfg, config.ServiceIdApi)
 
 	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
 		Rate:  1 * time.Minute,
@@ -38,12 +29,6 @@ func GetGinServer(cfg config.C) *gin.Engine {
 	})
 
 	router := api_common.GinForService("api", &cfg.GetRoot().AdminApi)
-
-	//router.Use(authService.Optional())
-	//router.Use(cors.New(GetCorsConfig()))
-
-	// Static content
-	router.Use(static.Serve("/", static.LocalFile("./client/build", true)))
 
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
@@ -59,15 +44,15 @@ func GetGinServer(cfg config.C) *gin.Engine {
 		})
 	})
 
-	api := router.Group("/api", authService.AdminOnly())
-	{
-		mw := ratelimit.RateLimiter(rlstore, &ratelimit.Options{
-			ErrorHandler: rateErrorHandler,
-			KeyFunc:      rateKeyFunc,
-		})
+	rl := ratelimit.RateLimiter(rlstore, &ratelimit.Options{
+		ErrorHandler: rateErrorHandler,
+		KeyFunc:      rateKeyFunc,
+	})
 
-		api.GET("/domains", mw, ListDomains)
-	}
+	routesConnectors := routes.NewConnectorsRoutes(cfg, authService)
+
+	api := router.Group("/api", rl)
+	routesConnectors.Register(api)
 
 	return router
 }

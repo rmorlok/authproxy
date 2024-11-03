@@ -13,7 +13,7 @@ system_auth:
       path: ./dev_config/keys/system
   admin_users:
     keys_path: ./dev_config/keys/admin
-integrations:
+connectors:
   - id: google-drive
     version: 1
     display_name: Google Drive

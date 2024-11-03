@@ -46,7 +46,7 @@ integrations:
       type: api-key
 `
 	expected := &Root{
-		Integrations: []Integration{
+		Integrations: []Connector{
 			{
 				Id:          "google-drive",
 				Version:     1,

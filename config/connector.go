@@ -5,7 +5,7 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-type Integration struct {
+type Connector struct {
 	Id          string `json:"id" yaml:"id"`
 	Version     uint64 `json:"version" yaml:"version"`
 	DisplayName string `json:"display_name" yaml:"display_name"`
@@ -14,7 +14,7 @@ type Integration struct {
 	Auth        Auth   `json:"auth" yaml:"auth"`
 }
 
-func (i *Integration) UnmarshalYAML(value *yaml.Node) error {
+func (c *Connector) UnmarshalYAML(value *yaml.Node) error {
 	// Ensure the node is a mapping node
 	if value.Kind != yaml.MappingNode {
 		return fmt.Errorf("expected a mapping node, got %v", value.Kind)
@@ -54,8 +54,8 @@ func (i *Integration) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	// Let the rest unmarshall normally
-	type RawType Integration
-	raw := (*RawType)(i)
+	type RawType Connector
+	raw := (*RawType)(c)
 	if err := value.Decode(raw); err != nil {
 		return err
 	}

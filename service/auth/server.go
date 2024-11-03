@@ -30,7 +30,7 @@ func rateErrorHandler(c *gin.Context, info ratelimit.Info) {
 //}
 
 func GetGinServer(cfg config.C) *gin.Engine {
-	authService := auth.StandardAuthService(cfg, config.ServiceIdAdminApi)
+	authService := auth.StandardAuthService(cfg, config.ServiceIdAuth)
 
 	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
 		Rate:  1 * time.Minute,
