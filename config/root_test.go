@@ -9,7 +9,7 @@ func TestRootFullConfig(t *testing.T) {
 	assert := require.New(t)
 
 	data := `
-integrations:
+connectors:
   - id: google-drive
     version: 1
     display_name: Google Drive
@@ -46,7 +46,7 @@ integrations:
       type: api-key
 `
 	expected := &Root{
-		Integrations: []Connector{
+		Connectors: []Connector{
 			{
 				Id:          "google-drive",
 				Version:     1,

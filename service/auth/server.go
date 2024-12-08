@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/service/auth/routes"
 	"net/http"
 	"time"
 )
@@ -47,14 +48,14 @@ func GetGinServer(cfg config.C) *gin.Engine {
 
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"service": "api",
+			"service": "auth",
 			"message": "pong",
 		})
 	})
 
 	router.GET("/healthz", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{
-			"service": "api",
+			"service": "auth",
 			"ok":      true,
 		})
 	})
@@ -68,6 +69,9 @@ func GetGinServer(cfg config.C) *gin.Engine {
 
 		api.GET("/domains", mw, ListDomains)
 	}
+
+	routesCallback := routes.NewCallbackRoutes(cfg, authService)
+	routesCallback.Register(router)
 
 	return router
 }

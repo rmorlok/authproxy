@@ -10,6 +10,8 @@ type Root struct {
 	Api        ApiHost     `json:"api" yaml:"api"`
 	Auth       ApiHost     `json:"auth" yaml:"auth"`
 	SystemAuth SystemAuth  `json:"system_auth" yaml:"system_auth"`
+	Database   Database    `json:"database" yaml:"database"`
+	ErrorPages ErrorPages  `json:"error_pages" yaml:"error_pages"`
 	Connectors []Connector `json:"connectors" yaml:"connectors"`
 }
 

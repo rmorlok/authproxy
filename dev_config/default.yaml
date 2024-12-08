@@ -13,6 +13,14 @@ system_auth:
       path: ./dev_config/keys/system
   admin_users:
     keys_path: ./dev_config/keys/admin
+  global_aes_key:
+    random:
+      num_bytes: 32
+error_pages:
+  general: https://example.com
+database:
+  provider: sqlite
+  path: ./tmp/dev.db
 connectors:
   - id: google-drive
     version: 1

@@ -5,8 +5,10 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/util"
 	"gopkg.in/yaml.v3"
 	"os"
+	"sync"
 )
 
 type KeyData interface {
@@ -57,6 +59,9 @@ fieldLoop:
 			break fieldLoop
 		case "path":
 			keyData = &KeyDataFile{}
+			break fieldLoop
+		case "random":
+			keyData = &KeyDataRandomBytes{}
 			break fieldLoop
 		}
 	}
@@ -137,4 +142,27 @@ func (kf *KeyDataFile) GetData(ctx context.Context) ([]byte, error) {
 
 	// Read the file contents
 	return os.ReadFile(kf.Path)
+}
+
+type KeyDataRandomBytes struct {
+	NumBytes  int `json:"num_bytes" yaml:"num_bytes"`
+	bytes     []byte
+	bytesOnce sync.Once
+}
+
+func (kf *KeyDataRandomBytes) HasData(ctx context.Context) bool {
+	return true
+}
+
+func (kf *KeyDataRandomBytes) GetData(ctx context.Context) ([]byte, error) {
+	kf.bytesOnce.Do(func() {
+		numBytes := 16
+		if kf.NumBytes > 0 {
+			numBytes = kf.NumBytes
+		}
+
+		kf.bytes = util.MustGenerateSecureRandomKey(numBytes)
+	})
+
+	return kf.bytes, nil
 }

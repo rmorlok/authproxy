@@ -25,3 +25,5 @@ go.work
 
 .idea
 .DS_Store
+
+tmp

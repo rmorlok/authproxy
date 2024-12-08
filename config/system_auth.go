@@ -14,6 +14,7 @@ type SystemAuth struct {
 	CookieDurationVal   time.Duration `json:"cookie_duration" yaml:"cookie_duration"`
 	DisableXSRF         bool          `json:"disable_xsrf" yaml:"disable_xsrf"`
 	AdminUsers          AdminUsers    `json:"admin_users" yaml:"admin_users"`
+	GlobalAESKey        KeyData       `json:"global_aes_key" yaml:"global_aes_key"`
 }
 
 func (sa *SystemAuth) JwtIssuer() string {
@@ -48,6 +49,7 @@ func (sa *SystemAuth) UnmarshalYAML(value *yaml.Node) error {
 
 	var jwtSigngingKey Key
 	var adminUsers AdminUsers
+	var globalAESKey KeyData
 
 	// Handle custom unmarshalling for some attributes. Iterate through the mapping node's content,
 	// which will be sequences of keys, then values.
@@ -69,6 +71,10 @@ func (sa *SystemAuth) UnmarshalYAML(value *yaml.Node) error {
 				return err
 			}
 			matched = true
+		case "global_aes_key":
+			if globalAESKey, err = keyDataUnmarshalYAML(valueNode); err != nil {
+				return err
+			}
 		}
 
 		if matched {
@@ -89,6 +95,7 @@ func (sa *SystemAuth) UnmarshalYAML(value *yaml.Node) error {
 	// Set the custom unmarshalled types
 	raw.JwtSigningKey = jwtSigngingKey
 	raw.AdminUsers = adminUsers
+	raw.GlobalAESKey = globalAESKey
 
 	return nil
 }

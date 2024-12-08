@@ -15,16 +15,16 @@ type Connector struct {
 }
 
 type GetConnectorRequestPath struct {
-	Id string `json:"id"`
+	Id string `uri:"id"`
 }
 
-type ListConnectorsRequest struct {
-	Continue string `json:"continue,omitempty"`
+type ListConnectorsRequestQueryParams struct {
+	Continue string `form:"continue,omitempty"`
 }
 
 type ListConnectorsResponse struct {
-	Connectors []Connector `json:"connectors"`
-	Next       string      `json:"next,omitempty"`
+	Items  []Connector `json:"items"`
+	Cursor string      `json:"cursor,omitempty"`
 }
 
 type ConnectorsRoutes struct {
@@ -63,7 +63,7 @@ func (r *ConnectorsRoutes) get(ctx *gin.Context) {
 }
 
 func (r *ConnectorsRoutes) list(ctx *gin.Context) {
-	var req ListConnectorsRequest
+	var req ListConnectorsRequestQueryParams
 	if err := ctx.ShouldBindQuery(&req); err != nil {
 		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
@@ -75,7 +75,7 @@ func (r *ConnectorsRoutes) list(ctx *gin.Context) {
 	}
 
 	ctx.JSON(http.StatusOK, ListConnectorsResponse{
-		Connectors: connectors,
+		Items: connectors,
 	})
 }
 
