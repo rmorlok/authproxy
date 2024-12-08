@@ -30,7 +30,7 @@ const (
 )
 
 type InitiateConnectionResponse struct {
-	Id   string                         `json:"id"`
+	Id   uuid.UUID                      `json:"id"`
 	Type InitiateConnectionResponseType `json:"type"`
 }
 
@@ -62,14 +62,28 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 		return
 	}
 
-	r.db.CreateConnection()
-	if connector.Auth.GetType() == config.AuthTypeOAuth2 {
-
+	connection := database.Connection{
+		ID:    uuid.New(),
+		State: database.ConnectionStateCreated,
 	}
 
-	gctx.JSON(http.StatusOK, InitiateConnectionResponse{
-		Connectors: connectors,
-	})
+	err := r.db.CreateConnection(ctx, &connection)
+	if err != nil {
+		gctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+	}
+
+	if oAuth2, ok := connector.Auth.(*config.AuthOAuth2); ok {
+		gctx.JSON(http.StatusOK, InitiateConnectionRedirect{
+			InitiateConnectionResponse: InitiateConnectionResponse{
+				Id:   connection.ID,
+				Type: PreconnectionResponseTypeRedirect,
+			},
+			RedirectUrl: oAuth2.AuthorizationEndpoint,
+		})
+		return
+	}
+
+	gctx.JSON(http.StatusInternalServerError, gin.H{"error": "unsupported connector auth type"})
 }
 
 type ConnectionJson struct {
