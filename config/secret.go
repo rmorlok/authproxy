@@ -32,7 +32,7 @@ func UnmarshallYamlSecret(data []byte) (Secret, error) {
 func secretUnmarshalYAML(value *yaml.Node) (Secret, error) {
 	// Ensure the node is a mapping node
 	if value.Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("expected a mapping node, got %v", value.Kind)
+		return nil, fmt.Errorf("secret expected a mapping node, got %s", KindToString(value.Kind))
 	}
 
 	var secret Secret

@@ -34,7 +34,7 @@ func UnmarshallYamlDatabase(data []byte) (Database, error) {
 func databaseUnmarshalYAML(value *yaml.Node) (Database, error) {
 	// Ensure the node is a mapping node
 	if value.Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("expected a mapping node, got %v", value.Kind)
+		return nil, fmt.Errorf("database expected a mapping node, got %s", KindToString(value.Kind))
 	}
 
 	var database Database

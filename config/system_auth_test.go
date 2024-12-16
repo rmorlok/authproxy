@@ -41,15 +41,15 @@ func TestSystemAuth(t *testing.T) {
 		})
 		t.Run("admin users list", func(t *testing.T) {
 			data := `
-  cookie_domain: localhost:8080
-  jwt_signing_key:
-    public_key:
-      path: ./dev_config/keys/system.pub
-    private_key:
-      path: ./dev_config/keys/system
-  admin_users:
-    - username: bobdole
-      key: ./dev_config/keys/admin/bobdole.pub
+cookie_domain: localhost:8080
+jwt_signing_key:
+  public_key:
+    path: ./dev_config/keys/system.pub
+  private_key:
+    path: ./dev_config/keys/system
+admin_users:
+  - username: bobdole
+    key: ./dev_config/keys/admin/bobdole.pub
 `
 			expected := &SystemAuth{
 				CookieDomain: "localhost:8080",

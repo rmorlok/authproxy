@@ -33,7 +33,7 @@ func adminUsersUnmarshalYAML(value *yaml.Node) (AdminUsers, error) {
 
 	// Ensure the node is a mapping node
 	if value.Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("expected a sequence node or mapping node, got %v", value.Kind)
+		return nil, fmt.Errorf("admin users expected a sequence node or mapping node, got %s", KindToString(value.Kind))
 	}
 
 	var adminUsersExternalSource AdminUsersExternalSource

@@ -40,7 +40,7 @@ func UnmarshallYamlAdminUsersList(data []byte) (AdminUsersList, error) {
 func adminUsersListUnmarshalYAML(value *yaml.Node) (AdminUsersList, error) {
 	// Ensure the node is a sequence node
 	if value.Kind != yaml.SequenceNode {
-		return nil, fmt.Errorf("expected a sequence node, got %v", value.Kind)
+		return nil, fmt.Errorf("admin users list expected a sequence node, got %v", value.Kind)
 	}
 
 	var results []*AdminUser

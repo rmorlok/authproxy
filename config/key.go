@@ -31,7 +31,7 @@ func UnmarshallYamlKey(data []byte) (Key, error) {
 func keyUnmarshalYAML(value *yaml.Node) (Key, error) {
 	// Ensure the node is a mapping node
 	if value.Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("expected a mapping node, got %v", value.Kind)
+		return nil, fmt.Errorf("key expected a mapping node, got %s", KindToString(value.Kind))
 	}
 
 	var key Key

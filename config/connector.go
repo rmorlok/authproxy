@@ -17,7 +17,7 @@ type Connector struct {
 func (c *Connector) UnmarshalYAML(value *yaml.Node) error {
 	// Ensure the node is a mapping node
 	if value.Kind != yaml.MappingNode {
-		return fmt.Errorf("expected a mapping node, got %v", value.Kind)
+		return fmt.Errorf("connector expected a mapping node, got %s", KindToString(value.Kind))
 	}
 
 	var image Image

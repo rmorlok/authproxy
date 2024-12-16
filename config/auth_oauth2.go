@@ -17,7 +17,7 @@ type AuthOAuth2 struct {
 func (i *AuthOAuth2) UnmarshalYAML(value *yaml.Node) error {
 	// Ensure the node is a mapping node
 	if value.Kind != yaml.MappingNode {
-		return fmt.Errorf("expected a mapping node, got %v", value.Kind)
+		return fmt.Errorf("auth oauth2 expected a mapping node, got %s", KindToString(value.Kind))
 	}
 
 	var clientIdSecret Secret
