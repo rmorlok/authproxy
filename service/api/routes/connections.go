@@ -174,31 +174,33 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 	})
 }
 
-type GetConnectionRequestPath struct {
-	Id uuid.UUID `uri:"id"`
-}
-
 func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 	ctx := context.AsContext(gctx.Request.Context())
-	var req GetConnectionRequestPath
-	if err := gctx.ShouldBindUri(&req); err != nil {
+	id, err := uuid.Parse(gctx.Param("id"))
+	if err != nil {
 		gctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
 		return
 	}
 
-	if req.Id == uuid.Nil {
+	if id == uuid.Nil {
 		gctx.JSON(http.StatusBadRequest, gin.H{"error": "id is required"})
 	}
 
-	c, err := r.db.GetConnection(ctx, req.Id)
+	c, err := r.db.GetConnection(ctx, id)
 	if err != nil {
 		gctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		return
 	}
 
-	gctx.JSON(http.StatusNotFound, gin.H{"error": "connection not found"})
+	if c == nil {
+		gctx.JSON(http.StatusNotFound, gin.H{"error": "connection not found"})
+		return
+	}
+
+	gctx.JSON(http.StatusOK, DatabaseConnectionToJson(*c))
 }
 
-func (r *ConnectionsRoutes) Register(g *gin.RouterGroup) {
+func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 	g.POST("/connections/initiate", r.authService.Required(), r.initiate)
 	g.GET("/connections", r.authService.Required(), r.list)
 	g.GET("/connections/:id", r.authService.Required(), r.get)

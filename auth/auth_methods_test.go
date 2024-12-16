@@ -37,7 +37,7 @@ func mockKeyStore(aud string) (string, error) {
 }
 
 func TestJWT_Token(t *testing.T) {
-	cfg := config.ConfigFromRoot(&testConfig)
+	cfg := config.FromRoot(&testConfig)
 	j := NewService(Opts{
 		Config:    cfg,
 		ServiceId: config.ServiceIdAdminApi,
@@ -50,7 +50,7 @@ func TestJWT_Token(t *testing.T) {
 }
 
 func TestJWT_Parse(t *testing.T) {
-	cfg := config.ConfigFromRoot(&testConfig)
+	cfg := config.FromRoot(&testConfig)
 	j := NewService(Opts{Config: cfg, ServiceId: config.ServiceIdAdminApi})
 	claims, err := j.Parse(testContext, testJwtValid)
 	assert.NoError(t, err)
@@ -90,7 +90,7 @@ func TestJWT_Parse(t *testing.T) {
 }
 
 func TestJWT_Set(t *testing.T) {
-	cfg := config.ConfigFromRoot(&testConfig)
+	cfg := config.FromRoot(&testConfig)
 
 	j := NewService(Opts{
 		Config:    cfg,
@@ -140,7 +140,7 @@ func TestJWT_Set(t *testing.T) {
 }
 
 func TestJWT_SetWithDomain(t *testing.T) {
-	cfg := config.ConfigFromRoot(&testConfig)
+	cfg := config.FromRoot(&testConfig)
 	j := NewService(Opts{
 		Config: cfg,
 	})
@@ -164,7 +164,7 @@ func TestJWT_SetWithDomain(t *testing.T) {
 }
 
 func TestJWT_SendJWTHeader(t *testing.T) {
-	cfg := config.ConfigFromRoot(&testConfig)
+	cfg := config.FromRoot(&testConfig)
 	j := NewService(Opts{
 		SendJWTHeader: true,
 		Config:        cfg,
@@ -181,7 +181,7 @@ func TestJWT_SendJWTHeader(t *testing.T) {
 }
 
 func TestJWT_SetProlonged(t *testing.T) {
-	cfg := config.ConfigFromRoot(&testConfig)
+	cfg := config.FromRoot(&testConfig)
 	j := NewService(Opts{
 		Config:    cfg,
 		ServiceId: config.ServiceIdAdminApi,
@@ -203,7 +203,7 @@ func TestJWT_SetProlonged(t *testing.T) {
 }
 
 func TestJWT_NoIssuer(t *testing.T) {
-	cfg := config.ConfigFromRoot(&testConfig)
+	cfg := config.FromRoot(&testConfig)
 	j := NewService(Opts{
 		Config: cfg,
 	})
@@ -224,7 +224,7 @@ func TestJWT_NoIssuer(t *testing.T) {
 }
 
 func TestJWT_GetFromHeader(t *testing.T) {
-	cfg := config.ConfigFromRoot(&testConfig)
+	cfg := config.FromRoot(&testConfig)
 	j := NewService(Opts{
 		Config: cfg,
 	})
@@ -253,7 +253,7 @@ func TestJWT_GetFromHeader(t *testing.T) {
 }
 
 func TestJWT_GetFromQuery(t *testing.T) {
-	cfg := config.ConfigFromRoot(&testConfig)
+	cfg := config.FromRoot(&testConfig)
 	j := NewService(Opts{
 		Config: cfg,
 	})
@@ -279,7 +279,7 @@ func TestJWT_GetFromQuery(t *testing.T) {
 }
 
 func TestJWT_GetFailed(t *testing.T) {
-	cfg := config.ConfigFromRoot(&testConfig)
+	cfg := config.FromRoot(&testConfig)
 	j := NewService(Opts{Config: cfg})
 	req := httptest.NewRequest("GET", "/", nil)
 	_, _, err := j.Get(testContext, req)
@@ -287,7 +287,7 @@ func TestJWT_GetFailed(t *testing.T) {
 }
 
 func TestJWT_SetAndGetWithCookies(t *testing.T) {
-	cfg := config.ConfigFromRoot(&testConfig)
+	cfg := config.FromRoot(&testConfig)
 	j := NewService(Opts{
 		Config: cfg,
 	})
@@ -322,7 +322,7 @@ func TestJWT_SetAndGetWithCookies(t *testing.T) {
 }
 
 func TestJWT_SetAndGetWithXsrfMismatch(t *testing.T) {
-	cfg := config.ConfigFromRoot(&testConfig)
+	cfg := config.FromRoot(&testConfig)
 	j := NewService(Opts{
 		Config: cfg,
 	})
@@ -365,7 +365,7 @@ func TestJWT_SetAndGetWithXsrfMismatch(t *testing.T) {
 }
 
 func TestJWT_SetAndGetWithCookiesExpired(t *testing.T) {
-	cfg := config.ConfigFromRoot(&testConfig)
+	cfg := config.FromRoot(&testConfig)
 	j := NewService(Opts{
 		Config: cfg,
 	})
@@ -397,7 +397,7 @@ func TestJWT_SetAndGetWithCookiesExpired(t *testing.T) {
 }
 
 func TestJWT_Reset(t *testing.T) {
-	cfg := config.ConfigFromRoot(&testConfig)
+	cfg := config.FromRoot(&testConfig)
 	j := NewService(Opts{Config: cfg})
 
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -435,7 +435,7 @@ func TestClaims_String(t *testing.T) {
 }
 
 func TestParseWithAud(t *testing.T) {
-	cfg := config.ConfigFromRoot(&testConfig)
+	cfg := config.FromRoot(&testConfig)
 	j := NewService(Opts{AudSecrets: true, Config: cfg, ServiceId: config.ServiceIdAdminApi})
 
 	claims, err := j.Parse(testContext, testJwtValid)

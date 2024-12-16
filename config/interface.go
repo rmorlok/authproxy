@@ -18,6 +18,9 @@ type C interface {
 
 	// MustGetAESKey retrieves an AES key from the config that can be used to symmetrically encrypt data temporarily
 	MustGetAESKey(ctx context.Context) []byte
+
+	// GetFallbackConnectorLogo gets a logo to use if not specified for a connector configuration
+	GetFallbackConnectorLogo() string
 }
 
 type config struct {
@@ -49,6 +52,10 @@ func (c *config) MustGetAESKey(ctx context.Context) []byte {
 	return util.Must(c.GetRoot().SystemAuth.GlobalAESKey.GetData(ctx))
 }
 
+func (c *config) GetFallbackConnectorLogo() string {
+	return "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg"
+}
+
 func LoadConfig(path string) (C, error) {
 	content, err := os.ReadFile(path)
 	if err != nil {
@@ -63,6 +70,6 @@ func LoadConfig(path string) (C, error) {
 	return &config{root: root}, nil
 }
 
-func ConfigFromRoot(root *Root) C {
+func FromRoot(root *Root) C {
 	return &config{root: root}
 }

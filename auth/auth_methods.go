@@ -178,6 +178,10 @@ func (s *Service) validate(ctx context.Context, claims *JwtTokenClaims) error {
 	return v.Validate(claims)
 }
 
+func (s *Service) setJwtResponseHeader(w http.ResponseWriter, tokenString string) {
+	w.Header().Set(jwtHeaderKey, fmt.Sprintf("Bearer %s", tokenString))
+}
+
 // Set creates token cookie with xsrf cookie and put it to ResponseWriter
 // accepts claims and sets expiration if none defined. permanent flag means long-living cookie,
 // false makes it session only.
@@ -200,7 +204,7 @@ func (s *Service) Set(ctx context.Context, w http.ResponseWriter, claims *JwtTok
 	}
 
 	if s.SendJWTHeader {
-		w.Header().Set(jwtHeaderKey, tokenString)
+		s.setJwtResponseHeader(w, tokenString)
 		return claims, nil
 	}
 

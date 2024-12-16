@@ -7,7 +7,7 @@ import (
 	"net/http"
 )
 
-type Connector struct {
+type ConnectorJson struct {
 	Id          string `json:"id"`
 	DisplayName string `json:"display_name"`
 	Description string `json:"description"`
@@ -23,8 +23,8 @@ type ListConnectorsRequestQueryParams struct {
 }
 
 type ListConnectorsResponse struct {
-	Items  []Connector `json:"items"`
-	Cursor string      `json:"cursor,omitempty"`
+	Items  []ConnectorJson `json:"items"`
+	Cursor string          `json:"cursor,omitempty"`
 }
 
 type ConnectorsRoutes struct {
@@ -32,12 +32,17 @@ type ConnectorsRoutes struct {
 	authService *auth.Service
 }
 
-func connectorResponseFromConfig(configConn *config.Connector) Connector {
-	return Connector{
+func connectorResponseFromConfig(cfg config.C, configConn *config.Connector) ConnectorJson {
+	logo := cfg.GetFallbackConnectorLogo()
+	if configConn.Logo != nil {
+		logo = configConn.Logo.GetUrl()
+	}
+
+	return ConnectorJson{
 		Id:          configConn.Id,
 		DisplayName: configConn.DisplayName,
 		Description: configConn.Description,
-		Logo:        configConn.Logo.GetUrl(),
+		Logo:        logo,
 	}
 }
 
@@ -54,7 +59,7 @@ func (r *ConnectorsRoutes) get(ctx *gin.Context) {
 
 	for _, c := range r.cfg.GetRoot().Connectors {
 		if c.Id == req.Id {
-			ctx.JSON(http.StatusOK, connectorResponseFromConfig(&c))
+			ctx.JSON(http.StatusOK, connectorResponseFromConfig(r.cfg, &c))
 			return
 		}
 	}
@@ -69,9 +74,9 @@ func (r *ConnectorsRoutes) list(ctx *gin.Context) {
 		return
 	}
 
-	connectors := make([]Connector, 0, len(r.cfg.GetRoot().Connectors))
+	connectors := make([]ConnectorJson, 0, len(r.cfg.GetRoot().Connectors))
 	for _, c := range r.cfg.GetRoot().Connectors {
-		connectors = append(connectors, connectorResponseFromConfig(&c))
+		connectors = append(connectors, connectorResponseFromConfig(r.cfg, &c))
 	}
 
 	ctx.JSON(http.StatusOK, ListConnectorsResponse{
@@ -79,7 +84,7 @@ func (r *ConnectorsRoutes) list(ctx *gin.Context) {
 	})
 }
 
-func (r *ConnectorsRoutes) Register(g *gin.RouterGroup) {
+func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 	g.GET("/connectors", r.authService.Required(), r.list)
 	g.GET("/connectors/:id", r.authService.Required(), r.get)
 }

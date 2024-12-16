@@ -1,14 +1,9 @@
 package config
 
 import (
-	"encoding/base64"
 	"fmt"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/context"
-	"github.com/rmorlok/authproxy/util"
 	"gopkg.in/yaml.v3"
-	"os"
-	"sync"
 )
 
 type KeyData interface {
@@ -75,94 +70,4 @@ fieldLoop:
 	}
 
 	return keyData, nil
-}
-
-type KeyDataValue struct {
-	Value string `json:"value" yaml:"value"`
-}
-
-func (kv *KeyDataValue) HasData(ctx context.Context) bool {
-	return len(kv.Value) > 0
-}
-
-func (kv *KeyDataValue) GetData(ctx context.Context) ([]byte, error) {
-	return []byte(kv.Value), nil
-}
-
-type KeyDataBase64Val struct {
-	Base64 string `json:"base64" yaml:"base64"`
-}
-
-func (kb *KeyDataBase64Val) HasData(ctx context.Context) bool {
-	return len(kb.Base64) > 0
-}
-
-func (kb *KeyDataBase64Val) GetData(ctx context.Context) ([]byte, error) {
-	decodedBytes, err := base64.StdEncoding.DecodeString(kb.Base64)
-	if err != nil {
-		return nil, err
-	}
-
-	return decodedBytes, nil
-}
-
-type KeyDataEnvVar struct {
-	EnvVar string `json:"env_var" yaml:"env_var"`
-}
-
-func (kev *KeyDataEnvVar) HasData(ctx context.Context) bool {
-	val, present := os.LookupEnv(kev.EnvVar)
-	return present && len(val) > 0
-}
-
-func (kev *KeyDataEnvVar) GetData(ctx context.Context) ([]byte, error) {
-	val, present := os.LookupEnv(kev.EnvVar)
-	if !present || len(val) == 0 {
-		return nil, errors.Errorf("environment variable '%s' does not have value", kev.EnvVar)
-	}
-	return []byte(val), nil
-}
-
-type KeyDataFile struct {
-	Path string `json:"path" yaml:"path"`
-}
-
-func (kf *KeyDataFile) HasData(ctx context.Context) bool {
-	if _, err := os.Stat(kf.Path); os.IsNotExist(err) {
-		return false
-	}
-
-	return true
-}
-
-func (kf *KeyDataFile) GetData(ctx context.Context) ([]byte, error) {
-	if _, err := os.Stat(kf.Path); os.IsNotExist(err) {
-		return nil, errors.Errorf("key file '%s' does not exist", kf.Path)
-	}
-
-	// Read the file contents
-	return os.ReadFile(kf.Path)
-}
-
-type KeyDataRandomBytes struct {
-	NumBytes  int `json:"num_bytes" yaml:"num_bytes"`
-	bytes     []byte
-	bytesOnce sync.Once
-}
-
-func (kf *KeyDataRandomBytes) HasData(ctx context.Context) bool {
-	return true
-}
-
-func (kf *KeyDataRandomBytes) GetData(ctx context.Context) ([]byte, error) {
-	kf.bytesOnce.Do(func() {
-		numBytes := 16
-		if kf.NumBytes > 0 {
-			numBytes = kf.NumBytes
-		}
-
-		kf.bytes = util.MustGenerateSecureRandomKey(numBytes)
-	})
-
-	return kf.bytes, nil
 }

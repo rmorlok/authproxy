@@ -22,13 +22,19 @@ import (
 // Returns:
 // - the config with information populated for the database. If a config was passed in, the same value is returned with data populated.
 // - a database instance configured with the specified root. This database can be used directly, or if the root used again, it will connect to the same database instance.
-func MustApplyBlankTestDbConfig(testName string, root *config.Root) (*config.Root, DB) {
+func MustApplyBlankTestDbConfig(testName string, cfg config.C) (config.C, DB) {
 	if testName != "" {
 		testName = testName + "-"
 	}
 
+	if cfg == nil {
+		cfg = config.FromRoot(&config.Root{})
+	}
+
+	root := cfg.GetRoot()
+
 	if root == nil {
-		root = &config.Root{}
+		panic("No root in config")
 	}
 
 	tempFilePath := filepath.Join(
@@ -65,5 +71,5 @@ func MustApplyBlankTestDbConfig(testName string, root *config.Root) (*config.Roo
 		panic(err)
 	}
 
-	return root, db
+	return cfg, db
 }
