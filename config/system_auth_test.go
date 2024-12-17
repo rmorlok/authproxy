@@ -49,7 +49,9 @@ jwt_signing_key:
     path: ./dev_config/keys/system
 admin_users:
   - username: bobdole
-    key: ./dev_config/keys/admin/bobdole.pub
+    key:
+      public_key:
+        path: ./dev_config/keys/admin/bobdole.pub
 `
 			expected := &SystemAuth{
 				CookieDomain: "localhost:8080",
@@ -61,7 +63,7 @@ admin_users:
 						Path: "./dev_config/keys/system",
 					},
 				},
-				AdminUsers: &AdminUsersList{
+				AdminUsers: AdminUsersList{
 					&AdminUser{
 						Username: "bobdole",
 						Key: &KeyPublicPrivate{
