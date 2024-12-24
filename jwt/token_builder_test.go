@@ -1,4 +1,4 @@
-package auth
+package jwt
 
 import (
 	"github.com/golang-jwt/jwt/v5"
@@ -11,7 +11,7 @@ func TestJwtTokenBuilder(t *testing.T) {
 		t.Run("RSA SSH", func(t *testing.T) {
 			tb := NewJwtTokenBuilder().
 				WithPrivateKeyPath("../test_data/admin_user_keys/ronaldreagan-ssh-rsa")
-			x := tb.(*jwtTokenBuilder)
+			x := tb.(*tokenBuilder)
 			_, signingMethod, err := x.getSigningKeyDataAndMethod()
 			require.NoError(t, err)
 			require.IsType(t, jwt.SigningMethodRS256, signingMethod)
@@ -19,7 +19,7 @@ func TestJwtTokenBuilder(t *testing.T) {
 		t.Run("RSA PEM", func(t *testing.T) {
 			tb := NewJwtTokenBuilder().
 				WithPrivateKeyPath("../test_data/admin_user_keys/ronaldreagan-pem-rsa.pem")
-			x := tb.(*jwtTokenBuilder)
+			x := tb.(*tokenBuilder)
 			_, signingMethod, err := x.getSigningKeyDataAndMethod()
 			require.NoError(t, err)
 			require.IsType(t, jwt.SigningMethodRS256, signingMethod)
@@ -27,7 +27,7 @@ func TestJwtTokenBuilder(t *testing.T) {
 		t.Run("ed SSH", func(t *testing.T) {
 			tb := NewJwtTokenBuilder().
 				WithPrivateKeyPath("../test_data/admin_user_keys/georgebush-ssh-ed")
-			x := tb.(*jwtTokenBuilder)
+			x := tb.(*tokenBuilder)
 			_, signingMethod, err := x.getSigningKeyDataAndMethod()
 			require.NoError(t, err)
 			require.IsType(t, jwt.SigningMethodEdDSA, signingMethod)
@@ -35,7 +35,7 @@ func TestJwtTokenBuilder(t *testing.T) {
 		t.Run("ed PEM", func(t *testing.T) {
 			tb := NewJwtTokenBuilder().
 				WithPrivateKeyPath("../test_data/admin_user_keys/georgebush-pem-ed.pem")
-			x := tb.(*jwtTokenBuilder)
+			x := tb.(*tokenBuilder)
 			_, signingMethod, err := x.getSigningKeyDataAndMethod()
 			require.NoError(t, err)
 			require.IsType(t, jwt.SigningMethodEdDSA, signingMethod)
@@ -43,7 +43,7 @@ func TestJwtTokenBuilder(t *testing.T) {
 		t.Run("ec SSH", func(t *testing.T) {
 			tb := NewJwtTokenBuilder().
 				WithPrivateKeyPath("../test_data/admin_user_keys/jimmycarter-ssh-ec")
-			x := tb.(*jwtTokenBuilder)
+			x := tb.(*tokenBuilder)
 			_, signingMethod, err := x.getSigningKeyDataAndMethod()
 			require.NoError(t, err)
 			_, ok := signingMethod.(*jwt.SigningMethodECDSA)
@@ -52,7 +52,7 @@ func TestJwtTokenBuilder(t *testing.T) {
 		t.Run("ec PEM", func(t *testing.T) {
 			tb := NewJwtTokenBuilder().
 				WithPrivateKeyPath("../test_data/admin_user_keys/jimmycarter-pem-ec.pem")
-			x := tb.(*jwtTokenBuilder)
+			x := tb.(*tokenBuilder)
 			_, signingMethod, err := x.getSigningKeyDataAndMethod()
 			require.NoError(t, err)
 			_, ok := signingMethod.(*jwt.SigningMethodECDSA)
@@ -60,7 +60,7 @@ func TestJwtTokenBuilder(t *testing.T) {
 
 			tb = NewJwtTokenBuilder().
 				WithPrivateKeyPath("../test_data/admin_user_keys/jimmycarter-pem-ec-old.pem")
-			x = tb.(*jwtTokenBuilder)
+			x = tb.(*tokenBuilder)
 			_, signingMethod, err = x.getSigningKeyDataAndMethod()
 			require.NoError(t, err)
 			_, ok = signingMethod.(*jwt.SigningMethodECDSA)

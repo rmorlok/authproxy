@@ -6,6 +6,7 @@ package auth
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/rmorlok/authproxy/jwt"
 	"net/http"
 	"strings"
 )
@@ -15,7 +16,7 @@ func (j *Service) Required() gin.HandlerFunc {
 		success := false
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-			a := GetActorInfoFromRequest(c.Request)
+			a := jwt.GetActorInfoFromRequest(c.Request)
 			c.Set("actor", a)
 			success = a != nil
 
@@ -31,7 +32,7 @@ func (j *Service) Required() gin.HandlerFunc {
 func (j *Service) Optional() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			a := GetActorInfoFromRequest(c.Request)
+			a := jwt.GetActorInfoFromRequest(c.Request)
 			c.Set("actor", a)
 			c.Next()
 		})
@@ -44,7 +45,7 @@ func (j *Service) AdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		success := false
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			actor := GetActorInfoFromRequest(r)
+			actor := jwt.GetActorInfoFromRequest(r)
 			if actor == nil {
 				http.Error(c.Writer, "Unauthorized", http.StatusUnauthorized)
 				return
@@ -73,7 +74,7 @@ func (j *Service) RBAC(roles ...string) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		success := false
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			actor := GetActorInfoFromRequest(c.Request)
+			actor := jwt.GetActorInfoFromRequest(c.Request)
 			if actor == nil {
 				http.Error(c.Writer, "Unauthorized", http.StatusUnauthorized)
 				return

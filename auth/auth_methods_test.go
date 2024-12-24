@@ -5,6 +5,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
+	jwt2 "github.com/rmorlok/authproxy/jwt"
 	"github.com/stretchr/testify/require"
 	test_clock "k8s.io/utils/clock/testing"
 	"net/http"
@@ -56,7 +57,7 @@ func TestJWT_RoundtripPublicPrivate(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(Opts{Config: cfg, ServiceId: config.ServiceIdAdminApi})
 
-	claims := JwtTokenClaims{
+	claims := jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        "random id",
 			Issuer:    "remark42",
@@ -66,7 +67,7 @@ func TestJWT_RoundtripPublicPrivate(t *testing.T) {
 			IssuedAt:  &jwt.NumericDate{testContext.Clock().Now()},
 		},
 
-		Actor: &Actor{
+		Actor: &jwt2.Actor{
 			ID:    "id1",
 			IP:    "127.0.0.1",
 			Email: "me@example.com",
@@ -92,7 +93,7 @@ func TestJWT_RoundtripSecretKey(t *testing.T) {
 	cfg := config.FromRoot(&testConfigSecretKey)
 	j := NewService(Opts{Config: cfg, ServiceId: config.ServiceIdAdminApi})
 
-	claims := JwtTokenClaims{
+	claims := jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        "random id",
 			Issuer:    "remark42",
@@ -102,7 +103,7 @@ func TestJWT_RoundtripSecretKey(t *testing.T) {
 			IssuedAt:  &jwt.NumericDate{testContext.Clock().Now()},
 		},
 
-		Actor: &Actor{
+		Actor: &jwt2.Actor{
 			ID:    "id7",
 			IP:    "127.0.0.1",
 			Email: "me@example.com",
@@ -139,7 +140,7 @@ func TestJWT_Parse(t *testing.T) {
 
 	})
 	t.Run("expired", func(t *testing.T) {
-		org := JwtTokenClaims{
+		org := jwt2.AuthProxyClaims{
 			RegisteredClaims: jwt.RegisteredClaims{
 				ID:        "random id",
 				Issuer:    "remark42",
@@ -149,7 +150,7 @@ func TestJWT_Parse(t *testing.T) {
 				IssuedAt:  &jwt.NumericDate{testContext.Clock().Now()},
 			},
 
-			Actor: &Actor{
+			Actor: &jwt2.Actor{
 				ID:    "id1",
 				IP:    "127.0.0.1",
 				Email: "me@example.com",
@@ -168,7 +169,7 @@ func TestJWT_Parse(t *testing.T) {
 	})
 
 	t.Run("not before", func(t *testing.T) {
-		org := JwtTokenClaims{
+		org := jwt2.AuthProxyClaims{
 			RegisteredClaims: jwt.RegisteredClaims{
 				ID:        "random id",
 				Issuer:    "remark42",
@@ -178,7 +179,7 @@ func TestJWT_Parse(t *testing.T) {
 				IssuedAt:  &jwt.NumericDate{testContext.Clock().Now()},
 			},
 
-			Actor: &Actor{
+			Actor: &jwt2.Actor{
 				ID:    "id1",
 				IP:    "127.0.0.1",
 				Email: "me@example.com",
@@ -280,7 +281,7 @@ func TestJWT_Parse(t *testing.T) {
 		adminSrv := NewService(Opts{Config: cfg, ServiceId: config.ServiceIdAdminApi})
 
 		t.Run("valid", func(t *testing.T) {
-			token, err := NewJwtTokenBuilder().
+			token, err := jwt2.NewJwtTokenBuilder().
 				WithActorId("bobdole").
 				WithActorEmail("bobdole@example.com").
 				WithPrivateKeyPath("../test_data/admin_user_keys/bobdole").
@@ -296,7 +297,7 @@ func TestJWT_Parse(t *testing.T) {
 		})
 
 		t.Run("unknown admin", func(t *testing.T) {
-			token, err := NewJwtTokenBuilder().
+			token, err := jwt2.NewJwtTokenBuilder().
 				WithActorId("billclinton").
 				WithActorEmail("billclinton@example.com").
 				WithPrivateKeyPath("../test_data/admin_user_keys/billclinton").
@@ -309,7 +310,7 @@ func TestJWT_Parse(t *testing.T) {
 		})
 
 		t.Run("wrong key for admin", func(t *testing.T) {
-			token, err := NewJwtTokenBuilder().
+			token, err := jwt2.NewJwtTokenBuilder().
 				WithActorId("bobdole").
 				WithActorEmail("bobdole@example.com").
 				WithPrivateKeyPath("../test_data/admin_user_keys/billclinton").
@@ -566,7 +567,7 @@ func TestJWT_SetAndGetWithCookies(t *testing.T) {
 	req.Header.Add(xsrfHeaderKey, "random id")
 	r, _, err := j.Get(testContext, req)
 	require.Nil(t, err)
-	require.Equal(t, &Actor{ID: "id1", IP: "127.0.0.1",
+	require.Equal(t, &jwt2.Actor{ID: "id1", IP: "127.0.0.1",
 		Email: "me@example.com", Audience: []string{"admin-api"}}, r.Actor)
 	require.Equal(t, "admin-api", claims.Issuer)
 	require.Equal(t, true, claims.SessionOnly)
@@ -647,7 +648,7 @@ func TestJWT_SetAndGetWithCookiesExpired(t *testing.T) {
 	req.Header.Add(xsrfHeaderKey, "random id")
 	_, _, err = j.Get(testContext, req)
 	require.Error(t, err)
-	require.True(t, IsTokenExpiredError(err))
+	require.True(t, jwt2.IsTokenExpiredError(err))
 }
 
 func TestJWT_Reset(t *testing.T) {
@@ -671,11 +672,11 @@ func TestJWT_Reset(t *testing.T) {
 }
 
 func TestJWT_Validator(t *testing.T) {
-	ch := ValidatorFunc(func(token string, claims JwtTokenClaims) bool {
+	ch := ValidatorFunc(func(token string, claims jwt2.AuthProxyClaims) bool {
 		return token == "good"
 	})
-	require.True(t, ch.Validate("good", JwtTokenClaims{}))
-	require.False(t, ch.Validate("bad", JwtTokenClaims{}))
+	require.True(t, ch.Validate("good", jwt2.AuthProxyClaims{}))
+	require.False(t, ch.Validate("bad", jwt2.AuthProxyClaims{}))
 }
 
 func TestClaims_String(t *testing.T) {
@@ -700,8 +701,8 @@ func TestExtractTokenFromBearer(t *testing.T) {
 
 var testContext = context.Background().WithClock(test_clock.NewFakeClock(time.Date(2024, 10, 1, 0, 0, 0, 0, time.UTC)))
 
-func testClaims() *JwtTokenClaims {
-	return &JwtTokenClaims{
+func testClaims() *jwt2.AuthProxyClaims {
+	return &jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        "random id",
 			Issuer:    "remark42",
@@ -711,7 +712,7 @@ func testClaims() *JwtTokenClaims {
 			IssuedAt:  &jwt.NumericDate{testContext.Clock().Now()},
 		},
 
-		Actor: &Actor{
+		Actor: &jwt2.Actor{
 			ID:    "id1",
 			IP:    "127.0.0.1",
 			Email: "me@example.com",

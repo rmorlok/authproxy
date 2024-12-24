@@ -1,4 +1,4 @@
-package auth
+package jwt
 
 import (
 	"github.com/golang-jwt/jwt/v5"
@@ -10,27 +10,27 @@ import (
 func TestJwtTokenClaims(t *testing.T) {
 	t.Run("String", func(t *testing.T) {
 		assert.NotPanics(t, func() {
-			var tc *JwtTokenClaims
+			var tc *AuthProxyClaims
 			tc.String()
 		}, "it doesn't panic on a nil value")
 	})
 	t.Run("IsAdmin", func(t *testing.T) {
-		var tc *JwtTokenClaims
+		var tc *AuthProxyClaims
 		assert.False(t, tc.IsAdmin(), "nil values aren't admins")
 	})
 	t.Run("IsSuperAdmin", func(t *testing.T) {
-		var tc *JwtTokenClaims
+		var tc *AuthProxyClaims
 		assert.False(t, tc.IsAdmin(), "nil values aren't super admins")
 	})
 	t.Run("IsNormalActor", func(t *testing.T) {
-		var tc *JwtTokenClaims
+		var tc *AuthProxyClaims
 		assert.True(t, tc.IsNormalActor(), "nil values are normal actors")
 	})
 	t.Run("AdminUsername", func(t *testing.T) {
 		assert := require.New(t)
 
 		// valid
-		j := JwtTokenClaims{
+		j := AuthProxyClaims{
 			jwt.RegisteredClaims{
 				Subject: "admin/bobdole",
 			},
@@ -45,7 +45,7 @@ func TestJwtTokenClaims(t *testing.T) {
 		assert.Equal("bobdole", username)
 
 		// No actor id
-		j = JwtTokenClaims{
+		j = AuthProxyClaims{
 			jwt.RegisteredClaims{
 				Subject: "admin/bobdole",
 			},
@@ -58,7 +58,7 @@ func TestJwtTokenClaims(t *testing.T) {
 		assert.Error(err)
 
 		// No subject
-		j = JwtTokenClaims{
+		j = AuthProxyClaims{
 			jwt.RegisteredClaims{},
 			&Actor{
 				ID:    "admin/bobdole",
@@ -70,7 +70,7 @@ func TestJwtTokenClaims(t *testing.T) {
 		assert.Error(err)
 
 		// usernames don't match
-		j = JwtTokenClaims{
+		j = AuthProxyClaims{
 			jwt.RegisteredClaims{
 				Subject: "admin/bobsmith",
 			},
@@ -84,7 +84,7 @@ func TestJwtTokenClaims(t *testing.T) {
 		assert.Error(err)
 
 		// not formatted as admin username
-		j = JwtTokenClaims{
+		j = AuthProxyClaims{
 			jwt.RegisteredClaims{
 				Subject: "bobdole",
 			},
@@ -98,7 +98,7 @@ func TestJwtTokenClaims(t *testing.T) {
 		assert.Error(err)
 
 		// not admin
-		j = JwtTokenClaims{
+		j = AuthProxyClaims{
 			jwt.RegisteredClaims{
 				Subject: "admin/bobdole",
 			},
@@ -112,7 +112,7 @@ func TestJwtTokenClaims(t *testing.T) {
 		assert.Error(err)
 
 		// Blank object
-		j = JwtTokenClaims{}
+		j = AuthProxyClaims{}
 		_, err = j.AdminUsername()
 		assert.Error(err)
 	})

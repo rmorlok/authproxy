@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/rmorlok/authproxy/auth"
+	"github.com/rmorlok/authproxy/jwt"
 	"github.com/rmorlok/authproxy/util"
 	"github.com/spf13/cobra"
 	"os"
@@ -26,7 +26,7 @@ func cmdVerifyJwt() *cobra.Command {
 				return fmt.Errorf("must specify public key to verify JWT")
 			}
 
-			pb := auth.NewJwtTokenParserBuilder()
+			pb := jwt.NewJwtTokenParserBuilder()
 
 			if publicKeyPath != "" {
 				pb = pb.WithPublicKeyPath(publicKeyPath)

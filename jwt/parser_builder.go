@@ -1,4 +1,4 @@
-package auth
+package jwt
 
 import (
 	"crypto/ecdsa"
@@ -26,43 +26,43 @@ import (
 // * kd: the key data to use
 // * isShared: if the key data is a shared (aka secret) key. If false, will assume public key.
 // * err: An error from loading key data. If specified, other return values are ignored.
-type KeySelector func(ctx context.Context, unverified *JwtTokenClaims) (kd config.KeyData, isShared bool, err error)
+type KeySelector func(ctx context.Context, unverified *AuthProxyClaims) (kd config.KeyData, isShared bool, err error)
 
-// JwtTokenParserBuilder is a builder that can parse a JWT
-type JwtTokenParserBuilder interface {
+// ParserBuilder is a builder that can parse a JWT
+type ParserBuilder interface {
 
 	// WithKeySelector specifies a key selector function to dynamically load a key based on the unverified, parsed
 	// JWT. This is useful for cases where the key used can vary based on the token issued.
-	WithKeySelector(KeySelector) JwtTokenParserBuilder
+	WithKeySelector(KeySelector) ParserBuilder
 
 	// WithConfigKey specifies the key to be used for parsing as a config value. Key can be either secret or public.
-	WithConfigKey(ctx context.Context, cfgKey config.Key) JwtTokenParserBuilder
+	WithConfigKey(ctx context.Context, cfgKey config.Key) ParserBuilder
 
 	// WithPublicKeyPath specifies the public key as a file path.
-	WithPublicKeyPath(string) JwtTokenParserBuilder
+	WithPublicKeyPath(string) ParserBuilder
 
 	// WithPublicKeyString specifies the public key as an explicit string value.
-	WithPublicKeyString(string) JwtTokenParserBuilder
+	WithPublicKeyString(string) ParserBuilder
 
 	// WithPublicKey sets the public key using the provided byte slice.
-	WithPublicKey([]byte) JwtTokenParserBuilder
+	WithPublicKey([]byte) ParserBuilder
 
 	// WithSharedKeyPath sets the shared (aka secret) key using the file path provided.
-	WithSharedKeyPath(string) JwtTokenParserBuilder
+	WithSharedKeyPath(string) ParserBuilder
 
 	// WithSharedKeyString sets the shared (aka secret) key for the parser using a string.
-	WithSharedKeyString(string) JwtTokenParserBuilder
+	WithSharedKeyString(string) ParserBuilder
 
 	// WithSharedKey sets the shared (aka secret) key for the JWT parser using the provided byte slice.
-	WithSharedKey([]byte) JwtTokenParserBuilder
+	WithSharedKey([]byte) ParserBuilder
 
-	ParseCtx(context.Context, string) (*JwtTokenClaims, error)
-	Parse(string) (*JwtTokenClaims, error)
-	MustParseCtx(context.Context, string) JwtTokenClaims
-	MustParse(string) JwtTokenClaims
+	ParseCtx(context.Context, string) (*AuthProxyClaims, error)
+	Parse(string) (*AuthProxyClaims, error)
+	MustParseCtx(context.Context, string) AuthProxyClaims
+	MustParse(string) AuthProxyClaims
 }
 
-type jwtTokenParserBuilder struct {
+type parserBuilder struct {
 	keySelector   KeySelector
 	key           config.Key
 	publicKeyPath *string
@@ -71,16 +71,16 @@ type jwtTokenParserBuilder struct {
 	secretKeyData []byte
 }
 
-func (pb *jwtTokenParserBuilder) WithKeySelector(
+func (pb *parserBuilder) WithKeySelector(
 	selector KeySelector,
-) JwtTokenParserBuilder {
+) ParserBuilder {
 	pb.keySelector = selector
 	return pb
 }
 
-func (pb *jwtTokenParserBuilder) defaultKeySelector(
+func (pb *parserBuilder) defaultKeySelector(
 	ctx context.Context,
-	unverified *JwtTokenClaims,
+	unverified *AuthProxyClaims,
 ) (config.KeyData, bool, error) {
 	const (
 		isPublicKey = false
@@ -130,35 +130,35 @@ func (pb *jwtTokenParserBuilder) defaultKeySelector(
 	return nil, isSharedKey, errors.New("no key specified")
 }
 
-func (pb *jwtTokenParserBuilder) WithConfigKey(ctx context.Context, cfgKey config.Key) JwtTokenParserBuilder {
+func (pb *parserBuilder) WithConfigKey(ctx context.Context, cfgKey config.Key) ParserBuilder {
 	pb.key = cfgKey
 	return pb
 }
 
-func (pb *jwtTokenParserBuilder) WithPublicKeyPath(publicKeyPath string) JwtTokenParserBuilder {
+func (pb *parserBuilder) WithPublicKeyPath(publicKeyPath string) ParserBuilder {
 	pb.publicKeyPath = &publicKeyPath
 	return pb
 }
 
-func (pb *jwtTokenParserBuilder) WithPublicKeyString(publicKey string) JwtTokenParserBuilder {
+func (pb *parserBuilder) WithPublicKeyString(publicKey string) ParserBuilder {
 	return pb.WithPublicKey([]byte(publicKey))
 }
 
-func (pb *jwtTokenParserBuilder) WithPublicKey(publicKey []byte) JwtTokenParserBuilder {
+func (pb *parserBuilder) WithPublicKey(publicKey []byte) ParserBuilder {
 	pb.publicKeyData = publicKey
 	return pb
 }
 
-func (pb *jwtTokenParserBuilder) WithSharedKeyPath(secretKeyPath string) JwtTokenParserBuilder {
+func (pb *parserBuilder) WithSharedKeyPath(secretKeyPath string) ParserBuilder {
 	pb.secretKeyPath = &secretKeyPath
 	return pb
 }
 
-func (pb *jwtTokenParserBuilder) WithSharedKeyString(secretKey string) JwtTokenParserBuilder {
+func (pb *parserBuilder) WithSharedKeyString(secretKey string) ParserBuilder {
 	return pb.WithSharedKey([]byte(secretKey))
 }
 
-func (pb *jwtTokenParserBuilder) WithSharedKey(secretKey []byte) JwtTokenParserBuilder {
+func (pb *parserBuilder) WithSharedKey(secretKey []byte) ParserBuilder {
 	pb.secretKeyData = secretKey
 	return pb
 }
@@ -264,7 +264,7 @@ func signingKeyMethodFromParsedPublicKey(parsedKey interface{}) (interface{}, jw
 	}
 }
 
-func (pb *jwtTokenParserBuilder) getVerifyingKeyData(ctx context.Context, unverified *JwtTokenClaims) (interface{}, jwt.SigningMethod, error) {
+func (pb *parserBuilder) getVerifyingKeyData(ctx context.Context, unverified *AuthProxyClaims) (interface{}, jwt.SigningMethod, error) {
 	keySelector := pb.defaultKeySelector
 	if pb.keySelector != nil {
 		keySelector = pb.keySelector
@@ -291,7 +291,7 @@ func (pb *jwtTokenParserBuilder) getVerifyingKeyData(ctx context.Context, unveri
 	return loadPublicKeyFromPEMOrOpenSSH(rawKeyData)
 }
 
-func (pb *jwtTokenParserBuilder) ParseCtx(ctx context.Context, token string) (*JwtTokenClaims, error) {
+func (pb *parserBuilder) ParseCtx(ctx context.Context, token string) (*AuthProxyClaims, error) {
 	if pb.secretKeyPath == nil && pb.secretKeyData == nil &&
 		pb.publicKeyData == nil && pb.publicKeyPath == nil &&
 		pb.keySelector == nil {
@@ -305,8 +305,8 @@ func (pb *jwtTokenParserBuilder) ParseCtx(ctx context.Context, token string) (*J
 	)
 
 	// Now parse with verification, using the key for this actor
-	parsed, err := parser.ParseWithClaims(token, &JwtTokenClaims{}, func(unverified *jwt.Token) (interface{}, error) {
-		unverifiedClaims, ok := unverified.Claims.(*JwtTokenClaims)
+	parsed, err := parser.ParseWithClaims(token, &AuthProxyClaims{}, func(unverified *jwt.Token) (interface{}, error) {
+		unverifiedClaims, ok := unverified.Claims.(*AuthProxyClaims)
 		if !ok {
 			return nil, errors.New("invalid token")
 		}
@@ -322,7 +322,7 @@ func (pb *jwtTokenParserBuilder) ParseCtx(ctx context.Context, token string) (*J
 		return nil, errors.Wrap(err, "can't parse token")
 	}
 
-	claims, ok := parsed.Claims.(*JwtTokenClaims)
+	claims, ok := parsed.Claims.(*AuthProxyClaims)
 	if !ok {
 		return nil, errors.New("invalid token")
 	}
@@ -330,11 +330,11 @@ func (pb *jwtTokenParserBuilder) ParseCtx(ctx context.Context, token string) (*J
 	return claims, nil
 }
 
-func (pb *jwtTokenParserBuilder) Parse(token string) (*JwtTokenClaims, error) {
+func (pb *parserBuilder) Parse(token string) (*AuthProxyClaims, error) {
 	return pb.ParseCtx(context.Background(), token)
 }
 
-func (pb *jwtTokenParserBuilder) MustParseCtx(ctx context.Context, token string) JwtTokenClaims {
+func (pb *parserBuilder) MustParseCtx(ctx context.Context, token string) AuthProxyClaims {
 	claims, err := pb.ParseCtx(ctx, token)
 	if err != nil {
 		panic(err)
@@ -343,10 +343,10 @@ func (pb *jwtTokenParserBuilder) MustParseCtx(ctx context.Context, token string)
 	return *claims
 }
 
-func (pb *jwtTokenParserBuilder) MustParse(token string) JwtTokenClaims {
+func (pb *parserBuilder) MustParse(token string) AuthProxyClaims {
 	return pb.MustParseCtx(context.Background(), token)
 }
 
-func NewJwtTokenParserBuilder() JwtTokenParserBuilder {
-	return &jwtTokenParserBuilder{}
+func NewJwtTokenParserBuilder() ParserBuilder {
+	return &parserBuilder{}
 }

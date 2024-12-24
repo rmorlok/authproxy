@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
+	jwt2 "github.com/rmorlok/authproxy/jwt"
 	"net/http"
 	"strings"
 	"time"
@@ -25,7 +26,7 @@ func verificationKeyData(key config.Key) config.KeyData {
 
 // keyDataForToken loads an appropriate key to sign or verify a given token. This accounts for the
 // fact that admin users will verify with different keys to sign/verify tokens.
-func (s *Service) keyForToken(claims *JwtTokenClaims) (config.Key, error) {
+func (s *Service) keyForToken(claims *jwt2.AuthProxyClaims) (config.Key, error) {
 	if claims.IsAdmin() {
 		adminUsername, err := claims.AdminUsername()
 		if err != nil {
@@ -44,7 +45,7 @@ func (s *Service) keyForToken(claims *JwtTokenClaims) (config.Key, error) {
 }
 
 // Token mints a signed JWT with the specified claims
-func (s *Service) Token(ctx context.Context, claims *JwtTokenClaims) (string, error) {
+func (s *Service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (string, error) {
 	key, err := s.keyForToken(claims)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get key")
@@ -67,7 +68,7 @@ func (s *Service) Token(ctx context.Context, claims *JwtTokenClaims) (string, er
 		return "", errors.New("some service ids in aud are invalid")
 	}
 
-	tb, err := NewJwtTokenBuilder().
+	tb, err := jwt2.NewJwtTokenBuilder().
 		WithClaims(claims).
 		WithConfigKey(ctx, key)
 
@@ -79,9 +80,9 @@ func (s *Service) Token(ctx context.Context, claims *JwtTokenClaims) (string, er
 }
 
 // Parse token string and verify.
-func (s *Service) Parse(ctx context.Context, tokenString string) (*JwtTokenClaims, error) {
-	claims, err := NewJwtTokenParserBuilder().
-		WithKeySelector(func(ctx context.Context, unverified *JwtTokenClaims) (kd config.KeyData, isShared bool, err error) {
+func (s *Service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProxyClaims, error) {
+	claims, err := jwt2.NewJwtTokenParserBuilder().
+		WithKeySelector(func(ctx context.Context, unverified *jwt2.AuthProxyClaims) (kd config.KeyData, isShared bool, err error) {
 			key, err := s.keyForToken(unverified)
 			if err != nil {
 				return nil, false, errors.Wrap(err, "failed to get key")
@@ -116,7 +117,7 @@ func (s *Service) Parse(ctx context.Context, tokenString string) (*JwtTokenClaim
 	return claims, s.validate(ctx, claims)
 }
 
-func (s *Service) validate(ctx context.Context, claims *JwtTokenClaims) error {
+func (s *Service) validate(ctx context.Context, claims *jwt2.AuthProxyClaims) error {
 	v := jwt.NewValidator(
 		jwt.WithTimeFunc(func() time.Time {
 			return ctx.Clock().Now()
@@ -133,7 +134,7 @@ func (s *Service) setJwtResponseHeader(w http.ResponseWriter, tokenString string
 // Set creates token cookie with xsrf cookie and put it to ResponseWriter
 // accepts claims and sets expiration if none defined. permanent flag means long-living cookie,
 // false makes it session only.
-func (s *Service) Set(ctx context.Context, w http.ResponseWriter, claims *JwtTokenClaims) (*JwtTokenClaims, error) {
+func (s *Service) Set(ctx context.Context, w http.ResponseWriter, claims *jwt2.AuthProxyClaims) (*jwt2.AuthProxyClaims, error) {
 	expiresAt, err := claims.GetExpirationTime()
 	if err != nil {
 		return nil, errors.Wrap(err, "can't get expiration time")
@@ -199,7 +200,7 @@ func extractTokenFromBearer(authorizationHeader string) (string, error) {
 
 // Get token from url, header, or cookie
 // if cookie used, verify xsrf token to match
-func (s *Service) Get(ctx context.Context, r *http.Request) (*JwtTokenClaims, string, error) {
+func (s *Service) Get(ctx context.Context, r *http.Request) (*jwt2.AuthProxyClaims, string, error) {
 
 	fromCookie := false
 	tokenString := ""
@@ -253,7 +254,7 @@ func (s *Service) Get(ctx context.Context, r *http.Request) (*JwtTokenClaims, st
 }
 
 // IsExpired returns true if claims expired
-func (s *Service) IsExpired(ctx context.Context, claims *JwtTokenClaims) bool {
+func (s *Service) IsExpired(ctx context.Context, claims *jwt2.AuthProxyClaims) bool {
 	return claims.ExpiresAt != nil && claims.ExpiresAt.Before(ctx.Clock().Now())
 }
 
@@ -280,9 +281,4 @@ func claimStringsVal(cs jwt.ClaimStrings) string {
 	}
 
 	return fmt.Sprintf("%q", cs)
-}
-
-// ClaimString converts a singular string into a claims string.
-func ClaimString(s string) jwt.ClaimStrings {
-	return jwt.ClaimStrings{s}
 }

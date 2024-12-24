@@ -1,4 +1,4 @@
-package auth
+package jwt
 
 import (
 	"encoding/json"
@@ -8,16 +8,16 @@ import (
 	"strings"
 )
 
-// JwtTokenClaims is the struct that defines a JWT for the auth service. It contains information about the actor
+// AuthProxyClaims is the struct that defines a JWT for the auth service. It contains information about the actor
 // (user or system taking the action) as well as standard JWT information.
-type JwtTokenClaims struct {
+type AuthProxyClaims struct {
 	jwt.RegisteredClaims
 	Actor       *Actor `json:"actor,omitempty"`
 	SessionOnly bool   `json:"sess_only,omitempty"`
 }
 
-func (tc *JwtTokenClaims) String() string {
-	var tmp JwtTokenClaims
+func (tc *AuthProxyClaims) String() string {
+	var tmp AuthProxyClaims
 	if tc != nil {
 		tmp = *tc
 	}
@@ -32,7 +32,7 @@ func (tc *JwtTokenClaims) String() string {
 // AdminUsername retrieves the username of an admin actor. Admin actors must have their id and token subject formatted
 // in the form admin/username. If token subject and actor id do not match, or they are not correctly formatted, this
 // method will return an error.
-func (tc *JwtTokenClaims) AdminUsername() (string, error) {
+func (tc *AuthProxyClaims) AdminUsername() (string, error) {
 	if !tc.IsAdmin() {
 		return "", errors.New("not admin")
 	}
@@ -49,7 +49,7 @@ func (tc *JwtTokenClaims) AdminUsername() (string, error) {
 }
 
 // IsAdmin checks if the actor represented by these claims is an admin
-func (tc *JwtTokenClaims) IsAdmin() bool {
+func (tc *AuthProxyClaims) IsAdmin() bool {
 	if tc == nil {
 		return false
 	}
@@ -58,7 +58,7 @@ func (tc *JwtTokenClaims) IsAdmin() bool {
 }
 
 // IsSuperAdmin checks if the actor represented by these claims is an admin
-func (tc *JwtTokenClaims) IsSuperAdmin() bool {
+func (tc *AuthProxyClaims) IsSuperAdmin() bool {
 	if tc == nil {
 		return false
 	}
@@ -67,7 +67,7 @@ func (tc *JwtTokenClaims) IsSuperAdmin() bool {
 }
 
 // IsNormalActor checks if the actor represented by these claims is not an admin or superadmin
-func (tc *JwtTokenClaims) IsNormalActor() bool {
+func (tc *AuthProxyClaims) IsNormalActor() bool {
 	if tc == nil {
 		// nil values default to normal actors to route to lower access paths
 		return true

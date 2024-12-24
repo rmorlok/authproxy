@@ -1,4 +1,4 @@
-package auth
+package jwt
 
 import (
 	"crypto/ecdsa"
@@ -17,35 +17,35 @@ import (
 	"time"
 )
 
-// JwtTokenBuilder extends from JwtBuilder to provide options to sign tokens
-type JwtTokenBuilder interface {
+// TokenBuilder extends from ClaimsBuilder to provide options to sign tokens
+type TokenBuilder interface {
 	// WithClaims allows the claims to be specified explicitly instead of built progressively
-	WithClaims(c *JwtTokenClaims) JwtTokenBuilder
+	WithClaims(c *AuthProxyClaims) TokenBuilder
 
 	/*
 	 * Create claims dynamically as part of the builder
 	 */
 
-	WithIssuer(issuer string) JwtTokenBuilder
-	WithAudience(audience string) JwtTokenBuilder
-	WithServiceId(serviceId config.ServiceId) JwtTokenBuilder
-	WithServiceIds(serviceId []config.ServiceId) JwtTokenBuilder
-	WithExpiration(expiration time.Time) JwtTokenBuilder
-	WithExpiresIn(expiresIn time.Duration) JwtTokenBuilder
-	WithExpiresInCtx(ctx context.Context, expiresIn time.Duration) JwtTokenBuilder
-	WithSuperAdmin() JwtTokenBuilder
-	WithAdmin() JwtTokenBuilder
-	WithActorEmail(email string) JwtTokenBuilder
-	WithActorId(id string) JwtTokenBuilder
-	WithSessionOnly() JwtTokenBuilder
+	WithIssuer(issuer string) TokenBuilder
+	WithAudience(audience string) TokenBuilder
+	WithServiceId(serviceId config.ServiceId) TokenBuilder
+	WithServiceIds(serviceId []config.ServiceId) TokenBuilder
+	WithExpiration(expiration time.Time) TokenBuilder
+	WithExpiresIn(expiresIn time.Duration) TokenBuilder
+	WithExpiresInCtx(ctx context.Context, expiresIn time.Duration) TokenBuilder
+	WithSuperAdmin() TokenBuilder
+	WithAdmin() TokenBuilder
+	WithActorEmail(email string) TokenBuilder
+	WithActorId(id string) TokenBuilder
+	WithSessionOnly() TokenBuilder
 
-	WithConfigKey(ctx context.Context, cfgKey config.Key) (JwtTokenBuilder, error)
-	WithPrivateKeyPath(string) JwtTokenBuilder
-	WithPrivateKeyString(string) JwtTokenBuilder
-	WithPrivateKey([]byte) JwtTokenBuilder
-	WithSecretKeyPath(string) JwtTokenBuilder
-	WithSecretKeyString(string) JwtTokenBuilder
-	WithSecretKey([]byte) JwtTokenBuilder
+	WithConfigKey(ctx context.Context, cfgKey config.Key) (TokenBuilder, error)
+	WithPrivateKeyPath(string) TokenBuilder
+	WithPrivateKeyString(string) TokenBuilder
+	WithPrivateKey([]byte) TokenBuilder
+	WithSecretKeyPath(string) TokenBuilder
+	WithSecretKeyString(string) TokenBuilder
+	WithSecretKey([]byte) TokenBuilder
 
 	TokenCtx(context.Context) (string, error)
 	Token() (string, error)
@@ -53,82 +53,82 @@ type JwtTokenBuilder interface {
 	MustToken() string
 }
 
-type jwtTokenBuilder struct {
-	jwtBuilder     jwtBuilder
-	claims         *JwtTokenClaims
+type tokenBuilder struct {
+	jwtBuilder     claimsBuilder
+	claims         *AuthProxyClaims
 	privateKeyPath *string
 	privateKeyData []byte
 	secretKeyPath  *string
 	secretKeyData  []byte
 }
 
-func (tb *jwtTokenBuilder) WithClaims(c *JwtTokenClaims) JwtTokenBuilder {
+func (tb *tokenBuilder) WithClaims(c *AuthProxyClaims) TokenBuilder {
 	tb.claims = c
 	return tb
 }
 
-func (tb *jwtTokenBuilder) WithIssuer(issuer string) JwtTokenBuilder {
+func (tb *tokenBuilder) WithIssuer(issuer string) TokenBuilder {
 	tb.jwtBuilder.WithIssuer(issuer)
 	return tb
 }
 
-func (tb *jwtTokenBuilder) WithAudience(audience string) JwtTokenBuilder {
+func (tb *tokenBuilder) WithAudience(audience string) TokenBuilder {
 	tb.jwtBuilder.WithAudience(audience)
 	return tb
 }
 
-func (tb *jwtTokenBuilder) WithServiceId(serviceId config.ServiceId) JwtTokenBuilder {
+func (tb *tokenBuilder) WithServiceId(serviceId config.ServiceId) TokenBuilder {
 	tb.jwtBuilder.WithServiceId(serviceId)
 	return tb
 }
 
-func (tb *jwtTokenBuilder) WithServiceIds(serviceIds []config.ServiceId) JwtTokenBuilder {
+func (tb *tokenBuilder) WithServiceIds(serviceIds []config.ServiceId) TokenBuilder {
 	tb.jwtBuilder.WithServiceIds(serviceIds)
 	return tb
 }
 
-func (tb *jwtTokenBuilder) WithExpiration(expiration time.Time) JwtTokenBuilder {
+func (tb *tokenBuilder) WithExpiration(expiration time.Time) TokenBuilder {
 	tb.jwtBuilder.WithExpiration(expiration)
 	return tb
 }
 
-func (tb *jwtTokenBuilder) WithExpiresIn(expiresIn time.Duration) JwtTokenBuilder {
+func (tb *tokenBuilder) WithExpiresIn(expiresIn time.Duration) TokenBuilder {
 	tb.jwtBuilder.WithExpiresIn(expiresIn)
 	return tb
 }
 
-func (tb *jwtTokenBuilder) WithExpiresInCtx(ctx context.Context, expiresIn time.Duration) JwtTokenBuilder {
+func (tb *tokenBuilder) WithExpiresInCtx(ctx context.Context, expiresIn time.Duration) TokenBuilder {
 	tb.jwtBuilder.WithExpiresInCtx(ctx, expiresIn)
 	return tb
 }
 
-func (tb *jwtTokenBuilder) WithSuperAdmin() JwtTokenBuilder {
+func (tb *tokenBuilder) WithSuperAdmin() TokenBuilder {
 	tb.jwtBuilder.WithSuperAdmin()
 	return tb
 }
 
-func (tb *jwtTokenBuilder) WithAdmin() JwtTokenBuilder {
+func (tb *tokenBuilder) WithAdmin() TokenBuilder {
 	tb.jwtBuilder.WithAdmin()
 	return tb
 }
 
-func (tb *jwtTokenBuilder) WithActorEmail(email string) JwtTokenBuilder {
+func (tb *tokenBuilder) WithActorEmail(email string) TokenBuilder {
 	tb.jwtBuilder.WithActorEmail(email)
 	return tb
 }
 
-func (tb *jwtTokenBuilder) WithActorId(id string) JwtTokenBuilder {
+func (tb *tokenBuilder) WithActorId(id string) TokenBuilder {
 	tb.jwtBuilder.WithActorId(id)
 	return tb
 }
 
-func (tb *jwtTokenBuilder) WithSessionOnly() JwtTokenBuilder {
+func (tb *tokenBuilder) WithSessionOnly() TokenBuilder {
 	tb.jwtBuilder.WithSessionOnly()
 	return tb
 }
 
-func (tb *jwtTokenBuilder) WithConfigKey(ctx context.Context, cfgKey config.Key) (JwtTokenBuilder, error) {
-	var us JwtTokenBuilder = tb
+func (tb *tokenBuilder) WithConfigKey(ctx context.Context, cfgKey config.Key) (TokenBuilder, error) {
+	var us TokenBuilder = tb
 
 	if pp, ok := cfgKey.(*config.KeyPublicPrivate); ok {
 		if pp.PrivateKey != nil {
@@ -157,30 +157,30 @@ func (tb *jwtTokenBuilder) WithConfigKey(ctx context.Context, cfgKey config.Key)
 	return us, nil
 }
 
-func (tb *jwtTokenBuilder) WithPrivateKeyPath(privateKeyPath string) JwtTokenBuilder {
+func (tb *tokenBuilder) WithPrivateKeyPath(privateKeyPath string) TokenBuilder {
 	tb.privateKeyPath = &privateKeyPath
 	return tb
 }
 
-func (tb *jwtTokenBuilder) WithPrivateKeyString(privateKey string) JwtTokenBuilder {
+func (tb *tokenBuilder) WithPrivateKeyString(privateKey string) TokenBuilder {
 	return tb.WithPrivateKey([]byte(privateKey))
 }
 
-func (tb *jwtTokenBuilder) WithPrivateKey(privateKey []byte) JwtTokenBuilder {
+func (tb *tokenBuilder) WithPrivateKey(privateKey []byte) TokenBuilder {
 	tb.privateKeyData = privateKey
 	return tb
 }
 
-func (tb *jwtTokenBuilder) WithSecretKeyPath(secretKeyPath string) JwtTokenBuilder {
+func (tb *tokenBuilder) WithSecretKeyPath(secretKeyPath string) TokenBuilder {
 	tb.secretKeyPath = &secretKeyPath
 	return tb
 }
 
-func (tb *jwtTokenBuilder) WithSecretKeyString(secretKey string) JwtTokenBuilder {
+func (tb *tokenBuilder) WithSecretKeyString(secretKey string) TokenBuilder {
 	return tb.WithSecretKey([]byte(secretKey))
 }
 
-func (tb *jwtTokenBuilder) WithSecretKey(secretKey []byte) JwtTokenBuilder {
+func (tb *tokenBuilder) WithSecretKey(secretKey []byte) TokenBuilder {
 	tb.secretKeyData = secretKey
 	return tb
 }
@@ -259,7 +259,7 @@ func signingKeyMethodFromParsedPrivateKey(parsedKey interface{}) (interface{}, j
 	}
 }
 
-func (tb *jwtTokenBuilder) getSigningKeyDataAndMethod() (interface{}, jwt.SigningMethod, error) {
+func (tb *tokenBuilder) getSigningKeyDataAndMethod() (interface{}, jwt.SigningMethod, error) {
 	if tb.privateKeyData != nil && tb.privateKeyPath != nil {
 		return nil, nil, errors.New("cannot specify secret key data and path")
 	}
@@ -318,8 +318,8 @@ func (tb *jwtTokenBuilder) getSigningKeyDataAndMethod() (interface{}, jwt.Signin
 	return keyData, jwt.SigningMethodHS256, nil
 }
 
-func (tb *jwtTokenBuilder) TokenCtx(ctx context.Context) (string, error) {
-	var claims *JwtTokenClaims
+func (tb *tokenBuilder) TokenCtx(ctx context.Context) (string, error) {
+	var claims *AuthProxyClaims
 	var err error
 
 	if tb.claims != nil {
@@ -345,11 +345,11 @@ func (tb *jwtTokenBuilder) TokenCtx(ctx context.Context) (string, error) {
 	return tokenString, nil
 }
 
-func (tb *jwtTokenBuilder) Token() (string, error) {
+func (tb *tokenBuilder) Token() (string, error) {
 	return tb.TokenCtx(context.Background())
 }
 
-func (tb *jwtTokenBuilder) MustTokenCtx(ctx context.Context) string {
+func (tb *tokenBuilder) MustTokenCtx(ctx context.Context) string {
 	token, err := tb.TokenCtx(ctx)
 	if err != nil {
 		panic(err)
@@ -358,10 +358,10 @@ func (tb *jwtTokenBuilder) MustTokenCtx(ctx context.Context) string {
 	return token
 }
 
-func (tb *jwtTokenBuilder) MustToken() string {
+func (tb *tokenBuilder) MustToken() string {
 	return tb.MustTokenCtx(context.Background())
 }
 
-func NewJwtTokenBuilder() JwtTokenBuilder {
-	return &jwtTokenBuilder{}
+func NewJwtTokenBuilder() TokenBuilder {
+	return &tokenBuilder{}
 }

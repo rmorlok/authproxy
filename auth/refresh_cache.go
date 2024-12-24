@@ -1,18 +1,19 @@
 package auth
 
 import (
+	"github.com/rmorlok/authproxy/jwt"
 	"sync"
 	"sync/atomic"
 )
 
 // RefreshCache defines interface storing and retrieving refreshed tokens
 type RefreshCache interface {
-	Get(key string) (value JwtTokenClaims, ok bool)
-	Set(key string, value JwtTokenClaims)
+	Get(key string) (value jwt.AuthProxyClaims, ok bool)
+	Set(key string, value jwt.AuthProxyClaims)
 }
 
 type memoryRefreshCache struct {
-	data map[string]JwtTokenClaims
+	data map[string]jwt.AuthProxyClaims
 	sync.RWMutex
 	hits, misses int32
 }
@@ -22,10 +23,10 @@ func NewMemoryRefreshCache() RefreshCache {
 }
 
 func newMemoryRefreshCache() *memoryRefreshCache {
-	return &memoryRefreshCache{data: make(map[string]JwtTokenClaims)}
+	return &memoryRefreshCache{data: make(map[string]jwt.AuthProxyClaims)}
 }
 
-func (c *memoryRefreshCache) Get(key string) (value JwtTokenClaims, ok bool) {
+func (c *memoryRefreshCache) Get(key string) (value jwt.AuthProxyClaims, ok bool) {
 	c.RLock()
 	defer c.RUnlock()
 	value, ok = c.data[key]
@@ -37,7 +38,7 @@ func (c *memoryRefreshCache) Get(key string) (value JwtTokenClaims, ok bool) {
 	return value, ok
 }
 
-func (c *memoryRefreshCache) Set(key string, value JwtTokenClaims) {
+func (c *memoryRefreshCache) Set(key string, value jwt.AuthProxyClaims) {
 	c.Lock()
 	defer c.Unlock()
 	c.data[key] = value

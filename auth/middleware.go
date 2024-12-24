@@ -5,6 +5,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/context"
+	jwt2 "github.com/rmorlok/authproxy/jwt"
 	"net/http"
 	"time"
 )
@@ -60,7 +61,7 @@ func (j *Service) auth(reqAuth bool) func(http.Handler) http.Handler {
 					}
 				}
 
-				r = SetActorInfoOnRequest(r, claims.Actor) // populate actor info to request context
+				r = jwt2.SetActorInfoOnRequest(r, claims.Actor) // populate actor info to request context
 			}
 
 			h.ServeHTTP(w, r)
@@ -71,7 +72,7 @@ func (j *Service) auth(reqAuth bool) func(http.Handler) http.Handler {
 }
 
 // refreshExpiredToken makes a new token with passed claims
-func (j *Service) refreshExpiredToken(ctx context.Context, w http.ResponseWriter, claims *JwtTokenClaims, tkn string) (*JwtTokenClaims, error) {
+func (j *Service) refreshExpiredToken(ctx context.Context, w http.ResponseWriter, claims *jwt2.AuthProxyClaims, tkn string) (*jwt2.AuthProxyClaims, error) {
 	if claims.IsAdmin() || claims.IsSuperAdmin() {
 		return nil, errors.New("cannot refresh admin tokens")
 	}

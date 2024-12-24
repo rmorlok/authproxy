@@ -3,8 +3,8 @@ package main
 import (
 	"fmt"
 	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/jwt"
 	"github.com/spf13/cobra"
 	"os/user"
 	"strings"
@@ -59,7 +59,7 @@ func cmdSignJwt() *cobra.Command {
 				}
 			}
 
-			b := auth.NewJwtTokenBuilder().
+			b := jwt.NewJwtTokenBuilder().
 				WithActorId(userId).
 				WithServiceIds(serviceIds)
 

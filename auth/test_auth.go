@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
+	jwt2 "github.com/rmorlok/authproxy/jwt"
 	"github.com/rmorlok/authproxy/logger"
 	"io"
 	"net/http"
@@ -59,7 +60,7 @@ func (atu *AuthTestUtil) NewSignedRequestForActorId(method, url string, body io.
 	req, err = atu.SignRequestAs(
 		context.Background(),
 		req,
-		Actor{
+		jwt2.Actor{
 			ID: actorId,
 		},
 	)
@@ -70,7 +71,7 @@ func (atu *AuthTestUtil) NewSignedRequestForActorId(method, url string, body io.
 	return req, nil
 }
 
-func (atu *AuthTestUtil) SignRequestAs(ctx context.Context, req *http.Request, a Actor) (*http.Request, error) {
+func (atu *AuthTestUtil) SignRequestAs(ctx context.Context, req *http.Request, a jwt2.Actor) (*http.Request, error) {
 	if atu.s.UsesCookies {
 		return atu.SignRequestCookieAs(ctx, req, a)
 	} else {
@@ -78,8 +79,8 @@ func (atu *AuthTestUtil) SignRequestAs(ctx context.Context, req *http.Request, a
 	}
 }
 
-func (atu *AuthTestUtil) claimsForActor(a Actor) *JwtTokenClaims {
-	claims := &JwtTokenClaims{
+func (atu *AuthTestUtil) claimsForActor(a jwt2.Actor) *jwt2.AuthProxyClaims {
+	claims := &jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:   "test",
 			Subject:  a.ID,
@@ -96,7 +97,7 @@ func (atu *AuthTestUtil) claimsForActor(a Actor) *JwtTokenClaims {
 	return claims
 }
 
-func (atu *AuthTestUtil) SignRequestHeaderAs(ctx context.Context, req *http.Request, a Actor) (*http.Request, error) {
+func (atu *AuthTestUtil) SignRequestHeaderAs(ctx context.Context, req *http.Request, a jwt2.Actor) (*http.Request, error) {
 	claims := atu.claimsForActor(a)
 
 	tokenString, err := atu.s.Token(ctx, claims)
@@ -109,7 +110,7 @@ func (atu *AuthTestUtil) SignRequestHeaderAs(ctx context.Context, req *http.Requ
 	return req, nil
 }
 
-func (atu *AuthTestUtil) SignRequestCookieAs(ctx context.Context, req *http.Request, a Actor) (*http.Request, error) {
+func (atu *AuthTestUtil) SignRequestCookieAs(ctx context.Context, req *http.Request, a jwt2.Actor) (*http.Request, error) {
 	claims := atu.claimsForActor(a)
 
 	tokenString, err := atu.s.Token(ctx, claims)
