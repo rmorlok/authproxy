@@ -1,6 +1,8 @@
 package auth
 
 import (
+	"crypto/ecdsa"
+	"crypto/ed25519"
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
@@ -17,6 +19,13 @@ import (
 
 // JwtTokenBuilder extends from JwtBuilder to provide options to sign tokens
 type JwtTokenBuilder interface {
+	// WithClaims allows the claims to be specified explicitly instead of built progressively
+	WithClaims(c *JwtTokenClaims) JwtTokenBuilder
+
+	/*
+	 * Create claims dynamically as part of the builder
+	 */
+
 	WithIssuer(issuer string) JwtTokenBuilder
 	WithAudience(audience string) JwtTokenBuilder
 	WithServiceId(serviceId config.ServiceId) JwtTokenBuilder
@@ -30,6 +39,7 @@ type JwtTokenBuilder interface {
 	WithActorId(id string) JwtTokenBuilder
 	WithSessionOnly() JwtTokenBuilder
 
+	WithConfigKey(ctx context.Context, cfgKey config.Key) (JwtTokenBuilder, error)
 	WithPrivateKeyPath(string) JwtTokenBuilder
 	WithPrivateKeyString(string) JwtTokenBuilder
 	WithPrivateKey([]byte) JwtTokenBuilder
@@ -45,10 +55,16 @@ type JwtTokenBuilder interface {
 
 type jwtTokenBuilder struct {
 	jwtBuilder     jwtBuilder
+	claims         *JwtTokenClaims
 	privateKeyPath *string
 	privateKeyData []byte
 	secretKeyPath  *string
 	secretKeyData  []byte
+}
+
+func (tb *jwtTokenBuilder) WithClaims(c *JwtTokenClaims) JwtTokenBuilder {
+	tb.claims = c
+	return tb
 }
 
 func (tb *jwtTokenBuilder) WithIssuer(issuer string) JwtTokenBuilder {
@@ -111,6 +127,36 @@ func (tb *jwtTokenBuilder) WithSessionOnly() JwtTokenBuilder {
 	return tb
 }
 
+func (tb *jwtTokenBuilder) WithConfigKey(ctx context.Context, cfgKey config.Key) (JwtTokenBuilder, error) {
+	var us JwtTokenBuilder = tb
+
+	if pp, ok := cfgKey.(*config.KeyPublicPrivate); ok {
+		if pp.PrivateKey != nil {
+			if pp.PrivateKey.HasData(ctx) {
+				data, err := pp.PrivateKey.GetData(ctx)
+				if err != nil {
+					return us, err
+				}
+				us = us.WithPrivateKey(data)
+			}
+		}
+	}
+
+	if ks, ok := cfgKey.(*config.KeyShared); ok {
+		if ks.SharedKey != nil {
+			if ks.SharedKey.HasData(ctx) {
+				data, err := ks.SharedKey.GetData(ctx)
+				if err != nil {
+					return us, err
+				}
+				us = us.WithSecretKey(data)
+			}
+		}
+	}
+
+	return us, nil
+}
+
 func (tb *jwtTokenBuilder) WithPrivateKeyPath(privateKeyPath string) JwtTokenBuilder {
 	tb.privateKeyPath = &privateKeyPath
 	return tb
@@ -139,61 +185,100 @@ func (tb *jwtTokenBuilder) WithSecretKey(secretKey []byte) JwtTokenBuilder {
 	return tb
 }
 
-func (tb *jwtTokenBuilder) getSigningMethod() jwt.SigningMethod {
-	if tb.privateKeyData != nil || tb.privateKeyPath != nil {
-		return jwt.SigningMethodRS256
-	}
-
-	return jwt.SigningMethodHS256
-}
-
 // loadRSAPrivateKeyFromPEM loads an RSA private key from a PEM file data
-func loadRSAPrivateKeyFromPEMOrOpenSSH(keyData []byte) (*rsa.PrivateKey, error) {
+func loadPrivateKeyFromPEMOrOpenSSH(keyData []byte) (interface{}, jwt.SigningMethod, error) {
 	parsedKey, err := ssh.ParseRawPrivateKey(keyData)
 	if err == nil {
-		rsaKey, ok := parsedKey.(*rsa.PrivateKey)
-		if !ok {
-			return nil, fmt.Errorf("not an RSA private key")
-		}
-
-		return rsaKey, nil
+		return signingKeyMethodFromParsedPrivateKey(parsedKey)
 	}
 
 	// Decode the PEM block
-	block, _ := pem.Decode(keyData)
-	if block == nil || block.Type != "RSA PRIVATE KEY" {
-		return nil, fmt.Errorf("failed to decode key as OpenSSH RSA and failed to decode PEM block containing private key")
+	block, rest := pem.Decode(keyData)
+	if block == nil {
+		return nil, nil, fmt.Errorf("failed to decode key as OpenSSH and failed to decode PEM block containing private key")
 	}
 
-	// Parse the DER-encoded RSA private key
-	privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
-	if err != nil {
-		return nil, fmt.Errorf("failed to parse RSA private key: %w", err)
+	if block.Type == "EC PARAMETERS" {
+		block, _ = pem.Decode(rest)
+		if block == nil {
+			return nil, nil, fmt.Errorf("EC PEM file contained EC PARMETERS but not EC PRIVATE KEY")
+		}
 	}
 
-	return privateKey, nil
+	switch block.Type {
+	case "RSA PRIVATE KEY":
+		// Parse the DER-encoded RSA private key
+		privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "failed to parse RSA private key")
+		}
+
+		return privateKey, jwt.SigningMethodRS256, nil
+	case "EC PRIVATE KEY":
+		// Parse the EC private key
+		privateKey, err := x509.ParseECPrivateKey(block.Bytes)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "failed to parse EC private key")
+		}
+
+		return signingKeyMethodFromParsedPrivateKey(privateKey)
+	case "PRIVATE KEY":
+		// Parse an unencrypted private key (PKCS#8 encoded)
+		privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
+		if err != nil {
+			return nil, nil, errors.Wrapf(err, "failed to parse private key")
+		}
+
+		return signingKeyMethodFromParsedPrivateKey(privateKey)
+	default:
+		return nil, nil, fmt.Errorf("unsupported private key type: %s", block.Type)
+	}
 }
 
-func (tb *jwtTokenBuilder) getSigningKeyData() (interface{}, error) {
+func signingKeyMethodFromParsedPrivateKey(parsedKey interface{}) (interface{}, jwt.SigningMethod, error) {
+	switch k := parsedKey.(type) {
+	case *rsa.PrivateKey:
+		return parsedKey, jwt.SigningMethodRS256, nil
+	case *ecdsa.PrivateKey:
+		switch k.Curve.Params().Name {
+		case "P-256":
+			return parsedKey, jwt.SigningMethodES256, nil
+		case "P-384":
+			return parsedKey, jwt.SigningMethodES384, nil
+		case "P-521":
+			return parsedKey, jwt.SigningMethodES512, nil
+		default:
+			return nil, nil, errors.New("unsupported elliptic curve for ECDSA")
+		}
+	case *ed25519.PrivateKey:
+		return parsedKey, jwt.SigningMethodEdDSA, nil
+	case ed25519.PrivateKey:
+		return parsedKey, jwt.SigningMethodEdDSA, nil
+	default:
+		return nil, nil, errors.New("unsupported private key type")
+	}
+}
+
+func (tb *jwtTokenBuilder) getSigningKeyDataAndMethod() (interface{}, jwt.SigningMethod, error) {
 	if tb.privateKeyData != nil && tb.privateKeyPath != nil {
-		return nil, errors.New("cannot specify secret key data and path")
+		return nil, nil, errors.New("cannot specify secret key data and path")
 	}
 
 	if tb.secretKeyPath != nil && tb.secretKeyData != nil {
-		return nil, errors.New("cannot specify secret key data and path")
+		return nil, nil, errors.New("cannot specify secret key data and path")
 	}
 
 	if tb.privateKeyData == nil && tb.privateKeyPath == nil &&
 		tb.secretKeyPath == nil && tb.secretKeyData == nil {
-		return nil, errors.New("key material must be specified in some form")
+		return nil, nil, errors.New("key material must be specified in some form")
 	}
 
 	if tb.privateKeyData != nil {
-		return loadRSAPrivateKeyFromPEMOrOpenSSH(tb.privateKeyData)
+		return loadPrivateKeyFromPEMOrOpenSSH(tb.privateKeyData)
 	}
 
 	if tb.secretKeyData != nil {
-		return tb.secretKeyData, nil
+		return tb.secretKeyData, jwt.SigningMethodHS256, nil
 	}
 
 	pathType := "private"
@@ -212,39 +297,46 @@ func (tb *jwtTokenBuilder) getSigningKeyData() (interface{}, error) {
 		// attempt home path expansion
 		path, err = homedir.Expand(path)
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
 	}
 
 	_, err = os.Stat(path)
 	if err != nil {
-		return nil, errors.Wrapf(err, "invalid %s key path", pathType)
+		return nil, nil, errors.Wrapf(err, "invalid %s key path", pathType)
 	}
 
 	keyData, err := os.ReadFile(path)
 	if err != nil {
-		return nil, errors.Wrapf(err, "error reading %s key", pathType)
+		return nil, nil, errors.Wrapf(err, "error reading %s key", pathType)
 	}
 
 	if isPrivate {
-		return loadRSAPrivateKeyFromPEMOrOpenSSH(keyData)
+		return loadPrivateKeyFromPEMOrOpenSSH(keyData)
 	}
 
-	return keyData, nil
+	return keyData, jwt.SigningMethodHS256, nil
 }
 
 func (tb *jwtTokenBuilder) TokenCtx(ctx context.Context) (string, error) {
-	claims, err := tb.jwtBuilder.BuildCtx(ctx)
+	var claims *JwtTokenClaims
+	var err error
+
+	if tb.claims != nil {
+		claims = tb.claims
+	} else {
+		claims, err = tb.jwtBuilder.BuildCtx(ctx)
+		if err != nil {
+			return "", err
+		}
+	}
+
+	keyData, signingMethdod, err := tb.getSigningKeyDataAndMethod()
 	if err != nil {
 		return "", err
 	}
 
-	keyData, err := tb.getSigningKeyData()
-	if err != nil {
-		return "", err
-	}
-
-	token := jwt.NewWithClaims(tb.getSigningMethod(), claims)
+	token := jwt.NewWithClaims(signingMethdod, claims)
 	tokenString, err := token.SignedString(keyData)
 	if err != nil {
 		return "", errors.Wrap(err, "error signing jwt")

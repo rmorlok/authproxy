@@ -31,7 +31,7 @@ func cmdVerifyJwt() *cobra.Command {
 			if publicKeyPath != "" {
 				pb = pb.WithPublicKeyPath(publicKeyPath)
 			} else if secretKeyPath != "" {
-				pb = pb.WithSecretKeyPath(secretKeyPath)
+				pb = pb.WithSharedKeyPath(secretKeyPath)
 			}
 
 			result, err := pb.Parse(token)

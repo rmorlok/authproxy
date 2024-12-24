@@ -12,17 +12,6 @@ import (
 	"github.com/pkg/errors"
 )
 
-func signingKeyData(key config.Key) config.KeyData {
-	switch v := key.(type) {
-	case *config.KeyPublicPrivate:
-		return v.PrivateKey
-	case *config.KeyShared:
-		return v.SharedKey
-	default:
-		panic("key does not support signing")
-	}
-}
-
 func verificationKeyData(key config.Key) config.KeyData {
 	switch v := key.(type) {
 	case *config.KeyPublicPrivate:
@@ -56,7 +45,18 @@ func (s *Service) keyForToken(claims *JwtTokenClaims) (config.Key, error) {
 
 // Token mints a signed JWT with the specified claims
 func (s *Service) Token(ctx context.Context, claims *JwtTokenClaims) (string, error) {
-	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	key, err := s.keyForToken(claims)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to get key")
+	}
+
+	if key == nil {
+		return "", errors.New("failed to get key for token")
+	}
+
+	if !key.CanSign() {
+		return "", errors.New("key cannot be used to sign tokens")
+	}
 
 	audiences, err := claims.GetAudience()
 	if err != nil {
@@ -64,94 +64,42 @@ func (s *Service) Token(ctx context.Context, claims *JwtTokenClaims) (string, er
 	}
 
 	if !config.AllValidServiceIds(audiences) {
-		return "", errors.Wrap(err, "some service ids in aud are invalid")
+		return "", errors.New("some service ids in aud are invalid")
 	}
 
-	key, err := s.keyForToken(claims)
+	tb, err := NewJwtTokenBuilder().
+		WithClaims(claims).
+		WithConfigKey(ctx, key)
+
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get key")
+		return "", errors.Wrap(err, "failed to create token")
 	}
 
-	if !key.CanSign() {
-		return "", errors.New("key cannot be used to sign tokens")
-	}
-
-	keyData := signingKeyData(key)
-
-	if !keyData.HasData(ctx) {
-		return "", errors.New("no data found in signing key")
-	}
-
-	secret, err := keyData.GetData(ctx)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to get key data for signing")
-	}
-
-	tokenString, err := token.SignedString(secret)
-	if err != nil {
-		return "", errors.Wrap(err, "can't sign token")
-	}
-	return tokenString, nil
+	return tb.TokenCtx(ctx)
 }
 
 // Parse token string and verify.
 func (s *Service) Parse(ctx context.Context, tokenString string) (*JwtTokenClaims, error) {
-	parser := jwt.NewParser(
-		jwt.WithTimeFunc(func() time.Time {
-			return ctx.Clock().Now()
-		}),
-	)
+	claims, err := NewJwtTokenParserBuilder().
+		WithKeySelector(func(ctx context.Context, unverified *JwtTokenClaims) (kd config.KeyData, isShared bool, err error) {
+			key, err := s.keyForToken(unverified)
+			if err != nil {
+				return nil, false, errors.Wrap(err, "failed to get key")
+			}
 
-	// Now parse with verification, using the key for this actor
-	token, err := parser.ParseWithClaims(tokenString, &JwtTokenClaims{}, func(unverified *jwt.Token) (interface{}, error) {
-		isSecretKey := false
-		switch unverified.Method.(type) {
-		case *jwt.SigningMethodHMAC:
-			isSecretKey = true
-		case *jwt.SigningMethodRSA:
-			isSecretKey = false
-		default:
-			return nil, errors.Errorf("unexpected signing method: %v", unverified.Header["alg"])
-		}
+			if pk, ok := key.(*config.KeyPublicPrivate); ok {
+				return pk.PublicKey, false, nil
+			}
 
-		unverifiedClaims, ok := unverified.Claims.(*JwtTokenClaims)
-		if !ok {
-			return nil, errors.New("invalid token")
-		}
+			if sk, ok := key.(*config.KeyShared); ok {
+				return sk.SharedKey, true, nil
+			}
 
-		key, err := s.keyForToken(unverifiedClaims)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get key")
-		}
-
-		if !key.CanVerifySignature() {
-			return nil, errors.New("key cannot be used to verify signatures")
-		}
-
-		keyData := verificationKeyData(key)
-
-		if !keyData.HasData(ctx) {
-			return nil, errors.New("no data found in signing key")
-		}
-
-		rawKeyData, err := keyData.GetData(ctx)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get key data for signing")
-		}
-
-		if isSecretKey {
-			return rawKeyData, nil
-		}
-
-		return loadRSAPublicKeyFromPEMOrOpenSSH(rawKeyData)
-	})
+			return nil, false, errors.New("invalid key type")
+		}).
+		ParseCtx(ctx, tokenString)
 	if err != nil {
 		return nil, errors.Wrap(err, "can't parse token")
-	}
-
-	claims, ok := token.Claims.(*JwtTokenClaims)
-	if !ok {
-		return nil, errors.New("invalid token")
 	}
 
 	found := false
