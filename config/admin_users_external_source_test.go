@@ -23,7 +23,9 @@ keys_path: some/path/to/keys
 		aues := AdminUsersExternalSource{
 			KeysPath: tu.TestDataPath("admin_user_keys"),
 		}
-		assert.Equal(3, len(aues.All()))
+
+		// Check the test_data/admin_user_keys folder to see what this count should be
+		assert.Equal(8, len(aues.All()))
 
 		u, found := aues.GetByUsername("bobdole")
 		assert.True(found)
