@@ -75,6 +75,7 @@ func (sa *SystemAuth) UnmarshalYAML(value *yaml.Node) error {
 			if globalAESKey, err = keyDataUnmarshalYAML(valueNode); err != nil {
 				return err
 			}
+			matched = true
 		}
 
 		if matched {
@@ -99,6 +100,7 @@ func (sa *SystemAuth) UnmarshalYAML(value *yaml.Node) error {
 
 	return nil
 }
+
 func UnmarshallYamlSystemAuthString(data string) (*SystemAuth, error) {
 	return UnmarshallYamlSystemAuth([]byte(data))
 }
