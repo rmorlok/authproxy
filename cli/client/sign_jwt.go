@@ -13,7 +13,7 @@ import (
 func cmdSignJwt() *cobra.Command {
 	var (
 		admin          bool
-		userId         string
+		actorId        string
 		privateKeyPath string
 		secretKeyPath  string
 		apis           string
@@ -23,16 +23,16 @@ func cmdSignJwt() *cobra.Command {
 		Use:   "sign-jwt",
 		Short: "Sign a JWT",
 		RunE: func(cmd *cobra.Command, args []string) error {
-			if admin && userId == "" {
+			if admin && actorId == "" {
 				user, err := user.Current()
 				if err != nil {
 					return errors.Wrap(err, "failed to retrieve current user to sign admin jwt")
 				}
 
-				userId = user.Username
+				actorId = user.Username
 			}
 
-			if userId == "" {
+			if actorId == "" {
 				return fmt.Errorf("must specify user id to sign JWT")
 			}
 
@@ -60,7 +60,7 @@ func cmdSignJwt() *cobra.Command {
 			}
 
 			b := jwt.NewJwtTokenBuilder().
-				WithActorId(userId).
+				WithActorId(actorId).
 				WithServiceIds(serviceIds)
 
 			if privateKeyPath != "" {
@@ -85,7 +85,7 @@ func cmdSignJwt() *cobra.Command {
 	}
 
 	cmd.Flags().BoolVar(&admin, "admin", false, "Sign the request as an admin")
-	cmd.Flags().StringVar(&userId, "actorId", "", "ActorID/username to sign the request as. For admin requests, defaults to current OS user")
+	cmd.Flags().StringVar(&actorId, "actorId", "", "ActorID/username to sign the request as. For admin requests, defaults to current OS user")
 	cmd.Flags().StringVar(&apis, "apis", "", fmt.Sprintf("Service identifiers to sign the token for. Comma separted list. Possibly values: %s or 'all' for all services", strings.Join(config.AllServiceIdStrings(), ", ")))
 
 	cmd.Flags().StringVar(&privateKeyPath, "privateKeyPath", "", "Private key to use to sign request")
