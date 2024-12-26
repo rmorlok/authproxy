@@ -51,6 +51,11 @@ type TokenBuilder interface {
 	Token() (string, error)
 	MustTokenCtx(context.Context) string
 	MustToken() string
+
+	Signer() (Signer, error)
+	SignerCtx(context.Context) (Signer, error)
+	MustSigner() Signer
+	MustSignerCtx(context.Context) Signer
 }
 
 type tokenBuilder struct {
@@ -360,6 +365,37 @@ func (tb *tokenBuilder) MustTokenCtx(ctx context.Context) string {
 
 func (tb *tokenBuilder) MustToken() string {
 	return tb.MustTokenCtx(context.Background())
+}
+
+func (tb *tokenBuilder) Signer() (Signer, error) {
+	return tb.SignerCtx(context.Background())
+}
+
+func (tb *tokenBuilder) SignerCtx(ctx context.Context) (Signer, error) {
+	token, err := tb.TokenCtx(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	return NewSigner(token), nil
+}
+
+func (tb *tokenBuilder) MustSigner() Signer {
+	s, err := tb.Signer()
+	if err != nil {
+		panic(err)
+	}
+
+	return s
+}
+
+func (tb *tokenBuilder) MustSignerCtx(ctx context.Context) Signer {
+	s, err := tb.SignerCtx(ctx)
+	if err != nil {
+		panic(err)
+	}
+
+	return s
 }
 
 func NewJwtTokenBuilder() TokenBuilder {
