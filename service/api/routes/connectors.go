@@ -49,12 +49,12 @@ func connectorResponseFromConfig(cfg config.C, configConn *config.Connector) Con
 func (r *ConnectorsRoutes) get(ctx *gin.Context) {
 	var req GetConnectorRequestPath
 	if err := ctx.ShouldBindUri(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, Error{err.Error()})
 		return
 	}
 
 	if req.Id == "" {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": "id is required"})
+		ctx.JSON(http.StatusBadRequest, Error{"id is required"})
 	}
 
 	for _, c := range r.cfg.GetRoot().Connectors {
@@ -64,13 +64,13 @@ func (r *ConnectorsRoutes) get(ctx *gin.Context) {
 		}
 	}
 
-	ctx.JSON(http.StatusNotFound, gin.H{"error": "connector not found"})
+	ctx.JSON(http.StatusNotFound, Error{"connector not found"})
 }
 
 func (r *ConnectorsRoutes) list(ctx *gin.Context) {
 	var req ListConnectorsRequestQueryParams
 	if err := ctx.ShouldBindQuery(&req); err != nil {
-		ctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		ctx.JSON(http.StatusBadRequest, Error{err.Error()})
 		return
 	}
 

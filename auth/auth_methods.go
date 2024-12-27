@@ -111,7 +111,10 @@ func (s *Service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProx
 		}
 	}
 	if !found {
-		return nil, errors.Errorf("aud not valid for service '%s'", s.Opts.ServiceId)
+		if len(claims.Audience) > 0 {
+			return nil, errors.Errorf("aud '%s' not valid for service '%s'", strings.Join(claims.Audience, ","), s.Opts.ServiceId)
+		}
+		return nil, errors.Errorf("aud not specified for service '%s'", s.Opts.ServiceId)
 	}
 
 	return claims, s.validate(ctx, claims)

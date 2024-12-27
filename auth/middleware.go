@@ -1,6 +1,7 @@
 package auth
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
@@ -33,7 +34,21 @@ func (j *Service) auth(reqAuth bool) func(http.Handler) http.Handler {
 			return
 		}
 		j.logf("[DEBUG] auth failed, %v", err)
-		http.Error(w, "Unauthorized", http.StatusUnauthorized)
+
+		errorResponse := struct {
+			Error string `json:"error"`
+		}{
+			Error: "authorization failed",
+		}
+
+		if j.Config.IsDebugMode() {
+			errorResponse.Error = fmt.Sprintf("authorization failed: %s", err.Error())
+		}
+
+		response, _ := json.Marshal(errorResponse)
+		w.Header().Set("Content-Type", "application/json")
+		w.WriteHeader(http.StatusUnauthorized)
+		w.Write(response)
 	}
 
 	f := func(h http.Handler) http.Handler {

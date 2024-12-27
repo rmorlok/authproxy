@@ -63,7 +63,12 @@ func NewSqliteConnection(dbConfig *config.DatabaseSqlite, secretKey config.KeyDa
 
 	_, err = os.Stat(path)
 	if err != nil {
-		return nil, errors.Wrapf(err, "could not load sqlite database path '%s'", dbConfig.Path)
+		// Attempt to create file
+		file, err := os.Create(path)
+		if err != nil {
+			return nil, errors.Wrapf(err, "could not load sqlite database path '%s'; failed to create", dbConfig.Path)
+		}
+		defer file.Close()
 	}
 
 	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{})

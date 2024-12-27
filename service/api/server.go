@@ -7,6 +7,8 @@ import (
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/service/api/routes"
 	"net/http"
 	"time"
@@ -20,12 +22,12 @@ func rateErrorHandler(c *gin.Context, info ratelimit.Info) {
 	c.String(429, "Too many requests. Try again in "+time.Until(info.ResetTime).String())
 }
 
-func GetGinServer(cfg config.C) *gin.Engine {
+func GetGinServer(cfg config.C, db database.DB) *gin.Engine {
 	authService := auth.StandardAuthService(cfg, config.ServiceIdApi)
 
 	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
 		Rate:  1 * time.Minute,
-		Limit: 3,
+		Limit: 10_000,
 	})
 
 	router := api_common.GinForService("api", &cfg.GetRoot().AdminApi)
@@ -50,9 +52,12 @@ func GetGinServer(cfg config.C) *gin.Engine {
 	})
 
 	routesConnectors := routes.NewConnectorsRoutes(cfg, authService)
+	routesConnections := routes.NewConnectionsRoutes(cfg, authService, db)
 
 	api := router.Group("/api", rl)
+
 	routesConnectors.Register(api)
+	routesConnections.Register(api)
 
 	return router
 }
@@ -62,6 +67,15 @@ func Serve(cfg config.C) {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	r := GetGinServer(cfg)
+	db, err := database.NewConnectionForRoot(cfg.GetRoot())
+	if err != nil {
+		panic(err)
+	}
+
+	if err := db.Migrate(context.Background()); err != nil {
+		panic(err)
+	}
+
+	r := GetGinServer(cfg, db)
 	r.Run(fmt.Sprintf(":%d", cfg.GetRoot().Api.Port))
 }

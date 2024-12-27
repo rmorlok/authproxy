@@ -7,7 +7,6 @@ import (
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/util"
-	"strings"
 	"time"
 )
 
@@ -16,6 +15,7 @@ import (
 type ClaimsBuilder interface {
 	WithIssuer(issuer string) ClaimsBuilder
 	WithAudience(audience string) ClaimsBuilder
+	WithAudiences(audience []string) ClaimsBuilder
 	WithServiceId(serviceId config.ServiceId) ClaimsBuilder
 	WithServiceIds(serviceIds []config.ServiceId) ClaimsBuilder
 	WithExpiration(expiration time.Time) ClaimsBuilder
@@ -34,7 +34,7 @@ type ClaimsBuilder interface {
 
 type claimsBuilder struct {
 	issuer      *string
-	audience    *string
+	audiences   []string
 	expiration  *time.Time
 	superAdmin  *bool
 	admin       *bool
@@ -49,7 +49,12 @@ func (b *claimsBuilder) WithIssuer(issuer string) ClaimsBuilder {
 }
 
 func (b *claimsBuilder) WithAudience(audience string) ClaimsBuilder {
-	b.audience = &audience
+	b.audiences = []string{audience}
+	return b
+}
+
+func (b *claimsBuilder) WithAudiences(audiences []string) ClaimsBuilder {
+	b.audiences = audiences
 	return b
 }
 
@@ -58,9 +63,7 @@ func (b *claimsBuilder) WithServiceId(serviceId config.ServiceId) ClaimsBuilder 
 }
 
 func (b *claimsBuilder) WithServiceIds(serviceIds []config.ServiceId) ClaimsBuilder {
-	return b.WithAudience(strings.Join(util.Map(serviceIds, func(serviceId config.ServiceId) string {
-		return string(serviceId)
-	}), ","))
+	return b.WithAudiences(util.Map(serviceIds, func(s config.ServiceId) string { return string(s) }))
 }
 
 func (b *claimsBuilder) WithExpiration(expiration time.Time) ClaimsBuilder {
@@ -140,9 +143,9 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 		c.Issuer = *b.issuer
 	}
 
-	if b.audience != nil {
-		c.Audience = ClaimString(*b.audience)
-		c.Actor.Audience = ClaimString(*b.audience)
+	if len(b.audiences) > 0 {
+		c.Audience = b.audiences
+		c.Actor.Audience = b.audiences
 	}
 
 	if b.expiration != nil {

@@ -44,7 +44,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	ctx := context.AsContext(gctx.Request.Context())
 	var req InitiateConnectionRequest
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		gctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		gctx.JSON(http.StatusBadRequest, Error{err.Error()})
 		return
 	}
 
@@ -58,7 +58,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	}
 
 	if !found {
-		gctx.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("connector '%s' not found", req.ConnectorId)})
+		gctx.JSON(http.StatusBadRequest, Error{fmt.Sprintf("connector '%s' not found", req.ConnectorId)})
 		return
 	}
 
@@ -83,7 +83,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 		return
 	}
 
-	gctx.JSON(http.StatusInternalServerError, gin.H{"error": "unsupported connector auth type"})
+	gctx.JSON(http.StatusInternalServerError, Error{"unsupported connector auth type"})
 }
 
 type ConnectionJson struct {
@@ -121,7 +121,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 	var err error
 
 	if err = gctx.ShouldBindQuery(&req); err != nil {
-		gctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		gctx.JSON(http.StatusBadRequest, Error{err.Error()})
 		return
 	}
 
@@ -130,7 +130,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 	if req.Cursor != nil {
 		ex, err = r.db.ListConnectionsFromCursor(ctx, *req.Cursor)
 		if err != nil {
-			gctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+			gctx.JSON(http.StatusBadRequest, Error{err.Error()})
 			return
 		}
 	} else {
@@ -147,12 +147,12 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 		if req.OrderByVal != nil {
 			field, order, err := database.SplitOrderByParam(*req.OrderByVal)
 			if err != nil {
-				gctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+				gctx.JSON(http.StatusBadRequest, Error{err.Error()})
 				return
 			}
 
 			if field != string(database.ConnectionOrderByCreatedAt) {
-				gctx.JSON(http.StatusBadRequest, gin.H{"error": fmt.Sprintf("invalid sort field '%s'", field)})
+				gctx.JSON(http.StatusBadRequest, Error{fmt.Sprintf("invalid sort field '%s'", field)})
 				return
 			}
 
@@ -178,22 +178,22 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 	ctx := context.AsContext(gctx.Request.Context())
 	id, err := uuid.Parse(gctx.Param("id"))
 	if err != nil {
-		gctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		gctx.JSON(http.StatusBadRequest, Error{err.Error()})
 		return
 	}
 
 	if id == uuid.Nil {
-		gctx.JSON(http.StatusBadRequest, gin.H{"error": "id is required"})
+		gctx.JSON(http.StatusBadRequest, Error{"id is required"})
 	}
 
 	c, err := r.db.GetConnection(ctx, id)
 	if err != nil {
-		gctx.JSON(http.StatusBadRequest, gin.H{"error": err.Error()})
+		gctx.JSON(http.StatusBadRequest, Error{err.Error()})
 		return
 	}
 
 	if c == nil {
-		gctx.JSON(http.StatusNotFound, gin.H{"error": "connection not found"})
+		gctx.JSON(http.StatusNotFound, Error{"connection not found"})
 		return
 	}
 

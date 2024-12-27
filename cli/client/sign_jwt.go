@@ -2,12 +2,13 @@ package main
 
 import (
 	"fmt"
+	"github.com/rmorlok/authproxy/cli/client/config"
 	"github.com/spf13/cobra"
 )
 
 func cmdSignJwt() *cobra.Command {
 	var (
-		resolver *jwtResolver
+		resolver *config.Resolver
 	)
 
 	cmd := &cobra.Command{
@@ -25,7 +26,7 @@ func cmdSignJwt() *cobra.Command {
 		},
 	}
 
-	resolver = withJwtParams(cmd)
+	resolver = config.WithConfigParams(cmd)
 
 	return cmd
 }

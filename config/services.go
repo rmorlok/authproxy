@@ -7,7 +7,7 @@ type ServiceId string
 const (
 	ServiceIdAdminApi ServiceId = "admin-api"
 	ServiceIdApi      ServiceId = "api"
-	ServiceIdAuth     ServiceId = "api"
+	ServiceIdAuth     ServiceId = "auth"
 )
 
 func AllServiceIds() []ServiceId {
