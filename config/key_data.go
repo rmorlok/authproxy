@@ -14,18 +14,18 @@ type KeyData interface {
 	GetData(ctx context.Context) ([]byte, error)
 }
 
-func UnmarshallYamlKeyDataString(data string) (Auth, error) {
+func UnmarshallYamlKeyDataString(data string) (KeyData, error) {
 	return UnmarshallYamlKeyData([]byte(data))
 }
 
-func UnmarshallYamlKeyData(data []byte) (Auth, error) {
+func UnmarshallYamlKeyData(data []byte) (KeyData, error) {
 	var rootNode yaml.Node
 
 	if err := yaml.Unmarshal(data, &rootNode); err != nil {
 		return nil, err
 	}
 
-	return authUnmarshalYAML(rootNode.Content[0])
+	return keyDataUnmarshalYAML(rootNode.Content[0])
 }
 
 // keyUnmarshalYAML handles unmarshalling from YAML while allowing us to make decisions
@@ -62,7 +62,7 @@ fieldLoop:
 	}
 
 	if keyData == nil {
-		return nil, fmt.Errorf("invalid structure for key data type; does not match value, value, base64, env_var, file")
+		return nil, fmt.Errorf("invalid structure for key data type; does not match value, base64, env_var, file")
 	}
 
 	if err := value.Decode(keyData); err != nil {

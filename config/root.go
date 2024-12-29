@@ -11,6 +11,7 @@ type Root struct {
 	Auth       ApiHost     `json:"auth" yaml:"auth"`
 	SystemAuth SystemAuth  `json:"system_auth" yaml:"system_auth"`
 	Database   Database    `json:"database" yaml:"database"`
+	Redis      Redis       `json:"redis" yaml:"redis"`
 	ErrorPages ErrorPages  `json:"error_pages" yaml:"error_pages"`
 	Connectors []Connector `json:"connectors" yaml:"connectors"`
 }
@@ -30,6 +31,7 @@ func (sa *Root) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	var database Database
+	var redis Redis
 
 	// Handle custom unmarshalling for some attributes. Iterate through the mapping node's content,
 	// which will be sequences of keys, then values.
@@ -43,6 +45,11 @@ func (sa *Root) UnmarshalYAML(value *yaml.Node) error {
 		switch keyNode.Value {
 		case "database":
 			if database, err = databaseUnmarshalYAML(valueNode); err != nil {
+				return err
+			}
+			matched = true
+		case "redis":
+			if redis, err = redisUnmarshalYAML(valueNode); err != nil {
 				return err
 			}
 			matched = true
@@ -65,6 +72,7 @@ func (sa *Root) UnmarshalYAML(value *yaml.Node) error {
 
 	// Set the custom unmarshalled types
 	raw.Database = database
+	raw.Redis = redis
 
 	return nil
 }

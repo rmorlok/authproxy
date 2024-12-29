@@ -8,12 +8,14 @@ import (
 	"github.com/rmorlok/authproxy/context"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
+	"log"
 	"os"
 	"time"
 )
 
 type DB interface {
 	Migrate(ctx context.Context) error
+	Ping(ctx context.Context) bool
 
 	/*
 	 *  Connections
@@ -109,6 +111,16 @@ func (db *gormDB) Migrate(ctx context.Context) error {
 	}
 
 	return nil
+}
+
+func (db *gormDB) Ping(ctx context.Context) bool {
+	err := db.session(ctx).Raw("SELECT 1").Error
+	if err != nil {
+		log.Println(errors.Wrap(err, "failed to connect to database"))
+		return false
+	}
+
+	return true
 }
 
 var _ DB = (*gormDB)(nil)

@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/google/uuid"
 	"k8s.io/utils/clock"
+	"time"
 )
 
 const (
@@ -63,6 +64,11 @@ func AsContext(ctx context.Context) Context {
 	return &commonContext{
 		ctx,
 	}
+}
+
+func WithTimeout(ctx context.Context, timeout time.Duration) (Context, context.CancelFunc) {
+	out, cancel := context.WithTimeout(ctx, timeout)
+	return AsContext(out), cancel
 }
 
 func (cc *commonContext) WithClock(clock clock.Clock) Context {

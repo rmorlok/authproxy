@@ -9,6 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
+	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/service/api/routes"
 	"net/http"
 	"time"
@@ -22,7 +23,7 @@ func rateErrorHandler(c *gin.Context, info ratelimit.Info) {
 	c.String(429, "Too many requests. Try again in "+time.Until(info.ResetTime).String())
 }
 
-func GetGinServer(cfg config.C, db database.DB) *gin.Engine {
+func GetGinServer(cfg config.C, db database.DB, redis *redis.Wrapper) *gin.Engine {
 	authService := auth.StandardAuthService(cfg, config.ServiceIdApi)
 
 	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
@@ -40,8 +41,24 @@ func GetGinServer(cfg config.C, db database.DB) *gin.Engine {
 	})
 
 	router.GET("/healthz", func(c *gin.Context) {
+		ctx, cancel := context.WithTimeout(context.AsContext(c.Request.Context()), 1*time.Second)
+		defer cancel()
+
+		dbChan := make(chan bool, 1)
+		redisChan := make(chan bool, 1)
+
+		go func() {
+			dbChan <- db.Ping(ctx)
+		}()
+
+		go func() {
+			redisChan <- redis.Ping(ctx)
+		}()
+
 		c.JSON(http.StatusOK, gin.H{
 			"service": "api",
+			"db":      <-dbChan,
+			"redis":   <-redisChan,
 			"ok":      true,
 		})
 	})
@@ -67,6 +84,11 @@ func Serve(cfg config.C) {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
+	redis, err := redis.New(context.Background(), cfg)
+	if err != nil {
+		panic(err)
+	}
+
 	db, err := database.NewConnectionForRoot(cfg.GetRoot())
 	if err != nil {
 		panic(err)
@@ -76,6 +98,6 @@ func Serve(cfg config.C) {
 		panic(err)
 	}
 
-	r := GetGinServer(cfg, db)
+	r := GetGinServer(cfg, db, redis)
 	r.Run(fmt.Sprintf(":%d", cfg.GetRoot().Api.Port))
 }

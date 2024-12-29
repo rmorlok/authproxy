@@ -18,6 +18,8 @@ require (
 )
 
 require (
+	github.com/alicebob/gopher-json v0.0.0-20230218143504-906a9b012302 // indirect
+	github.com/alicebob/miniredis v2.5.0+incompatible // indirect
 	github.com/bytedance/sonic v1.12.5 // indirect
 	github.com/bytedance/sonic/loader v0.2.1 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -34,6 +36,7 @@ require (
 	github.com/go-playground/validator/v10 v10.23.0 // indirect
 	github.com/go-resty/resty/v2 v2.16.2 // indirect
 	github.com/goccy/go-json v0.10.4 // indirect
+	github.com/gomodule/redigo v1.9.2 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
@@ -58,6 +61,7 @@ require (
 	github.com/tidwall/pretty v1.2.0 // indirect
 	github.com/twitchyliquid64/golang-asm v0.15.1 // indirect
 	github.com/ugorji/go/codec v1.2.12 // indirect
+	github.com/yuin/gopher-lua v1.1.1 // indirect
 	golang.org/x/arch v0.12.0 // indirect
 	golang.org/x/crypto v0.31.0 // indirect
 	golang.org/x/net v0.32.0 // indirect

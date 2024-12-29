@@ -21,6 +21,8 @@ error_pages:
 database:
   provider: sqlite
   path: ./tmp/dev.db
+redis:
+  provider: miniredis
 connectors:
   - id: google-drive
     version: 1
