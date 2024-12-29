@@ -7,11 +7,11 @@ import (
 )
 
 type StringValue interface {
-	// HasData checks if this value has data.
-	HasData(ctx context.Context) bool
+	// HasValue checks if this value has data.
+	HasValue(ctx context.Context) bool
 
-	// GetData retrieves the bytes of the key
-	GetData(ctx context.Context) (string, error)
+	// GetValue retrieves the bytes of the key
+	GetValue(ctx context.Context) (string, error)
 }
 
 func UnmarshallYamlStringValueString(data string) (StringValue, error) {
@@ -47,6 +47,9 @@ fieldLoop:
 		keyNode := value.Content[i]
 
 		switch keyNode.Value {
+		case "value":
+			keyData = &StringValueDirect{}
+			break fieldLoop
 		case "base64":
 			keyData = &StringValueBase64{}
 			break fieldLoop

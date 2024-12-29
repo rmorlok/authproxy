@@ -11,7 +11,7 @@ type StringValueFile struct {
 	Path string `json:"path" yaml:"path"`
 }
 
-func (kf *StringValueFile) HasData(ctx context.Context) bool {
+func (kf *StringValueFile) HasValue(ctx context.Context) bool {
 	if _, err := os.Stat(kf.Path); err != nil {
 		// attempt home path expansion
 		path, err := homedir.Expand(kf.Path)
@@ -27,7 +27,7 @@ func (kf *StringValueFile) HasData(ctx context.Context) bool {
 	return true
 }
 
-func (kf *StringValueFile) GetData(ctx context.Context) (string, error) {
+func (kf *StringValueFile) GetValue(ctx context.Context) (string, error) {
 	path := kf.Path
 	if _, err := os.Stat(path); os.IsNotExist(err) {
 		// attempt home path expansion

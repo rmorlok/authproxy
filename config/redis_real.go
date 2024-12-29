@@ -49,16 +49,16 @@ func (d *RedisReal) ToRedisOptions(ctx context.Context) (*redis.Options, error) 
 		ContextTimeoutEnabled: true,
 	}
 
-	if d.Username != nil && d.Username.HasData(ctx) {
-		username, err := d.Username.GetData(ctx)
+	if d.Username != nil && d.Username.HasValue(ctx) {
+		username, err := d.Username.GetValue(ctx)
 		if err != nil {
 			return nil, err
 		}
 		options.Username = username
 	}
 
-	if d.Password != nil && d.Password.HasData(ctx) {
-		password, err := d.Password.GetData(ctx)
+	if d.Password != nil && d.Password.HasValue(ctx) {
+		password, err := d.Password.GetValue(ctx)
 		if err != nil {
 			return nil, err
 		}

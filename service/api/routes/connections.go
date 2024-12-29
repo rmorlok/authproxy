@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
+	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/util"
 	"net/http"
 	"time"
@@ -17,6 +18,7 @@ type ConnectionsRoutes struct {
 	cfg         config.C
 	authService *auth.Service
 	db          database.DB
+	redis       *redis.Wrapper
 }
 
 type InitiateConnectionRequest struct {
@@ -69,7 +71,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 
 	err := r.db.CreateConnection(ctx, &connection)
 	if err != nil {
-		gctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
+		gctx.JSON(http.StatusInternalServerError, Error{err.Error()})
 	}
 
 	if oAuth2, ok := connector.Auth.(*config.AuthOAuth2); ok {
@@ -206,10 +208,16 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 	g.GET("/connections/:id", r.authService.Required(), r.get)
 }
 
-func NewConnectionsRoutes(cfg config.C, authService *auth.Service, db database.DB) *ConnectionsRoutes {
+func NewConnectionsRoutes(
+	cfg config.C,
+	authService *auth.Service,
+	db database.DB,
+	redis *redis.Wrapper,
+) *ConnectionsRoutes {
 	return &ConnectionsRoutes{
 		cfg:         cfg,
 		authService: authService,
 		db:          db,
+		redis:       redis,
 	}
 }

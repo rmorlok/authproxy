@@ -6,12 +6,12 @@ import (
 )
 
 type AuthOAuth2 struct {
-	Type                  AuthType `json:"type" yaml:"type"`
-	ClientId              Secret   `json:"client_id" yaml:"client_id"`
-	ClientSecret          Secret   `json:"client_secret" yaml:"client_secret"`
-	Scopes                []Scope  `json:"scopes" yaml:"scopes"`
-	AuthorizationEndpoint string   `json:"authorization_endpoint" yaml:"authorization_endpoint"`
-	TokenEndpoint         string   `json:"token_endpoint" yaml:"token_endpoint"`
+	Type                  AuthType    `json:"type" yaml:"type"`
+	ClientId              StringValue `json:"client_id" yaml:"client_id"`
+	ClientSecret          StringValue `json:"client_secret" yaml:"client_secret"`
+	Scopes                []Scope     `json:"scopes" yaml:"scopes"`
+	AuthorizationEndpoint string      `json:"authorization_endpoint" yaml:"authorization_endpoint"`
+	TokenEndpoint         string      `json:"token_endpoint" yaml:"token_endpoint"`
 }
 
 func (i *AuthOAuth2) UnmarshalYAML(value *yaml.Node) error {
@@ -20,8 +20,8 @@ func (i *AuthOAuth2) UnmarshalYAML(value *yaml.Node) error {
 		return fmt.Errorf("auth oauth2 expected a mapping node, got %s", KindToString(value.Kind))
 	}
 
-	var clientIdSecret Secret
-	var clientSecretSecret Secret
+	var clientIdSecret StringValue
+	var clientSecretSecret StringValue
 
 	// Handle custom unmarshalling for some attributes. Iterate through the mapping node's content,
 	// which will be sequences of keys, then values.
@@ -34,12 +34,12 @@ func (i *AuthOAuth2) UnmarshalYAML(value *yaml.Node) error {
 
 		switch keyNode.Value {
 		case "client_id":
-			if clientIdSecret, err = secretUnmarshalYAML(valueNode); err != nil {
+			if clientIdSecret, err = stringValueUnmarshalYAML(valueNode); err != nil {
 				return err
 			}
 			matched = true
 		case "client_secret":
-			if clientSecretSecret, err = secretUnmarshalYAML(valueNode); err != nil {
+			if clientSecretSecret, err = stringValueUnmarshalYAML(valueNode); err != nil {
 				return err
 			}
 			matched = true

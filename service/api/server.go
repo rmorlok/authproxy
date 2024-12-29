@@ -69,7 +69,7 @@ func GetGinServer(cfg config.C, db database.DB, redis *redis.Wrapper) *gin.Engin
 	})
 
 	routesConnectors := routes.NewConnectorsRoutes(cfg, authService)
-	routesConnections := routes.NewConnectionsRoutes(cfg, authService, db)
+	routesConnections := routes.NewConnectionsRoutes(cfg, authService, db, redis)
 
 	api := router.Group("/api", rl)
 

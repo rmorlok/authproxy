@@ -10,10 +10,10 @@ type StringValueDirect struct {
 	Value string `json:"-" yaml:"-"`
 }
 
-func (kb *StringValueDirect) HasData(ctx context.Context) bool {
+func (kb *StringValueDirect) HasValue(ctx context.Context) bool {
 	return len(kb.Value) > 0
 }
 
-func (kb *StringValueDirect) GetData(ctx context.Context) (string, error) {
+func (kb *StringValueDirect) GetValue(ctx context.Context) (string, error) {
 	return kb.Value, nil
 }
