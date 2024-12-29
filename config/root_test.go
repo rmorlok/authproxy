@@ -57,10 +57,10 @@ connectors:
 				},
 				Auth: &AuthOAuth2{
 					Type: AuthTypeOAuth2,
-					ClientId: &SecretValue{
+					ClientId: &StringValueDirect{
 						Value: "some-client-id",
 					},
-					ClientSecret: &SecretEnvVar{
+					ClientSecret: &StringValueEnvVar{
 						EnvVar: "GOOGLE_DRIVE_CLIENT_SECRET",
 					},
 					Scopes: []Scope{
