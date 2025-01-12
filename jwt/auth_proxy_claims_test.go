@@ -2,9 +2,11 @@ package jwt
 
 import (
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/rmorlok/authproxy/context"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"testing"
+	"time"
 )
 
 func TestJwtTokenClaims(t *testing.T) {
@@ -31,14 +33,13 @@ func TestJwtTokenClaims(t *testing.T) {
 
 		// valid
 		j := AuthProxyClaims{
-			jwt.RegisteredClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
 				Subject: "admin/bobdole",
 			},
-			&Actor{
+			Actor: &Actor{
 				ID:    "admin/bobdole",
 				Admin: true,
 			},
-			false,
 		}
 		username, err := j.AdminUsername()
 		assert.NoError(err)
@@ -46,67 +47,62 @@ func TestJwtTokenClaims(t *testing.T) {
 
 		// No actor id
 		j = AuthProxyClaims{
-			jwt.RegisteredClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
 				Subject: "admin/bobdole",
 			},
-			&Actor{
+			Actor: &Actor{
 				Admin: true,
 			},
-			false,
 		}
 		_, err = j.AdminUsername()
 		assert.Error(err)
 
 		// No subject
 		j = AuthProxyClaims{
-			jwt.RegisteredClaims{},
-			&Actor{
+			RegisteredClaims: jwt.RegisteredClaims{},
+			Actor: &Actor{
 				ID:    "admin/bobdole",
 				Admin: true,
 			},
-			false,
 		}
 		_, err = j.AdminUsername()
 		assert.Error(err)
 
 		// usernames don't match
 		j = AuthProxyClaims{
-			jwt.RegisteredClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
 				Subject: "admin/bobsmith",
 			},
-			&Actor{
+			Actor: &Actor{
 				ID:    "admin/bobdole",
 				Admin: true,
 			},
-			false,
 		}
 		_, err = j.AdminUsername()
 		assert.Error(err)
 
 		// not formatted as admin username
 		j = AuthProxyClaims{
-			jwt.RegisteredClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
 				Subject: "bobdole",
 			},
-			&Actor{
+			Actor: &Actor{
 				ID:    "bobdole",
 				Admin: true,
 			},
-			false,
 		}
 		_, err = j.AdminUsername()
 		assert.Error(err)
 
 		// not admin
 		j = AuthProxyClaims{
-			jwt.RegisteredClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
 				Subject: "admin/bobdole",
 			},
-			&Actor{
+			Actor: &Actor{
 				ID:    "admin/bobdole",
 				Admin: false,
 			},
-			false,
 		}
 		_, err = j.AdminUsername()
 		assert.Error(err)
@@ -115,5 +111,25 @@ func TestJwtTokenClaims(t *testing.T) {
 		j = AuthProxyClaims{}
 		_, err = j.AdminUsername()
 		assert.Error(err)
+	})
+	t.Run("IsExpired", func(t *testing.T) {
+		t.Run("nil", func(t *testing.T) {
+			var tc *AuthProxyClaims
+			assert.True(t, tc.IsExpired(context.Background()), "nil values default to expired")
+		})
+		t.Run("does not have expiration", func(t *testing.T) {
+			var tc AuthProxyClaims
+			assert.False(t, tc.IsExpired(context.Background()), "no expiration specified should never be expired")
+		})
+		t.Run("expired", func(t *testing.T) {
+			tc := AuthProxyClaims{
+				RegisteredClaims: jwt.RegisteredClaims{
+					ExpiresAt: &jwt.NumericDate{
+						time.Date(1985, time.October, 26, 1, 22, 0, 0, time.UTC),
+					},
+				},
+			}
+			assert.True(t, tc.IsExpired(context.Background()), "no expiration specified should never be expired")
+		})
 	})
 }

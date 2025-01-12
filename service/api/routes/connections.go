@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
+	"github.com/rmorlok/authproxy/oauth2"
 	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/util"
 	"net/http"
@@ -16,13 +17,13 @@ import (
 
 type ConnectionsRoutes struct {
 	cfg         config.C
-	authService *auth.Service
+	authService auth.A
 	db          database.DB
 	redis       *redis.Wrapper
 }
 
 type InitiateConnectionRequest struct {
-	ConnectorId string `json:"connectors"`
+	ConnectorId string `json:"connector_id"`
 }
 
 type InitiateConnectionResponseType string
@@ -44,8 +45,15 @@ type InitiateConnectionRedirect struct {
 
 func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	ctx := context.AsContext(gctx.Request.Context())
+
+	actor := auth.GetActorInfoFromGinContext(gctx)
+	if actor == nil {
+		gctx.JSON(http.StatusUnauthorized, Error{"unauthorized"})
+		return
+	}
+
 	var req InitiateConnectionRequest
-	if err := gctx.ShouldBindQuery(&req); err != nil {
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
 		gctx.JSON(http.StatusBadRequest, Error{err.Error()})
 		return
 	}
@@ -74,13 +82,20 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 		gctx.JSON(http.StatusInternalServerError, Error{err.Error()})
 	}
 
-	if oAuth2, ok := connector.Auth.(*config.AuthOAuth2); ok {
+	if _, ok := connector.Auth.(*config.AuthOAuth2); ok {
+		oAuth2 := oauth2.NewOAuth2(r.cfg, r.db, r.redis, connection, connector)
+		url, err := oAuth2.SetStateAndGeneratePublicUrl(ctx, *actor)
+		if err != nil {
+			gctx.JSON(http.StatusInternalServerError, Error{err.Error()})
+			return
+		}
+
 		gctx.JSON(http.StatusOK, InitiateConnectionRedirect{
 			InitiateConnectionResponse: InitiateConnectionResponse{
 				Id:   connection.ID,
 				Type: PreconnectionResponseTypeRedirect,
 			},
-			RedirectUrl: oAuth2.AuthorizationEndpoint,
+			RedirectUrl: url,
 		})
 		return
 	}
@@ -203,14 +218,14 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 }
 
 func (r *ConnectionsRoutes) Register(g gin.IRouter) {
-	g.POST("/connections/initiate", r.authService.Required(), r.initiate)
+	g.POST("/connections/_initiate", r.authService.Required(), r.initiate)
 	g.GET("/connections", r.authService.Required(), r.list)
 	g.GET("/connections/:id", r.authService.Required(), r.get)
 }
 
 func NewConnectionsRoutes(
 	cfg config.C,
-	authService *auth.Service,
+	authService auth.A,
 	db database.DB,
 	redis *redis.Wrapper,
 ) *ConnectionsRoutes {

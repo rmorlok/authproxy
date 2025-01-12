@@ -6,6 +6,7 @@ import (
 	"github.com/rmorlok/authproxy/context"
 	jwt2 "github.com/rmorlok/authproxy/jwt"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 
@@ -26,7 +27,7 @@ func verificationKeyData(key config.Key) config.KeyData {
 
 // keyDataForToken loads an appropriate key to sign or verify a given token. This accounts for the
 // fact that admin users will verify with different keys to sign/verify tokens.
-func (s *Service) keyForToken(claims *jwt2.AuthProxyClaims) (config.Key, error) {
+func (s *service) keyForToken(claims *jwt2.AuthProxyClaims) (config.Key, error) {
 	if claims.IsAdmin() {
 		adminUsername, err := claims.AdminUsername()
 		if err != nil {
@@ -44,22 +45,15 @@ func (s *Service) keyForToken(claims *jwt2.AuthProxyClaims) (config.Key, error) 
 	}
 }
 
-// Token mints a signed JWT with the specified claims
-func (s *Service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (string, error) {
-	key, err := s.keyForToken(claims)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to get key")
-	}
+// Token mints a signed JWT with the specified claims. The token will be self-signed using the GlobalAESKey. The
+// claims will be modified prior to signing to indicate which service signed this token and that it is self-signed.
+func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (string, error) {
+	claimsClone := *claims
+	claimsClone.Issuer = string(s.ServiceId)
+	claimsClone.IssuedAt = jwt.NewNumericDate(ctx.Clock().Now())
+	claimsClone.SelfSigned = true
 
-	if key == nil {
-		return "", errors.New("failed to get key for token")
-	}
-
-	if !key.CanSign() {
-		return "", errors.New("key cannot be used to sign tokens")
-	}
-
-	audiences, err := claims.GetAudience()
+	audiences, err := claimsClone.GetAudience()
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get aud")
 	}
@@ -68,21 +62,27 @@ func (s *Service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (stri
 		return "", errors.New("some service ids in aud are invalid")
 	}
 
-	tb, err := jwt2.NewJwtTokenBuilder().
-		WithClaims(claims).
-		WithConfigKey(ctx, key)
-
+	data, err := s.Config.GetRoot().SystemAuth.GlobalAESKey.GetData(ctx)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to create token")
+		return "", errors.Wrap(err, "failed to get global aes key")
 	}
 
-	return tb.TokenCtx(ctx)
+	return jwt2.
+		NewJwtTokenBuilder().
+		WithClaims(&claimsClone).
+		WithSecretKey(data).
+		WithSelfSigned().
+		TokenCtx(ctx)
 }
 
 // Parse token string and verify.
-func (s *Service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProxyClaims, error) {
+func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProxyClaims, error) {
 	claims, err := jwt2.NewJwtTokenParserBuilder().
 		WithKeySelector(func(ctx context.Context, unverified *jwt2.AuthProxyClaims) (kd config.KeyData, isShared bool, err error) {
+			if unverified.SelfSigned {
+				return s.Config.GetRoot().SystemAuth.GlobalAESKey, true, nil
+			}
+
 			key, err := s.keyForToken(unverified)
 			if err != nil {
 				return nil, false, errors.Wrap(err, "failed to get key")
@@ -120,7 +120,7 @@ func (s *Service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProx
 	return claims, s.validate(ctx, claims)
 }
 
-func (s *Service) validate(ctx context.Context, claims *jwt2.AuthProxyClaims) error {
+func (s *service) validate(ctx context.Context, claims *jwt2.AuthProxyClaims) error {
 	v := jwt.NewValidator(
 		jwt.WithTimeFunc(func() time.Time {
 			return ctx.Clock().Now()
@@ -130,14 +130,30 @@ func (s *Service) validate(ctx context.Context, claims *jwt2.AuthProxyClaims) er
 	return v.Validate(claims)
 }
 
-func (s *Service) setJwtResponseHeader(w http.ResponseWriter, tokenString string) {
-	w.Header().Set(jwtHeaderKey, fmt.Sprintf("Bearer %s", tokenString))
+func JwtBearerHeaderVal(tokenString string) string {
+	return fmt.Sprintf("Bearer %s", tokenString)
+}
+
+func SetJwtHeader(h http.Header, tokenString string) {
+	h.Set(jwtHeaderKey, JwtBearerHeaderVal(tokenString))
+}
+
+func SetJwtRequestHeader(w *http.Request, tokenString string) {
+	SetJwtHeader(w.Header, tokenString)
+}
+
+func SetJwtResponseHeader(w http.ResponseWriter, tokenString string) {
+	SetJwtHeader(w.Header(), tokenString)
+}
+
+func (s *service) setJwtResponseHeader(w http.ResponseWriter, tokenString string) {
+	SetJwtResponseHeader(w, tokenString)
 }
 
 // Set creates token cookie with xsrf cookie and put it to ResponseWriter
 // accepts claims and sets expiration if none defined. permanent flag means long-living cookie,
 // false makes it session only.
-func (s *Service) Set(ctx context.Context, w http.ResponseWriter, claims *jwt2.AuthProxyClaims) (*jwt2.AuthProxyClaims, error) {
+func (s *service) Set(ctx context.Context, w http.ResponseWriter, claims *jwt2.AuthProxyClaims) (*jwt2.AuthProxyClaims, error) {
 	expiresAt, err := claims.GetExpirationTime()
 	if err != nil {
 		return nil, errors.Wrap(err, "can't get expiration time")
@@ -201,35 +217,89 @@ func extractTokenFromBearer(authorizationHeader string) (string, error) {
 	return "", errors.New("no bearer token found")
 }
 
+func SetJwtQueryParm(q url.Values, tokenString string) {
+	q.Set(JwtQueryParam, tokenString)
+}
+
+func getJwtTokenFromQuery(r *http.Request) (token string, hasValue bool) {
+	tokenQuery := r.URL.Query().Get(JwtQueryParam)
+	if tokenQuery == "" {
+		return "", false
+	}
+
+	return tokenQuery, true
+}
+
+func getJwtTokenFromHeader(r *http.Request) (token string, hasValue bool, err error) {
+	if tokenHeader := r.Header.Get(jwtHeaderKey); tokenHeader != "" {
+		tokenString, err := extractTokenFromBearer(tokenHeader)
+		if err != nil {
+			return "", true, errors.Wrap(err, "failed to extract token from authorization header")
+		}
+
+		if tokenString != "" {
+			return tokenString, true, nil
+		}
+	}
+
+	return "", false, nil
+}
+
+func getJwtTokenFromCookie(r *http.Request) (token string, hasValue bool, err error) {
+	jc, err := r.Cookie(jwtCookieName)
+
+	if errors.Is(err, http.ErrNoCookie) {
+		return "", false, nil
+	}
+
+	if err != nil {
+		return "", true, errors.Wrap(err, "failed to get cookie")
+	}
+
+	return jc.Value, true, nil
+}
+
+func requestHasAuth(r *http.Request) bool {
+	_, hasQueryVal := getJwtTokenFromQuery(r)
+	_, hasHeaderVal, _ := getJwtTokenFromHeader(r)
+	_, hasCookieVal, _ := getJwtTokenFromCookie(r)
+
+	return hasQueryVal || hasHeaderVal || hasCookieVal
+}
+
 // Get token from url, header, or cookie
 // if cookie used, verify xsrf token to match
-func (s *Service) Get(ctx context.Context, r *http.Request) (*jwt2.AuthProxyClaims, string, error) {
+func (s *service) Get(ctx context.Context, r *http.Request) (*jwt2.AuthProxyClaims, string, error) {
 
 	fromCookie := false
 	tokenString := ""
 
 	// try to get from "token" query param
-	if tkQuery := r.URL.Query().Get(jwtQueryParam); tkQuery != "" {
+	if tkQuery, hasValue := getJwtTokenFromQuery(r); hasValue {
 		tokenString = tkQuery
 	}
 
 	// try to get from JWT header
-	if tokenHeader := r.Header.Get(jwtHeaderKey); tokenHeader != "" && tokenString == "" {
-		var err error
-		tokenString, err = extractTokenFromBearer(tokenHeader)
-		if err != nil {
-			return nil, "", errors.Wrap(err, "failed to extract token from authorization header")
+	if tokenString == "" {
+		if tokenHeader, hasValue, err := getJwtTokenFromHeader(r); hasValue || err != nil {
+			if err != nil {
+				return nil, "", err
+			}
+
+			tokenString = tokenHeader
 		}
 	}
 
 	// try to get from JWT cookie
 	if tokenString == "" {
-		fromCookie = true
-		jc, err := r.Cookie(jwtCookieName)
-		if err != nil {
-			return nil, "", errors.Wrap(err, "token cookie was not presented")
+		if tokenCookie, hasValue, err := getJwtTokenFromCookie(r); hasValue || err != nil {
+			if err != nil {
+				return nil, "", err
+			}
+
+			fromCookie = true
+			tokenString = tokenCookie
 		}
-		tokenString = jc.Value
 	}
 
 	claims, err := s.Parse(ctx, tokenString)
@@ -256,13 +326,8 @@ func (s *Service) Get(ctx context.Context, r *http.Request) (*jwt2.AuthProxyClai
 	return claims, tokenString, nil
 }
 
-// IsExpired returns true if claims expired
-func (s *Service) IsExpired(ctx context.Context, claims *jwt2.AuthProxyClaims) bool {
-	return claims.ExpiresAt != nil && claims.ExpiresAt.Before(ctx.Clock().Now())
-}
-
 // Reset token's cookies
-func (s *Service) Reset(w http.ResponseWriter) {
+func (s *service) Reset(w http.ResponseWriter) {
 	jwtCookie := http.Cookie{Name: jwtCookieName, Value: "", HttpOnly: false, Path: "/", Domain: s.Config.GetRoot().SystemAuth.CookieDomain,
 		MaxAge: -1, Expires: time.Unix(0, 0), Secure: s.apiHost().IsHttps(), SameSite: cookieSameSite}
 	http.SetCookie(w, &jwtCookie)
@@ -270,18 +335,4 @@ func (s *Service) Reset(w http.ResponseWriter) {
 	xsrfCookie := http.Cookie{Name: xsrfCookieName, Value: "", HttpOnly: false, Path: "/", Domain: s.Config.GetRoot().SystemAuth.CookieDomain,
 		MaxAge: -1, Expires: time.Unix(0, 0), Secure: s.apiHost().IsHttps(), SameSite: cookieSameSite}
 	http.SetCookie(w, &xsrfCookie)
-}
-
-// claimStringsVal returns a string for used in errors/logging for claims string that accounts for the fact
-// that often it will be a single string and we don't need to print an array when that is the case.
-func claimStringsVal(cs jwt.ClaimStrings) string {
-	if len(cs) == 0 {
-		return "''"
-	}
-
-	if len(cs) == 1 {
-		return cs[0]
-	}
-
-	return fmt.Sprintf("%q", cs)
 }

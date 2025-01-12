@@ -3,10 +3,12 @@ package jwt
 import (
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/util"
+	"strings"
 	"time"
 )
 
@@ -14,8 +16,8 @@ import (
 // with the actor/subject etc properly constructed.
 type ClaimsBuilder interface {
 	WithIssuer(issuer string) ClaimsBuilder
-	WithAudience(audience string) ClaimsBuilder
-	WithAudiences(audience []string) ClaimsBuilder
+	WithAudience(audience string) ClaimsBuilder    // Specifies the audience of the claims; normally a service id
+	WithAudiences(audience []string) ClaimsBuilder // Specifies the service that is intended to consume the claims. Communicated as aud.
 	WithServiceId(serviceId config.ServiceId) ClaimsBuilder
 	WithServiceIds(serviceIds []config.ServiceId) ClaimsBuilder
 	WithExpiration(expiration time.Time) ClaimsBuilder
@@ -23,9 +25,12 @@ type ClaimsBuilder interface {
 	WithExpiresInCtx(ctx context.Context, expiresIn time.Duration) ClaimsBuilder
 	WithSuperAdmin() ClaimsBuilder
 	WithAdmin() ClaimsBuilder
+	WithSelfSigned() ClaimsBuilder
 	WithActorEmail(email string) ClaimsBuilder
 	WithActorId(id string) ClaimsBuilder
+	WithActor(actor *Actor) ClaimsBuilder
 	WithSessionOnly() ClaimsBuilder
+	WithNonce() ClaimsBuilder
 	BuildCtx(context.Context) (*AuthProxyClaims, error)
 	Build() (*AuthProxyClaims, error)
 	MustBuild() AuthProxyClaims
@@ -35,12 +40,16 @@ type ClaimsBuilder interface {
 type claimsBuilder struct {
 	issuer      *string
 	audiences   []string
+	expiresIn   *time.Duration
 	expiration  *time.Time
 	superAdmin  *bool
 	admin       *bool
 	email       *string
 	id          *string
+	actor       *Actor
 	sessionOnly bool
+	selfSigned  bool
+	nonce       *uuid.UUID
 }
 
 func (b *claimsBuilder) WithIssuer(issuer string) ClaimsBuilder {
@@ -72,7 +81,8 @@ func (b *claimsBuilder) WithExpiration(expiration time.Time) ClaimsBuilder {
 }
 
 func (b *claimsBuilder) WithExpiresIn(expiresIn time.Duration) ClaimsBuilder {
-	return b.WithExpiresInCtx(context.Background(), expiresIn)
+	b.expiresIn = &expiresIn
+	return b
 }
 
 func (b *claimsBuilder) WithExpiresInCtx(ctx context.Context, expiresIn time.Duration) ClaimsBuilder {
@@ -93,6 +103,11 @@ func (b *claimsBuilder) WithAdmin() ClaimsBuilder {
 	return b
 }
 
+func (b *claimsBuilder) WithSelfSigned() ClaimsBuilder {
+	b.selfSigned = true
+	return b
+}
+
 func (b *claimsBuilder) WithActorEmail(email string) ClaimsBuilder {
 	b.email = &email
 	return b
@@ -103,8 +118,19 @@ func (b *claimsBuilder) WithActorId(id string) ClaimsBuilder {
 	return b
 }
 
+func (b *claimsBuilder) WithActor(actor *Actor) ClaimsBuilder {
+	b.actor = actor
+	return b
+}
+
 func (b *claimsBuilder) WithSessionOnly() ClaimsBuilder {
 	b.sessionOnly = true
+	return b
+}
+
+func (b *claimsBuilder) WithNonce() ClaimsBuilder {
+	u := uuid.New()
+	b.nonce = &u
 	return b
 }
 
@@ -117,12 +143,29 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 		b.id = util.ToPtr("superadmin/superadmin")
 	}
 
+	var actor Actor
+	if b.actor != nil {
+		actor = *b.actor
+		if actor.ID != "" {
+			b.id = util.ToPtr(actor.ID)
+		}
+	}
+
 	if b.id == nil {
 		return nil, errors.New("id is required")
 	}
 
-	if util.CoerceBool(b.admin) {
+	if util.CoerceBool(b.admin) && !strings.HasPrefix(*b.id, "admin/") {
 		b.id = util.ToPtr(fmt.Sprintf("admin/%s", *b.id))
+		actor.ID = *b.id
+	}
+
+	if b.email != nil {
+		actor.Email = *b.email
+	}
+
+	if b.admin != nil {
+		actor.Admin = *b.admin
 	}
 
 	c := AuthProxyClaims{
@@ -131,12 +174,9 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 			IssuedAt: &jwt.NumericDate{ctx.Clock().Now()},
 			ID:       ctx.UuidGenerator().NewString(),
 		},
-		Actor: &Actor{
-			ID:         util.CoerceString(b.id),
-			Admin:      util.CoerceBool(b.admin),
-			SuperAdmin: util.CoerceBool(b.superAdmin),
-		},
+		Actor:       &actor,
 		SessionOnly: b.sessionOnly,
+		SelfSigned:  b.selfSigned,
 	}
 
 	if b.issuer != nil {
@@ -148,8 +188,20 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 		c.Actor.Audience = b.audiences
 	}
 
+	if b.expiresIn != nil {
+		b.expiration = util.ToPtr(ctx.Clock().Now().Add(*b.expiresIn))
+	}
+
 	if b.expiration != nil {
 		c.ExpiresAt = &jwt.NumericDate{*b.expiration}
+	}
+
+	if b.nonce != nil {
+		if b.expiration == nil {
+			return nil, errors.New("nonce requires an expiration")
+		}
+
+		c.Nonce = b.nonce
 	}
 
 	return &c, nil
@@ -172,6 +224,6 @@ func (b *claimsBuilder) MustBuild() AuthProxyClaims {
 	return b.MustBuildCtx(context.Background())
 }
 
-func NewJwtBuilder() ClaimsBuilder {
+func NewClaimsBuilder() ClaimsBuilder {
 	return &claimsBuilder{}
 }

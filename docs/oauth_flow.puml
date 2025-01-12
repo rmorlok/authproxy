@@ -1,0 +1,42 @@
+@startuml
+actor User
+participant "Single Page App" as SPA
+participant "Browser" as browser
+participant "AuthProxy Public" as public
+participant "AuthProxy API" as API
+database "Redis" as Redis
+database "Database" as db
+participant "3rd Party Authorization Server" as 3pAuthServer
+
+User -> SPA: Connect connector
+SPA -> API: POST /api/connections/_initiate
+
+API -> db: Create connection record
+API -> Redis: state_id = actor_id,connector_id,connection_id
+API --> SPA: redirect url to auth with auth token,state id
+
+SPA -> browser: http://auth/auth_token=...&state_id=...
+browser -> public: GET http://auth/auth_token=...&state_id=...
+
+public -> public: Validate short-lived auth token
+public -> Redis: Get by state id
+public -> public: Validate same actor
+public -> public: Read 3p redirect url
+
+public --> browser: 302 http://3p/auth?scopes=...&client_id=...&state=...; set auth token cookie
+browser -> 3pAuthServer: GET 302 http://3p/auth?scopes=...&client_id=...&state=...
+3pAuthServer --> browser: consent screen
+User -> browser: approve
+browser -> 3pAuthServer: approve
+3pAuthServer --> browser: 302 http://public/oauth2/callback?code=...&state=...
+
+browser -> public: GET http://public/oauth2/callback?code=...&state=... with auth token cookie
+public -> public: Validate auth token from cookie
+public -> redis: Get actor_id,connector_id,connection_id by state id
+public -> public: Validate same actor
+public -> 3pAuthServer: GET http://3p/token?code=...
+3pAuthServer --> public: access token, refresh token
+public -> db: access token, refresh token
+public --> browser: 302 return to url
+
+@enduml

@@ -1,4 +1,4 @@
-auth:
+public:
   port: 8080
 api:
   port: 8081
@@ -23,6 +23,8 @@ database:
   path: ./tmp/dev.db
 redis:
   provider: miniredis
+oauth:
+  roundtrip_ttl: 60m
 connectors:
   - id: google-drive
     version: 1
@@ -38,9 +40,11 @@ connectors:
     auth:
       type: OAuth2
       client_id:
-        value: some-client-id
+        env_var: GOOGLE_DRIVE_CLIENT_ID
       client_secret:
         env_var: GOOGLE_DRIVE_CLIENT_SECRET
+      authorization_endpoint: https://accounts.google.com/o/oauth2/v2/auth
+      token_endpoint: https://oauth2.googleapis.com/token
       scopes:
         - id: https://www.googleapis.com/auth/drive.readonly
           reason: |

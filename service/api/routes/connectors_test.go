@@ -37,7 +37,7 @@ func TestConnectors(t *testing.T) {
 			}
 		}
 
-		cfg, auth, authUtil := auth2.TestAuthService(config.ServiceIdApi, cfg)
+		cfg, auth, authUtil := auth2.TestAuthService(t, config.ServiceIdApi, cfg)
 		cr := NewConnectorsRoutes(cfg, auth)
 		r := gin.Default()
 		cr.Register(r)

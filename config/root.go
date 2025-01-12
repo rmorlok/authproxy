@@ -8,10 +8,11 @@ import (
 type Root struct {
 	AdminApi   ApiHost     `json:"admin_api" yaml:"admin_api"`
 	Api        ApiHost     `json:"api" yaml:"api"`
-	Auth       ApiHost     `json:"auth" yaml:"auth"`
+	Public     ApiHost     `json:"public" yaml:"public"`
 	SystemAuth SystemAuth  `json:"system_auth" yaml:"system_auth"`
 	Database   Database    `json:"database" yaml:"database"`
 	Redis      Redis       `json:"redis" yaml:"redis"`
+	Oauth      OAuth       `json:"oauth" yaml:"oauth"`
 	ErrorPages ErrorPages  `json:"error_pages" yaml:"error_pages"`
 	Connectors []Connector `json:"connectors" yaml:"connectors"`
 }

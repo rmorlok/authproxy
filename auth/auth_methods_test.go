@@ -2,11 +2,16 @@ package auth
 
 import (
 	"fmt"
+	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
+	"github.com/mohae/deepcopy"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
 	jwt2 "github.com/rmorlok/authproxy/jwt"
+	"github.com/rmorlok/authproxy/util"
 	"github.com/stretchr/testify/require"
+	clock "k8s.io/utils/clock/testing"
 	test_clock "k8s.io/utils/clock/testing"
 	"net/http"
 	"net/http/httptest"
@@ -19,7 +24,7 @@ var (
 	testJwtValidSess = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJyZW1hcms0MiIsImF1ZCI6WyJ0ZXN0X3N5cyJdLCJleHAiOjI3ODkxOTE4MjIsIm5iZiI6MTUyNjg4NDIyMiwiaWF0IjoxNzI3NzQwODAwLCJqdGkiOiJyYW5kb20gaWQiLCJ1c2VyIjp7ImlkIjoiaWQxIiwiaXAiOiIxMjcuMC4wLjEiLCJlbWFpbCI6Im1lQGV4YW1wbGUuY29tIiwiYXR0cnMiOnsiYm9vbGEiOnRydWUsInN0cmEiOiJzdHJhLXZhbCJ9fSwic2Vzc19vbmx5Ijp0cnVlfQ.dTB_PamolW5w7LFRBbXDuN_SKh9BOMawVH_6ECaWsvE"
 )
 
-func TestJWT_Token(t *testing.T) {
+func TestAuth_Token(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(Opts{
 		Config:    cfg,
@@ -34,7 +39,7 @@ func TestJWT_Token(t *testing.T) {
 	require.NotNil(t, testClaims().Actor.ID, claims.Actor.ID)
 }
 
-func TestJWT_SendJWTHeader(t *testing.T) {
+func TestAuth_SendJWTHeader(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(Opts{
 		SendJWTHeader: true,
@@ -44,7 +49,7 @@ func TestJWT_SendJWTHeader(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	_, err := j.Set(testContext, rr, testClaims())
-	require.Nil(t, err)
+	require.NoError(t, err)
 	cookies := rr.Result().Cookies()
 	require.Equal(t, 0, len(cookies), "no cookies set")
 	token := strings.Replace(rr.Result().Header.Get(jwtHeaderKey), "Bearer ", "", 1)
@@ -53,7 +58,65 @@ func TestJWT_SendJWTHeader(t *testing.T) {
 	require.NotNil(t, testClaims().Actor.ID, claims.Actor.ID)
 }
 
-func TestJWT_RoundtripPublicPrivate(t *testing.T) {
+func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
+	cfg := config.FromRoot(&testConfigPublicPrivateKey)
+	j := NewService(Opts{Config: cfg, ServiceId: config.ServiceIdAdminApi})
+
+	claims := jwt2.AuthProxyClaims{
+		RegisteredClaims: jwt.RegisteredClaims{
+			ID:        "random id",
+			Issuer:    "remark42",
+			Audience:  []string{string(config.ServiceIdAdminApi)},
+			ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
+			NotBefore: &jwt.NumericDate{time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
+			IssuedAt:  &jwt.NumericDate{testContext.Clock().Now()},
+		},
+
+		Actor: &jwt2.Actor{
+			ID:    "id1",
+			IP:    "127.0.0.1",
+			Email: "me@example.com",
+		},
+	}
+
+	t.Run("via service methods", func(t *testing.T) {
+		tok, err := j.Token(testContext, &claims)
+		require.NoError(t, err)
+		rtClaims, err := j.Parse(testContext, tok)
+		require.NoError(t, err)
+		require.Equal(t, claims.Actor.ID, rtClaims.Actor.ID)
+
+		tokRunes := []rune(tok)
+		if len(tokRunes) >= 10 {
+			tokRunes[9] = 'X' // Replace the 10th character (0-based index 9)
+		}
+		tok = string(tokRunes)
+		_, err = j.Parse(testContext, tok)
+		require.Error(t, err)
+	})
+	t.Run("via token builder", func(t *testing.T) {
+		// Clone
+		copiedClaims := deepcopy.Copy(&claims).(*jwt2.AuthProxyClaims)
+		copiedClaims.SelfSigned = true
+
+		tb := jwt2.NewJwtTokenBuilder().WithSecretKey(util.Must(cfg.GetRoot().SystemAuth.GlobalAESKey.GetData(testContext)))
+		tok, err := tb.WithClaims(copiedClaims).TokenCtx(testContext)
+		require.NoError(t, err)
+		rtClaims, err := j.Parse(testContext, tok)
+		require.NoError(t, err)
+		require.Equal(t, claims.Actor.ID, rtClaims.Actor.ID)
+
+		tokRunes := []rune(tok)
+		if len(tokRunes) >= 10 {
+			tokRunes[9] = 'X' // Replace the 10th character (0-based index 9)
+		}
+		tok = string(tokRunes)
+		_, err = j.Parse(testContext, tok)
+		require.Error(t, err)
+	})
+}
+
+func TestAuth_RoundtripPublicPrivate(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(Opts{Config: cfg, ServiceId: config.ServiceIdAdminApi})
 
@@ -89,7 +152,7 @@ func TestJWT_RoundtripPublicPrivate(t *testing.T) {
 	require.Error(t, err)
 }
 
-func TestJWT_RoundtripSecretKey(t *testing.T) {
+func TestAuth_SecretKey(t *testing.T) {
 	cfg := config.FromRoot(&testConfigSecretKey)
 	j := NewService(Opts{Config: cfg, ServiceId: config.ServiceIdAdminApi})
 
@@ -110,8 +173,12 @@ func TestJWT_RoundtripSecretKey(t *testing.T) {
 		},
 	}
 
-	tok, err := j.Token(testContext, &claims)
+	tb, err := jwt2.NewJwtTokenBuilder().WithConfigKey(testContext, cfg.GetRoot().SystemAuth.JwtSigningKey)
 	require.NoError(t, err)
+
+	tok, err := tb.WithClaims(&claims).TokenCtx(testContext)
+	require.NoError(t, err)
+
 	rtClaims, err := j.Parse(testContext, tok)
 	require.NoError(t, err)
 	require.Equal(t, claims.Actor.ID, rtClaims.Actor.ID)
@@ -126,7 +193,7 @@ func TestJWT_RoundtripSecretKey(t *testing.T) {
 
 }
 
-func TestJWT_Parse(t *testing.T) {
+func TestAuth_Parse(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(Opts{Config: cfg, ServiceId: config.ServiceIdAdminApi})
 	t.Run("valid", func(t *testing.T) {
@@ -135,7 +202,7 @@ func TestJWT_Parse(t *testing.T) {
 
 		claims, err := j.Parse(testContext, tok)
 		require.NoError(t, err)
-		require.False(t, j.IsExpired(testContext, claims))
+		require.False(t, claims.IsExpired(testContext))
 		require.Equal(t, testClaims().Actor.Email, claims.Actor.Email)
 
 	})
@@ -204,7 +271,10 @@ func TestJWT_Parse(t *testing.T) {
 
 	t.Run("invalid signature", func(t *testing.T) {
 		serv1 := j
-		tokServ1, err := serv1.Token(testContext, testClaims())
+		tb, err := jwt2.NewJwtTokenBuilder().WithConfigKey(testContext, cfg.GetRoot().SystemAuth.JwtSigningKey)
+		require.NoError(t, err)
+
+		tokServ1, err := tb.WithClaims(testClaims()).TokenCtx(testContext)
 		require.NoError(t, err)
 
 		// Valid with the current
@@ -232,7 +302,10 @@ func TestJWT_Parse(t *testing.T) {
 		})
 		serv2 := NewService(Opts{Config: cfg, ServiceId: config.ServiceIdAdminApi})
 
-		tokServ2, err := serv2.Token(testContext, testClaims())
+		tb2, err := jwt2.NewJwtTokenBuilder().WithConfigKey(testContext, cfg.GetRoot().SystemAuth.JwtSigningKey)
+		require.NoError(t, err)
+
+		tokServ2, err := tb2.WithClaims(testClaims()).TokenCtx(testContext)
 		require.NoError(t, err)
 
 		// Valid with the current
@@ -324,7 +397,7 @@ func TestJWT_Parse(t *testing.T) {
 	})
 }
 
-func TestJWT_Set(t *testing.T) {
+func TestAuth_Set(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 
 	j := NewService(Opts{
@@ -336,7 +409,7 @@ func TestJWT_Set(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	c, err := j.Set(testContext, rr, &claims)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, claims, *c)
 	cookies := rr.Result().Cookies()
 	t.Log(cookies)
@@ -354,7 +427,7 @@ func TestJWT_Set(t *testing.T) {
 	claims.SessionOnly = true
 	rr = httptest.NewRecorder()
 	_, err = j.Set(testContext, rr, &claims)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	cookies = rr.Result().Cookies()
 	t.Log(cookies)
 	require.Equal(t, 2, len(cookies))
@@ -373,7 +446,7 @@ func TestJWT_Set(t *testing.T) {
 
 	// Check below looks at issued at changing, so we need a different time than the test context
 	_, err = j.Set(context.Background().WithClock(test_clock.NewFakeClock(time.Date(2024, 11, 2, 0, 0, 0, 0, time.UTC))), rr, &claims)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	cookies = rr.Result().Cookies()
 	t.Log(cookies)
 	require.Equal(t, 2, len(cookies))
@@ -382,7 +455,7 @@ func TestJWT_Set(t *testing.T) {
 	require.Equal(t, "", rr.Result().Header.Get(jwtHeaderKey), "no JWT header set")
 }
 
-func TestJWT_SetWithDomain(t *testing.T) {
+func TestAuth_SetWithDomain(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(Opts{
 		Config:    cfg,
@@ -393,7 +466,7 @@ func TestJWT_SetWithDomain(t *testing.T) {
 
 	rr := httptest.NewRecorder()
 	_, err := j.Set(testContext, rr, &claims)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	cookies := rr.Result().Cookies()
 	t.Log(cookies)
 	require.Equal(t, 2, len(cookies))
@@ -409,7 +482,7 @@ func TestJWT_SetWithDomain(t *testing.T) {
 	require.Equal(t, "random id", cookies[1].Value)
 }
 
-func TestJWT_SetProlonged(t *testing.T) {
+func TestAuth_SetProlonged(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(Opts{
 		Config:    cfg,
@@ -431,7 +504,7 @@ func TestJWT_SetProlonged(t *testing.T) {
 	require.True(t, cc.ExpiresAt.Time.After(testContext.Clock().Now()))
 }
 
-func TestJWT_NoIssuer(t *testing.T) {
+func TestAuth_NoIssuer(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(Opts{
 		Config:    cfg,
@@ -453,7 +526,7 @@ func TestJWT_NoIssuer(t *testing.T) {
 	require.Equal(t, string(config.ServiceIdAdminApi), cc.Issuer)
 }
 
-func TestJWT_GetFromHeader(t *testing.T) {
+func TestAuth_GetFromHeader(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(Opts{
 		Config:    cfg,
@@ -467,7 +540,7 @@ func TestJWT_GetFromHeader(t *testing.T) {
 		req := httptest.NewRequest("GET", "/", nil)
 		req.Header.Add(jwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
 		claims, _, err := j.Get(testContext, req)
-		require.Nil(t, err)
+		require.NoError(t, err)
 		require.Equal(t, testClaims().Actor.ID, claims.Actor.ID)
 	})
 
@@ -494,7 +567,107 @@ func TestJWT_GetFromHeader(t *testing.T) {
 	})
 }
 
-func TestJWT_GetFromQuery(t *testing.T) {
+func TestAuth_Nonce(t *testing.T) {
+	now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+	ctx := context.Background().WithClock(clock.NewFakeClock(now))
+
+	type TestSetup struct {
+		Gin      *gin.Engine
+		Cfg      config.C
+		AuthUtil *AuthTestUtil
+	}
+
+	setup := func(t *testing.T) *TestSetup {
+		cfg := config.FromRoot(&testConfigPublicPrivateKey)
+		cfg, auth, authUtil := TestAuthService(t, config.ServiceIdAdminApi, cfg)
+		r := gin.Default()
+		r.GET("/", auth.Required(), func(c *gin.Context) {
+			a := MustGetActorInfoFromGinContext(c)
+			c.String(200, a.ID)
+		})
+
+		return &TestSetup{
+			Gin:      r,
+			Cfg:      cfg,
+			AuthUtil: authUtil,
+		}
+	}
+
+	t.Run("valid", func(t *testing.T) {
+		ts := setup(t)
+		c := testClaims()
+		c.Nonce = util.ToPtr(uuid.New())
+		c.ExpiresAt = &jwt.NumericDate{now.Add(time.Hour)}
+		c.NotBefore = nil
+
+		tok, err := ts.AuthUtil.s.Token(testContext, c)
+		require.NoError(t, err)
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/?jwt="+tok, nil).WithContext(ctx)
+		ts.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Equal(t, c.Actor.ID, w.Body.String())
+	})
+
+	t.Run("expired", func(t *testing.T) {
+		ts := setup(t)
+		c := testClaims()
+		c.Nonce = util.ToPtr(uuid.New())
+		c.ExpiresAt = &jwt.NumericDate{now.Add(-time.Hour)}
+		c.NotBefore = nil
+
+		tok, err := ts.AuthUtil.s.Token(testContext, c)
+		require.NoError(t, err)
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/?jwt="+tok, nil).WithContext(ctx)
+		ts.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+
+	t.Run("used more than once", func(t *testing.T) {
+		ts := setup(t)
+		c := testClaims()
+		c.Nonce = util.ToPtr(uuid.New())
+		c.ExpiresAt = &jwt.NumericDate{now.Add(time.Hour)}
+		c.NotBefore = nil
+
+		tok, err := ts.AuthUtil.s.Token(testContext, c)
+		require.NoError(t, err)
+
+		// First request ok
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/?jwt="+tok, nil).WithContext(ctx)
+		ts.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+		require.Equal(t, c.Actor.ID, w.Body.String())
+
+		// Second request fail
+		w = httptest.NewRecorder()
+		req = httptest.NewRequest("GET", "/?jwt="+tok, nil).WithContext(ctx)
+		ts.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+
+	t.Run("token does not contain expirey", func(t *testing.T) {
+		ts := setup(t)
+		c := testClaims()
+		c.Nonce = util.ToPtr(uuid.New())
+		c.ExpiresAt = nil
+		c.NotBefore = nil
+
+		tok, err := ts.AuthUtil.s.Token(testContext, c)
+		require.NoError(t, err)
+
+		w := httptest.NewRecorder()
+		req := httptest.NewRequest("GET", "/?jwt="+tok, nil).WithContext(ctx)
+		ts.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusUnauthorized, w.Code)
+	})
+}
+
+func TestAuth_GetFromQuery(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(Opts{
 		Config:    cfg,
@@ -510,7 +683,7 @@ func TestJWT_GetFromQuery(t *testing.T) {
 		require.NoError(t, err)
 
 		require.Equal(t, claims.Actor.ID, claims.Actor.ID)
-		require.False(t, j.IsExpired(testContext, claims))
+		require.False(t, claims.IsExpired(testContext))
 	})
 	t.Run("expired", func(t *testing.T) {
 		tok, err := j.Token(testContext, testClaims())
@@ -531,7 +704,7 @@ func TestJWT_GetFromQuery(t *testing.T) {
 	})
 }
 
-func TestJWT_GetFailed(t *testing.T) {
+func TestAuth_GetFailed(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(Opts{Config: cfg, ServiceId: config.ServiceIdAdminApi})
 	req := httptest.NewRequest("GET", "/", nil)
@@ -539,7 +712,7 @@ func TestJWT_GetFailed(t *testing.T) {
 	require.Error(t, err, "token cookie was not presented")
 }
 
-func TestJWT_SetAndGetWithCookies(t *testing.T) {
+func TestAuth_SetAndGetWithCookies(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(Opts{
 		Config:    cfg,
@@ -559,14 +732,14 @@ func TestJWT_SetAndGetWithCookies(t *testing.T) {
 	defer ts.Close()
 
 	resp, err := http.Get(ts.URL + "/valid")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, 200, resp.StatusCode)
 
 	req := httptest.NewRequest("GET", "/valid", nil)
 	req.AddCookie(resp.Cookies()[0])
 	req.Header.Add(xsrfHeaderKey, "random id")
 	r, _, err := j.Get(testContext, req)
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, &jwt2.Actor{ID: "id1", IP: "127.0.0.1",
 		Email: "me@example.com", Audience: []string{"admin-api"}}, r.Actor)
 	require.Equal(t, "admin-api", claims.Issuer)
@@ -574,7 +747,7 @@ func TestJWT_SetAndGetWithCookies(t *testing.T) {
 	t.Log(resp.Cookies())
 }
 
-func TestJWT_SetAndGetWithXsrfMismatch(t *testing.T) {
+func TestAuth_SetAndGetWithXsrfMismatch(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(Opts{
 		Config:    cfg,
@@ -583,6 +756,7 @@ func TestJWT_SetAndGetWithXsrfMismatch(t *testing.T) {
 
 	claims := *testClaims()
 	claims.SessionOnly = true
+	claims.SelfSigned = true
 	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/valid" {
 			_, e := j.Set(testContext, w, &claims)
@@ -593,7 +767,7 @@ func TestJWT_SetAndGetWithXsrfMismatch(t *testing.T) {
 	defer ts.Close()
 
 	resp, err := http.Get(ts.URL + "/valid")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, 200, resp.StatusCode)
 
 	req := httptest.NewRequest("GET", "/valid", nil)
@@ -618,7 +792,7 @@ func TestJWT_SetAndGetWithXsrfMismatch(t *testing.T) {
 	require.Equal(t, claims, *c)
 }
 
-func TestJWT_SetAndGetWithCookiesExpired(t *testing.T) {
+func TestAuth_SetAndGetWithCookiesExpired(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(Opts{
 		Config:    cfg,
@@ -640,7 +814,7 @@ func TestJWT_SetAndGetWithCookiesExpired(t *testing.T) {
 	defer ts.Close()
 
 	resp, err := http.Get(ts.URL + "/expired")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, 200, resp.StatusCode)
 
 	req := httptest.NewRequest("GET", "/expired", nil)
@@ -651,7 +825,7 @@ func TestJWT_SetAndGetWithCookiesExpired(t *testing.T) {
 	require.True(t, jwt2.IsTokenExpiredError(err))
 }
 
-func TestJWT_Reset(t *testing.T) {
+func TestAuth_Reset(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(Opts{Config: cfg, ServiceId: config.ServiceIdAdminApi})
 
@@ -664,14 +838,14 @@ func TestJWT_Reset(t *testing.T) {
 	defer ts.Close()
 
 	resp, err := http.Get(ts.URL + "/valid")
-	require.Nil(t, err)
+	require.NoError(t, err)
 	require.Equal(t, 200, resp.StatusCode)
 
 	require.Equal(t, `auth-proxy-jwt=; Path=/; Domain=example.com; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; SameSite=None`, resp.Header.Get("Set-Cookie"))
 	require.Equal(t, "0", resp.Header.Get("Content-Length"))
 }
 
-func TestJWT_Validator(t *testing.T) {
+func TestAuth_Validator(t *testing.T) {
 	ch := ValidatorFunc(func(token string, claims jwt2.AuthProxyClaims) bool {
 		return token == "good"
 	})
@@ -734,6 +908,22 @@ var testConfigPublicPrivateKey = config.Root{
 				Path: "../test_data/system_keys/system",
 			},
 		},
+		AdminUsers: config.AdminUsersList{
+			&config.AdminUser{
+				Username: "aid1",
+				Key: &config.KeyPublicPrivate{
+					PublicKey: &config.KeyDataFile{
+						Path: "../test_data/system_keys/system.pub",
+					},
+					PrivateKey: &config.KeyDataFile{
+						Path: "../test_data/system_keys/system",
+					},
+				},
+			},
+		},
+		GlobalAESKey: &config.KeyDataBase64Val{
+			Base64: "tOqE5HtiujnwB7pXt6lQLH8/gCh6TmMq9uSLFtJxZtU=",
+		},
 	},
 	AdminApi: config.ApiHost{
 		Port: 8080,
@@ -750,6 +940,9 @@ var testConfigSecretKey = config.Root{
 			SharedKey: &config.KeyDataBase64Val{
 				Base64: "+xKbTv+pdvWK+4ucIsUcAHqzEhelLWuud80+fy1pQzc=",
 			},
+		},
+		GlobalAESKey: &config.KeyDataBase64Val{
+			Base64: "tOqE5HtiujnwB7pXt6lQLH8/gCh6TmMq9uSLFtJxZtU=",
 		},
 	},
 	AdminApi: config.ApiHost{

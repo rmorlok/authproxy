@@ -2,7 +2,9 @@ package auth
 
 import (
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/logger"
+	"github.com/rmorlok/authproxy/redis"
 	"net/http"
 	"time"
 )
@@ -10,7 +12,7 @@ import (
 const (
 	jwtCookieName = "auth-proxy-jwt"
 	jwtHeaderKey  = "Authorization"
-	jwtQueryParam = "jwt"
+	JwtQueryParam = "jwt"
 
 	xsrfCookieName = "XSRF-TOKEN"
 	xsrfHeaderKey  = "X-XSRF-TOKEN"
@@ -46,4 +48,6 @@ type Opts struct {
 	Logger       logger.L // logger interface, default is no logging at all
 	RefreshCache RefreshCache
 	Validator    Validator
+	Db           database.DB
+	Redis        *redis.Wrapper
 }

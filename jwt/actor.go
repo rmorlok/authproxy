@@ -9,7 +9,6 @@ import (
 	"hash"
 	"hash/crc64"
 	"io"
-	"net/http"
 	"regexp"
 )
 
@@ -146,6 +145,11 @@ func MustGetActorFromContext(ctx context2.Context) Actor {
 	return *a
 }
 
+// SetActorInContext sets the actor on the context. This is just an alias for the context.With method.
+func SetActorInContext(ctx context2.Context, actor *Actor) context2.Context {
+	return ctx.With(actor)
+}
+
 // GetActorFromContext gets an actor from the context, or returns nil if one is not present
 func GetActorFromContext(ctx context2.Context) *Actor {
 	if a, ok := ctx.Value(actorContextKey).(*Actor); ok {
@@ -173,32 +177,4 @@ func HashID(h hash.Hash, val string) string {
 		return fmt.Sprintf("%x", crc64.Checksum([]byte(val), crc64.MakeTable(crc64.ECMA)))
 	}
 	return hex.EncodeToString(h.Sum(nil))
-}
-
-// MustGetActorInfoFromRequest gets actor info and panics if can't extract it from the request.
-// should be called from authenticated controllers only
-func MustGetActorInfoFromRequest(r *http.Request) *Actor {
-	actor := GetActorInfoFromRequest(r)
-	if actor == nil {
-		panic("actor is not present on request")
-	}
-	return actor
-}
-
-// GetActorInfoFromRequest returns actor info from request if present, otherwise returns nil
-func GetActorInfoFromRequest(r *http.Request) *Actor {
-
-	ctx := r.Context()
-	if ctx == nil {
-		return nil
-	}
-
-	return GetActorFromContext(context2.AsContext(ctx))
-}
-
-// SetActorInfoOnRequest sets actor into request util
-func SetActorInfoOnRequest(r *http.Request, actor *Actor) *http.Request {
-	ctx := r.Context()
-	ctx = actor.ContextWith(ctx)
-	return r.WithContext(ctx)
 }

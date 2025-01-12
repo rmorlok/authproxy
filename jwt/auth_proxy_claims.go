@@ -4,7 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/context"
 	"strings"
 )
 
@@ -12,8 +14,22 @@ import (
 // (user or system taking the action) as well as standard JWT information.
 type AuthProxyClaims struct {
 	jwt.RegisteredClaims
-	Actor       *Actor `json:"actor,omitempty"`
-	SessionOnly bool   `json:"sess_only,omitempty"`
+
+	// Actor is the entity taking the action. Specifying the full actor here (versus just the ID in the subject)
+	// implies that the actor should be upserted into the system as specified versus only working against a previous
+	// actor configured in the system.
+	Actor *Actor `json:"actor,omitempty"`
+
+	// SessionOnly implies this token is only valid within the context of an existing session.
+	SessionOnly bool `json:"sess_only,omitempty"`
+
+	// SelfSigned indicates this token is signed with the GlobalAESKey. This mean that that AuthProxy has signed
+	// this token to itself for auth transfer between services, a token used in session, etc.
+	SelfSigned bool `json:"self_signed,omitempty"`
+
+	// Nonce is a one-time-use value. Adding a nonce to the JWT make it a one-time-use for auth purposes. If you use
+	// a nonce, the JWT must also have an expiry so that tracking of the nonce values do not need to be kept forever.
+	Nonce *uuid.UUID `json:"nonce,omitempty"`
 }
 
 func (tc *AuthProxyClaims) String() string {
@@ -74,4 +90,13 @@ func (tc *AuthProxyClaims) IsNormalActor() bool {
 	}
 
 	return tc.Actor.IsNormalActor()
+}
+
+// IsExpired returns true if claims expired
+func (tc *AuthProxyClaims) IsExpired(ctx context.Context) bool {
+	if tc == nil {
+		return true
+	}
+
+	return tc.ExpiresAt != nil && tc.ExpiresAt.Before(ctx.Clock().Now())
 }

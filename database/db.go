@@ -25,6 +25,13 @@ type DB interface {
 	CreateConnection(ctx context.Context, c *Connection) error
 	ListConnectionsBuilder() ListConnectionsBuilder
 	ListConnectionsFromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error)
+
+	/*
+	 *  Nonces
+	 */
+
+	HasNonceBeenUsed(ctx context.Context, nonce uuid.UUID) (hasBeenUsed bool, err error)
+	CheckNonceValidAndMarkUsed(ctx context.Context, nonce uuid.UUID, retainRecordUntil time.Time) (wasValid bool, err error)
 }
 
 // NewConnection creates a new database connection from the specified configuration. The type of the database
@@ -105,9 +112,9 @@ func (db *gormDB) Migrate(ctx context.Context) error {
 		return errors.Wrap(err, "failed to auto migrate connections")
 	}
 
-	err = db.gorm.AutoMigrate(&Roundtrip{})
+	err = db.gorm.AutoMigrate(&UsedNonce{})
 	if err != nil {
-		return errors.Wrap(err, "failed to auto migrate roundtrips")
+		return errors.Wrap(err, "failed to auto migrate used nonces")
 	}
 
 	return nil

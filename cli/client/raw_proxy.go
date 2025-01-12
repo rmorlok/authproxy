@@ -111,7 +111,7 @@ func cmdRawProxy() *cobra.Command {
 				baseUrl = proxyTo
 			} else if proxyTo == string(server_config.ServiceIdApi) {
 				baseUrl, err = resolver.ResolveApiUrl()
-			} else if proxyTo == string(server_config.ServiceIdAuth) {
+			} else if proxyTo == string(server_config.ServiceIdPublic) {
 				baseUrl, err = resolver.ResolveAuthUrl()
 			} else if proxyTo == string(server_config.ServiceIdAdminApi) {
 				baseUrl, err = resolver.ResolveAdminApiUrl()

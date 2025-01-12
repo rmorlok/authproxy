@@ -8,6 +8,9 @@ import (
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/database"
+	"github.com/rmorlok/authproxy/redis"
 	"net/http"
 	"time"
 )
@@ -29,8 +32,8 @@ func rateErrorHandler(c *gin.Context, info ratelimit.Info) {
 //	return config
 //}
 
-func GetGinServer(cfg config.C) *gin.Engine {
-	authService := auth.StandardAuthService(cfg, config.ServiceIdAdminApi)
+func GetGinServer(cfg config.C, db database.DB, redis *redis.Wrapper) *gin.Engine {
+	authService := auth.StandardAuthService(cfg, config.ServiceIdAdminApi, db, redis)
 
 	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
 		Rate:  1 * time.Minute,
@@ -77,6 +80,20 @@ func Serve(cfg config.C) {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	r := GetGinServer(cfg)
+	redis, err := redis.New(context.Background(), cfg)
+	if err != nil {
+		panic(err)
+	}
+
+	db, err := database.NewConnectionForRoot(cfg.GetRoot())
+	if err != nil {
+		panic(err)
+	}
+
+	if err := db.Migrate(context.Background()); err != nil {
+		panic(err)
+	}
+
+	r := GetGinServer(cfg, db, redis)
 	r.Run(fmt.Sprintf(":%d", cfg.GetRoot().AdminApi.Port))
 }

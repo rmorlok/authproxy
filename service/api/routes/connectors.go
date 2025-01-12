@@ -29,7 +29,7 @@ type ListConnectorsResponse struct {
 
 type ConnectorsRoutes struct {
 	cfg         config.C
-	authService *auth.Service
+	authService auth.A
 }
 
 func connectorResponseFromConfig(cfg config.C, configConn *config.Connector) ConnectorJson {
@@ -89,7 +89,7 @@ func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 	g.GET("/connectors/:id", r.authService.Required(), r.get)
 }
 
-func NewConnectorsRoutes(cfg config.C, authService *auth.Service) *ConnectorsRoutes {
+func NewConnectorsRoutes(cfg config.C, authService auth.A) *ConnectorsRoutes {
 	return &ConnectorsRoutes{
 		cfg:         cfg,
 		authService: authService,

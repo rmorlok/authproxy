@@ -27,19 +27,23 @@ type TokenBuilder interface {
 	 */
 
 	WithIssuer(issuer string) TokenBuilder
-	WithAudience(audience string) TokenBuilder
-	WithServiceId(serviceId config.ServiceId) TokenBuilder
+	WithAudience(audience string) TokenBuilder             // Specifies the audience of the claims; normally a service id
+	WithServiceId(serviceId config.ServiceId) TokenBuilder // Specifies the service that is intended to consume the claims. Communicated as aud.
 	WithServiceIds(serviceId []config.ServiceId) TokenBuilder
 	WithExpiration(expiration time.Time) TokenBuilder
 	WithExpiresIn(expiresIn time.Duration) TokenBuilder
 	WithExpiresInCtx(ctx context.Context, expiresIn time.Duration) TokenBuilder
 	WithSuperAdmin() TokenBuilder
 	WithAdmin() TokenBuilder
+	WithSelfSigned() TokenBuilder
 	WithActorEmail(email string) TokenBuilder
 	WithActorId(id string) TokenBuilder
+	WithActor(actor *Actor) TokenBuilder
 	WithSessionOnly() TokenBuilder
+	WithNonce() TokenBuilder
 
 	WithConfigKey(ctx context.Context, cfgKey config.Key) (TokenBuilder, error)
+	WithSecretConfigKeyData(ctx context.Context, cfgKeyData config.KeyData) (TokenBuilder, error)
 	WithPrivateKeyPath(string) TokenBuilder
 	WithPrivateKeyString(string) TokenBuilder
 	WithPrivateKey([]byte) TokenBuilder
@@ -117,6 +121,11 @@ func (tb *tokenBuilder) WithAdmin() TokenBuilder {
 	return tb
 }
 
+func (tb *tokenBuilder) WithSelfSigned() TokenBuilder {
+	tb.jwtBuilder.WithSelfSigned()
+	return tb
+}
+
 func (tb *tokenBuilder) WithActorEmail(email string) TokenBuilder {
 	tb.jwtBuilder.WithActorEmail(email)
 	return tb
@@ -127,8 +136,18 @@ func (tb *tokenBuilder) WithActorId(id string) TokenBuilder {
 	return tb
 }
 
+func (tb *tokenBuilder) WithActor(actor *Actor) TokenBuilder {
+	tb.jwtBuilder.WithActor(actor)
+	return tb
+}
+
 func (tb *tokenBuilder) WithSessionOnly() TokenBuilder {
 	tb.jwtBuilder.WithSessionOnly()
+	return tb
+}
+
+func (tb *tokenBuilder) WithNonce() TokenBuilder {
+	tb.jwtBuilder.WithNonce()
 	return tb
 }
 
@@ -157,6 +176,20 @@ func (tb *tokenBuilder) WithConfigKey(ctx context.Context, cfgKey config.Key) (T
 				us = us.WithSecretKey(data)
 			}
 		}
+	}
+
+	return us, nil
+}
+
+func (tb *tokenBuilder) WithSecretConfigKeyData(ctx context.Context, cfgKeyData config.KeyData) (TokenBuilder, error) {
+	var us TokenBuilder = tb
+
+	if cfgKeyData.HasData(ctx) {
+		data, err := cfgKeyData.GetData(ctx)
+		if err != nil {
+			return us, err
+		}
+		us = us.WithSecretKey(data)
 	}
 
 	return us, nil

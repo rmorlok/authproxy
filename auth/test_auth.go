@@ -7,20 +7,32 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/database"
 	jwt2 "github.com/rmorlok/authproxy/jwt"
 	"github.com/rmorlok/authproxy/logger"
 	"io"
 	"net/http"
+	"testing"
 )
 
 // AuthTestUtil provides utility functions and helpers for testing authentication-related functionality.
 type AuthTestUtil struct {
 	cfg       config.C
-	s         *Service
+	s         *service
 	serviceId config.ServiceId
 }
 
-func TestAuthService(serviceId config.ServiceId, cfg config.C) (config.C, *Service, *AuthTestUtil) {
+func TestAuthService(t *testing.T, serviceId config.ServiceId, cfg config.C) (config.C, A, *AuthTestUtil) {
+	testName := "unknown"
+	if t != nil {
+		testName = t.Name()
+	}
+
+	cfg, db := database.MustApplyBlankTestDbConfig(testName, cfg)
+	return TestAuthServiceWithDb(serviceId, cfg, db)
+}
+
+func TestAuthServiceWithDb(serviceId config.ServiceId, cfg config.C, db database.DB) (config.C, A, *AuthTestUtil) {
 	if cfg == nil {
 		cfg = config.FromRoot(&config.Root{})
 	}
@@ -46,9 +58,10 @@ func TestAuthService(serviceId config.ServiceId, cfg config.C) (config.C, *Servi
 		Config:    cfg,
 		ServiceId: serviceId,
 		Logger:    logger.Std,
+		Db:        db,
 	})
 
-	return cfg, s, &AuthTestUtil{cfg: cfg, s: s, serviceId: serviceId}
+	return cfg, s, &AuthTestUtil{cfg: cfg, s: s.(*service), serviceId: serviceId}
 }
 
 func (atu *AuthTestUtil) NewSignedRequestForActorId(method, url string, body io.Reader, actorId string) (*http.Request, error) {

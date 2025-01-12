@@ -8,7 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/service/admin_api"
 	api "github.com/rmorlok/authproxy/service/api"
-	auth "github.com/rmorlok/authproxy/service/auth"
+	public "github.com/rmorlok/authproxy/service/public"
 	"github.com/spf13/cobra"
 	"os"
 	"strings"
@@ -45,10 +45,10 @@ func runServices(noBanner bool, servicesList string) error {
 			servers = append(servers, admin_api.Serve)
 		case "api":
 			servers = append(servers, api.Serve)
-		case "auth":
-			servers = append(servers, auth.Serve)
+		case "public":
+			servers = append(servers, public.Serve)
 		case "all":
-			servers = append(servers, admin_api.Serve, api.Serve, auth.Serve)
+			servers = append(servers, admin_api.Serve, api.Serve, public.Serve)
 		default:
 			return errors.New("unknown service: " + service)
 		}
@@ -89,7 +89,7 @@ func cmdRoutes() *cobra.Command {
 		Use:   "routes",
 		Short: "Print routes exposed by app",
 		Run: func(cmd *cobra.Command, args []string) {
-			api_common.PrintRoutes(admin_api.GetGinServer(cfg))
+			api_common.PrintRoutes(admin_api.GetGinServer(cfg, nil, nil))
 		},
 	}
 }

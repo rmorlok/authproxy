@@ -15,21 +15,42 @@ import (
  This file implements middleware not specific to any particular framework.
 */
 
+// MustGetActorInfoFromRequest gets actor info and panics if can't extract it from the request.
+// should be called from authenticated controllers only
+func MustGetActorInfoFromRequest(r *http.Request) *jwt2.Actor {
+	actor := GetActorInfoFromRequest(r)
+	if actor == nil {
+		panic("actor is not present on request")
+	}
+	return actor
+}
+
+// GetActorInfoFromRequest returns actor info from request if present, otherwise returns nil
+func GetActorInfoFromRequest(r *http.Request) *jwt2.Actor {
+
+	ctx := r.Context()
+	if ctx == nil {
+		return nil
+	}
+
+	return jwt2.GetActorFromContext(context.AsContext(ctx))
+}
+
 // Auth middleware adds auth from session and populates actor info
-func (j *Service) Auth(next http.Handler) http.Handler {
+func (j *service) Auth(next http.Handler) http.Handler {
 	return j.auth(true)(next)
 }
 
 // Trace middleware doesn't require valid actor but if actor info presented populates info
-func (j *Service) Trace(next http.Handler) http.Handler {
+func (j *service) Trace(next http.Handler) http.Handler {
 	return j.auth(false)(next)
 }
 
 // auth implements all logic for authentication (reqAuth=true) and tracing (reqAuth=false)
-func (j *Service) auth(reqAuth bool) func(http.Handler) http.Handler {
+func (j *service) auth(reqAuth bool) func(http.Handler) http.Handler {
 
 	onError := func(h http.Handler, w http.ResponseWriter, r *http.Request, err error) {
-		if !reqAuth { // if no auth required allow to proceeded on error
+		if !requestHasAuth(r) && !reqAuth { // if no auth required allow to proceed on error
 			h.ServeHTTP(w, r)
 			return
 		}
@@ -54,7 +75,7 @@ func (j *Service) auth(reqAuth bool) func(http.Handler) http.Handler {
 	f := func(h http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := context.AsContext(r.Context())
-			claims, tkn, err := j.Get(ctx, r)
+			claims, _, err := j.Get(ctx, r)
 			if err != nil {
 				onError(h, w, r, fmt.Errorf("can't get token: %w", err))
 				return
@@ -65,19 +86,38 @@ func (j *Service) auth(reqAuth bool) func(http.Handler) http.Handler {
 				return
 			}
 
-			// If actor info is present, populate it to the context
-			if claims.Actor != nil {
+			if claims.IsExpired(ctx) {
+				onError(h, w, r, fmt.Errorf("claim is expired"))
+				return
+				// TODO: look at token refresh for appropriate cases
+				//if claims, err = j.refreshExpiredToken(ctx, w, claims, tkn); err != nil {
+				//	j.Reset(w)
+				//	onError(h, w, r, fmt.Errorf("can't refresh token: %w", err))
+				//	return
+				//}
+			}
 
-				if j.IsExpired(ctx, claims) {
-					if claims, err = j.refreshExpiredToken(ctx, w, claims, tkn); err != nil {
-						j.Reset(w)
-						onError(h, w, r, fmt.Errorf("can't refresh token: %w", err))
-						return
-					}
+			if claims.Nonce != nil {
+				if claims.ExpiresAt == nil {
+					onError(h, w, r, fmt.Errorf("cannot use nonce without expiration time"))
+					return
 				}
 
-				r = jwt2.SetActorInfoOnRequest(r, claims.Actor) // populate actor info to request context
+				j.logf("[DEBUG] using nonce: %s", claims.Nonce.String())
+
+				wasValid, err := j.Db.CheckNonceValidAndMarkUsed(ctx, *claims.Nonce, claims.ExpiresAt.Time)
+				if err != nil {
+					onError(h, w, r, errors.Wrap(err, "can't check nonce"))
+					return
+				}
+
+				if !wasValid {
+					onError(h, w, r, fmt.Errorf("nonce already used"))
+					return
+				}
 			}
+
+			r = SetActorInfoOnRequest(r, claims.Actor) // populate actor info to request context
 
 			h.ServeHTTP(w, r)
 		}
@@ -87,7 +127,7 @@ func (j *Service) auth(reqAuth bool) func(http.Handler) http.Handler {
 }
 
 // refreshExpiredToken makes a new token with passed claims
-func (j *Service) refreshExpiredToken(ctx context.Context, w http.ResponseWriter, claims *jwt2.AuthProxyClaims, tkn string) (*jwt2.AuthProxyClaims, error) {
+func (j *service) refreshExpiredToken(ctx context.Context, w http.ResponseWriter, claims *jwt2.AuthProxyClaims, tkn string) (*jwt2.AuthProxyClaims, error) {
 	if claims.IsAdmin() || claims.IsSuperAdmin() {
 		return nil, errors.New("cannot refresh admin tokens")
 	}

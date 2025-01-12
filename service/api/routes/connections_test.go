@@ -26,7 +26,7 @@ func TestConnections(t *testing.T) {
 	setup := func(t *testing.T, cfg config.C) *TestSetup {
 		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
 		cfg, rds := redis.MustApplyTestConfig(cfg)
-		cfg, auth, authUtil := auth2.TestAuthService(config.ServiceIdApi, cfg)
+		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(config.ServiceIdApi, cfg, db)
 		cr := NewConnectionsRoutes(cfg, auth, db, rds)
 		r := gin.Default()
 		cr.Register(r)

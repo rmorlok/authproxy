@@ -1,8 +1,6 @@
 package config
 
 import (
-	"github.com/rmorlok/authproxy/context"
-	"github.com/rmorlok/authproxy/util"
 	"os"
 )
 
@@ -15,9 +13,6 @@ type C interface {
 
 	// MustApiHostForService gets the host information for the specified service name
 	MustApiHostForService(serviceName ServiceId) *ApiHost
-
-	// MustGetAESKey retrieves an AES key from the config that can be used to symmetrically encrypt data temporarily
-	MustGetAESKey(ctx context.Context) []byte
 
 	// GetFallbackConnectorLogo gets a logo to use if not specified for a connector configuration
 	GetFallbackConnectorLogo() string
@@ -46,10 +41,6 @@ func (c *config) MustApiHostForService(serviceName ServiceId) *ApiHost {
 
 func (c *config) IsDebugMode() bool {
 	return os.Getenv("AUTHPROXY_DEBUG_MODE") == "true"
-}
-
-func (c *config) MustGetAESKey(ctx context.Context) []byte {
-	return util.Must(c.GetRoot().SystemAuth.GlobalAESKey.GetData(ctx))
 }
 
 func (c *config) GetFallbackConnectorLogo() string {
