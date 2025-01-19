@@ -19,20 +19,25 @@ var redisClient *redis.Client
 var redisOnce sync.Once
 var redisErr error
 
-type Wrapper struct {
-	Client    *redis.Client
+type R interface {
+	Ping(ctx context.Context) bool
+	Client() *redis.Client
+}
+
+type wrapper struct {
+	client    *redis.Client
 	secretKey config.KeyData
 }
 
 // New creates a new database connection from the specified configuration. The type of the database
 // returned will be determined by the configuration.
-func New(ctx context.Context, c config.C) (*Wrapper, error) {
+func New(ctx context.Context, c config.C) (R, error) {
 	return NewForRoot(ctx, c.GetRoot())
 }
 
 // NewForRoot creates a new database connection from the specified configuration. The type of the database
 // returned will be determined by the configuration. Same as NewConnection.
-func NewForRoot(ctx context.Context, root *config.Root) (*Wrapper, error) {
+func NewForRoot(ctx context.Context, root *config.Root) (R, error) {
 	redisConfig := root.Redis
 	secretKey := root.SystemAuth.GlobalAESKey
 
@@ -51,7 +56,7 @@ func NewForRoot(ctx context.Context, root *config.Root) (*Wrapper, error) {
 // Parameters:
 // - redisConfig: the configuration for the SQLite database
 // - secretKey: the AES key used to secure cursors
-func NewMiniredis(redisConfig *config.RedisMiniredis, secretKey config.KeyData) (*Wrapper, error) {
+func NewMiniredis(redisConfig *config.RedisMiniredis, secretKey config.KeyData) (R, error) {
 	if miniredisServer == nil {
 		miniredisOnce.Do(func() {
 			var err error
@@ -80,8 +85,8 @@ func NewMiniredis(redisConfig *config.RedisMiniredis, secretKey config.KeyData) 
 	}
 
 	// Return the wrapper containing the Redis client
-	return &Wrapper{
-		Client:    miniredisClient,
+	return &wrapper{
+		client:    miniredisClient,
 		secretKey: secretKey,
 	}, nil
 }
@@ -91,7 +96,7 @@ func NewMiniredis(redisConfig *config.RedisMiniredis, secretKey config.KeyData) 
 // Parameters:
 // - redisConfig: the configuration for the Redis instance
 // - secretKey: the AES key used to secure cursors
-func NewRedis(ctx context.Context, redisConfig *config.RedisReal, secretKey config.KeyData) (*Wrapper, error) {
+func NewRedis(ctx context.Context, redisConfig *config.RedisReal, secretKey config.KeyData) (R, error) {
 	if redisClient == nil {
 		redisOnce.Do(func() {
 			var err error
@@ -118,19 +123,19 @@ func NewRedis(ctx context.Context, redisConfig *config.RedisReal, secretKey conf
 		return nil, redisErr
 	}
 
-	return &Wrapper{
-		Client:    redisClient,
+	return &wrapper{
+		client:    redisClient,
 		secretKey: secretKey,
 	}, nil
 }
 
-func (w *Wrapper) Ping(ctx context.Context) bool {
-	if w.Client == nil {
+func (w *wrapper) Ping(ctx context.Context) bool {
+	if w.client == nil {
 		log.Println("redis client is unexpectedly nil ")
 		return false
 	}
 
-	_, err := w.Client.Ping(ctx).Result()
+	_, err := w.client.Ping(ctx).Result()
 	if err != nil {
 		log.Println(errors.Wrap(err, "failed to connect to redis server"))
 		return false
@@ -139,7 +144,11 @@ func (w *Wrapper) Ping(ctx context.Context) bool {
 	return true
 }
 
-func MustApplyTestConfig(cfg config.C) (config.C, *Wrapper) {
+func (w *wrapper) Client() *redis.Client {
+	return w.client
+}
+
+func MustApplyTestConfig(cfg config.C) (config.C, R) {
 	// Avoid shared singletons for test cases, while still going through wireup logic
 	miniredisServerPrevious := miniredisServer
 	miniredisClientPrevious := miniredisClient

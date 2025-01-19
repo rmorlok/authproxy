@@ -9,6 +9,8 @@ import (
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
+	"github.com/rmorlok/authproxy/encrypt"
+	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/service/api/routes"
 	"net/http"
@@ -23,7 +25,13 @@ func rateErrorHandler(c *gin.Context, info ratelimit.Info) {
 	c.String(429, "Too many requests. Try again in "+time.Until(info.ResetTime).String())
 }
 
-func GetGinServer(cfg config.C, db database.DB, redis *redis.Wrapper) *gin.Engine {
+func GetGinServer(
+	cfg config.C,
+	db database.DB,
+	redis redis.R,
+	httpf httpf.F,
+	encrypt encrypt.E,
+) *gin.Engine {
 	authService := auth.StandardAuthService(cfg, config.ServiceIdApi, db, redis)
 
 	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
@@ -77,7 +85,7 @@ func GetGinServer(cfg config.C, db database.DB, redis *redis.Wrapper) *gin.Engin
 	})
 
 	routesConnectors := routes.NewConnectorsRoutes(cfg, authService)
-	routesConnections := routes.NewConnectionsRoutes(cfg, authService, db, redis)
+	routesConnections := routes.NewConnectionsRoutes(cfg, authService, db, redis, httpf, encrypt)
 
 	api := router.Group("/api", rl)
 
@@ -106,6 +114,9 @@ func Serve(cfg config.C) {
 		panic(err)
 	}
 
-	r := GetGinServer(cfg, db, redis)
+	httpf := httpf.CreateFactory(cfg, redis)
+	encrypt := encrypt.NewEncryptService(cfg, db)
+
+	r := GetGinServer(cfg, db, redis, httpf, encrypt)
 	r.Run(fmt.Sprintf(":%d", cfg.GetRoot().Api.Port))
 }

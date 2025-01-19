@@ -12,9 +12,9 @@ import (
 // when they are used there is a known time that they must be retained until so that the list of used nonces doesn't
 // grow infinitely.
 type UsedNonce struct {
-	ID          uuid.UUID `gorm:"primarykey"`
-	RetainUntil time.Time `gorm:"index"`
-	CreatedAt   time.Time
+	ID          uuid.UUID `gorm:"column:id;primarykey"`
+	RetainUntil time.Time `gorm:"column:retain_until;index"`
+	CreatedAt   time.Time `gorm:"column:created_at"`
 }
 
 func (db *gormDB) HasNonceBeenUsed(ctx context.Context, nonce uuid.UUID) (hasBeenUsed bool, err error) {

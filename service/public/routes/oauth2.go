@@ -9,6 +9,8 @@ import (
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
+	"github.com/rmorlok/authproxy/encrypt"
+	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/oauth2"
 	"github.com/rmorlok/authproxy/redis"
 	"net/http"
@@ -18,22 +20,48 @@ type Oauth2Routes struct {
 	cfg         config.C
 	authService auth.A
 	db          database.DB
-	redis       *redis.Wrapper
+	redis       redis.R
+	httpf       httpf.F
+	encrypt     encrypt.E
+	oauthf      oauth2.Factory
 }
 
 type Oauth2QueryParams struct {
-	Code  string `form:"code"`
-	State string `form:"state"`
+	State uuid.UUID `form:"state"`
 }
 
-func (r *Oauth2Routes) callback(ctx *gin.Context) {
-	var req Oauth2QueryParams
-	if err := ctx.ShouldBindQuery(&req); err != nil {
-		ctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+func (r *Oauth2Routes) callback(gctx *gin.Context) {
+	ctx := context.AsContext(gctx.Request.Context())
+
+	actor := auth.GetActorInfoFromGinContext(gctx)
+	if actor == nil {
+		api_common.AddDebugHeader(r.cfg, gctx, "actor not present on context")
+		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.GetUnauthorized())
 		return
 	}
 
-	ctx.JSON(http.StatusOK, gin.H{"status": "ok"})
+	var req Oauth2QueryParams
+	if err := gctx.ShouldBindQuery(&req); err != nil {
+		api_common.AddDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to deserialize query params"))
+		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+		return
+	}
+
+	oauthState, err := r.oauthf.GetOAuth2State(ctx, *actor, req.State) // Get the OAuth2 state
+	if err != nil {
+		api_common.AddDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to get oauth2 state"))
+		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+		return
+	}
+
+	redirectUrl, err := oauthState.CallbackFrom3rdParty(ctx, gctx.Request.URL.Query())
+	if err != nil {
+		api_common.AddDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to handle oauth2 callback"))
+		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+		return
+	}
+
+	gctx.Redirect(http.StatusFound, redirectUrl)
 }
 
 type RedirectParams struct {
@@ -71,7 +99,7 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
 	}
 
-	o2, err := oauth2.GetOAuth2State(ctx, r.cfg, r.db, r.redis, *actor, stateId)
+	o2, err := r.oauthf.GetOAuth2State(ctx, *actor, stateId)
 	if err != nil {
 		api_common.AddDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to get oauth2 state"))
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
@@ -98,12 +126,17 @@ func NewOauth2Routes(
 	cfg config.C,
 	authService auth.A,
 	db database.DB,
-	redis *redis.Wrapper,
+	redis redis.R,
+	httpf httpf.F,
+	encrypt encrypt.E,
 ) *Oauth2Routes {
 	return &Oauth2Routes{
 		cfg:         cfg,
 		authService: authService,
 		db:          db,
 		redis:       redis,
+		httpf:       httpf,
+		encrypt:     encrypt,
+		oauthf:      oauth2.NewFactory(cfg, db, redis, httpf, encrypt),
 	}
 }

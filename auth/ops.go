@@ -49,5 +49,5 @@ type Opts struct {
 	RefreshCache RefreshCache
 	Validator    Validator
 	Db           database.DB
-	Redis        *redis.Wrapper
+	Redis        redis.R
 }

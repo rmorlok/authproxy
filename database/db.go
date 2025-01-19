@@ -27,6 +27,20 @@ type DB interface {
 	ListConnectionsFromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error)
 
 	/*
+	 * OAuth2 tokens
+	 */
+	GetOAuth2Token(ctx context.Context, connectionId uuid.UUID) (*OAuth2Token, error)
+	InsertOAuth2Token(
+		ctx context.Context,
+		connectionId uuid.UUID,
+		refreshedFrom *uuid.UUID,
+		encryptedRefreshToken string,
+		encryptedAccessToken string,
+		accessTokenExpiresAt *time.Time,
+		scopes string,
+	) (*OAuth2Token, error)
+
+	/*
 	 *  Nonces
 	 */
 
@@ -115,6 +129,11 @@ func (db *gormDB) Migrate(ctx context.Context) error {
 	err = db.gorm.AutoMigrate(&UsedNonce{})
 	if err != nil {
 		return errors.Wrap(err, "failed to auto migrate used nonces")
+	}
+
+	err = db.gorm.AutoMigrate(&OAuth2Token{})
+	if err != nil {
+		return errors.Wrap(err, "failed to auto migrate oauth2 tokens")
 	}
 
 	return nil

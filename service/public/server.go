@@ -10,6 +10,8 @@ import (
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
+	"github.com/rmorlok/authproxy/encrypt"
+	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/service/public/routes"
 	"net/http"
@@ -33,7 +35,13 @@ func rateErrorHandler(c *gin.Context, info ratelimit.Info) {
 //	return config
 //}
 
-func GetGinServer(cfg config.C, db database.DB, redis *redis.Wrapper) *gin.Engine {
+func GetGinServer(
+	cfg config.C,
+	db database.DB,
+	redis redis.R,
+	httpf httpf.F,
+	encrypt encrypt.E,
+) *gin.Engine {
 	authService := auth.StandardAuthService(cfg, config.ServiceIdPublic, db, redis)
 
 	router := api_common.GinForService("api", &cfg.GetRoot().AdminApi)
@@ -82,7 +90,7 @@ func GetGinServer(cfg config.C, db database.DB, redis *redis.Wrapper) *gin.Engin
 		})
 	})
 
-	routesOauth2 := routes.NewOauth2Routes(cfg, authService, db, redis)
+	routesOauth2 := routes.NewOauth2Routes(cfg, authService, db, redis, httpf, encrypt)
 	routesOauth2.Register(router)
 
 	return router
@@ -107,6 +115,9 @@ func Serve(cfg config.C) {
 		panic(err)
 	}
 
-	r := GetGinServer(cfg, db, redis)
+	httpf := httpf.CreateFactory(cfg, redis)
+	encrypt := encrypt.NewEncryptService(cfg, db)
+
+	r := GetGinServer(cfg, db, redis, httpf, encrypt)
 	r.Run(fmt.Sprintf(":%d", cfg.GetRoot().Public.Port))
 }

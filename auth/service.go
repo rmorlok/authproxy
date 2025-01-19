@@ -31,7 +31,7 @@ func StandardAuthService(
 	cfg config.C,
 	serviceId config.ServiceId,
 	db database.DB,
-	redis *redis.Wrapper,
+	redis redis.R,
 ) A {
 	return NewService(Opts{
 		Config:    cfg,

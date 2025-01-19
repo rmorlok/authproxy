@@ -8,6 +8,8 @@ import (
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
+	"github.com/rmorlok/authproxy/encrypt"
+	httpf2 "github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/redis"
 	"github.com/stretchr/testify/require"
 	"net/http"
@@ -27,7 +29,10 @@ func TestConnections(t *testing.T) {
 		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
 		cfg, rds := redis.MustApplyTestConfig(cfg)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(config.ServiceIdApi, cfg, db)
-		cr := NewConnectionsRoutes(cfg, auth, db, rds)
+		httpf := httpf2.CreateFactory(cfg, rds)
+		cfg, encrypt := encrypt.NewTestEncryptService(cfg, db)
+
+		cr := NewConnectionsRoutes(cfg, auth, db, rds, httpf, encrypt)
 		r := gin.Default()
 		cr.Register(r)
 

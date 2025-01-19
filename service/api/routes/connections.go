@@ -8,6 +8,8 @@ import (
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
+	"github.com/rmorlok/authproxy/encrypt"
+	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/oauth2"
 	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/util"
@@ -19,11 +21,15 @@ type ConnectionsRoutes struct {
 	cfg         config.C
 	authService auth.A
 	db          database.DB
-	redis       *redis.Wrapper
+	redis       redis.R
+	httpf       httpf.F
+	encrypt     encrypt.E
+	oauthf      oauth2.Factory
 }
 
 type InitiateConnectionRequest struct {
 	ConnectorId string `json:"connector_id"`
+	ReturnToUrl string `json:"return_to_url"`
 }
 
 type InitiateConnectionResponseType string
@@ -83,8 +89,13 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	}
 
 	if _, ok := connector.Auth.(*config.AuthOAuth2); ok {
-		oAuth2 := oauth2.NewOAuth2(r.cfg, r.db, r.redis, connection, connector)
-		url, err := oAuth2.SetStateAndGeneratePublicUrl(ctx, *actor)
+		if req.ReturnToUrl == "" {
+			gctx.JSON(http.StatusBadRequest, Error{"must specify return_to_url"})
+			return
+		}
+
+		o2 := r.oauthf.NewOAuth2(connection, connector)
+		url, err := o2.SetStateAndGeneratePublicUrl(ctx, *actor, req.ReturnToUrl)
 		if err != nil {
 			gctx.JSON(http.StatusInternalServerError, Error{err.Error()})
 			return
@@ -227,12 +238,17 @@ func NewConnectionsRoutes(
 	cfg config.C,
 	authService auth.A,
 	db database.DB,
-	redis *redis.Wrapper,
+	redis redis.R,
+	httpf httpf.F,
+	encrypt encrypt.E,
 ) *ConnectionsRoutes {
 	return &ConnectionsRoutes{
 		cfg:         cfg,
 		authService: authService,
 		db:          db,
 		redis:       redis,
+		httpf:       httpf,
+		encrypt:     encrypt,
+		oauthf:      oauth2.NewFactory(cfg, db, redis, httpf, encrypt),
 	}
 }
