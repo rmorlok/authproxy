@@ -33,9 +33,9 @@ type Oauth2QueryParams struct {
 func (r *Oauth2Routes) callback(gctx *gin.Context) {
 	ctx := context.AsContext(gctx.Request.Context())
 
-	actor := auth.GetActorInfoFromGinContext(gctx)
-	if actor == nil {
-		api_common.AddDebugHeader(r.cfg, gctx, "actor not present on context")
+	ra := auth.GetAuthFromGinContext(gctx)
+	if !ra.IsAuthenticated() {
+		api_common.AddDebugHeader(r.cfg, gctx, "auth not present on context")
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.GetUnauthorized())
 		return
 	}
@@ -47,7 +47,7 @@ func (r *Oauth2Routes) callback(gctx *gin.Context) {
 		return
 	}
 
-	oauthState, err := r.oauthf.GetOAuth2State(ctx, *actor, req.State) // Get the OAuth2 state
+	oauthState, err := r.oauthf.GetOAuth2State(ctx, ra.MustGetActor(), req.State) // Get the OAuth2 state
 	if err != nil {
 		api_common.AddDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to get oauth2 state"))
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
@@ -71,9 +71,9 @@ type RedirectParams struct {
 func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 	ctx := context.AsContext(gctx.Request.Context())
 
-	actor := auth.GetActorInfoFromGinContext(gctx)
-	if actor == nil {
-		api_common.AddDebugHeader(r.cfg, gctx, "actor not present on context")
+	ra := auth.GetAuthFromGinContext(gctx)
+	if !ra.IsAuthenticated() {
+		api_common.AddDebugHeader(r.cfg, gctx, "auth not present on context")
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.GetUnauthorized())
 		return
 	}
@@ -99,14 +99,14 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
 	}
 
-	o2, err := r.oauthf.GetOAuth2State(ctx, *actor, stateId)
+	o2, err := r.oauthf.GetOAuth2State(ctx, ra.MustGetActor(), stateId)
 	if err != nil {
 		api_common.AddDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to get oauth2 state"))
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
 		return
 	}
 
-	redirectUrl, err := o2.GenerateAuthUrl(ctx, *actor)
+	redirectUrl, err := o2.GenerateAuthUrl(ctx, ra.MustGetActor())
 	if err != nil {
 		api_common.AddDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to generate oauth2 redirect url"))
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)

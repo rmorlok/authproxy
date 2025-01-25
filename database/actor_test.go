@@ -278,4 +278,41 @@ func TestActor(t *testing.T) {
 			require.Equal(t, firstUuid, allResults[49].ID)
 		})
 	})
+	t.Run("IsAdmin", func(t *testing.T) {
+		u := Actor{}
+		require.False(t, u.IsAdmin())
+		u.Admin = true
+		require.True(t, u.IsAdmin())
+		u.Admin = false
+		require.False(t, u.IsAdmin())
+
+		var nila *Actor
+		require.False(t, nila.IsAdmin())
+	})
+	t.Run("IsSuperAdmin", func(t *testing.T) {
+		u := Actor{}
+		require.False(t, u.IsSuperAdmin())
+		u.SuperAdmin = true
+		require.True(t, u.IsSuperAdmin())
+		u.SuperAdmin = false
+		require.False(t, u.IsSuperAdmin())
+
+		var nila *Actor
+		require.False(t, nila.IsSuperAdmin())
+	})
+	t.Run("IsNormalActor", func(t *testing.T) {
+		u := Actor{}
+		require.True(t, u.IsNormalActor())
+		u.SuperAdmin = true
+		require.False(t, u.IsNormalActor())
+		u.SuperAdmin = false
+		u.Admin = true
+		require.False(t, u.IsNormalActor())
+		u.SuperAdmin = false
+		u.Admin = false
+		require.True(t, u.IsNormalActor())
+
+		var nila *Actor
+		require.True(t, nila.IsNormalActor())
+	})
 }

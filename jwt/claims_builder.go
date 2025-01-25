@@ -185,7 +185,6 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 
 	if len(b.audiences) > 0 {
 		c.Audience = b.audiences
-		c.Actor.Audience = b.audiences
 	}
 
 	if b.expiresIn != nil {

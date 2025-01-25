@@ -7,44 +7,34 @@ package auth
 import (
 	"github.com/gin-gonic/gin"
 	context2 "github.com/rmorlok/authproxy/context"
-	"github.com/rmorlok/authproxy/jwt"
 	"net/http"
 )
 
-const GinAuthActorKey = "auth_actor"
-
-// GetActorInfoFromGinContext returns actor info from request if present, otherwise returns nil
-func GetActorInfoFromGinContext(c *gin.Context) *jwt.Actor {
+// GetAuthFromGinContext returns auth info from a request. This auth info can be authenticated or unauthenticated.
+func GetAuthFromGinContext(c *gin.Context) RequestAuth {
 	if c == nil {
 		return nil
 	}
 
-	if a, ok := c.Get(GinAuthActorKey); ok {
-		return a.(*jwt.Actor)
+	if a, ok := c.Get(authContextKey); ok {
+		return a.(RequestAuth)
 	}
 
 	if c.Request == nil {
-		return nil
+		return NewUnauthenticatedRequestAuth()
 	}
 
-	return jwt.GetActorFromContext(context2.AsContext(c.Request.Context()))
+	return GetAuthFromContext(context2.AsContext(c.Request.Context()))
 }
 
-// MustGetActorInfoFromGinContext returns actor info from request if present, otherwise panics
-// if there is not actor present (the request is unauthorized)
-func MustGetActorInfoFromGinContext(c *gin.Context) *jwt.Actor {
-	actor := GetActorInfoFromGinContext(c)
-	if actor == nil {
-		panic("actor is not present on request")
+// MustGetAuthFromGinContext returns an authenticated request info. If the request is not authenticated, this
+// method panics.
+func MustGetAuthFromGinContext(c *gin.Context) RequestAuth {
+	ra := GetAuthFromGinContext(c)
+	if ra == nil || !ra.IsAuthenticated() {
+		panic("request is not authenticated")
 	}
-	return actor
-}
-
-// SetActorInfoOnRequest sets actor into request util
-func SetActorInfoOnRequest(r *http.Request, actor *jwt.Actor) *http.Request {
-	ctx := r.Context()
-	ctx = actor.ContextWith(ctx)
-	return r.WithContext(ctx)
+	return ra
 }
 
 func (j *service) Required() gin.HandlerFunc {
@@ -52,10 +42,10 @@ func (j *service) Required() gin.HandlerFunc {
 		success := false
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 
-			a := GetActorInfoFromRequest(r)
-			success = a != nil
+			a := GetAuthFromRequest(r)
+			success = a.IsAuthenticated()
 			if success {
-				c.Set(GinAuthActorKey, a)
+				c.Set(authContextKey, a)
 			}
 
 			c.Next()
@@ -70,9 +60,9 @@ func (j *service) Required() gin.HandlerFunc {
 func (j *service) Optional() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			a := GetActorInfoFromRequest(r)
-			if a != nil {
-				c.Set(GinAuthActorKey, a)
+			a := GetAuthFromRequest(r)
+			if a.IsAuthenticated() {
+				c.Set(authContextKey, a)
 			}
 
 			c.Next()
@@ -86,21 +76,21 @@ func (j *service) AdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {
 		success := false
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			actor := GetActorInfoFromRequest(r)
-			if actor == nil {
+			a := GetAuthFromRequest(r)
+			if !a.IsAuthenticated() {
 				http.Error(c.Writer, "Unauthorized", http.StatusUnauthorized)
 				return
 			}
 
-			if !actor.IsAdmin() {
+			if !a.MustGetActor().Admin {
 				http.Error(c.Writer, "Access denied", http.StatusForbidden)
 				return
 			}
 
 			// This is really duplicative of the above
-			success = actor != nil && actor.IsAdmin()
+			success = a.MustGetActor().Admin
 			if success {
-				c.Set(GinAuthActorKey, actor)
+				c.Set(authContextKey, a)
 			}
 
 			c.Next()

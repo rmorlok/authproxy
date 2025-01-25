@@ -33,7 +33,6 @@ type A interface {
 	Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (string, error)
 	Parse(ctx context.Context, tokenString string) (*jwt2.AuthProxyClaims, error)
 	Set(ctx context.Context, w http.ResponseWriter, claims *jwt2.AuthProxyClaims) (*jwt2.AuthProxyClaims, error)
-	Get(ctx context.Context, r *http.Request) (*jwt2.AuthProxyClaims, string, error)
 	Reset(w http.ResponseWriter)
 }
 

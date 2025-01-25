@@ -11,14 +11,13 @@ import (
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
-	"github.com/rmorlok/authproxy/jwt"
 	"github.com/rmorlok/authproxy/redis"
 	"time"
 )
 
 type state struct {
 	Id           uuid.UUID `json:"id"`
-	ActorId      string    `json:"actor_id"`
+	ActorId      uuid.UUID `json:"actor_id"`
 	ConnectorId  string    `json:"connector_id"`
 	ConnectionId uuid.UUID `json:"connection_id"`
 	ReturnToUrl  string    `json:"return_to"`
@@ -38,7 +37,7 @@ var _ encoding.BinaryMarshaler = (*state)(nil)
 var _ encoding.BinaryUnmarshaler = (*state)(nil)
 
 func (s *state) IsValid() bool {
-	return s.ActorId != "" && s.ConnectorId != "" && s.ConnectionId != uuid.Nil && !s.ExpiresAt.IsZero()
+	return s.ActorId != uuid.Nil && s.ConnectorId != "" && s.ConnectionId != uuid.Nil && !s.ExpiresAt.IsZero()
 }
 
 func getStateRedisKey(u uuid.UUID) string {
@@ -48,7 +47,7 @@ func getStateRedisKey(u uuid.UUID) string {
 	return fmt.Sprintf("oauth2:state:%s", u.String())
 }
 
-func (o *OAuth2) saveStateToRedis(ctx context.Context, actor jwt.Actor, stateId uuid.UUID, returnToUrl string) error {
+func (o *OAuth2) saveStateToRedis(ctx context.Context, actor database.Actor, stateId uuid.UUID, returnToUrl string) error {
 	ttl := o.cfg.GetRoot().Oauth.GetRoundTripTtlOrDefault()
 	s := &state{
 		Id:           stateId,
@@ -75,7 +74,7 @@ func getOAuth2State(
 	redis redis.R,
 	httpf httpf.F,
 	encrypt encrypt.E,
-	actor jwt.Actor,
+	actor database.Actor,
 	stateId uuid.UUID,
 ) (*OAuth2, error) {
 	result := redis.Client().Get(ctx, getStateRedisKey(stateId))

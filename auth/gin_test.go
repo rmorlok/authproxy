@@ -70,12 +70,12 @@ func TestAuth_Gin(t *testing.T) {
 		cfg, auth, authUtil := TestAuthService(t, config.ServiceIdApi, cfg)
 		r := gin.Default()
 		r.GET("/", authMethod(auth), func(c *gin.Context) {
-			a := GetActorInfoFromGinContext(c)
-			if a == nil {
+			a := GetAuthFromGinContext(c)
+			if !a.IsAuthenticated() {
 				c.String(200, "no_actor")
 				return
 			}
-			c.String(200, a.ID)
+			c.String(200, a.GetActor().ExternalId)
 		})
 
 		return &TestSetup{

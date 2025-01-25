@@ -8,6 +8,7 @@ import (
 	"github.com/mohae/deepcopy"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/database"
 	jwt2 "github.com/rmorlok/authproxy/jwt"
 	"github.com/rmorlok/authproxy/util"
 	"github.com/stretchr/testify/require"
@@ -526,44 +527,160 @@ func TestAuth_NoIssuer(t *testing.T) {
 	require.Equal(t, string(config.ServiceIdAdminApi), cc.Issuer)
 }
 
-func TestAuth_GetFromHeader(t *testing.T) {
-	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(Opts{
-		Config:    cfg,
-		ServiceId: config.ServiceIdAdminApi,
+func TestAuth_establishAuthFromRequest(t *testing.T) {
+	var a A
+	var raw *service
+	var db database.DB
+
+	setup := func(t *testing.T) {
+		cfg := config.FromRoot(&testConfigPublicPrivateKey)
+		cfg, db = database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+		a = NewService(Opts{
+			Config:    cfg,
+			ServiceId: config.ServiceIdAdminApi,
+			Db:        db,
+		})
+		raw = a.(*service)
+	}
+
+	t.Run("from header", func(t *testing.T) {
+		t.Run("valid", func(t *testing.T) {
+			t.Run("create actor", func(t *testing.T) {
+				setup(t)
+
+				tok, err := a.Token(testContext, testClaims())
+				require.NoError(t, err)
+
+				req := httptest.NewRequest("GET", "/", nil)
+				req.Header.Add(jwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
+				ra, err := raw.establishAuthFromRequest(testContext, req)
+				require.NoError(t, err)
+				require.True(t, ra.IsAuthenticated())
+				require.Equal(t, testClaims().Actor.ID, ra.MustGetActor().ExternalId)
+
+				actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.ID)
+				require.NoError(t, err)
+				require.Equal(t, testClaims().Actor.ID, actor.ExternalId)
+			})
+
+			t.Run("actor loaded from database", func(t *testing.T) {
+				setup(t)
+
+				dbActorId := uuid.New()
+				dbActor := &database.Actor{
+					ID:         dbActorId,
+					ExternalId: testClaims().Actor.ID,
+					Email:      testClaims().Actor.Email,
+				}
+				require.NoError(t, db.CreateActor(testContext, dbActor))
+
+				claims := *testClaims()
+				claims.Actor = nil // Explicitly don't specify actor details
+
+				tok, err := a.Token(testContext, &claims)
+				require.NoError(t, err)
+
+				req := httptest.NewRequest("GET", "/", nil)
+				req.Header.Add(jwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
+				ra, err := raw.establishAuthFromRequest(testContext, req)
+				require.NoError(t, err)
+				require.True(t, ra.IsAuthenticated())
+				require.Equal(t, testClaims().Actor.ID, ra.MustGetActor().ExternalId)
+			})
+
+			t.Run("actor updated in database", func(t *testing.T) {
+				setup(t)
+
+				dbActorId := uuid.New()
+				dbActor := &database.Actor{
+					ID:         dbActorId,
+					ExternalId: testClaims().Actor.ID,
+					Email:      "old-" + testClaims().Actor.Email,
+				}
+				require.NoError(t, db.CreateActor(testContext, dbActor))
+
+				tok, err := a.Token(testContext, testClaims())
+				require.NoError(t, err)
+
+				req := httptest.NewRequest("GET", "/", nil)
+				req.Header.Add(jwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
+				ra, err := raw.establishAuthFromRequest(testContext, req)
+				require.NoError(t, err)
+				require.True(t, ra.IsAuthenticated())
+				require.Equal(t, testClaims().Actor.ID, ra.MustGetActor().ExternalId)
+				require.Equal(t, testClaims().Actor.Email, ra.MustGetActor().Email)
+			})
+		})
+
+		t.Run("expired", func(t *testing.T) {
+			setup(t)
+
+			tok, err := a.Token(testContext, testClaims())
+			require.NoError(t, err)
+
+			req := httptest.NewRequest("GET", "/", nil)
+			req.Header.Add(jwtHeaderKey, tok)
+
+			futureCtx := context.
+				Background().
+				WithClock(test_clock.NewFakeClock(time.Date(2059, 10, 1, 0, 0, 0, 0, time.UTC)))
+
+			_, err = raw.establishAuthFromRequest(futureCtx, req)
+			require.NotNil(t, err)
+
+			actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.ID)
+			require.NoError(t, err)
+			require.Nil(t, actor)
+		})
+
+		t.Run("bad token", func(t *testing.T) {
+			setup(t)
+
+			req := httptest.NewRequest("GET", "/", nil)
+			req.Header.Add(jwtHeaderKey, "Bearer: bad bad token")
+			_, err := raw.establishAuthFromRequest(testContext, req)
+			require.NotNil(t, err)
+
+			actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.ID)
+			require.NoError(t, err)
+			require.Nil(t, actor)
+		})
 	})
+	t.Run("from query", func(t *testing.T) {
+		t.Run("valid", func(t *testing.T) {
+			setup(t)
 
-	t.Run("valid", func(t *testing.T) {
-		tok, err := j.Token(testContext, testClaims())
-		require.NoError(t, err)
+			tok, err := a.Token(testContext, testClaims())
+			require.NoError(t, err)
 
-		req := httptest.NewRequest("GET", "/", nil)
-		req.Header.Add(jwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
-		claims, _, err := j.Get(testContext, req)
-		require.NoError(t, err)
-		require.Equal(t, testClaims().Actor.ID, claims.Actor.ID)
-	})
+			req := httptest.NewRequest("GET", "/blah?jwt="+tok, nil)
+			ra, err := raw.establishAuthFromRequest(testContext, req)
+			require.NoError(t, err)
+			require.True(t, ra.IsAuthenticated())
 
-	t.Run("expired", func(t *testing.T) {
-		tok, err := j.Token(testContext, testClaims())
-		require.NoError(t, err)
+			require.Equal(t, ra.MustGetActor().ID, ra.MustGetActor().ID)
+		})
+		t.Run("expired", func(t *testing.T) {
+			setup(t)
 
-		req := httptest.NewRequest("GET", "/", nil)
-		req.Header.Add(jwtHeaderKey, tok)
+			tok, err := a.Token(testContext, testClaims())
+			require.NoError(t, err)
 
-		futureCtx := context.
-			Background().
-			WithClock(test_clock.NewFakeClock(time.Date(2059, 10, 1, 0, 0, 0, 0, time.UTC)))
+			futureCtx := context.
+				Background().
+				WithClock(test_clock.NewFakeClock(time.Date(2059, 10, 1, 0, 0, 0, 0, time.UTC)))
 
-		_, _, err = j.Get(futureCtx, req)
-		require.NotNil(t, err)
-	})
+			req := httptest.NewRequest("GET", "/blah?token="+tok, nil)
+			_, err = raw.establishAuthFromRequest(futureCtx, req)
+			require.NotNil(t, err)
+		})
+		t.Run("bad token", func(t *testing.T) {
+			setup(t)
 
-	t.Run("bad token", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/", nil)
-		req.Header.Add(jwtHeaderKey, "Bearer: bad bad token")
-		_, _, err := j.Get(testContext, req)
-		require.NotNil(t, err)
+			req := httptest.NewRequest("GET", "/blah?jwt=blah", nil)
+			_, err := raw.establishAuthFromRequest(testContext, req)
+			require.NotNil(t, err)
+		})
 	})
 }
 
@@ -582,8 +699,8 @@ func TestAuth_Nonce(t *testing.T) {
 		cfg, auth, authUtil := TestAuthService(t, config.ServiceIdAdminApi, cfg)
 		r := gin.Default()
 		r.GET("/", auth.Required(), func(c *gin.Context) {
-			a := MustGetActorInfoFromGinContext(c)
-			c.String(200, a.ID)
+			ra := MustGetAuthFromGinContext(c)
+			c.String(200, util.ToPtr(ra.MustGetActor()).ExternalId)
 		})
 
 		return &TestSetup{
@@ -667,164 +784,6 @@ func TestAuth_Nonce(t *testing.T) {
 	})
 }
 
-func TestAuth_GetFromQuery(t *testing.T) {
-	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(Opts{
-		Config:    cfg,
-		ServiceId: config.ServiceIdAdminApi,
-	})
-
-	t.Run("valid", func(t *testing.T) {
-		tok, err := j.Token(testContext, testClaims())
-		require.NoError(t, err)
-
-		req := httptest.NewRequest("GET", "/blah?jwt="+tok, nil)
-		claims, _, err := j.Get(testContext, req)
-		require.NoError(t, err)
-
-		require.Equal(t, claims.Actor.ID, claims.Actor.ID)
-		require.False(t, claims.IsExpired(testContext))
-	})
-	t.Run("expired", func(t *testing.T) {
-		tok, err := j.Token(testContext, testClaims())
-		require.NoError(t, err)
-
-		futureCtx := context.
-			Background().
-			WithClock(test_clock.NewFakeClock(time.Date(2059, 10, 1, 0, 0, 0, 0, time.UTC)))
-
-		req := httptest.NewRequest("GET", "/blah?token="+tok, nil)
-		_, _, err = j.Get(futureCtx, req)
-		require.NotNil(t, err)
-	})
-	t.Run("bad token", func(t *testing.T) {
-		req := httptest.NewRequest("GET", "/blah?jwt=blah", nil)
-		_, _, err := j.Get(testContext, req)
-		require.NotNil(t, err)
-	})
-}
-
-func TestAuth_GetFailed(t *testing.T) {
-	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(Opts{Config: cfg, ServiceId: config.ServiceIdAdminApi})
-	req := httptest.NewRequest("GET", "/", nil)
-	_, _, err := j.Get(testContext, req)
-	require.Error(t, err, "token cookie was not presented")
-}
-
-func TestAuth_SetAndGetWithCookies(t *testing.T) {
-	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(Opts{
-		Config:    cfg,
-		ServiceId: config.ServiceIdAdminApi,
-	})
-
-	claims := *testClaims()
-	claims.SessionOnly = true
-
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/valid" {
-			_, e := j.Set(testContext, w, &claims)
-			require.NoError(t, e)
-			w.WriteHeader(200)
-		}
-	}))
-	defer ts.Close()
-
-	resp, err := http.Get(ts.URL + "/valid")
-	require.NoError(t, err)
-	require.Equal(t, 200, resp.StatusCode)
-
-	req := httptest.NewRequest("GET", "/valid", nil)
-	req.AddCookie(resp.Cookies()[0])
-	req.Header.Add(xsrfHeaderKey, "random id")
-	r, _, err := j.Get(testContext, req)
-	require.NoError(t, err)
-	require.Equal(t, &jwt2.Actor{ID: "id1", IP: "127.0.0.1",
-		Email: "me@example.com", Audience: []string{"admin-api"}}, r.Actor)
-	require.Equal(t, "admin-api", claims.Issuer)
-	require.Equal(t, true, claims.SessionOnly)
-	t.Log(resp.Cookies())
-}
-
-func TestAuth_SetAndGetWithXsrfMismatch(t *testing.T) {
-	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(Opts{
-		Config:    cfg,
-		ServiceId: config.ServiceIdAdminApi,
-	})
-
-	claims := *testClaims()
-	claims.SessionOnly = true
-	claims.SelfSigned = true
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/valid" {
-			_, e := j.Set(testContext, w, &claims)
-			require.NoError(t, e)
-			w.WriteHeader(200)
-		}
-	}))
-	defer ts.Close()
-
-	resp, err := http.Get(ts.URL + "/valid")
-	require.NoError(t, err)
-	require.Equal(t, 200, resp.StatusCode)
-
-	req := httptest.NewRequest("GET", "/valid", nil)
-	req.AddCookie(resp.Cookies()[0])
-	req.Header.Add(xsrfHeaderKey, "random id wrong")
-	_, _, err = j.Get(testContext, req)
-	require.EqualError(t, err, "xsrf mismatch")
-
-	cfg.GetRoot().SystemAuth.DisableXSRF = true
-	req = httptest.NewRequest("GET", "/valid", nil)
-	req.AddCookie(resp.Cookies()[0])
-	req.Header.Add(xsrfHeaderKey, "random id wrong")
-	c, _, err := j.Get(testContext, req)
-	require.NoError(t, err, "xsrf mismatch, but ignored")
-	claims.Actor.Audience = c.Audience // set aud to user because we don't do the normal Get call
-
-	// Force UTC for check because parsing isn't
-	c.ExpiresAt = jwt.NewNumericDate(c.ExpiresAt.UTC())
-	c.IssuedAt = jwt.NewNumericDate(c.IssuedAt.UTC())
-	c.NotBefore = jwt.NewNumericDate(c.NotBefore.UTC())
-
-	require.Equal(t, claims, *c)
-}
-
-func TestAuth_SetAndGetWithCookiesExpired(t *testing.T) {
-	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(Opts{
-		Config:    cfg,
-		ServiceId: config.ServiceIdAdminApi,
-	})
-
-	claims := *testClaims()
-	claims.RegisteredClaims.ExpiresAt = &jwt.NumericDate{time.Date(2018, 5, 21, 1, 35, 22, 0, time.Local)}
-	claims.RegisteredClaims.NotBefore = &jwt.NumericDate{time.Date(2018, 5, 21, 1, 30, 22, 0, time.Local)}
-	claims.SessionOnly = true
-
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/expired" {
-			_, e := j.Set(testContext, w, &claims)
-			require.NoError(t, e)
-			w.WriteHeader(200)
-		}
-	}))
-	defer ts.Close()
-
-	resp, err := http.Get(ts.URL + "/expired")
-	require.NoError(t, err)
-	require.Equal(t, 200, resp.StatusCode)
-
-	req := httptest.NewRequest("GET", "/expired", nil)
-	req.AddCookie(resp.Cookies()[0])
-	req.Header.Add(xsrfHeaderKey, "random id")
-	_, _, err = j.Get(testContext, req)
-	require.Error(t, err)
-	require.True(t, jwt2.IsTokenExpiredError(err))
-}
-
 func TestAuth_Reset(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(Opts{Config: cfg, ServiceId: config.ServiceIdAdminApi})
@@ -879,6 +838,7 @@ func testClaims() *jwt2.AuthProxyClaims {
 	return &jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        "random id",
+			Subject:   "id1",
 			Issuer:    "remark42",
 			Audience:  []string{string(config.ServiceIdAdminApi)},
 			ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},

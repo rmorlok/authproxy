@@ -7,13 +7,12 @@ import (
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
-	"github.com/rmorlok/authproxy/jwt"
 	"github.com/rmorlok/authproxy/redis"
 )
 
 type Factory interface {
 	NewOAuth2(connection database.Connection, connector config.Connector) *OAuth2
-	GetOAuth2State(ctx context.Context, actor jwt.Actor, stateId uuid.UUID) (*OAuth2, error)
+	GetOAuth2State(ctx context.Context, actor database.Actor, stateId uuid.UUID) (*OAuth2, error)
 }
 
 type factory struct {
@@ -46,7 +45,7 @@ func (f *factory) NewOAuth2(connection database.Connection, connector config.Con
 	)
 }
 
-func (f *factory) GetOAuth2State(ctx context.Context, actor jwt.Actor, stateId uuid.UUID) (*OAuth2, error) {
+func (f *factory) GetOAuth2State(ctx context.Context, actor database.Actor, stateId uuid.UUID) (*OAuth2, error) {
 	return getOAuth2State(
 		ctx,
 		f.cfg,

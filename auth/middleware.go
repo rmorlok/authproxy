@@ -15,25 +15,34 @@ import (
  This file implements middleware not specific to any particular framework.
 */
 
-// MustGetActorInfoFromRequest gets actor info and panics if can't extract it from the request.
-// should be called from authenticated controllers only
-func MustGetActorInfoFromRequest(r *http.Request) *jwt2.Actor {
-	actor := GetActorInfoFromRequest(r)
-	if actor == nil {
-		panic("actor is not present on request")
+// MustGetAuthFromRequest gets an authenticated info for the request. If the request is not authenticated, it
+// panics.
+func MustGetAuthFromRequest(r *http.Request) RequestAuth {
+	a := GetAuthFromRequest(r)
+	if a == nil || !a.IsAuthenticated() {
+		panic("request is not authenticated")
 	}
-	return actor
+	return a
 }
 
-// GetActorInfoFromRequest returns actor info from request if present, otherwise returns nil
-func GetActorInfoFromRequest(r *http.Request) *jwt2.Actor {
+// GetAuthFromRequest returns auth info for the request. If the request is unauthenticated, it will return
+// a value indicating not authenticated.
+func GetAuthFromRequest(r *http.Request) RequestAuth {
 
 	ctx := r.Context()
 	if ctx == nil {
-		return nil
+		return NewUnauthenticatedRequestAuth()
 	}
 
-	return jwt2.GetActorFromContext(context.AsContext(ctx))
+	return GetAuthFromContext(context.AsContext(ctx))
+}
+
+// SetAuthOnRequestContext sets the auth information into the context for the request so that later handlers
+// can retrieve the auth information.
+func SetAuthOnRequestContext(r *http.Request, auth RequestAuth) *http.Request {
+	ctx := r.Context()
+	ctx = auth.ContextWith(ctx)
+	return r.WithContext(ctx)
 }
 
 // Auth middleware adds auth from session and populates actor info
@@ -75,49 +84,13 @@ func (j *service) auth(reqAuth bool) func(http.Handler) http.Handler {
 	f := func(h http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := context.AsContext(r.Context())
-			claims, _, err := j.Get(ctx, r)
+			reqAuth, err := j.establishAuthFromRequest(ctx, r)
 			if err != nil {
 				onError(h, w, r, fmt.Errorf("can't get token: %w", err))
 				return
 			}
 
-			if claims.Actor == nil {
-				onError(h, w, r, fmt.Errorf("no actor info presented in the claim"))
-				return
-			}
-
-			if claims.IsExpired(ctx) {
-				onError(h, w, r, fmt.Errorf("claim is expired"))
-				return
-				// TODO: look at token refresh for appropriate cases
-				//if claims, err = j.refreshExpiredToken(ctx, w, claims, tkn); err != nil {
-				//	j.Reset(w)
-				//	onError(h, w, r, fmt.Errorf("can't refresh token: %w", err))
-				//	return
-				//}
-			}
-
-			if claims.Nonce != nil {
-				if claims.ExpiresAt == nil {
-					onError(h, w, r, fmt.Errorf("cannot use nonce without expiration time"))
-					return
-				}
-
-				j.logf("[DEBUG] using nonce: %s", claims.Nonce.String())
-
-				wasValid, err := j.Db.CheckNonceValidAndMarkUsed(ctx, *claims.Nonce, claims.ExpiresAt.Time)
-				if err != nil {
-					onError(h, w, r, errors.Wrap(err, "can't check nonce"))
-					return
-				}
-
-				if !wasValid {
-					onError(h, w, r, fmt.Errorf("nonce already used"))
-					return
-				}
-			}
-
-			r = SetActorInfoOnRequest(r, claims.Actor) // populate actor info to request context
+			r = SetAuthOnRequestContext(r, reqAuth) // populate auth/actor info to request context
 
 			h.ServeHTTP(w, r)
 		}

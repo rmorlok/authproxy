@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	"github.com/golang-jwt/jwt/v5"
 	context2 "github.com/rmorlok/authproxy/context"
 	"hash"
 	"hash/crc64"
@@ -30,10 +29,9 @@ const (
 // system, an admin from the calling system, a devops admin from the cli, etc.
 type Actor struct {
 	// set by service
-	ID         string           `json:"id"`
-	Audience   jwt.ClaimStrings `json:"aud,omitempty"`
-	Admin      bool             `json:"admin,omitempty"`
-	SuperAdmin bool             `json:"super_admin,omitempty"`
+	ID         string `json:"id"`
+	Admin      bool   `json:"admin,omitempty"`
+	SuperAdmin bool   `json:"super_admin,omitempty"`
 	// set by client
 	IP         string                 `json:"ip,omitempty"`
 	Email      string                 `json:"email,omitempty"`

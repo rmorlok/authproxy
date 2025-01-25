@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/database"
 	jwt2 "github.com/rmorlok/authproxy/jwt"
 	"net/http"
 	"net/url"
@@ -267,9 +268,11 @@ func requestHasAuth(r *http.Request) bool {
 	return hasQueryVal || hasHeaderVal || hasCookieVal
 }
 
-// Get token from url, header, or cookie
-// if cookie used, verify xsrf token to match
-func (s *service) Get(ctx context.Context, r *http.Request) (*jwt2.AuthProxyClaims, string, error) {
+// establishAuthFromRequest is the top-level method for managing auth. It looks for authentication in all the places
+// supported by the configuration, makes sure any incoming JWTs are consistent with the auth information stored in the
+// database, and returns the established internal actor. This method will error if no auth is present, or the
+// information is somehow inconsistent with the auth state of the system.
+func (s *service) establishAuthFromRequest(ctx context.Context, r *http.Request) (RequestAuth, error) {
 
 	fromCookie := false
 	tokenString := ""
@@ -283,7 +286,7 @@ func (s *service) Get(ctx context.Context, r *http.Request) (*jwt2.AuthProxyClai
 	if tokenString == "" {
 		if tokenHeader, hasValue, err := getJwtTokenFromHeader(r); hasValue || err != nil {
 			if err != nil {
-				return nil, "", err
+				return NewUnauthenticatedRequestAuth(), err
 			}
 
 			tokenString = tokenHeader
@@ -294,7 +297,7 @@ func (s *service) Get(ctx context.Context, r *http.Request) (*jwt2.AuthProxyClai
 	if tokenString == "" {
 		if tokenCookie, hasValue, err := getJwtTokenFromCookie(r); hasValue || err != nil {
 			if err != nil {
-				return nil, "", err
+				return NewUnauthenticatedRequestAuth(), err
 			}
 
 			fromCookie = true
@@ -304,26 +307,60 @@ func (s *service) Get(ctx context.Context, r *http.Request) (*jwt2.AuthProxyClai
 
 	claims, err := s.Parse(ctx, tokenString)
 	if err != nil {
-		return nil, "", errors.Wrap(err, "failed to get token")
+		return NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to get token")
 	}
 
-	// promote claim's aud to User.Audience
-	if claims.Actor != nil {
-		claims.Actor.Audience = claims.Audience
-	}
-
-	if s.Config.GetRoot().SystemAuth.DisableXSRF {
-		return claims, tokenString, nil
-	}
-
-	if fromCookie && claims.Actor != nil {
+	if !s.Config.GetRoot().SystemAuth.DisableXSRF && fromCookie && claims.Actor != nil {
 		xsrf := r.Header.Get(xsrfHeaderKey)
 		if claims.ID != xsrf {
-			return nil, "", errors.New("xsrf mismatch")
+			return NewUnauthenticatedRequestAuth(), errors.New("xsrf mismatch")
 		}
 	}
 
-	return claims, tokenString, nil
+	if claims.IsExpired(ctx) {
+		return NewUnauthenticatedRequestAuth(), fmt.Errorf("claim is expired")
+	}
+
+	if claims.Nonce != nil {
+		if claims.ExpiresAt == nil {
+			return NewUnauthenticatedRequestAuth(), fmt.Errorf("cannot use nonce without expiration time")
+		}
+
+		s.logf("[DEBUG] using nonce: %s", claims.Nonce.String())
+
+		wasValid, err := s.Db.CheckNonceValidAndMarkUsed(ctx, *claims.Nonce, claims.ExpiresAt.Time)
+		if err != nil {
+			return NewUnauthenticatedRequestAuth(), errors.Wrap(err, "can't check nonce")
+		}
+
+		if !wasValid {
+			return NewUnauthenticatedRequestAuth(), fmt.Errorf("nonce already used")
+		}
+	}
+
+	var actor *database.Actor
+	if claims.Actor == nil {
+		// This implies that the subject of the claim is the external id of the actor, and the actor must already
+		// exist. If the actor does not exist, the claim is invalid.
+		actor, err = s.Opts.Db.GetActorByExternalId(ctx, claims.Subject)
+		if err != nil {
+			return NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to get actor")
+		}
+		if actor == nil {
+			return NewUnauthenticatedRequestAuth(), errors.Errorf("actor '%s' not found", claims.Subject)
+		}
+	} else {
+		// The actor was specified in the JWT. This means that we can upsert an actor, either creating it or making
+		// it consistent with the request's definition.
+		actor, err = s.Opts.Db.UpsertActor(ctx, claims.Actor)
+		if err != nil {
+			return NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to upsert actor")
+		}
+	}
+
+	return &requestAuth{
+		actor: actor,
+	}, nil
 }
 
 // Reset token's cookies

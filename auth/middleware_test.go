@@ -1,7 +1,8 @@
 package auth
 
 import (
-	"github.com/rmorlok/authproxy/jwt"
+	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/util"
 	"github.com/stretchr/testify/assert"
 	"net/http"
@@ -9,13 +10,14 @@ import (
 )
 
 func TestActorOnRequest(t *testing.T) {
-	assert.Nil(t, GetActorInfoFromRequest(util.Must(http.NewRequest("GET", "https://example.com", nil))))
+	assert.False(t, GetAuthFromRequest(util.Must(http.NewRequest("GET", "https://example.com", nil))).IsAuthenticated())
 
-	a := jwt.Actor{
-		ID: "bobdole",
+	a := database.Actor{
+		ID:         uuid.New(),
+		ExternalId: "bobdole",
 	}
 
 	r := util.Must(http.NewRequest("GET", "https://example.com", nil))
-	r = SetActorInfoOnRequest(r, &a)
-	assert.Equal(t, &a, GetActorInfoFromRequest(r))
+	r = SetAuthOnRequestContext(r, &requestAuth{actor: &a})
+	assert.Equal(t, &a, GetAuthFromRequest(r).GetActor())
 }

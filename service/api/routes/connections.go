@@ -52,8 +52,8 @@ type InitiateConnectionRedirect struct {
 func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	ctx := context.AsContext(gctx.Request.Context())
 
-	actor := auth.GetActorInfoFromGinContext(gctx)
-	if actor == nil {
+	ra := auth.GetAuthFromGinContext(gctx)
+	if !ra.IsAuthenticated() {
 		gctx.JSON(http.StatusUnauthorized, Error{"unauthorized"})
 		return
 	}
@@ -95,7 +95,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 		}
 
 		o2 := r.oauthf.NewOAuth2(connection, connector)
-		url, err := o2.SetStateAndGeneratePublicUrl(ctx, *actor, req.ReturnToUrl)
+		url, err := o2.SetStateAndGeneratePublicUrl(ctx, ra.MustGetActor(), req.ReturnToUrl)
 		if err != nil {
 			gctx.JSON(http.StatusInternalServerError, Error{err.Error()})
 			return
