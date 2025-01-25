@@ -6,6 +6,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/jwt"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"log"
@@ -16,6 +17,17 @@ import (
 type DB interface {
 	Migrate(ctx context.Context) error
 	Ping(ctx context.Context) bool
+
+	/*
+	 *  Actors
+	 */
+
+	GetActor(ctx context.Context, id uuid.UUID) (*Actor, error)
+	GetActorByExternalId(ctx context.Context, externalId string) (*Actor, error)
+	CreateActor(ctx context.Context, actor *Actor) error
+	UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, error)
+	ListActorsBuilder() ListActorsBuilder
+	ListActorsFromCursor(ctx context.Context, cursor string) (ListActorsExecutor, error)
 
 	/*
 	 *  Connections
