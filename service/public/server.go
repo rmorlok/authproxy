@@ -119,5 +119,5 @@ func Serve(cfg config.C) {
 	encrypt := encrypt.NewEncryptService(cfg, db)
 
 	r := GetGinServer(cfg, db, redis, httpf, encrypt)
-	r.Run(fmt.Sprintf(":%d", cfg.GetRoot().Public.Port))
+	r.Run(fmt.Sprintf(":%d", cfg.GetRoot().Public.Port()))
 }

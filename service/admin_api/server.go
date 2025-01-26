@@ -95,5 +95,5 @@ func Serve(cfg config.C) {
 	}
 
 	r := GetGinServer(cfg, db, redis)
-	r.Run(fmt.Sprintf(":%d", cfg.GetRoot().AdminApi.Port))
+	r.Run(fmt.Sprintf(":%d", cfg.GetRoot().AdminApi.Port()))
 }
