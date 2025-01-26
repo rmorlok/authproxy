@@ -11,8 +11,8 @@ type C interface {
 	// IsDebugMode tells the system if debug flags have been passed when running this service
 	IsDebugMode() bool
 
-	// MustApiHostForService gets the host information for the specified service name
-	MustApiHostForService(serviceName ServiceId) *ApiHost
+	// MustGetService gets the service information for the specified service name
+	MustGetService(serviceName ServiceId) Service
 
 	// GetFallbackConnectorLogo gets a logo to use if not specified for a connector configuration
 	GetFallbackConnectorLogo() string
@@ -30,13 +30,13 @@ func (c *config) GetRoot() *Root {
 	return c.root
 }
 
-func (c *config) MustApiHostForService(serviceName ServiceId) *ApiHost {
+func (c *config) MustGetService(serviceName ServiceId) Service {
 	r := c.GetRoot()
 	if r == nil {
 		panic("root config not present")
 	}
 
-	return r.MustApiHostForService(serviceName)
+	return r.MustGetService(serviceName)
 }
 
 func (c *config) IsDebugMode() bool {

@@ -32,14 +32,14 @@ func GetGinServer(
 	httpf httpf.F,
 	encrypt encrypt.E,
 ) *gin.Engine {
-	authService := auth.StandardAuthService(cfg, config.ServiceIdApi, db, redis)
+	authService := auth.StandardAuthService(cfg, &cfg.GetRoot().Api, db, redis)
 
 	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
 		Rate:  1 * time.Minute,
 		Limit: 10_000,
 	})
 
-	router := api_common.GinForService("api", &cfg.GetRoot().AdminApi)
+	router := api_common.GinForService(&cfg.GetRoot().Api)
 
 	router.GET("/ping", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{

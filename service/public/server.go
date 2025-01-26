@@ -42,9 +42,9 @@ func GetGinServer(
 	httpf httpf.F,
 	encrypt encrypt.E,
 ) *gin.Engine {
-	authService := auth.StandardAuthService(cfg, config.ServiceIdPublic, db, redis)
+	authService := auth.StandardAuthService(cfg, &cfg.GetRoot().Public, db, redis)
 
-	router := api_common.GinForService("api", &cfg.GetRoot().AdminApi)
+	router := api_common.GinForService(&cfg.GetRoot().Public)
 
 	//router.Use(authService.Optional())
 	//router.Use(cors.New(GetCorsConfig()))

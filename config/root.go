@@ -6,20 +6,25 @@ import (
 )
 
 type Root struct {
-	AdminApi   ApiHost     `json:"admin_api" yaml:"admin_api"`
-	Api        ApiHost     `json:"api" yaml:"api"`
-	Public     ApiHost     `json:"public" yaml:"public"`
-	SystemAuth SystemAuth  `json:"system_auth" yaml:"system_auth"`
-	Database   Database    `json:"database" yaml:"database"`
-	Redis      Redis       `json:"redis" yaml:"redis"`
-	Oauth      OAuth       `json:"oauth" yaml:"oauth"`
-	ErrorPages ErrorPages  `json:"error_pages" yaml:"error_pages"`
-	Connectors []Connector `json:"connectors" yaml:"connectors"`
+	AdminApi   ServiceAdminApi `json:"admin_api" yaml:"admin_api"`
+	Api        ServiceApi      `json:"api" yaml:"api"`
+	Public     ServicePublic   `json:"public" yaml:"public"`
+	SystemAuth SystemAuth      `json:"system_auth" yaml:"system_auth"`
+	Database   Database        `json:"database" yaml:"database"`
+	Redis      Redis           `json:"redis" yaml:"redis"`
+	Oauth      OAuth           `json:"oauth" yaml:"oauth"`
+	ErrorPages ErrorPages      `json:"error_pages" yaml:"error_pages"`
+	Connectors []Connector     `json:"connectors" yaml:"connectors"`
 }
 
-func (r *Root) MustApiHostForService(serviceId ServiceId) *ApiHost {
-	if serviceId == ServiceIdAdminApi {
+func (r *Root) MustGetService(serviceId ServiceId) Service {
+	switch serviceId {
+	case ServiceIdApi:
+		return &r.Api
+	case ServiceIdAdminApi:
 		return &r.AdminApi
+	case ServiceIdPublic:
+		return &r.Public
 	}
 
 	panic(fmt.Sprintf("invalid service id %s", serviceId))

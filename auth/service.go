@@ -18,7 +18,7 @@ func NewService(opts Opts) A {
 		panic("Ops.Config is required")
 	}
 
-	if opts.ServiceId == "" {
+	if opts.Service == nil {
 		panic("Opts.ServiceId is required")
 	}
 
@@ -29,16 +29,16 @@ func NewService(opts Opts) A {
 
 func StandardAuthService(
 	cfg config.C,
-	serviceId config.ServiceId,
+	service config.Service,
 	db database.DB,
 	redis redis.R,
 ) A {
 	return NewService(Opts{
-		Config:    cfg,
-		ServiceId: serviceId,
-		Logger:    logger.Std,
-		Db:        db,
-		Redis:     redis,
+		Config:  cfg,
+		Service: service,
+		Logger:  logger.Std,
+		Db:      db,
+		Redis:   redis,
 	})
 }
 
@@ -48,8 +48,4 @@ func (s *service) logf(format string, args ...interface{}) {
 	}
 
 	s.Opts.Logger.Logf(format, args...)
-}
-
-func (s *service) apiHost() *config.ApiHost {
-	return s.Config.MustApiHostForService(s.ServiceId)
 }

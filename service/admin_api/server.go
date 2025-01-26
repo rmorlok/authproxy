@@ -33,14 +33,14 @@ func rateErrorHandler(c *gin.Context, info ratelimit.Info) {
 //}
 
 func GetGinServer(cfg config.C, db database.DB, redis redis.R) *gin.Engine {
-	authService := auth.StandardAuthService(cfg, config.ServiceIdAdminApi, db, redis)
+	authService := auth.StandardAuthService(cfg, &cfg.GetRoot().AdminApi, db, redis)
 
 	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
 		Rate:  1 * time.Minute,
 		Limit: 3,
 	})
 
-	router := api_common.GinForService("admin-api", &cfg.GetRoot().AdminApi)
+	router := api_common.GinForService(&cfg.GetRoot().AdminApi)
 
 	//router.Use(authService.Optional())
 	//router.Use(cors.New(GetCorsConfig()))

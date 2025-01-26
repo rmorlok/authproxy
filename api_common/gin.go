@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func GinForService(service string, apiHost *config.ApiHost) *gin.Engine {
+func GinForService(service config.Service) *gin.Engine {
 	logFormatter := func(param gin.LogFormatterParams) string {
 		var statusColor, methodColor, resetColor string
 		if param.IsOutputColor() {
@@ -19,7 +19,7 @@ func GinForService(service string, apiHost *config.ApiHost) *gin.Engine {
 		if param.Latency > time.Minute {
 			param.Latency = param.Latency.Truncate(time.Second)
 		}
-		return fmt.Sprintf("["+service+"] %v |%s %3d %s| %13v | %15s |%s %-7s %s %#v\n%s",
+		return fmt.Sprintf("["+string(service.GetId())+"] %v |%s %3d %s| %13v | %15s |%s %-7s %s %#v\n%s",
 			param.TimeStamp.Format("2006/01/02 - 15:04:05"),
 			statusColor, param.StatusCode, resetColor,
 			param.Latency,

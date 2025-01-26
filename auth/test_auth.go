@@ -55,10 +55,10 @@ func TestAuthServiceWithDb(serviceId config.ServiceId, cfg config.C, db database
 	}
 
 	s := NewService(Opts{
-		Config:    cfg,
-		ServiceId: serviceId,
-		Logger:    logger.Std,
-		Db:        db,
+		Config:  cfg,
+		Service: cfg.MustGetService(serviceId),
+		Logger:  logger.Std,
+		Db:      db,
 	})
 
 	return cfg, s, &AuthTestUtil{cfg: cfg, s: s.(*service), serviceId: serviceId}

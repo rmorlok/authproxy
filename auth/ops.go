@@ -27,8 +27,8 @@ type Opts struct {
 	// Configuration for the overall application. Provides many options that control the system.
 	Config config.C
 
-	// The service id for the service using this authentication
-	ServiceId config.ServiceId
+	// The service using this authentication
+	Service config.Service
 
 	// UsesQueryParam defines if the auth will accept tokens form the jwt query param. Needed
 	// for authorized link-in scenarios for services

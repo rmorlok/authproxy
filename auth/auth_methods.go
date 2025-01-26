@@ -50,7 +50,7 @@ func (s *service) keyForToken(claims *jwt2.AuthProxyClaims) (config.Key, error) 
 // claims will be modified prior to signing to indicate which service signed this token and that it is self-signed.
 func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (string, error) {
 	claimsClone := *claims
-	claimsClone.Issuer = string(s.ServiceId)
+	claimsClone.Issuer = string(s.Opts.Service.GetId())
 	claimsClone.IssuedAt = jwt.NewNumericDate(ctx.Clock().Now())
 	claimsClone.SelfSigned = true
 
@@ -106,16 +106,16 @@ func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProx
 
 	found := false
 	for _, aud := range claims.Audience {
-		if aud == string(s.Opts.ServiceId) {
+		if aud == string(s.Opts.Service.GetId()) {
 			found = true
 			break
 		}
 	}
 	if !found {
 		if len(claims.Audience) > 0 {
-			return nil, errors.Errorf("aud '%s' not valid for service '%s'", strings.Join(claims.Audience, ","), s.Opts.ServiceId)
+			return nil, errors.Errorf("aud '%s' not valid for service '%s'", strings.Join(claims.Audience, ","), s.Opts.Service.GetId())
 		}
-		return nil, errors.Errorf("aud not specified for service '%s'", s.Opts.ServiceId)
+		return nil, errors.Errorf("aud not specified for service '%s'", s.Opts.Service.GetId())
 	}
 
 	return claims, s.validate(ctx, claims)
@@ -164,7 +164,7 @@ func (s *service) Set(ctx context.Context, w http.ResponseWriter, claims *jwt2.A
 		claims.ExpiresAt = jwt.NewNumericDate(ctx.Clock().Now().Add(s.Config.GetRoot().SystemAuth.JwtTokenDuration()))
 	}
 
-	claims.Issuer = string(s.ServiceId)
+	claims.Issuer = string(s.Opts.Service.GetId())
 	claims.IssuedAt = jwt.NewNumericDate(ctx.Clock().Now())
 
 	tokenString, err := s.Token(ctx, claims)
@@ -189,7 +189,7 @@ func (s *service) Set(ctx context.Context, w http.ResponseWriter, claims *jwt2.A
 		Path:     "/",
 		Domain:   s.Config.GetRoot().SystemAuth.CookieDomain,
 		MaxAge:   cookieExpiration,
-		Secure:   s.apiHost().IsHttps(),
+		Secure:   s.Opts.Service.IsHttps(),
 		SameSite: cookieSameSite,
 	}
 	http.SetCookie(w, &jwtCookie)
@@ -201,7 +201,7 @@ func (s *service) Set(ctx context.Context, w http.ResponseWriter, claims *jwt2.A
 		Path:     "/",
 		Domain:   s.Config.GetRoot().SystemAuth.CookieDomain,
 		MaxAge:   cookieExpiration,
-		Secure:   s.apiHost().IsHttps(),
+		Secure:   s.Opts.Service.IsHttps(),
 		SameSite: cookieSameSite,
 	}
 	http.SetCookie(w, &xsrfCookie)
@@ -366,10 +366,10 @@ func (s *service) establishAuthFromRequest(ctx context.Context, r *http.Request)
 // Reset token's cookies
 func (s *service) Reset(w http.ResponseWriter) {
 	jwtCookie := http.Cookie{Name: jwtCookieName, Value: "", HttpOnly: false, Path: "/", Domain: s.Config.GetRoot().SystemAuth.CookieDomain,
-		MaxAge: -1, Expires: time.Unix(0, 0), Secure: s.apiHost().IsHttps(), SameSite: cookieSameSite}
+		MaxAge: -1, Expires: time.Unix(0, 0), Secure: s.Opts.Service.IsHttps(), SameSite: cookieSameSite}
 	http.SetCookie(w, &jwtCookie)
 
 	xsrfCookie := http.Cookie{Name: xsrfCookieName, Value: "", HttpOnly: false, Path: "/", Domain: s.Config.GetRoot().SystemAuth.CookieDomain,
-		MaxAge: -1, Expires: time.Unix(0, 0), Secure: s.apiHost().IsHttps(), SameSite: cookieSameSite}
+		MaxAge: -1, Expires: time.Unix(0, 0), Secure: s.Opts.Service.IsHttps(), SameSite: cookieSameSite}
 	http.SetCookie(w, &xsrfCookie)
 }
