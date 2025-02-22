@@ -20,11 +20,8 @@ type AuthProxyClaims struct {
 	// actor configured in the system.
 	Actor *Actor `json:"actor,omitempty"`
 
-	// SessionOnly implies this token is only valid within the context of an existing session.
-	SessionOnly bool `json:"sess_only,omitempty"`
-
 	// SelfSigned indicates this token is signed with the GlobalAESKey. This mean that that AuthProxy has signed
-	// this token to itself for auth transfer between services, a token used in session, etc.
+	// this token to itself for auth transfer between services, etc.
 	SelfSigned bool `json:"self_signed,omitempty"`
 
 	// Nonce is a one-time-use value. Adding a nonce to the JWT make it a one-time-use for auth purposes. If you use

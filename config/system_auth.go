@@ -10,8 +10,6 @@ type SystemAuth struct {
 	JwtSigningKey       Key           `json:"jwt_signing_key" yaml:"jwt_signing_key"`
 	JwtIssuerVal        string        `json:"jwt_issuer" yaml:"jwt_issuer"`
 	JwtTokenDurationVal time.Duration `json:"jwt_token_duration" yaml:"jwt_token_duration"`
-	CookieDomain        string        `json:"cookie_domain" yaml:"cookie_domain"`
-	CookieDurationVal   time.Duration `json:"cookie_duration" yaml:"cookie_duration"`
 	DisableXSRF         bool          `json:"disable_xsrf" yaml:"disable_xsrf"`
 	AdminUsers          AdminUsers    `json:"admin_users" yaml:"admin_users"`
 	GlobalAESKey        KeyData       `json:"global_aes_key" yaml:"global_aes_key"`
@@ -31,14 +29,6 @@ func (sa *SystemAuth) JwtTokenDuration() time.Duration {
 	}
 
 	return sa.JwtTokenDurationVal
-}
-
-func (sa *SystemAuth) CookieDuration() time.Duration {
-	if sa.CookieDurationVal == 0 {
-		return 1 * time.Hour
-	}
-
-	return sa.CookieDurationVal
 }
 
 func (sa *SystemAuth) UnmarshalYAML(value *yaml.Node) error {

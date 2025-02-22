@@ -1,0 +1,664 @@
+package auth
+
+import (
+	"bytes"
+	"encoding/json"
+	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/api_common"
+	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/database"
+	"github.com/rmorlok/authproxy/jwt"
+	"github.com/rmorlok/authproxy/redis"
+	"github.com/rmorlok/authproxy/util"
+	"github.com/stretchr/testify/require"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
+	"net/http/httptest"
+	"net/url"
+	"testing"
+	"time"
+)
+
+// HandlerFunc mirrors gin.HandlerFunc but injects the auth object into the handler so you can do things like
+// manage session.
+type HandlerFunc func(c *gin.Context, a A)
+
+type route struct {
+	method  string
+	path    string
+	handler HandlerFunc
+}
+
+type TestGinServerBuilder struct {
+	testName           string
+	pingCounter        int
+	service            config.ServiceId
+	cfg                config.C
+	db                 database.DB
+	redis              redis.R
+	ginEngine          *gin.Engine
+	openRoutes         []route
+	optionalAuthRoutes []route
+	requiredAuthRoutes []route
+	adminAuthRoutes    []route
+}
+
+func NewTestGinServerBuilder(testName string) *TestGinServerBuilder {
+	return &TestGinServerBuilder{testName: testName}
+}
+
+func (b *TestGinServerBuilder) WithConfig(cfg config.C) *TestGinServerBuilder {
+	b.cfg = cfg
+	return b
+}
+
+func (b *TestGinServerBuilder) WithDb(db database.DB) *TestGinServerBuilder {
+	b.db = db
+	return b
+}
+
+func (b *TestGinServerBuilder) WitRedis(redis redis.R) *TestGinServerBuilder {
+	b.redis = redis
+	return b
+}
+
+func (b *TestGinServerBuilder) WithOpenRoute(method, path string, handler HandlerFunc) *TestGinServerBuilder {
+	b.openRoutes = append(b.openRoutes, route{path: path, handler: handler, method: method})
+	return b
+}
+
+func (b *TestGinServerBuilder) WithGetPingOpenRoute(path string) *TestGinServerBuilder {
+	return b.WithOpenRoute(http.MethodGet, path, func(c *gin.Context, a A) {
+		b.pingCounter++
+		c.JSON(200, gin.H{"ok": true})
+	})
+}
+
+func (b *TestGinServerBuilder) WithOptionalAuthRoute(method, path string, handler HandlerFunc) *TestGinServerBuilder {
+	b.optionalAuthRoutes = append(b.optionalAuthRoutes, route{path: path, handler: handler, method: method})
+	return b
+}
+
+func (b *TestGinServerBuilder) WithGetPingOptionalAuthRoute(path string) *TestGinServerBuilder {
+	return b.WithOptionalAuthRoute(http.MethodGet, path, func(c *gin.Context, a A) {
+		b.pingCounter++
+		c.JSON(200, gin.H{"ok": true})
+	})
+}
+
+func (b *TestGinServerBuilder) WithRequiredAuthRoute(method, path string, handler HandlerFunc) *TestGinServerBuilder {
+	b.requiredAuthRoutes = append(b.requiredAuthRoutes, route{path: path, handler: handler, method: method})
+	return b
+}
+
+func (b *TestGinServerBuilder) WithGetPingRequiredAuthRoute(path string) *TestGinServerBuilder {
+	return b.WithRequiredAuthRoute(http.MethodGet, path, func(c *gin.Context, a A) {
+		b.pingCounter++
+		c.JSON(200, gin.H{"ok": true})
+	})
+}
+
+func (b *TestGinServerBuilder) WithPostPingRequiredAuthRoute(path string) *TestGinServerBuilder {
+	return b.WithRequiredAuthRoute(http.MethodPost, path, func(c *gin.Context, a A) {
+		b.pingCounter++
+		c.JSON(200, gin.H{"ok": true})
+	})
+}
+
+func (b *TestGinServerBuilder) WithAdminAuthRoute(method, path string, handler HandlerFunc) *TestGinServerBuilder {
+	b.adminAuthRoutes = append(b.adminAuthRoutes, route{path: path, handler: handler, method: method})
+	return b
+}
+
+func (b *TestGinServerBuilder) WithGetPingAdminAuthRoute(path string) *TestGinServerBuilder {
+	return b.WithAdminAuthRoute(http.MethodGet, path, func(c *gin.Context, a A) {
+		b.pingCounter++
+		c.JSON(200, gin.H{"ok": true})
+	})
+}
+
+func (b *TestGinServerBuilder) Build() TestSetup {
+	if b.service == config.ServiceId("") {
+		b.service = config.ServiceIdPublic
+	}
+
+	if b.cfg == nil {
+		b.cfg = config.FromRoot(&config.Root{
+			Public: config.ServicePublic{
+				PortVal:                  8080,
+				DomainVal:                "example.com",
+				IsHttpsVal:               false,
+				SessionTimeoutVal:        &config.HumanDuration{Duration: 10 * time.Hour},
+				CookieDomainVal:          util.ToPtr("example.com"),
+				XsrfRequestQueueDepthVal: util.ToPtr(5),
+			},
+			SystemAuth: config.SystemAuth{
+				JwtSigningKey: &config.KeyShared{
+					SharedKey: &config.KeyDataRandomBytes{},
+				},
+				GlobalAESKey: &config.KeyDataRandomBytes{},
+				AdminUsers: config.AdminUsersList{
+					&config.AdminUser{
+						Username: "bobdole",
+						Key: &config.KeyShared{
+							SharedKey: &config.KeyDataRandomBytes{},
+						},
+					},
+				},
+			},
+		})
+	}
+
+	if b.db == nil {
+		b.cfg, b.db = database.MustApplyBlankTestDbConfig(b.testName, b.cfg)
+	}
+
+	if b.redis == nil {
+		b.cfg, b.redis = redis.MustApplyTestConfig(b.cfg)
+	}
+
+	auth := NewService(Opts{
+		Config:  b.cfg,
+		Service: b.cfg.MustGetService(b.service),
+		Db:      b.db,
+		Redis:   b.redis,
+	})
+
+	b.ginEngine = gin.New()
+
+	for _, r := range b.openRoutes {
+		b.ginEngine.Handle(r.method, r.path, func(gctx *gin.Context) { r.handler(gctx, auth) })
+	}
+
+	for _, r := range b.optionalAuthRoutes {
+		b.ginEngine.Handle(r.method, r.path, auth.Optional(), func(gctx *gin.Context) { r.handler(gctx, auth) })
+	}
+
+	for _, r := range b.requiredAuthRoutes {
+		b.ginEngine.Handle(r.method, r.path, auth.Required(), func(gctx *gin.Context) { r.handler(gctx, auth) })
+	}
+
+	for _, r := range b.adminAuthRoutes {
+		b.ginEngine.Handle(r.method, r.path, auth.AdminOnly(), func(gctx *gin.Context) { r.handler(gctx, auth) })
+	}
+
+	return TestSetup{
+		pingCounter: &b.pingCounter,
+		Service:     b.service,
+		Gin:         b.ginEngine,
+		Cfg:         b.cfg,
+		Db:          b.db,
+		Redis:       b.redis,
+		CookieJar:   util.Must(cookiejar.New(nil)),
+	}
+}
+
+type TestSetup struct {
+	pingCounter *int
+	Service     config.ServiceId
+	Gin         *gin.Engine
+	Cfg         config.C
+	Db          database.DB
+	Redis       redis.R
+	CookieJar   http.CookieJar
+	XSRFToken   string
+}
+
+// MustGetValidAdminUser gives an admin user that can sign JWTs. This method makes sure the admin exists in the database
+// regardless of if they have interacted with the system previously.
+func (ts *TestSetup) MustGetValidAdminUser(ctx context.Context) database.Actor {
+	a, err := ts.Db.GetActorByExternalId(ctx, "admin/bobdole")
+	if err != nil {
+		panic(err)
+	}
+
+	if a == nil {
+		a = &database.Actor{
+			ID:         uuid.New(),
+			ExternalId: "admin/bobdole",
+			Email:      "bobdole@example.com",
+			Admin:      true,
+		}
+		if err := ts.Db.CreateActor(ctx, a); err != nil {
+			panic(err)
+		}
+	}
+
+	return *a
+}
+
+// MustGetValidUser gives an user that can sign JWTs. This method makes sure the admin exists in the database
+// regardless of if they have interacted with the system previously.
+func (ts *TestSetup) MustGetValidUser(ctx context.Context) database.Actor {
+	a, err := ts.Db.GetActorByExternalId(ctx, "jimmycarter")
+	if err != nil {
+		panic(err)
+	}
+
+	if a == nil {
+		a = &database.Actor{
+			ID:         uuid.New(),
+			ExternalId: "jimmycarter",
+			Email:      "jimmycarter@example.com",
+		}
+		if err := ts.Db.CreateActor(ctx, a); err != nil {
+			panic(err)
+		}
+	}
+
+	return *a
+}
+
+func (ts *TestSetup) GetPingCount() int {
+	return *ts.pingCounter
+}
+
+func (ts *TestSetup) MustGetValidSigningTokenForUser() config.Key {
+	return ts.Cfg.GetRoot().SystemAuth.JwtSigningKey
+}
+
+func (ts *TestSetup) GET(ctx context.Context, path string) (responseJson gin.H, statusCode int, debugHeader string) {
+	return ts.GetWithSigner(ctx, path, func(req *http.Request) {})
+}
+
+func (ts *TestSetup) GetWithSigner(ctx context.Context, path string, sign func(req *http.Request)) (responseJson gin.H, statusCode int, debugHeader string) {
+	return ts.Request(ctx, http.MethodGet, path, nil, sign)
+}
+
+func (ts *TestSetup) POST(ctx context.Context, path string, body gin.H) (responseJson gin.H, statusCode int, debugHeader string) {
+	return ts.Request(ctx, http.MethodPost, path, body, nil)
+}
+
+func (ts *TestSetup) Request(ctx context.Context, method string, path string, body gin.H, sign func(req *http.Request)) (responseJson gin.H, statusCode int, debugHeader string) {
+	var bodyReader io.Reader
+	if body != nil {
+		// Convert the body into a JSON reader
+		bodyBytes, err := json.Marshal(body)
+		if err != nil {
+			panic(err)
+		}
+		bodyReader = bytes.NewReader(bodyBytes)
+	}
+
+	// Create a request to the specified path
+	req, _ := http.NewRequestWithContext(ctx, method, path, bodyReader)
+	w := httptest.NewRecorder()
+
+	if ts.XSRFToken != "" {
+		req.Header.Set(xsrfHeaderKey, ts.XSRFToken)
+	}
+
+	// Retrieve cookies for the request URL from the cookie jar
+	cookies := ts.CookieJar.Cookies(util.Must(url.Parse("http://example.com")))
+	for _, cookie := range cookies {
+		req.AddCookie(cookie)
+	}
+
+	if sign != nil {
+		sign(req)
+	}
+
+	// Use the Gin engine to handle the request
+	ts.Gin.ServeHTTP(w, req)
+
+	resp := w.Result()
+	ts.CookieJar.SetCookies(util.Must(url.Parse("http://example.com")), resp.Cookies())
+
+	// Read the XSRF token from the response headers and store it
+	if xsrfToken := resp.Header.Get(xsrfHeaderKey); xsrfToken != "" {
+		ts.XSRFToken = xsrfToken
+	}
+
+	// Decode the response JSON into an Actor object
+	if err := json.Unmarshal(w.Body.Bytes(), &responseJson); err != nil {
+		panic(err)
+	}
+
+	// Return the response actor and HTTP status code
+	return responseJson, w.Code, w.Header().Get(api_common.DebugHeader)
+}
+func (ts *TestSetup) PostWithSigner(ctx context.Context, path string, body gin.H, sign func(req *http.Request)) (responseJson gin.H, statusCode int, debugHeader string) {
+	// Convert the body into a JSON reader
+	bodyBytes, err := json.Marshal(body)
+	if err != nil {
+		panic(err)
+	}
+	bodyReader := bytes.NewReader(bodyBytes)
+
+	// Create a request to the specified path
+	req, _ := http.NewRequestWithContext(ctx, http.MethodPost, path, bodyReader)
+	w := httptest.NewRecorder()
+
+	sign(req)
+
+	// Use the Gin engine to handle the request
+	ts.Gin.ServeHTTP(w, req)
+
+	// Decode the response JSON into an Actor object
+	if err := json.Unmarshal(w.Body.Bytes(), &responseJson); err != nil {
+		panic(err)
+	}
+
+	// Return the response actor and HTTP status code
+	return responseJson, w.Code, w.Header().Get(api_common.DebugHeader)
+}
+
+// MustGetInvalidAdminUser gives an admin user that cannot be used to sign JWTs as it is not listed in the config
+// admin user list. This admin does not actually exist in the database, the databaes actor is just used to pass
+// the information.
+func (ts *TestSetup) MustGetInvalidAdminUser(ctx context.Context) database.Actor {
+	return database.Actor{
+		ID:         uuid.New(),
+		ExternalId: "admin/billclinton",
+		Email:      "billclinton@example.com",
+		Admin:      true,
+	}
+}
+
+func TestAuth(t *testing.T) {
+	t.Setenv("AUTHPROXY_DEBUG_MODE", "true")
+
+	ctx := context.Background()
+	t.Run("unauthenticated", func(t *testing.T) {
+		t.Run("open route", func(t *testing.T) {
+			ts := NewTestGinServerBuilder(t.Name()).
+				WithGetPingOpenRoute("/ping").
+				Build()
+
+			resp, statusCode, debugHeader := ts.GET(ctx, "/ping")
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 1, ts.GetPingCount())
+		})
+		t.Run("optional auth route", func(t *testing.T) {
+			ts := NewTestGinServerBuilder(t.Name()).
+				WithGetPingOptionalAuthRoute("/ping").
+				Build()
+
+			resp, statusCode, debugHeader := ts.GET(ctx, "/ping")
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 1, ts.GetPingCount())
+		})
+		t.Run("required auth route", func(t *testing.T) {
+			ts := NewTestGinServerBuilder(t.Name()).
+				WithGetPingRequiredAuthRoute("/ping").
+				Build()
+
+			resp, statusCode, debugHeader := ts.GET(ctx, "/ping")
+			require.Equal(t, http.StatusUnauthorized, statusCode, debugHeader)
+			require.Equal(t, gin.H{"error": "HTTP 401: Unauthorized"}, resp)
+			require.Equal(t, 0, ts.GetPingCount())
+		})
+	})
+	t.Run("jwt query param auth", func(t *testing.T) {
+		t.Run("open route", func(t *testing.T) {
+			ts := NewTestGinServerBuilder(t.Name()).
+				WithGetPingOpenRoute("/ping").
+				Build()
+
+			s := jwt.NewJwtTokenBuilder().
+				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+				MustSignerCtx(ctx)
+
+			resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 1, ts.GetPingCount())
+		})
+		t.Run("optional auth route", func(t *testing.T) {
+			ts := NewTestGinServerBuilder(t.Name()).
+				WithGetPingOptionalAuthRoute("/ping").
+				Build()
+
+			s := jwt.NewJwtTokenBuilder().
+				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				WithServiceId(ts.Service).
+				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+				MustSignerCtx(ctx)
+
+			resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
+
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 1, ts.GetPingCount())
+		})
+		t.Run("required auth route", func(t *testing.T) {
+			ts := NewTestGinServerBuilder(t.Name()).
+				WithGetPingRequiredAuthRoute("/ping").
+				Build()
+
+			s := jwt.NewJwtTokenBuilder().
+				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				WithServiceId(ts.Service).
+				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+				MustSignerCtx(ctx)
+
+			resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 1, ts.GetPingCount())
+		})
+	})
+	t.Run("jwt header auth", func(t *testing.T) {
+		t.Run("open route", func(t *testing.T) {
+			ts := NewTestGinServerBuilder(t.Name()).
+				WithGetPingOpenRoute("/ping").
+				Build()
+
+			s := jwt.NewJwtTokenBuilder().
+				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				WithServiceId(ts.Service).
+				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+				MustSignerCtx(ctx)
+
+			resp, statusCode, debugHeader := ts.GetWithSigner(ctx, "/ping", s.SignAuthHeader)
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 1, ts.GetPingCount())
+		})
+		t.Run("optional auth route", func(t *testing.T) {
+			ts := NewTestGinServerBuilder(t.Name()).
+				WithGetPingOptionalAuthRoute("/ping").
+				Build()
+
+			s := jwt.NewJwtTokenBuilder().
+				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				WithServiceId(ts.Service).
+				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+				MustSignerCtx(ctx)
+
+			resp, statusCode, debugHeader := ts.GetWithSigner(ctx, "/ping", s.SignAuthHeader)
+
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 1, ts.GetPingCount())
+		})
+		t.Run("required auth route", func(t *testing.T) {
+			ts := NewTestGinServerBuilder(t.Name()).
+				WithGetPingRequiredAuthRoute("/ping").
+				Build()
+
+			s := jwt.NewJwtTokenBuilder().
+				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				WithServiceId(ts.Service).
+				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+				MustSignerCtx(ctx)
+
+			resp, statusCode, debugHeader := ts.GetWithSigner(ctx, "/ping", s.SignAuthHeader)
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 1, ts.GetPingCount())
+		})
+	})
+	t.Run("invalid jwt", func(t *testing.T) {
+		t.Run("invalid audience", func(t *testing.T) {
+			t.Run("open route", func(t *testing.T) {
+				ts := NewTestGinServerBuilder(t.Name()).
+					WithGetPingOpenRoute("/ping").
+					Build()
+
+				s := jwt.NewJwtTokenBuilder().
+					WithAudience("invalid").
+					WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+					MustSignerCtx(ctx)
+
+				_, statusCode, debugHeader := ts.GetWithSigner(ctx, "/ping", s.SignAuthHeader)
+				require.Equal(t, http.StatusOK, statusCode, debugHeader)
+				require.Equal(t, 1, ts.GetPingCount())
+			})
+			t.Run("optional auth route", func(t *testing.T) {
+				ts := NewTestGinServerBuilder(t.Name()).
+					WithGetPingOptionalAuthRoute("/ping").
+					Build()
+
+				s := jwt.NewJwtTokenBuilder().
+					WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+					WithAudience("invalid").
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+					MustSignerCtx(ctx)
+
+				_, statusCode, debugHeader := ts.GetWithSigner(ctx, "/ping", s.SignAuthHeader)
+
+				require.Equal(t, http.StatusUnauthorized, statusCode, debugHeader)
+				require.Equal(t, 0, ts.GetPingCount())
+			})
+			t.Run("required auth route", func(t *testing.T) {
+				ts := NewTestGinServerBuilder(t.Name()).
+					WithGetPingRequiredAuthRoute("/ping").
+					Build()
+
+				s := jwt.NewJwtTokenBuilder().
+					WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+					WithAudience("invalid").
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+					MustSignerCtx(ctx)
+
+				_, statusCode, debugHeader := ts.GetWithSigner(ctx, "/ping", s.SignAuthHeader)
+				require.Equal(t, http.StatusUnauthorized, statusCode, debugHeader)
+				require.Equal(t, 0, ts.GetPingCount())
+			})
+		})
+	})
+	t.Run("session", func(t *testing.T) {
+		setup := func() TestSetup {
+			return NewTestGinServerBuilder(t.Name()).
+				WithRequiredAuthRoute(http.MethodGet, "/initiate-session", func(gctx *gin.Context, auth A) {
+					ra := GetAuthFromGinContext(gctx)
+					err := auth.EstablishGinSession(gctx, ra)
+					if err != nil {
+						api_common.NewHttpStatusErrorBuilder().
+							WithInternalErr(err).
+							BuildStatusError().
+							WriteGinResponse(api_common.NewMockDebuggable(true), gctx)
+						return
+					}
+
+					gctx.JSON(http.StatusOK, gin.H{"ok": true})
+				}).
+				WithRequiredAuthRoute(http.MethodGet, "/end-session", func(gctx *gin.Context, auth A) {
+					ra := GetAuthFromGinContext(gctx)
+					err := auth.EndGinSession(gctx, ra)
+					if err != nil {
+						api_common.NewHttpStatusErrorBuilder().
+							WithInternalErr(err).
+							BuildStatusError().
+							WriteGinResponse(api_common.NewMockDebuggable(true), gctx)
+						return
+					}
+
+					gctx.JSON(http.StatusOK, gin.H{"ok": true})
+				}).
+				WithGetPingRequiredAuthRoute("/ping-get").
+				WithPostPingRequiredAuthRoute("/ping-post").
+				Build()
+		}
+
+		t.Run("full flow", func(t *testing.T) {
+			ts := setup()
+
+			// No session
+			resp, statusCode, debugHeader := ts.GET(ctx, "/ping-get")
+			require.Equal(t, http.StatusUnauthorized, statusCode, debugHeader)
+			require.Equal(t, 0, ts.GetPingCount())
+
+			resp, statusCode, debugHeader = ts.POST(ctx, "/ping-post", gin.H{})
+			require.Equal(t, http.StatusUnauthorized, statusCode, debugHeader)
+			require.Equal(t, 0, ts.GetPingCount())
+
+			resp, statusCode, debugHeader = ts.GET(ctx, "/initiate-session")
+			require.Equal(t, http.StatusUnauthorized, statusCode, debugHeader)
+
+			resp, statusCode, debugHeader = ts.GET(ctx, "/end-session")
+			require.Equal(t, http.StatusUnauthorized, statusCode, debugHeader)
+
+			s := jwt.NewJwtTokenBuilder().
+				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				WithServiceId(ts.Service).
+				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+				MustSignerCtx(ctx)
+
+			// Start session
+			resp, statusCode, debugHeader = ts.GET(ctx, s.SignUrlQuery("/initiate-session"))
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+
+			resp, statusCode, debugHeader = ts.GET(ctx, "/ping-get")
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 1, ts.GetPingCount())
+
+			resp, statusCode, debugHeader = ts.POST(ctx, "/ping-post", gin.H{})
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 2, ts.GetPingCount())
+
+			resp, statusCode, debugHeader = ts.GET(ctx, "/end-session")
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 2, ts.GetPingCount())
+
+			// No session again
+			resp, statusCode, debugHeader = ts.GET(ctx, "/ping-get")
+			require.Equal(t, http.StatusUnauthorized, statusCode, debugHeader)
+			require.Equal(t, 2, ts.GetPingCount())
+
+			resp, statusCode, debugHeader = ts.POST(ctx, "/ping-post", gin.H{})
+			require.Equal(t, http.StatusUnauthorized, statusCode, debugHeader)
+			require.Equal(t, 2, ts.GetPingCount())
+		})
+
+		t.Run("requires xsrf for post but not for get", func(t *testing.T) {
+			ts := setup()
+
+			s := jwt.NewJwtTokenBuilder().
+				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				WithServiceId(ts.Service).
+				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+				MustSignerCtx(ctx)
+
+			// Start session
+			resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/initiate-session"))
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+
+			ts.XSRFToken = ""
+
+			resp, statusCode, debugHeader = ts.GET(ctx, "/ping-get")
+			require.Equal(t, http.StatusOK, statusCode, debugHeader) // Does not require xsrf
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 1, ts.GetPingCount())
+
+			ts.XSRFToken = ""
+
+			resp, statusCode, debugHeader = ts.POST(ctx, "/ping-post", gin.H{})
+			require.Equal(t, http.StatusForbidden, statusCode, debugHeader) // Requires xsrf
+			require.Equal(t, 1, ts.GetPingCount())
+		})
+	})
+}

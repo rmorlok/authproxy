@@ -1,6 +1,9 @@
 package config
 
-import "fmt"
+import (
+	"fmt"
+	"time"
+)
 
 type ServiceAdminApi struct {
 	PortVal    uint64 `json:"port" yaml:"port"`
@@ -40,6 +43,18 @@ func (s *ServiceAdminApi) GetBaseUrl() string {
 
 func (s *ServiceAdminApi) SupportsSession() bool {
 	return false
+}
+
+func (s *ServiceAdminApi) SessionTimeout() time.Duration {
+	return 0 * time.Second
+}
+
+func (s *ServiceAdminApi) CookieDomain() string {
+	return ""
+}
+
+func (s *ServiceAdminApi) XsrfRequestQueueDepth() int {
+	return 0
 }
 
 func (s *ServiceAdminApi) GetId() ServiceId {

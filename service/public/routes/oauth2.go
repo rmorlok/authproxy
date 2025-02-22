@@ -35,28 +35,28 @@ func (r *Oauth2Routes) callback(gctx *gin.Context) {
 
 	ra := auth.GetAuthFromGinContext(gctx)
 	if !ra.IsAuthenticated() {
-		api_common.AddDebugHeader(r.cfg, gctx, "auth not present on context")
+		api_common.AddGinDebugHeader(r.cfg, gctx, "auth not present on context")
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.GetUnauthorized())
 		return
 	}
 
 	var req Oauth2QueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		api_common.AddDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to deserialize query params"))
+		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to deserialize query params"))
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
 		return
 	}
 
 	oauthState, err := r.oauthf.GetOAuth2State(ctx, ra.MustGetActor(), req.State) // Get the OAuth2 state
 	if err != nil {
-		api_common.AddDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to get oauth2 state"))
+		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to get oauth2 state"))
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
 		return
 	}
 
 	redirectUrl, err := oauthState.CallbackFrom3rdParty(ctx, gctx.Request.URL.Query())
 	if err != nil {
-		api_common.AddDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to handle oauth2 callback"))
+		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to handle oauth2 callback"))
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
 		return
 	}
@@ -73,7 +73,7 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 
 	ra := auth.GetAuthFromGinContext(gctx)
 	if !ra.IsAuthenticated() {
-		api_common.AddDebugHeader(r.cfg, gctx, "auth not present on context")
+		api_common.AddGinDebugHeader(r.cfg, gctx, "auth not present on context")
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.GetUnauthorized())
 		return
 	}
@@ -82,33 +82,33 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 
 	var req RedirectParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		api_common.AddDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to bind redirect params"))
+		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to bind redirect params"))
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
 		return
 	}
 
 	if req.StateId == "" {
-		api_common.AddDebugHeader(r.cfg, gctx, "state_id is required")
+		api_common.AddGinDebugHeader(r.cfg, gctx, "state_id is required")
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
 		return
 	}
 
 	stateId, err := uuid.Parse(req.StateId)
 	if err != nil {
-		api_common.AddDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to parse state_id"))
+		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to parse state_id"))
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
 	}
 
 	o2, err := r.oauthf.GetOAuth2State(ctx, ra.MustGetActor(), stateId)
 	if err != nil {
-		api_common.AddDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to get oauth2 state"))
+		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to get oauth2 state"))
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
 		return
 	}
 
 	redirectUrl, err := o2.GenerateAuthUrl(ctx, ra.MustGetActor())
 	if err != nil {
-		api_common.AddDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to generate oauth2 redirect url"))
+		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to generate oauth2 redirect url"))
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
 		return
 	}

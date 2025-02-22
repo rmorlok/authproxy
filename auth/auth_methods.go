@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
@@ -15,18 +16,7 @@ import (
 	"github.com/pkg/errors"
 )
 
-func verificationKeyData(key config.Key) config.KeyData {
-	switch v := key.(type) {
-	case *config.KeyPublicPrivate:
-		return v.PublicKey
-	case *config.KeyShared:
-		return v.SharedKey
-	default:
-		panic("key does not support verification")
-	}
-}
-
-// keyDataForToken loads an appropriate key to sign or verify a given token. This accounts for the
+// keyForToken loads an appropriate key to sign or verify a given token. This accounts for the
 // fact that admin users will verify with different keys to sign/verify tokens.
 func (s *service) keyForToken(claims *jwt2.AuthProxyClaims) (config.Key, error) {
 	if claims.IsAdmin() {
@@ -136,7 +126,7 @@ func JwtBearerHeaderVal(tokenString string) string {
 }
 
 func SetJwtHeader(h http.Header, tokenString string) {
-	h.Set(jwtHeaderKey, JwtBearerHeaderVal(tokenString))
+	h.Set(JwtHeaderKey, JwtBearerHeaderVal(tokenString))
 }
 
 func SetJwtRequestHeader(w *http.Request, tokenString string) {
@@ -149,64 +139,6 @@ func SetJwtResponseHeader(w http.ResponseWriter, tokenString string) {
 
 func (s *service) setJwtResponseHeader(w http.ResponseWriter, tokenString string) {
 	SetJwtResponseHeader(w, tokenString)
-}
-
-// Set creates token cookie with xsrf cookie and put it to ResponseWriter
-// accepts claims and sets expiration if none defined. permanent flag means long-living cookie,
-// false makes it session only.
-func (s *service) Set(ctx context.Context, w http.ResponseWriter, claims *jwt2.AuthProxyClaims) (*jwt2.AuthProxyClaims, error) {
-	expiresAt, err := claims.GetExpirationTime()
-	if err != nil {
-		return nil, errors.Wrap(err, "can't get expiration time")
-	}
-
-	if expiresAt == nil {
-		claims.ExpiresAt = jwt.NewNumericDate(ctx.Clock().Now().Add(s.Config.GetRoot().SystemAuth.JwtTokenDuration()))
-	}
-
-	claims.Issuer = string(s.Opts.Service.GetId())
-	claims.IssuedAt = jwt.NewNumericDate(ctx.Clock().Now())
-
-	tokenString, err := s.Token(ctx, claims)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to make token token")
-	}
-
-	if s.SendJWTHeader {
-		s.setJwtResponseHeader(w, tokenString)
-		return claims, nil
-	}
-
-	cookieExpiration := 0 // session cookie
-	if !claims.SessionOnly {
-		cookieExpiration = int(s.Config.GetRoot().SystemAuth.CookieDuration().Seconds())
-	}
-
-	jwtCookie := http.Cookie{
-		Name:     jwtCookieName,
-		Value:    tokenString,
-		HttpOnly: true,
-		Path:     "/",
-		Domain:   s.Config.GetRoot().SystemAuth.CookieDomain,
-		MaxAge:   cookieExpiration,
-		Secure:   s.Opts.Service.IsHttps(),
-		SameSite: cookieSameSite,
-	}
-	http.SetCookie(w, &jwtCookie)
-
-	xsrfCookie := http.Cookie{
-		Name:     xsrfCookieName,
-		Value:    claims.ID,
-		HttpOnly: false,
-		Path:     "/",
-		Domain:   s.Config.GetRoot().SystemAuth.CookieDomain,
-		MaxAge:   cookieExpiration,
-		Secure:   s.Opts.Service.IsHttps(),
-		SameSite: cookieSameSite,
-	}
-	http.SetCookie(w, &xsrfCookie)
-
-	return claims, nil
 }
 
 // extractTokenFromBearer extracts the token v
@@ -232,7 +164,7 @@ func getJwtTokenFromQuery(r *http.Request) (token string, hasValue bool) {
 }
 
 func getJwtTokenFromHeader(r *http.Request) (token string, hasValue bool, err error) {
-	if tokenHeader := r.Header.Get(jwtHeaderKey); tokenHeader != "" {
+	if tokenHeader := r.Header.Get(JwtHeaderKey); tokenHeader != "" {
 		tokenString, err := extractTokenFromBearer(tokenHeader)
 		if err != nil {
 			return "", true, errors.Wrap(err, "failed to extract token from authorization header")
@@ -246,35 +178,17 @@ func getJwtTokenFromHeader(r *http.Request) (token string, hasValue bool, err er
 	return "", false, nil
 }
 
-func getJwtTokenFromCookie(r *http.Request) (token string, hasValue bool, err error) {
-	jc, err := r.Cookie(jwtCookieName)
-
-	if errors.Is(err, http.ErrNoCookie) {
-		return "", false, nil
-	}
-
-	if err != nil {
-		return "", true, errors.Wrap(err, "failed to get cookie")
-	}
-
-	return jc.Value, true, nil
-}
-
-func requestHasAuth(r *http.Request) bool {
-	_, hasQueryVal := getJwtTokenFromQuery(r)
-	_, hasHeaderVal, _ := getJwtTokenFromHeader(r)
-	_, hasCookieVal, _ := getJwtTokenFromCookie(r)
-
-	return hasQueryVal || hasHeaderVal || hasCookieVal
-}
-
 // establishAuthFromRequest is the top-level method for managing auth. It looks for authentication in all the places
 // supported by the configuration, makes sure any incoming JWTs are consistent with the auth information stored in the
 // database, and returns the established internal actor. This method will error if no auth is present, or the
 // information is somehow inconsistent with the auth state of the system.
-func (s *service) establishAuthFromRequest(ctx context.Context, r *http.Request) (RequestAuth, error) {
-
-	fromCookie := false
+//
+// When establishing auth, a JWT always takes precedence over a session. If the session and JWT differ, the session will
+// be terminated and the caller must decide to start a new session explicitly.
+func (s *service) establishAuthFromRequest(ctx context.Context, r *http.Request, w http.ResponseWriter) (RequestAuth, error) {
+	var err error
+	var claims *jwt2.AuthProxyClaims
+	var ra = NewUnauthenticatedRequestAuth()
 	tokenString := ""
 
 	// try to get from "token" query param
@@ -293,83 +207,96 @@ func (s *service) establishAuthFromRequest(ctx context.Context, r *http.Request)
 		}
 	}
 
-	// try to get from JWT cookie
-	if tokenString == "" {
-		if tokenCookie, hasValue, err := getJwtTokenFromCookie(r); hasValue || err != nil {
-			if err != nil {
-				return NewUnauthenticatedRequestAuth(), err
+	if tokenString != "" {
+		claims, err = s.Parse(ctx, tokenString)
+		if err != nil {
+			return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+				WithStatusUnauthorized().
+				WithResponseMsg("invalid token").
+				WithInternalErr(errors.Wrap(err, "failed to get token")).
+				Build()
+		}
+
+		if claims.IsExpired(ctx) {
+			return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+				WithStatusUnauthorized().
+				WithResponseMsg("token is expired").
+				Build()
+		}
+
+		if claims.Nonce != nil {
+			if claims.ExpiresAt == nil {
+				return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+					WithStatusBadRequest().
+					WithResponseMsg("cannot use nonce in jwt without expiration time").
+					Build()
 			}
 
-			fromCookie = true
-			tokenString = tokenCookie
+			s.logf("[DEBUG] using nonce: %s", claims.Nonce.String())
+
+			wasValid, err := s.Db.CheckNonceValidAndMarkUsed(ctx, *claims.Nonce, claims.ExpiresAt.Time)
+			if err != nil {
+				return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+					WithStatusUnauthorized().
+					WithResponseMsg("failed to verify jwt details").
+					WithInternalErr(errors.Wrap(err, "can't check nonce")).
+					Build()
+			}
+
+			if !wasValid {
+				return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+					WithStatusUnauthorized().
+					WithResponseMsg("jwt nonce already used").
+					Build()
+			}
+		}
+
+		var actor *database.Actor
+		if claims.Actor == nil {
+			// This implies that the subject of the claim is the external id of the actor, and the actor must already
+			// exist. If the actor does not exist, the claim is invalid.
+			actor, err = s.Opts.Db.GetActorByExternalId(ctx, claims.Subject)
+			if err != nil {
+				return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+					WithStatusInternalServerError().
+					WithResponseMsg("database error").
+					WithInternalErr(errors.Wrap(err, "failed to get actor")).
+					Build()
+			}
+			if actor == nil {
+				return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+					WithStatusUnauthorized().
+					WithResponseMsg("actor does not exist").
+					WithInternalErr(errors.Errorf("actor '%s' not found", claims.Subject)).
+					Build()
+			}
+		} else {
+			// The actor was specified in the JWT. This means that we can upsert an actor, either creating it or making
+			// it consistent with the request's definition.
+			actor, err = s.Opts.Db.UpsertActor(ctx, claims.Actor)
+			if err != nil {
+				return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+					WithStatusInternalServerError().
+					WithResponseMsg("database error").
+					WithInternalErr(errors.Wrap(err, "failed to upsert actor")).
+					Build()
+			}
+		}
+
+		ra = &requestAuth{
+			actor: actor,
 		}
 	}
 
-	claims, err := s.Parse(ctx, tokenString)
+	// Extend auth with session, or establish the user authed from session if not authenticated yet
+	ra, err = s.establishAuthFromSession(ctx, r, w, ra)
 	if err != nil {
-		return NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to get token")
+		return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+			WithStatusUnauthorized().
+			WithResponseMsg("failed to establish auth from session").
+			WithInternalErr(errors.Wrap(err, "failed to establish auth from session")).
+			Build()
 	}
 
-	if !s.Config.GetRoot().SystemAuth.DisableXSRF && fromCookie && claims.Actor != nil {
-		xsrf := r.Header.Get(xsrfHeaderKey)
-		if claims.ID != xsrf {
-			return NewUnauthenticatedRequestAuth(), errors.New("xsrf mismatch")
-		}
-	}
-
-	if claims.IsExpired(ctx) {
-		return NewUnauthenticatedRequestAuth(), fmt.Errorf("claim is expired")
-	}
-
-	if claims.Nonce != nil {
-		if claims.ExpiresAt == nil {
-			return NewUnauthenticatedRequestAuth(), fmt.Errorf("cannot use nonce without expiration time")
-		}
-
-		s.logf("[DEBUG] using nonce: %s", claims.Nonce.String())
-
-		wasValid, err := s.Db.CheckNonceValidAndMarkUsed(ctx, *claims.Nonce, claims.ExpiresAt.Time)
-		if err != nil {
-			return NewUnauthenticatedRequestAuth(), errors.Wrap(err, "can't check nonce")
-		}
-
-		if !wasValid {
-			return NewUnauthenticatedRequestAuth(), fmt.Errorf("nonce already used")
-		}
-	}
-
-	var actor *database.Actor
-	if claims.Actor == nil {
-		// This implies that the subject of the claim is the external id of the actor, and the actor must already
-		// exist. If the actor does not exist, the claim is invalid.
-		actor, err = s.Opts.Db.GetActorByExternalId(ctx, claims.Subject)
-		if err != nil {
-			return NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to get actor")
-		}
-		if actor == nil {
-			return NewUnauthenticatedRequestAuth(), errors.Errorf("actor '%s' not found", claims.Subject)
-		}
-	} else {
-		// The actor was specified in the JWT. This means that we can upsert an actor, either creating it or making
-		// it consistent with the request's definition.
-		actor, err = s.Opts.Db.UpsertActor(ctx, claims.Actor)
-		if err != nil {
-			return NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to upsert actor")
-		}
-	}
-
-	return &requestAuth{
-		actor: actor,
-	}, nil
-}
-
-// Reset token's cookies
-func (s *service) Reset(w http.ResponseWriter) {
-	jwtCookie := http.Cookie{Name: jwtCookieName, Value: "", HttpOnly: false, Path: "/", Domain: s.Config.GetRoot().SystemAuth.CookieDomain,
-		MaxAge: -1, Expires: time.Unix(0, 0), Secure: s.Opts.Service.IsHttps(), SameSite: cookieSameSite}
-	http.SetCookie(w, &jwtCookie)
-
-	xsrfCookie := http.Cookie{Name: xsrfCookieName, Value: "", HttpOnly: false, Path: "/", Domain: s.Config.GetRoot().SystemAuth.CookieDomain,
-		MaxAge: -1, Expires: time.Unix(0, 0), Secure: s.Opts.Service.IsHttps(), SameSite: cookieSameSite}
-	http.SetCookie(w, &xsrfCookie)
+	return ra, nil
 }

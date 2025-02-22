@@ -21,10 +21,6 @@ import (
 	"time"
 )
 
-var (
-	testJwtValidSess = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJyZW1hcms0MiIsImF1ZCI6WyJ0ZXN0X3N5cyJdLCJleHAiOjI3ODkxOTE4MjIsIm5iZiI6MTUyNjg4NDIyMiwiaWF0IjoxNzI3NzQwODAwLCJqdGkiOiJyYW5kb20gaWQiLCJ1c2VyIjp7ImlkIjoiaWQxIiwiaXAiOiIxMjcuMC4wLjEiLCJlbWFpbCI6Im1lQGV4YW1wbGUuY29tIiwiYXR0cnMiOnsiYm9vbGEiOnRydWUsInN0cmEiOiJzdHJhLXZhbCJ9fSwic2Vzc19vbmx5Ijp0cnVlfQ.dTB_PamolW5w7LFRBbXDuN_SKh9BOMawVH_6ECaWsvE"
-)
-
 func TestAuth_Token(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(Opts{
@@ -36,25 +32,6 @@ func TestAuth_Token(t *testing.T) {
 	require.NoError(t, err)
 
 	claims, err := j.Parse(testContext, res)
-	require.NoError(t, err)
-	require.NotNil(t, testClaims().Actor.ID, claims.Actor.ID)
-}
-
-func TestAuth_SendJWTHeader(t *testing.T) {
-	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(Opts{
-		SendJWTHeader: true,
-		Config:        cfg,
-		Service:       cfg.MustGetService(config.ServiceIdAdminApi),
-	})
-
-	rr := httptest.NewRecorder()
-	_, err := j.Set(testContext, rr, testClaims())
-	require.NoError(t, err)
-	cookies := rr.Result().Cookies()
-	require.Equal(t, 0, len(cookies), "no cookies set")
-	token := strings.Replace(rr.Result().Header.Get(jwtHeaderKey), "Bearer ", "", 1)
-	claims, err := j.Parse(testContext, token)
 	require.NoError(t, err)
 	require.NotNil(t, testClaims().Actor.ID, claims.Actor.ID)
 }
@@ -284,8 +261,6 @@ func TestAuth_Parse(t *testing.T) {
 
 		cfg := config.FromRoot(&config.Root{
 			SystemAuth: config.SystemAuth{
-				CookieDurationVal:   10 * time.Hour,
-				CookieDomain:        "example.com",
 				JwtTokenDurationVal: 12 * time.Hour,
 				JwtIssuerVal:        "example",
 				JwtSigningKey: &config.KeyPublicPrivate{
@@ -335,8 +310,6 @@ func TestAuth_Parse(t *testing.T) {
 						},
 					},
 				},
-				CookieDurationVal:   10 * time.Hour,
-				CookieDomain:        "example.com",
 				JwtTokenDurationVal: 12 * time.Hour,
 				JwtIssuerVal:        "example",
 				JwtSigningKey: &config.KeyPublicPrivate{
@@ -398,135 +371,6 @@ func TestAuth_Parse(t *testing.T) {
 	})
 }
 
-func TestAuth_Set(t *testing.T) {
-	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-
-	j := NewService(Opts{
-		Config:  cfg,
-		Service: cfg.MustGetService(config.ServiceIdAdminApi),
-	})
-
-	claims := *testClaims()
-
-	rr := httptest.NewRecorder()
-	c, err := j.Set(testContext, rr, &claims)
-	require.NoError(t, err)
-	require.Equal(t, claims, *c)
-	cookies := rr.Result().Cookies()
-	t.Log(cookies)
-	require.Equal(t, 2, len(cookies))
-	require.Equal(t, jwtCookieName, cookies[0].Name)
-
-	returnedClaims, err := j.Parse(testContext, cookies[0].Value)
-	require.NoError(t, err)
-	require.Equal(t, testClaims().Actor.ID, returnedClaims.Actor.ID)
-
-	require.Equal(t, int(testConfigPublicPrivateKey.SystemAuth.CookieDurationVal.Seconds()), cookies[0].MaxAge)
-	require.Equal(t, xsrfCookieName, cookies[1].Name)
-	require.Equal(t, "random id", cookies[1].Value)
-
-	claims.SessionOnly = true
-	rr = httptest.NewRecorder()
-	_, err = j.Set(testContext, rr, &claims)
-	require.NoError(t, err)
-	cookies = rr.Result().Cookies()
-	t.Log(cookies)
-	require.Equal(t, 2, len(cookies))
-	require.Equal(t, jwtCookieName, cookies[0].Name)
-
-	returnedClaims, err = j.Parse(testContext, cookies[0].Value)
-	require.NoError(t, err)
-	require.Equal(t, testClaims().Actor.ID, returnedClaims.Actor.ID)
-
-	require.Equal(t, 0, cookies[0].MaxAge)
-	require.Equal(t, xsrfCookieName, cookies[1].Name)
-	require.Equal(t, "random id", cookies[1].Value)
-	require.Equal(t, "example.com", cookies[0].Domain)
-
-	rr = httptest.NewRecorder()
-
-	// Check below looks at issued at changing, so we need a different time than the test context
-	_, err = j.Set(context.Background().WithClock(test_clock.NewFakeClock(time.Date(2024, 11, 2, 0, 0, 0, 0, time.UTC))), rr, &claims)
-	require.NoError(t, err)
-	cookies = rr.Result().Cookies()
-	t.Log(cookies)
-	require.Equal(t, 2, len(cookies))
-	require.Equal(t, jwtCookieName, cookies[0].Name)
-	require.NotEqual(t, testJwtValidSess, cookies[0].Value, "iat changed the token")
-	require.Equal(t, "", rr.Result().Header.Get(jwtHeaderKey), "no JWT header set")
-}
-
-func TestAuth_SetWithDomain(t *testing.T) {
-	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(Opts{
-		Config:  cfg,
-		Service: cfg.MustGetService(config.ServiceIdAdminApi),
-	})
-
-	claims := *testClaims()
-
-	rr := httptest.NewRecorder()
-	_, err := j.Set(testContext, rr, &claims)
-	require.NoError(t, err)
-	cookies := rr.Result().Cookies()
-	t.Log(cookies)
-	require.Equal(t, 2, len(cookies))
-	require.Equal(t, jwtCookieName, cookies[0].Name)
-	require.Equal(t, "example.com", cookies[0].Domain)
-
-	returnedClaims, err := j.Parse(testContext, cookies[0].Value)
-	require.NoError(t, err)
-	require.Equal(t, testClaims().Actor.ID, returnedClaims.Actor.ID)
-
-	require.Equal(t, int(testConfigPublicPrivateKey.SystemAuth.CookieDuration().Seconds()), cookies[0].MaxAge)
-	require.Equal(t, xsrfCookieName, cookies[1].Name)
-	require.Equal(t, "random id", cookies[1].Value)
-}
-
-func TestAuth_SetProlonged(t *testing.T) {
-	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(Opts{
-		Config:  cfg,
-		Service: cfg.MustGetService(config.ServiceIdAdminApi),
-	})
-
-	claims := *testClaims()
-	claims.ExpiresAt = nil
-
-	rr := httptest.NewRecorder()
-	_, err := j.Set(testContext, rr, &claims)
-	require.NoError(t, err)
-	cookies := rr.Result().Cookies()
-	t.Log(cookies)
-	require.Equal(t, jwtCookieName, cookies[0].Name)
-
-	cc, err := j.Parse(testContext, cookies[0].Value)
-	require.NoError(t, err)
-	require.True(t, cc.ExpiresAt.Time.After(testContext.Clock().Now()))
-}
-
-func TestAuth_NoIssuer(t *testing.T) {
-	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(Opts{
-		Config:  cfg,
-		Service: cfg.MustGetService(config.ServiceIdAdminApi),
-	})
-
-	claims := *testClaims()
-	claims.Issuer = ""
-
-	rr := httptest.NewRecorder()
-	_, err := j.Set(testContext, rr, &claims)
-	require.NoError(t, err)
-	cookies := rr.Result().Cookies()
-	t.Log(cookies)
-	require.Equal(t, jwtCookieName, cookies[0].Name)
-
-	cc, err := j.Parse(testContext, cookies[0].Value)
-	require.NoError(t, err)
-	require.Equal(t, string(config.ServiceIdAdminApi), cc.Issuer)
-}
-
 func TestAuth_establishAuthFromRequest(t *testing.T) {
 	var a A
 	var raw *service
@@ -552,8 +396,9 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				require.NoError(t, err)
 
 				req := httptest.NewRequest("GET", "/", nil)
-				req.Header.Add(jwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
-				ra, err := raw.establishAuthFromRequest(testContext, req)
+				req.Header.Add(JwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
+				w := httptest.NewRecorder()
+				ra, err := raw.establishAuthFromRequest(testContext, req, w)
 				require.NoError(t, err)
 				require.True(t, ra.IsAuthenticated())
 				require.Equal(t, testClaims().Actor.ID, ra.MustGetActor().ExternalId)
@@ -581,8 +426,9 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				require.NoError(t, err)
 
 				req := httptest.NewRequest("GET", "/", nil)
-				req.Header.Add(jwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
-				ra, err := raw.establishAuthFromRequest(testContext, req)
+				req.Header.Add(JwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
+				w := httptest.NewRecorder()
+				ra, err := raw.establishAuthFromRequest(testContext, req, w)
 				require.NoError(t, err)
 				require.True(t, ra.IsAuthenticated())
 				require.Equal(t, testClaims().Actor.ID, ra.MustGetActor().ExternalId)
@@ -603,8 +449,9 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				require.NoError(t, err)
 
 				req := httptest.NewRequest("GET", "/", nil)
-				req.Header.Add(jwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
-				ra, err := raw.establishAuthFromRequest(testContext, req)
+				req.Header.Add(JwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
+				w := httptest.NewRecorder()
+				ra, err := raw.establishAuthFromRequest(testContext, req, w)
 				require.NoError(t, err)
 				require.True(t, ra.IsAuthenticated())
 				require.Equal(t, testClaims().Actor.ID, ra.MustGetActor().ExternalId)
@@ -619,13 +466,14 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			require.NoError(t, err)
 
 			req := httptest.NewRequest("GET", "/", nil)
-			req.Header.Add(jwtHeaderKey, tok)
+			req.Header.Add(JwtHeaderKey, tok)
 
 			futureCtx := context.
 				Background().
 				WithClock(test_clock.NewFakeClock(time.Date(2059, 10, 1, 0, 0, 0, 0, time.UTC)))
 
-			_, err = raw.establishAuthFromRequest(futureCtx, req)
+			w := httptest.NewRecorder()
+			_, err = raw.establishAuthFromRequest(futureCtx, req, w)
 			require.NotNil(t, err)
 
 			actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.ID)
@@ -637,8 +485,9 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			setup(t)
 
 			req := httptest.NewRequest("GET", "/", nil)
-			req.Header.Add(jwtHeaderKey, "Bearer: bad bad token")
-			_, err := raw.establishAuthFromRequest(testContext, req)
+			req.Header.Add(JwtHeaderKey, "Bearer: bad bad token")
+			w := httptest.NewRecorder()
+			_, err := raw.establishAuthFromRequest(testContext, req, w)
 			require.NotNil(t, err)
 
 			actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.ID)
@@ -654,7 +503,8 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			require.NoError(t, err)
 
 			req := httptest.NewRequest("GET", "/blah?jwt="+tok, nil)
-			ra, err := raw.establishAuthFromRequest(testContext, req)
+			w := httptest.NewRecorder()
+			ra, err := raw.establishAuthFromRequest(testContext, req, w)
 			require.NoError(t, err)
 			require.True(t, ra.IsAuthenticated())
 
@@ -671,14 +521,16 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				WithClock(test_clock.NewFakeClock(time.Date(2059, 10, 1, 0, 0, 0, 0, time.UTC)))
 
 			req := httptest.NewRequest("GET", "/blah?token="+tok, nil)
-			_, err = raw.establishAuthFromRequest(futureCtx, req)
+			w := httptest.NewRecorder()
+			_, err = raw.establishAuthFromRequest(futureCtx, req, w)
 			require.NotNil(t, err)
 		})
 		t.Run("bad token", func(t *testing.T) {
 			setup(t)
 
 			req := httptest.NewRequest("GET", "/blah?jwt=blah", nil)
-			_, err := raw.establishAuthFromRequest(testContext, req)
+			w := httptest.NewRecorder()
+			_, err := raw.establishAuthFromRequest(testContext, req, w)
 			require.NotNil(t, err)
 		})
 	})
@@ -784,26 +636,6 @@ func TestAuth_Nonce(t *testing.T) {
 	})
 }
 
-func TestAuth_Reset(t *testing.T) {
-	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(Opts{Config: cfg, Service: cfg.MustGetService(config.ServiceIdAdminApi)})
-
-	ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.URL.Path == "/valid" {
-			j.Reset(w)
-			w.WriteHeader(200)
-		}
-	}))
-	defer ts.Close()
-
-	resp, err := http.Get(ts.URL + "/valid")
-	require.NoError(t, err)
-	require.Equal(t, 200, resp.StatusCode)
-
-	require.Equal(t, `auth-proxy-jwt=; Path=/; Domain=example.com; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0; SameSite=None`, resp.Header.Get("Set-Cookie"))
-	require.Equal(t, "0", resp.Header.Get("Content-Length"))
-}
-
 func TestAuth_Validator(t *testing.T) {
 	ch := ValidatorFunc(func(token string, claims jwt2.AuthProxyClaims) bool {
 		return token == "good"
@@ -856,8 +688,6 @@ func testClaims() *jwt2.AuthProxyClaims {
 
 var testConfigPublicPrivateKey = config.Root{
 	SystemAuth: config.SystemAuth{
-		CookieDurationVal:   10 * time.Hour,
-		CookieDomain:        "example.com",
 		JwtTokenDurationVal: 12 * time.Hour,
 		JwtIssuerVal:        "example",
 		JwtSigningKey: &config.KeyPublicPrivate{
@@ -892,8 +722,6 @@ var testConfigPublicPrivateKey = config.Root{
 
 var testConfigSecretKey = config.Root{
 	SystemAuth: config.SystemAuth{
-		CookieDurationVal:   10 * time.Hour,
-		CookieDomain:        "example.com",
 		JwtTokenDurationVal: 12 * time.Hour,
 		JwtIssuerVal:        "example",
 		JwtSigningKey: &config.KeyShared{

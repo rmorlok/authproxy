@@ -10,9 +10,11 @@ import (
 	"github.com/rmorlok/authproxy/database"
 	jwt2 "github.com/rmorlok/authproxy/jwt"
 	"github.com/rmorlok/authproxy/logger"
+	"github.com/rmorlok/authproxy/util"
 	"io"
 	"net/http"
 	"testing"
+	"time"
 )
 
 // AuthTestUtil provides utility functions and helpers for testing authentication-related functionality.
@@ -42,9 +44,6 @@ func TestAuthServiceWithDb(serviceId config.ServiceId, cfg config.C, db database
 		panic("No root in config")
 	}
 
-	if root.SystemAuth.CookieDomain == "" {
-		root.SystemAuth.CookieDomain = "localhost:8080"
-	}
 	if root.SystemAuth.GlobalAESKey == nil {
 		root.SystemAuth.GlobalAESKey = &config.KeyDataRandomBytes{}
 	}
@@ -70,7 +69,7 @@ func (atu *AuthTestUtil) NewSignedRequestForActorId(method, url string, body io.
 		return nil, err
 	}
 
-	req, err = atu.SignRequestAs(
+	req, err = atu.SignRequestHeaderAs(
 		context.Background(),
 		req,
 		jwt2.Actor{
@@ -82,14 +81,6 @@ func (atu *AuthTestUtil) NewSignedRequestForActorId(method, url string, body io.
 	}
 
 	return req, nil
-}
-
-func (atu *AuthTestUtil) SignRequestAs(ctx context.Context, req *http.Request, a jwt2.Actor) (*http.Request, error) {
-	if atu.s.UsesCookies {
-		return atu.SignRequestCookieAs(ctx, req, a)
-	} else {
-		return atu.SignRequestHeaderAs(ctx, req, a)
-	}
 }
 
 func (atu *AuthTestUtil) claimsForActor(a jwt2.Actor) *jwt2.AuthProxyClaims {
@@ -118,30 +109,24 @@ func (atu *AuthTestUtil) SignRequestHeaderAs(ctx context.Context, req *http.Requ
 		return req, errors.Wrap(err, "failed to generate jwt")
 	}
 
-	req.Header.Set(jwtHeaderKey, fmt.Sprintf("Bearer %s", tokenString))
+	req.Header.Set(JwtHeaderKey, fmt.Sprintf("Bearer %s", tokenString))
 
 	return req, nil
 }
 
-func (atu *AuthTestUtil) SignRequestCookieAs(ctx context.Context, req *http.Request, a jwt2.Actor) (*http.Request, error) {
+func (atu *AuthTestUtil) SignRequestQueryAs(ctx context.Context, req *http.Request, a jwt2.Actor) (*http.Request, error) {
 	claims := atu.claimsForActor(a)
+	claims.Nonce = util.ToPtr(uuid.New())
+	claims.ExpiresAt = &jwt.NumericDate{ctx.Clock().Now().Add(time.Hour)}
 
 	tokenString, err := atu.s.Token(ctx, claims)
 	if err != nil {
 		return req, errors.Wrap(err, "failed to generate jwt")
 	}
 
-	jwtCookie := http.Cookie{
-		Name:     jwtCookieName,
-		Value:    tokenString,
-		HttpOnly: true,
-		Path:     "/",
-		Domain:   atu.cfg.GetRoot().SystemAuth.CookieDomain,
-		MaxAge:   0,
-		Secure:   false,
-		SameSite: cookieSameSite,
-	}
+	q := req.URL.Query()
+	q.Set(JwtQueryParam, tokenString)
+	req.URL.RawQuery = q.Encode()
 
-	req.AddCookie(&jwtCookie)
 	return req, nil
 }

@@ -39,21 +39,14 @@ func MustGetAuthFromGinContext(c *gin.Context) RequestAuth {
 
 func (j *service) Required() gin.HandlerFunc {
 	return func(c *gin.Context) {
-		success := false
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-
 			a := GetAuthFromRequest(r)
-			success = a.IsAuthenticated()
-			if success {
+			if a.IsAuthenticated() {
 				c.Set(authContextKey, a)
+				c.Next()
 			}
-
-			c.Next()
 		})
-		j.Auth(_next).ServeHTTP(c.Writer, c.Request)
-		if !success {
-			c.Abort()
-		}
+		j.Auth(_next, c.Abort).ServeHTTP(c.Writer, c.Request)
 	}
 }
 
@@ -67,7 +60,7 @@ func (j *service) Optional() gin.HandlerFunc {
 
 			c.Next()
 		})
-		j.Trace(_next).ServeHTTP(c.Writer, c.Request)
+		j.Trace(_next, c.Abort).ServeHTTP(c.Writer, c.Request)
 	}
 }
 
@@ -91,53 +84,19 @@ func (j *service) AdminOnly() gin.HandlerFunc {
 			success = a.MustGetActor().Admin
 			if success {
 				c.Set(authContextKey, a)
+				c.Next()
 			}
-
-			c.Next()
 		})
-		j.Auth(_next).ServeHTTP(c.Writer, c.Request)
-		if !success {
-			c.Abort()
-		}
+		j.Auth(_next, c.Abort).ServeHTTP(c.Writer, c.Request)
 	}
 }
 
-// RBAC middleware allows role based control for routes
-// this handler internally wrapped with auth(true) to avoid situation if RBAC defined without prior Auth
-//func (j *service) RBAC(roles ...string) gin.HandlerFunc {
-//	return func(c *gin.Context) {
-//		success := false
-//		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-//			actor := GetActorInfoFromRequest(r)
-//			if actor == nil {
-//				http.Error(c.Writer, "Unauthorized", http.StatusUnauthorized)
-//				return
-//			}
-//
-//			var matched bool
-//			for _, role := range roles {
-//				if strings.EqualFold(role, actor.Role) {
-//					matched = true
-//					break
-//				}
-//			}
-//			if !matched {
-//				http.Error(c.Writer, "Access denied", http.StatusForbidden)
-//				return
-//			}
-//
-//			// This is really duplicative of the above
-//			success = actor != nil && matched
-//			if success {
-//				c.Set(GinAuthActorKey, actor)
-//			}
-//
-//			c.Next()
-//		})
-//
-//		j.Auth(_next).ServeHTTP(c.Writer, c.Request)
-//		if !success {
-//			c.Abort()
-//		}
-//	}
-//}
+func (j *service) EstablishGinSession(c *gin.Context, ra RequestAuth) error {
+	ctx := context2.AsContext(c.Request.Context())
+	return j.EstablishSession(ctx, c.Writer, ra)
+}
+
+func (j *service) EndGinSession(c *gin.Context, ra RequestAuth) error {
+	ctx := context2.AsContext(c.Request.Context())
+	return j.EndSession(ctx, c.Writer, ra)
+}

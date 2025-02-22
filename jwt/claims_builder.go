@@ -29,7 +29,6 @@ type ClaimsBuilder interface {
 	WithActorEmail(email string) ClaimsBuilder
 	WithActorId(id string) ClaimsBuilder
 	WithActor(actor *Actor) ClaimsBuilder
-	WithSessionOnly() ClaimsBuilder
 	WithNonce() ClaimsBuilder
 	BuildCtx(context.Context) (*AuthProxyClaims, error)
 	Build() (*AuthProxyClaims, error)
@@ -38,18 +37,17 @@ type ClaimsBuilder interface {
 }
 
 type claimsBuilder struct {
-	issuer      *string
-	audiences   []string
-	expiresIn   *time.Duration
-	expiration  *time.Time
-	superAdmin  *bool
-	admin       *bool
-	email       *string
-	id          *string
-	actor       *Actor
-	sessionOnly bool
-	selfSigned  bool
-	nonce       *uuid.UUID
+	issuer     *string
+	audiences  []string
+	expiresIn  *time.Duration
+	expiration *time.Time
+	superAdmin *bool
+	admin      *bool
+	email      *string
+	id         *string
+	actor      *Actor
+	selfSigned bool
+	nonce      *uuid.UUID
 }
 
 func (b *claimsBuilder) WithIssuer(issuer string) ClaimsBuilder {
@@ -123,11 +121,6 @@ func (b *claimsBuilder) WithActor(actor *Actor) ClaimsBuilder {
 	return b
 }
 
-func (b *claimsBuilder) WithSessionOnly() ClaimsBuilder {
-	b.sessionOnly = true
-	return b
-}
-
 func (b *claimsBuilder) WithNonce() ClaimsBuilder {
 	u := uuid.New()
 	b.nonce = &u
@@ -143,11 +136,9 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 		b.id = util.ToPtr("superadmin/superadmin")
 	}
 
-	var actor Actor
 	if b.actor != nil {
-		actor = *b.actor
-		if actor.ID != "" {
-			b.id = util.ToPtr(actor.ID)
+		if b.actor.ID != "" {
+			b.id = util.ToPtr(b.actor.ID)
 		}
 	}
 
@@ -157,15 +148,19 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 
 	if util.CoerceBool(b.admin) && !strings.HasPrefix(*b.id, "admin/") {
 		b.id = util.ToPtr(fmt.Sprintf("admin/%s", *b.id))
-		actor.ID = *b.id
+		if b.actor != nil {
+			b.actor.ID = *b.id
+		}
 	}
 
-	if b.email != nil {
-		actor.Email = *b.email
-	}
+	if b.actor != nil {
+		if b.email != nil {
+			b.actor.Email = *b.email
+		}
 
-	if b.admin != nil {
-		actor.Admin = *b.admin
+		if b.admin != nil {
+			b.actor.Admin = *b.admin
+		}
 	}
 
 	c := AuthProxyClaims{
@@ -174,9 +169,8 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 			IssuedAt: &jwt.NumericDate{ctx.Clock().Now()},
 			ID:       ctx.UuidGenerator().NewString(),
 		},
-		Actor:       &actor,
-		SessionOnly: b.sessionOnly,
-		SelfSigned:  b.selfSigned,
+		Actor:      b.actor,
+		SelfSigned: b.selfSigned,
 	}
 
 	if b.issuer != nil {

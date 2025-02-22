@@ -92,7 +92,7 @@ func getOAuth2State(
 		return nil, errors.Errorf("state %s is invalid", stateId.String())
 	}
 
-	if s.ExpiresAt.Before(time.Now()) {
+	if s.ExpiresAt.Before(ctx.Clock().Now()) {
 		return nil, errors.Errorf("state %s has expired", stateId.String())
 	}
 

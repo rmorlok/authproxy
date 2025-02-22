@@ -3,7 +3,11 @@ package api_common
 import (
 	"fmt"
 	"github.com/gin-gonic/gin"
-	"github.com/rmorlok/authproxy/config"
+	"net/http"
+)
+
+const (
+	DebugHeader = "x-authproxy-debug"
 )
 
 func PrintRoutes(g *gin.Engine) {
@@ -12,12 +16,22 @@ func PrintRoutes(g *gin.Engine) {
 	}
 }
 
-func AddDebugHeader(cfg config.C, gctx *gin.Context, debugMessage string) {
-	if cfg.IsDebugMode() {
-		gctx.Header("x-authproxy-debug", debugMessage)
+func AddGinDebugHeader(cfg Debuggable, gctx *gin.Context, debugMessage string) {
+	if cfg != nil && cfg.IsDebugMode() {
+		gctx.Header(DebugHeader, debugMessage)
 	}
 }
 
-func AddDebugHeaderError(cfg config.C, gctx *gin.Context, err error) {
-	AddDebugHeader(cfg, gctx, err.Error())
+func AddDebugHeader(cfg Debuggable, w http.ResponseWriter, debugMessage string) {
+	if cfg != nil && cfg.IsDebugMode() {
+		w.Header().Set(DebugHeader, debugMessage)
+	}
+}
+
+func AddGinDebugHeaderError(cfg Debuggable, gctx *gin.Context, err error) {
+	AddGinDebugHeader(cfg, gctx, err.Error())
+}
+
+func AddDebugHeaderError(cfg Debuggable, w http.ResponseWriter, err error) {
+	AddDebugHeader(cfg, w, err.Error())
 }

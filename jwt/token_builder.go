@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/util"
 	"golang.org/x/crypto/ssh"
 	"os"
 	"time"
@@ -39,10 +40,10 @@ type TokenBuilder interface {
 	WithActorEmail(email string) TokenBuilder
 	WithActorId(id string) TokenBuilder
 	WithActor(actor *Actor) TokenBuilder
-	WithSessionOnly() TokenBuilder
 	WithNonce() TokenBuilder
 
 	WithConfigKey(ctx context.Context, cfgKey config.Key) (TokenBuilder, error)
+	MustWithConfigKey(ctx context.Context, cfgKey config.Key) TokenBuilder
 	WithSecretConfigKeyData(ctx context.Context, cfgKeyData config.KeyData) (TokenBuilder, error)
 	WithPrivateKeyPath(string) TokenBuilder
 	WithPrivateKeyString(string) TokenBuilder
@@ -141,11 +142,6 @@ func (tb *tokenBuilder) WithActor(actor *Actor) TokenBuilder {
 	return tb
 }
 
-func (tb *tokenBuilder) WithSessionOnly() TokenBuilder {
-	tb.jwtBuilder.WithSessionOnly()
-	return tb
-}
-
 func (tb *tokenBuilder) WithNonce() TokenBuilder {
 	tb.jwtBuilder.WithNonce()
 	return tb
@@ -179,6 +175,10 @@ func (tb *tokenBuilder) WithConfigKey(ctx context.Context, cfgKey config.Key) (T
 	}
 
 	return us, nil
+}
+
+func (tb *tokenBuilder) MustWithConfigKey(ctx context.Context, cfgKey config.Key) TokenBuilder {
+	return util.Must(tb.WithConfigKey(ctx, cfgKey))
 }
 
 func (tb *tokenBuilder) WithSecretConfigKeyData(ctx context.Context, cfgKeyData config.KeyData) (TokenBuilder, error) {
