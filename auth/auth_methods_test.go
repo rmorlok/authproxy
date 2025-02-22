@@ -339,8 +339,8 @@ func TestAuth_Parse(t *testing.T) {
 
 			claims, err := adminSrv.Parse(testContext, token)
 			require.NoError(t, err)
-			require.Equal(t, "admin/bobdole", claims.Actor.ID)
-			require.True(t, claims.Actor.IsAdmin())
+			require.Equal(t, "admin/bobdole", claims.Subject)
+			require.True(t, claims.IsAdmin())
 		})
 
 		t.Run("unknown admin", func(t *testing.T) {

@@ -50,7 +50,7 @@ func (tc *AuthProxyClaims) AdminUsername() (string, error) {
 		return "", errors.New("not admin")
 	}
 
-	if tc.Subject != tc.Actor.ID {
+	if tc.Actor != nil && tc.Subject != tc.Actor.ID {
 		return "", errors.New("token subject and actor id do not match")
 	}
 
@@ -67,7 +67,7 @@ func (tc *AuthProxyClaims) IsAdmin() bool {
 		return false
 	}
 
-	return tc.Actor.IsAdmin()
+	return strings.HasPrefix(tc.Subject, "admin/") && (tc.Actor == nil || tc.Actor.IsAdmin())
 }
 
 // IsSuperAdmin checks if the actor represented by these claims is an admin

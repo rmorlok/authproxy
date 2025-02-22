@@ -19,7 +19,40 @@ func TestJwtTokenClaims(t *testing.T) {
 	t.Run("IsAdmin", func(t *testing.T) {
 		var tc *AuthProxyClaims
 		assert.False(t, tc.IsAdmin(), "nil values aren't admins")
+
+		tc = &AuthProxyClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				Subject: "admin/bobdole",
+			},
+			Actor: &Actor{
+				ID:    "admin/bobdole",
+				Admin: true,
+			},
+		}
+
+		assert.True(t, tc.IsAdmin(), "admins with actor are admins")
+
+		tc = &AuthProxyClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				Subject: "admin/bobdole",
+			},
+		}
+
+		assert.True(t, tc.IsAdmin(), "admins without actor are admins")
+
+		tc = &AuthProxyClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				Subject: "admin/bobdole",
+			},
+			Actor: &Actor{
+				ID:    "admin/bobdole",
+				Admin: false,
+			},
+		}
+
+		assert.False(t, tc.IsAdmin(), "conflicting values result in false")
 	})
+
 	t.Run("IsSuperAdmin", func(t *testing.T) {
 		var tc *AuthProxyClaims
 		assert.False(t, tc.IsAdmin(), "nil values aren't super admins")
@@ -56,6 +89,16 @@ func TestJwtTokenClaims(t *testing.T) {
 		}
 		_, err = j.AdminUsername()
 		assert.Error(err)
+
+		// No actor
+		j = AuthProxyClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				Subject: "admin/bobdole",
+			},
+		}
+		username, err = j.AdminUsername()
+		assert.NoError(err)
+		assert.Equal("bobdole", username)
 
 		// No subject
 		j = AuthProxyClaims{
