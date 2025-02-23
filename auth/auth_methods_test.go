@@ -520,7 +520,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				Background().
 				WithClock(test_clock.NewFakeClock(time.Date(2059, 10, 1, 0, 0, 0, 0, time.UTC)))
 
-			req := httptest.NewRequest("GET", "/blah?token="+tok, nil)
+			req := httptest.NewRequest("GET", "/blah?jwt="+tok, nil)
 			w := httptest.NewRecorder()
 			_, err = raw.establishAuthFromRequest(futureCtx, req, w)
 			require.NotNil(t, err)
@@ -619,7 +619,7 @@ func TestAuth_Nonce(t *testing.T) {
 		require.Equal(t, http.StatusUnauthorized, w.Code)
 	})
 
-	t.Run("token does not contain expirey", func(t *testing.T) {
+	t.Run("token does not contain expiry", func(t *testing.T) {
 		ts := setup(t)
 		c := testClaims()
 		c.Nonce = util.ToPtr(uuid.New())

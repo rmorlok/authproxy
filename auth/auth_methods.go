@@ -227,7 +227,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, r *http.Request,
 		if claims.Nonce != nil {
 			if claims.ExpiresAt == nil {
 				return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
-					WithStatusBadRequest().
+					WithStatusUnauthorized().
 					WithResponseMsg("cannot use nonce in jwt without expiration time").
 					Build()
 			}

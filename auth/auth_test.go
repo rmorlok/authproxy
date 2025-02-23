@@ -158,6 +158,9 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 
 	if b.redis == nil {
 		b.cfg, b.redis = redis.MustApplyTestConfig(b.cfg)
+		if b.redis == nil {
+			panic("redis is nil")
+		}
 	}
 
 	auth := NewService(Opts{
@@ -546,7 +549,7 @@ func TestAuth(t *testing.T) {
 		})
 	})
 	t.Run("session", func(t *testing.T) {
-		setup := func() TestSetup {
+		setup := func(t *testing.T) TestSetup {
 			return NewTestGinServerBuilder(t.Name()).
 				WithRequiredAuthRoute(http.MethodGet, "/initiate-session", func(gctx *gin.Context, auth A) {
 					ra := GetAuthFromGinContext(gctx)
@@ -580,7 +583,7 @@ func TestAuth(t *testing.T) {
 		}
 
 		t.Run("full flow", func(t *testing.T) {
-			ts := setup()
+			ts := setup(t)
 
 			// No session
 			resp, statusCode, debugHeader := ts.GET(ctx, "/ping-get")
@@ -634,7 +637,7 @@ func TestAuth(t *testing.T) {
 		})
 
 		t.Run("requires xsrf for post but not for get", func(t *testing.T) {
-			ts := setup()
+			ts := setup(t)
 
 			s := jwt.NewJwtTokenBuilder().
 				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
