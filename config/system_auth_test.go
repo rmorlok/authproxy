@@ -21,7 +21,6 @@ func TestSystemAuth(t *testing.T) {
     keys_path: ./dev_config/keys/admin
 `
 			expected := &SystemAuth{
-				CookieDomain: "localhost:8080",
 				JwtSigningKey: &KeyPublicPrivate{
 					PublicKey: &KeyDataFile{
 						Path: "./dev_config/keys/system.pub",
@@ -54,7 +53,6 @@ admin_users:
         path: ./dev_config/keys/admin/bobdole.pub
 `
 			expected := &SystemAuth{
-				CookieDomain: "localhost:8080",
 				JwtSigningKey: &KeyPublicPrivate{
 					PublicKey: &KeyDataFile{
 						Path: "./dev_config/keys/system.pub",
