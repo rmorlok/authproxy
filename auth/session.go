@@ -43,7 +43,7 @@ func (s *session) IsExpired(ctx context.Context) bool {
 // to establish auth for a request. It takes an optional claims which would have come from any JWT present on
 // the request previously.
 func (s *service) establishAuthFromSession(ctx context.Context, r *http.Request, w http.ResponseWriter, fromJwt RequestAuth) (RequestAuth, error) {
-	if !s.Opts.Service.SupportsSession() {
+	if !s.service.SupportsSession() {
 		// This service doesn't support sessions, so do nothing
 		return fromJwt, nil
 	}
@@ -124,7 +124,7 @@ func (s *service) establishAuthFromSession(ctx context.Context, r *http.Request,
 		}
 	}
 
-	actor, err := s.Opts.Db.GetActor(ctx, sess.ActorId)
+	actor, err := s.db.GetActor(ctx, sess.ActorId)
 	if err != nil {
 		return NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to get actor from database")
 	}
@@ -148,8 +148,8 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 		return errors.New("request is not authenticated")
 	}
 
-	if !s.Opts.Service.SupportsSession() {
-		return errors.Errorf("server %s does not support session", s.Opts.Service.GetId())
+	if !s.service.SupportsSession() {
+		return errors.Errorf("server %s does not support session", s.service.GetId())
 	}
 
 	var err error
@@ -178,7 +178,7 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 		sess = &session{
 			Id:        uuid.New(),
 			ActorId:   ra.GetActor().ID,
-			ExpiresAt: ctx.Clock().Now().Add(s.Opts.Service.SessionTimeout()),
+			ExpiresAt: ctx.Clock().Now().Add(s.service.SessionTimeout()),
 		}
 	}
 
@@ -194,7 +194,7 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 }
 
 func (s *service) extendSession(ctx context.Context, sess *session, w http.ResponseWriter) error {
-	validCsrfValuesLimit := s.Opts.Service.XsrfRequestQueueDepth()
+	validCsrfValuesLimit := s.service.XsrfRequestQueueDepth()
 
 	// Generate a new UUID to push onto the list.
 	newCsrfValue := uuid.New()
@@ -209,7 +209,7 @@ func (s *service) extendSession(ctx context.Context, sess *session, w http.Respo
 
 	// Write the session to Redis
 	key := getRedisSessionKey(sess.Id)
-	if err := s.Opts.Redis.Client().Set(ctx, key, sess, sess.ExpiresAt.Sub(ctx.Clock().Now())).Err(); err != nil {
+	if err := s.redis.Client().Set(ctx, key, sess, sess.ExpiresAt.Sub(ctx.Clock().Now())).Err(); err != nil {
 		return errors.Wrap(err, "failed to write session to redis")
 	}
 
@@ -221,7 +221,7 @@ func (s *service) extendSession(ctx context.Context, sess *session, w http.Respo
 
 func (s *service) setSessionCookie(ctx context.Context, w http.ResponseWriter, sess session) {
 	cookieExpiration := 0 // session cookie
-	if s.Opts.Service.SessionTimeout() != 0 {
+	if s.service.SessionTimeout() != 0 {
 		cookieExpiration = int(sess.ExpiresAt.Sub(ctx.Clock().Now()).Seconds())
 	}
 
@@ -230,9 +230,9 @@ func (s *service) setSessionCookie(ctx context.Context, w http.ResponseWriter, s
 		Value:    sess.Id.String(),
 		HttpOnly: true,
 		Path:     "/",
-		Domain:   s.Opts.Service.CookieDomain(),
+		Domain:   s.service.CookieDomain(),
 		MaxAge:   cookieExpiration,
-		Secure:   s.Opts.Service.IsHttps(),
+		Secure:   s.service.IsHttps(),
 		SameSite: http.SameSiteLaxMode,
 	})
 }
@@ -252,10 +252,10 @@ func (s *service) EndSession(ctx context.Context, w http.ResponseWriter, ra Requ
 		Value:    "",
 		HttpOnly: false,
 		Path:     "/",
-		Domain:   s.Opts.Service.CookieDomain(),
+		Domain:   s.service.CookieDomain(),
 		MaxAge:   -1,
 		Expires:  time.Unix(0, 0),
-		Secure:   s.Opts.Service.IsHttps(),
+		Secure:   s.service.IsHttps(),
 		SameSite: http.SameSiteLaxMode,
 	}
 	http.SetCookie(w, &sessionCookie)
@@ -268,7 +268,7 @@ func getRedisSessionKey(sessionId uuid.UUID) string {
 }
 
 func (s *service) deleteSessionFromRedis(ctx context.Context, sessionId uuid.UUID) error {
-	if err := s.Opts.Redis.Client().Del(ctx, getRedisSessionKey(sessionId)).Err(); err != nil {
+	if err := s.redis.Client().Del(ctx, getRedisSessionKey(sessionId)).Err(); err != nil {
 		if err == redis.Nil {
 			// Key does not exist, this is not an error
 			return nil
@@ -281,7 +281,7 @@ func (s *service) deleteSessionFromRedis(ctx context.Context, sessionId uuid.UUI
 
 // tryReadSessionFromRedis attempts to get session from Redis. Returns nil if the session does not exist, or is expired.
 func (s *service) tryReadSessionFromRedis(ctx context.Context, sessionId uuid.UUID) (*session, error) {
-	result := s.Opts.Redis.Client().Get(ctx, getRedisSessionKey(sessionId))
+	result := s.redis.Client().Get(ctx, getRedisSessionKey(sessionId))
 
 	if result.Err() != nil {
 		if result.Err() == redis.Nil {

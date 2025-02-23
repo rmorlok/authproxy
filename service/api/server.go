@@ -32,7 +32,7 @@ func GetGinServer(
 	httpf httpf.F,
 	encrypt encrypt.E,
 ) *gin.Engine {
-	authService := auth.StandardAuthService(cfg, &cfg.GetRoot().Api, db, redis)
+	authService := auth.NewService(cfg, &cfg.GetRoot().Api, db, redis)
 
 	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
 		Rate:  1 * time.Minute,

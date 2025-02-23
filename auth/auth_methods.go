@@ -25,14 +25,14 @@ func (s *service) keyForToken(claims *jwt2.AuthProxyClaims) (config.Key, error) 
 			return nil, errors.Wrap(err, "failed to establish admin username to sign jwt")
 		}
 
-		adminUser, ok := s.Config.GetRoot().SystemAuth.AdminUsers.GetByUsername(adminUsername)
+		adminUser, ok := s.config.GetRoot().SystemAuth.AdminUsers.GetByUsername(adminUsername)
 		if !ok {
 			return nil, errors.Errorf("admin user '%s' not found", adminUsername)
 		}
 
 		return adminUser.Key, nil
 	} else {
-		return s.Config.GetRoot().SystemAuth.JwtSigningKey, nil
+		return s.config.GetRoot().SystemAuth.JwtSigningKey, nil
 	}
 }
 
@@ -40,7 +40,7 @@ func (s *service) keyForToken(claims *jwt2.AuthProxyClaims) (config.Key, error) 
 // claims will be modified prior to signing to indicate which service signed this token and that it is self-signed.
 func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (string, error) {
 	claimsClone := *claims
-	claimsClone.Issuer = string(s.Opts.Service.GetId())
+	claimsClone.Issuer = string(s.service.GetId())
 	claimsClone.IssuedAt = jwt.NewNumericDate(ctx.Clock().Now())
 	claimsClone.SelfSigned = true
 
@@ -53,7 +53,7 @@ func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (stri
 		return "", errors.New("some service ids in aud are invalid")
 	}
 
-	data, err := s.Config.GetRoot().SystemAuth.GlobalAESKey.GetData(ctx)
+	data, err := s.config.GetRoot().SystemAuth.GlobalAESKey.GetData(ctx)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get global aes key")
 	}
@@ -71,7 +71,7 @@ func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProx
 	claims, err := jwt2.NewJwtTokenParserBuilder().
 		WithKeySelector(func(ctx context.Context, unverified *jwt2.AuthProxyClaims) (kd config.KeyData, isShared bool, err error) {
 			if unverified.SelfSigned {
-				return s.Config.GetRoot().SystemAuth.GlobalAESKey, true, nil
+				return s.config.GetRoot().SystemAuth.GlobalAESKey, true, nil
 			}
 
 			key, err := s.keyForToken(unverified)
@@ -96,16 +96,16 @@ func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProx
 
 	found := false
 	for _, aud := range claims.Audience {
-		if aud == string(s.Opts.Service.GetId()) {
+		if aud == string(s.service.GetId()) {
 			found = true
 			break
 		}
 	}
 	if !found {
 		if len(claims.Audience) > 0 {
-			return nil, errors.Errorf("aud '%s' not valid for service '%s'", strings.Join(claims.Audience, ","), s.Opts.Service.GetId())
+			return nil, errors.Errorf("aud '%s' not valid for service '%s'", strings.Join(claims.Audience, ","), s.service.GetId())
 		}
-		return nil, errors.Errorf("aud not specified for service '%s'", s.Opts.Service.GetId())
+		return nil, errors.Errorf("aud not specified for service '%s'", s.service.GetId())
 	}
 
 	return claims, s.validate(ctx, claims)
@@ -234,7 +234,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, r *http.Request,
 
 			s.logf("[DEBUG] using nonce: %s", claims.Nonce.String())
 
-			wasValid, err := s.Db.CheckNonceValidAndMarkUsed(ctx, *claims.Nonce, claims.ExpiresAt.Time)
+			wasValid, err := s.db.CheckNonceValidAndMarkUsed(ctx, *claims.Nonce, claims.ExpiresAt.Time)
 			if err != nil {
 				return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
 					WithStatusUnauthorized().
@@ -255,7 +255,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, r *http.Request,
 		if claims.Actor == nil {
 			// This implies that the subject of the claim is the external id of the actor, and the actor must already
 			// exist. If the actor does not exist, the claim is invalid.
-			actor, err = s.Opts.Db.GetActorByExternalId(ctx, claims.Subject)
+			actor, err = s.db.GetActorByExternalId(ctx, claims.Subject)
 			if err != nil {
 				return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
 					WithStatusInternalServerError().
@@ -273,7 +273,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, r *http.Request,
 		} else {
 			// The actor was specified in the JWT. This means that we can upsert an actor, either creating it or making
 			// it consistent with the request's definition.
-			actor, err = s.Opts.Db.UpsertActor(ctx, claims.Actor)
+			actor, err = s.db.UpsertActor(ctx, claims.Actor)
 			if err != nil {
 				return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
 					WithStatusInternalServerError().

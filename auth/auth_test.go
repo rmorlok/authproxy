@@ -163,12 +163,7 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 		}
 	}
 
-	auth := NewService(Opts{
-		Config:  b.cfg,
-		Service: b.cfg.MustGetService(b.service),
-		Db:      b.db,
-		Redis:   b.redis,
-	})
+	auth := NewService(b.cfg, b.cfg.MustGetService(b.service), b.db, b.redis)
 
 	b.ginEngine = gin.New()
 

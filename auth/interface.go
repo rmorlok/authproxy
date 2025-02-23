@@ -7,6 +7,11 @@ import (
 	"net/http"
 )
 
+const (
+	JwtHeaderKey  = "Authorization"
+	JwtQueryParam = "jwt"
+)
+
 type A interface {
 	/*
 	 * Gin middlewares for establishing auth

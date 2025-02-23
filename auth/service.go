@@ -7,45 +7,43 @@ import (
 	"github.com/rmorlok/authproxy/redis"
 )
 
-// service service that wraps operations for validating JWTs from both headers and cookies.
+// service is the implementation of the core auth service.
 type service struct {
-	Opts
+	// Configuration for the overall application. Provides many options that control the system.
+	config config.C
+
+	// The service using this authentication
+	service config.Service
+
+	// logger interface, default is no logging at all
+	logger logger.L
+
+	db    database.DB
+	redis redis.R
 }
 
 // NewService makes an auth service
-func NewService(opts Opts) A {
-	if opts.Config == nil {
-		panic("Ops.Config is required")
+func NewService(cfg config.C, svc config.Service, db database.DB, redis redis.R) A {
+	if cfg == nil {
+		panic("config is required")
 	}
 
-	if opts.Service == nil {
-		panic("Opts.ServiceId is required")
+	if svc == nil {
+		panic("service is required")
 	}
 
-	res := service{Opts: opts}
-
-	return &res
-}
-
-func StandardAuthService(
-	cfg config.C,
-	service config.Service,
-	db database.DB,
-	redis redis.R,
-) A {
-	return NewService(Opts{
-		Config:  cfg,
-		Service: service,
-		Logger:  logger.Std,
-		Db:      db,
-		Redis:   redis,
-	})
+	return &service{
+		config:  cfg,
+		service: svc,
+		db:      db,
+		redis:   redis,
+	}
 }
 
 func (s *service) logf(format string, args ...interface{}) {
-	if s.Opts.Logger == nil {
+	if s.logger == nil {
 		return
 	}
 
-	s.Opts.Logger.Logf(format, args...)
+	s.logger.Logf(format, args...)
 }

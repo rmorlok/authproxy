@@ -9,7 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
 	jwt2 "github.com/rmorlok/authproxy/jwt"
-	"github.com/rmorlok/authproxy/logger"
+	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/util"
 	"io"
 	"net/http"
@@ -53,12 +53,8 @@ func TestAuthServiceWithDb(serviceId config.ServiceId, cfg config.C, db database
 		}
 	}
 
-	s := NewService(Opts{
-		Config:  cfg,
-		Service: cfg.MustGetService(serviceId),
-		Logger:  logger.Std,
-		Db:      db,
-	})
+	cfg, r := redis.MustApplyTestConfig(cfg)
+	s := NewService(cfg, cfg.MustGetService(serviceId), db, r)
 
 	return cfg, s, &AuthTestUtil{cfg: cfg, s: s.(*service), serviceId: serviceId}
 }

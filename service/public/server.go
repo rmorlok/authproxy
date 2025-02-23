@@ -42,7 +42,7 @@ func GetGinServer(
 	httpf httpf.F,
 	encrypt encrypt.E,
 ) *gin.Engine {
-	authService := auth.StandardAuthService(cfg, &cfg.GetRoot().Public, db, redis)
+	authService := auth.NewService(cfg, &cfg.GetRoot().Public, db, redis)
 
 	router := api_common.GinForService(&cfg.GetRoot().Public)
 
