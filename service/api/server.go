@@ -42,7 +42,7 @@ func GetGinServer(
 	router := api_common.GinForService(&cfg.GetRoot().Api)
 
 	router.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
+		c.PureJSON(http.StatusOK, gin.H{
 			"service": "api",
 			"message": "pong",
 		})
@@ -71,7 +71,7 @@ func GetGinServer(
 			status = http.StatusServiceUnavailable
 		}
 
-		c.JSON(status, gin.H{
+		c.PureJSON(status, gin.H{
 			"service": "api",
 			"db":      dbOk,
 			"redis":   redisOk,

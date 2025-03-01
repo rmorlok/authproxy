@@ -49,14 +49,14 @@ func GetGinServer(cfg config.C, db database.DB, redis redis.R) *gin.Engine {
 	router.Use(static.Serve("/", static.LocalFile("./client/build", true)))
 
 	router.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
+		c.PureJSON(http.StatusOK, gin.H{
 			"service": "admin-api",
 			"message": "pong",
 		})
 	})
 
 	router.GET("/healthz", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
+		c.PureJSON(http.StatusOK, gin.H{
 			"service": "admin-api",
 			"ok":      true,
 		})

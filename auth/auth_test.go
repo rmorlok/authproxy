@@ -73,7 +73,7 @@ func (b *TestGinServerBuilder) WithOpenRoute(method, path string, handler Handle
 func (b *TestGinServerBuilder) WithGetPingOpenRoute(path string) *TestGinServerBuilder {
 	return b.WithOpenRoute(http.MethodGet, path, func(c *gin.Context, a A) {
 		b.pingCounter++
-		c.JSON(200, gin.H{"ok": true})
+		c.PureJSON(200, gin.H{"ok": true})
 	})
 }
 
@@ -85,7 +85,7 @@ func (b *TestGinServerBuilder) WithOptionalAuthRoute(method, path string, handle
 func (b *TestGinServerBuilder) WithGetPingOptionalAuthRoute(path string) *TestGinServerBuilder {
 	return b.WithOptionalAuthRoute(http.MethodGet, path, func(c *gin.Context, a A) {
 		b.pingCounter++
-		c.JSON(200, gin.H{"ok": true})
+		c.PureJSON(200, gin.H{"ok": true})
 	})
 }
 
@@ -97,14 +97,14 @@ func (b *TestGinServerBuilder) WithRequiredAuthRoute(method, path string, handle
 func (b *TestGinServerBuilder) WithGetPingRequiredAuthRoute(path string) *TestGinServerBuilder {
 	return b.WithRequiredAuthRoute(http.MethodGet, path, func(c *gin.Context, a A) {
 		b.pingCounter++
-		c.JSON(200, gin.H{"ok": true})
+		c.PureJSON(200, gin.H{"ok": true})
 	})
 }
 
 func (b *TestGinServerBuilder) WithPostPingRequiredAuthRoute(path string) *TestGinServerBuilder {
 	return b.WithRequiredAuthRoute(http.MethodPost, path, func(c *gin.Context, a A) {
 		b.pingCounter++
-		c.JSON(200, gin.H{"ok": true})
+		c.PureJSON(200, gin.H{"ok": true})
 	})
 }
 
@@ -116,7 +116,7 @@ func (b *TestGinServerBuilder) WithAdminAuthRoute(method, path string, handler H
 func (b *TestGinServerBuilder) WithGetPingAdminAuthRoute(path string) *TestGinServerBuilder {
 	return b.WithAdminAuthRoute(http.MethodGet, path, func(c *gin.Context, a A) {
 		b.pingCounter++
-		c.JSON(200, gin.H{"ok": true})
+		c.PureJSON(200, gin.H{"ok": true})
 	})
 }
 
@@ -665,7 +665,7 @@ func TestAuth(t *testing.T) {
 						return
 					}
 
-					gctx.JSON(http.StatusOK, gin.H{"ok": true})
+					gctx.PureJSON(http.StatusOK, gin.H{"ok": true})
 				}).
 				WithRequiredAuthRoute(http.MethodGet, "/end-session", func(gctx *gin.Context, auth A) {
 					ra := GetAuthFromGinContext(gctx)
@@ -678,7 +678,7 @@ func TestAuth(t *testing.T) {
 						return
 					}
 
-					gctx.JSON(http.StatusOK, gin.H{"ok": true})
+					gctx.PureJSON(http.StatusOK, gin.H{"ok": true})
 				}).
 				WithGetPingRequiredAuthRoute("/ping-get").
 				WithPostPingRequiredAuthRoute("/ping-post").

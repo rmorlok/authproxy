@@ -56,7 +56,7 @@ func (e *HttpStatusError) WriteGinResponse(cfg Debuggable, gctx *gin.Context) {
 	}
 
 	gctx.Header("Content-Type", "application/json")
-	gctx.JSON(e.Status, errorResponse)
+	gctx.PureJSON(e.Status, errorResponse)
 }
 
 func (e *HttpStatusError) WriteResponse(cfg Debuggable, w http.ResponseWriter) {

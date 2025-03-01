@@ -53,7 +53,7 @@ func GetGinServer(
 	router.Use(static.Serve("/", static.LocalFile("./client/build", true)))
 
 	router.GET("/ping", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
+		c.PureJSON(http.StatusOK, gin.H{
 			"service": "auth",
 			"message": "pong",
 		})
@@ -82,7 +82,7 @@ func GetGinServer(
 			status = http.StatusServiceUnavailable
 		}
 
-		c.JSON(status, gin.H{
+		c.PureJSON(status, gin.H{
 			"service": "api",
 			"db":      dbOk,
 			"redis":   redisOk,
