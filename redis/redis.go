@@ -61,23 +61,26 @@ func NewMiniredis(redisConfig *config.RedisMiniredis, secretKey config.KeyData) 
 		miniredisMutex.Lock()
 		defer miniredisMutex.Unlock()
 
-		var err error
-		// Create a new instance of miniredis for testing purposes
-		miniredisServer, err = miniredis.Run()
-		if err != nil {
-			miniredisErr = errors.Wrap(err, "failed to start miniredis server")
-		}
+		// Check again now that we are the primary
+		if miniredisServer == nil {
+			var err error
+			// Create a new instance of miniredis for testing purposes
+			miniredisServer, err = miniredis.Run()
+			if err != nil {
+				miniredisErr = errors.Wrap(err, "failed to start miniredis server")
+			}
 
-		// Configure the Redis client to use the miniredis instance
-		miniredisClient = redis.NewClient(&redis.Options{
-			Addr: miniredisServer.Addr(),
-		})
+			// Configure the Redis client to use the miniredis instance
+			miniredisClient = redis.NewClient(&redis.Options{
+				Addr: miniredisServer.Addr(),
+			})
 
-		// Test the connection to ensure it's working
-		_, err = miniredisClient.Ping(context.Background()).Result()
-		if err != nil {
-			miniredisServer.Close()
-			miniredisErr = errors.Wrap(err, "failed to connect to miniredis client")
+			// Test the connection to ensure it's working
+			_, err = miniredisClient.Ping(context.Background()).Result()
+			if err != nil {
+				miniredisServer.Close()
+				miniredisErr = errors.Wrap(err, "failed to connect to miniredis client")
+			}
 		}
 	}
 
