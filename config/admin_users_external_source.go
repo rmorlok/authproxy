@@ -51,6 +51,15 @@ func (s *AdminUsersExternalSource) GetByUsername(username string) (*AdminUser, b
 	return nil, false
 }
 
+func (s *AdminUsersExternalSource) GetByJwtSubject(subject string) (*AdminUser, bool) {
+	if !strings.HasPrefix(subject, "admin/") {
+		return nil, false
+	}
+
+	username := strings.TrimPrefix(subject, "admin/")
+	return s.GetByUsername(username)
+}
+
 func UnmarshallYamlAdminUsersExternalSourceString(data string) (*AdminUsersExternalSource, error) {
 	return UnmarshallYamlAdminUsersExternalSource([]byte(data))
 }

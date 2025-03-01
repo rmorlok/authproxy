@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"gopkg.in/yaml.v3"
+	"strings"
 )
 
 type AdminUsersList []*AdminUser
@@ -19,6 +20,15 @@ func (aul AdminUsersList) GetByUsername(username string) (*AdminUser, bool) {
 	}
 
 	return nil, false
+}
+
+func (s AdminUsersList) GetByJwtSubject(subject string) (*AdminUser, bool) {
+	if !strings.HasPrefix(subject, "admin/") {
+		return nil, false
+	}
+
+	username := strings.TrimPrefix(subject, "admin/")
+	return s.GetByUsername(username)
 }
 
 func UnmarshallYamlAdminUsersListString(data string) (AdminUsersList, error) {

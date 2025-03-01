@@ -42,4 +42,24 @@ keys_path: some/path/to/keys
 		assert.NotNil(u)
 		assert.True(u.Key.CanVerifySignature())
 	})
+	t.Run("get by jwt subject", func(t *testing.T) {
+		aues := AdminUsersExternalSource{
+			KeysPath: tu.TestDataPath("admin_user_keys"),
+		}
+
+		// Check the test_data/admin_user_keys folder to see what this count should be
+		assert.Equal(8, len(aues.All()))
+
+		u, found := aues.GetByJwtSubject("admin/bobdole")
+		assert.True(found)
+		assert.NotNil(u)
+
+		u, found = aues.GetByJwtSubject("bobdole")
+		assert.False(found)
+		assert.Nil(u)
+
+		u, found = aues.GetByJwtSubject("andrewjackson")
+		assert.False(found)
+		assert.Nil(u)
+	})
 }

@@ -27,4 +27,50 @@ func TestAdminUsersList(t *testing.T) {
 			assert.Equal("bobdole", adminUsers[1].Username)
 		})
 	})
+	t.Run("get by username", func(t *testing.T) {
+		adminUsers := AdminUsersList{
+			&AdminUser{
+				Username: "bobdole",
+				Key: &KeyPublicPrivate{
+					PublicKey: &KeyDataFile{
+						Path: "../test_data/admin_user_keys/bobdole.pub",
+					},
+				},
+			},
+		}
+
+		u, found := adminUsers.GetByUsername("bobdole")
+		assert.True(found)
+		assert.NotNil(u)
+		assert.True(u.Key.CanVerifySignature())
+
+		u, found = adminUsers.GetByUsername("billclinton")
+		assert.False(found)
+		assert.Nil(u)
+	})
+	t.Run("get by jwt subject", func(t *testing.T) {
+		adminUsers := AdminUsersList{
+			&AdminUser{
+				Username: "bobdole",
+				Key: &KeyPublicPrivate{
+					PublicKey: &KeyDataFile{
+						Path: "../test_data/admin_user_keys/bobdole.pub",
+					},
+				},
+			},
+		}
+
+		u, found := adminUsers.GetByJwtSubject("admin/bobdole")
+		assert.True(found)
+		assert.NotNil(u)
+		assert.True(u.Key.CanVerifySignature())
+
+		u, found = adminUsers.GetByJwtSubject("bobdole")
+		assert.False(found)
+		assert.Nil(u)
+
+		u, found = adminUsers.GetByJwtSubject("admin/billclinton")
+		assert.False(found)
+		assert.Nil(u)
+	})
 }

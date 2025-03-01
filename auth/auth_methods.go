@@ -2,6 +2,7 @@ package auth
 
 import (
 	"fmt"
+	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
@@ -254,7 +255,8 @@ func (s *service) establishAuthFromRequest(ctx context.Context, r *http.Request,
 		var actor *database.Actor
 		if claims.Actor == nil {
 			// This implies that the subject of the claim is the external id of the actor, and the actor must already
-			// exist. If the actor does not exist, the claim is invalid.
+			// exist. If the actor does not exist, the claim is invalid. Admins are special cased so that they can
+			// be created dynamically based on information in the system.
 			actor, err = s.db.GetActorByExternalId(ctx, claims.Subject)
 			if err != nil {
 				return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
@@ -264,11 +266,50 @@ func (s *service) establishAuthFromRequest(ctx context.Context, r *http.Request,
 					Build()
 			}
 			if actor == nil {
-				return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+				unauthenticatedError := api_common.NewHttpStatusErrorBuilder().
 					WithStatusUnauthorized().
 					WithResponseMsg("actor does not exist").
 					WithInternalErr(errors.Errorf("actor '%s' not found", claims.Subject)).
 					Build()
+
+				if claims.IsAdmin() {
+					if cfgAdmin, ok := s.config.GetRoot().SystemAuth.AdminUsers.GetByJwtSubject(claims.Subject); ok {
+						adminDomain := "local"
+						if s.config.GetRoot().SystemAuth.AdminEmailDomain != "" {
+							adminDomain = s.config.GetRoot().SystemAuth.AdminEmailDomain
+						}
+
+						email := fmt.Sprintf("%s@%s", cfgAdmin.Username, adminDomain)
+						if cfgAdmin.Email != "" {
+							email = cfgAdmin.Email
+						}
+
+						adminActor := database.Actor{
+							ID:         uuid.New(),
+							ExternalId: claims.Subject,
+							Email:      email,
+							Admin:      true,
+						}
+
+						err = s.db.CreateActor(ctx, &adminActor)
+						if err != nil {
+							return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+								WithStatusInternalServerError().
+								WithResponseMsg("database error").
+								WithInternalErr(errors.Wrap(err, "failed to upsert admin actor")).
+								Build()
+						}
+
+						// success
+						actor = &adminActor
+
+					} else {
+						return NewUnauthenticatedRequestAuth(), unauthenticatedError
+					}
+
+				} else {
+					return NewUnauthenticatedRequestAuth(), unauthenticatedError
+				}
 			}
 		} else {
 			// The actor was specified in the JWT. This means that we can upsert an actor, either creating it or making

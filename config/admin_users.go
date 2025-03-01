@@ -8,6 +8,7 @@ import (
 type AdminUsers interface {
 	All() []*AdminUser
 	GetByUsername(username string) (*AdminUser, bool)
+	GetByJwtSubject(subject string) (*AdminUser, bool)
 }
 
 func UnmarshallYamlAdminUsersString(data string) (AdminUsers, error) {

@@ -126,6 +126,7 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 	}
 
 	if b.cfg == nil {
+		adminSigningKey := &config.KeyDataRandomBytes{}
 		b.cfg = config.FromRoot(&config.Root{
 			Public: config.ServicePublic{
 				PortVal:                  8080,
@@ -144,7 +145,13 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 					&config.AdminUser{
 						Username: "bobdole",
 						Key: &config.KeyShared{
-							SharedKey: &config.KeyDataRandomBytes{},
+							SharedKey: adminSigningKey,
+						},
+					},
+					&config.AdminUser{
+						Username: "ronaldreagan",
+						Key: &config.KeyShared{
+							SharedKey: adminSigningKey,
 						},
 					},
 				},
@@ -228,6 +235,16 @@ func (ts *TestSetup) MustGetValidAdminUser(ctx context.Context) database.Actor {
 	return *a
 }
 
+// MustGetValidUninitializedAdminUser give a valid admin, but does not create a user in the database ahead of time.
+func (ts *TestSetup) MustGetValidUninitializedAdminUser(ctx context.Context) database.Actor {
+	return database.Actor{
+		ID:         uuid.New(),
+		ExternalId: "admin/ronaldreagan",
+		Email:      "ronaldreagan@example.com",
+		Admin:      true,
+	}
+}
+
 // MustGetValidUser gives an user that can sign JWTs. This method makes sure the admin exists in the database
 // regardless of if they have interacted with the system previously.
 func (ts *TestSetup) MustGetValidUser(ctx context.Context) database.Actor {
@@ -256,6 +273,10 @@ func (ts *TestSetup) GetPingCount() int {
 
 func (ts *TestSetup) MustGetValidSigningTokenForUser() config.Key {
 	return ts.Cfg.GetRoot().SystemAuth.JwtSigningKey
+}
+
+func (ts *TestSetup) MustGetValidSigningTokenForAdmin() config.Key {
+	return ts.Cfg.GetRoot().SystemAuth.AdminUsers.All()[0].Key
 }
 
 func (ts *TestSetup) GET(ctx context.Context, path string) (responseJson gin.H, statusCode int, debugHeader string) {
@@ -345,7 +366,7 @@ func (ts *TestSetup) PostWithSigner(ctx context.Context, path string, body gin.H
 }
 
 // MustGetInvalidAdminUser gives an admin user that cannot be used to sign JWTs as it is not listed in the config
-// admin user list. This admin does not actually exist in the database, the databaes actor is just used to pass
+// admin user list. This admin does not actually exist in the database, the database actor is just used to pass
 // the information.
 func (ts *TestSetup) MustGetInvalidAdminUser(ctx context.Context) database.Actor {
 	return database.Actor{
@@ -393,53 +414,140 @@ func TestAuth(t *testing.T) {
 		})
 	})
 	t.Run("jwt query param auth", func(t *testing.T) {
-		t.Run("open route", func(t *testing.T) {
-			ts := NewTestGinServerBuilder(t.Name()).
-				WithGetPingOpenRoute("/ping").
-				Build()
+		t.Run("normal actor", func(t *testing.T) {
+			t.Run("open route", func(t *testing.T) {
+				ts := NewTestGinServerBuilder(t.Name()).
+					WithGetPingOpenRoute("/ping").
+					Build()
 
-			s := jwt.NewJwtTokenBuilder().
-				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
-				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
-				MustSignerCtx(ctx)
+				s := jwt.NewJwtTokenBuilder().
+					WithServiceId(ts.Service).
+					WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+					MustSignerCtx(ctx)
 
-			resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
-			require.Equal(t, http.StatusOK, statusCode, debugHeader)
-			require.Equal(t, gin.H{"ok": true}, resp)
-			require.Equal(t, 1, ts.GetPingCount())
+				resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
+				require.Equal(t, http.StatusOK, statusCode, debugHeader)
+				require.Equal(t, gin.H{"ok": true}, resp)
+				require.Equal(t, 1, ts.GetPingCount())
+			})
+			t.Run("optional auth route", func(t *testing.T) {
+				ts := NewTestGinServerBuilder(t.Name()).
+					WithGetPingOptionalAuthRoute("/ping").
+					Build()
+
+				s := jwt.NewJwtTokenBuilder().
+					WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+					WithServiceId(ts.Service).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+					MustSignerCtx(ctx)
+
+				resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
+
+				require.Equal(t, http.StatusOK, statusCode, debugHeader)
+				require.Equal(t, gin.H{"ok": true}, resp)
+				require.Equal(t, 1, ts.GetPingCount())
+			})
+			t.Run("required auth route", func(t *testing.T) {
+				ts := NewTestGinServerBuilder(t.Name()).
+					WithGetPingRequiredAuthRoute("/ping").
+					Build()
+
+				s := jwt.NewJwtTokenBuilder().
+					WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+					WithServiceId(ts.Service).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+					MustSignerCtx(ctx)
+
+				resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
+				require.Equal(t, http.StatusOK, statusCode, debugHeader)
+				require.Equal(t, gin.H{"ok": true}, resp)
+				require.Equal(t, 1, ts.GetPingCount())
+			})
 		})
-		t.Run("optional auth route", func(t *testing.T) {
-			ts := NewTestGinServerBuilder(t.Name()).
-				WithGetPingOptionalAuthRoute("/ping").
-				Build()
+		t.Run("admin actor", func(t *testing.T) {
+			t.Run("open route", func(t *testing.T) {
+				ts := NewTestGinServerBuilder(t.Name()).
+					WithGetPingOpenRoute("/ping").
+					Build()
 
-			s := jwt.NewJwtTokenBuilder().
-				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
-				WithServiceId(ts.Service).
-				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
-				MustSignerCtx(ctx)
+				s := jwt.NewJwtTokenBuilder().
+					WithServiceId(ts.Service).
+					WithActorId(ts.MustGetValidAdminUser(ctx).ExternalId).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForAdmin()).
+					MustSignerCtx(ctx)
 
-			resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
+				resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
+				require.Equal(t, http.StatusOK, statusCode, debugHeader)
+				require.Equal(t, gin.H{"ok": true}, resp)
+				require.Equal(t, 1, ts.GetPingCount())
+			})
+			t.Run("optional auth route", func(t *testing.T) {
+				ts := NewTestGinServerBuilder(t.Name()).
+					WithGetPingOptionalAuthRoute("/ping").
+					Build()
 
-			require.Equal(t, http.StatusOK, statusCode, debugHeader)
-			require.Equal(t, gin.H{"ok": true}, resp)
-			require.Equal(t, 1, ts.GetPingCount())
-		})
-		t.Run("required auth route", func(t *testing.T) {
-			ts := NewTestGinServerBuilder(t.Name()).
-				WithGetPingRequiredAuthRoute("/ping").
-				Build()
+				s := jwt.NewJwtTokenBuilder().
+					WithServiceId(ts.Service).
+					WithActorId(ts.MustGetValidAdminUser(ctx).ExternalId).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForAdmin()).
+					MustSignerCtx(ctx)
 
-			s := jwt.NewJwtTokenBuilder().
-				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
-				WithServiceId(ts.Service).
-				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
-				MustSignerCtx(ctx)
+				resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
 
-			resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
-			require.Equal(t, http.StatusOK, statusCode, debugHeader)
-			require.Equal(t, gin.H{"ok": true}, resp)
-			require.Equal(t, 1, ts.GetPingCount())
+				require.Equal(t, http.StatusOK, statusCode, debugHeader)
+				require.Equal(t, gin.H{"ok": true}, resp)
+				require.Equal(t, 1, ts.GetPingCount())
+			})
+			t.Run("required auth route", func(t *testing.T) {
+				ts := NewTestGinServerBuilder(t.Name()).
+					WithGetPingRequiredAuthRoute("/ping").
+					Build()
+
+				s := jwt.NewJwtTokenBuilder().
+					WithServiceId(ts.Service).
+					WithActorId(ts.MustGetValidAdminUser(ctx).ExternalId).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForAdmin()).
+					MustSignerCtx(ctx)
+
+				resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
+				require.Equal(t, http.StatusOK, statusCode, debugHeader)
+				require.Equal(t, gin.H{"ok": true}, resp)
+				require.Equal(t, 1, ts.GetPingCount())
+			})
+			t.Run("required auth route invalid admin", func(t *testing.T) {
+				ts := NewTestGinServerBuilder(t.Name()).
+					WithGetPingRequiredAuthRoute("/ping").
+					Build()
+
+				s := jwt.NewJwtTokenBuilder().
+					WithServiceId(ts.Service).
+					WithActorId(ts.MustGetInvalidAdminUser(ctx).ExternalId).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForAdmin()).
+					MustSignerCtx(ctx)
+
+				_, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
+				require.Equal(t, http.StatusUnauthorized, statusCode, debugHeader)
+				require.Equal(t, 0, ts.GetPingCount())
+			})
+			t.Run("required auth route uninitialized admin", func(t *testing.T) {
+				ts := NewTestGinServerBuilder(t.Name()).
+					WithGetPingRequiredAuthRoute("/ping").
+					Build()
+
+				// Even though we don't send the actor for the admin, the system should initialize the admin user
+				// because this admin is listed as valid in the system.
+				s := jwt.NewJwtTokenBuilder().
+					WithServiceId(ts.Service).
+					WithActorId(ts.MustGetValidUninitializedAdminUser(ctx).ExternalId).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForAdmin()).
+					MustSignerCtx(ctx)
+
+				resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
+				require.Equal(t, http.StatusOK, statusCode, debugHeader)
+				require.Equal(t, gin.H{"ok": true}, resp)
+				require.Equal(t, 1, ts.GetPingCount())
+			})
 		})
 	})
 	t.Run("jwt header auth", func(t *testing.T) {
