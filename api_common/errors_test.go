@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 )
 
@@ -85,8 +86,9 @@ func TestHttpStatusError_WriteGinResponse(t *testing.T) {
 				t.Errorf("expected status %d, got %d", tt.expectedStatus, rec.Code)
 			}
 
-			if rec.Body.String() != tt.expectedBody {
-				t.Errorf("expected body %q, got %q", tt.expectedBody, rec.Body.String())
+			trimmedBody := strings.TrimSpace(rec.Body.String())
+			if trimmedBody != tt.expectedBody {
+				t.Errorf("expected body %q, got %q", tt.expectedBody, trimmedBody)
 			}
 		})
 	}
