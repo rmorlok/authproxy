@@ -2,7 +2,9 @@ package oauth2
 
 import (
 	"fmt"
+	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -45,4 +47,24 @@ func newOAuth2(
 		encrypt:    encrypt,
 		connector:  &connector,
 	}
+}
+
+func (o *OAuth2) RecordCancelSessionAfterAuth(ctx context.Context, shouldCancel bool) error {
+	if shouldCancel == o.state.CancelSessionAfterAuth {
+		return nil
+	}
+
+	o.state.CancelSessionAfterAuth = shouldCancel
+	ttl := o.state.ExpiresAt.Sub(ctx.Clock().Now())
+
+	result := o.redis.Client().Set(ctx, getStateRedisKey(o.state.Id), o.state, ttl)
+	if result.Err() != nil {
+		return errors.Wrapf(result.Err(), "failed to set state in redis for session status for connector %s", o.connector.Id)
+	}
+
+	return nil
+}
+
+func (o *OAuth2) CancelSessionAfterAuth() bool {
+	return o.state.CancelSessionAfterAuth
 }

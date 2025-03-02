@@ -16,12 +16,13 @@ import (
 )
 
 type state struct {
-	Id           uuid.UUID `json:"id"`
-	ActorId      uuid.UUID `json:"actor_id"`
-	ConnectorId  string    `json:"connector_id"`
-	ConnectionId uuid.UUID `json:"connection_id"`
-	ReturnToUrl  string    `json:"return_to"`
-	ExpiresAt    time.Time `json:"expires_at"`
+	Id                     uuid.UUID `json:"id"`
+	ActorId                uuid.UUID `json:"actor_id"`
+	ConnectorId            string    `json:"connector_id"`
+	ConnectionId           uuid.UUID `json:"connection_id"`
+	ReturnToUrl            string    `json:"return_to"`
+	CancelSessionAfterAuth bool      `json:"cancel_session_after_auth"`
+	ExpiresAt              time.Time `json:"expires_at"`
 }
 
 func (s *state) MarshalBinary() ([]byte, error) {

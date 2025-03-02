@@ -57,14 +57,26 @@ func (o *OAuth2) CallbackFrom3rdParty(ctx context.Context, query url.Values) (st
 		UseContext(ctx)
 	req := c.Request()
 
+	clientId, err := o.auth.ClientId.GetValue(ctx)
+	if err != nil {
+		return errorRedirectPage, errors.Wrapf(err, "failed to get client id for connector")
+	}
+
+	clientSecret, err := o.auth.ClientSecret.GetValue(ctx)
+	if err != nil {
+		return errorRedirectPage, errors.Wrapf(err, "failed to get client id for connector")
+	}
+
 	resp, err := req.Method("POST").
 		URL(o.auth.TokenEndpoint).
 		Type("application/x-www-form-urlencoded").
 		AddHeader("accept", "application/json").
 		BodyString(url.Values{
-			"grant_type":   {"authorization_code"},
-			"code":         {code},
-			"redirect_uri": {callbackUrl},
+			"client_id":     {clientId},
+			"client_secret": {clientSecret},
+			"grant_type":    {"authorization_code"},
+			"code":          {code},
+			"redirect_uri":  {callbackUrl},
 		}.Encode()).
 		Send()
 
@@ -73,6 +85,7 @@ func (o *OAuth2) CallbackFrom3rdParty(ctx context.Context, query url.Values) (st
 	}
 
 	if resp.StatusCode != 200 {
+		print(resp.String())
 		return errorRedirectPage, errors.Errorf("received status code %d from exchange authorization code for access token", resp.StatusCode)
 	}
 

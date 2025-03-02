@@ -88,6 +88,7 @@ func (o *OAuth2) GenerateAuthUrl(ctx context.Context, actor database.Actor) (str
 	query := authUrl3p.Query()
 
 	query.Set("redirect_uri", callbackUrl)
+	query.Set("access_type", "offline")
 	query.Set("response_type", "code")
 	query.Set("client_id", clientId)
 	query.Set("scope", strings.Join(scopes, " "))

@@ -26,10 +26,6 @@ type Oauth2Routes struct {
 	oauthf      oauth2.Factory
 }
 
-type Oauth2QueryParams struct {
-	State uuid.UUID `form:"state"`
-}
-
 func (r *Oauth2Routes) callback(gctx *gin.Context) {
 	ctx := context.AsContext(gctx.Request.Context())
 
@@ -40,18 +36,32 @@ func (r *Oauth2Routes) callback(gctx *gin.Context) {
 		return
 	}
 
-	var req Oauth2QueryParams
-	if err := gctx.ShouldBindQuery(&req); err != nil {
-		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to deserialize query params"))
+	if gctx.Query("state") == "" {
+		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.New("failed to bind state param"))
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
 		return
 	}
 
-	oauthState, err := r.oauthf.GetOAuth2State(ctx, ra.MustGetActor(), req.State) // Get the OAuth2 state
+	stateUUID, err := uuid.Parse(gctx.Query("state"))
+	if err != nil {
+		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to parse state param to UUID"))
+		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+		return
+	}
+
+	oauthState, err := r.oauthf.GetOAuth2State(ctx, ra.MustGetActor(), stateUUID) // Get the OAuth2 state
 	if err != nil {
 		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to get oauth2 state"))
 		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
 		return
+	}
+
+	if oauthState.CancelSessionAfterAuth() {
+		err = r.authService.EndGinSession(gctx, ra)
+		if err != nil {
+			api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to end gin session"))
+			gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+		}
 	}
 
 	redirectUrl, err := oauthState.CallbackFrom3rdParty(ctx, gctx.Request.URL.Query())
@@ -78,7 +88,16 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 		return
 	}
 
-	// TODO Cookie the user to make sure we have a session
+	// If we are not in a session, we create one, but cancel it after the oauth flow completes
+	shouldCancelSession := false
+	if !ra.IsSession() {
+		shouldCancelSession = true
+		err := r.authService.EstablishGinSession(gctx, ra)
+		if err != nil {
+			api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to establish gin session"))
+			gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+		}
+	}
 
 	var req RedirectParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
@@ -106,6 +125,12 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 		return
 	}
 
+	err = o2.RecordCancelSessionAfterAuth(ctx, shouldCancelSession)
+	if err != nil {
+		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to record cancel session after auth"))
+		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+	}
+
 	redirectUrl, err := o2.GenerateAuthUrl(ctx, ra.MustGetActor())
 	if err != nil {
 		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to generate oauth2 redirect url"))
@@ -119,7 +144,7 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 
 func (r *Oauth2Routes) Register(g *gin.Engine) {
 	g.GET("/oauth2/callback", r.authService.Required(), r.callback)
-	g.GET("/oauth2/redirect", r.authService.Optional(), r.redirect) // Auth here is optional so we can handle nice redirects for uauthed requests
+	g.GET("/oauth2/redirect", r.authService.Optional(), r.redirect) // Auth here is optional so we can handle nice redirects for unauthed requests
 }
 
 func NewOauth2Routes(
