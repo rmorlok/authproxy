@@ -337,6 +337,22 @@ func TestAuth_Gin(t *testing.T) {
 			req := httptest.NewRequest("GET", "/", nil).WithContext(ctx)
 			SetJwtRequestHeader(req, tok)
 			ts.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code) // admin will be created from just jwt with no actor if valid
+		})
+
+		t.Run("invalid admin", func(t *testing.T) {
+			ts := setup(t, authFunc)
+			c := testAdminClaims()
+			c.Subject = "admin/this-is-not-valid"
+			c.Actor = nil
+
+			tok, err := ts.AuthUtil.s.Token(testContext, c)
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			req := httptest.NewRequest("GET", "/", nil).WithContext(ctx)
+			SetJwtRequestHeader(req, tok)
+			ts.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusUnauthorized, w.Code)
 		})
 
