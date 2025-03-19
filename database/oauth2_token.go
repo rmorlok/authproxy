@@ -20,6 +20,14 @@ type OAuth2Token struct {
 	DeletedAt             gorm.DeletedAt `gorm:"column:deleted_at;index"`
 }
 
+func (t *OAuth2Token) IsAccessTokenExpired(ctx context.Context) bool {
+	if t.AccessTokenExpiresAt == nil {
+		return false
+	}
+
+	return t.AccessTokenExpiresAt.Before(ctx.Clock().Now())
+}
+
 func (db *gormDB) GetOAuth2Token(
 	ctx context.Context,
 	connectionId uuid.UUID,

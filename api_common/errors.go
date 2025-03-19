@@ -40,21 +40,33 @@ func (e *HttpStatusError) ResponseMsgOrDefault() string {
 	return httpStatusText(e.Status)
 }
 
+type errorResponse struct {
+	Error      string `json:"error"`
+	StackTrace string `json:"stack_trace,omitempty"`
+}
+
+func (e *HttpStatusError) toErrorResponse(cfg Debuggable) *errorResponse {
+	resp := &errorResponse{
+		Error: e.ResponseMsgOrDefault(),
+	}
+
+	if cfg.IsDebugMode() {
+		resp.Error = e.Error()
+
+		if e.InternalErr != nil {
+			resp.StackTrace = fmt.Sprintf("%+v", e.InternalErr)
+		}
+	}
+
+	return resp
+}
+
 func (e *HttpStatusError) WriteGinResponse(cfg Debuggable, gctx *gin.Context) {
 	if e.InternalErr != nil {
 		AddGinDebugHeaderError(cfg, gctx, e.InternalErr)
 	}
 
-	errorResponse := struct {
-		Error string `json:"error"`
-	}{
-		Error: e.ResponseMsgOrDefault(),
-	}
-
-	if cfg.IsDebugMode() {
-		errorResponse.Error = e.Error()
-	}
-
+	errorResponse := e.toErrorResponse(cfg)
 	gctx.Header("Content-Type", "application/json")
 	gctx.PureJSON(e.Status, errorResponse)
 }
@@ -64,15 +76,7 @@ func (e *HttpStatusError) WriteResponse(cfg Debuggable, w http.ResponseWriter) {
 		AddDebugHeaderError(cfg, w, e.InternalErr)
 	}
 
-	errorResponse := struct {
-		Error string `json:"error"`
-	}{
-		Error: e.ResponseMsgOrDefault(),
-	}
-
-	if cfg.IsDebugMode() {
-		errorResponse.Error = e.Error()
-	}
+	errorResponse := e.toErrorResponse(cfg)
 
 	response, _ := json.Marshal(errorResponse)
 	w.Header().Set("Content-Type", "application/json")

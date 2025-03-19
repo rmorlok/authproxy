@@ -14,8 +14,7 @@ system_auth:
   admin_users:
     keys_path: ./dev_config/keys/admin
   global_aes_key:
-    random:
-      num_bytes: 32
+    base64: SA2s7lBmQi08ghWqfZmK3pp2eaAMix1znLn+653UtkA=
 error_pages:
   general: https://example.com
 database:

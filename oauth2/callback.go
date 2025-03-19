@@ -2,21 +2,9 @@ package oauth2
 
 import (
 	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
-	"github.com/rmorlok/authproxy/util"
 	"net/url"
-	"strings"
-	"time"
 )
-
-type authorizationCodeResponse struct {
-	AccessToken  string `json:"access_token"`
-	TokenType    string `json:"token_type"`
-	ExpiresIn    *int   `json:"expires_in"`
-	RefreshToken string `json:"refresh_token"`
-	Scope        string `json:"scope"`
-}
 
 func (o *OAuth2) getPublicCallbackUrl() (string, error) {
 	if o.cfg == nil {
@@ -85,56 +73,12 @@ func (o *OAuth2) CallbackFrom3rdParty(ctx context.Context, query url.Values) (st
 	}
 
 	if resp.StatusCode != 200 {
-		print(resp.String())
 		return errorRedirectPage, errors.Errorf("received status code %d from exchange authorization code for access token", resp.StatusCode)
 	}
 
-	jsonResp := authorizationCodeResponse{}
-	err = resp.JSON(&jsonResp)
+	_, err = o.createDbTokenFromResponse(ctx, resp, nil)
 	if err != nil {
-		return errorRedirectPage, errors.Wrapf(err, "failed to parse response from exchange authorization code for access token")
-	}
-
-	if jsonResp.AccessToken == "" {
-		return errorRedirectPage, errors.New("no access token in response")
-	}
-
-	encryptedAccessToken, err := o.encrypt.EncryptStringForConnection(ctx, o.connection, jsonResp.AccessToken)
-	if err != nil {
-		return errorRedirectPage, errors.Wrapf(err, "failed to encrypt access token")
-	}
-
-	encryptedRefreshToken := ""
-
-	// Not all OAuth has refresh tokens
-	if jsonResp.RefreshToken != "" {
-		encryptedRefreshToken, err = o.encrypt.EncryptStringForConnection(ctx, o.connection, jsonResp.RefreshToken)
-		if err != nil {
-			return errorRedirectPage, errors.Wrapf(err, "failed to encrypt refresh token")
-		}
-	}
-
-	scopes := strings.Join(util.Map(o.auth.Scopes, func(s config.Scope) string { return s.Id }), " ")
-	if jsonResp.Scope != "" {
-		scopes = jsonResp.Scope
-	}
-
-	var expiresAt *time.Time
-	if jsonResp.ExpiresIn != nil {
-		expiresAt = util.ToPtr(ctx.Clock().Now().Add(time.Duration(*jsonResp.ExpiresIn) * time.Second))
-	}
-
-	_, err = o.db.InsertOAuth2Token(
-		ctx,
-		o.connection.ID,
-		nil, // refreshedFrom
-		encryptedRefreshToken,
-		encryptedAccessToken,
-		expiresAt,
-		scopes,
-	)
-	if err != nil {
-		return errorRedirectPage, errors.Wrapf(err, "failed to insert oauth2 token")
+		return errorRedirectPage, errors.Wrapf(err, "failed to create db token from response")
 	}
 
 	return o.state.ReturnToUrl, nil

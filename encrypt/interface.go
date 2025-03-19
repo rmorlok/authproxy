@@ -5,6 +5,11 @@ import (
 	"github.com/rmorlok/authproxy/database"
 )
 
+/*
+ * Regenerate mocks for this interface using:
+ * mockgen -source=encrypt/interface.go -destination=encrypt/mock/encrypt.go -package=mock
+ */
+
 type E interface {
 	EncryptGlobal(ctx context.Context, data []byte) ([]byte, error)
 	EncryptStringGlobal(ctx context.Context, data string) (string, error)

@@ -79,8 +79,9 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	}
 
 	connection := database.Connection{
-		ID:    uuid.New(),
-		State: database.ConnectionStateCreated,
+		ID:          uuid.New(),
+		ConnectorId: connector.Id,
+		State:       database.ConnectionStateCreated,
 	}
 
 	err := r.db.CreateConnection(ctx, &connection)
@@ -115,18 +116,20 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 }
 
 type ConnectionJson struct {
-	ID        uuid.UUID                `json:"id"`
-	State     database.ConnectionState `json:"state"`
-	CreatedAt time.Time                `json:"created_at"`
-	UpdatedAt time.Time                `json:"updated_at"`
+	ID          uuid.UUID                `json:"id"`
+	State       database.ConnectionState `json:"state"`
+	ConnectorId string                   `json:"connector_id"`
+	CreatedAt   time.Time                `json:"created_at"`
+	UpdatedAt   time.Time                `json:"updated_at"`
 }
 
 func DatabaseConnectionToJson(conn database.Connection) ConnectionJson {
 	return ConnectionJson{
-		ID:        conn.ID,
-		State:     conn.State,
-		CreatedAt: conn.CreatedAt,
-		UpdatedAt: conn.UpdatedAt,
+		ID:          conn.ID,
+		State:       conn.State,
+		ConnectorId: conn.ConnectorId,
+		CreatedAt:   conn.CreatedAt,
+		UpdatedAt:   conn.UpdatedAt,
 	}
 }
 
@@ -225,6 +228,8 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 		return
 	}
 
+	// TODO: add security checking for ownership
+
 	gctx.PureJSON(http.StatusOK, DatabaseConnectionToJson(*c))
 }
 
@@ -232,6 +237,7 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 	g.POST("/connections/_initiate", r.authService.Required(), r.initiate)
 	g.GET("/connections", r.authService.Required(), r.list)
 	g.GET("/connections/:id", r.authService.Required(), r.get)
+	g.POST("/connections/:id/_proxy", r.authService.Required(), r.proxy)
 }
 
 func NewConnectionsRoutes(

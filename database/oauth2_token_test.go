@@ -3,11 +3,52 @@ package database
 import (
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/util"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
 	"testing"
 	"time"
 )
+
+func TestOAuth2Token_IsAccessTokenExpired(t *testing.T) {
+	t.Run("table-driven tests", func(t *testing.T) {
+		now := time.Date(2023, time.November, 5, 6, 29, 0, 0, time.UTC)
+		clock := clock.NewFakeClock(now)
+		ctx := context.Background().WithClock(clock)
+
+		testCases := []struct {
+			name               string
+			accessTokenExpires *time.Time
+			expected           bool
+		}{
+			{
+				name:               "no expiration time",
+				accessTokenExpires: nil,
+				expected:           false,
+			},
+			{
+				name:               "expires in the past",
+				accessTokenExpires: util.ToPtr(now.Add(-1 * time.Hour)),
+				expected:           true,
+			},
+			{
+				name:               "expires in the future",
+				accessTokenExpires: util.ToPtr(now.Add(1 * time.Hour)),
+				expected:           false,
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				token := &OAuth2Token{
+					AccessTokenExpiresAt: tc.accessTokenExpires,
+				}
+				result := token.IsAccessTokenExpired(ctx)
+				require.Equal(t, tc.expected, result)
+			})
+		}
+	})
+}
 
 func TestOAuth2Tokens(t *testing.T) {
 	t.Run("round trip", func(t *testing.T) {

@@ -1,9 +1,9 @@
 package httpf
 
 import (
-	"github.com/h2non/gentleman"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/redis"
+	"gopkg.in/h2non/gentleman.v2"
 	"sync"
 )
 

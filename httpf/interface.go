@@ -1,6 +1,6 @@
 package httpf
 
-import "github.com/h2non/gentleman"
+import "gopkg.in/h2non/gentleman.v2"
 
 type F interface {
 	NewTopLevel() *gentleman.Client
