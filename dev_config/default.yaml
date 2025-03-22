@@ -14,7 +14,7 @@ system_auth:
   admin_users:
     keys_path: ./dev_config/keys/admin
   global_aes_key:
-    base64: SA2s7lBmQi08ghWqfZmK3pp2eaAMix1znLn+653UtkA=
+    env_var_base64: GLOBAL_AES_KEY
 error_pages:
   general: https://example.com
 database:

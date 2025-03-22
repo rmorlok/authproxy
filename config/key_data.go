@@ -52,6 +52,9 @@ fieldLoop:
 		case "env_var":
 			keyData = &KeyDataEnvVar{}
 			break fieldLoop
+		case "env_var_base64":
+			keyData = &KeyDataEnvBase64Var{}
+			break fieldLoop
 		case "path":
 			keyData = &KeyDataFile{}
 			break fieldLoop
@@ -62,7 +65,7 @@ fieldLoop:
 	}
 
 	if keyData == nil {
-		return nil, fmt.Errorf("invalid structure for key data type; does not match value, base64, env_var, file")
+		return nil, fmt.Errorf("invalid structure for key data type; does not match value, base64, env_var, env_var_base64, file")
 	}
 
 	if err := value.Decode(keyData); err != nil {

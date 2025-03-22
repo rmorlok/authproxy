@@ -56,6 +56,9 @@ fieldLoop:
 		case "env_var":
 			keyData = &StringValueEnvVar{}
 			break fieldLoop
+		case "env_var_base64":
+			keyData = &StringValueEnvVarBase64{}
+			break fieldLoop
 		case "path":
 			keyData = &StringValueFile{}
 			break fieldLoop
