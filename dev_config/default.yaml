@@ -39,11 +39,15 @@ connectors:
     auth:
       type: OAuth2
       client_id:
-        env_var: GOOGLE_DRIVE_CLIENT_ID
+        env_var: GOOGLE_CLIENT_ID
       client_secret:
-        env_var: GOOGLE_DRIVE_CLIENT_SECRET
-      authorization_endpoint: https://accounts.google.com/o/oauth2/v2/auth
-      token_endpoint: https://oauth2.googleapis.com/token
+        env_var: GOOGLE_CLIENT_SECRET
+      authorization:
+        endpoint: https://accounts.google.com/o/oauth2/v2/auth
+        query_overrides:
+          prompt: consent
+      token:
+        endpoint: https://oauth2.googleapis.com/token
       scopes:
         - id: https://www.googleapis.com/auth/drive.readonly
           reason: |
@@ -52,6 +56,29 @@ connectors:
           required: false
           reason: |
             We need to be able to see what's been going on in drive
+  - id: google-calendar
+    version: 1
+    display_name: Google Calendar
+    logo:
+      public_url: https://en.wikipedia.org/wiki/Google_Calendar#/media/File:Google_Calendar_icon_(2020).svg
+    description: |
+      Sync your Google Calendar
+    auth:
+      type: OAuth2
+      client_id:
+        env_var: GOOGLE_CLIENT_ID
+      client_secret:
+        env_var: GOOGLE_CLIENT_SECRET
+      authorization:
+        endpoint: https://accounts.google.com/o/oauth2/v2/auth
+        query_overrides:
+          prompt: consent
+      token:
+        endpoint: https://oauth2.googleapis.com/token
+      scopes:
+        - id: https://www.googleapis.com/auth/calendar.readonly
+          reason: |
+            We need to be able to read the calendar
   - id: greenhouse
     version: 1
     display_name: Greenhouse

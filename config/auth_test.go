@@ -83,8 +83,13 @@ type: api-key
 						Reason:   "We need to be able to see what's been going on in drive\n",
 					},
 				},
-				AuthorizationEndpoint: "https://example.com/authorization",
-				TokenEndpoint:         "https://example.com/token",
+				Authorization: AuthOauth2Authorization{
+					Endpoint: "https://example.com/authorization",
+				},
+
+				Token: AuthOauth2Token{
+					Endpoint: "https://example.com/token",
+				},
 			}
 			assert.Equal(`type: OAuth2
 client_id:
@@ -100,8 +105,10 @@ scopes:
       required: false
       reason: |
         We need to be able to see what's been going on in drive
-authorization_endpoint: https://example.com/authorization
-token_endpoint: https://example.com/token
+authorization:
+    endpoint: https://example.com/authorization
+token:
+    endpoint: https://example.com/token
 `, mustMarshalToYamlString(data))
 		})
 		t.Run("api key", func(t *testing.T) {

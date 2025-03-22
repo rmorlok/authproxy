@@ -43,7 +43,6 @@ func (o *OAuth2) CallbackFrom3rdParty(ctx context.Context, query url.Values) (st
 
 	c := o.httpf.NewTopLevel().
 		UseContext(ctx)
-	req := c.Request()
 
 	clientId, err := o.auth.ClientId.GetValue(ctx)
 	if err != nil {
@@ -55,17 +54,30 @@ func (o *OAuth2) CallbackFrom3rdParty(ctx context.Context, query url.Values) (st
 		return errorRedirectPage, errors.Wrapf(err, "failed to get client id for connector")
 	}
 
-	resp, err := req.Method("POST").
-		URL(o.auth.TokenEndpoint).
+	req := c.Request().
+		Method("POST").
+		URL(o.auth.Token.Endpoint).
 		Type("application/x-www-form-urlencoded").
-		AddHeader("accept", "application/json").
-		BodyString(url.Values{
-			"client_id":     {clientId},
-			"client_secret": {clientSecret},
-			"grant_type":    {"authorization_code"},
-			"code":          {code},
-			"redirect_uri":  {callbackUrl},
-		}.Encode()).
+		AddHeader("accept", "application/json")
+
+	for k, v := range o.auth.Token.QueryOverrides {
+		req = req.SetQuery(k, v)
+	}
+
+	values := url.Values{
+		"client_id":     {clientId},
+		"client_secret": {clientSecret},
+		"grant_type":    {"authorization_code"},
+		"code":          {code},
+		"redirect_uri":  {callbackUrl},
+	}
+
+	for k, v := range o.auth.Token.FormOverrides {
+		values.Set(k, v)
+	}
+
+	resp, err := req.
+		BodyString(values.Encode()).
 		Send()
 
 	if err != nil {

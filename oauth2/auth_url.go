@@ -63,7 +63,7 @@ func (o *OAuth2) GenerateAuthUrl(ctx context.Context, actor database.Actor) (str
 		return "", errors.Wrapf(err, "failed to get client id for connector %s", o.connector.Id)
 	}
 
-	if o.auth.AuthorizationEndpoint == "" {
+	if o.auth.Authorization.Endpoint == "" {
 		return "", errors.Errorf("no authorization endpoint for connector %s", o.connector.Id)
 	}
 
@@ -80,7 +80,7 @@ func (o *OAuth2) GenerateAuthUrl(ctx context.Context, actor database.Actor) (str
 		return s.Id
 	})
 
-	authUrl3p, err := url.Parse(o.auth.AuthorizationEndpoint)
+	authUrl3p, err := url.Parse(o.auth.Authorization.Endpoint)
 	if err != nil {
 		return "", errors.Wrapf(err, "failed to parse authorization endpoint for connector %s", o.connector.Id)
 	}
@@ -93,6 +93,10 @@ func (o *OAuth2) GenerateAuthUrl(ctx context.Context, actor database.Actor) (str
 	query.Set("client_id", clientId)
 	query.Set("scope", strings.Join(scopes, " "))
 	query.Set("state", o.state.Id.String())
+
+	for k, v := range o.auth.Authorization.QueryOverrides {
+		query.Set(k, v)
+	}
 
 	authUrl3p.RawQuery = query.Encode()
 

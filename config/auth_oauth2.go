@@ -6,12 +6,12 @@ import (
 )
 
 type AuthOAuth2 struct {
-	Type                  AuthType    `json:"type" yaml:"type"`
-	ClientId              StringValue `json:"client_id" yaml:"client_id"`
-	ClientSecret          StringValue `json:"client_secret" yaml:"client_secret"`
-	Scopes                []Scope     `json:"scopes" yaml:"scopes"`
-	AuthorizationEndpoint string      `json:"authorization_endpoint" yaml:"authorization_endpoint"`
-	TokenEndpoint         string      `json:"token_endpoint" yaml:"token_endpoint"`
+	Type          AuthType                `json:"type" yaml:"type"`
+	ClientId      StringValue             `json:"client_id" yaml:"client_id"`
+	ClientSecret  StringValue             `json:"client_secret" yaml:"client_secret"`
+	Scopes        []Scope                 `json:"scopes" yaml:"scopes"`
+	Authorization AuthOauth2Authorization `json:"authorization" yaml:"authorization"`
+	Token         AuthOauth2Token         `json:"token" yaml:"token"`
 }
 
 func (i *AuthOAuth2) UnmarshalYAML(value *yaml.Node) error {

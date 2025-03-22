@@ -45,7 +45,7 @@ func (o *OAuth2) refreshAccessToken(ctx context.Context, token *database.OAuth2T
 		UseContext(ctx).
 		Request().
 		Method("POST").
-		URL(o.auth.TokenEndpoint).
+		URL(o.auth.Token.Endpoint).
 		SetHeader("Content-Type", "application/x-www-form-urlencoded").
 		AddHeader("accept", "application/json").
 		BodyString(
