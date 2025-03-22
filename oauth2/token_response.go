@@ -1,7 +1,6 @@
 package oauth2
 
 import (
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
@@ -23,7 +22,7 @@ type tokenResponse struct {
 
 // createDbTokenFromResponse deserializes an oauth token from a refresh or authorization code response. It deserializes
 // the response, and then inserts a token into the databse. It returns the newly created token.
-func (o *OAuth2) createDbTokenFromResponse(ctx context.Context, resp *gentleman.Response, refreshFrom *uuid.UUID) (*database.OAuth2Token, error) {
+func (o *OAuth2) createDbTokenFromResponse(ctx context.Context, resp *gentleman.Response, refreshFrom *database.OAuth2Token) (*database.OAuth2Token, error) {
 	jsonResp := tokenResponse{}
 	err := resp.JSON(&jsonResp)
 	if err != nil {
@@ -47,6 +46,8 @@ func (o *OAuth2) createDbTokenFromResponse(ctx context.Context, resp *gentleman.
 		if err != nil {
 			return nil, errors.Wrapf(err, "failed to encrypt refresh token")
 		}
+	} else if refreshFrom != nil {
+		encryptedRefreshToken = refreshFrom.EncryptedRefreshToken
 	}
 
 	scopes := strings.Join(util.Map(o.auth.Scopes, func(s config.Scope) string { return s.Id }), " ")
@@ -62,7 +63,7 @@ func (o *OAuth2) createDbTokenFromResponse(ctx context.Context, resp *gentleman.
 	token, err := o.db.InsertOAuth2Token(
 		ctx,
 		o.connection.ID,
-		refreshFrom,
+		util.ToPtr(refreshFrom.ID),
 		encryptedRefreshToken,
 		encryptedAccessToken,
 		expiresAt,

@@ -63,7 +63,7 @@ func (o *OAuth2) refreshAccessToken(ctx context.Context, token *database.OAuth2T
 		return nil, err
 	}
 
-	newToken, err := o.createDbTokenFromResponse(ctx, refreshResp, &token.ID)
+	newToken, err := o.createDbTokenFromResponse(ctx, refreshResp, token)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to refresh token")
 	}
