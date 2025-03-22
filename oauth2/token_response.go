@@ -1,6 +1,7 @@
 package oauth2
 
 import (
+	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
@@ -60,10 +61,15 @@ func (o *OAuth2) createDbTokenFromResponse(ctx context.Context, resp *gentleman.
 		expiresAt = util.ToPtr(ctx.Clock().Now().Add(time.Duration(*jsonResp.ExpiresIn) * time.Second))
 	}
 
+	var refreshFromId *uuid.UUID
+	if refreshFrom != nil {
+		refreshFromId = &refreshFrom.ID
+	}
+
 	token, err := o.db.InsertOAuth2Token(
 		ctx,
 		o.connection.ID,
-		util.ToPtr(refreshFrom.ID),
+		refreshFromId,
 		encryptedRefreshToken,
 		encryptedAccessToken,
 		expiresAt,
