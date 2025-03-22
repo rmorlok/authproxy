@@ -5,6 +5,7 @@ import (
 	"github.com/pkg/errors"
 	"net/http"
 	"net/http/httptest"
+	"regexp"
 	"strings"
 	"testing"
 )
@@ -52,11 +53,11 @@ func TestHttpStatusError_ResponseMsgOrDefault(t *testing.T) {
 func TestHttpStatusError_WriteGinResponse(t *testing.T) {
 	gin.SetMode(gin.TestMode)
 	tests := []struct {
-		name           string
-		err            *HttpStatusError
-		debug          bool
-		expectedStatus int
-		expectedBody   string
+		name              string
+		err               *HttpStatusError
+		debug             bool
+		expectedStatus    int
+		expectedBodyRegex string
 	}{
 		{
 			"normalMode",
@@ -70,7 +71,7 @@ func TestHttpStatusError_WriteGinResponse(t *testing.T) {
 			&HttpStatusError{Status: http.StatusForbidden, ResponseMsg: "Forbidden", InternalErr: errors.New("internal error text")},
 			true,
 			http.StatusForbidden,
-			`{"error":"internal error text"}`,
+			`{"error":"internal error text","stack_trace":".*"}`,
 		},
 	}
 
@@ -87,8 +88,12 @@ func TestHttpStatusError_WriteGinResponse(t *testing.T) {
 			}
 
 			trimmedBody := strings.TrimSpace(rec.Body.String())
-			if trimmedBody != tt.expectedBody {
-				t.Errorf("expected body %q, got %q", tt.expectedBody, trimmedBody)
+
+			matched, err := regexp.MatchString(tt.expectedBodyRegex, trimmedBody)
+			if err != nil {
+				t.Errorf("error matching regex: %v", err)
+			} else if !matched {
+				t.Errorf("expected body to match regex %q, but got %q", tt.expectedBodyRegex, trimmedBody)
 			}
 		})
 	}
@@ -96,11 +101,11 @@ func TestHttpStatusError_WriteGinResponse(t *testing.T) {
 
 func TestHttpStatusError_WriteResponse(t *testing.T) {
 	tests := []struct {
-		name           string
-		err            *HttpStatusError
-		debug          bool
-		expectedStatus int
-		expectedBody   string
+		name              string
+		err               *HttpStatusError
+		debug             bool
+		expectedStatus    int
+		expectedBodyRegex string
 	}{
 		{
 			"normalMode",
@@ -114,7 +119,7 @@ func TestHttpStatusError_WriteResponse(t *testing.T) {
 			&HttpStatusError{Status: http.StatusNotFound, ResponseMsg: "Not Found", InternalErr: errors.New("internal error text")},
 			true,
 			http.StatusNotFound,
-			`{"error":"internal error text"}`,
+			`{"error":"internal error text","stack_trace":".*"}`,
 		},
 	}
 
@@ -129,8 +134,12 @@ func TestHttpStatusError_WriteResponse(t *testing.T) {
 				t.Errorf("expected status %d, got %d", tt.expectedStatus, rec.Code)
 			}
 
-			if rec.Body.String() != tt.expectedBody {
-				t.Errorf("expected body %q, got %q", tt.expectedBody, rec.Body.String())
+			trimmedBody := strings.TrimSpace(rec.Body.String())
+			matched, err := regexp.MatchString(tt.expectedBodyRegex, trimmedBody)
+			if err != nil {
+				t.Errorf("error matching regex: %v", err)
+			} else if !matched {
+				t.Errorf("expected body to match regex %q, but got %q", tt.expectedBodyRegex, trimmedBody)
 			}
 		})
 	}
