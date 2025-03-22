@@ -56,7 +56,11 @@ func httpProxyForHost(baseUrl url.URL, signer jwt.Signer) func(w http.ResponseWr
 			writeJsonErrorResponse(w, http.StatusInternalServerError, errStr)
 		}
 
-		defer resp.Body.Close()
+		defer func() {
+			if resp != nil && resp.Body != nil {
+				resp.Body.Close()
+			}
+		}()
 
 		log.Printf("[%d] %s %s", resp.StatusCode, req.Method, u.String())
 		copyHeader(w.Header(), resp.Header)
