@@ -56,6 +56,8 @@ type Context interface {
 	UuidGenerator() UuidGenerator
 }
 
+type CancelFunc = context.CancelFunc
+
 type commonContext struct {
 	context.Context
 }
@@ -66,8 +68,18 @@ func AsContext(ctx context.Context) Context {
 	}
 }
 
+func WithDeadline(ctx context.Context, deadline time.Time) (Context, context.CancelFunc) {
+	out, cancel := context.WithDeadline(ctx, deadline)
+	return AsContext(out), cancel
+}
+
 func WithTimeout(ctx context.Context, timeout time.Duration) (Context, context.CancelFunc) {
-	out, cancel := context.WithTimeout(ctx, timeout)
+	deadline := time.Now().Add(timeout)
+	if innerCtx, ok := ctx.(Context); ok {
+		deadline = innerCtx.Clock().Now().Add(timeout)
+	}
+
+	out, cancel := WithDeadline(ctx, deadline)
 	return AsContext(out), cancel
 }
 

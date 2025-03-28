@@ -18,7 +18,22 @@ func (o *OAuth2) proxyToplevel() *gentleman.Client {
 }
 
 func (o *OAuth2) refreshAccessToken(ctx context.Context, token *database.OAuth2Token) (*database.OAuth2Token, error) {
-	// TODO: redis locking so only one process can refresh a token at once
+	m := o.tokenMutex()
+	err := m.Lock(ctx)
+	if err != nil {
+		return nil, err
+	}
+	defer m.Unlock(ctx)
+
+	// Get the latest token to make sure we still need to refresh
+	token, err = o.db.GetOAuth2Token(ctx, o.connection.ID)
+	if err != nil {
+		return nil, err
+	}
+
+	if !token.IsAccessTokenExpired(ctx) {
+		return token, nil
+	}
 
 	if token.EncryptedRefreshToken == "" {
 		return nil, fmt.Errorf("token does not have refresh token")

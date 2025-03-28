@@ -2,6 +2,7 @@ package redis
 
 import (
 	"github.com/alicebob/miniredis"
+	"github.com/bsm/redislock"
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/config"
@@ -22,11 +23,13 @@ var redisErr error
 type R interface {
 	Ping(ctx context.Context) bool
 	Client() *redis.Client
+	NewMutex(key string, options ...MutexOption) Mutex
 }
 
 type wrapper struct {
-	client    *redis.Client
-	secretKey config.KeyData
+	client     *redis.Client
+	secretKey  config.KeyData
+	lockClient *redislock.Client
 }
 
 // New creates a new database connection from the specified configuration. The type of the database
@@ -90,8 +93,9 @@ func NewMiniredis(redisConfig *config.RedisMiniredis, secretKey config.KeyData) 
 
 	// Return the wrapper containing the Redis client
 	return &wrapper{
-		client:    miniredisClient,
-		secretKey: secretKey,
+		client:     miniredisClient,
+		secretKey:  secretKey,
+		lockClient: redislock.New(miniredisClient),
 	}, nil
 }
 
@@ -128,8 +132,9 @@ func NewRedis(ctx context.Context, redisConfig *config.RedisReal, secretKey conf
 	}
 
 	return &wrapper{
-		client:    redisClient,
-		secretKey: secretKey,
+		client:     redisClient,
+		secretKey:  secretKey,
+		lockClient: redislock.New(redisClient),
 	}, nil
 }
 
