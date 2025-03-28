@@ -19,6 +19,8 @@ error_pages:
   general: https://example.com
 database:
   provider: sqlite
+  auto_migrate: true
+  auto_migration_lock_duration: 30s
   path: ./tmp/dev.db
 redis:
   provider: miniredis

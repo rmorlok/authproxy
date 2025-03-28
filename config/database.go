@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"gopkg.in/yaml.v3"
+	"time"
 )
 
 type DatabaseProvider string
@@ -13,6 +14,8 @@ const (
 
 type Database interface {
 	GetProvider() DatabaseProvider
+	GetAutoMigrate() bool
+	GetAutoMigrationLockDuration() time.Duration
 }
 
 func UnmarshallYamlDatabaseString(data string) (Database, error) {
@@ -48,7 +51,7 @@ fieldLoop:
 		case "provider":
 			switch DatabaseProvider(valueNode.Value) {
 			case DatabaseProviderSqlite:
-				database = &DatabaseSqlite{}
+				database = &DatabaseSqlite{Provider: DatabaseProviderSqlite}
 				break fieldLoop
 			default:
 				return nil, fmt.Errorf("unknown database provider %v", valueNode.Value)

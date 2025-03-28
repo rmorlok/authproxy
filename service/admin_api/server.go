@@ -80,7 +80,7 @@ func Serve(cfg config.C) {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	redis, err := redis.New(context.Background(), cfg)
+	rs, err := redis.New(context.Background(), cfg)
 	if err != nil {
 		panic(err)
 	}
@@ -90,10 +90,27 @@ func Serve(cfg config.C) {
 		panic(err)
 	}
 
-	if err := db.Migrate(context.Background()); err != nil {
-		panic(err)
+	if cfg.GetRoot().Database.GetAutoMigrate() {
+		func() {
+			m := rs.NewMutex(
+				database.MigrateMutexKeyName,
+				redis.MutexOptionLockFor(cfg.GetRoot().Database.GetAutoMigrationLockDuration()),
+				redis.MutexOptionRetryFor(cfg.GetRoot().Database.GetAutoMigrationLockDuration()+1*time.Second),
+				redis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
+				redis.MutexOptionDetailedLockMetadata(),
+			)
+			err := m.Lock(context.Background())
+			if err != nil {
+				panic(err)
+			}
+			defer m.Unlock(context.Background())
+
+			if err := db.Migrate(context.Background()); err != nil {
+				panic(err)
+			}
+		}()
 	}
 
-	r := GetGinServer(cfg, db, redis)
+	r := GetGinServer(cfg, db, rs)
 	r.Run(fmt.Sprintf(":%d", cfg.GetRoot().AdminApi.Port()))
 }

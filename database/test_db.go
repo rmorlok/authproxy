@@ -54,8 +54,7 @@ func MustApplyBlankTestDbConfig(testName string, cfg config.C) (config.C, DB) {
 	}
 
 	root.Database = &config.DatabaseSqlite{
-		Provider: config.DatabaseProviderSqlite,
-		Path:     tempFilePath,
+		Path: tempFilePath,
 	}
 	if root.SystemAuth.GlobalAESKey == nil {
 		root.SystemAuth.GlobalAESKey = &config.KeyDataRandomBytes{}

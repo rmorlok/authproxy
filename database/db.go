@@ -132,6 +132,9 @@ func (db *gormDB) session(ctx context.Context) *gorm.DB {
 	})
 }
 
+// MigrateMutexKeyName is the key that can be used when locking to perform a migration in redis.
+const MigrateMutexKeyName = "db-migrate-lock"
+
 func (db *gormDB) Migrate(ctx context.Context) error {
 	err := db.gorm.AutoMigrate(&Actor{})
 	if err != nil {
