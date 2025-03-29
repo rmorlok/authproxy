@@ -54,7 +54,7 @@ func GetGinServer(
 
 	router.GET("/ping", func(c *gin.Context) {
 		c.PureJSON(http.StatusOK, gin.H{
-			"service": "auth",
+			"service": "api",
 			"message": "pong",
 		})
 	})

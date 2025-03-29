@@ -11,6 +11,7 @@ const (
 	ServiceIdAdminApi ServiceId = "admin-api"
 	ServiceIdApi      ServiceId = "api"
 	ServiceIdPublic   ServiceId = "public"
+	ServiceIdWorker   ServiceId = "worker"
 )
 
 func AllServiceIds() []ServiceId {
@@ -18,6 +19,7 @@ func AllServiceIds() []ServiceId {
 		ServiceIdAdminApi,
 		ServiceIdApi,
 		ServiceIdPublic,
+		ServiceIdWorker,
 	}
 }
 

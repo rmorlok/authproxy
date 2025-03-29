@@ -9,6 +9,7 @@ type Root struct {
 	AdminApi   ServiceAdminApi `json:"admin_api" yaml:"admin_api"`
 	Api        ServiceApi      `json:"api" yaml:"api"`
 	Public     ServicePublic   `json:"public" yaml:"public"`
+	Worker     ServiceWorker   `json:"worker" yaml:"worker"`
 	SystemAuth SystemAuth      `json:"system_auth" yaml:"system_auth"`
 	Database   Database        `json:"database" yaml:"database"`
 	Redis      Redis           `json:"redis" yaml:"redis"`
@@ -25,6 +26,8 @@ func (r *Root) MustGetService(serviceId ServiceId) Service {
 		return &r.AdminApi
 	case ServiceIdPublic:
 		return &r.Public
+	case ServiceIdWorker:
+		return &r.Worker
 	}
 
 	panic(fmt.Sprintf("invalid service id %s", serviceId))

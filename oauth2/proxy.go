@@ -17,7 +17,14 @@ func (o *OAuth2) proxyToplevel() *gentleman.Client {
 	return gentleman.New()
 }
 
-func (o *OAuth2) refreshAccessToken(ctx context.Context, token *database.OAuth2Token) (*database.OAuth2Token, error) {
+type refreshMode int
+
+const (
+	refreshModeOnlyExpired refreshMode = iota
+	refreshModeAlways
+)
+
+func (o *OAuth2) refreshAccessToken(ctx context.Context, token *database.OAuth2Token, mode refreshMode) (*database.OAuth2Token, error) {
 	m := o.tokenMutex()
 	err := m.Lock(ctx)
 	if err != nil {
@@ -31,7 +38,7 @@ func (o *OAuth2) refreshAccessToken(ctx context.Context, token *database.OAuth2T
 		return nil, err
 	}
 
-	if !token.IsAccessTokenExpired(ctx) {
+	if mode == refreshModeOnlyExpired && !token.IsAccessTokenExpired(ctx) {
 		return token, nil
 	}
 
@@ -103,7 +110,7 @@ func (o *OAuth2) getValidToken(ctx context.Context) (*database.OAuth2Token, erro
 
 	// Check if the token has expired
 	if token.IsAccessTokenExpired(ctx) {
-		token, err = o.refreshAccessToken(ctx, token)
+		token, err = o.refreshAccessToken(ctx, token, refreshModeOnlyExpired)
 		if err != nil {
 			return nil, err
 		}

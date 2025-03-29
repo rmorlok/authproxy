@@ -4,6 +4,8 @@ api:
   port: 8081
 admin_api:
   port: 8082
+worker:
+  port: 8083
 system_auth:
   cookie_domain: localhost:8080
   jwt_signing_key:
@@ -22,8 +24,11 @@ database:
   auto_migrate: true
   auto_migration_lock_duration: 30s
   path: ./tmp/dev.db
+#redis:
+#  provider: miniredis
 redis:
-  provider: miniredis
+  provider: redis
+  address: localhost:6379
 oauth:
   roundtrip_ttl: 60m
 connectors:

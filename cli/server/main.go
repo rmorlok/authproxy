@@ -9,6 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/service/admin_api"
 	api "github.com/rmorlok/authproxy/service/api"
 	public "github.com/rmorlok/authproxy/service/public"
+	"github.com/rmorlok/authproxy/service/worker"
 	"github.com/spf13/cobra"
 	"os"
 	"strings"
@@ -47,8 +48,10 @@ func runServices(noBanner bool, servicesList string) error {
 			servers = append(servers, api.Serve)
 		case "public":
 			servers = append(servers, public.Serve)
+		case "worker":
+			servers = append(servers, worker.Serve)
 		case "all":
-			servers = append(servers, admin_api.Serve, api.Serve, public.Serve)
+			servers = append(servers, admin_api.Serve, api.Serve, public.Serve, worker.Serve)
 		default:
 			return errors.New("unknown service: " + service)
 		}
