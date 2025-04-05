@@ -83,12 +83,17 @@ func Serve(cfg config.C) {
 		asyncHasError = err != nil
 	}
 
+	asynqClient := asynq.NewClientFromRedisClient(rs.Client())
+	defer asynqClient.Close()
+	asynqClient.Ping()
+
 	router.GET("/healthz", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.AsContext(c.Request.Context()), 1*time.Second)
 		defer cancel()
 
 		dbChan := make(chan bool, 1)
 		redisChan := make(chan bool, 1)
+		asynqClientChan := make(chan bool, 1)
 
 		go func() {
 			dbChan <- db.Ping(ctx)
@@ -98,20 +103,30 @@ func Serve(cfg config.C) {
 			redisChan <- rs.Ping(ctx)
 		}()
 
+		go func() {
+			if err := asynqClient.Ping(); err != nil {
+				asynqClientChan <- false
+			} else {
+				asynqClientChan <- true
+			}
+		}()
+
 		dbOk := <-dbChan
 		redisOk := <-redisChan
-		everythingOk := dbOk && redisOk
+		asyncClientOk := <-asynqClientChan
+		everythingOk := dbOk && redisOk && asyncRunning && !asyncHasError && asyncClientOk
 		status := http.StatusOK
 		if !everythingOk {
 			status = http.StatusServiceUnavailable
 		}
 
 		c.PureJSON(status, gin.H{
-			"service": "worker",
-			"db":      dbOk,
-			"redis":   redisOk,
-			"asynq":   asyncRunning && !asyncHasError,
-			"ok":      everythingOk,
+			"service":     "worker",
+			"db":          dbOk,
+			"redis":       redisOk,
+			"asynqServer": asyncRunning && !asyncHasError,
+			"asynqClient": asyncClientOk,
+			"ok":          everythingOk,
 		})
 	})
 
@@ -123,13 +138,16 @@ func Serve(cfg config.C) {
 			BaseContext: func() context2.Context {
 				return context.Background()
 			},
+			Queues: map[string]int{
+				"default": 5,
+			},
 		},
 	)
 
 	mux := asynq.NewServeMux()
 
 	oauth2.
-		NewTaskHandler(cfg, db, rs, httpf, encrypt).
+		NewTaskHandler(cfg, db, rs, asynqClient, httpf, encrypt).
 		RegisterTasks(mux)
 
 	var wg sync.WaitGroup
@@ -143,10 +161,10 @@ func Serve(cfg config.C) {
 		asyncRunning = false
 		wg.Done()
 	}()
-	
+
 	wg.Add(1)
 	go func() {
-		if err := router.Run(fmt.Sprintf(":%d", cfg.GetRoot().Public.Port())); err != nil {
+		if err := router.Run(fmt.Sprintf(":%d", cfg.GetRoot().Worker.Port())); err != nil {
 			log.Fatalf("could not run gin server: %v", err)
 		}
 	}()

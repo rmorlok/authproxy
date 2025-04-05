@@ -12,6 +12,14 @@ import (
 
 const taskTypeRefreshOAuthToken = "oauth2:refresh_oauth_token"
 
+func newRefreshOauth2TokenTask(connectionId uuid.UUID) (*asynq.Task, error) {
+	payload, err := json.Marshal(refreshOAuthTokenTaskPayload{connectionId})
+	if err != nil {
+		return nil, err
+	}
+	return asynq.NewTask(taskTypeRefreshOAuthToken, payload), nil
+}
+
 type refreshOAuthTokenTaskPayload struct {
 	ConnectionId uuid.UUID `json:"connection_id"`
 }

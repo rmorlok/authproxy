@@ -14,6 +14,18 @@ Run the client to proxy authenticated calls to the backend:
 go run ./cli/client raw-proxy --proxyTo=api
 ```
 
+To manage tasks in asynq, install the [asynq cli](https://github.com/hibiken/asynq/blob/master/tools/asynq/README.md):
+
+```bash
+go install github.com/hibiken/asynq/tools/asynq@latest
+```
+
+and run the cli:
+
+``bash
+asynq dash
+``
+
 ## Client Config
 
 The client cli looks for a config file at `~/.authproxy.yaml`:

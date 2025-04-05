@@ -13,6 +13,7 @@ type taskHandler struct {
 	cfg     config.C
 	db      database.DB
 	redis   redis.R
+	asynq   *asynq.Client
 	httpf   httpf.F
 	encrypt encrypt.E
 	factory Factory
@@ -26,6 +27,7 @@ func NewTaskHandler(
 	cfg config.C,
 	db database.DB,
 	redis redis.R,
+	ac *asynq.Client,
 	httpf httpf.F,
 	encrypt encrypt.E,
 ) TaskRegistrar {
@@ -33,6 +35,7 @@ func NewTaskHandler(
 		cfg:     cfg,
 		db:      db,
 		redis:   redis,
+		asynq:   ac,
 		httpf:   httpf,
 		encrypt: encrypt,
 		factory: NewFactory(cfg, db, redis, httpf, encrypt),

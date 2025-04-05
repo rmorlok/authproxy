@@ -57,6 +57,15 @@ type DB interface {
 		scopes string,
 	) (*OAuth2Token, error)
 
+	// EnumerateOAuth2TokensExpiringWithin enumerates OAuth2 tokens that are expiring within a specified time interval
+	// of now. This includes tokens that are already expired. Deleted tokens are not considered, nor are tokens tied
+	// to a deleted connection.
+	EnumerateOAuth2TokensExpiringWithin(
+		ctx context.Context,
+		duration time.Duration,
+		callback func(tokens []*OAuth2TokenWithConnection, lastPage bool) (stop bool, err error),
+	) error
+
 	/*
 	 *  Nonces
 	 */

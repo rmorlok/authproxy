@@ -81,6 +81,20 @@ func (mr *MockDBMockRecorder) CreateConnection(ctx, c interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateConnection", reflect.TypeOf((*MockDB)(nil).CreateConnection), ctx, c)
 }
 
+// EnumerateOAuth2TokensExpiringWithin mocks base method.
+func (m *MockDB) EnumerateOAuth2TokensExpiringWithin(ctx context.Context, duration time.Duration, callback func([]*database.OAuth2TokenWithConnection, bool) (bool, error)) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EnumerateOAuth2TokensExpiringWithin", ctx, duration, callback)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// EnumerateOAuth2TokensExpiringWithin indicates an expected call of EnumerateOAuth2TokensExpiringWithin.
+func (mr *MockDBMockRecorder) EnumerateOAuth2TokensExpiringWithin(ctx, duration, callback interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnumerateOAuth2TokensExpiringWithin", reflect.TypeOf((*MockDB)(nil).EnumerateOAuth2TokensExpiringWithin), ctx, duration, callback)
+}
+
 // GetActor mocks base method.
 func (m *MockDB) GetActor(ctx context.Context, id uuid.UUID) (*database.Actor, error) {
 	m.ctrl.T.Helper()

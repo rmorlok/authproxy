@@ -13,8 +13,9 @@ import (
 type ConnectionState string
 
 const (
-	ConnectionStateCreated ConnectionState = "created"
-	ConnectionStateReady   ConnectionState = "ready"
+	ConnectionStateCreated  ConnectionState = "created"
+	ConnectionStateReady    ConnectionState = "ready"
+	ConnectionStateDisabled ConnectionState = "disabled"
 )
 
 type Connection struct {

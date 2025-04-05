@@ -20,6 +20,10 @@ type OAuth2Token struct {
 	DeletedAt             gorm.DeletedAt `gorm:"column:deleted_at;index"`
 }
 
+func (*OAuth2Token) TableName() string {
+	return "oauth2_tokens"
+}
+
 func (t *OAuth2Token) IsAccessTokenExpired(ctx context.Context) bool {
 	if t.AccessTokenExpiresAt == nil {
 		return false
@@ -106,4 +110,63 @@ func (db *gormDB) InsertOAuth2Token(
 	}
 
 	return newToken, nil
+}
+
+type OAuth2TokenWithConnection struct {
+	OAuth2Token
+	Connection Connection `gorm:"embedded"`
+}
+
+func (db *gormDB) EnumerateOAuth2TokensExpiringWithin(
+	ctx context.Context,
+	duration time.Duration,
+	callback func(tokens []*OAuth2TokenWithConnection, lastPage bool) (stop bool, err error),
+) error {
+	const pageSize = 100
+	now := ctx.Clock().Now()
+	expirationThreshold := now.Add(duration)
+
+	sess := db.session(ctx)
+	offset := 0
+
+	for {
+		var tokensWithConnections []*OAuth2TokenWithConnection
+
+		// Fetch tokens that are expiring within the given duration or already expired
+		result := sess.
+			Table("oauth2_tokens t").
+			Select("t.*, c.*").
+			Joins("INNER JOIN connections c ON c.id = t.connection_id").
+			Where("t.access_token_expires_at <= ?", expirationThreshold).
+			Where("t.deleted_at IS NULL").
+			Where("c.deleted_at IS NULL").
+			Where("c.state = ?", ConnectionStateReady).
+			Order("t.created_at DESC").
+			Limit(pageSize + 1).
+			Offset(offset).
+			Find(&tokensWithConnections)
+
+		if result.Error != nil {
+			return result.Error
+		}
+
+		lastPage := len(tokensWithConnections) < pageSize+1
+
+		if len(tokensWithConnections) > pageSize {
+			tokensWithConnections = tokensWithConnections[:pageSize]
+		}
+		
+		stop, err := callback(tokensWithConnections, lastPage)
+		if err != nil {
+			return err
+		}
+
+		if stop || lastPage {
+			break
+		}
+
+		offset += pageSize
+	}
+
+	return nil
 }

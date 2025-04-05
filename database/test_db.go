@@ -15,6 +15,10 @@ import (
 // cleaned up after the process exits. Note that the configuration in the root will be modified for the database
 // and populated for the GlobalAESKey if it is not already populated.
 //
+// To support debugging tests by inspecting the SQLite database, if the SQLITE_TEST_DATABASE_PATH env var is set
+// this method will use the database at that path. It will delete the existing file at that path to recreate unless
+// the SQLITE_TEST_DATABASE_PATH_CLEAR env var is set to false.
+//
 // Parameters:
 // - testName: the name of the test. this can be a blank value but providing it make file names be identifiable by the test that generated them
 // - root: the config to apply the database config to. This may be nil, in which case a new config is created. This method will overwrite the existing config.
@@ -37,10 +41,18 @@ func MustApplyBlankTestDbConfig(testName string, cfg config.C) (config.C, DB) {
 		panic("No root in config")
 	}
 
-	tempFilePath := filepath.Join(
-		os.TempDir(),
-		fmt.Sprintf("authproxy-tests/db/%s-%d-%s%s.sqlite3", time.Now().Format("2006-01-02T15-04-05"), os.Getpid(), testName, uuid.New().String()),
-	)
+	tempFilePath := os.Getenv("SQLITE_TEST_DATABASE_PATH")
+	if tempFilePath != "" {
+		clearEnv := os.Getenv("SQLITE_TEST_DATABASE_PATH_CLEAR")
+		if clearEnv != "false" {
+			_ = os.Remove(tempFilePath)
+		}
+	} else {
+		tempFilePath = filepath.Join(
+			os.TempDir(),
+			fmt.Sprintf("authproxy-tests/db/%s-%d-%s%s.sqlite3", time.Now().Format("2006-01-02T15-04-05"), os.Getpid(), testName, uuid.New().String()),
+		)
+	}
 
 	dirPath := filepath.Dir(tempFilePath)
 	err := os.MkdirAll(dirPath, os.ModePerm)

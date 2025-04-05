@@ -1,10 +1,12 @@
 package database
 
 import (
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/util"
 	"github.com/stretchr/testify/require"
+	"gorm.io/gorm"
 	clock "k8s.io/utils/clock/testing"
 	"testing"
 	"time"
@@ -203,5 +205,241 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.Nil(t, tok2.RefreshedFromID)
 		require.Equal(t, "encryptedRefreshToken2", tok2.EncryptedRefreshToken)
 		require.Equal(t, "encryptedAccessToken2", tok2.EncryptedAccessToken)
+	})
+}
+
+func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
+	t.Run("table-driven tests", func(t *testing.T) {
+		now := time.Date(2023, time.November, 5, 6, 0, 0, 0, time.UTC)
+		ctx := context.Background().
+			WithClock(clock.NewFakeClock(now))
+
+		createdConnection := Connection{
+			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+			State:       ConnectionStateCreated,
+			ConnectorId: "some-connector",
+			CreatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
+			UpdatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
+		}
+
+		readyConnection1 := Connection{
+			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000002"),
+			State:       ConnectionStateReady,
+			ConnectorId: "some-connector",
+			CreatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
+			UpdatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
+		}
+
+		readyConnection2 := Connection{
+			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000003"),
+			State:       ConnectionStateReady,
+			ConnectorId: "some-connector",
+			CreatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
+			UpdatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
+		}
+
+		disabledConnection := Connection{
+			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000004"),
+			State:       ConnectionStateDisabled,
+			ConnectorId: "some-connector",
+			CreatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
+			UpdatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
+		}
+
+		deletedConnection := Connection{
+			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000005"),
+			State:       ConnectionStateReady,
+			ConnectorId: "some-connector",
+			CreatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
+			UpdatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
+			DeletedAt: gorm.DeletedAt{
+				Time:  ctx.Clock().Now().Add(-30 * time.Minute),
+				Valid: true,
+			},
+		}
+
+		manyReadyConnections := make([]Connection, 0)
+		for i := 0; i < 200; i++ {
+			manyReadyConnections = append(manyReadyConnections, Connection{
+				ID:          uuid.New(),
+				State:       ConnectionStateReady,
+				ConnectorId: "some-connector",
+				CreatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
+				UpdatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
+			})
+		}
+
+		tokens150AllExpiring := make([]*OAuth2Token, 0)
+		for i := 0; i < 150; i++ {
+			tokens150AllExpiring = append(tokens150AllExpiring, &OAuth2Token{
+				ConnectionID:         manyReadyConnections[i].ID,
+				AccessTokenExpiresAt: util.ToPtr(now.Add(15 * time.Minute)),
+			})
+		}
+
+		connections := []Connection{
+			createdConnection,
+			readyConnection1,
+			readyConnection2,
+			disabledConnection,
+			deletedConnection,
+		}
+
+		connections = append(connections, manyReadyConnections...)
+
+		testCases := []struct {
+			name           string
+			tokens         []*OAuth2Token
+			duration       time.Duration
+			callbackError  bool
+			expectedTokens int
+		}{
+			{
+				name:           "no tokens in database",
+				tokens:         nil,
+				duration:       time.Hour,
+				callbackError:  false,
+				expectedTokens: 0,
+			},
+			{
+				name: "one token expiring within duration",
+				tokens: []*OAuth2Token{
+					{
+						ConnectionID:         readyConnection1.ID,
+						AccessTokenExpiresAt: util.ToPtr(now.Add(30 * time.Minute)),
+					},
+				},
+				duration:       time.Hour,
+				callbackError:  false,
+				expectedTokens: 1,
+			},
+			{
+				name: "one token already expired",
+				tokens: []*OAuth2Token{
+					{
+						ConnectionID:         readyConnection1.ID,
+						AccessTokenExpiresAt: util.ToPtr(now.Add(-30 * time.Minute)),
+					},
+				},
+				duration:       time.Hour,
+				callbackError:  false,
+				expectedTokens: 1,
+			},
+			{
+				name: "multiple tokens expiring within duration",
+				tokens: []*OAuth2Token{
+					{
+						ConnectionID:         readyConnection1.ID,
+						AccessTokenExpiresAt: util.ToPtr(now.Add(15 * time.Minute)),
+					},
+					{
+						ConnectionID:         readyConnection2.ID,
+						AccessTokenExpiresAt: util.ToPtr(now.Add(45 * time.Minute)),
+					},
+				},
+				duration:       time.Hour,
+				callbackError:  false,
+				expectedTokens: 2,
+			},
+			{
+				name: "tokens expiring beyond provided duration",
+				tokens: []*OAuth2Token{
+					{
+						ConnectionID:         readyConnection1.ID,
+						AccessTokenExpiresAt: util.ToPtr(now.Add(2 * time.Hour)),
+					},
+				},
+				duration:       time.Hour,
+				callbackError:  false,
+				expectedTokens: 0,
+			},
+			{
+				name: "ignores tokens for disabled connections",
+				tokens: []*OAuth2Token{
+					{
+						ConnectionID:         disabledConnection.ID,
+						AccessTokenExpiresAt: util.ToPtr(now.Add(30 * time.Minute)),
+					},
+				},
+				duration:       time.Hour,
+				callbackError:  false,
+				expectedTokens: 0,
+			},
+			{
+				name: "ignores tokens for deleted connections",
+				tokens: []*OAuth2Token{
+					{
+						ConnectionID:         deletedConnection.ID,
+						AccessTokenExpiresAt: util.ToPtr(now.Add(30 * time.Minute)),
+					},
+				},
+				duration:       time.Hour,
+				callbackError:  false,
+				expectedTokens: 0,
+			},
+			{
+				name:           "multiple pages of tokens",
+				tokens:         tokens150AllExpiring,
+				duration:       time.Hour,
+				callbackError:  false,
+				expectedTokens: 150,
+			},
+			{
+				name: "callback returns error",
+				tokens: []*OAuth2Token{
+					{
+						ConnectionID:         readyConnection1.ID,
+						AccessTokenExpiresAt: util.ToPtr(now.Add(15 * time.Minute)),
+					},
+				},
+				duration:       time.Hour,
+				callbackError:  true,
+				expectedTokens: 0,
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				_, db := MustApplyBlankTestDbConfig("enumerate_tokens_test", nil)
+				err := db.Migrate(ctx)
+				require.NoError(t, err)
+
+				dbRaw := db.(*gormDB)
+
+				for _, connection := range connections {
+					result := dbRaw.gorm.Create(&connection)
+					require.NoError(t, result.Error)
+				}
+
+				for _, token := range tc.tokens {
+					_, err := db.InsertOAuth2Token(
+						ctx,
+						token.ConnectionID,
+						nil,
+						"refreshToken",
+						"accessToken",
+						token.AccessTokenExpiresAt,
+						"scope1 scope2",
+					)
+					require.NoError(t, err)
+				}
+
+				count := 0
+				err = db.EnumerateOAuth2TokensExpiringWithin(ctx, tc.duration, func(tokens []*OAuth2TokenWithConnection, lastPage bool) (bool, error) {
+					if tc.callbackError {
+						return true, fmt.Errorf("callback error")
+					}
+					count += len(tokens)
+					return false, nil
+				})
+
+				if tc.callbackError {
+					require.Error(t, err)
+				} else {
+					require.NoError(t, err)
+					require.Equal(t, tc.expectedTokens, count)
+				}
+			})
+		}
 	})
 }

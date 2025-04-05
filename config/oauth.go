@@ -22,6 +22,19 @@ type OAuth struct {
 	// is to reduce the time that a redirect link from auth proxy would be valid for the purposes of phishing other
 	// peoples credentials using this link as the basis.
 	RoundTripTtl HumanDuration `json:"round_trip_ttl" yaml:"round_trip_ttl"`
+
+	// RefreshTokensInBackground controls if the system should proactively refresh tokens in the background. Default
+	// value is `true`. If set to false, tokens will not be refreshed until they are detected to be expired when used.
+	RefreshTokensInBackground *bool `json:"refresh_tokens_in_background" yaml:"refresh_tokens_in_background"`
+
+	// RefreshTokensTimeBeforeExpiry is the default time prior to token expiry to refresh the tokens. This value can be
+	// overridden on a per-connector basis, but the granularity of this value is limited by the cron for running refresh.
+	// If not specified the default value is 10 minutes.
+	RefreshTokensTimeBeforeExpiry *HumanDuration `json:"refresh_tokens_time_before_expiry" yaml:"refresh_tokens_time_before_expiry"`
+
+	// RefreshTokensCronSchedule is the schedule at which the background job to refresh oauth tokens will run. If not
+	// specified, runs every 10 minutes.
+	RefreshTokensCronSchedule string `json:"refresh_tokens_cron_schedule" yaml:"refresh_tokens_cron_schedule"`
 }
 
 func (o *OAuth) GetRoundTripTtlOrDefault() time.Duration {
@@ -49,4 +62,28 @@ func (o *OAuth) GetInitiateToRedirectTtlOrDefault() time.Duration {
 	}
 
 	return initiateToRedirectTtl
+}
+
+func (o *OAuth) GetRefreshTokensInBackgroundOrDefault() bool {
+	if o == nil || o.RefreshTokensInBackground == nil {
+		return true
+	}
+
+	return *o.RefreshTokensInBackground
+}
+
+func (o *OAuth) GetRefreshTokensTimeBeforeExpiryOrDefault() time.Duration {
+	if o == nil || o.RefreshTokensTimeBeforeExpiry == nil {
+		return 10 * time.Minute
+	}
+
+	return o.RefreshTokensTimeBeforeExpiry.Duration
+}
+
+func (o *OAuth) GetRefreshTokensCronScheduleOrDefault() string {
+	if o == nil || o.RefreshTokensCronSchedule == "" {
+		return "*/10 * * * *"
+	}
+
+	return o.RefreshTokensCronSchedule
 }
