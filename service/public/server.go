@@ -15,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/service/public/routes"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -41,25 +42,28 @@ func GetGinServer(
 	redis redis.R,
 	httpf httpf.F,
 	encrypt encrypt.E,
-) *gin.Engine {
+) (server *gin.Engine, healthChecker *gin.Engine) {
 	authService := auth.NewService(cfg, &cfg.GetRoot().Public, db, redis)
 
-	router := api_common.GinForService(&cfg.GetRoot().Public)
+	server = api_common.GinForService(&cfg.GetRoot().Public)
 
-	//router.Use(authService.Optional())
-	//router.Use(cors.New(GetCorsConfig()))
+	if cfg.GetRoot().Public.Port() != cfg.GetRoot().Public.HealthCheckPort() {
+		healthChecker = api_common.GinForService(&cfg.GetRoot().Public)
+	} else {
+		healthChecker = server
+	}
 
 	// Static content
-	router.Use(static.Serve("/", static.LocalFile("./client/build", true)))
+	server.Use(static.Serve("/", static.LocalFile("./client/build", true)))
 
-	router.GET("/ping", func(c *gin.Context) {
+	healthChecker.GET("/ping", func(c *gin.Context) {
 		c.PureJSON(http.StatusOK, gin.H{
 			"service": "api",
 			"message": "pong",
 		})
 	})
 
-	router.GET("/healthz", func(c *gin.Context) {
+	healthChecker.GET("/healthz", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.AsContext(c.Request.Context()), 1*time.Second)
 		defer cancel()
 
@@ -91,9 +95,9 @@ func GetGinServer(
 	})
 
 	routesOauth2 := routes.NewOauth2Routes(cfg, authService, db, redis, httpf, encrypt)
-	routesOauth2.Register(router)
+	routesOauth2.Register(server)
 
-	return router
+	return server, healthChecker
 }
 
 func Serve(cfg config.C) {
@@ -135,6 +139,22 @@ func Serve(cfg config.C) {
 	httpf := httpf.CreateFactory(cfg, rs)
 	encrypt := encrypt.NewEncryptService(cfg, db)
 
-	r := GetGinServer(cfg, db, rs, httpf, encrypt)
-	r.Run(fmt.Sprintf(":%d", cfg.GetRoot().Public.Port()))
+	server, healthChecker := GetGinServer(cfg, db, rs, httpf, encrypt)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		server.Run(fmt.Sprintf(":%d", cfg.GetRoot().Public.Port()))
+	}()
+
+	if server != healthChecker {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			healthChecker.Run(fmt.Sprintf(":%d", cfg.GetRoot().Public.HealthCheckPort()))
+		}()
+	}
+
+	wg.Wait()
 }

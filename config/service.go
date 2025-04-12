@@ -49,6 +49,7 @@ func AllValidServiceIds(ids []string) bool {
 
 type Service interface {
 	Port() uint64
+	HealthCheckPort() uint64
 	IsHttps() bool
 	Domain() string
 	GetBaseUrl() string

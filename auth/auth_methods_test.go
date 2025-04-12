@@ -270,7 +270,7 @@ func TestAuth_Parse(t *testing.T) {
 				},
 			},
 			AdminApi: config.ServiceAdminApi{
-				PortVal: 8080,
+				PortVal: &config.StringValueDirect{Value: "8080"},
 			},
 		})
 		serv2 := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi), nil, nil)
@@ -319,7 +319,7 @@ func TestAuth_Parse(t *testing.T) {
 				},
 			},
 			AdminApi: config.ServiceAdminApi{
-				PortVal: 8080,
+				PortVal: &config.StringValueDirect{Value: "8080"},
 			},
 		})
 		adminSrv := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi), nil, nil)
@@ -701,7 +701,7 @@ var testConfigPublicPrivateKey = config.Root{
 		},
 	},
 	AdminApi: config.ServiceAdminApi{
-		PortVal: 8080,
+		PortVal: &config.StringValueDirect{Value: "8080"},
 	},
 }
 
@@ -719,6 +719,6 @@ var testConfigSecretKey = config.Root{
 		},
 	},
 	AdminApi: config.ServiceAdminApi{
-		PortVal: 8080,
+		PortVal: &config.StringValueDirect{Value: "8080"},
 	},
 }

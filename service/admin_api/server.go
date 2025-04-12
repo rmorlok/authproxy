@@ -3,7 +3,6 @@ package admin_api
 import (
 	"fmt"
 	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
-	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/auth"
@@ -12,6 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/redis"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -23,16 +23,7 @@ func rateErrorHandler(c *gin.Context, info ratelimit.Info) {
 	c.String(429, "Too many requests. Try again in "+time.Until(info.ResetTime).String())
 }
 
-//func GetCorsConfig() cors.Config {
-//	config := cors.DefaultConfig()
-//
-//	config.AllowOrigins = GetEnvironmentVariables().CorsAllowedOrigins
-//	config.AllowCredentials = true
-//
-//	return config
-//}
-
-func GetGinServer(cfg config.C, db database.DB, redis redis.R) *gin.Engine {
+func GetGinServer(cfg config.C, db database.DB, redis redis.R) (server *gin.Engine, healthChecker *gin.Engine) {
 	authService := auth.NewService(cfg, &cfg.GetRoot().AdminApi, db, redis)
 
 	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
@@ -40,29 +31,29 @@ func GetGinServer(cfg config.C, db database.DB, redis redis.R) *gin.Engine {
 		Limit: 3,
 	})
 
-	router := api_common.GinForService(&cfg.GetRoot().AdminApi)
+	server = api_common.GinForService(&cfg.GetRoot().AdminApi)
 
-	//router.Use(authService.Optional())
-	//router.Use(cors.New(GetCorsConfig()))
+	if cfg.GetRoot().Public.Port() != cfg.GetRoot().Public.HealthCheckPort() {
+		healthChecker = api_common.GinForService(&cfg.GetRoot().AdminApi)
+	} else {
+		healthChecker = server
+	}
 
-	// Static content
-	router.Use(static.Serve("/", static.LocalFile("./client/build", true)))
-
-	router.GET("/ping", func(c *gin.Context) {
+	healthChecker.GET("/ping", func(c *gin.Context) {
 		c.PureJSON(http.StatusOK, gin.H{
 			"service": "admin-api",
 			"message": "pong",
 		})
 	})
 
-	router.GET("/healthz", func(c *gin.Context) {
+	healthChecker.GET("/healthz", func(c *gin.Context) {
 		c.PureJSON(http.StatusOK, gin.H{
 			"service": "admin-api",
 			"ok":      true,
 		})
 	})
 
-	api := router.Group("/api", authService.AdminOnly())
+	api := server.Group("/api", authService.AdminOnly())
 	{
 		mw := ratelimit.RateLimiter(rlstore, &ratelimit.Options{
 			ErrorHandler: rateErrorHandler,
@@ -72,7 +63,7 @@ func GetGinServer(cfg config.C, db database.DB, redis redis.R) *gin.Engine {
 		api.GET("/domains", mw, ListDomains)
 	}
 
-	return router
+	return server, healthChecker
 }
 
 func Serve(cfg config.C) {
@@ -111,6 +102,23 @@ func Serve(cfg config.C) {
 		}()
 	}
 
-	r := GetGinServer(cfg, db, rs)
-	r.Run(fmt.Sprintf(":%d", cfg.GetRoot().AdminApi.Port()))
+	server, healthChecker := GetGinServer(cfg, db, rs)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		server.Run(fmt.Sprintf(":%d", cfg.GetRoot().AdminApi.Port()))
+	}()
+
+	if server != healthChecker {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			healthChecker.Run(fmt.Sprintf(":%d", cfg.GetRoot().AdminApi.HealthCheckPort()))
+		}()
+	}
+
+	wg.Wait()
+
 }

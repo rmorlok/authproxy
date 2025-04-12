@@ -3,7 +3,6 @@ package worker
 import (
 	context2 "context"
 	"fmt"
-	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/api_common"
@@ -19,14 +18,6 @@ import (
 	"sync"
 	"time"
 )
-
-func rateKeyFunc(c *gin.Context) string {
-	return c.ClientIP()
-}
-
-func rateErrorHandler(c *gin.Context, info ratelimit.Info) {
-	c.String(429, "Too many requests. Try again in "+time.Until(info.ResetTime).String())
-}
 
 func Serve(cfg config.C) {
 	if !cfg.IsDebugMode() {
@@ -79,8 +70,14 @@ func Serve(cfg config.C) {
 
 	asyncHasError := false
 	asyncRunning := false
+	asyncIsScheduler := false
 	asyncHealthChecker := func(err error) {
-		asyncHasError = err != nil
+		asyncHasError = asyncHasError || err != nil
+	}
+
+	asyncSchedulerHealthChecker := func(isScheduler bool, err error) {
+		asyncHasError = asyncHasError || err != nil
+		asyncIsScheduler = isScheduler
 	}
 
 	asynqClient := asynq.NewClientFromRedisClient(rs.Client())
@@ -121,14 +118,17 @@ func Serve(cfg config.C) {
 		}
 
 		c.PureJSON(status, gin.H{
-			"service":     "worker",
-			"db":          dbOk,
-			"redis":       redisOk,
-			"asynqServer": asyncRunning && !asyncHasError,
-			"asynqClient": asyncClientOk,
-			"ok":          everythingOk,
+			"service":          "worker",
+			"db":               dbOk,
+			"redis":            redisOk,
+			"asynqServer":      asyncRunning && !asyncHasError,
+			"asynqClient":      asyncClientOk,
+			"asyncIsScheduler": asyncIsScheduler,
+			"ok":               everythingOk,
 		})
 	})
+
+	ctx := context.Background()
 
 	srv := asynq.NewServerFromRedisClient(
 		rs.Client(),
@@ -136,7 +136,7 @@ func Serve(cfg config.C) {
 			HealthCheckFunc: asyncHealthChecker,
 			Concurrency:     workerConfig.GetConcurrency(context.Background()),
 			BaseContext: func() context2.Context {
-				return context.Background()
+				return ctx
 			},
 			Queues: map[string]int{
 				"default": 5,
@@ -146,25 +146,41 @@ func Serve(cfg config.C) {
 
 	mux := asynq.NewServeMux()
 
-	oauth2.
-		NewTaskHandler(cfg, db, rs, asynqClient, httpf, encrypt).
-		RegisterTasks(mux)
+	oauth2TaskHandler := oauth2.NewTaskHandler(cfg, db, rs, asynqClient, httpf, encrypt)
+	oauth2TaskHandler.RegisterTasks(mux)
 
 	var wg sync.WaitGroup
 
 	wg.Add(1)
 	go func() {
+		defer wg.Done()
 		if err := srv.Run(mux); err != nil {
 			asyncHasError = true
 			log.Fatalf("could not run async server: %v", err)
 		}
 		asyncRunning = false
-		wg.Done()
+	}()
+
+	scheduler := &scheduler{
+		redis:               rs,
+		healthCheckFunc:     asyncSchedulerHealthChecker,
+		oauth2TaskRegistrar: oauth2TaskHandler,
+	}
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		if err := scheduler.Run(ctx); err != nil {
+			asyncHasError = true
+			log.Fatalf("could not run scheduler: %v", err)
+		}
+		asyncIsScheduler = false
 	}()
 
 	wg.Add(1)
 	go func() {
-		if err := router.Run(fmt.Sprintf(":%d", cfg.GetRoot().Worker.Port())); err != nil {
+		defer wg.Done()
+		if err := router.Run(fmt.Sprintf(":%d", cfg.GetRoot().Worker.HealthCheckPort())); err != nil {
 			log.Fatalf("could not run gin server: %v", err)
 		}
 	}()

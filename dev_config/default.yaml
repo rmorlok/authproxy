@@ -5,7 +5,9 @@ api:
 admin_api:
   port: 8082
 worker:
-  port: 8083
+  health_check_port:
+    env_var: HEALTH_CHECK_PORT
+    default: 8083
 system_auth:
   cookie_domain: localhost:8080
   jwt_signing_key:

@@ -83,6 +83,11 @@ func WithTimeout(ctx context.Context, timeout time.Duration) (Context, context.C
 	return AsContext(out), cancel
 }
 
+func WithCancel(ctx context.Context) (Context, CancelFunc) {
+	out, cancel := context.WithCancel(ctx)
+	return AsContext(out), cancel
+}
+
 func (cc *commonContext) WithClock(clock clock.Clock) Context {
 	ctx := context.WithValue(cc, clockKey, clock)
 	return AsContext(ctx)

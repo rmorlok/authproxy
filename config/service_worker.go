@@ -9,8 +9,8 @@ import (
 )
 
 type ServiceWorker struct {
-	PortVal        uint64      `json:"port" yaml:"port"`
-	ConcurrencyVal StringValue `json:"concurrency" yaml:"concurrency"`
+	HealthCheckPortVal StringValue `json:"heath_check_port" yaml:"heath_check_port"`
+	ConcurrencyVal     StringValue `json:"concurrency" yaml:"concurrency"`
 }
 
 func (s *ServiceWorker) UnmarshalYAML(value *yaml.Node) error {
@@ -20,6 +20,7 @@ func (s *ServiceWorker) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	var concurrencyVal StringValue = &StringValueDirect{Value: "0"}
+	var healthCheckPortVal StringValue = &StringValueDirect{Value: "0"}
 
 	// Handle custom unmarshalling for some attributes. Iterate through the mapping node's content,
 	// which will be sequences of keys, then values.
@@ -36,6 +37,10 @@ func (s *ServiceWorker) UnmarshalYAML(value *yaml.Node) error {
 				return err
 			}
 			matched = true
+		case "health_check_port":
+			if healthCheckPortVal, err = stringValueUnmarshalYAML(valueNode); err != nil {
+				return err
+			}
 		}
 
 		if matched {
@@ -55,12 +60,27 @@ func (s *ServiceWorker) UnmarshalYAML(value *yaml.Node) error {
 
 	// Set the custom unmarshalled types
 	raw.ConcurrencyVal = concurrencyVal
+	raw.HealthCheckPortVal = healthCheckPortVal
 
 	return nil
 }
 
 func (s *ServiceWorker) Port() uint64 {
-	return s.PortVal
+	return s.HealthCheckPort()
+}
+
+func (s *ServiceWorker) HealthCheckPort() uint64 {
+	portS, err := s.HealthCheckPortVal.GetValue(context.Background())
+	if err != nil {
+		panic("failed to obtain health check port from worker config")
+	}
+
+	port, err := strconv.ParseUint(portS, 10, 64)
+	if err != nil {
+		panic(fmt.Sprintf("failed to parse health check port '%s' from worker config", portS))
+	}
+
+	return port
 }
 
 func (s *ServiceWorker) IsHttps() bool {

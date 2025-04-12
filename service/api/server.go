@@ -14,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/service/api/routes"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -31,7 +32,7 @@ func GetGinServer(
 	redis redis.R,
 	httpf httpf.F,
 	encrypt encrypt.E,
-) *gin.Engine {
+) (server *gin.Engine, healthChecker *gin.Engine) {
 	authService := auth.NewService(cfg, &cfg.GetRoot().Api, db, redis)
 
 	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
@@ -39,16 +40,22 @@ func GetGinServer(
 		Limit: 10_000,
 	})
 
-	router := api_common.GinForService(&cfg.GetRoot().Api)
+	server = api_common.GinForService(&cfg.GetRoot().Api)
 
-	router.GET("/ping", func(c *gin.Context) {
+	if cfg.GetRoot().Public.Port() != cfg.GetRoot().Public.HealthCheckPort() {
+		healthChecker = api_common.GinForService(&cfg.GetRoot().Api)
+	} else {
+		healthChecker = server
+	}
+
+	healthChecker.GET("/ping", func(c *gin.Context) {
 		c.PureJSON(http.StatusOK, gin.H{
 			"service": "api",
 			"message": "pong",
 		})
 	})
 
-	router.GET("/healthz", func(c *gin.Context) {
+	healthChecker.GET("/healthz", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(context.AsContext(c.Request.Context()), 1*time.Second)
 		defer cancel()
 
@@ -87,12 +94,12 @@ func GetGinServer(
 	routesConnectors := routes.NewConnectorsRoutes(cfg, authService)
 	routesConnections := routes.NewConnectionsRoutes(cfg, authService, db, redis, httpf, encrypt)
 
-	api := router.Group("/api", rl)
+	api := server.Group("/api", rl)
 
 	routesConnectors.Register(api)
 	routesConnections.Register(api)
 
-	return router
+	return server, healthChecker
 }
 
 func Serve(cfg config.C) {
@@ -134,6 +141,22 @@ func Serve(cfg config.C) {
 	httpf := httpf.CreateFactory(cfg, rs)
 	encrypt := encrypt.NewEncryptService(cfg, db)
 
-	r := GetGinServer(cfg, db, rs, httpf, encrypt)
-	r.Run(fmt.Sprintf(":%d", cfg.GetRoot().Api.Port()))
+	server, healthChecker := GetGinServer(cfg, db, rs, httpf, encrypt)
+
+	var wg sync.WaitGroup
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		server.Run(fmt.Sprintf(":%d", cfg.GetRoot().Api.Port()))
+	}()
+
+	if server != healthChecker {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			healthChecker.Run(fmt.Sprintf(":%d", cfg.GetRoot().Api.HealthCheckPort()))
+		}()
+	}
+
+	wg.Wait()
 }

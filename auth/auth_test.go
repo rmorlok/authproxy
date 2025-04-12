@@ -129,7 +129,7 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 		adminSigningKey := &config.KeyDataRandomBytes{}
 		b.cfg = config.FromRoot(&config.Root{
 			Public: config.ServicePublic{
-				PortVal:                  8080,
+				PortVal:                  &config.StringValueDirect{Value: "8080"},
 				DomainVal:                "example.com",
 				IsHttpsVal:               false,
 				SessionTimeoutVal:        &config.HumanDuration{Duration: 10 * time.Hour},
