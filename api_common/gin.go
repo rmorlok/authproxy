@@ -4,6 +4,12 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/context"
+	"log"
+	"net/http"
+	"os"
+	"os/signal"
+	"syscall"
 	"time"
 )
 
@@ -34,4 +40,46 @@ func GinForService(service config.Service) *gin.Engine {
 	engine.Use(gin.LoggerWithFormatter(logFormatter), gin.Recovery())
 
 	return engine
+}
+
+// RunGin attaches the router to a http.Server and starts listening and serving HTTP requests. It handles termination
+// signals automatically.
+func RunGin(engine *gin.Engine, address string) (err error) {
+	defer func() {
+		if err != nil {
+			log.Fatalf("Gin Error: %v\n", err)
+		}
+	}()
+
+	srv := &http.Server{
+		Addr:    address, // or your desired port
+		Handler: engine,
+	}
+
+	// Create channel to listen for signals
+	quit := make(chan os.Signal, 1)
+	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
+
+	go func() {
+		if err = srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+			log.Fatalf("listen: %s\n", err)
+		}
+	}()
+
+	// Wait for interrupt signal
+	<-quit
+	log.Println("Shutting down Gin server...")
+
+	// Create context with timeout for shutdown
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	// Attempt graceful shutdown
+	if err := srv.Shutdown(ctx); err != nil {
+		log.Fatal("Server forced to shutdown:", err)
+	}
+
+	log.Println("Gin Server exiting")
+
+	return
 }

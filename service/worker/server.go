@@ -159,6 +159,7 @@ func Serve(cfg config.C) {
 			log.Fatalf("could not run async server: %v", err)
 		}
 		asyncRunning = false
+		println("Worker shutdown complete")
 	}()
 
 	scheduler := &scheduler{
@@ -175,14 +176,16 @@ func Serve(cfg config.C) {
 			log.Fatalf("could not run scheduler: %v", err)
 		}
 		asyncIsScheduler = false
+		println("Scheduler shutdown complete")
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := router.Run(fmt.Sprintf(":%d", cfg.GetRoot().Worker.HealthCheckPort())); err != nil {
+		if err := api_common.RunGin(router, fmt.Sprintf(":%d", cfg.GetRoot().Worker.HealthCheckPort())); err != nil {
 			log.Fatalf("could not run gin server: %v", err)
 		}
+		println("Gin shutdown complete")
 	}()
 
 	wg.Wait()
