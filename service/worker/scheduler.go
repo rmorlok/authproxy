@@ -34,54 +34,11 @@ func (s *scheduler) getMutex() redis.Mutex {
 	)
 }
 
-func (s *scheduler) runScheduler(ctx context.Context) error {
-	mgr, err := asynq.NewPeriodicTaskManager(
-		asynq.PeriodicTaskManagerOpts{
-			RedisUniversalClient:       s.redis.Client(),
-			PeriodicTaskConfigProvider: s,
-			SyncInterval:               10 * time.Second,
-		},
-	)
-
-	if err != nil {
-		return err
-	}
-
-	var wg sync.WaitGroup
-	var mgrDone chan struct{}
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-		err = mgr.Run()
-		mgrDone <- struct{}{}
-	}()
-
-	wg.Add(1)
-	go func() {
-		defer wg.Done()
-
-		for {
-			select {
-			case <-mgrDone:
-				close(mgrDone)
-				return
-			case <-ctx.Done():
-				mgr.Shutdown()
-				return
-			default:
-				time.Sleep(100 * time.Millisecond)
-			}
-		}
-	}()
-
-	wg.Wait()
-
-	return err
-}
-
 func (s *scheduler) Run(ctx context.Context) error {
 	m := s.getMutex()
+
+	var mgr *asynq.PeriodicTaskManager
+	var mgrMutex sync.Mutex
 
 	// Create signal channel
 	sigChan := make(chan os.Signal, 1)
@@ -112,6 +69,14 @@ func (s *scheduler) Run(ctx context.Context) error {
 		select {
 		case <-done:
 			println("Shutting down scheduler watchdog")
+			func() {
+				mgrMutex.Lock()
+				defer mgrMutex.Unlock()
+				if mgr != nil {
+					mgr.Shutdown()
+					mgr = nil
+				}
+			}()
 			return nil
 		default:
 			err := m.Lock(ctx)
@@ -120,22 +85,32 @@ func (s *scheduler) Run(ctx context.Context) error {
 				println("Obtained lock for scheduler")
 				s.healthCheckFunc(true, nil)
 
-				// We have the lock and are thus the scheduler
-				cancelCtx, cancel := context.WithCancel(ctx)
-
 				var wg sync.WaitGroup
-				var schedDone chan struct{}
 
-				var runSchedulerError error
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					println("Scheduler is running")
-					runSchedulerError = s.runScheduler(cancelCtx)
-					close(schedDone)
-					s.healthCheckFunc(false, runSchedulerError)
-					println("Scheduler has stopped")
+				func() {
+					mgrMutex.Lock()
+					defer mgrMutex.Unlock()
+
+					mgr, err = asynq.NewPeriodicTaskManager(
+						asynq.PeriodicTaskManagerOpts{
+							RedisUniversalClient:       s.redis.Client(),
+							PeriodicTaskConfigProvider: s,
+							SyncInterval:               10 * time.Second,
+						},
+					)
 				}()
+
+				if err != nil {
+					return errors.Wrap(err, "error creating periodic task manager")
+				}
+
+				runSchedulerError := mgr.Start()
+				if runSchedulerError != nil {
+					s.healthCheckFunc(false, runSchedulerError)
+					return runSchedulerError
+				}
+				s.healthCheckFunc(true, runSchedulerError)
+				println("Scheduler is running")
 
 				var extendLockError error
 				wg.Add(1)
@@ -143,14 +118,39 @@ func (s *scheduler) Run(ctx context.Context) error {
 					defer wg.Done()
 					for {
 						select {
-						case <-schedDone:
+						case <-done:
+							println("Shutting down scheduler")
+							func() {
+								mgrMutex.Lock()
+								defer mgrMutex.Unlock()
+								if mgr != nil {
+									mgr.Shutdown()
+									mgr = nil
+								}
+							}()
 							return
 						case <-ctx.Done():
+							func() {
+								mgrMutex.Lock()
+								defer mgrMutex.Unlock()
+								if mgr != nil {
+									mgr.Shutdown()
+									mgr = nil
+								}
+							}()
 							return
 						case <-time.After(mutexLockTime / 2):
 							extendLockError = m.Extend(ctx, mutexLockTime)
 							if extendLockError != nil {
-								cancel()
+								func() {
+									mgrMutex.Lock()
+									defer mgrMutex.Unlock()
+									if mgr != nil {
+										mgr.Shutdown()
+										mgr = nil
+									}
+								}()
+								s.healthCheckFunc(false, nil)
 								return
 							}
 							s.healthCheckFunc(true, nil)
@@ -168,6 +168,14 @@ func (s *scheduler) Run(ctx context.Context) error {
 			}
 
 			if !redis.MutexIsErrNotObtained(err) {
+				func() {
+					mgrMutex.Lock()
+					defer mgrMutex.Unlock()
+					if mgr != nil {
+						mgr.Shutdown()
+						mgr = nil
+					}
+				}()
 				s.healthCheckFunc(false, err)
 				return errors.Wrap(err, "error while attaining lock for scheduler")
 			} else {

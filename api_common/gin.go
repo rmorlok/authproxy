@@ -45,12 +45,6 @@ func GinForService(service config.Service) *gin.Engine {
 // RunGin attaches the router to a http.Server and starts listening and serving HTTP requests. It handles termination
 // signals automatically.
 func RunGin(engine *gin.Engine, address string) (err error) {
-	defer func() {
-		if err != nil {
-			log.Fatalf("Gin Error: %v\n", err)
-		}
-	}()
-
 	srv := &http.Server{
 		Addr:    address, // or your desired port
 		Handler: engine,
@@ -61,7 +55,11 @@ func RunGin(engine *gin.Engine, address string) (err error) {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		if err = srv.ListenAndServe(); err != nil && err != http.ErrServerClosed {
+		if err = srv.ListenAndServe(); err != nil {
+			if err == http.ErrServerClosed {
+				err = nil
+				return
+			}
 			log.Fatalf("listen: %s\n", err)
 		}
 	}()
