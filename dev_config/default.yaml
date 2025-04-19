@@ -26,6 +26,9 @@ database:
   auto_migrate: true
   auto_migration_lock_duration: 30s
   path: ./tmp/dev.db
+logging:
+  type: tint
+  level: debug
 #redis:
 #  provider: miniredis
 redis:

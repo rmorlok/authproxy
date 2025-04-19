@@ -14,22 +14,27 @@ import (
 	"github.com/rmorlok/authproxy/oauth2"
 	"github.com/rmorlok/authproxy/redis"
 	"log"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
 )
 
 func Serve(cfg config.C) {
+	rootLogger := cfg.GetRootLogger()
+	slog.SetDefault(rootLogger)
+	logger := rootLogger.With("service", "worker")
+
 	if !cfg.IsDebugMode() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	rs, err := redis.New(context.Background(), cfg)
+	rs, err := redis.New(context.Background(), cfg, logger)
 	if err != nil {
 		panic(err)
 	}
 
-	db, err := database.NewConnectionForRoot(cfg.GetRoot())
+	db, err := database.NewConnectionForRoot(cfg.GetRoot(), logger)
 	if err != nil {
 		panic(err)
 	}
@@ -138,6 +143,8 @@ func Serve(cfg config.C) {
 			BaseContext: func() context2.Context {
 				return ctx
 			},
+			Logger:   &asyncLogger{inner: logger.With("component", "asynq")},
+			LogLevel: asynq.InfoLevel,
 			Queues: map[string]int{
 				"default": 5,
 			},
@@ -159,13 +166,14 @@ func Serve(cfg config.C) {
 			log.Fatalf("could not run async server: %v", err)
 		}
 		asyncRunning = false
-		println("Worker shutdown complete")
+		logger.Info("Worker shutdown complete")
 	}()
 
 	scheduler := &scheduler{
 		redis:               rs,
 		healthCheckFunc:     asyncSchedulerHealthChecker,
 		oauth2TaskRegistrar: oauth2TaskHandler,
+		logger:              logger.With("component", "asynq-scheduler"),
 	}
 
 	wg.Add(1)
@@ -176,16 +184,16 @@ func Serve(cfg config.C) {
 			log.Fatalf("could not run scheduler: %v", err)
 		}
 		asyncIsScheduler = false
-		println("Scheduler shutdown complete")
+		logger.Info("Scheduler shutdown complete")
 	}()
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := api_common.RunGin(router, fmt.Sprintf(":%d", cfg.GetRoot().Worker.HealthCheckPort())); err != nil {
+		if err := api_common.RunGin(router, fmt.Sprintf(":%d", cfg.GetRoot().Worker.HealthCheckPort()), logger); err != nil {
 			log.Fatalf("could not run gin server: %v", err)
 		}
-		println("Gin shutdown complete")
+		logger.Info("Gin shutdown complete")
 	}()
 
 	wg.Wait()

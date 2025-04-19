@@ -6,6 +6,7 @@ import (
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
 	"log"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
@@ -44,7 +45,7 @@ func GinForService(service config.Service) *gin.Engine {
 
 // RunGin attaches the router to a http.Server and starts listening and serving HTTP requests. It handles termination
 // signals automatically.
-func RunGin(engine *gin.Engine, address string) (err error) {
+func RunGin(engine *gin.Engine, address string, logger *slog.Logger) (err error) {
 	srv := &http.Server{
 		Addr:    address, // or your desired port
 		Handler: engine,
@@ -66,7 +67,7 @@ func RunGin(engine *gin.Engine, address string) (err error) {
 
 	// Wait for interrupt signal
 	<-quit
-	log.Println("Shutting down Gin server...")
+	logger.Info("Shutting down Gin server...")
 
 	// Create context with timeout for shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
@@ -77,7 +78,7 @@ func RunGin(engine *gin.Engine, address string) (err error) {
 		log.Fatal("Server forced to shutdown:", err)
 	}
 
-	log.Println("Gin Server exiting")
+	logger.Info("Gin Server exiting")
 
 	return
 }

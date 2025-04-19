@@ -10,6 +10,7 @@ import (
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"log"
+	"log/slog"
 	"os"
 	"time"
 )
@@ -74,21 +75,15 @@ type DB interface {
 	CheckNonceValidAndMarkUsed(ctx context.Context, nonce uuid.UUID, retainRecordUntil time.Time) (wasValid bool, err error)
 }
 
-// NewConnection creates a new database connection from the specified configuration. The type of the database
-// returned will be determined by the configuration.
-func NewConnection(c config.C) (DB, error) {
-	return NewConnectionForRoot(c.GetRoot())
-}
-
 // NewConnectionForRoot creates a new database connection from the specified configuration. The type of the database
 // returned will be determined by the configuration. Same as NewConnection.
-func NewConnectionForRoot(root *config.Root) (DB, error) {
+func NewConnectionForRoot(root *config.Root, logger *slog.Logger) (DB, error) {
 	dbConfig := root.Database
 	secretKey := root.SystemAuth.GlobalAESKey
 
 	switch dbConfig.(type) {
 	case *config.DatabaseSqlite:
-		return NewSqliteConnection(dbConfig.(*config.DatabaseSqlite), secretKey)
+		return NewSqliteConnection(dbConfig.(*config.DatabaseSqlite), secretKey, logger)
 	default:
 		return nil, errors.New("database type not supported")
 	}
@@ -99,7 +94,7 @@ func NewConnectionForRoot(root *config.Root) (DB, error) {
 // Parameters:
 // - dbConfig: the configuration for the SQLite database
 // - secretKey: the AES key used to secure cursors
-func NewSqliteConnection(dbConfig *config.DatabaseSqlite, secretKey config.KeyData) (DB, error) {
+func NewSqliteConnection(dbConfig *config.DatabaseSqlite, secretKey config.KeyData, l *slog.Logger) (DB, error) {
 	path := dbConfig.Path
 	_, err := os.Stat(path)
 	if err != nil {
@@ -120,17 +115,22 @@ func NewSqliteConnection(dbConfig *config.DatabaseSqlite, secretKey config.KeyDa
 		defer file.Close()
 	}
 
-	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{})
+	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{
+		Logger: &logger{
+			inner: l,
+		},
+	})
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open sqlite database '%s'", dbConfig.Path)
 	}
 
-	return &gormDB{gorm: db, secretKey: secretKey}, nil
+	return &gormDB{gorm: db, secretKey: secretKey, logger: l}, nil
 }
 
 type gormDB struct {
 	gorm      *gorm.DB       // the gorm instance
 	secretKey config.KeyData // the AES key used to secure cursors
+	logger    *slog.Logger
 }
 
 func (db *gormDB) session(ctx context.Context) *gorm.DB {

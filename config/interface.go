@@ -1,6 +1,7 @@
 package config
 
 import (
+	"log/slog"
 	"os"
 )
 
@@ -16,6 +17,10 @@ type C interface {
 
 	// GetFallbackConnectorLogo gets a logo to use if not specified for a connector configuration
 	GetFallbackConnectorLogo() string
+
+	// GetRootLogger returns the root logger instance configured for the application. This will always
+	// return a logger, defaulting to a none logger if nothing is configured.
+	GetRootLogger() *slog.Logger
 }
 
 type config struct {
@@ -45,6 +50,10 @@ func (c *config) IsDebugMode() bool {
 
 func (c *config) GetFallbackConnectorLogo() string {
 	return "https://upload.wikimedia.org/wikipedia/commons/a/ac/No_image_available.svg"
+}
+
+func (c *config) GetRootLogger() *slog.Logger {
+	return c.root.GetRootLogger()
 }
 
 func LoadConfig(path string) (C, error) {

@@ -3,13 +3,14 @@ package redis
 import (
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/test_utils"
 	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
 )
 
 func TestMutex(t *testing.T) {
-	r, err := NewMiniredis(nil, &config.KeyDataRandomBytes{})
+	r, err := NewMiniredis(nil, &config.KeyDataRandomBytes{}, test_utils.NewTestLogger())
 	require.NoError(t, err)
 	ctx := context.Background()
 

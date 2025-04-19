@@ -6,6 +6,7 @@ import (
 	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/oauth2"
 	"github.com/rmorlok/authproxy/redis"
+	"log/slog"
 	"os"
 	"os/signal"
 	"sync"
@@ -17,6 +18,7 @@ type scheduler struct {
 	redis               redis.R
 	healthCheckFunc     func(isScheduler bool, err error)
 	oauth2TaskRegistrar oauth2.TaskRegistrar
+	logger              *slog.Logger
 }
 
 func (s *scheduler) GetConfigs() ([]*asynq.PeriodicTaskConfig, error) {
@@ -53,14 +55,14 @@ func (s *scheduler) Run(ctx context.Context) error {
 	go func() {
 		select {
 		case <-sigChan:
-			println("Received termination signal")
+			s.logger.Info("Received termination signal")
 			close(done)
 			return
 		case <-ctx.Done():
 			close(done)
 			return
 		case <-runReturning:
-			println("shutting down monitor")
+			s.logger.Info("Shutting down monitor")
 			return
 		}
 	}()
@@ -68,7 +70,7 @@ func (s *scheduler) Run(ctx context.Context) error {
 	for {
 		select {
 		case <-done:
-			println("Shutting down scheduler watchdog")
+			s.logger.Info("Shutting down scheduler watchdog")
 			func() {
 				mgrMutex.Lock()
 				defer mgrMutex.Unlock()
@@ -82,7 +84,7 @@ func (s *scheduler) Run(ctx context.Context) error {
 			err := m.Lock(ctx)
 			if err == nil {
 				defer m.Unlock(ctx)
-				println("Obtained lock for scheduler")
+				s.logger.Info("Obtained lock for scheduler")
 				s.healthCheckFunc(true, nil)
 
 				var wg sync.WaitGroup
@@ -96,6 +98,10 @@ func (s *scheduler) Run(ctx context.Context) error {
 							RedisUniversalClient:       s.redis.Client(),
 							PeriodicTaskConfigProvider: s,
 							SyncInterval:               10 * time.Second,
+							SchedulerOpts: &asynq.SchedulerOpts{
+								Logger:   &asyncLogger{inner: s.logger.With("component", "asynq-scheduler")},
+								LogLevel: asynq.InfoLevel,
+							},
 						},
 					)
 				}()
@@ -110,7 +116,7 @@ func (s *scheduler) Run(ctx context.Context) error {
 					return runSchedulerError
 				}
 				s.healthCheckFunc(true, runSchedulerError)
-				println("Scheduler is running")
+				s.logger.Info("Scheduler is running")
 
 				var extendLockError error
 				wg.Add(1)
@@ -119,7 +125,7 @@ func (s *scheduler) Run(ctx context.Context) error {
 					for {
 						select {
 						case <-done:
-							println("Shutting down scheduler")
+							s.logger.Info("Shutting down scheduler")
 							func() {
 								mgrMutex.Lock()
 								defer mgrMutex.Unlock()

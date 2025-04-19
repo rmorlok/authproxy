@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
 	"log"
+	"log/slog"
 	"sync"
 )
 
@@ -30,25 +31,26 @@ type wrapper struct {
 	client     *redis.Client
 	secretKey  config.KeyData
 	lockClient *redislock.Client
+	logger     *slog.Logger
 }
 
 // New creates a new database connection from the specified configuration. The type of the database
 // returned will be determined by the configuration.
-func New(ctx context.Context, c config.C) (R, error) {
-	return NewForRoot(ctx, c.GetRoot())
+func New(ctx context.Context, c config.C, logger *slog.Logger) (R, error) {
+	return NewForRoot(ctx, c.GetRoot(), logger)
 }
 
 // NewForRoot creates a new database connection from the specified configuration. The type of the database
 // returned will be determined by the configuration. Same as NewConnection.
-func NewForRoot(ctx context.Context, root *config.Root) (R, error) {
+func NewForRoot(ctx context.Context, root *config.Root, logger *slog.Logger) (R, error) {
 	redisConfig := root.Redis
 	secretKey := root.SystemAuth.GlobalAESKey
 
 	switch v := redisConfig.(type) {
 	case *config.RedisMiniredis:
-		return NewMiniredis(v, secretKey)
+		return NewMiniredis(v, secretKey, logger)
 	case *config.RedisReal:
-		return NewRedis(ctx, v, secretKey)
+		return NewRedis(ctx, v, secretKey, logger)
 	default:
 		return nil, errors.New("redis type not supported")
 	}
@@ -59,7 +61,7 @@ func NewForRoot(ctx context.Context, root *config.Root) (R, error) {
 // Parameters:
 // - redisConfig: the configuration for the SQLite database
 // - secretKey: the AES key used to secure cursors
-func NewMiniredis(redisConfig *config.RedisMiniredis, secretKey config.KeyData) (R, error) {
+func NewMiniredis(redisConfig *config.RedisMiniredis, secretKey config.KeyData, logger *slog.Logger) (R, error) {
 	if miniredisServer == nil {
 		miniredisMutex.Lock()
 		defer miniredisMutex.Unlock()
@@ -96,6 +98,7 @@ func NewMiniredis(redisConfig *config.RedisMiniredis, secretKey config.KeyData) 
 		client:     miniredisClient,
 		secretKey:  secretKey,
 		lockClient: redislock.New(miniredisClient),
+		logger:     logger,
 	}, nil
 }
 
@@ -104,7 +107,7 @@ func NewMiniredis(redisConfig *config.RedisMiniredis, secretKey config.KeyData) 
 // Parameters:
 // - redisConfig: the configuration for the Redis instance
 // - secretKey: the AES key used to secure cursors
-func NewRedis(ctx context.Context, redisConfig *config.RedisReal, secretKey config.KeyData) (R, error) {
+func NewRedis(ctx context.Context, redisConfig *config.RedisReal, secretKey config.KeyData, logger *slog.Logger) (R, error) {
 	if redisClient == nil {
 		redisOnce.Do(func() {
 			var err error
@@ -135,6 +138,7 @@ func NewRedis(ctx context.Context, redisConfig *config.RedisReal, secretKey conf
 		client:     redisClient,
 		secretKey:  secretKey,
 		lockClient: redislock.New(redisClient),
+		logger:     logger,
 	}, nil
 }
 
@@ -189,7 +193,7 @@ func MustApplyTestConfig(cfg config.C) (config.C, R) {
 		root.SystemAuth.GlobalAESKey = &config.KeyDataRandomBytes{}
 	}
 
-	r, err := NewMiniredis(redisCfg, root.SystemAuth.GlobalAESKey)
+	r, err := NewMiniredis(redisCfg, root.SystemAuth.GlobalAESKey, cfg.GetRootLogger())
 	if err != nil {
 		panic(err)
 	}

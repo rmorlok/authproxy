@@ -72,7 +72,7 @@ func MustApplyBlankTestDbConfig(testName string, cfg config.C) (config.C, DB) {
 		root.SystemAuth.GlobalAESKey = &config.KeyDataRandomBytes{}
 	}
 
-	db, err := NewConnectionForRoot(root)
+	db, err := NewConnectionForRoot(root, root.GetRootLogger())
 	if err != nil {
 		panic(err)
 	}

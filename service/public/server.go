@@ -14,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/service/public/routes"
+	"log/slog"
 	"net/http"
 	"sync"
 	"time"
@@ -101,16 +102,20 @@ func GetGinServer(
 }
 
 func Serve(cfg config.C) {
+	rootLogger := cfg.GetRootLogger()
+	slog.SetDefault(rootLogger)
+	logger := rootLogger.With("service", "public")
+
 	if !cfg.IsDebugMode() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	rs, err := redis.New(context.Background(), cfg)
+	rs, err := redis.New(context.Background(), cfg, logger)
 	if err != nil {
 		panic(err)
 	}
 
-	db, err := database.NewConnectionForRoot(cfg.GetRoot())
+	db, err := database.NewConnectionForRoot(cfg.GetRoot(), logger)
 	if err != nil {
 		panic(err)
 	}
