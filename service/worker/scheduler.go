@@ -3,6 +3,7 @@ package worker
 import (
 	"github.com/hibiken/asynq"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/oauth2"
 	"github.com/rmorlok/authproxy/redis"
@@ -99,7 +100,7 @@ func (s *scheduler) Run(ctx context.Context) error {
 							PeriodicTaskConfigProvider: s,
 							SyncInterval:               10 * time.Second,
 							SchedulerOpts: &asynq.SchedulerOpts{
-								Logger:   &asyncLogger{inner: s.logger.With("component", "asynq-scheduler")},
+								Logger:   &asyncLogger{inner: aplog.NewBuilder(s.logger).WithComponent("asynq-scheduler").Build()},
 								LogLevel: asynq.InfoLevel,
 							},
 						},

@@ -13,6 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/oauth2"
 	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/util"
+	"log/slog"
 	"net/http"
 	"time"
 )
@@ -247,6 +248,7 @@ func NewConnectionsRoutes(
 	redis redis.R,
 	httpf httpf.F,
 	encrypt encrypt.E,
+	logger *slog.Logger,
 ) *ConnectionsRoutes {
 	return &ConnectionsRoutes{
 		cfg:         cfg,
@@ -255,6 +257,6 @@ func NewConnectionsRoutes(
 		redis:       redis,
 		httpf:       httpf,
 		encrypt:     encrypt,
-		oauthf:      oauth2.NewFactory(cfg, db, redis, httpf, encrypt),
+		oauthf:      oauth2.NewFactory(cfg, db, redis, httpf, encrypt, logger),
 	}
 }

@@ -9,6 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/redis"
+	"log/slog"
 )
 
 type OAuth2 struct {
@@ -21,6 +22,7 @@ type OAuth2 struct {
 	httpf      httpf.F
 	encrypt    encrypt.E
 	state      *state
+	logger     *slog.Logger
 }
 
 func newOAuth2(
@@ -29,6 +31,7 @@ func newOAuth2(
 	redis redis.R,
 	httpf httpf.F,
 	encrypt encrypt.E,
+	logger *slog.Logger,
 	connection database.Connection,
 	connector config.Connector,
 ) *OAuth2 {
@@ -46,6 +49,7 @@ func newOAuth2(
 		httpf:      httpf,
 		encrypt:    encrypt,
 		connector:  &connector,
+		logger:     logger,
 	}
 }
 

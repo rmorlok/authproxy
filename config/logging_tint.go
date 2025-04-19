@@ -3,7 +3,6 @@ package config
 import (
 	"github.com/lmittmann/tint"
 	"log/slog"
-	"sync"
 	"time"
 )
 
@@ -14,7 +13,6 @@ type LoggingConfigTint struct {
 	Source     bool                `json:"source,omitempty" yaml:"source,omitempty"`
 	NoColor    *bool               `json:"no_color,omitempty" yaml:"no_color,omitempty"`
 	TimeFormat *string             `json:"time_format,omitempty" yaml:"time_format,omitempty"`
-	once       sync.Once           `json:"-" yaml:"-"`
 }
 
 func (l *LoggingConfigTint) GetType() LoggingConfigType {
@@ -22,8 +20,6 @@ func (l *LoggingConfigTint) GetType() LoggingConfigType {
 }
 
 func (l *LoggingConfigTint) GetRootLogger() *slog.Logger {
-	var logger *slog.Logger
-
 	noColor := false
 	if l.NoColor != nil {
 		noColor = *l.NoColor
@@ -34,16 +30,12 @@ func (l *LoggingConfigTint) GetRootLogger() *slog.Logger {
 		timeFormat = *l.TimeFormat
 	}
 
-	l.once.Do(func() {
-		handler := tint.NewHandler(l.To.Output(), &tint.Options{
-			Level:      l.Level.Level(), // This configures minimum level
-			AddSource:  l.Source,
-			NoColor:    noColor,
-			TimeFormat: timeFormat,
-		})
-
-		logger = slog.New(handler)
+	handler := tint.NewHandler(l.To.Output(), &tint.Options{
+		Level:      l.Level.Level(), // This configures minimum level
+		AddSource:  l.Source,
+		NoColor:    noColor,
+		TimeFormat: timeFormat,
 	})
 
-	return logger
+	return slog.New(handler)
 }

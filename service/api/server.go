@@ -5,6 +5,7 @@ import (
 	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/api_common"
+	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
@@ -33,8 +34,9 @@ func GetGinServer(
 	redis redis.R,
 	httpf httpf.F,
 	encrypt encrypt.E,
+	logger *slog.Logger,
 ) (server *gin.Engine, healthChecker *gin.Engine) {
-	authService := auth.NewService(cfg, &cfg.GetRoot().Api, db, redis)
+	authService := auth.NewService(cfg, &cfg.GetRoot().Api, db, redis, logger)
 
 	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
 		Rate:  1 * time.Minute,
@@ -93,7 +95,7 @@ func GetGinServer(
 	})
 
 	routesConnectors := routes.NewConnectorsRoutes(cfg, authService)
-	routesConnections := routes.NewConnectionsRoutes(cfg, authService, db, redis, httpf, encrypt)
+	routesConnections := routes.NewConnectionsRoutes(cfg, authService, db, redis, httpf, encrypt, logger)
 
 	api := server.Group("/api", rl)
 
@@ -104,9 +106,10 @@ func GetGinServer(
 }
 
 func Serve(cfg config.C) {
-	rootLogger := cfg.GetRootLogger()
-	slog.SetDefault(rootLogger)
-	logger := rootLogger.With("service", "api")
+	aplog.SetDefaultLog(cfg.GetRootLogger())
+	logBuilder := aplog.NewBuilder(cfg.GetRootLogger())
+	logBuilder = logBuilder.WithService("api")
+	logger := logBuilder.Build()
 
 	if !cfg.IsDebugMode() {
 		gin.SetMode(gin.ReleaseMode)
@@ -146,7 +149,7 @@ func Serve(cfg config.C) {
 	httpf := httpf.CreateFactory(cfg, rs)
 	encrypt := encrypt.NewEncryptService(cfg, db)
 
-	server, healthChecker := GetGinServer(cfg, db, rs, httpf, encrypt)
+	server, healthChecker := GetGinServer(cfg, db, rs, httpf, encrypt, logger)
 
 	var wg sync.WaitGroup
 	wg.Add(1)

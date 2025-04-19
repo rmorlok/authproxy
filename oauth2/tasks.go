@@ -7,6 +7,7 @@ import (
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/redis"
+	"log/slog"
 )
 
 type taskHandler struct {
@@ -17,6 +18,7 @@ type taskHandler struct {
 	httpf   httpf.F
 	encrypt encrypt.E
 	factory Factory
+	logger  *slog.Logger
 }
 
 type TaskRegistrar interface {
@@ -31,6 +33,7 @@ func NewTaskHandler(
 	ac *asynq.Client,
 	httpf httpf.F,
 	encrypt encrypt.E,
+	logger *slog.Logger,
 ) TaskRegistrar {
 	return &taskHandler{
 		cfg:     cfg,
@@ -39,7 +42,8 @@ func NewTaskHandler(
 		asynq:   ac,
 		httpf:   httpf,
 		encrypt: encrypt,
-		factory: NewFactory(cfg, db, redis, httpf, encrypt),
+		logger:  logger,
+		factory: NewFactory(cfg, db, redis, httpf, encrypt, logger),
 	}
 }
 

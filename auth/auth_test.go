@@ -11,6 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/jwt"
 	"github.com/rmorlok/authproxy/redis"
+	"github.com/rmorlok/authproxy/test_utils"
 	"github.com/rmorlok/authproxy/util"
 	"github.com/stretchr/testify/require"
 	"io"
@@ -170,7 +171,7 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 		}
 	}
 
-	auth := NewService(b.cfg, b.cfg.MustGetService(b.service), b.db, b.redis)
+	auth := NewService(b.cfg, b.cfg.MustGetService(b.service), b.db, b.redis, test_utils.NewTestLogger())
 
 	b.ginEngine = gin.New()
 

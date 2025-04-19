@@ -12,6 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/redis"
+	"log/slog"
 	"time"
 )
 
@@ -75,6 +76,7 @@ func getOAuth2State(
 	redis redis.R,
 	httpf httpf.F,
 	encrypt encrypt.E,
+	logger *slog.Logger,
 	actor database.Actor,
 	stateId uuid.UUID,
 ) (*OAuth2, error) {
@@ -131,7 +133,7 @@ func getOAuth2State(
 
 	// TODO: add connector validation to make sure the connection is of the specified connector type once connections get mapped to connectors
 
-	o := newOAuth2(cfg, db, redis, httpf, encrypt, *connection, connector)
+	o := newOAuth2(cfg, db, redis, httpf, encrypt, logger, *connection, connector)
 	o.state = &s
 
 	deleteResult := redis.Client().Del(ctx, getStateRedisKey(stateId))

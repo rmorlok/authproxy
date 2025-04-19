@@ -2,8 +2,8 @@ package oauth2
 
 import (
 	"context"
-	"fmt"
 	"github.com/hibiken/asynq"
+	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/config"
 	context2 "github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
@@ -16,7 +16,13 @@ func newRefreshExpiringOauth2TokensTask() (*asynq.Task, error) {
 }
 
 func (th *taskHandler) refreshExpiringOauth2Tokens(rctx context.Context, t *asynq.Task) error {
+	logger := aplog.NewBuilder(th.logger).
+		WithTask(t).
+		WithCtx(rctx).
+		Build()
 	ctx := context2.AsContext(rctx)
+	logger.Info("Refresh expiring oauth tokens task started")
+	defer logger.Info("Refresh expiring oauth tokens task completed")
 
 	if !th.cfg.GetRoot().Oauth.GetRefreshTokensInBackgroundOrDefault() {
 		return nil
@@ -36,7 +42,7 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(rctx context.Context, t *asyn
 		}
 	}
 
-	fmt.Printf("refreshing oauth tokens expiring within %v\n", refreshWithin)
+	th.logger.Info("Tokens being refreshed within", "within", refreshWithin)
 	err := th.db.EnumerateOAuth2TokensExpiringWithin(
 		ctx,
 		refreshWithin,

@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/api_common"
+	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
@@ -14,16 +15,16 @@ import (
 	"github.com/rmorlok/authproxy/oauth2"
 	"github.com/rmorlok/authproxy/redis"
 	"log"
-	"log/slog"
 	"net/http"
 	"sync"
 	"time"
 )
 
 func Serve(cfg config.C) {
-	rootLogger := cfg.GetRootLogger()
-	slog.SetDefault(rootLogger)
-	logger := rootLogger.With("service", "worker")
+	aplog.SetDefaultLog(cfg.GetRootLogger())
+	logBuilder := aplog.NewBuilder(cfg.GetRootLogger())
+	logBuilder = logBuilder.WithService("worker")
+	logger := logBuilder.Build()
 
 	if !cfg.IsDebugMode() {
 		gin.SetMode(gin.ReleaseMode)
@@ -143,7 +144,7 @@ func Serve(cfg config.C) {
 			BaseContext: func() context2.Context {
 				return ctx
 			},
-			Logger:   &asyncLogger{inner: logger.With("component", "asynq")},
+			Logger:   &asyncLogger{inner: logBuilder.WithComponent("asynq").Build()},
 			LogLevel: asynq.InfoLevel,
 			Queues: map[string]int{
 				"default": 5,
@@ -151,9 +152,11 @@ func Serve(cfg config.C) {
 		},
 	)
 
+	logBuilder.Build().Info("TEST LOG")
+
 	mux := asynq.NewServeMux()
 
-	oauth2TaskHandler := oauth2.NewTaskHandler(cfg, db, rs, asynqClient, httpf, encrypt)
+	oauth2TaskHandler := oauth2.NewTaskHandler(cfg, db, rs, asynqClient, httpf, encrypt, logger)
 	oauth2TaskHandler.RegisterTasks(mux)
 
 	var wg sync.WaitGroup
@@ -173,7 +176,7 @@ func Serve(cfg config.C) {
 		redis:               rs,
 		healthCheckFunc:     asyncSchedulerHealthChecker,
 		oauth2TaskRegistrar: oauth2TaskHandler,
-		logger:              logger.With("component", "asynq-scheduler"),
+		logger:              logBuilder.WithComponent("scheduler").Build(),
 	}
 
 	wg.Add(1)

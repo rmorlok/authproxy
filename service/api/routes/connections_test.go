@@ -11,6 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/redis"
+	"github.com/rmorlok/authproxy/test_utils"
 	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
@@ -32,7 +33,7 @@ func TestConnections(t *testing.T) {
 		httpf := httpf2.CreateFactory(cfg, rds)
 		cfg, encrypt := encrypt.NewTestEncryptService(cfg, db)
 
-		cr := NewConnectionsRoutes(cfg, auth, db, rds, httpf, encrypt)
+		cr := NewConnectionsRoutes(cfg, auth, db, rds, httpf, encrypt, test_utils.NewTestLogger())
 		r := gin.Default()
 		cr.Register(r)
 

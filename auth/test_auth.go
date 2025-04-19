@@ -54,7 +54,7 @@ func TestAuthServiceWithDb(serviceId config.ServiceId, cfg config.C, db database
 	}
 
 	cfg, r := redis.MustApplyTestConfig(cfg)
-	s := NewService(cfg, cfg.MustGetService(serviceId), db, r)
+	s := NewService(cfg, cfg.MustGetService(serviceId), db, r, cfg.GetRootLogger())
 
 	return cfg, s, &AuthTestUtil{cfg: cfg, s: s.(*service), serviceId: serviceId}
 }

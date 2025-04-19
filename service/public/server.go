@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/api_common"
+	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/context"
@@ -43,8 +44,9 @@ func GetGinServer(
 	redis redis.R,
 	httpf httpf.F,
 	encrypt encrypt.E,
+	logger *slog.Logger,
 ) (server *gin.Engine, healthChecker *gin.Engine) {
-	authService := auth.NewService(cfg, &cfg.GetRoot().Public, db, redis)
+	authService := auth.NewService(cfg, &cfg.GetRoot().Public, db, redis, logger)
 
 	server = api_common.GinForService(&cfg.GetRoot().Public)
 
@@ -95,16 +97,17 @@ func GetGinServer(
 		})
 	})
 
-	routesOauth2 := routes.NewOauth2Routes(cfg, authService, db, redis, httpf, encrypt)
+	routesOauth2 := routes.NewOauth2Routes(cfg, authService, db, redis, httpf, encrypt, logger)
 	routesOauth2.Register(server)
 
 	return server, healthChecker
 }
 
 func Serve(cfg config.C) {
-	rootLogger := cfg.GetRootLogger()
-	slog.SetDefault(rootLogger)
-	logger := rootLogger.With("service", "public")
+	aplog.SetDefaultLog(cfg.GetRootLogger())
+	logBuilder := aplog.NewBuilder(cfg.GetRootLogger())
+	logBuilder = logBuilder.WithService("public")
+	logger := logBuilder.Build()
 
 	if !cfg.IsDebugMode() {
 		gin.SetMode(gin.ReleaseMode)
@@ -144,7 +147,7 @@ func Serve(cfg config.C) {
 	httpf := httpf.CreateFactory(cfg, rs)
 	encrypt := encrypt.NewEncryptService(cfg, db)
 
-	server, healthChecker := GetGinServer(cfg, db, rs, httpf, encrypt)
+	server, healthChecker := GetGinServer(cfg, db, rs, httpf, encrypt, logger)
 
 	var wg sync.WaitGroup
 	wg.Add(1)

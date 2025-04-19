@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/redis"
+	"log/slog"
 )
 
 type Factory interface {
@@ -21,15 +22,17 @@ type factory struct {
 	redis   redis.R
 	httpf   httpf.F
 	encrypt encrypt.E
+	logger  *slog.Logger
 }
 
-func NewFactory(cfg config.C, db database.DB, redis redis.R, httpf httpf.F, encrypt encrypt.E) Factory {
+func NewFactory(cfg config.C, db database.DB, redis redis.R, httpf httpf.F, encrypt encrypt.E, logger *slog.Logger) Factory {
 	return &factory{
 		cfg:     cfg,
 		db:      db,
 		redis:   redis,
 		httpf:   httpf,
 		encrypt: encrypt,
+		logger:  logger,
 	}
 }
 
@@ -40,6 +43,7 @@ func (f *factory) NewOAuth2(connection database.Connection, connector config.Con
 		f.redis,
 		f.httpf,
 		f.encrypt,
+		f.logger,
 		connection,
 		connector,
 	)
@@ -53,6 +57,7 @@ func (f *factory) GetOAuth2State(ctx context.Context, actor database.Actor, stat
 		f.redis,
 		f.httpf,
 		f.encrypt,
+		f.logger,
 		actor,
 		stateId,
 	)

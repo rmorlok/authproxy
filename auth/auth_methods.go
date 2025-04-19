@@ -233,7 +233,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, r *http.Request,
 					Build()
 			}
 
-			s.logf("[DEBUG] using nonce: %s", claims.Nonce.String())
+			s.logger.Debug("using nonce", "nonce", claims.Nonce.String())
 
 			wasValid, err := s.db.CheckNonceValidAndMarkUsed(ctx, *claims.Nonce, claims.ExpiresAt.Time)
 			if err != nil {

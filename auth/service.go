@@ -3,8 +3,8 @@ package auth
 import (
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/database"
-	"github.com/rmorlok/authproxy/logger"
 	"github.com/rmorlok/authproxy/redis"
+	"log/slog"
 )
 
 // service is the implementation of the core auth service.
@@ -16,14 +16,14 @@ type service struct {
 	service config.Service
 
 	// logger interface, default is no logging at all
-	logger logger.L
+	logger *slog.Logger
 
 	db    database.DB
 	redis redis.R
 }
 
 // NewService makes an auth service
-func NewService(cfg config.C, svc config.Service, db database.DB, redis redis.R) A {
+func NewService(cfg config.C, svc config.Service, db database.DB, redis redis.R, logger *slog.Logger) A {
 	if cfg == nil {
 		panic("config is required")
 	}
@@ -37,13 +37,6 @@ func NewService(cfg config.C, svc config.Service, db database.DB, redis redis.R)
 		service: svc,
 		db:      db,
 		redis:   redis,
+		logger:  logger,
 	}
-}
-
-func (s *service) logf(format string, args ...interface{}) {
-	if s.logger == nil {
-		return
-	}
-
-	s.logger.Logf(format, args...)
 }
