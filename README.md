@@ -22,9 +22,9 @@ go install github.com/hibiken/asynq/tools/asynq@latest
 
 and run the cli:
 
-``bash
+```bash
 asynq dash
-``
+````
 
 ## Client Config
 
