@@ -1,9 +1,9 @@
 package config
 
 import (
+	"context"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/context"
 	"os"
 )
 

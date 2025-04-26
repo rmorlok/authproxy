@@ -1,6 +1,7 @@
 package worker
 
 import (
+	"context"
 	context2 "context"
 	"fmt"
 	"github.com/gin-gonic/gin"
@@ -8,7 +9,6 @@ import (
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -91,7 +91,7 @@ func Serve(cfg config.C) {
 	asynqClient.Ping()
 
 	router.GET("/healthz", func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(context.AsContext(c.Request.Context()), 1*time.Second)
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 1*time.Second)
 		defer cancel()
 
 		dbChan := make(chan bool, 1)

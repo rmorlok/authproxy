@@ -1,8 +1,8 @@
 package redis
 
 import (
+	"context"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/test_utils"
 	"github.com/stretchr/testify/require"
 	"testing"

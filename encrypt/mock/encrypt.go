@@ -8,7 +8,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	context "github.com/rmorlok/authproxy/context"
+	context "context"
 	database "github.com/rmorlok/authproxy/database"
 )
 

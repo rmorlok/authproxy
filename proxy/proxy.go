@@ -2,8 +2,8 @@ package proxy
 
 import (
 	"bytes"
+	"context"
 	"github.com/rmorlok/authproxy/api_common"
-	"github.com/rmorlok/authproxy/context"
 	"gopkg.in/h2non/gentleman.v2"
 	"net/http"
 	"strings"

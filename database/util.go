@@ -1,9 +1,9 @@
 package database
 
 import (
+	"context"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/util"
 )
 

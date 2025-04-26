@@ -1,7 +1,7 @@
 package encrypt
 
 import (
-	"github.com/rmorlok/authproxy/context"
+	"context"
 	"github.com/rmorlok/authproxy/database"
 )
 

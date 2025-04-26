@@ -1,10 +1,10 @@
 package oauth2
 
 import (
+	"context"
 	"errors"
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
 	database_mock "github.com/rmorlok/authproxy/database/mock"
 	encrypt_mock "github.com/rmorlok/authproxy/encrypt/mock"

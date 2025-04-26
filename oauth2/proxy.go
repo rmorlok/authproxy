@@ -1,10 +1,10 @@
 package oauth2
 
 import (
+	"context"
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/api_common"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/proxy"
 	"gopkg.in/h2non/gentleman.v2"

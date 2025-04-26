@@ -6,8 +6,8 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/mohae/deepcopy"
+	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
 	jwt2 "github.com/rmorlok/authproxy/jwt"
 	"github.com/rmorlok/authproxy/test_utils"
@@ -45,7 +45,7 @@ func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 			Audience:  []string{string(config.ServiceIdAdminApi)},
 			ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
 			NotBefore: &jwt.NumericDate{time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
-			IssuedAt:  &jwt.NumericDate{testContext.Clock().Now()},
+			IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 		},
 
 		Actor: &jwt2.Actor{
@@ -103,7 +103,7 @@ func TestAuth_RoundtripPublicPrivate(t *testing.T) {
 			Audience:  []string{string(config.ServiceIdAdminApi)},
 			ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
 			NotBefore: &jwt.NumericDate{time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
-			IssuedAt:  &jwt.NumericDate{testContext.Clock().Now()},
+			IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 		},
 
 		Actor: &jwt2.Actor{
@@ -139,7 +139,7 @@ func TestAuth_SecretKey(t *testing.T) {
 			Audience:  []string{string(config.ServiceIdAdminApi)},
 			ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
 			NotBefore: &jwt.NumericDate{time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
-			IssuedAt:  &jwt.NumericDate{testContext.Clock().Now()},
+			IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 		},
 
 		Actor: &jwt2.Actor{
@@ -190,7 +190,7 @@ func TestAuth_Parse(t *testing.T) {
 				Audience:  []string{string(config.ServiceIdAdminApi)},
 				ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
 				NotBefore: &jwt.NumericDate{time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
-				IssuedAt:  &jwt.NumericDate{testContext.Clock().Now()},
+				IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 			},
 
 			Actor: &jwt2.Actor{
@@ -203,9 +203,10 @@ func TestAuth_Parse(t *testing.T) {
 		tok, err := j.Token(testContext, &org)
 		require.NoError(t, err)
 
-		futureCtx := context.
-			Background().
-			WithClock(test_clock.NewFakeClock(time.Date(2059, 10, 1, 0, 0, 0, 0, time.UTC)))
+		futureCtx := apctx.
+			NewBuilderBackground().
+			WithClock(test_clock.NewFakeClock(time.Date(2059, 10, 1, 0, 0, 0, 0, time.UTC))).
+			Build()
 
 		_, err = j.Parse(futureCtx, tok)
 		require.Contains(t, err.Error(), "token is expired")
@@ -219,7 +220,7 @@ func TestAuth_Parse(t *testing.T) {
 				Audience:  []string{string(config.ServiceIdAdminApi)},
 				ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
 				NotBefore: &jwt.NumericDate{time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
-				IssuedAt:  &jwt.NumericDate{testContext.Clock().Now()},
+				IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 			},
 
 			Actor: &jwt2.Actor{
@@ -232,9 +233,10 @@ func TestAuth_Parse(t *testing.T) {
 		tok, err := j.Token(testContext, &org)
 		require.NoError(t, err)
 
-		pastCtx := context.
-			Background().
-			WithClock(test_clock.NewFakeClock(time.Date(2017, 10, 1, 0, 0, 0, 0, time.UTC)))
+		pastCtx := apctx.
+			NewBuilderBackground().
+			WithClock(test_clock.NewFakeClock(time.Date(2017, 10, 1, 0, 0, 0, 0, time.UTC))).
+			Build()
 
 		_, err = j.Parse(pastCtx, tok)
 		require.Contains(t, err.Error(), "token is not valid yet")
@@ -462,9 +464,10 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			req := httptest.NewRequest("GET", "/", nil)
 			req.Header.Add(JwtHeaderKey, tok)
 
-			futureCtx := context.
-				Background().
-				WithClock(test_clock.NewFakeClock(time.Date(2059, 10, 1, 0, 0, 0, 0, time.UTC)))
+			futureCtx := apctx.
+				NewBuilderBackground().
+				WithClock(test_clock.NewFakeClock(time.Date(2059, 10, 1, 0, 0, 0, 0, time.UTC))).
+				Build()
 
 			w := httptest.NewRecorder()
 			_, err = raw.establishAuthFromRequest(futureCtx, req, w)
@@ -510,9 +513,10 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			tok, err := a.Token(testContext, testClaims())
 			require.NoError(t, err)
 
-			futureCtx := context.
-				Background().
-				WithClock(test_clock.NewFakeClock(time.Date(2059, 10, 1, 0, 0, 0, 0, time.UTC)))
+			futureCtx := apctx.
+				NewBuilderBackground().
+				WithClock(test_clock.NewFakeClock(time.Date(2059, 10, 1, 0, 0, 0, 0, time.UTC))).
+				Build()
 
 			req := httptest.NewRequest("GET", "/blah?jwt="+tok, nil)
 			w := httptest.NewRecorder()
@@ -532,7 +536,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 
 func TestAuth_Nonce(t *testing.T) {
 	now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
-	ctx := context.Background().WithClock(clock.NewFakeClock(now))
+	ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 	type TestSetup struct {
 		Gin      *gin.Engine
@@ -650,7 +654,10 @@ func TestExtractTokenFromBearer(t *testing.T) {
 	require.Equal(t, "", tok)
 }
 
-var testContext = context.Background().WithClock(test_clock.NewFakeClock(time.Date(2024, 10, 1, 0, 0, 0, 0, time.UTC)))
+var testContext = apctx.
+	NewBuilderBackground().
+	WithClock(test_clock.NewFakeClock(time.Date(2024, 10, 1, 0, 0, 0, 0, time.UTC))).
+	Build()
 
 func testClaims() *jwt2.AuthProxyClaims {
 	return &jwt2.AuthProxyClaims{
@@ -661,7 +668,7 @@ func testClaims() *jwt2.AuthProxyClaims {
 			Audience:  []string{string(config.ServiceIdAdminApi)},
 			ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
 			NotBefore: &jwt.NumericDate{time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
-			IssuedAt:  &jwt.NumericDate{testContext.Clock().Now()},
+			IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 		},
 
 		Actor: &jwt2.Actor{

@@ -1,9 +1,10 @@
 package database
 
 import (
+	"context"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/jwt"
 	"github.com/rmorlok/authproxy/util"
 	"gorm.io/gorm"
@@ -199,10 +200,11 @@ func (db *gormDB) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 		if err != nil {
 			if err == gorm.ErrRecordNotFound {
 				// Actor does not exist. Create new actor.
+				now := apctx.GetClock(ctx).Now()
 				newActor := Actor{
 					ID:        uuid.New(),
-					CreatedAt: ctx.Clock().Now(),
-					UpdatedAt: ctx.Clock().Now(),
+					CreatedAt: now,
+					UpdatedAt: now,
 				}
 				newActor.setFromJwt(actor)
 				validationErr := newActor.validate()

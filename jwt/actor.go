@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/hex"
 	"fmt"
-	context2 "github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/apctx"
 	"hash"
 	"hash/crc64"
 	"io"
@@ -134,7 +134,7 @@ func (a *Actor) ContextWith(ctx context.Context) context.Context {
 }
 
 // MustGetActorFromContext always returns an actor, or panics if an actor is not present on the context.
-func MustGetActorFromContext(ctx context2.Context) Actor {
+func MustGetActorFromContext(ctx context.Context) Actor {
 	a := GetActorFromContext(ctx)
 	if a == nil {
 		panic("actor not present on context")
@@ -144,12 +144,12 @@ func MustGetActorFromContext(ctx context2.Context) Actor {
 }
 
 // SetActorInContext sets the actor on the context. This is just an alias for the context.With method.
-func SetActorInContext(ctx context2.Context, actor *Actor) context2.Context {
-	return ctx.With(actor)
+func SetActorInContext(ctx context.Context, actor *Actor) context.Context {
+	return apctx.NewBuilder(ctx).With(actor).Build()
 }
 
 // GetActorFromContext gets an actor from the context, or returns nil if one is not present
-func GetActorFromContext(ctx context2.Context) *Actor {
+func GetActorFromContext(ctx context.Context) *Actor {
 	if a, ok := ctx.Value(actorContextKey).(*Actor); ok {
 		return a
 	}

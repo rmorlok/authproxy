@@ -3,7 +3,7 @@ package database
 import (
 	"context"
 	"fmt"
-	context2 "github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/apctx"
 	glogger "gorm.io/gorm/logger"
 	"log/slog"
 	"time"
@@ -25,11 +25,10 @@ func (l *logger) Error(ctx context.Context, msg string, args ...interface{}) {
 	l.inner.Error(fmt.Sprintf(msg, args...))
 }
 
-func (l *logger) Trace(rctx context.Context, begin time.Time, fc func() (sql string, rowsAffected int64), err error) {
+func (l *logger) Trace(ctx context.Context, begin time.Time, fc func() (sql string, rowsAffected int64), err error) {
 	sql, rows := fc()
 
-	ctx := context2.AsContext(rctx)
-	elapsed := ctx.Clock().Since(begin)
+	elapsed := apctx.GetClock(ctx).Since(begin)
 	if err != nil {
 		l.inner.Error("gorm trace failed", "sql", sql, "elapsed", elapsed, "rows", rows, "error", err)
 	} else {

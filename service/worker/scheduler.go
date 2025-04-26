@@ -1,10 +1,10 @@
 package worker
 
 import (
+	"context"
 	"github.com/hibiken/asynq"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/aplog"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/oauth2"
 	"github.com/rmorlok/authproxy/redis"
 	"log/slog"

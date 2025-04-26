@@ -7,7 +7,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/config"
-	context2 "github.com/rmorlok/authproxy/context"
 )
 
 const taskTypeRefreshOAuthToken = "oauth2:refresh_oauth_token"
@@ -24,9 +23,7 @@ type refreshOAuthTokenTaskPayload struct {
 	ConnectionId uuid.UUID `json:"connection_id"`
 }
 
-func (th *taskHandler) refreshOauth2Token(rctx context.Context, t *asynq.Task) error {
-	ctx := context2.AsContext(rctx)
-
+func (th *taskHandler) refreshOauth2Token(ctx context.Context, t *asynq.Task) error {
 	var p refreshOAuthTokenTaskPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
 		return fmt.Errorf("%s json.Unmarshal failed: %v: %w", taskTypeRefreshOAuthToken, err, asynq.SkipRetry)

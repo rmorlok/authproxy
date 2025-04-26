@@ -1,10 +1,10 @@
 package api_common
 
 import (
+	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"log"
 	"log/slog"
 	"net/http"

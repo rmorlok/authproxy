@@ -1,6 +1,6 @@
 package config
 
-import "github.com/rmorlok/authproxy/context"
+import "context"
 
 type KeyDataValue struct {
 	Value string `json:"value" yaml:"value"`

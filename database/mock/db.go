@@ -10,7 +10,7 @@ import (
 
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
-	context "github.com/rmorlok/authproxy/context"
+	context "context"
 	database "github.com/rmorlok/authproxy/database"
 	jwt "github.com/rmorlok/authproxy/jwt"
 )

@@ -1,6 +1,7 @@
 package jwt
 
 import (
+	"context"
 	"crypto/ecdsa"
 	"crypto/ed25519"
 	"crypto/rsa"
@@ -9,8 +10,8 @@ import (
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"golang.org/x/crypto/ssh"
 	"time"
 )
@@ -300,7 +301,7 @@ func (pb *parserBuilder) ParseCtx(ctx context.Context, token string) (*AuthProxy
 
 	parser := jwt.NewParser(
 		jwt.WithTimeFunc(func() time.Time {
-			return ctx.Clock().Now()
+			return apctx.GetClock(ctx).Now()
 		}),
 	)
 

@@ -1,9 +1,10 @@
 package database
 
 import (
+	"context"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/apctx"
 	"gorm.io/gorm"
 	"time"
 )
@@ -29,7 +30,7 @@ func (t *OAuth2Token) IsAccessTokenExpired(ctx context.Context) bool {
 		return false
 	}
 
-	return t.AccessTokenExpiresAt.Before(ctx.Clock().Now())
+	return t.AccessTokenExpiresAt.Before(apctx.GetClock(ctx).Now())
 }
 
 func (db *gormDB) GetOAuth2Token(
@@ -80,7 +81,7 @@ func (db *gormDB) InsertOAuth2Token(
 			Model(&OAuth2Token{}).
 			Where("connection_id = ?", connectionId).
 			Where("deleted_at IS NULL").
-			Update("deleted_at", ctx.Clock().Now())
+			Update("deleted_at", apctx.GetClock(ctx).Now())
 
 		if result.Error != nil {
 			return result.Error
@@ -88,14 +89,14 @@ func (db *gormDB) InsertOAuth2Token(
 
 		// Create a new token
 		newToken = &OAuth2Token{
-			ID:                    ctx.UuidGenerator().New(),
+			ID:                    apctx.GetUuidGenerator(ctx).New(),
 			ConnectionID:          connectionId,
 			RefreshedFromID:       refreshedFrom,
 			EncryptedRefreshToken: encryptedRefreshToken,
 			EncryptedAccessToken:  encryptedAccessToken,
 			AccessTokenExpiresAt:  accessTokenExpiresAt,
 			Scopes:                scopes,
-			CreatedAt:             ctx.Clock().Now(),
+			CreatedAt:             apctx.GetClock(ctx).Now(),
 		}
 
 		if err := tx.Create(newToken).Error; err != nil {
@@ -123,7 +124,7 @@ func (db *gormDB) EnumerateOAuth2TokensExpiringWithin(
 	callback func(tokens []*OAuth2TokenWithConnection, lastPage bool) (stop bool, err error),
 ) error {
 	const pageSize = 100
-	now := ctx.Clock().Now()
+	now := apctx.GetClock(ctx).Now()
 	expirationThreshold := now.Add(duration)
 
 	sess := db.session(ctx)
@@ -155,7 +156,7 @@ func (db *gormDB) EnumerateOAuth2TokensExpiringWithin(
 		if len(tokensWithConnections) > pageSize {
 			tokensWithConnections = tokensWithConnections[:pageSize]
 		}
-		
+
 		stop, err := callback(tokensWithConnections, lastPage)
 		if err != nil {
 			return err

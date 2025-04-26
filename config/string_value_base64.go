@@ -1,8 +1,8 @@
 package config
 
 import (
+	"context"
 	"encoding/base64"
-	"github.com/rmorlok/authproxy/context"
 )
 
 type StringValueBase64 struct {

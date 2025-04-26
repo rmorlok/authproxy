@@ -1,12 +1,13 @@
 package auth
 
 import (
+	"context"
 	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
+	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/api_common"
-	"github.com/rmorlok/authproxy/context"
 	"net/http"
 	"time"
 )
@@ -36,7 +37,7 @@ func (s *session) IsValid() bool {
 }
 
 func (s *session) IsExpired(ctx context.Context) bool {
-	return s.ExpiresAt.Before(ctx.Clock().Now())
+	return s.ExpiresAt.Before(apctx.GetClock(ctx).Now())
 }
 
 // establishAuthFromSession loads auth from an existing session. It is used as part of the process of attempting
@@ -178,7 +179,7 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 		sess = &session{
 			Id:        uuid.New(),
 			ActorId:   ra.GetActor().ID,
-			ExpiresAt: ctx.Clock().Now().Add(s.service.SessionTimeout()),
+			ExpiresAt: apctx.GetClock(ctx).Now().Add(s.service.SessionTimeout()),
 		}
 	}
 
@@ -209,7 +210,7 @@ func (s *service) extendSession(ctx context.Context, sess *session, w http.Respo
 
 	// Write the session to Redis
 	key := getRedisSessionKey(sess.Id)
-	if err := s.redis.Client().Set(ctx, key, sess, sess.ExpiresAt.Sub(ctx.Clock().Now())).Err(); err != nil {
+	if err := s.redis.Client().Set(ctx, key, sess, sess.ExpiresAt.Sub(apctx.GetClock(ctx).Now())).Err(); err != nil {
 		return errors.Wrap(err, "failed to write session to redis")
 	}
 
@@ -222,7 +223,7 @@ func (s *service) extendSession(ctx context.Context, sess *session, w http.Respo
 func (s *service) setSessionCookie(ctx context.Context, w http.ResponseWriter, sess session) {
 	cookieExpiration := 0 // session cookie
 	if s.service.SessionTimeout() != 0 {
-		cookieExpiration = int(sess.ExpiresAt.Sub(ctx.Clock().Now()).Seconds())
+		cookieExpiration = int(sess.ExpiresAt.Sub(apctx.GetClock(ctx).Now()).Seconds())
 	}
 
 	http.SetCookie(w, &http.Cookie{

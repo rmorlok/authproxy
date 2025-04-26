@@ -1,12 +1,13 @@
 package jwt
 
 import (
+	"context"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/util"
 	"strings"
 	"time"
@@ -84,7 +85,7 @@ func (b *claimsBuilder) WithExpiresIn(expiresIn time.Duration) ClaimsBuilder {
 }
 
 func (b *claimsBuilder) WithExpiresInCtx(ctx context.Context, expiresIn time.Duration) ClaimsBuilder {
-	t := ctx.Clock().Now().Add(expiresIn)
+	t := apctx.GetClock(ctx).Now().Add(expiresIn)
 	b.expiration = &t
 	return b
 }
@@ -166,8 +167,8 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 	c := AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:  util.CoerceString(b.id),
-			IssuedAt: &jwt.NumericDate{ctx.Clock().Now()},
-			ID:       ctx.UuidGenerator().NewString(),
+			IssuedAt: &jwt.NumericDate{apctx.GetClock(ctx).Now()},
+			ID:       apctx.GetUuidGenerator(ctx).NewString(),
 		},
 		Actor:      b.actor,
 		SelfSigned: b.selfSigned,
@@ -182,7 +183,7 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 	}
 
 	if b.expiresIn != nil {
-		b.expiration = util.ToPtr(ctx.Clock().Now().Add(*b.expiresIn))
+		b.expiration = util.ToPtr(apctx.GetClock(ctx).Now().Add(*b.expiresIn))
 	}
 
 	if b.expiration != nil {

@@ -6,12 +6,11 @@ import (
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/proxy"
 )
 
 func (r *ConnectionsRoutes) proxy(gctx *gin.Context) {
-	ctx := context.AsContext(gctx.Request.Context())
+	ctx := gctx.Request.Context()
 	ra := auth.GetAuthFromGinContext(gctx)
 	if !ra.IsAuthenticated() {
 		api_common.NewHttpStatusErrorBuilder().

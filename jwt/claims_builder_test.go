@@ -1,8 +1,8 @@
 package jwt
 
 import (
+	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
 	"testing"
@@ -12,7 +12,7 @@ import (
 func TestClaimsBuilder(t *testing.T) {
 	t.Run("valid no actor", func(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
-		ctx := context.Background().WithClock(clock.NewFakeClock(now))
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		cb := NewClaimsBuilder()
 
@@ -31,11 +31,11 @@ func TestClaimsBuilder(t *testing.T) {
 		require.Equal(t, "me", claims.Issuer)
 		require.Equal(t, "public", claims.Audience[0])
 		require.Equal(t, "admin/bob-dole", claims.Subject)
-		require.Equal(t, ctx.Clock().Now().Add(10*time.Minute), claims.ExpiresAt.Time)
+		require.Equal(t, apctx.GetClock(ctx).Now().Add(10*time.Minute), claims.ExpiresAt.Time)
 	})
 	t.Run("valid with actor", func(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
-		ctx := context.Background().WithClock(clock.NewFakeClock(now))
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		cb := NewClaimsBuilder()
 
@@ -57,12 +57,12 @@ func TestClaimsBuilder(t *testing.T) {
 		require.Equal(t, "admin/bob-dole", claims.Subject)
 		require.Equal(t, "bobdole@example.com", claims.Actor.Email)
 		require.True(t, claims.Actor.IsAdmin())
-		require.Equal(t, ctx.Clock().Now().Add(10*time.Minute), claims.ExpiresAt.Time)
+		require.Equal(t, apctx.GetClock(ctx).Now().Add(10*time.Minute), claims.ExpiresAt.Time)
 	})
 	t.Run("nonce", func(t *testing.T) {
 		t.Run("valid", func(t *testing.T) {
 			now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
-			ctx := context.Background().WithClock(clock.NewFakeClock(now))
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			cb := NewClaimsBuilder()
 
@@ -80,12 +80,12 @@ func TestClaimsBuilder(t *testing.T) {
 			require.Equal(t, "me", claims.Issuer)
 			require.Equal(t, "public", claims.Audience[0])
 			require.Equal(t, "admin/bob-dole", claims.Subject)
-			require.Equal(t, ctx.Clock().Now().Add(10*time.Minute), claims.ExpiresAt.Time)
+			require.Equal(t, apctx.GetClock(ctx).Now().Add(10*time.Minute), claims.ExpiresAt.Time)
 			require.NotNil(t, claims.Nonce)
 		})
 		t.Run("valid with actor", func(t *testing.T) {
 			now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
-			ctx := context.Background().WithClock(clock.NewFakeClock(now))
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			cb := NewClaimsBuilder()
 
@@ -108,12 +108,12 @@ func TestClaimsBuilder(t *testing.T) {
 			require.Equal(t, "admin/bob-dole", claims.Subject)
 			require.Equal(t, "bobdole@example.com", claims.Actor.Email)
 			require.True(t, claims.Actor.IsAdmin())
-			require.Equal(t, ctx.Clock().Now().Add(10*time.Minute), claims.ExpiresAt.Time)
+			require.Equal(t, apctx.GetClock(ctx).Now().Add(10*time.Minute), claims.ExpiresAt.Time)
 			require.NotNil(t, claims.Nonce)
 		})
 		t.Run("missing expiration", func(t *testing.T) {
 			now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
-			ctx := context.Background().WithClock(clock.NewFakeClock(now))
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			cb := NewClaimsBuilder()
 

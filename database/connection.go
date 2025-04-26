@@ -1,9 +1,9 @@
 package database
 
 import (
+	"context"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/util"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"

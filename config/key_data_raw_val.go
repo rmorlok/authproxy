@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/rmorlok/authproxy/context"
+	"context"
 )
 
 // KeyDataRawVal is where the key data is specified directly as bytes. This isn't used for config via file

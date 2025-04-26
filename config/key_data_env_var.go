@@ -1,8 +1,8 @@
 package config
 
 import (
+	"context"
 	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/context"
 	"os"
 )
 

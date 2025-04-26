@@ -3,8 +3,8 @@ package auth
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	jwt2 "github.com/rmorlok/authproxy/jwt"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
@@ -16,7 +16,7 @@ import (
 
 func TestAuth_Gin(t *testing.T) {
 	now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
-	ctx := context.Background().WithClock(clock.NewFakeClock(now))
+	ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 	testClaims := func() *jwt2.AuthProxyClaims {
 		return &jwt2.AuthProxyClaims{
@@ -26,7 +26,7 @@ func TestAuth_Gin(t *testing.T) {
 				Audience:  []string{string(config.ServiceIdApi)},
 				ExpiresAt: nil,
 				NotBefore: nil,
-				IssuedAt:  &jwt.NumericDate{ctx.Clock().Now()},
+				IssuedAt:  &jwt.NumericDate{apctx.GetClock(ctx).Now()},
 				Subject:   "id1",
 			},
 
@@ -46,7 +46,7 @@ func TestAuth_Gin(t *testing.T) {
 				Audience:  []string{string(config.ServiceIdApi)},
 				ExpiresAt: nil,
 				NotBefore: nil,
-				IssuedAt:  &jwt.NumericDate{ctx.Clock().Now()},
+				IssuedAt:  &jwt.NumericDate{apctx.GetClock(ctx).Now()},
 				Subject:   "admin/aid1",
 			},
 

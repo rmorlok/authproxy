@@ -1,9 +1,9 @@
 package oauth2
 
 import (
+	"context"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"

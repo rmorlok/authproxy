@@ -7,7 +7,6 @@ import (
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -28,7 +27,7 @@ type Oauth2Routes struct {
 }
 
 func (r *Oauth2Routes) callback(gctx *gin.Context) {
-	ctx := context.AsContext(gctx.Request.Context())
+	ctx := gctx.Request.Context()
 
 	ra := auth.GetAuthFromGinContext(gctx)
 	if !ra.IsAuthenticated() {
@@ -80,7 +79,7 @@ type RedirectParams struct {
 }
 
 func (r *Oauth2Routes) redirect(gctx *gin.Context) {
-	ctx := context.AsContext(gctx.Request.Context())
+	ctx := gctx.Request.Context()
 
 	ra := auth.GetAuthFromGinContext(gctx)
 	if !ra.IsAuthenticated() {

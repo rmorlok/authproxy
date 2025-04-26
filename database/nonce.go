@@ -1,8 +1,9 @@
 package database
 
 import (
+	"context"
 	"github.com/google/uuid"
-	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/apctx"
 	"gorm.io/gorm"
 	"time"
 )
@@ -43,7 +44,7 @@ func (db *gormDB) CheckNonceValidAndMarkUsed(
 				newUsedNonce := UsedNonce{
 					ID:          nonce,
 					RetainUntil: retainRecordUntil,
-					CreatedAt:   ctx.Clock().Now(),
+					CreatedAt:   apctx.GetClock(ctx).Now(),
 				}
 				if createErr := tx.Create(&newUsedNonce).Error; createErr != nil {
 					return createErr

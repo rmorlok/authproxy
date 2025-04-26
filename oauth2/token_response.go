@@ -1,10 +1,11 @@
 package oauth2
 
 import (
+	"context"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/util"
 	"gopkg.in/h2non/gentleman.v2"
@@ -58,7 +59,7 @@ func (o *OAuth2) createDbTokenFromResponse(ctx context.Context, resp *gentleman.
 
 	var expiresAt *time.Time
 	if jsonResp.ExpiresIn != nil {
-		expiresAt = util.ToPtr(ctx.Clock().Now().Add(time.Duration(*jsonResp.ExpiresIn) * time.Second))
+		expiresAt = util.ToPtr(apctx.GetClock(ctx).Now().Add(time.Duration(*jsonResp.ExpiresIn) * time.Second))
 	}
 
 	var refreshFromId *uuid.UUID

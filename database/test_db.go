@@ -1,10 +1,10 @@
 package database
 
 import (
+	"context"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"os"
 	"path/filepath"
 	"time"

@@ -6,7 +6,6 @@ package auth
 
 import (
 	"github.com/gin-gonic/gin"
-	context2 "github.com/rmorlok/authproxy/context"
 	"net/http"
 )
 
@@ -24,7 +23,7 @@ func GetAuthFromGinContext(c *gin.Context) RequestAuth {
 		return NewUnauthenticatedRequestAuth()
 	}
 
-	return GetAuthFromContext(context2.AsContext(c.Request.Context()))
+	return GetAuthFromContext(c.Request.Context())
 }
 
 // MustGetAuthFromGinContext returns an authenticated request info. If the request is not authenticated, this
@@ -92,11 +91,9 @@ func (j *service) AdminOnly() gin.HandlerFunc {
 }
 
 func (j *service) EstablishGinSession(c *gin.Context, ra RequestAuth) error {
-	ctx := context2.AsContext(c.Request.Context())
-	return j.EstablishSession(ctx, c.Writer, ra)
+	return j.EstablishSession(c.Request.Context(), c.Writer, ra)
 }
 
 func (j *service) EndGinSession(c *gin.Context, ra RequestAuth) error {
-	ctx := context2.AsContext(c.Request.Context())
-	return j.EndSession(ctx, c.Writer, ra)
+	return j.EndSession(c.Request.Context(), c.Writer, ra)
 }

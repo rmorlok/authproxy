@@ -1,8 +1,8 @@
 package config
 
 import (
+	"context"
 	"fmt"
-	"github.com/rmorlok/authproxy/context"
 	"gopkg.in/yaml.v3"
 	"strconv"
 	"time"

@@ -1,8 +1,8 @@
 package jwt
 
 import (
+	"context"
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/stretchr/testify/require"
 	"testing"
 )

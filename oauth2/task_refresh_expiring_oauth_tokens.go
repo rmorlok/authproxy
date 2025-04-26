@@ -5,7 +5,6 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/config"
-	context2 "github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
 )
 
@@ -15,12 +14,11 @@ func newRefreshExpiringOauth2TokensTask() (*asynq.Task, error) {
 	return asynq.NewTask(taskTypeRefreshExpiringOAuthTokens, nil), nil
 }
 
-func (th *taskHandler) refreshExpiringOauth2Tokens(rctx context.Context, t *asynq.Task) error {
+func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq.Task) error {
 	logger := aplog.NewBuilder(th.logger).
 		WithTask(t).
-		WithCtx(rctx).
+		WithCtx(ctx).
 		Build()
-	ctx := context2.AsContext(rctx)
 	logger.Info("Refresh expiring oauth tokens task started")
 	defer logger.Info("Refresh expiring oauth tokens task completed")
 

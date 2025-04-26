@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/rmorlok/authproxy/context"
+	"context"
 	"github.com/rmorlok/authproxy/util"
 	"sync"
 )

@@ -1,9 +1,10 @@
 package redis
 
 import (
+	"context"
 	"github.com/bsm/redislock"
 	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/apctx"
 	"time"
 )
 
@@ -99,7 +100,7 @@ func MutexOptionRetryFor(d time.Duration) MutexOption {
 		m.lockContextCancellation = func(ctx context.Context) (context.Context, context.CancelFunc) {
 			// Check if the context currently has a more aggressive deadline, and if so, respect that
 			if currentDeadline, ok := ctx.Deadline(); !ok {
-				desiredDeadline := ctx.Clock().Now().Add(d)
+				desiredDeadline := apctx.GetClock(ctx).Now().Add(d)
 				if desiredDeadline.After(currentDeadline) {
 					return ctx, func() {}
 				}

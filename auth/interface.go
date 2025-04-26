@@ -1,8 +1,8 @@
 package auth
 
 import (
+	"context"
 	"github.com/gin-gonic/gin"
-	"github.com/rmorlok/authproxy/context"
 	jwt2 "github.com/rmorlok/authproxy/jwt"
 	"net/http"
 )

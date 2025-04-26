@@ -1,8 +1,9 @@
 package database
 
 import (
+	"context"
 	"github.com/google/uuid"
-	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/jwt"
 	"github.com/rmorlok/authproxy/util"
 	"github.com/stretchr/testify/require"
@@ -19,7 +20,7 @@ func TestActor(t *testing.T) {
 
 	setup := func(t *testing.T) {
 		_, db = MustApplyBlankTestDbConfig(t.Name(), nil)
-		ctx = context.Background().WithClock(clk)
+		ctx = apctx.NewBuilderBackground().WithClock(clk).Build()
 	}
 
 	t.Run("Validation", func(t *testing.T) {

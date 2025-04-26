@@ -6,7 +6,6 @@ import (
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -51,7 +50,7 @@ type InitiateConnectionRedirect struct {
 }
 
 func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
-	ctx := context.AsContext(gctx.Request.Context())
+	ctx := gctx.Request.Context()
 
 	ra := auth.GetAuthFromGinContext(gctx)
 	if !ra.IsAuthenticated() {
@@ -147,7 +146,7 @@ type ListConnectionResponseJson struct {
 }
 
 func (r *ConnectionsRoutes) list(gctx *gin.Context) {
-	ctx := context.AsContext(gctx.Request.Context())
+	ctx := gctx.Request.Context()
 
 	var req ListConnectionRequestQuery
 	var err error
@@ -207,7 +206,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 }
 
 func (r *ConnectionsRoutes) get(gctx *gin.Context) {
-	ctx := context.AsContext(gctx.Request.Context())
+	ctx := gctx.Request.Context()
 	id, err := uuid.Parse(gctx.Param("id"))
 	if err != nil {
 		gctx.PureJSON(http.StatusBadRequest, Error{err.Error()})

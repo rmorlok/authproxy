@@ -1,9 +1,9 @@
 package config
 
 import (
+	"context"
 	"encoding/base64"
 	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/context"
 	"os"
 )
 

@@ -1,12 +1,13 @@
 package auth
 
 import (
+	"context"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
 	jwt2 "github.com/rmorlok/authproxy/jwt"
 	"github.com/rmorlok/authproxy/redis"
@@ -113,7 +114,7 @@ func (atu *AuthTestUtil) SignRequestHeaderAs(ctx context.Context, req *http.Requ
 func (atu *AuthTestUtil) SignRequestQueryAs(ctx context.Context, req *http.Request, a jwt2.Actor) (*http.Request, error) {
 	claims := atu.claimsForActor(a)
 	claims.Nonce = util.ToPtr(uuid.New())
-	claims.ExpiresAt = &jwt.NumericDate{ctx.Clock().Now().Add(time.Hour)}
+	claims.ExpiresAt = &jwt.NumericDate{apctx.GetClock(ctx).Now().Add(time.Hour)}
 
 	tokenString, err := atu.s.Token(ctx, claims)
 	if err != nil {

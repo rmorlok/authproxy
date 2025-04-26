@@ -1,10 +1,11 @@
 package oauth2
 
 import (
+	"context"
 	"fmt"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -59,7 +60,7 @@ func (o *OAuth2) RecordCancelSessionAfterAuth(ctx context.Context, shouldCancel 
 	}
 
 	o.state.CancelSessionAfterAuth = shouldCancel
-	ttl := o.state.ExpiresAt.Sub(ctx.Clock().Now())
+	ttl := o.state.ExpiresAt.Sub(apctx.GetClock(ctx).Now())
 
 	result := o.redis.Client().Set(ctx, getStateRedisKey(o.state.Id), o.state, ttl)
 	if result.Err() != nil {

@@ -1,12 +1,13 @@
 package jwt
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/apctx"
 	"strings"
 )
 
@@ -95,5 +96,5 @@ func (tc *AuthProxyClaims) IsExpired(ctx context.Context) bool {
 		return true
 	}
 
-	return tc.ExpiresAt != nil && tc.ExpiresAt.Before(ctx.Clock().Now())
+	return tc.ExpiresAt != nil && tc.ExpiresAt.Before(apctx.GetClock(ctx).Now())
 }

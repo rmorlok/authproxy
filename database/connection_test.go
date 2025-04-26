@@ -2,7 +2,7 @@ package database
 
 import (
 	"github.com/google/uuid"
-	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/apctx"
 	"github.com/stretchr/testify/assert"
 	clock "k8s.io/utils/clock/testing"
 	"testing"
@@ -13,7 +13,7 @@ func TestConnections(t *testing.T) {
 	t.Run("round trip", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig("connection_round_trip", nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
-		ctx := context.Background().WithClock(clock.NewFakeClock(now))
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		u := uuid.New()
 		err := db.CreateConnection(ctx, &Connection{ID: u, State: ConnectionStateCreated})
@@ -31,7 +31,7 @@ func TestConnections(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig("connection_round_trip", nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		c := clock.NewFakeClock(now)
-		ctx := context.Background().WithClock(c)
+		ctx := apctx.NewBuilderBackground().WithClock(c).Build()
 
 		var firstUuid, lastUuid uuid.UUID
 		for i := 0; i < 50; i++ {

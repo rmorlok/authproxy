@@ -1,11 +1,12 @@
 package auth
 
 import (
+	"context"
 	"fmt"
 	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
 	jwt2 "github.com/rmorlok/authproxy/jwt"
 	"net/http"
@@ -42,7 +43,7 @@ func (s *service) keyForToken(claims *jwt2.AuthProxyClaims) (config.Key, error) 
 func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (string, error) {
 	claimsClone := *claims
 	claimsClone.Issuer = string(s.service.GetId())
-	claimsClone.IssuedAt = jwt.NewNumericDate(ctx.Clock().Now())
+	claimsClone.IssuedAt = jwt.NewNumericDate(apctx.GetClock(ctx).Now())
 	claimsClone.SelfSigned = true
 
 	audiences, err := claimsClone.GetAudience()
@@ -115,7 +116,7 @@ func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProx
 func (s *service) validate(ctx context.Context, claims *jwt2.AuthProxyClaims) error {
 	v := jwt.NewValidator(
 		jwt.WithTimeFunc(func() time.Time {
-			return ctx.Clock().Now()
+			return apctx.GetClock(ctx).Now()
 		}),
 	)
 

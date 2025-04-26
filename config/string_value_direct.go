@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/rmorlok/authproxy/context"
+	"context"
 )
 
 // StringValueDirect is where the string data is specified directly. This isn't used for config via file

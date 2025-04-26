@@ -1,13 +1,14 @@
 package oauth2
 
 import (
+	"context"
 	"encoding"
 	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -95,7 +96,7 @@ func getOAuth2State(
 		return nil, errors.Errorf("state %s is invalid", stateId.String())
 	}
 
-	if s.ExpiresAt.Before(ctx.Clock().Now()) {
+	if s.ExpiresAt.Before(apctx.GetClock(ctx).Now()) {
 		return nil, errors.Errorf("state %s has expired", stateId.String())
 	}
 

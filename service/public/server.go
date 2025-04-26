@@ -1,6 +1,7 @@
 package admin_api
 
 import (
+	"context"
 	"fmt"
 	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
 	"github.com/gin-gonic/contrib/static"
@@ -9,7 +10,6 @@ import (
 	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -67,7 +67,7 @@ func GetGinServer(
 	})
 
 	healthChecker.GET("/healthz", func(c *gin.Context) {
-		ctx, cancel := context.WithTimeout(context.AsContext(c.Request.Context()), 1*time.Second)
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 1*time.Second)
 		defer cancel()
 
 		dbChan := make(chan bool, 1)

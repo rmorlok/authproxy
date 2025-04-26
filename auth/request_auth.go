@@ -2,8 +2,8 @@ package auth
 
 import (
 	"context"
+	context2 "context"
 	"github.com/google/uuid"
-	context2 "github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/database"
 )
 

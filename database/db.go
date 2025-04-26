@@ -1,11 +1,12 @@
 package database
 
 import (
+	"context"
 	"github.com/google/uuid"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"github.com/rmorlok/authproxy/jwt"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
@@ -136,7 +137,7 @@ type gormDB struct {
 func (db *gormDB) session(ctx context.Context) *gorm.DB {
 	return db.gorm.Session(&gorm.Session{
 		NowFunc: func() time.Time {
-			return ctx.Clock().Now().UTC()
+			return apctx.GetClock(ctx).Now().UTC()
 		},
 	})
 }

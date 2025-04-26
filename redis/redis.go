@@ -1,12 +1,12 @@
 package redis
 
 import (
+	"context"
 	"github.com/alicebob/miniredis"
 	"github.com/bsm/redislock"
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/context"
 	"log"
 	"log/slog"
 	"sync"

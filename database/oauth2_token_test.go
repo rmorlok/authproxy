@@ -3,7 +3,7 @@ package database
 import (
 	"fmt"
 	"github.com/google/uuid"
-	"github.com/rmorlok/authproxy/context"
+	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/util"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -16,7 +16,7 @@ func TestOAuth2Token_IsAccessTokenExpired(t *testing.T) {
 	t.Run("table-driven tests", func(t *testing.T) {
 		now := time.Date(2023, time.November, 5, 6, 29, 0, 0, time.UTC)
 		clock := clock.NewFakeClock(now)
-		ctx := context.Background().WithClock(clock)
+		ctx := apctx.NewBuilderBackground().WithClock(clock).Build()
 
 		testCases := []struct {
 			name               string
@@ -56,7 +56,7 @@ func TestOAuth2Tokens(t *testing.T) {
 	t.Run("round trip", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig("nonce_round_trip", nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
-		ctx := context.Background().WithClock(clock.NewFakeClock(now))
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		connectionId := uuid.New()
 
@@ -88,7 +88,7 @@ func TestOAuth2Tokens(t *testing.T) {
 	t.Run("no tokens", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig("nonce_round_trip", nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
-		ctx := context.Background().WithClock(clock.NewFakeClock(now))
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		connectionId1 := uuid.New()
 		connectionId2 := uuid.New()
@@ -111,7 +111,7 @@ func TestOAuth2Tokens(t *testing.T) {
 	t.Run("replaces previous when tagging previous", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig("nonce_round_trip", nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
-		ctx := context.Background().WithClock(clock.NewFakeClock(now))
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		connectionId := uuid.New()
 
@@ -160,7 +160,7 @@ func TestOAuth2Tokens(t *testing.T) {
 	t.Run("replaces previous when not tagging previous", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig("nonce_round_trip", nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
-		ctx := context.Background().WithClock(clock.NewFakeClock(now))
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		connectionId := uuid.New()
 
@@ -211,49 +211,48 @@ func TestOAuth2Tokens(t *testing.T) {
 func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 	t.Run("table-driven tests", func(t *testing.T) {
 		now := time.Date(2023, time.November, 5, 6, 0, 0, 0, time.UTC)
-		ctx := context.Background().
-			WithClock(clock.NewFakeClock(now))
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		createdConnection := Connection{
 			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 			State:       ConnectionStateCreated,
 			ConnectorId: "some-connector",
-			CreatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
-			UpdatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
+			CreatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			UpdatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
 
 		readyConnection1 := Connection{
 			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000002"),
 			State:       ConnectionStateReady,
 			ConnectorId: "some-connector",
-			CreatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
-			UpdatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
+			CreatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			UpdatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
 
 		readyConnection2 := Connection{
 			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000003"),
 			State:       ConnectionStateReady,
 			ConnectorId: "some-connector",
-			CreatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
-			UpdatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
+			CreatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			UpdatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
 
 		disabledConnection := Connection{
 			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000004"),
 			State:       ConnectionStateDisabled,
 			ConnectorId: "some-connector",
-			CreatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
-			UpdatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
+			CreatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			UpdatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
 
 		deletedConnection := Connection{
 			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000005"),
 			State:       ConnectionStateReady,
 			ConnectorId: "some-connector",
-			CreatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
-			UpdatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
+			CreatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			UpdatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 			DeletedAt: gorm.DeletedAt{
-				Time:  ctx.Clock().Now().Add(-30 * time.Minute),
+				Time:  apctx.GetClock(ctx).Now().Add(-30 * time.Minute),
 				Valid: true,
 			},
 		}
@@ -264,8 +263,8 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 				ID:          uuid.New(),
 				State:       ConnectionStateReady,
 				ConnectorId: "some-connector",
-				CreatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
-				UpdatedAt:   ctx.Clock().Now().Add(-1 * time.Hour),
+				CreatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+				UpdatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 			})
 		}
 

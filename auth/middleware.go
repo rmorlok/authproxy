@@ -2,7 +2,6 @@ package auth
 
 import (
 	"github.com/rmorlok/authproxy/api_common"
-	"github.com/rmorlok/authproxy/context"
 	"net/http"
 )
 
@@ -29,7 +28,7 @@ func GetAuthFromRequest(r *http.Request) RequestAuth {
 		return NewUnauthenticatedRequestAuth()
 	}
 
-	return GetAuthFromContext(context.AsContext(ctx))
+	return GetAuthFromContext(ctx)
 }
 
 // SetAuthOnRequestContext sets the auth information into the context for the request so that later handlers
@@ -54,7 +53,7 @@ func (j *service) Trace(next http.Handler, abort func()) http.Handler {
 func (j *service) auth(requireAuth bool, abort func()) func(http.Handler) http.Handler {
 	f := func(h http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
-			ctx := context.AsContext(r.Context())
+			ctx := r.Context()
 			requestAuth, err := j.establishAuthFromRequest(ctx, r, w)
 			if err != nil {
 				// We treat any errors as a failure, even if the resulting status is unauthorized. Not passing
