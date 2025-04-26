@@ -82,7 +82,8 @@ func Serve(cfg config.C) {
 	if err != nil {
 		panic(err)
 	}
-
+	defer rs.Close()
+	
 	db, err := database.NewConnectionForRoot(cfg.GetRoot(), logger)
 	if err != nil {
 		panic(err)

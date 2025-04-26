@@ -23,6 +23,7 @@ var redisErr error
 
 type R interface {
 	Ping(ctx context.Context) bool
+	Close() error
 	Client() *redis.Client
 	NewMutex(key string, options ...MutexOption) Mutex
 }
@@ -155,6 +156,10 @@ func (w *wrapper) Ping(ctx context.Context) bool {
 	}
 
 	return true
+}
+
+func (w *wrapper) Close() error {
+	return w.client.Close()
 }
 
 func (w *wrapper) Client() *redis.Client {

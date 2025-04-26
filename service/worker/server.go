@@ -34,6 +34,7 @@ func Serve(cfg config.C) {
 	if err != nil {
 		panic(err)
 	}
+	defer rs.Close()
 
 	db, err := database.NewConnectionForRoot(cfg.GetRoot(), logger)
 	if err != nil {
@@ -87,7 +88,8 @@ func Serve(cfg config.C) {
 	}
 
 	asynqClient := asynq.NewClientFromRedisClient(rs.Client())
-	defer asynqClient.Close()
+	// defer asynqClient.Close() // Do no close the async connection because it is a shared redis connection
+
 	asynqClient.Ping()
 
 	router.GET("/healthz", func(c *gin.Context) {
