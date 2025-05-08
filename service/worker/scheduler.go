@@ -15,11 +15,32 @@ import (
 	"time"
 )
 
+const mutexLockTime = 2 * time.Minute
+
 type scheduler struct {
 	redis               redis.R
 	healthCheckFunc     func(isScheduler bool, err error)
 	oauth2TaskRegistrar oauth2.TaskRegistrar
+	mtx                 sync.Mutex
+	mgr                 *asynq.PeriodicTaskManager
+	wg                  sync.WaitGroup
+	done                chan struct{}
+	rsMtx               redis.Mutex
 	logger              *slog.Logger
+}
+
+func newScheduler(rs redis.R, hc func(isScheduler bool, err error), tr oauth2.TaskRegistrar, l *slog.Logger) *scheduler {
+	return &scheduler{
+		redis:               rs,
+		healthCheckFunc:     hc,
+		oauth2TaskRegistrar: tr,
+		logger:              l,
+		done:                make(chan struct{}),
+		rsMtx: rs.NewMutex("worker:scheduler_master",
+			redis.MutexOptionLockFor(mutexLockTime),
+			redis.MutexOptionDetailedLockMetadata(),
+		),
+	}
 }
 
 func (s *scheduler) GetConfigs() ([]*asynq.PeriodicTaskConfig, error) {
@@ -28,168 +49,136 @@ func (s *scheduler) GetConfigs() ([]*asynq.PeriodicTaskConfig, error) {
 	return configs, nil
 }
 
-const mutexLockTime = 2 * time.Minute
+func (s *scheduler) start(ctx context.Context) error {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
 
-func (s *scheduler) getMutex() redis.Mutex {
-	return s.redis.NewMutex("worker:scheduler_master",
-		redis.MutexOptionLockFor(mutexLockTime),
-		redis.MutexOptionDetailedLockMetadata(),
+	if s.mgr != nil {
+		return nil
+	}
+
+	s.logger.Info("Obtained lock for scheduler")
+	s.healthCheckFunc(true, nil)
+
+	var err error
+	s.mgr, err = asynq.NewPeriodicTaskManager(
+		asynq.PeriodicTaskManagerOpts{
+			RedisUniversalClient:       s.redis.Client(),
+			PeriodicTaskConfigProvider: s,
+			SyncInterval:               10 * time.Second,
+			SchedulerOpts: &asynq.SchedulerOpts{
+				Logger:   &asyncLogger{inner: aplog.NewBuilder(s.logger).WithComponent("asynq-scheduler").Build()},
+				LogLevel: asynq.InfoLevel,
+			},
+		},
 	)
+
+	if err != nil {
+		return errors.Wrap(err, "error creating periodic task manager")
+	}
+
+	err = s.mgr.Start()
+
+	if err != nil {
+		s.healthCheckFunc(false, err)
+		return err
+	}
+	s.healthCheckFunc(true, err)
+	s.logger.Info("Scheduler is running")
+
+	s.wg.Add(1)
+	go func() {
+		defer s.wg.Done()
+		for {
+			select {
+			case <-s.done:
+				s.logger.Info("Shutting down scheduler")
+				s.shutdown()
+				return
+			case <-time.After(mutexLockTime / 2):
+				s.logger.Debug("Extending scheduler ownership lock")
+				err = s.rsMtx.Extend(ctx, mutexLockTime)
+				if err != nil {
+					if s.mgr != nil {
+						s.logger.Info("Shutting down scheduler due to failure to extend the scheduler ownership lock")
+						s.shutdown()
+					}
+					s.healthCheckFunc(false, nil)
+					return
+				}
+				s.healthCheckFunc(true, nil)
+			}
+		}
+	}()
+
+	return nil
 }
 
-func (s *scheduler) Run(ctx context.Context) error {
-	m := s.getMutex()
+func (s *scheduler) shutdown() {
+	s.mtx.Lock()
+	defer s.mtx.Unlock()
+	if s.mgr != nil {
+		s.mgr.Shutdown()
+		s.logger.Info("Async scheduler shutdown complete")
+		s.mgr = nil
+	}
+}
 
-	var mgr *asynq.PeriodicTaskManager
-	var mgrMutex sync.Mutex
+func (s *scheduler) Run() error {
+	ctx := context.Background()
+	defer s.wg.Wait()
 
-	// Create signal channel
 	sigChan := make(chan os.Signal, 1)
 	signal.Notify(sigChan, syscall.SIGTERM, syscall.SIGINT)
 
-	// Create a done channel to handle cleanup
-	done := make(chan struct{})
-	runReturning := make(chan struct{})
-	defer close(runReturning)
-
-	// Start a goroutine to handle signals
+	s.wg.Add(1)
 	go func() {
+		defer s.wg.Done()
 		select {
 		case <-sigChan:
 			s.logger.Info("Received termination signal")
-			close(done)
+			close(s.done)
 			return
-		case <-ctx.Done():
-			close(done)
-			return
-		case <-runReturning:
-			s.logger.Info("Shutting down monitor")
+		case <-s.done:
 			return
 		}
 	}()
 
+	var lastErr error
+
 	for {
 		select {
-		case <-done:
+		case <-s.done:
 			s.logger.Info("Shutting down scheduler watchdog")
-			func() {
-				mgrMutex.Lock()
-				defer mgrMutex.Unlock()
-				if mgr != nil {
-					mgr.Shutdown()
-					mgr = nil
-				}
-			}()
+			s.shutdown()
 			return nil
 		default:
-			err := m.Lock(ctx)
-			if err == nil {
-				defer m.Unlock(ctx)
-				s.logger.Info("Obtained lock for scheduler")
-				s.healthCheckFunc(true, nil)
-
-				var wg sync.WaitGroup
-
-				func() {
-					mgrMutex.Lock()
-					defer mgrMutex.Unlock()
-
-					mgr, err = asynq.NewPeriodicTaskManager(
-						asynq.PeriodicTaskManagerOpts{
-							RedisUniversalClient:       s.redis.Client(),
-							PeriodicTaskConfigProvider: s,
-							SyncInterval:               10 * time.Second,
-							SchedulerOpts: &asynq.SchedulerOpts{
-								Logger:   &asyncLogger{inner: aplog.NewBuilder(s.logger).WithComponent("asynq-scheduler").Build()},
-								LogLevel: asynq.InfoLevel,
-							},
-						},
-					)
-				}()
-
-				if err != nil {
-					return errors.Wrap(err, "error creating periodic task manager")
-				}
-
-				runSchedulerError := mgr.Start()
-				if runSchedulerError != nil {
-					s.healthCheckFunc(false, runSchedulerError)
-					return runSchedulerError
-				}
-				s.healthCheckFunc(true, runSchedulerError)
-				s.logger.Info("Scheduler is running")
-
-				var extendLockError error
-				wg.Add(1)
-				go func() {
-					defer wg.Done()
-					for {
-						select {
-						case <-done:
-							s.logger.Info("Shutting down scheduler")
-							func() {
-								mgrMutex.Lock()
-								defer mgrMutex.Unlock()
-								if mgr != nil {
-									mgr.Shutdown()
-									mgr = nil
-								}
-							}()
-							return
-						case <-ctx.Done():
-							func() {
-								mgrMutex.Lock()
-								defer mgrMutex.Unlock()
-								if mgr != nil {
-									mgr.Shutdown()
-									mgr = nil
-								}
-							}()
-							return
-						case <-time.After(mutexLockTime / 2):
-							extendLockError = m.Extend(ctx, mutexLockTime)
-							if extendLockError != nil {
-								func() {
-									mgrMutex.Lock()
-									defer mgrMutex.Unlock()
-									if mgr != nil {
-										mgr.Shutdown()
-										mgr = nil
-									}
-								}()
-								s.healthCheckFunc(false, nil)
-								return
-							}
-							s.healthCheckFunc(true, nil)
-						}
+			if s.mgr == nil {
+				err := s.rsMtx.Lock(ctx)
+				if err == nil {
+					lastErr = nil
+					err = s.start(ctx)
+					if err != nil {
+						s.shutdown()
+						s.healthCheckFunc(false, err)
+						s.rsMtx.Unlock(ctx)
+						return err
 					}
-				}()
-
-				wg.Wait()
-
-				if extendLockError != nil {
-					return extendLockError
+				} else if !redis.MutexIsErrNotObtained(err) {
+					s.shutdown()
+					s.healthCheckFunc(false, err)
+					if lastErr == nil {
+						s.logger.Error(
+							"Failed to obtain lock for scheduler",
+							"err", err)
+						lastErr = err
+					}
+				} else {
+					s.healthCheckFunc(false, nil)
 				}
-
-				return runSchedulerError
 			}
 
-			if !redis.MutexIsErrNotObtained(err) {
-				func() {
-					mgrMutex.Lock()
-					defer mgrMutex.Unlock()
-					if mgr != nil {
-						mgr.Shutdown()
-						mgr = nil
-					}
-				}()
-				s.healthCheckFunc(false, err)
-				return errors.Wrap(err, "error while attaining lock for scheduler")
-			} else {
-				s.healthCheckFunc(false, nil)
-			}
-
-			time.Sleep(100 * time.Millisecond)
+			time.Sleep(300 * time.Millisecond)
 		}
 	}
 }

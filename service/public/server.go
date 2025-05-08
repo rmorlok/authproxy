@@ -154,16 +154,18 @@ func Serve(cfg config.C) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		server.Run(fmt.Sprintf(":%d", cfg.GetRoot().Public.Port()))
+		api_common.RunGin(server, fmt.Sprintf(":%d", cfg.GetRoot().Public.Port()), logger)
 	}()
 
 	if server != healthChecker {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			healthChecker.Run(fmt.Sprintf(":%d", cfg.GetRoot().Public.HealthCheckPort()))
+			api_common.RunGin(healthChecker, fmt.Sprintf(":%d", cfg.GetRoot().Public.HealthCheckPort()), logger)
 		}()
 	}
 
 	wg.Wait()
+	logger.Info("Public shutting down")
+	defer logger.Info("Public shutdown complete")
 }

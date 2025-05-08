@@ -174,7 +174,13 @@ func (m *mutex) Extend(ctx context.Context, d time.Duration) error {
 		return errors.Errorf("mutex '%s' not locked", m.key)
 	}
 
-	return m.lock.Refresh(ctx, d, m.opts())
+	err := m.lock.Refresh(ctx, d, m.opts())
+	if err != nil {
+		// We no longer hold the lock
+		m.lock = nil
+	}
+
+	return err
 }
 
 func (m *mutex) Unlock(ctx context.Context) error {

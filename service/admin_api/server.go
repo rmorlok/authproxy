@@ -83,7 +83,7 @@ func Serve(cfg config.C) {
 		panic(err)
 	}
 	defer rs.Close()
-	
+
 	db, err := database.NewConnectionForRoot(cfg.GetRoot(), logger)
 	if err != nil {
 		panic(err)
@@ -116,17 +116,19 @@ func Serve(cfg config.C) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		server.Run(fmt.Sprintf(":%d", cfg.GetRoot().AdminApi.Port()))
+		api_common.RunGin(server, fmt.Sprintf(":%d", cfg.GetRoot().AdminApi.Port()), logger)
 	}()
 
 	if server != healthChecker {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			healthChecker.Run(fmt.Sprintf(":%d", cfg.GetRoot().AdminApi.HealthCheckPort()))
+			api_common.RunGin(healthChecker, fmt.Sprintf(":%d", cfg.GetRoot().AdminApi.HealthCheckPort()), logger)
 		}()
 	}
 
 	wg.Wait()
 
+	logger.Info("Admin API shutting down")
+	defer logger.Info("Admin API shutdown complete")
 }

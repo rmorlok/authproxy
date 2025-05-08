@@ -171,25 +171,25 @@ func Serve(cfg config.C) {
 			log.Fatalf("could not run async server: %v", err)
 		}
 		asyncRunning = false
-		logger.Info("Worker shutdown complete")
+		logger.Info("Async worker shutdown complete")
 	}()
 
-	scheduler := &scheduler{
-		redis:               rs,
-		healthCheckFunc:     asyncSchedulerHealthChecker,
-		oauth2TaskRegistrar: oauth2TaskHandler,
-		logger:              logBuilder.WithComponent("scheduler").Build(),
-	}
+	scheduler := newScheduler(
+		rs,
+		asyncSchedulerHealthChecker,
+		oauth2TaskHandler,
+		logBuilder.WithComponent("scheduler").Build(),
+	)
 
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := scheduler.Run(ctx); err != nil {
+		if err := scheduler.Run(); err != nil {
 			asyncHasError = true
 			log.Fatalf("could not run scheduler: %v", err)
 		}
 		asyncIsScheduler = false
-		logger.Info("Scheduler shutdown complete")
+		logger.Info("Async scheduler shutdown complete")
 	}()
 
 	wg.Add(1)
@@ -202,4 +202,6 @@ func Serve(cfg config.C) {
 	}()
 
 	wg.Wait()
+	logger.Info("Worker shutting down")
+	defer logger.Info("Worker shutdown complete")
 }
