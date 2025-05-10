@@ -48,6 +48,7 @@ func NewTaskHandler(
 }
 
 func (th *taskHandler) RegisterTasks(mux *asynq.ServeMux) {
+	mux.HandleFunc(taskTypeRefreshExpiringOAuthTokens, th.refreshExpiringOauth2Tokens)
 	mux.HandleFunc(taskTypeRefreshOAuthToken, th.refreshOauth2Token)
 }
 
