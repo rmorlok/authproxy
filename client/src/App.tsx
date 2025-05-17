@@ -1,15 +1,23 @@
 import * as React from 'react';
+import { useEffect } from 'react';
 import LoadingPage from "./LoadingPage";
-import {BrowserRouter, Route, Routes, Outlet, Navigate} from "react-router-dom";
+import { BrowserRouter, Route, Routes, Outlet, Navigate } from "react-router-dom";
 import SignIn from "./SignIn";
-import GameBoard from "./GameBoard";
-import ChooseTable from "./ChooseTable";
-import {AuthState} from "./AuthState";
-import {useSelector} from "react-redux";
-import {selectAuthStatus} from "./store";
+import { useSelector, useDispatch } from "react-redux";
+import { selectAuthStatus, loadAuthStateAsync, loadProvidersAsync } from "./store";
+import Layout from './components/Layout';
+import ConnectorList from './components/ConnectorList';
+import ConnectionList from './components/ConnectionList';
 
 export default function App() {
+    const dispatch = useDispatch();
     const authStatus = useSelector(selectAuthStatus);
+
+    useEffect(() => {
+        // Load auth state and providers when the app starts
+        dispatch(loadAuthStateAsync());
+        dispatch(loadProvidersAsync());
+    }, [dispatch]);
 
     if(authStatus === 'checking' || authStatus === 'redirecting') {
         return (
@@ -54,8 +62,11 @@ export function Router() {
 
               { /* Things only authenticated users can see */ }
               <Route element={<ProtectedRoutes />}>
-                  <Route path={'/'} Component={ChooseTable}/>
-                  <Route path={'/table/:id'} Component={GameBoard}/>
+                  <Route element={<Layout />}>
+                      <Route path={'/'} element={<Navigate to="/connections" replace />} />
+                      <Route path={'/connectors'} Component={ConnectorList}/>
+                      <Route path={'/connections'} Component={ConnectionList}/>
+                  </Route>
               </Route>
           </Routes>
       </BrowserRouter>

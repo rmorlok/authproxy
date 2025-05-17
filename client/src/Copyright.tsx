@@ -6,7 +6,7 @@ export function Copyright(props: any) {
     return (
         <Typography variant="body2" color="text.secondary" align="center" {...props}>
             {'Copyright © '}
-            <Link color="inherit" href="https://kodenames.morlok.com">
+            <Link color="inherit" href="https://github.com/rmorlok/authproxy">
                 Ryan Morlok
             </Link>{' '}
             {new Date().getFullYear()}
