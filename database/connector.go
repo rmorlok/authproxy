@@ -291,7 +291,6 @@ cvc.versions as total_versions
 	var connectors []Connector
 	for rows.Next() {
 		var c Connector
-		var statesJSON string
 
 		// Scan all fields except States
 		err := rows.Scan(
@@ -306,23 +305,11 @@ cvc.versions as total_versions
 			&c.CreatedAt,
 			&c.UpdatedAt,
 			&c.DeletedAt,
-			&statesJSON,
+			&c.States,
 			&c.TotalVersions,
 		)
 		if err != nil {
 			return PageResult[Connector]{Error: err}
-		}
-
-		// Manually unmarshall the states JSON
-		var stateStrings []string
-		if err := json.Unmarshal([]byte(statesJSON), &stateStrings); err != nil {
-			return PageResult[Connector]{Error: err}
-		}
-
-		// Convert string array to ConnectorVersionState array
-		c.States = make([]ConnectorVersionState, len(stateStrings))
-		for i, s := range stateStrings {
-			c.States[i] = ConnectorVersionState(s)
 		}
 
 		connectors = append(connectors, c)
