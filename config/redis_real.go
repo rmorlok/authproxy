@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/redis/go-redis/v9"
+	"github.com/rmorlok/authproxy/config/common"
 	"gopkg.in/yaml.v3"
 )
 
@@ -88,12 +89,12 @@ func (sa *RedisReal) UnmarshalYAML(value *yaml.Node) error {
 
 		switch keyNode.Value {
 		case "username":
-			if username, err = stringValueUnmarshalYAML(valueNode); err != nil {
+			if username, err = common.StringValueUnmarshalYAML(valueNode); err != nil {
 				return err
 			}
 			matched = true
 		case "password":
-			if password, err = stringValueUnmarshalYAML(valueNode); err != nil {
+			if password, err = common.StringValueUnmarshalYAML(valueNode); err != nil {
 				return err
 			}
 			matched = true

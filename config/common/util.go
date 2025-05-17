@@ -1,17 +1,17 @@
-package config
+package common
 
 import (
 	"fmt"
 	"gopkg.in/yaml.v3"
 )
 
-func marshalToYamlString(v interface{}) (string, error) {
+func MarshalToYamlString(v interface{}) (string, error) {
 	bytes, err := yaml.Marshal(v)
 	return string(bytes), err
 }
 
-func mustMarshalToYamlString(v interface{}) string {
-	if s, err := marshalToYamlString(v); err != nil {
+func MustMarshalToYamlString(v interface{}) string {
+	if s, err := MarshalToYamlString(v); err != nil {
 		panic(err)
 	} else {
 		return s

@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"github.com/rmorlok/authproxy/config/common"
 	"gopkg.in/yaml.v3"
 	"strconv"
 	"time"
@@ -35,12 +36,12 @@ func (s *ServiceAdminApi) UnmarshalYAML(value *yaml.Node) error {
 
 		switch keyNode.Value {
 		case "port":
-			if portVal, err = stringValueUnmarshalYAML(valueNode); err != nil {
+			if portVal, err = common.StringValueUnmarshalYAML(valueNode); err != nil {
 				return err
 			}
 			matched = true
 		case "health_check_port":
-			if healthCheckPortVal, err = stringValueUnmarshalYAML(valueNode); err != nil {
+			if healthCheckPortVal, err = common.StringValueUnmarshalYAML(valueNode); err != nil {
 				return err
 			}
 		}

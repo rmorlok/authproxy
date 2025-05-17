@@ -1,14 +1,16 @@
-package config
+package connectors
 
 import (
 	"fmt"
 	"gopkg.in/yaml.v3"
+
+	"github.com/rmorlok/authproxy/config/common"
 )
 
 type AuthOAuth2 struct {
 	Type          AuthType                `json:"type" yaml:"type"`
-	ClientId      StringValue             `json:"client_id" yaml:"client_id"`
-	ClientSecret  StringValue             `json:"client_secret" yaml:"client_secret"`
+	ClientId      common.StringValue      `json:"client_id" yaml:"client_id"`
+	ClientSecret  common.StringValue      `json:"client_secret" yaml:"client_secret"`
 	Scopes        []Scope                 `json:"scopes" yaml:"scopes"`
 	Authorization AuthOauth2Authorization `json:"authorization" yaml:"authorization"`
 	Token         AuthOauth2Token         `json:"token" yaml:"token"`
@@ -17,11 +19,11 @@ type AuthOAuth2 struct {
 func (i *AuthOAuth2) UnmarshalYAML(value *yaml.Node) error {
 	// Ensure the node is a mapping node
 	if value.Kind != yaml.MappingNode {
-		return fmt.Errorf("auth oauth2 expected a mapping node, got %s", KindToString(value.Kind))
+		return fmt.Errorf("auth oauth2 expected a mapping node, got %s", common.KindToString(value.Kind))
 	}
 
-	var clientIdSecret StringValue
-	var clientSecretSecret StringValue
+	var clientIdSecret common.StringValue
+	var clientSecretSecret common.StringValue
 
 	// Handle custom unmarshalling for some attributes. Iterate through the mapping node's content,
 	// which will be sequences of keys, then values.
@@ -34,12 +36,12 @@ func (i *AuthOAuth2) UnmarshalYAML(value *yaml.Node) error {
 
 		switch keyNode.Value {
 		case "client_id":
-			if clientIdSecret, err = stringValueUnmarshalYAML(valueNode); err != nil {
+			if clientIdSecret, err = common.StringValueUnmarshalYAML(valueNode); err != nil {
 				return err
 			}
 			matched = true
 		case "client_secret":
-			if clientSecretSecret, err = stringValueUnmarshalYAML(valueNode); err != nil {
+			if clientSecretSecret, err = common.StringValueUnmarshalYAML(valueNode); err != nil {
 				return err
 			}
 			matched = true

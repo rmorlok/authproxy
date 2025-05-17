@@ -1,6 +1,7 @@
-package config
+package connectors
 
 import (
+	"github.com/rmorlok/authproxy/config/common"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -44,7 +45,7 @@ reason: We need to be able to view the files
 			assert.Equal(`id: https://www.googleapis.com/auth/drive.readonly
 required: false
 reason: We need to be able to view the files
-`, mustMarshalToYamlString(data))
+`, common.MustMarshalToYamlString(data))
 		})
 	})
 }

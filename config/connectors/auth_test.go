@@ -1,6 +1,7 @@
-package config
+package connectors
 
 import (
+	"github.com/rmorlok/authproxy/config/common"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -29,10 +30,10 @@ func TestAuth(t *testing.T) {
 			assert.NoError(err)
 			assert.Equal(&AuthOAuth2{
 				Type: AuthTypeOAuth2,
-				ClientId: &StringValueDirect{
+				ClientId: &common.StringValueDirect{
 					Value: "some-client-id",
 				},
-				ClientSecret: &StringValueEnvVar{
+				ClientSecret: &common.StringValueEnvVar{
 					EnvVar: "GOOGLE_DRIVE_CLIENT_SECRET",
 				},
 				Scopes: []Scope{
@@ -65,10 +66,10 @@ type: api-key
 		t.Run("oauth2", func(t *testing.T) {
 			data := &AuthOAuth2{
 				Type: AuthTypeOAuth2,
-				ClientId: &StringValueDirect{
+				ClientId: &common.StringValueDirect{
 					Value: "some-client-id",
 				},
-				ClientSecret: &StringValueEnvVar{
+				ClientSecret: &common.StringValueEnvVar{
 					EnvVar: "GOOGLE_DRIVE_CLIENT_SECRET",
 				},
 				Scopes: []Scope{
@@ -109,14 +110,14 @@ authorization:
     endpoint: https://example.com/authorization
 token:
     endpoint: https://example.com/token
-`, mustMarshalToYamlString(data))
+`, common.MustMarshalToYamlString(data))
 		})
 		t.Run("api key", func(t *testing.T) {
 			data := &AuthApiKey{
 				Type: AuthTypeAPIKey,
 			}
 			assert.Equal(`type: api-key
-`, mustMarshalToYamlString(data))
+`, common.MustMarshalToYamlString(data))
 		})
 	})
 }

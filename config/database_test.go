@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/rmorlok/authproxy/config/common"
 	"github.com/stretchr/testify/require"
 	"testing"
 )
@@ -31,7 +32,7 @@ func TestDatabase(t *testing.T) {
 			}
 			assert.Equal(`provider: sqlite
 path: ./some/path.db
-`, mustMarshalToYamlString(data))
+`, common.MustMarshalToYamlString(data))
 		})
 	})
 }

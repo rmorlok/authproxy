@@ -1,4 +1,4 @@
-package config
+package connectors
 
 type AuthOauth2Authorization struct {
 	Endpoint       string            `json:"endpoint" yaml:"endpoint"`

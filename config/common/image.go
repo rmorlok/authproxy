@@ -1,4 +1,4 @@
-package config
+package common
 
 import (
 	"fmt"
@@ -20,12 +20,12 @@ func UnmarshallYamlImage(data []byte) (Image, error) {
 		return nil, err
 	}
 
-	return imageUnmarshalYAML(rootNode.Content[0])
+	return ImageUnmarshalYAML(rootNode.Content[0])
 }
 
-// imageUnmarshalYAML handles unmarshalling from YAML while allowing us to make decisions
+// ImageUnmarshalYAML handles unmarshalling from YAML while allowing us to make decisions
 // about how the data is unmarshalled based on the concrete type being represented
-func imageUnmarshalYAML(value *yaml.Node) (Image, error) {
+func ImageUnmarshalYAML(value *yaml.Node) (Image, error) {
 	// Ensure the node is a mapping node
 	if value.Kind != yaml.MappingNode {
 		return nil, fmt.Errorf("image expected a mapping node, got %s", KindToString(value.Kind))

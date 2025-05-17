@@ -1,4 +1,4 @@
-package config
+package common
 
 import (
 	"context"
@@ -25,12 +25,12 @@ func UnmarshallYamlStringValue(data []byte) (StringValue, error) {
 		return nil, err
 	}
 
-	return stringValueUnmarshalYAML(rootNode.Content[0])
+	return StringValueUnmarshalYAML(rootNode.Content[0])
 }
 
-// stringValueUnmarshalYAML handles unmarshalling from YAML while allowing us to make decisions
+// StringValueUnmarshalYAML handles unmarshalling from YAML while allowing us to make decisions
 // about how the data is unmarshalled based on the concrete type being represented
-func stringValueUnmarshalYAML(value *yaml.Node) (StringValue, error) {
+func StringValueUnmarshalYAML(value *yaml.Node) (StringValue, error) {
 	if value.Kind == yaml.ScalarNode {
 		return &StringValueDirect{Value: value.Value}, nil
 	}

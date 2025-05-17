@@ -1,6 +1,8 @@
-package config
+package connectors
 
-import "gopkg.in/yaml.v3"
+import (
+	"gopkg.in/yaml.v3"
+)
 
 type Scope struct {
 	Id       string `json:"id" yaml:"id"`

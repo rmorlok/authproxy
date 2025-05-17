@@ -1,4 +1,4 @@
-package config
+package connectors
 
 type AuthApiKey struct {
 	Type AuthType `json:"type" yaml:"type"`

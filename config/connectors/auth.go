@@ -1,8 +1,10 @@
-package config
+package connectors
 
 import (
 	"fmt"
 	"gopkg.in/yaml.v3"
+
+	"github.com/rmorlok/authproxy/config/common"
 )
 
 type AuthType string
@@ -35,7 +37,7 @@ func UnmarshallYamlAuth(data []byte) (Auth, error) {
 func authUnmarshalYAML(value *yaml.Node) (Auth, error) {
 	// Ensure the node is a mapping node
 	if value.Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("auth expected a mapping node, got %s", KindToString(value.Kind))
+		return nil, fmt.Errorf("auth expected a mapping node, got %s", common.KindToString(value.Kind))
 	}
 
 	var auth Auth
