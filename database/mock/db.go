@@ -5,12 +5,12 @@
 package mock
 
 import (
+	context "context"
 	reflect "reflect"
 	time "time"
 
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
-	context "context"
 	database "github.com/rmorlok/authproxy/database"
 	jwt "github.com/rmorlok/authproxy/jwt"
 )
@@ -140,6 +140,21 @@ func (mr *MockDBMockRecorder) GetConnection(ctx, id interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnection", reflect.TypeOf((*MockDB)(nil).GetConnection), ctx, id)
 }
 
+// GetConnectorVersion mocks base method.
+func (m *MockDB) GetConnectorVersion(ctx context.Context, id uuid.UUID, version int64) (*database.ConnectorVersion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetConnectorVersion", ctx, id, version)
+	ret0, _ := ret[0].(*database.ConnectorVersion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetConnectorVersion indicates an expected call of GetConnectorVersion.
+func (mr *MockDBMockRecorder) GetConnectorVersion(ctx, id, version interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersion", reflect.TypeOf((*MockDB)(nil).GetConnectorVersion), ctx, id, version)
+}
+
 // GetOAuth2Token mocks base method.
 func (m *MockDB) GetOAuth2Token(ctx context.Context, connectionId uuid.UUID) (*database.OAuth2Token, error) {
 	m.ctrl.T.Helper()
@@ -241,6 +256,35 @@ func (m *MockDB) ListConnectionsFromCursor(ctx context.Context, cursor string) (
 func (mr *MockDBMockRecorder) ListConnectionsFromCursor(ctx, cursor interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListConnectionsFromCursor", reflect.TypeOf((*MockDB)(nil).ListConnectionsFromCursor), ctx, cursor)
+}
+
+// ListConnectorsBuilder mocks base method.
+func (m *MockDB) ListConnectorsBuilder() database.ListConnectorsBuilder {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListConnectorsBuilder")
+	ret0, _ := ret[0].(database.ListConnectorsBuilder)
+	return ret0
+}
+
+// ListConnectorsBuilder indicates an expected call of ListConnectorsBuilder.
+func (mr *MockDBMockRecorder) ListConnectorsBuilder() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListConnectorsBuilder", reflect.TypeOf((*MockDB)(nil).ListConnectorsBuilder))
+}
+
+// ListConnectorsFromCursor mocks base method.
+func (m *MockDB) ListConnectorsFromCursor(ctx context.Context, cursor string) (database.ListConnectorsExecutor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListConnectorsFromCursor", ctx, cursor)
+	ret0, _ := ret[0].(database.ListConnectorsExecutor)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListConnectorsFromCursor indicates an expected call of ListConnectorsFromCursor.
+func (mr *MockDBMockRecorder) ListConnectorsFromCursor(ctx, cursor interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListConnectorsFromCursor", reflect.TypeOf((*MockDB)(nil).ListConnectorsFromCursor), ctx, cursor)
 }
 
 // Migrate mocks base method.

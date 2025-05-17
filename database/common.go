@@ -12,6 +12,14 @@ const (
 	OrderByDesc = OrderBy("DESC")
 )
 
+func (o *OrderBy) String() string {
+	if o == nil {
+		return "ASC"
+	}
+
+	return string(*o)
+}
+
 type PageResult[T any] struct {
 	Results []T
 	HasMore bool

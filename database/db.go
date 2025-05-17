@@ -37,6 +37,14 @@ type DB interface {
 	ListActorsFromCursor(ctx context.Context, cursor string) (ListActorsExecutor, error)
 
 	/*
+	 * Connectors
+	 */
+
+	GetConnectorVersion(ctx context.Context, id uuid.UUID, version int64) (*ConnectorVersion, error)
+	ListConnectorsBuilder() ListConnectorsBuilder
+	ListConnectorsFromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error)
+
+	/*
 	 *  Connections
 	 */
 
@@ -149,6 +157,11 @@ func (db *gormDB) Migrate(ctx context.Context) error {
 	err := db.gorm.AutoMigrate(&Actor{})
 	if err != nil {
 		return errors.Wrap(err, "failed to auto migrate actors")
+	}
+
+	err = db.gorm.AutoMigrate(&ConnectorVersion{})
+	if err != nil {
+		return errors.Wrap(err, "failed to auto migrate connector versions")
 	}
 
 	err = db.gorm.AutoMigrate(&Connection{})
