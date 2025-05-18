@@ -5,6 +5,7 @@ import (
 	"fmt"
 	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
 	"github.com/gin-gonic/gin"
+	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/auth"
@@ -137,7 +138,7 @@ func Serve(cfg config.C) {
 			)
 			err := m.Lock(context.Background())
 			if err != nil {
-				panic(err)
+				panic(errors.Wrap(err, "failed to establish lock for database migration"))
 			}
 			defer m.Unlock(context.Background())
 

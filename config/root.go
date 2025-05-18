@@ -18,7 +18,7 @@ type Root struct {
 	Redis      Redis           `json:"redis" yaml:"redis"`
 	Oauth      OAuth           `json:"oauth" yaml:"oauth"`
 	ErrorPages ErrorPages      `json:"error_pages" yaml:"error_pages"`
-	Connectors []Connector     `json:"connectors" yaml:"connectors"`
+	Connectors Connectors      `json:"connectors" yaml:"connectors"`
 }
 
 func (r *Root) GetRootLogger() *slog.Logger {
@@ -100,7 +100,7 @@ func (sa *Root) UnmarshalYAML(value *yaml.Node) error {
 	raw.Database = database
 	raw.Redis = redis
 	raw.Logging = logging
-	
+
 	return nil
 }
 

@@ -91,7 +91,7 @@ connectors:
         - id: https://www.googleapis.com/auth/calendar.readonly
           reason: |
             We need to be able to read the calendar
-  - id: greenhouse
+  - type: greenhouse
     version: 1
     display_name: Greenhouse
     logo:
