@@ -20,7 +20,7 @@ import (
 type state struct {
 	Id                     uuid.UUID `json:"id"`
 	ActorId                uuid.UUID `json:"actor_id"`
-	ConnectorId            string    `json:"connector_id"`
+	ConnectorId            uuid.UUID `json:"connector_id"`
 	ConnectionId           uuid.UUID `json:"connection_id"`
 	ReturnToUrl            string    `json:"return_to"`
 	CancelSessionAfterAuth bool      `json:"cancel_session_after_auth"`
@@ -40,7 +40,7 @@ var _ encoding.BinaryMarshaler = (*state)(nil)
 var _ encoding.BinaryUnmarshaler = (*state)(nil)
 
 func (s *state) IsValid() bool {
-	return s.ActorId != uuid.Nil && s.ConnectorId != "" && s.ConnectionId != uuid.Nil && !s.ExpiresAt.IsZero()
+	return s.ActorId != uuid.Nil && s.ConnectorId != uuid.Nil && s.ConnectionId != uuid.Nil && !s.ExpiresAt.IsZero()
 }
 
 func getStateRedisKey(u uuid.UUID) string {

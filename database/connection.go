@@ -21,7 +21,7 @@ const (
 type Connection struct {
 	ID          uuid.UUID       `gorm:"column:id;primaryKey"`
 	State       ConnectionState `gorm:"column:state"`
-	ConnectorId string          `gorm:"column:connector_id"`
+	ConnectorId uuid.UUID       `gorm:"column:connector_id"`
 	CreatedAt   time.Time       `gorm:"column:created_at"`
 	UpdatedAt   time.Time       `gorm:"column:updated_at"`
 	DeletedAt   gorm.DeletedAt  `gorm:"column:deleted_at;index"`

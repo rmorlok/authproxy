@@ -10,7 +10,7 @@ func TestRootFullConfig(t *testing.T) {
 
 	data := `
 connectors:
-  - id: google-drive
+  - type: google-drive
     version: 1
     display_name: Google Drive
     logo:
@@ -35,7 +35,7 @@ connectors:
           required: false
           reason: |
             We need to be able to see what's been going on in drive
-  - id: greenhouse
+  - type: greenhouse
     version: 1
     display_name: Greenhouse
     logo:
@@ -48,7 +48,7 @@ connectors:
 	expected := &Root{
 		Connectors: []Connector{
 			{
-				Id:          "google-drive",
+				Type:        "google-drive",
 				Version:     1,
 				DisplayName: "Google Drive",
 				Description: "This integration connects Google Drive to Acme app. This has the following advantages:\n\n1. Some reason\n2. Some other reason\n3. Even better reason\n",
@@ -78,7 +78,7 @@ connectors:
 				},
 			},
 			{
-				Id:          "greenhouse",
+				Type:        "greenhouse",
 				Version:     1,
 				DisplayName: "Greenhouse",
 				Description: "This integration pushes candidates to greenhouse\n",

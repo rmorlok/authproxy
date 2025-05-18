@@ -216,7 +216,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 		createdConnection := Connection{
 			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 			State:       ConnectionStateCreated,
-			ConnectorId: "some-connector",
+			ConnectorId: uuid.MustParse("10000000-0000-0000-0000-000000000001"),
 			CreatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 			UpdatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
@@ -224,7 +224,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 		readyConnection1 := Connection{
 			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000002"),
 			State:       ConnectionStateReady,
-			ConnectorId: "some-connector",
+			ConnectorId: uuid.MustParse("10000000-0000-0000-0000-000000000001"),
 			CreatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 			UpdatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
@@ -232,7 +232,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 		readyConnection2 := Connection{
 			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000003"),
 			State:       ConnectionStateReady,
-			ConnectorId: "some-connector",
+			ConnectorId: uuid.MustParse("10000000-0000-0000-0000-000000000001"),
 			CreatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 			UpdatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
@@ -240,7 +240,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 		disabledConnection := Connection{
 			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000004"),
 			State:       ConnectionStateDisabled,
-			ConnectorId: "some-connector",
+			ConnectorId: uuid.MustParse("10000000-0000-0000-0000-000000000001"),
 			CreatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 			UpdatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
@@ -248,7 +248,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 		deletedConnection := Connection{
 			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000005"),
 			State:       ConnectionStateReady,
-			ConnectorId: "some-connector",
+			ConnectorId: uuid.MustParse("10000000-0000-0000-0000-000000000001"),
 			CreatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 			UpdatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 			DeletedAt: gorm.DeletedAt{
@@ -262,7 +262,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 			manyReadyConnections = append(manyReadyConnections, Connection{
 				ID:          uuid.New(),
 				State:       ConnectionStateReady,
-				ConnectorId: "some-connector",
+				ConnectorId: uuid.MustParse("10000000-0000-0000-0000-000000000001"),
 				CreatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 				UpdatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 			})

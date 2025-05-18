@@ -37,7 +37,7 @@ redis:
 oauth:
   roundtrip_ttl: 60m
 connectors:
-  - id: google-drive
+  - type: google-drive
     version: 1
     display_name: Google Drive
     logo:
@@ -68,7 +68,7 @@ connectors:
           required: false
           reason: |
             We need to be able to see what's been going on in drive
-  - id: google-calendar
+  - type: google-calendar
     version: 1
     display_name: Google Calendar
     logo:

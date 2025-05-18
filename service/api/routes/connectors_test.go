@@ -3,6 +3,7 @@ package routes
 import (
 	"encoding/json"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	auth2 "github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/stretchr/testify/require"
@@ -31,7 +32,8 @@ func TestConnectors(t *testing.T) {
 		if len(root.Connectors) == 0 {
 			root.Connectors = []config.Connector{
 				{
-					Id:          "test-connector",
+					Id:          uuid.MustParse("10000000-0000-0000-0000-000000000001"),
+					Type:        "test-connector",
 					DisplayName: "Test ConnectorJson",
 				},
 			}
@@ -61,9 +63,18 @@ func TestConnectors(t *testing.T) {
 			require.Equal(t, http.StatusUnauthorized, w.Code)
 		})
 
-		t.Run("invalid id", func(t *testing.T) {
+		t.Run("malformed id", func(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors/bad-connector", nil, "some-actor")
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("invalid id", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001", nil, "some-actor")
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -72,7 +83,7 @@ func TestConnectors(t *testing.T) {
 
 		t.Run("valid", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors/test-connector", nil, "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors/10000000-0000-0000-0000-000000000001", nil, "some-actor")
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -81,7 +92,7 @@ func TestConnectors(t *testing.T) {
 			var resp ConnectorJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, "test-connector", resp.Id)
+			require.Equal(t, uuid.MustParse("10000000-0000-0000-0000-000000000001"), resp.Id)
 			require.Equal(t, "Test ConnectorJson", resp.DisplayName)
 		})
 	})

@@ -28,8 +28,8 @@ type ConnectionsRoutes struct {
 }
 
 type InitiateConnectionRequest struct {
-	ConnectorId string `json:"connector_id"`
-	ReturnToUrl string `json:"return_to_url"`
+	ConnectorId uuid.UUID `json:"connector_id"`
+	ReturnToUrl string    `json:"return_to_url"`
 }
 
 type InitiateConnectionResponseType string
@@ -118,7 +118,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 type ConnectionJson struct {
 	ID          uuid.UUID                `json:"id"`
 	State       database.ConnectionState `json:"state"`
-	ConnectorId string                   `json:"connector_id"`
+	ConnectorId uuid.UUID                `json:"connector_id"`
 	CreatedAt   time.Time                `json:"created_at"`
 	UpdatedAt   time.Time                `json:"updated_at"`
 }

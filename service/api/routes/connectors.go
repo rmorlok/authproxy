@@ -2,20 +2,19 @@ package routes
 
 import (
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"net/http"
 )
 
 type ConnectorJson struct {
-	Id          string `json:"id"`
-	DisplayName string `json:"display_name"`
-	Description string `json:"description"`
-	Logo        string `json:"logo"`
-}
-
-type GetConnectorRequestPath struct {
-	Id string `uri:"id"`
+	Id          uuid.UUID `json:"id"`
+	Type        string    `json:"type"`
+	DisplayName string    `json:"display_name"`
+	Description string    `json:"description"`
+	Logo        string    `json:"logo"`
 }
 
 type ListConnectorsRequestQueryParams struct {
@@ -40,6 +39,7 @@ func connectorResponseFromConfig(cfg config.C, configConn *config.Connector) Con
 
 	return ConnectorJson{
 		Id:          configConn.Id,
+		Type:        configConn.Type,
 		DisplayName: configConn.DisplayName,
 		Description: configConn.Description,
 		Logo:        logo,
@@ -47,18 +47,25 @@ func connectorResponseFromConfig(cfg config.C, configConn *config.Connector) Con
 }
 
 func (r *ConnectorsRoutes) get(ctx *gin.Context) {
-	var req GetConnectorRequestPath
-	if err := ctx.ShouldBindUri(&req); err != nil {
-		ctx.PureJSON(http.StatusBadRequest, Error{err.Error()})
+	connectorIdStr := ctx.Param("id")
+
+	if connectorIdStr == "" {
+		ctx.PureJSON(http.StatusBadRequest, Error{"id is required"})
 		return
 	}
 
-	if req.Id == "" {
+	connectorId, err := uuid.Parse(connectorIdStr)
+	if err != nil {
+		ctx.PureJSON(http.StatusBadRequest, Error{errors.Wrap(err, "failed to parse connector id").Error()})
+		return
+	}
+
+	if connectorId == uuid.Nil {
 		ctx.PureJSON(http.StatusBadRequest, Error{"id is required"})
 	}
 
 	for _, c := range r.cfg.GetRoot().Connectors {
-		if c.Id == req.Id {
+		if c.Id == connectorId {
 			ctx.PureJSON(http.StatusOK, connectorResponseFromConfig(r.cfg, &c))
 			return
 		}
