@@ -122,8 +122,18 @@ func (s *service) migrateConnector(ctx context.Context, configConnector *config.
 			"type", authType,
 			"displayName", configConnector.DisplayName,
 			"description", configConnector.Description,
-			"logo", configConnector.Logo.GetUrl(),
-			"encryptedDefinition", encryptedDefinition[:20]+"...")
+			"logo", func() string {
+				if configConnector.Logo != nil {
+					return configConnector.Logo.GetUrl()
+				}
+				return ""
+			}(),
+			"encryptedDefinition", func() string {
+				if len(encryptedDefinition) > 20 {
+					return encryptedDefinition[:20] + "..."
+				}
+				return encryptedDefinition
+			}())
 
 		if err != nil {
 			return errors.Wrap(err, "failed to create connector version")

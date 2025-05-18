@@ -45,10 +45,15 @@ func TestConnectorsService(t *testing.T) {
 	assert.NoError(err)
 
 	// Test MigrateConnectors with connectors
-	// Since we're not actually creating connectors in the database yet,
-	// we'll just verify that the method doesn't return an error
-	// We'll skip the mock expectations for now since we're not actually
-	// creating connectors in the database yet
+	// Set up expectations for the encrypt service
+	mockEncrypt.EXPECT().
+		EncryptStringGlobal(gomock.Any(), gomock.Any()).
+		Return("encrypted-data", nil)
+
+	// Set up expectations for the database
+	mockDB.EXPECT().
+		GetConnectorVersion(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(nil, nil)
 
 	err = service.MigrateConnectors(context.Background())
 	assert.NoError(err)
