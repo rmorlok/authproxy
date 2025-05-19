@@ -2,6 +2,7 @@ package config
 
 import (
 	"fmt"
+	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/util"
 	"gopkg.in/yaml.v3"
 	"log/slog"
@@ -27,6 +28,16 @@ func (r *Root) GetRootLogger() *slog.Logger {
 	}
 
 	return r.Logging.GetRootLogger()
+}
+
+func (r *Root) Validate() error {
+	result := &multierror.Error{}
+
+	if err := r.Connectors.Validate(); err != nil {
+		result = multierror.Append(result, err)
+	}
+
+	return result.ErrorOrNil()
 }
 
 func (r *Root) MustGetService(serviceId ServiceId) Service {
