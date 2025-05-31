@@ -40,7 +40,12 @@ type DB interface {
 	 * Connectors
 	 */
 
-	GetConnectorVersion(ctx context.Context, id uuid.UUID, version int64) (*ConnectorVersion, error)
+	GetConnectorVersion(ctx context.Context, id uuid.UUID, version uint64) (*ConnectorVersion, error)
+	GetConnectorVersionForTypeAndVersion(ctx context.Context, typ string, version uint64) (*ConnectorVersion, error)
+	GetConnectorVersionForType(ctx context.Context, typ string) (*ConnectorVersion, error)
+	NewestConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error)
+	NewestPublishedConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error)
+	UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersion) error
 	ListConnectorsBuilder() ListConnectorsBuilder
 	ListConnectorsFromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error)
 

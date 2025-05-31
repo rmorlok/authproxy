@@ -2,9 +2,11 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/util"
 	"os"
 	"path/filepath"
 	"time"
@@ -27,6 +29,11 @@ import (
 // - the config with information populated for the database. If a config was passed in, the same value is returned with data populated.
 // - a database instance configured with the specified root. This database can be used directly, or if the root used again, it will connect to the same database instance.
 func MustApplyBlankTestDbConfig(testName string, cfg config.C) (config.C, DB) {
+	c, db, _ := MustApplyBlankTestDbConfigRaw(testName, cfg)
+	return c, db
+}
+
+func MustApplyBlankTestDbConfigRaw(testName string, cfg config.C) (config.C, DB, *sql.DB) {
 	if testName != "" {
 		testName = testName + "-"
 	}
@@ -82,5 +89,5 @@ func MustApplyBlankTestDbConfig(testName string, cfg config.C) (config.C, DB) {
 		panic(err)
 	}
 
-	return cfg, db
+	return cfg, db, util.Must(db.(*gormDB).gorm.DB())
 }

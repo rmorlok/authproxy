@@ -64,3 +64,6 @@ admin_private_key_path: /path/to/private/key
 server:
   api: http://localhost:8081
 ```
+
+# Related Projects
+* [GoVisual](https://github.com/doganarif/GoVisual/tree/main)

@@ -1,6 +1,9 @@
 package connectors
 
 import (
+	"crypto/sha1"
+	"encoding/hex"
+	"encoding/json"
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
@@ -94,4 +97,27 @@ func (c *Connector) Validate() error {
 	}
 
 	return result.ErrorOrNil()
+}
+
+// Hash computes a semantic hash of the connector data. It does not account for data that is not stored in the
+// configuration directly (e.g. environment variables referenced). A change in the hash implies that a new version
+// must be created if the existing version is already live.
+func (c *Connector) Hash() string {
+	jsonData, err := json.Marshal(c)
+	if err != nil {
+		return ""
+	}
+	h := sha1.New()
+	h.Write(jsonData)
+	return hex.EncodeToString(h.Sum(nil))[:7]
+}
+
+// HasUuid returns true if the connector has a UUID. This implies that the configuration set a UUID explicitly.
+func (c *Connector) HasId() bool {
+	return c.Id != uuid.Nil
+}
+
+// HasVersion returns true if the connector has a version. This implies that the configuration set a version explicitly.
+func (c *Connector) HasVersion() bool {
+	return c.Version > 0
 }

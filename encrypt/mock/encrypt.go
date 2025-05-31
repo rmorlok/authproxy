@@ -5,10 +5,10 @@
 package mock
 
 import (
+	context "context"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	context "context"
 	database "github.com/rmorlok/authproxy/database"
 )
 
@@ -50,6 +50,21 @@ func (mr *MockEMockRecorder) DecryptForConnection(ctx, connection, data interfac
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DecryptForConnection", reflect.TypeOf((*MockE)(nil).DecryptForConnection), ctx, connection, data)
 }
 
+// DecryptForConnector mocks base method.
+func (m *MockE) DecryptForConnector(ctx context.Context, connection database.ConnectorVersion, data []byte) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DecryptForConnector", ctx, connection, data)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DecryptForConnector indicates an expected call of DecryptForConnector.
+func (mr *MockEMockRecorder) DecryptForConnector(ctx, connection, data interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DecryptForConnector", reflect.TypeOf((*MockE)(nil).DecryptForConnector), ctx, connection, data)
+}
+
 // DecryptGlobal mocks base method.
 func (m *MockE) DecryptGlobal(ctx context.Context, data []byte) ([]byte, error) {
 	m.ctrl.T.Helper()
@@ -78,6 +93,21 @@ func (m *MockE) DecryptStringForConnection(ctx context.Context, connection datab
 func (mr *MockEMockRecorder) DecryptStringForConnection(ctx, connection, base64 interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DecryptStringForConnection", reflect.TypeOf((*MockE)(nil).DecryptStringForConnection), ctx, connection, base64)
+}
+
+// DecryptStringForConnector mocks base method.
+func (m *MockE) DecryptStringForConnector(ctx context.Context, connection database.ConnectorVersion, base64 string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DecryptStringForConnector", ctx, connection, base64)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DecryptStringForConnector indicates an expected call of DecryptStringForConnector.
+func (mr *MockEMockRecorder) DecryptStringForConnector(ctx, connection, base64 interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DecryptStringForConnector", reflect.TypeOf((*MockE)(nil).DecryptStringForConnector), ctx, connection, base64)
 }
 
 // DecryptStringGlobal mocks base method.
@@ -110,6 +140,21 @@ func (mr *MockEMockRecorder) EncryptForConnection(ctx, connection, data interfac
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EncryptForConnection", reflect.TypeOf((*MockE)(nil).EncryptForConnection), ctx, connection, data)
 }
 
+// EncryptForConnector mocks base method.
+func (m *MockE) EncryptForConnector(ctx context.Context, connection database.ConnectorVersion, data []byte) ([]byte, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EncryptForConnector", ctx, connection, data)
+	ret0, _ := ret[0].([]byte)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// EncryptForConnector indicates an expected call of EncryptForConnector.
+func (mr *MockEMockRecorder) EncryptForConnector(ctx, connection, data interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EncryptForConnector", reflect.TypeOf((*MockE)(nil).EncryptForConnector), ctx, connection, data)
+}
+
 // EncryptGlobal mocks base method.
 func (m *MockE) EncryptGlobal(ctx context.Context, data []byte) ([]byte, error) {
 	m.ctrl.T.Helper()
@@ -138,6 +183,21 @@ func (m *MockE) EncryptStringForConnection(ctx context.Context, connection datab
 func (mr *MockEMockRecorder) EncryptStringForConnection(ctx, connection, data interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EncryptStringForConnection", reflect.TypeOf((*MockE)(nil).EncryptStringForConnection), ctx, connection, data)
+}
+
+// EncryptStringForConnector mocks base method.
+func (m *MockE) EncryptStringForConnector(ctx context.Context, connection database.ConnectorVersion, data string) (string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EncryptStringForConnector", ctx, connection, data)
+	ret0, _ := ret[0].(string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// EncryptStringForConnector indicates an expected call of EncryptStringForConnector.
+func (mr *MockEMockRecorder) EncryptStringForConnector(ctx, connection, data interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EncryptStringForConnector", reflect.TypeOf((*MockE)(nil).EncryptStringForConnector), ctx, connection, data)
 }
 
 // EncryptStringGlobal mocks base method.
