@@ -17,3 +17,12 @@ func (kb *StringValueDirect) HasValue(ctx context.Context) bool {
 func (kb *StringValueDirect) GetValue(ctx context.Context) (string, error) {
 	return kb.Value, nil
 }
+
+func (kb *StringValueDirect) Clone() StringValue {
+	if kb == nil {
+		return nil
+	}
+
+	clone := *kb
+	return &clone
+}

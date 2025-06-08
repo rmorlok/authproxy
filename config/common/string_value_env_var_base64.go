@@ -29,3 +29,12 @@ func (kev *StringValueEnvVarBase64) GetValue(ctx context.Context) (string, error
 
 	return string(decodedBytes), nil
 }
+
+func (kb *StringValueEnvVarBase64) Clone() StringValue {
+	if kb == nil {
+		return nil
+	}
+
+	clone := *kb
+	return &clone
+}

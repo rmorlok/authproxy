@@ -50,3 +50,12 @@ func (kf *StringValueFile) GetValue(ctx context.Context) (string, error) {
 	// Read the file contents
 	return string(bytes), nil
 }
+
+func (kf *StringValueFile) Clone() StringValue {
+	if kf == nil {
+		return nil
+	}
+
+	clone := *kf
+	return &clone
+}

@@ -34,16 +34,17 @@ func NewTestEncryptService(
 		cfg.GetRoot().SystemAuth.GlobalAESKey = &config.KeyDataRandomBytes{}
 	}
 
-	return cfg, &service{
-		cfg: cfg,
-		db:  db,
-	}
+	return cfg, NewEncryptService(cfg, db)
 }
 
 func NewEncryptService(
 	cfg config.C,
 	db database.DB,
 ) E {
+	if cfg != nil && cfg.GetRoot().DevSettings.IsFakeEncryptionEnabled() {
+		return NewFakeEncryptService(cfg.GetRoot().DevSettings.IsFakeEncryptionSkipBase64Enabled())
+	}
+
 	return &service{
 		cfg: cfg,
 		db:  db,

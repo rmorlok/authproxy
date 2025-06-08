@@ -21,3 +21,12 @@ func (kb *StringValueBase64) GetValue(ctx context.Context) (string, error) {
 
 	return string(decodedBytes), nil
 }
+
+func (kb *StringValueBase64) Clone() StringValue {
+	if kb == nil {
+		return nil
+	}
+
+	clone := *kb
+	return &clone
+}

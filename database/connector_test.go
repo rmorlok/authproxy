@@ -13,11 +13,9 @@ import (
 
 func TestConnectors(t *testing.T) {
 	t.Run("basic", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig("connection_round_trip", nil)
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw("connection_round_trip", nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
-
-		g := db.(*gormDB).gorm
 
 		sql := `
 INSERT INTO connector_versions 
@@ -32,7 +30,7 @@ INSERT INTO connector_versions
 ('c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa', 2, 'active', 'google_drive', 'encrypted-def', 'hash8', '2023-10-13 00:00:00', '2023-10-13 00:00:00', null),
 ('c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa', 3, 'primary', 'google_drive', 'encrypted-def', 'hash9', '2023-10-14 00:00:00', '2023-10-14 00:00:00', null);
 `
-		err := g.Exec(sql).Error
+		_, err := rawDb.Exec(sql)
 		require.NoError(t, err)
 
 		v, err := db.GetConnectorVersion(ctx, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1)

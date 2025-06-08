@@ -15,6 +15,7 @@ const (
 )
 
 type Auth interface {
+	Clone() Auth
 	GetType() AuthType
 }
 

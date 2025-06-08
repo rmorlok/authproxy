@@ -29,7 +29,12 @@ type Connector struct {
 	// file, this version will prevent changes to the system by preventing startup. If unspecified, the system will
 	// automatically create versions based on the configuration changing. If specified explicitly, this version must
 	// start with 1 (zero implies unspecified).
-	Version     uint64       `json:"version" yaml:"version"`
+	Version uint64 `json:"version,omitempty" yaml:"version,omitempty"`
+
+	// The release state of the connector. Must either be primary or draft if specified. Defaults to primary
+	// if unspecified.
+	State string `json:"state,omitempty" yaml:"state,omitempty"`
+
 	DisplayName string       `json:"display_name" yaml:"display_name"`
 	Logo        common.Image `json:"logo" yaml:"logo"`
 	Description string       `json:"description" yaml:"description"`
@@ -89,11 +94,35 @@ func (c *Connector) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+func (c *Connector) Clone() *Connector {
+	if c == nil {
+		return nil
+	}
+
+	clone := *c
+
+	if c.Logo != nil {
+		clone.Logo = c.Logo.Clone()
+	}
+
+	if c.Auth != nil {
+		clone.Auth = c.Auth.Clone()
+	}
+
+	return &clone
+}
+
 func (c *Connector) Validate() error {
 	result := &multierror.Error{}
 
 	if c.Type == "" {
 		result = multierror.Append(result, fmt.Errorf("connector must have type"))
+	}
+
+	if c.State != "" {
+		if c.State != "draft" && c.State != "primary" {
+			result = multierror.Append(result, fmt.Errorf("connector state must be either draft or primary"))
+		}
 	}
 
 	return result.ErrorOrNil()

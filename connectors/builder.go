@@ -4,6 +4,7 @@ import (
 	"errors"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/database"
 )
 
 type versionBuilder struct {
@@ -58,6 +59,21 @@ func (b *versionBuilder) WithType(t string) *versionBuilder {
 	b.configSetters = append(b.configSetters,
 		func(c *config.Connector) {
 			c.Type = t
+		},
+	)
+	return b
+}
+
+func (b *versionBuilder) WithState(state database.ConnectorVersionState) *versionBuilder {
+	b.versionSetters = append(b.versionSetters,
+		func(v *ConnectorVersion) {
+			v.State = state
+		},
+	)
+
+	b.configSetters = append(b.configSetters,
+		func(c *config.Connector) {
+			c.State = string(state)
 		},
 	)
 	return b

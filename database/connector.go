@@ -298,7 +298,7 @@ func (db *gormDB) GetConnectorVersionForTypeAndVersion(ctx context.Context, typ 
 	sess := db.session(ctx)
 
 	var cv ConnectorVersion
-	result := sess.Order("created_at ASC").First(&cv, "type = ? AND version = ?", typ, version)
+	result := sess.Order("created_at DESC").First(&cv, "type = ? AND version = ?", typ, version)
 	if result.Error != nil {
 		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -317,7 +317,7 @@ func (db *gormDB) GetConnectorVersionForType(ctx context.Context, typ string) (*
 	sess := db.session(ctx)
 
 	var cv ConnectorVersion
-	result := sess.Order("created_at ASC").First(&cv, "type = ?", typ)
+	result := sess.Order("created_at DESC").Order("version DESC").First(&cv, "type = ?", typ)
 	if result.Error != nil {
 		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
 			return nil, nil

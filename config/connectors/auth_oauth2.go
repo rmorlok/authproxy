@@ -73,3 +73,22 @@ func (i *AuthOAuth2) UnmarshalYAML(value *yaml.Node) error {
 func (a *AuthOAuth2) GetType() AuthType {
 	return AuthTypeOAuth2
 }
+
+func (a *AuthOAuth2) Clone() Auth {
+	if a == nil {
+		return nil
+	}
+	
+	clone := *a
+
+	clone.ClientId = a.ClientId.Clone()
+	clone.ClientSecret = a.ClientSecret.Clone()
+
+	scopes := make([]Scope, 0, len(a.Scopes))
+	for _, scope := range a.Scopes {
+		scopes = append(scopes, scope)
+	}
+	clone.Scopes = scopes
+
+	return &clone
+}

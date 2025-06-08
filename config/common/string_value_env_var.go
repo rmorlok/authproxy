@@ -28,3 +28,12 @@ func (kev *StringValueEnvVar) GetValue(ctx context.Context) (string, error) {
 	}
 	return val, nil
 }
+
+func (kb *StringValueEnvVar) Clone() StringValue {
+	if kb == nil {
+		return nil
+	}
+
+	clone := *kb
+	return &clone
+}

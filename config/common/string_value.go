@@ -7,6 +7,8 @@ import (
 )
 
 type StringValue interface {
+	Clone() StringValue
+	
 	// HasValue checks if this value has data.
 	HasValue(ctx context.Context) bool
 
