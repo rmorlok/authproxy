@@ -217,6 +217,63 @@ func TestService(t *testing.T) {
 				},
 			})
 		})
+
+		t.Run("changed twice", func(t *testing.T) {
+			cleanup := setup(t, config.Connectors{
+				{
+					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+					Version:     1,
+					Type:        "fake",
+					DisplayName: "initial",
+				},
+			})
+			defer cleanup()
+
+			err := service.MigrateConnectors(context.Background())
+			require.NoError(t, err, "MigrateConnectors should not return an error with no connectors")
+
+			cfg.GetRoot().Connectors[0].Version = 2
+			cfg.GetRoot().Connectors[0].DisplayName = "changed"
+
+			err = service.MigrateConnectors(context.Background())
+			require.NoError(t, err, "MigrateConnectors should not return an error with no connectors")
+
+			cfg.GetRoot().Connectors[0].Version = 3
+			cfg.GetRoot().Connectors[0].DisplayName = "changed again"
+
+			err = service.MigrateConnectors(context.Background())
+			require.NoError(t, err, "MigrateConnectors should not return an error with no connectors")
+
+			type connectorResult struct {
+				Id          string
+				Version     int64
+				State       string
+				DisplayName string
+			}
+
+			test_utils.AssertSql(t, rawDb, `
+			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+		`, []connectorResult{
+				{
+					Id:          "00000000-0000-0000-0000-000000000001",
+					Version:     1,
+					State:       "active",
+					DisplayName: "initial",
+				},
+				{
+					Id:          "00000000-0000-0000-0000-000000000001",
+					Version:     2,
+					State:       "active",
+					DisplayName: "changed",
+				},
+				{
+					Id:          "00000000-0000-0000-0000-000000000001",
+					Version:     3,
+					State:       "primary",
+					DisplayName: "changed again",
+				},
+			})
+		})
 	})
 
 	t.Run("id", func(t *testing.T) {
@@ -369,6 +426,60 @@ func TestService(t *testing.T) {
 				},
 			})
 		})
+
+		t.Run("changed twice", func(t *testing.T) {
+			cleanup := setup(t, config.Connectors{
+				{
+					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+					Type:        "fake",
+					DisplayName: "initial",
+				},
+			})
+			defer cleanup()
+
+			err := service.MigrateConnectors(context.Background())
+			require.NoError(t, err, "MigrateConnectors should not return an error with no connectors")
+
+			cfg.GetRoot().Connectors[0].DisplayName = "changed"
+
+			err = service.MigrateConnectors(context.Background())
+			require.NoError(t, err, "MigrateConnectors should not return an error with no connectors")
+
+			cfg.GetRoot().Connectors[0].DisplayName = "changed again"
+
+			err = service.MigrateConnectors(context.Background())
+			require.NoError(t, err, "MigrateConnectors should not return an error with no connectors")
+
+			type connectorResult struct {
+				Id          string
+				Version     int64
+				State       string
+				DisplayName string
+			}
+
+			test_utils.AssertSql(t, rawDb, `
+			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+		`, []connectorResult{
+				{
+					Id:          "00000000-0000-0000-0000-000000000001",
+					Version:     1,
+					State:       "active",
+					DisplayName: "initial",
+				},
+				{
+					Id:          "00000000-0000-0000-0000-000000000001",
+					Version:     2,
+					State:       "active",
+					DisplayName: "changed",
+				},
+				{
+					Id:          "00000000-0000-0000-0000-000000000001",
+					Version:     3,
+					State:       "primary",
+					DisplayName: "changed again",
+				},
+			})
+		})
 	})
 
 	t.Run("type only", func(t *testing.T) {
@@ -504,6 +615,55 @@ func TestService(t *testing.T) {
 					Version:     2,
 					State:       "primary",
 					DisplayName: "changed",
+				},
+			})
+		})
+
+		t.Run("changed twice", func(t *testing.T) {
+			cleanup := setup(t, config.Connectors{
+				{
+					Type:        "fake",
+					DisplayName: "initial",
+				},
+			})
+			defer cleanup()
+
+			err := service.MigrateConnectors(context.Background())
+			require.NoError(t, err, "MigrateConnectors should not return an error with no connectors")
+
+			cfg.GetRoot().Connectors[0].DisplayName = "changed"
+
+			err = service.MigrateConnectors(context.Background())
+			require.NoError(t, err, "MigrateConnectors should not return an error with no connectors")
+
+			cfg.GetRoot().Connectors[0].DisplayName = "changed again"
+
+			err = service.MigrateConnectors(context.Background())
+			require.NoError(t, err, "MigrateConnectors should not return an error with no connectors")
+
+			type connectorResult struct {
+				Version     int64
+				State       string
+				DisplayName string
+			}
+
+			test_utils.AssertSql(t, rawDb, `
+			SELECT version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+		`, []connectorResult{
+				{
+					Version:     1,
+					State:       "active",
+					DisplayName: "initial",
+				},
+				{
+					Version:     2,
+					State:       "active",
+					DisplayName: "changed",
+				},
+				{
+					Version:     3,
+					State:       "primary",
+					DisplayName: "changed again",
 				},
 			})
 		})
