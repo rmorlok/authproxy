@@ -3,6 +3,8 @@ package connectors
 import (
 	"context"
 	"encoding/json"
+	"github.com/google/uuid"
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/config"
@@ -43,11 +45,10 @@ func (s *service) MigrateConnectors(ctx context.Context) error {
 		return nil
 	}
 
-	for _, configConnector := range root.Connectors {
-		if err := s.precheckConnectorForMigration(ctx, &configConnector); err != nil {
-			return err
-		}
+	if err := s.precheckConnectorsForMigration(ctx, root.Connectors); err != nil {
+		return err
 	}
+	s.logger.Info("Precheck passed, migrating connectors", "connector_count", len(root.Connectors))
 
 	for _, configConnector := range root.Connectors {
 		if err := s.migrateConnector(ctx, &configConnector); err != nil {
@@ -77,6 +78,147 @@ func (s *service) configConnectorToVersion(configConnector *config.Connector) (*
 		State:               database.ConnectorVersionStateDraft,
 		EncryptedDefinition: encryptedDefinition,
 	}, nil
+}
+
+func (s *service) precheckConnectorsForMigration(ctx context.Context, configConnectors config.Connectors) error {
+	type IdVersionStateTuple struct {
+		Id      uuid.UUID
+		Version uint64
+		State   string
+	}
+
+	type IdVersionTuple struct {
+		Id      uuid.UUID
+		Version uint64
+	}
+
+	type IdStateTuple struct {
+		Id    uuid.UUID
+		State string
+	}
+
+	idVersionStateCounts := make(map[IdVersionStateTuple]int)
+	idVersionCounts := make(map[IdVersionTuple]int)
+	idStateCounts := make(map[IdStateTuple]int)
+	idCounts := make(map[uuid.UUID]int)
+	typeCounts := make(map[string]int)
+
+	for _, configConnector := range configConnectors {
+		if err := s.precheckConnectorForMigration(ctx, &configConnector); err != nil {
+			return err
+		}
+
+		if configConnector.HasId() && configConnector.HasVersion() && configConnector.HasState() {
+			idVersionStateCounts[IdVersionStateTuple{
+				Id:      configConnector.Id,
+				Version: configConnector.Version,
+				State:   configConnector.State,
+			}]++
+
+			// All other entries for this id must have version and state specified if one does
+			for _, cc := range configConnectors {
+				if cc.Id == configConnector.Id && cc.Version == configConnector.Version && cc.State == configConnector.State {
+					// Same entry we are checking
+					continue
+				}
+
+				if cc.Id == configConnector.Id {
+					if !cc.HasVersion() || (!configConnector.IsDraft() && !cc.HasState()) {
+						return errors.Errorf("connector %s version %d has state %s but other entries do not have all these fields specified", configConnector.Id, configConnector.Version, configConnector.State)
+					}
+				}
+
+				if cc.Type == configConnector.Type && !cc.HasId() {
+					return errors.Errorf("a connector of type %s exists with an id, but not all connectors of that type have id", configConnector.Type)
+				}
+			}
+		} else if configConnector.HasId() && configConnector.HasVersion() {
+			idVersionCounts[IdVersionTuple{
+				Id:      configConnector.Id,
+				Version: configConnector.Version,
+			}]++
+
+			// All other entries for this id must have version if one does
+			for _, cc := range configConnectors {
+				if cc.Id == configConnector.Id && cc.Version == configConnector.Version {
+					// Same entry we are checking
+					continue
+				}
+
+				if cc.Id == configConnector.Id && !cc.HasVersion() {
+					if !cc.HasVersion() {
+						return errors.Errorf("connector %s has version %d has but not all other entries do not have version specified", configConnector.Id, configConnector.Version)
+					}
+				}
+
+				if cc.Type == configConnector.Type && !cc.HasId() {
+					return errors.Errorf("a connector of type %s exists with an id, but not all connectors of that type have id", configConnector.Type)
+				}
+			}
+		} else if configConnector.HasId() && configConnector.HasState() {
+			idStateCounts[IdStateTuple{
+				Id:    configConnector.Id,
+				State: configConnector.State,
+			}]++
+
+			// All other entries for this id must have version if one does
+			for _, cc := range configConnectors {
+				if cc.Id == configConnector.Id && cc.State == configConnector.State {
+					// Same entry we are checking
+					continue
+				}
+
+				if cc.Type == configConnector.Type && !cc.HasId() {
+					return errors.Errorf("a connector of type %s exists with an id, but not all connectors of that type have id", configConnector.Type)
+				}
+			}
+		} else if configConnector.HasId() {
+			idCounts[configConnector.Id]++
+
+			// All other entries for this id must have version if one does
+			for _, cc := range configConnectors {
+				if cc.Id == configConnector.Id && cc.State == configConnector.State {
+					// Same entry we are checking
+					continue
+				}
+
+				if cc.Type == configConnector.Type && !cc.HasId() {
+					return errors.Errorf("a connector of type %s exists with an id, but not all connectors of that type have id", configConnector.Type)
+				}
+			}
+		} else {
+			// Only type specified
+			typeCounts[configConnector.Type]++
+		}
+	}
+
+	result := &multierror.Error{}
+
+	for idVersionState, count := range idVersionStateCounts {
+		if count > 1 {
+			result = multierror.Append(result, errors.Errorf("connector %s version %d has multiple entries with state %s", idVersionState.Id, idVersionState.Version, idVersionState.State))
+		}
+	}
+
+	for idVersion, count := range idVersionCounts {
+		if count > 1 {
+			result = multierror.Append(result, errors.Errorf("connector %s version %d has multiple entries without differentiating state", idVersion.Id, idVersion.Version))
+		}
+	}
+
+	for id, count := range idCounts {
+		if count > 1 {
+			result = multierror.Append(result, errors.Errorf("connector %s has multiple entries without differentiating state or version", id))
+		}
+	}
+
+	for typ, count := range typeCounts {
+		if count > 1 {
+			result = multierror.Append(result, errors.Errorf("connector type %s has multiple entries without differentiating id or version", typ))
+		}
+	}
+
+	return result.ErrorOrNil()
 }
 
 // precheckConnectorForMigration checks the database to see if the connector definition aligns with the current state.

@@ -143,10 +143,36 @@ func (c *Connector) Hash() string {
 
 // HasUuid returns true if the connector has a UUID. This implies that the configuration set a UUID explicitly.
 func (c *Connector) HasId() bool {
+	if c == nil {
+		return false
+	}
+
 	return c.Id != uuid.Nil
 }
 
 // HasVersion returns true if the connector has a version. This implies that the configuration set a version explicitly.
 func (c *Connector) HasVersion() bool {
+	if c == nil {
+		return false
+	}
+
 	return c.Version > 0
+}
+
+// HasState returns true if the connector has a state. This implies that the configuration set a state explicitly.
+func (c *Connector) HasState() bool {
+	if c == nil {
+		return false
+	}
+
+	return c.State != ""
+}
+
+// IsDraft returns true if the connector has an explicitly defined state and that state is draft.
+func (c *Connector) IsDraft() bool {
+	if c == nil {
+		return false
+	}
+
+	return c.State == "draft"
 }
