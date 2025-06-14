@@ -2,6 +2,7 @@ package connectors
 
 import (
 	"context"
+	"github.com/hibiken/asynq"
 )
 
 // C is the interface for the connectors service
@@ -12,4 +13,7 @@ type C interface {
 	// - If it exists and the data matches, it does nothing
 	// - If it exists and the data has changed, it creates a new version
 	MigrateConnectors(ctx context.Context) error
+
+	RegisterTasks(mux *asynq.ServeMux)
+	GetCronTasks() []*asynq.PeriodicTaskConfig
 }

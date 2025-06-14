@@ -9,6 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/connectors"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -161,6 +162,9 @@ func Serve(cfg config.C) {
 	oauth2TaskHandler := oauth2.NewTaskHandler(cfg, db, rs, asynqClient, httpf, encrypt, logger)
 	oauth2TaskHandler.RegisterTasks(mux)
 
+	connectorsService := connectors.NewConnectorsService(cfg, db, encrypt, asynqClient, logger)
+	connectorsService.RegisterTasks(mux)
+
 	var wg sync.WaitGroup
 
 	wg.Add(1)
@@ -177,9 +181,10 @@ func Serve(cfg config.C) {
 	scheduler := newScheduler(
 		rs,
 		asyncSchedulerHealthChecker,
-		oauth2TaskHandler,
 		logBuilder.WithComponent("scheduler").Build(),
-	)
+	).
+		addRegistrar(oauth2TaskHandler).
+		addRegistrar(connectorsService)
 
 	wg.Add(1)
 	go func() {
