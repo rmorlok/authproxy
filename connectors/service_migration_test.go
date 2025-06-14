@@ -3,7 +3,10 @@ package connectors
 import (
 	"context"
 	"database/sql"
+	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/apasynq"
+	"github.com/rmorlok/authproxy/apasynq/mock"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
@@ -19,6 +22,7 @@ func TestService(t *testing.T) {
 	var db database.DB
 	var rawDb *sql.DB
 	var service C
+	var asynqClient apasynq.Client
 
 	setup := func(t *testing.T, connectors config.Connectors) func() {
 		cfg = config.FromRoot(&config.Root{
@@ -35,9 +39,13 @@ func TestService(t *testing.T) {
 		e := encrypt.NewEncryptService(cfg, db)
 		logger := slog.Default()
 
-		service = NewConnectorsService(cfg, db, e, logger)
+		ctrl := gomock.NewController(t)
+
+		asynqClient = mock.NewMockClient(ctrl)
+		service = NewConnectorsService(cfg, db, e, asynqClient, logger)
 
 		return func() {
+			ctrl.Finish()
 			err := rawDb.Close()
 			assert.NoError(t, err)
 		}

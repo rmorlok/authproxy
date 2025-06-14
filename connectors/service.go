@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/apasynq"
 	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/database"
@@ -19,6 +20,7 @@ type service struct {
 	cfg     config.C
 	db      database.DB
 	encrypt encrypt.E
+	ac      apasynq.Client
 	logger  *slog.Logger
 }
 
@@ -27,12 +29,14 @@ func NewConnectorsService(
 	cfg config.C,
 	db database.DB,
 	encrypt encrypt.E,
+	ac apasynq.Client,
 	logger *slog.Logger,
 ) C {
 	return &service{
 		cfg:     cfg,
 		db:      db,
 		encrypt: encrypt,
+		ac:      ac,
 		logger:  logger,
 	}
 }

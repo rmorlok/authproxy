@@ -16,11 +16,7 @@ import (
 	"time"
 )
 
-/*
- * Regenerate mocks for this interface using:
- * mockgen -source=database/db.go -destination=database/mock/db.go -package=mock
- */
-
+//go:generate mockgen -source=database/db.go -destination=database/mock/db.go -package=mock
 type DB interface {
 	Migrate(ctx context.Context) error
 	Ping(ctx context.Context) bool
