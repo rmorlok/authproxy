@@ -16,7 +16,7 @@ import (
 	"time"
 )
 
-//go:generate mockgen -source=database/db.go -destination=database/mock/db.go -package=mock
+//go:generate mockgen -source=./db.go -destination=./mock/db.go -package=mock
 type DB interface {
 	Migrate(ctx context.Context) error
 	Ping(ctx context.Context) bool
@@ -39,6 +39,7 @@ type DB interface {
 	GetConnectorVersion(ctx context.Context, id uuid.UUID, version uint64) (*ConnectorVersion, error)
 	GetConnectorVersionForTypeAndVersion(ctx context.Context, typ string, version uint64) (*ConnectorVersion, error)
 	GetConnectorVersionForType(ctx context.Context, typ string) (*ConnectorVersion, error)
+	GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state ConnectorVersionState) (*ConnectorVersion, error)
 	NewestConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error)
 	NewestPublishedConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error)
 	UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersion) error

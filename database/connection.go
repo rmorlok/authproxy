@@ -19,12 +19,13 @@ const (
 )
 
 type Connection struct {
-	ID          uuid.UUID       `gorm:"column:id;primaryKey"`
-	State       ConnectionState `gorm:"column:state"`
-	ConnectorId uuid.UUID       `gorm:"column:connector_id"`
-	CreatedAt   time.Time       `gorm:"column:created_at"`
-	UpdatedAt   time.Time       `gorm:"column:updated_at"`
-	DeletedAt   gorm.DeletedAt  `gorm:"column:deleted_at;index"`
+	ID               uuid.UUID       `gorm:"column:id;primaryKey"`
+	State            ConnectionState `gorm:"column:state"`
+	ConnectorId      uuid.UUID       `gorm:"column:connector_id"`
+	ConnectorVersion uint64          `gorm:"column:connector_version"`
+	CreatedAt        time.Time       `gorm:"column:created_at"`
+	UpdatedAt        time.Time       `gorm:"column:updated_at"`
+	DeletedAt        gorm.DeletedAt  `gorm:"column:deleted_at;index"`
 }
 
 func (db *gormDB) CreateConnection(ctx context.Context, c *Connection) error {

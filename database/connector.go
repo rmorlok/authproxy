@@ -89,7 +89,7 @@ const (
 
 type ConnectorVersion struct {
 	ID                  uuid.UUID             `gorm:"column:id;primaryKey"`
-	Version             int64                 `gorm:"column:version;primaryKey"`
+	Version             uint64                `gorm:"column:version;primaryKey"`
 	State               ConnectorVersionState `gorm:"column:state"`
 	Type                string                `gorm:"column:type"`
 	Hash                string                `gorm:"column:hash"`
@@ -227,9 +227,9 @@ func (db *gormDB) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 		} else {
 			// No existing row at this version. Need to verify if there are existing rows, the new version is
 			// existing version + 1
-			maxVersion := int64(-1)
+			maxVersion := uint64(0)
 			err := sqb.
-				Select("COALESCE(MAX(version), -1)").
+				Select("COALESCE(MAX(version), 0)").
 				From("connector_versions").
 				Where(sq.Eq{"id": cv.ID}).
 				QueryRowContext(ctx).
@@ -239,7 +239,7 @@ func (db *gormDB) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				return err
 			}
 
-			if maxVersion != -1 && maxVersion+1 != cv.Version {
+			if maxVersion != 0 && maxVersion+1 != cv.Version {
 				return errors.New("cannot insert connector version at non-sequential version")
 			}
 
@@ -318,6 +318,25 @@ func (db *gormDB) GetConnectorVersionForType(ctx context.Context, typ string) (*
 
 	var cv ConnectorVersion
 	result := sess.Order("created_at DESC").Order("version DESC").First(&cv, "type = ?", typ)
+	if result.Error != nil {
+		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	return &cv, nil
+}
+
+func (db *gormDB) GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state ConnectorVersionState) (*ConnectorVersion, error) {
+	sess := db.session(ctx)
+
+	var cv ConnectorVersion
+	result := sess.Order("version DESC").First(&cv, "id = ? AND state = ?", id, state)
 	if result.Error != nil {
 		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
 			return nil, nil

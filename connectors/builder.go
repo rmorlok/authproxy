@@ -25,7 +25,7 @@ func (b *versionBuilder) WithConfig(c *config.Connector) *versionBuilder {
 
 	b.versionSetters = append([]func(v *ConnectorVersion){
 		func(v *ConnectorVersion) {
-			v.Version = int64(c.Version)
+			v.Version = c.Version
 			v.Type = c.Type
 			v.ID = c.Id
 		},
@@ -79,7 +79,7 @@ func (b *versionBuilder) WithState(state database.ConnectorVersionState) *versio
 	return b
 }
 
-func (b *versionBuilder) WithVersion(ver int64) *versionBuilder {
+func (b *versionBuilder) WithVersion(ver uint64) *versionBuilder {
 	b.versionSetters = append(b.versionSetters,
 		func(v *ConnectorVersion) {
 			v.Version = ver

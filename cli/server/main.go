@@ -106,11 +106,11 @@ func cmdRoutes() *cobra.Command {
 			api_common.PrintRoutes(server)
 
 			println("\n\nAPI:")
-			server, _ = api.GetGinServer(cfg, nil, nil, nil, nil, nil)
+			server, _ = api.GetGinServer(cfg, nil, nil, nil, nil, nil, nil)
 			api_common.PrintRoutes(server)
 
 			println("\n\nPublic:")
-			server, _ = public.GetGinServer(cfg, nil, nil, nil, nil, nil)
+			server, _ = public.GetGinServer(cfg, nil, nil, nil, nil, nil, nil)
 			api_common.PrintRoutes(server)
 		},
 	}

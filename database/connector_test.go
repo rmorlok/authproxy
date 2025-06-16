@@ -48,6 +48,15 @@ INSERT INTO connector_versions
 		require.NoError(t, err)
 		require.Nil(t, v)
 
+		v, err = db.GetConnectorVersionForState(ctx, uuid.MustParse("4a9f3c22-a8d5-423e-af53-e459f1d7c8da"), ConnectorVersionStatePrimary)
+		require.NoError(t, err)
+		require.Equal(t, "outlook", v.Type)
+		require.Equal(t, ConnectorVersionStatePrimary, v.State)
+
+		v, err = db.GetConnectorVersionForState(ctx, uuid.MustParse("4a9f3c22-a8d5-423e-af53-e459f1d7c8da"), ConnectorVersionStateArchived)
+		require.NoError(t, err)
+		require.Nil(t, v)
+
 		pr := db.ListConnectorsBuilder().
 			ForType("gmail").
 			OrderBy(ConnectorOrderByCreatedAt, OrderByDesc).
@@ -84,7 +93,7 @@ INSERT INTO connector_versions
 			require.NoError(t, err)
 			require.NotNil(t, savedCV)
 			assert.Equal(t, connectorID, savedCV.ID)
-			assert.Equal(t, int64(1), savedCV.Version)
+			assert.Equal(t, uint64(1), savedCV.Version)
 			assert.Equal(t, ConnectorVersionStateDraft, savedCV.State)
 			assert.Equal(t, "test_connector", savedCV.Type)
 			assert.Equal(t, "test_hash", savedCV.Hash)
@@ -145,7 +154,7 @@ INSERT INTO connector_versions
 			require.NoError(t, err)
 			require.NotNil(t, savedCV)
 			assert.Equal(t, connectorID, savedCV.ID)
-			assert.Equal(t, int64(1), savedCV.Version)
+			assert.Equal(t, uint64(1), savedCV.Version)
 			assert.Equal(t, ConnectorVersionStateDraft, savedCV.State)
 			assert.Equal(t, "test_connector", savedCV.Type)
 			assert.Equal(t, "test_hash", savedCV.Hash)
@@ -191,14 +200,14 @@ INSERT INTO connector_versions
 			savedCV1, err := db.GetConnectorVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
 			require.NotNil(t, savedCV1)
-			assert.Equal(t, int64(1), savedCV1.Version)
+			assert.Equal(t, uint64(1), savedCV1.Version)
 			assert.Equal(t, "test_hash_v1", savedCV1.Hash)
 
 			// Verify version 2
 			savedCV2, err := db.GetConnectorVersion(ctx, connectorID, 2)
 			require.NoError(t, err)
 			require.NotNil(t, savedCV2)
-			assert.Equal(t, int64(2), savedCV2.Version)
+			assert.Equal(t, uint64(2), savedCV2.Version)
 			assert.Equal(t, "test_hash_v2", savedCV2.Hash)
 		})
 

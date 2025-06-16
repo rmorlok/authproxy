@@ -63,8 +63,8 @@ func Serve(cfg config.C) {
 		}()
 	}
 
-	httpf := httpf.CreateFactory(cfg, rs)
-	encrypt := encrypt.NewEncryptService(cfg, db)
+	h := httpf.CreateFactory(cfg, rs)
+	e := encrypt.NewEncryptService(cfg, db)
 
 	workerConfig := cfg.GetRoot().Worker
 	router := api_common.GinForService(&workerConfig)
@@ -92,6 +92,8 @@ func Serve(cfg config.C) {
 	// defer asynqClient.Close() // Do no close the async connection because it is a shared redis connection
 
 	asynqClient.Ping()
+
+	c := connectors.NewConnectorsService(cfg, db, e, asynqClient, logger)
 
 	router.GET("/healthz", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 1*time.Second)
@@ -159,10 +161,10 @@ func Serve(cfg config.C) {
 
 	mux := asynq.NewServeMux()
 
-	oauth2TaskHandler := oauth2.NewTaskHandler(cfg, db, rs, asynqClient, httpf, encrypt, logger)
+	oauth2TaskHandler := oauth2.NewTaskHandler(cfg, db, rs, c, asynqClient, h, e, logger)
 	oauth2TaskHandler.RegisterTasks(mux)
 
-	connectorsService := connectors.NewConnectorsService(cfg, db, encrypt, asynqClient, logger)
+	connectorsService := connectors.NewConnectorsService(cfg, db, e, asynqClient, logger)
 	connectorsService.RegisterTasks(mux)
 
 	var wg sync.WaitGroup

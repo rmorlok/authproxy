@@ -5,11 +5,13 @@ import (
 	"fmt"
 	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
 	"github.com/gin-gonic/gin"
+	"github.com/hibiken/asynq"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/connectors"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -33,6 +35,7 @@ func GetGinServer(
 	cfg config.C,
 	db database.DB,
 	redis redis.R,
+	c connectors.C,
 	httpf httpf.F,
 	encrypt encrypt.E,
 	logger *slog.Logger,
@@ -96,7 +99,7 @@ func GetGinServer(
 	})
 
 	routesConnectors := routes.NewConnectorsRoutes(cfg, authService)
-	routesConnections := routes.NewConnectionsRoutes(cfg, authService, db, redis, httpf, encrypt, logger)
+	routesConnections := routes.NewConnectionsRoutes(cfg, authService, db, redis, c, httpf, encrypt, logger)
 
 	api := server.Group("/api", rl)
 
@@ -148,10 +151,11 @@ func Serve(cfg config.C) {
 		}()
 	}
 
-	httpf := httpf.CreateFactory(cfg, rs)
-	encrypt := encrypt.NewEncryptService(cfg, db)
-
-	server, healthChecker := GetGinServer(cfg, db, rs, httpf, encrypt, logger)
+	h := httpf.CreateFactory(cfg, rs)
+	e := encrypt.NewEncryptService(cfg, db)
+	asynqClient := asynq.NewClientFromRedisClient(rs.Client())
+	c := connectors.NewConnectorsService(cfg, db, e, asynqClient, logger)
+	server, healthChecker := GetGinServer(cfg, db, rs, c, h, e, logger)
 
 	var wg sync.WaitGroup
 	wg.Add(1)

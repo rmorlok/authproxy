@@ -4,6 +4,7 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/apasynq"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/connectors"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -12,14 +13,15 @@ import (
 )
 
 type taskHandler struct {
-	cfg     config.C
-	db      database.DB
-	redis   redis.R
-	asynq   apasynq.Client
-	httpf   httpf.F
-	encrypt encrypt.E
-	factory Factory
-	logger  *slog.Logger
+	cfg        config.C
+	db         database.DB
+	redis      redis.R
+	connectors connectors.C
+	asynq      apasynq.Client
+	httpf      httpf.F
+	encrypt    encrypt.E
+	factory    Factory
+	logger     *slog.Logger
 }
 
 type TaskRegistrar interface {
@@ -31,20 +33,22 @@ func NewTaskHandler(
 	cfg config.C,
 	db database.DB,
 	redis redis.R,
+	c connectors.C,
 	ac apasynq.Client,
 	httpf httpf.F,
 	encrypt encrypt.E,
 	logger *slog.Logger,
 ) TaskRegistrar {
 	return &taskHandler{
-		cfg:     cfg,
-		db:      db,
-		redis:   redis,
-		asynq:   ac,
-		httpf:   httpf,
-		encrypt: encrypt,
-		logger:  logger,
-		factory: NewFactory(cfg, db, redis, httpf, encrypt, logger),
+		cfg:        cfg,
+		db:         db,
+		redis:      redis,
+		connectors: c,
+		asynq:      ac,
+		httpf:      httpf,
+		encrypt:    encrypt,
+		logger:     logger,
+		factory:    NewFactory(cfg, db, redis, c, httpf, encrypt, logger),
 	}
 }
 
