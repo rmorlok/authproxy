@@ -2,12 +2,10 @@ package database
 
 import (
 	"context"
-	"github.com/google/uuid"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/jwt"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
 	"log"
