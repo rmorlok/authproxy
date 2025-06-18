@@ -5,10 +5,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/config/common"
+	"time"
 )
 
 type Connectors struct {
-	AutoMigrate               bool                  `json:"auto_migrate,omitempty" yaml:"auto_migrate,omitempty"`
+	AutoMigrate               *bool                 `json:"auto_migrate,omitempty" yaml:"auto_migrate,omitempty"`
 	AutoMigrationLockDuration *common.HumanDuration `json:"auto_migration_lock_duration,omitempty" yaml:"auto_migration_lock_duration,omitempty"`
 	LoadFromList              []Connector           `json:"load_from_list,omitempty" yaml:"load_from_list,omitempty"`
 }
@@ -17,6 +18,20 @@ func FromList(c []Connector) *Connectors {
 	return &Connectors{
 		LoadFromList: c,
 	}
+}
+
+func (c *Connectors) GetAutoMigrate() bool {
+	if c.AutoMigrate == nil {
+		return true
+	}
+	return *c.AutoMigrate
+}
+
+func (c *Connectors) GetAutoMigrationLockDurationOrDefault() time.Duration {
+	if c.AutoMigrationLockDuration == nil {
+		return 1 * time.Minute
+	}
+	return c.AutoMigrationLockDuration.Duration
 }
 
 func (c *Connectors) GetConnectors() []Connector {

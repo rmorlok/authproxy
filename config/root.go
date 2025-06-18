@@ -3,6 +3,7 @@ package config
 import (
 	"fmt"
 	"github.com/hashicorp/go-multierror"
+	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/util"
 	"gopkg.in/yaml.v3"
 	"log/slog"
@@ -34,7 +35,9 @@ func (r *Root) GetRootLogger() *slog.Logger {
 func (r *Root) Validate() error {
 	result := &multierror.Error{}
 
-	if err := r.Connectors.Validate(); err != nil {
+	if r.Connectors == nil {
+		result = multierror.Append(result, errors.New("connectors block is required"))
+	} else if err := r.Connectors.Validate(); err != nil {
 		result = multierror.Append(result, err)
 	}
 

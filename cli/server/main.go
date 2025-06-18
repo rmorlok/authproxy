@@ -102,7 +102,7 @@ func cmdRoutes() *cobra.Command {
 		Short: "Print routes exposed by app",
 		Run: func(cmd *cobra.Command, args []string) {
 			println("Admin API:")
-			server, _ := admin_api.GetGinServer(cfg, nil, nil, nil)
+			server, _ := admin_api.GetGinServer(cfg, nil, nil, nil, nil, nil)
 			api_common.PrintRoutes(server)
 
 			println("\n\nAPI:")

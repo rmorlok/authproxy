@@ -155,6 +155,28 @@ func Serve(cfg config.C) {
 	e := encrypt.NewEncryptService(cfg, db)
 	asynqClient := asynq.NewClientFromRedisClient(rs.Client())
 	c := connectors.NewConnectorsService(cfg, db, e, asynqClient, logger)
+
+	if cfg.GetRoot().Connectors.GetAutoMigrate() {
+		func() {
+			m := rs.NewMutex(
+				connectors.MigrateMutexKeyName,
+				redis.MutexOptionLockFor(cfg.GetRoot().Connectors.GetAutoMigrationLockDurationOrDefault()),
+				redis.MutexOptionRetryFor(cfg.GetRoot().Connectors.GetAutoMigrationLockDurationOrDefault()+1*time.Second),
+				redis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
+				redis.MutexOptionDetailedLockMetadata(),
+			)
+			err := m.Lock(context.Background())
+			if err != nil {
+				panic(err)
+			}
+			defer m.Unlock(context.Background())
+
+			if err := c.MigrateConnectors(context.Background()); err != nil {
+				panic(err)
+			}
+		}()
+	}
+
 	server, healthChecker := GetGinServer(cfg, db, rs, c, h, e, logger)
 
 	var wg sync.WaitGroup

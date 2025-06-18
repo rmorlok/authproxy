@@ -13,6 +13,9 @@ import (
 	"strings"
 )
 
+// MigrateMutexKeyName is the key that can be used when locking to perform a migration in redis.
+const MigrateMutexKeyName = "connectors-migrate-lock"
+
 // MigrateConnectors migrates connectors from configuration to the database
 func (s *service) MigrateConnectors(ctx context.Context) error {
 	root := s.cfg.GetRoot()
