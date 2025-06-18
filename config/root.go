@@ -19,7 +19,7 @@ type Root struct {
 	Redis       Redis           `json:"redis" yaml:"redis"`
 	Oauth       OAuth           `json:"oauth" yaml:"oauth"`
 	ErrorPages  ErrorPages      `json:"error_pages" yaml:"error_pages"`
-	Connectors  Connectors      `json:"connectors" yaml:"connectors"`
+	Connectors  *Connectors     `json:"connectors" yaml:"connectors"`
 	DevSettings *DevSettings    `json:"dev_settings,omitempty" yaml:"dev_settings,omitempty"`
 }
 

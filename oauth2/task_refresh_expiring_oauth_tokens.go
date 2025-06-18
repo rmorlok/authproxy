@@ -30,7 +30,9 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 	connectorIdToConnector := make(map[uuid.UUID]*config.Connector)
 	refreshWithin := th.cfg.GetRoot().Oauth.GetRefreshTokensTimeBeforeExpiryOrDefault()
 
-	for _, connector := range th.cfg.GetRoot().Connectors {
+	// Establish the smallest value of refreshWithIn for all active connector versions
+	// TODO: migrate this to use the database stored versions
+	for _, connector := range th.cfg.GetRoot().Connectors.GetConnectors() {
 		connectorIdToConnector[connector.Id] = &connector
 
 		if o2, ok := connector.Auth.(*config.AuthOAuth2); ok {

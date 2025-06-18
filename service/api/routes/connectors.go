@@ -64,7 +64,8 @@ func (r *ConnectorsRoutes) get(ctx *gin.Context) {
 		ctx.PureJSON(http.StatusBadRequest, Error{"id is required"})
 	}
 
-	for _, c := range r.cfg.GetRoot().Connectors {
+	// TODO: migrate to load from database
+	for _, c := range r.cfg.GetRoot().Connectors.GetConnectors() {
 		if c.Id == connectorId {
 			ctx.PureJSON(http.StatusOK, connectorResponseFromConfig(r.cfg, &c))
 			return
@@ -81,8 +82,9 @@ func (r *ConnectorsRoutes) list(ctx *gin.Context) {
 		return
 	}
 
-	connectors := make([]ConnectorJson, 0, len(r.cfg.GetRoot().Connectors))
-	for _, c := range r.cfg.GetRoot().Connectors {
+	// TODO: migrate to load from database
+	connectors := make([]ConnectorJson, 0, len(r.cfg.GetRoot().Connectors.GetConnectors()))
+	for _, c := range r.cfg.GetRoot().Connectors.GetConnectors() {
 		connectors = append(connectors, connectorResponseFromConfig(r.cfg, &c))
 	}
 

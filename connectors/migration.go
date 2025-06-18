@@ -16,7 +16,7 @@ import (
 // MigrateConnectors migrates connectors from configuration to the database
 func (s *service) MigrateConnectors(ctx context.Context) error {
 	root := s.cfg.GetRoot()
-	if root == nil || len(root.Connectors) == 0 {
+	if root == nil || len(root.Connectors.GetConnectors()) == 0 {
 		s.logger.Info("No connectors to migrate")
 		return nil
 	}
@@ -24,9 +24,9 @@ func (s *service) MigrateConnectors(ctx context.Context) error {
 	if err := s.precheckConnectorsForMigration(ctx, root.Connectors); err != nil {
 		return err
 	}
-	s.logger.Info("Precheck passed, migrating connectors", "connector_count", len(root.Connectors))
+	s.logger.Info("Precheck passed, migrating connectors", "connector_count", len(root.Connectors.GetConnectors()))
 
-	for _, configConnector := range root.Connectors {
+	for _, configConnector := range root.Connectors.GetConnectors() {
 		if err := s.migrateConnector(ctx, &configConnector); err != nil {
 			return err
 		}
@@ -56,7 +56,7 @@ func (s *service) configConnectorToVersion(configConnector *config.Connector) (*
 	}, nil
 }
 
-func (s *service) precheckConnectorsForMigration(ctx context.Context, configConnectors config.Connectors) error {
+func (s *service) precheckConnectorsForMigration(ctx context.Context, configConnectors *config.Connectors) error {
 	type IdVersionStateTuple struct {
 		Id      uuid.UUID
 		Version uint64
@@ -79,7 +79,7 @@ func (s *service) precheckConnectorsForMigration(ctx context.Context, configConn
 	idCounts := make(map[uuid.UUID]int)
 	typeCounts := make(map[string]int)
 
-	for _, configConnector := range configConnectors {
+	for _, configConnector := range configConnectors.GetConnectors() {
 		if err := s.precheckConnectorForMigration(ctx, &configConnector); err != nil {
 			return err
 		}
@@ -92,7 +92,7 @@ func (s *service) precheckConnectorsForMigration(ctx context.Context, configConn
 			}]++
 
 			// All other entries for this id must have version and state specified if one does
-			for _, cc := range configConnectors {
+			for _, cc := range configConnectors.GetConnectors() {
 				if cc.Id == configConnector.Id && cc.Version == configConnector.Version && cc.State == configConnector.State {
 					// Same entry we are checking
 					continue
@@ -115,7 +115,7 @@ func (s *service) precheckConnectorsForMigration(ctx context.Context, configConn
 			}]++
 
 			// All other entries for this id must have version if one does
-			for _, cc := range configConnectors {
+			for _, cc := range configConnectors.GetConnectors() {
 				if cc.Id == configConnector.Id && cc.Version == configConnector.Version {
 					// Same entry we are checking
 					continue
@@ -138,7 +138,7 @@ func (s *service) precheckConnectorsForMigration(ctx context.Context, configConn
 			}]++
 
 			// All other entries for this id must have version if one does
-			for _, cc := range configConnectors {
+			for _, cc := range configConnectors.GetConnectors() {
 				if cc.Id == configConnector.Id && cc.State == configConnector.State {
 					// Same entry we are checking
 					continue
@@ -152,7 +152,7 @@ func (s *service) precheckConnectorsForMigration(ctx context.Context, configConn
 			idCounts[configConnector.Id]++
 
 			// All other entries for this id must have version if one does
-			for _, cc := range configConnectors {
+			for _, cc := range configConnectors.GetConnectors() {
 				if cc.Id == configConnector.Id && cc.State == configConnector.State {
 					// Same entry we are checking
 					continue

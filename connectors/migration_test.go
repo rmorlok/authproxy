@@ -24,14 +24,16 @@ func TestService(t *testing.T) {
 	var service C
 	var asynqClient apasynq.Client
 
-	setup := func(t *testing.T, connectors config.Connectors) func() {
+	setup := func(t *testing.T, connectors []config.Connector) func() {
 		cfg = config.FromRoot(&config.Root{
 			DevSettings: &config.DevSettings{
 				Enabled:                  true,
 				FakeEncryption:           true,
 				FakeEncryptionSkipBase64: true,
 			},
-			Connectors: connectors,
+			Connectors: &config.Connectors{
+				LoadFromList: connectors,
+			},
 		})
 
 		cfg, db, rawDb = database.MustApplyBlankTestDbConfigRaw(t.Name(), cfg)
@@ -52,7 +54,7 @@ func TestService(t *testing.T) {
 	}
 
 	t.Run("no connectors", func(t *testing.T) {
-		cleanup := setup(t, config.Connectors{})
+		cleanup := setup(t, []config.Connector{})
 		defer cleanup()
 
 		err := service.MigrateConnectors(context.Background())
@@ -71,7 +73,7 @@ func TestService(t *testing.T) {
 
 	t.Run("id and version", func(t *testing.T) {
 		t.Run("single initial", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:      uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version: 1,
@@ -101,7 +103,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("double initial same type", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:      uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version: 1,
@@ -141,7 +143,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("double initial different type", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:      uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version: 1,
@@ -184,7 +186,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("unchanged from initial", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:      uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version: 1,
@@ -217,7 +219,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("changed once", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version:     1,
@@ -230,8 +232,8 @@ func TestService(t *testing.T) {
 			err := service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
 
-			cfg.GetRoot().Connectors[0].Version = 2
-			cfg.GetRoot().Connectors[0].DisplayName = "changed"
+			cfg.GetRoot().Connectors.LoadFromList[0].Version = 2
+			cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
 
 			err = service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
@@ -262,7 +264,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("add draft version", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version:     1,
@@ -276,7 +278,7 @@ func TestService(t *testing.T) {
 			require.NoError(t, err)
 
 			// Draft versions can be added; non-specified versions default to primary
-			cfg.GetRoot().Connectors = append(cfg.GetRoot().Connectors, config.Connector{
+			cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, config.Connector{
 				Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 				Version:     2,
 				State:       "draft",
@@ -313,7 +315,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("changed once then unchanged", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version:     1,
@@ -326,8 +328,8 @@ func TestService(t *testing.T) {
 			err := service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
 
-			cfg.GetRoot().Connectors[0].Version = 2
-			cfg.GetRoot().Connectors[0].DisplayName = "changed"
+			cfg.GetRoot().Connectors.LoadFromList[0].Version = 2
+			cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
 
 			err = service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
@@ -361,7 +363,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("changed twice", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version:     1,
@@ -374,14 +376,14 @@ func TestService(t *testing.T) {
 			err := service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
 
-			cfg.GetRoot().Connectors[0].Version = 2
-			cfg.GetRoot().Connectors[0].DisplayName = "changed"
+			cfg.GetRoot().Connectors.LoadFromList[0].Version = 2
+			cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
 
 			err = service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
 
-			cfg.GetRoot().Connectors[0].Version = 3
-			cfg.GetRoot().Connectors[0].DisplayName = "changed again"
+			cfg.GetRoot().Connectors.LoadFromList[0].Version = 3
+			cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed again"
 
 			err = service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
@@ -418,7 +420,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("cannot change published version", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version:     1,
@@ -431,7 +433,7 @@ func TestService(t *testing.T) {
 			err := service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
 
-			cfg.GetRoot().Connectors[0].DisplayName = "changed"
+			cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
 
 			err = service.MigrateConnectors(context.Background())
 			require.Error(t, err)
@@ -456,7 +458,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("does not allow duplicate id versions initial", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version:     1,
@@ -488,7 +490,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("does not allow duplicate id versions when migrated", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version:     1,
@@ -501,7 +503,7 @@ func TestService(t *testing.T) {
 			err := service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
 
-			cfg.GetRoot().Connectors = append(cfg.GetRoot().Connectors, config.Connector{
+			cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, config.Connector{
 				Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 				Version:     1,
 				Type:        "fake",
@@ -533,7 +535,7 @@ func TestService(t *testing.T) {
 
 	t.Run("id", func(t *testing.T) {
 		t.Run("single initial", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:   uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Type: "fake",
@@ -562,7 +564,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("double initial same type", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:   uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Type: "fake",
@@ -600,7 +602,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("unchanged from initial", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:   uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Type: "fake",
@@ -632,7 +634,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("changed once", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Type:        "fake",
@@ -644,7 +646,7 @@ func TestService(t *testing.T) {
 			err := service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
 
-			cfg.GetRoot().Connectors[0].DisplayName = "changed"
+			cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
 
 			err = service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
@@ -675,7 +677,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("add draft version", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Type:        "fake",
@@ -687,7 +689,7 @@ func TestService(t *testing.T) {
 			err := service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
 
-			cfg.GetRoot().Connectors = append(cfg.GetRoot().Connectors, config.Connector{
+			cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, config.Connector{
 				Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 				Type:        "fake",
 				State:       "draft",
@@ -723,7 +725,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("changed once then unchanged", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Type:        "fake",
@@ -735,7 +737,7 @@ func TestService(t *testing.T) {
 			err := service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
 
-			cfg.GetRoot().Connectors[0].DisplayName = "changed"
+			cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
 
 			err = service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
@@ -769,7 +771,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("changed twice", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Type:        "fake",
@@ -781,12 +783,12 @@ func TestService(t *testing.T) {
 			err := service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
 
-			cfg.GetRoot().Connectors[0].DisplayName = "changed"
+			cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
 
 			err = service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
 
-			cfg.GetRoot().Connectors[0].DisplayName = "changed again"
+			cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed again"
 
 			err = service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
@@ -823,7 +825,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("does not allow duplicate id initial", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Type:        "fake",
@@ -853,7 +855,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("does not allow duplicate id when migrated", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Type:        "fake",
@@ -865,7 +867,7 @@ func TestService(t *testing.T) {
 			err := service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
 
-			cfg.GetRoot().Connectors = append(cfg.GetRoot().Connectors, config.Connector{
+			cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, config.Connector{
 				Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 				Type:        "fake",
 				DisplayName: "second",
@@ -896,7 +898,7 @@ func TestService(t *testing.T) {
 
 	t.Run("type only", func(t *testing.T) {
 		t.Run("single initial", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Type: "fake",
 				},
@@ -922,7 +924,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("unchanged initial", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Type: "fake",
 				},
@@ -951,7 +953,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("changed once", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Type:        "fake",
 					DisplayName: "initial",
@@ -962,7 +964,7 @@ func TestService(t *testing.T) {
 			err := service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
 
-			cfg.GetRoot().Connectors[0].DisplayName = "changed"
+			cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
 
 			err = service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
@@ -990,7 +992,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("changed once then unchanged", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Type:        "fake",
 					DisplayName: "initial",
@@ -1001,7 +1003,7 @@ func TestService(t *testing.T) {
 			err := service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
 
-			cfg.GetRoot().Connectors[0].DisplayName = "changed"
+			cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
 
 			err = service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
@@ -1032,7 +1034,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("changed twice", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Type:        "fake",
 					DisplayName: "initial",
@@ -1043,12 +1045,12 @@ func TestService(t *testing.T) {
 			err := service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
 
-			cfg.GetRoot().Connectors[0].DisplayName = "changed"
+			cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
 
 			err = service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
 
-			cfg.GetRoot().Connectors[0].DisplayName = "changed again"
+			cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed again"
 
 			err = service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
@@ -1081,7 +1083,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("does not allow duplicate type without id initial", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Type:        "fake",
 					DisplayName: "first",
@@ -1109,7 +1111,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("does not allow duplicate type without id when migrated", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Type:        "fake",
 					DisplayName: "first",
@@ -1120,7 +1122,7 @@ func TestService(t *testing.T) {
 			err := service.MigrateConnectors(context.Background())
 			require.NoError(t, err)
 
-			cfg.GetRoot().Connectors = append(cfg.GetRoot().Connectors, config.Connector{
+			cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, config.Connector{
 				Type:        "fake",
 				DisplayName: "second",
 			})
@@ -1148,7 +1150,7 @@ func TestService(t *testing.T) {
 
 	t.Run("bad config files", func(t *testing.T) {
 		t.Run("duplicate id version type", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version:     1,
@@ -1180,7 +1182,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("duplicate id version state primary", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version:     1,
@@ -1214,7 +1216,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("duplicate id version state draft", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version:     1,
@@ -1248,7 +1250,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("duplicate id version", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version:     1,
@@ -1280,7 +1282,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("id with and without version", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version:     1,
@@ -1311,7 +1313,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("id version and type without id", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version:     1,
@@ -1328,7 +1330,7 @@ func TestService(t *testing.T) {
 			err := service.MigrateConnectors(context.Background())
 			require.Error(t, err)
 
-			cleanup2 := setup(t, config.Connectors{
+			cleanup2 := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version:     1,
@@ -1346,7 +1348,7 @@ func TestService(t *testing.T) {
 			err = service.MigrateConnectors(context.Background())
 			require.Error(t, err)
 
-			cleanup3 := setup(t, config.Connectors{
+			cleanup3 := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version:     1,
@@ -1378,7 +1380,7 @@ func TestService(t *testing.T) {
 		})
 
 		t.Run("id and type without id", func(t *testing.T) {
-			cleanup := setup(t, config.Connectors{
+			cleanup := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Type:        "fake",
@@ -1394,7 +1396,7 @@ func TestService(t *testing.T) {
 			err := service.MigrateConnectors(context.Background())
 			require.Error(t, err)
 
-			cleanup2 := setup(t, config.Connectors{
+			cleanup2 := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Type:        "fake",
@@ -1411,7 +1413,7 @@ func TestService(t *testing.T) {
 			err = service.MigrateConnectors(context.Background())
 			require.Error(t, err)
 
-			cleanup3 := setup(t, config.Connectors{
+			cleanup3 := setup(t, []config.Connector{
 				{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Type:        "fake",

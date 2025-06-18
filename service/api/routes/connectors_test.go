@@ -21,7 +21,11 @@ func TestConnectors(t *testing.T) {
 
 	setup := func(t *testing.T, cfg config.C) *TestSetup {
 		if cfg == nil {
-			cfg = config.FromRoot(&config.Root{})
+			cfg = config.FromRoot(&config.Root{
+				Connectors: &config.Connectors{
+					LoadFromList: []config.Connector{},
+				},
+			})
 		}
 
 		root := cfg.GetRoot()
@@ -29,8 +33,8 @@ func TestConnectors(t *testing.T) {
 			panic("No root in config")
 		}
 
-		if len(root.Connectors) == 0 {
-			root.Connectors = []config.Connector{
+		if len(root.Connectors.LoadFromList) == 0 {
+			root.Connectors.LoadFromList = []config.Connector{
 				{
 					Id:          uuid.MustParse("10000000-0000-0000-0000-000000000001"),
 					Type:        "test-connector",
