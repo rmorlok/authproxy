@@ -59,12 +59,12 @@ func (cv *ConnectorVersion) setDefinition(def *cfg.Connector) error {
 		return err
 	}
 
-	encrypted, err := cv.s.encrypt.EncryptForConnector(context.Background(), cv.ConnectorVersion, jsonBytes)
+	encrypted, err := cv.s.encrypt.EncryptStringForConnector(context.Background(), cv.ConnectorVersion, string(jsonBytes))
 	if err != nil {
 		return err
 	}
 	cv.Hash = def.Hash()
-	cv.EncryptedDefinition = string(encrypted)
+	cv.EncryptedDefinition = encrypted
 	cv.def = def
 
 	return nil

@@ -22,6 +22,9 @@ type C interface {
 	// GetConnectorVersionForState returns the most recent version of the connector for the specified state.
 	GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state database.ConnectorVersionState) (*ConnectorVersion, error)
 
+	ListConnectorsBuilder() ListConnectorsBuilder
+	ListConnectorsFromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error)
+
 	/*
 	 * Task manager interface functions.
 	 */

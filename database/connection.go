@@ -67,6 +67,15 @@ const (
 	ConnectionOrderByCreatedAt ConnectionOrderByField = "created_at"
 )
 
+func IsValidConnectionOrderByField[T string | ConnectionOrderByField](field T) bool {
+	switch ConnectionOrderByField(field) {
+	case ConnectionOrderByCreatedAt:
+		return true
+	default:
+		return false
+	}
+}
+
 type ListConnectionsExecutor interface {
 	FetchPage(context.Context) PageResult[Connection]
 	Enumerate(context.Context, func(PageResult[Connection]) (keepGoing bool, err error)) error

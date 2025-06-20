@@ -98,7 +98,7 @@ func GetGinServer(
 		KeyFunc:      rateKeyFunc,
 	})
 
-	routesConnectors := routes.NewConnectorsRoutes(cfg, authService)
+	routesConnectors := routes.NewConnectorsRoutes(cfg, authService, c)
 	routesConnections := routes.NewConnectionsRoutes(cfg, authService, db, redis, c, httpf, encrypt, logger)
 
 	api := server.Group("/api", rl)

@@ -42,7 +42,8 @@ func NewEncryptService(
 	db database.DB,
 ) E {
 	if cfg != nil && cfg.GetRoot().DevSettings.IsFakeEncryptionEnabled() {
-		return NewFakeEncryptService(cfg.GetRoot().DevSettings.IsFakeEncryptionSkipBase64Enabled())
+		doBase64Encode := !cfg.GetRoot().DevSettings.IsFakeEncryptionSkipBase64Enabled()
+		return NewFakeEncryptService(doBase64Encode)
 	}
 
 	return &service{

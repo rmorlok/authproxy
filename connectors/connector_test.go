@@ -122,8 +122,8 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 
 	// Set up expectations for the encrypt service
 	mockEncrypt.EXPECT().
-		EncryptForConnector(gomock.Any(), cv.ConnectorVersion, gomock.Any()).
-		Return([]byte("new-encrypted-data"), nil)
+		EncryptStringForConnector(gomock.Any(), cv.ConnectorVersion, gomock.Any()).
+		Return("new-encrypted-data", nil)
 
 	// Test
 	err := cv.setDefinition(def)

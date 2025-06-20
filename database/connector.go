@@ -397,6 +397,17 @@ const (
 	ConnectorOrderByDisplayName ConnectorOrderByField = "display_name"
 )
 
+func IsValidConnectorOrderByField[T string | ConnectorOrderByField](field T) bool {
+	switch ConnectorOrderByField(field) {
+	case ConnectorOrderByCreatedAt,
+		ConnectorOrderByUpdatedAt,
+		ConnectorOrderByDisplayName:
+		return true
+	default:
+		return false
+	}
+}
+
 type ListConnectorsExecutor interface {
 	FetchPage(context.Context) PageResult[Connector]
 	Enumerate(context.Context, func(PageResult[Connector]) (keepGoing bool, err error)) error
@@ -406,6 +417,7 @@ type ListConnectorsBuilder interface {
 	ListConnectorsExecutor
 	Limit(int32) ListConnectorsBuilder
 	ForType(string) ListConnectorsBuilder
+	ForId(uuid.UUID) ListConnectorsBuilder
 	ForConnectorVersionState(ConnectorVersionState) ListConnectorsBuilder
 	OrderBy(ConnectorOrderByField, OrderBy) ListConnectorsBuilder
 	IncludeDeleted() ListConnectorsBuilder
@@ -417,6 +429,7 @@ type listConnectorsFilters struct {
 	Offset            int32                   `json:"offset"`
 	StatesVal         []ConnectorVersionState `json:"states,omitempty"`
 	TypeVal           []string                `json:"types,omitempty"`
+	IdsVal            []uuid.UUID             `json:"ids,omitempty"`
 	OrderByFieldVal   *ConnectorOrderByField  `json:"order_by_field"`
 	OrderByVal        *OrderBy                `json:"order_by"`
 	IncludeDeletedVal bool                    `json:"include_deleted,omitempty"`
@@ -434,6 +447,11 @@ func (l *listConnectorsFilters) ForConnectorVersionState(state ConnectorVersionS
 
 func (l *listConnectorsFilters) ForType(t string) ListConnectorsBuilder {
 	l.TypeVal = []string{t}
+	return l
+}
+
+func (l *listConnectorsFilters) ForId(id uuid.UUID) ListConnectorsBuilder {
+	l.IdsVal = []uuid.UUID{id}
 	return l
 }
 
@@ -518,6 +536,10 @@ cvc.versions as total_versions
 
 	if len(l.TypeVal) > 0 {
 		query = query.Where("rr.type IN ?", l.TypeVal)
+	}
+
+	if len(l.IdsVal) > 0 {
+		query = query.Where("rr.id IN ?", l.IdsVal)
 	}
 
 	if len(l.StatesVal) > 0 {

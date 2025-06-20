@@ -213,7 +213,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 				return
 			}
 
-			if field != string(database.ConnectionOrderByCreatedAt) {
+			if !database.IsValidConnectionOrderByField(field) {
 				gctx.PureJSON(http.StatusBadRequest, Error{fmt.Sprintf("invalid sort field '%s'", field)})
 				return
 			}

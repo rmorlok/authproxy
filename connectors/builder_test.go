@@ -197,8 +197,8 @@ func TestVersionBuilder_Build_Success(t *testing.T) {
 
 	// Set up expectations for the encrypt service
 	mockEncrypt.EXPECT().
-		EncryptForConnector(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return([]byte("encrypted-data"), nil)
+		EncryptStringForConnector(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return("encrypted-data", nil)
 
 	// Test
 	cv, err := builder.Build()
@@ -260,8 +260,8 @@ func TestVersionBuilder_Build_EncryptError(t *testing.T) {
 
 	// Set up expectations for the encrypt service with error
 	mockEncrypt.EXPECT().
-		EncryptForConnector(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return(nil, errors.New("encryption error"))
+		EncryptStringForConnector(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return("", errors.New("encryption error"))
 
 	// Test
 	cv, err := builder.Build()
