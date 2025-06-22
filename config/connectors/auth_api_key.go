@@ -7,3 +7,12 @@ type AuthApiKey struct {
 func (a *AuthApiKey) GetType() AuthType {
 	return AuthTypeAPIKey
 }
+
+func (a *AuthApiKey) Clone() Auth {
+	if a == nil {
+		return nil
+	}
+
+	clone := *a
+	return &clone
+}

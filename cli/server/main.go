@@ -30,7 +30,16 @@ func loadConfig() error {
 
 	var err error
 	cfg, err = config.LoadConfig(cfgFile)
-	return errors.Wrapf(err, "failed to load configuration from '%s'", cfgFile)
+	if err != nil {
+		return errors.Wrapf(err, "failed to load configuration from '%s'", cfgFile)
+	}
+
+	err = cfg.Validate()
+	if err != nil {
+		return errors.Wrapf(err, "invalid configuration")
+	}
+
+	return nil
 }
 
 func runServices(noBanner bool, servicesList string) error {
@@ -93,15 +102,15 @@ func cmdRoutes() *cobra.Command {
 		Short: "Print routes exposed by app",
 		Run: func(cmd *cobra.Command, args []string) {
 			println("Admin API:")
-			server, _ := admin_api.GetGinServer(cfg, nil, nil, nil)
+			server, _ := admin_api.GetGinServer(cfg, nil, nil, nil, nil, nil)
 			api_common.PrintRoutes(server)
 
 			println("\n\nAPI:")
-			server, _ = api.GetGinServer(cfg, nil, nil, nil, nil, nil)
+			server, _ = api.GetGinServer(cfg, nil, nil, nil, nil, nil, nil)
 			api_common.PrintRoutes(server)
 
 			println("\n\nPublic:")
-			server, _ = public.GetGinServer(cfg, nil, nil, nil, nil, nil)
+			server, _ = public.GetGinServer(cfg, nil, nil, nil, nil, nil, nil)
 			api_common.PrintRoutes(server)
 		},
 	}

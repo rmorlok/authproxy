@@ -1,6 +1,7 @@
 package connectors
 
 import (
+	"encoding/json"
 	"fmt"
 	"gopkg.in/yaml.v3"
 
@@ -72,4 +73,150 @@ func (i *AuthOAuth2) UnmarshalYAML(value *yaml.Node) error {
 
 func (a *AuthOAuth2) GetType() AuthType {
 	return AuthTypeOAuth2
+}
+
+// UnmarshalJSON implements custom JSON unmarshalling for the AuthOAuth2 struct
+func (a *AuthOAuth2) UnmarshalJSON(data []byte) error {
+	// Define a temporary struct with the same fields as AuthOAuth2
+	// but with ClientId and ClientSecret as json.RawMessage to capture their raw JSON
+	type TempAuthOAuth2 struct {
+		Type          AuthType                `json:"type"`
+		ClientId      json.RawMessage         `json:"client_id"`
+		ClientSecret  json.RawMessage         `json:"client_secret"`
+		Scopes        []Scope                 `json:"scopes"`
+		Authorization AuthOauth2Authorization `json:"authorization"`
+		Token         AuthOauth2Token         `json:"token"`
+	}
+
+	var temp TempAuthOAuth2
+
+	// Unmarshal into the temporary struct
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+
+	// Copy the simple fields
+	a.Type = temp.Type
+	a.Scopes = temp.Scopes
+	a.Authorization = temp.Authorization
+	a.Token = temp.Token
+
+	// Handle ClientId if it's not null
+	if len(temp.ClientId) > 0 && string(temp.ClientId) != "null" {
+		// Try to determine the type of StringValue from the JSON
+		var clientIdMap map[string]interface{}
+		if err := json.Unmarshal(temp.ClientId, &clientIdMap); err != nil {
+			return err
+		}
+
+		var clientId common.StringValue
+		if _, ok := clientIdMap["value"]; ok {
+			// It's a StringValueDirect
+			var svDirect common.StringValueDirect
+			if err := json.Unmarshal(temp.ClientId, &svDirect); err != nil {
+				return err
+			}
+			clientId = &svDirect
+		} else if _, ok := clientIdMap["base64"]; ok {
+			// It's a StringValueBase64
+			var svBase64 common.StringValueBase64
+			if err := json.Unmarshal(temp.ClientId, &svBase64); err != nil {
+				return err
+			}
+			clientId = &svBase64
+		} else if _, ok := clientIdMap["env_var"]; ok {
+			// It's a StringValueEnvVar
+			var svEnvVar common.StringValueEnvVar
+			if err := json.Unmarshal(temp.ClientId, &svEnvVar); err != nil {
+				return err
+			}
+			clientId = &svEnvVar
+		} else if _, ok := clientIdMap["env_var_base64"]; ok {
+			// It's a StringValueEnvVarBase64
+			var svEnvVarBase64 common.StringValueEnvVarBase64
+			if err := json.Unmarshal(temp.ClientId, &svEnvVarBase64); err != nil {
+				return err
+			}
+			clientId = &svEnvVarBase64
+		} else if _, ok := clientIdMap["path"]; ok {
+			// It's a StringValueFile
+			var svFile common.StringValueFile
+			if err := json.Unmarshal(temp.ClientId, &svFile); err != nil {
+				return err
+			}
+			clientId = &svFile
+		}
+
+		a.ClientId = clientId
+	}
+
+	// Handle ClientSecret if it's not null
+	if len(temp.ClientSecret) > 0 && string(temp.ClientSecret) != "null" {
+		// Try to determine the type of StringValue from the JSON
+		var clientSecretMap map[string]interface{}
+		if err := json.Unmarshal(temp.ClientSecret, &clientSecretMap); err != nil {
+			return err
+		}
+
+		var clientSecret common.StringValue
+		if _, ok := clientSecretMap["value"]; ok {
+			// It's a StringValueDirect
+			var svDirect common.StringValueDirect
+			if err := json.Unmarshal(temp.ClientSecret, &svDirect); err != nil {
+				return err
+			}
+			clientSecret = &svDirect
+		} else if _, ok := clientSecretMap["base64"]; ok {
+			// It's a StringValueBase64
+			var svBase64 common.StringValueBase64
+			if err := json.Unmarshal(temp.ClientSecret, &svBase64); err != nil {
+				return err
+			}
+			clientSecret = &svBase64
+		} else if _, ok := clientSecretMap["env_var"]; ok {
+			// It's a StringValueEnvVar
+			var svEnvVar common.StringValueEnvVar
+			if err := json.Unmarshal(temp.ClientSecret, &svEnvVar); err != nil {
+				return err
+			}
+			clientSecret = &svEnvVar
+		} else if _, ok := clientSecretMap["env_var_base64"]; ok {
+			// It's a StringValueEnvVarBase64
+			var svEnvVarBase64 common.StringValueEnvVarBase64
+			if err := json.Unmarshal(temp.ClientSecret, &svEnvVarBase64); err != nil {
+				return err
+			}
+			clientSecret = &svEnvVarBase64
+		} else if _, ok := clientSecretMap["path"]; ok {
+			// It's a StringValueFile
+			var svFile common.StringValueFile
+			if err := json.Unmarshal(temp.ClientSecret, &svFile); err != nil {
+				return err
+			}
+			clientSecret = &svFile
+		}
+
+		a.ClientSecret = clientSecret
+	}
+
+	return nil
+}
+
+func (a *AuthOAuth2) Clone() Auth {
+	if a == nil {
+		return nil
+	}
+
+	clone := *a
+
+	clone.ClientId = a.ClientId.Clone()
+	clone.ClientSecret = a.ClientSecret.Clone()
+
+	scopes := make([]Scope, 0, len(a.Scopes))
+	for _, scope := range a.Scopes {
+		scopes = append(scopes, scope)
+	}
+	clone.Scopes = scopes
+
+	return &clone
 }

@@ -55,16 +55,16 @@ func (o *OAuth2) getPublicRedirectUrl(ctx context.Context, stateId uuid.UUID, ac
 
 func (o *OAuth2) GenerateAuthUrl(ctx context.Context, actor database.Actor) (string, error) {
 	if !o.auth.ClientId.HasValue(ctx) {
-		return "", errors.Errorf("client id does not have value for connector %s", o.connector.Id)
+		return "", errors.Errorf("client id does not have value for connector %s", o.cv.ID)
 	}
 
 	clientId, err := o.auth.ClientId.GetValue(ctx)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to get client id for connector %s", o.connector.Id)
+		return "", errors.Wrapf(err, "failed to get client id for connector %s", o.cv.ID)
 	}
 
 	if o.auth.Authorization.Endpoint == "" {
-		return "", errors.Errorf("no authorization endpoint for connector %s", o.connector.Id)
+		return "", errors.Errorf("no authorization endpoint for connector %s", o.cv.ID)
 	}
 
 	if o.state == nil {
@@ -82,7 +82,7 @@ func (o *OAuth2) GenerateAuthUrl(ctx context.Context, actor database.Actor) (str
 
 	authUrl3p, err := url.Parse(o.auth.Authorization.Endpoint)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to parse authorization endpoint for connector %s", o.connector.Id)
+		return "", errors.Wrapf(err, "failed to parse authorization endpoint for connector %s", o.cv.ID)
 	}
 
 	query := authUrl3p.Query()

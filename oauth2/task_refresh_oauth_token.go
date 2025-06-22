@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
-	"github.com/rmorlok/authproxy/config"
+	"github.com/pkg/errors"
 )
 
 const taskTypeRefreshOAuthToken = "oauth2:refresh_oauth_token"
@@ -42,17 +42,13 @@ func (th *taskHandler) refreshOauth2Token(ctx context.Context, t *asynq.Task) er
 		return fmt.Errorf("connection not found: %w", asynq.SkipRetry)
 	}
 
-	var connector config.Connector
-	found := false
-	for _, connector = range th.cfg.GetRoot().Connectors {
-		if connector.Id == connection.ConnectorId {
-			found = true
-			break
-		}
+	cv, err := th.connectors.GetConnectorVersion(ctx, connection.ConnectorId, connection.ConnectorVersion)
+	if err != nil {
+		return errors.Wrap(err, "failed to load connector version")
 	}
 
-	if !found {
-		return fmt.Errorf("connector '%s' not found for connection %v: %w", connection.ConnectorId, connection.ID, asynq.SkipRetry)
+	if cv == nil {
+		return fmt.Errorf("connector %s version %d not found for connection %v: %w", connection.ConnectorId, connection.ConnectorVersion, connection.ID, asynq.SkipRetry)
 	}
 
 	token, err := th.db.GetOAuth2Token(ctx, connection.ID)
@@ -64,7 +60,7 @@ func (th *taskHandler) refreshOauth2Token(ctx context.Context, t *asynq.Task) er
 		return fmt.Errorf("oauth token not found for connection %v: %w", connection.ID, asynq.SkipRetry)
 	}
 
-	o2 := th.factory.NewOAuth2(*connection, connector)
+	o2 := th.factory.NewOAuth2(*connection, cv)
 	_, err = o2.refreshAccessToken(ctx, token, refreshModeAlways)
 	return err
 }

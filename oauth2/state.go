@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/connectors"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -20,7 +21,8 @@ import (
 type state struct {
 	Id                     uuid.UUID `json:"id"`
 	ActorId                uuid.UUID `json:"actor_id"`
-	ConnectorId            string    `json:"connector_id"`
+	ConnectorId            uuid.UUID `json:"connector_id"`
+	ConnectorVersion       uint64    `json:"connector_version"`
 	ConnectionId           uuid.UUID `json:"connection_id"`
 	ReturnToUrl            string    `json:"return_to"`
 	CancelSessionAfterAuth bool      `json:"cancel_session_after_auth"`
@@ -40,7 +42,7 @@ var _ encoding.BinaryMarshaler = (*state)(nil)
 var _ encoding.BinaryUnmarshaler = (*state)(nil)
 
 func (s *state) IsValid() bool {
-	return s.ActorId != uuid.Nil && s.ConnectorId != "" && s.ConnectionId != uuid.Nil && !s.ExpiresAt.IsZero()
+	return s.ActorId != uuid.Nil && s.ConnectorId != uuid.Nil && s.ConnectionId != uuid.Nil && !s.ExpiresAt.IsZero()
 }
 
 func getStateRedisKey(u uuid.UUID) string {
@@ -53,16 +55,17 @@ func getStateRedisKey(u uuid.UUID) string {
 func (o *OAuth2) saveStateToRedis(ctx context.Context, actor database.Actor, stateId uuid.UUID, returnToUrl string) error {
 	ttl := o.cfg.GetRoot().Oauth.GetRoundTripTtlOrDefault()
 	s := &state{
-		Id:           stateId,
-		ActorId:      actor.ID,
-		ConnectorId:  o.connector.Id,
-		ConnectionId: o.connection.ID,
-		ExpiresAt:    time.Now().Add(ttl),
-		ReturnToUrl:  returnToUrl,
+		Id:               stateId,
+		ActorId:          actor.ID,
+		ConnectorId:      o.cv.ID,
+		ConnectorVersion: o.cv.Version,
+		ConnectionId:     o.connection.ID,
+		ExpiresAt:        time.Now().Add(ttl),
+		ReturnToUrl:      returnToUrl,
 	}
 	result := o.redis.Client().Set(ctx, getStateRedisKey(stateId), s, ttl)
 	if result.Err() != nil {
-		return errors.Wrapf(result.Err(), "failed to set state in redis for connector %s", o.connector.Id)
+		return errors.Wrapf(result.Err(), "failed to set state in redis for connector %s", o.cv.ID)
 	}
 
 	o.state = s
@@ -75,12 +78,18 @@ func getOAuth2State(
 	cfg config.C,
 	db database.DB,
 	redis redis.R,
+	c connectors.C,
 	httpf httpf.F,
 	encrypt encrypt.E,
 	logger *slog.Logger,
 	actor database.Actor,
 	stateId uuid.UUID,
 ) (*OAuth2, error) {
+	logger.DebugContext(ctx, "getting oauth state",
+		"state_id", stateId,
+		"actor_id", actor.ID,
+	)
+
 	result := redis.Client().Get(ctx, getStateRedisKey(stateId))
 
 	if result.Err() != nil {
@@ -104,19 +113,16 @@ func getOAuth2State(
 		return nil, errors.Errorf("actor id %s does not match state actor id %s", actor.ID, s.ActorId)
 	}
 
-	var connector config.Connector
-	found := false
-	for _, connector = range cfg.GetRoot().Connectors {
-		if connector.Id == s.ConnectorId {
-			found = true
-			break
-		}
+	cv, err := c.GetConnectorVersion(ctx, s.ConnectorId, s.ConnectorVersion)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to load connector version")
 	}
 
-	if !found {
-		return nil, errors.Errorf("connector %s not found from state %s", s.ConnectorId, stateId.String())
+	if cv == nil {
+		return nil, errors.Errorf("connector %s version %d not found from state %s", s.ConnectorId, s.ConnectorVersion, stateId.String())
 	}
 
+	connector := cv.GetDefinition()
 	if connector.Auth.GetType() != config.AuthTypeOAuth2 {
 		return nil, errors.Errorf("connector %s is not an oauth2 connector", s.ConnectorId)
 	}
@@ -134,7 +140,7 @@ func getOAuth2State(
 
 	// TODO: add connector validation to make sure the connection is of the specified connector type once connections get mapped to connectors
 
-	o := newOAuth2(cfg, db, redis, httpf, encrypt, logger, *connection, connector)
+	o := newOAuth2(cfg, db, redis, c, encrypt, logger, httpf, *connection, cv)
 	o.state = &s
 
 	deleteResult := redis.Client().Del(ctx, getStateRedisKey(stateId))

@@ -214,43 +214,48 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		createdConnection := Connection{
-			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-			State:       ConnectionStateCreated,
-			ConnectorId: "some-connector",
-			CreatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
-			UpdatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			ID:               uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+			State:            ConnectionStateCreated,
+			ConnectorId:      uuid.MustParse("10000000-0000-0000-0000-000000000001"),
+			ConnectorVersion: 1,
+			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
 
 		readyConnection1 := Connection{
-			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000002"),
-			State:       ConnectionStateReady,
-			ConnectorId: "some-connector",
-			CreatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
-			UpdatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			ID:               uuid.MustParse("00000000-0000-0000-0000-000000000002"),
+			State:            ConnectionStateReady,
+			ConnectorId:      uuid.MustParse("10000000-0000-0000-0000-000000000001"),
+			ConnectorVersion: 1,
+			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
 
 		readyConnection2 := Connection{
-			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000003"),
-			State:       ConnectionStateReady,
-			ConnectorId: "some-connector",
-			CreatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
-			UpdatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			ID:               uuid.MustParse("00000000-0000-0000-0000-000000000003"),
+			State:            ConnectionStateReady,
+			ConnectorId:      uuid.MustParse("10000000-0000-0000-0000-000000000001"),
+			ConnectorVersion: 1,
+			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
 
 		disabledConnection := Connection{
-			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000004"),
-			State:       ConnectionStateDisabled,
-			ConnectorId: "some-connector",
-			CreatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
-			UpdatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			ID:               uuid.MustParse("00000000-0000-0000-0000-000000000004"),
+			State:            ConnectionStateDisabled,
+			ConnectorId:      uuid.MustParse("10000000-0000-0000-0000-000000000001"),
+			ConnectorVersion: 1,
+			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
 
 		deletedConnection := Connection{
-			ID:          uuid.MustParse("00000000-0000-0000-0000-000000000005"),
-			State:       ConnectionStateReady,
-			ConnectorId: "some-connector",
-			CreatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
-			UpdatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			ID:               uuid.MustParse("00000000-0000-0000-0000-000000000005"),
+			State:            ConnectionStateReady,
+			ConnectorId:      uuid.MustParse("10000000-0000-0000-0000-000000000001"),
+			ConnectorVersion: 1,
+			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+			UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 			DeletedAt: gorm.DeletedAt{
 				Time:  apctx.GetClock(ctx).Now().Add(-30 * time.Minute),
 				Valid: true,
@@ -260,11 +265,12 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 		manyReadyConnections := make([]Connection, 0)
 		for i := 0; i < 200; i++ {
 			manyReadyConnections = append(manyReadyConnections, Connection{
-				ID:          uuid.New(),
-				State:       ConnectionStateReady,
-				ConnectorId: "some-connector",
-				CreatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
-				UpdatedAt:   apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+				ID:               uuid.New(),
+				State:            ConnectionStateReady,
+				ConnectorId:      uuid.MustParse("10000000-0000-0000-0000-000000000001"),
+				ConnectorVersion: 1,
+				CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
+				UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 			})
 		}
 

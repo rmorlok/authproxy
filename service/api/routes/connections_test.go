@@ -4,9 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"github.com/gin-gonic/gin"
+	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/apasynq/mock"
 	auth2 "github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/connectors"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/httpf"
@@ -26,27 +29,32 @@ func TestConnections(t *testing.T) {
 		Db       database.DB
 	}
 
-	setup := func(t *testing.T, cfg config.C) *TestSetup {
+	setup := func(t *testing.T, cfg config.C) (*TestSetup, func()) {
 		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
 		cfg, rds := redis.MustApplyTestConfig(cfg)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(config.ServiceIdApi, cfg, db)
-		httpf := httpf2.CreateFactory(cfg, rds)
-		cfg, encrypt := encrypt.NewTestEncryptService(cfg, db)
-
-		cr := NewConnectionsRoutes(cfg, auth, db, rds, httpf, encrypt, test_utils.NewTestLogger())
+		h := httpf2.CreateFactory(cfg, rds)
+		cfg, e := encrypt.NewTestEncryptService(cfg, db)
+		ctrl := gomock.NewController(t)
+		ac := mock.NewMockClient(ctrl)
+		c := connectors.NewConnectorsService(cfg, db, e, ac, test_utils.NewTestLogger())
+		cr := NewConnectionsRoutes(cfg, auth, db, rds, c, h, e, test_utils.NewTestLogger())
 		r := gin.Default()
 		cr.Register(r)
 
 		return &TestSetup{
-			Gin:      r,
-			Cfg:      cfg,
-			AuthUtil: authUtil,
-			Db:       db,
-		}
+				Gin:      r,
+				Cfg:      cfg,
+				AuthUtil: authUtil,
+				Db:       db,
+			}, func() {
+				ctrl.Finish()
+			}
 	}
 
 	t.Run("get connection", func(t *testing.T) {
-		tu := setup(t, nil)
+		tu, done := setup(t, nil)
+		defer done()
 		u := uuid.New()
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{ID: u, State: database.ConnectionStateCreated})
 		require.NoError(t, err)

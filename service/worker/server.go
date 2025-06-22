@@ -9,6 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/connectors"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -62,8 +63,8 @@ func Serve(cfg config.C) {
 		}()
 	}
 
-	httpf := httpf.CreateFactory(cfg, rs)
-	encrypt := encrypt.NewEncryptService(cfg, db)
+	h := httpf.CreateFactory(cfg, rs)
+	e := encrypt.NewEncryptService(cfg, db)
 
 	workerConfig := cfg.GetRoot().Worker
 	router := api_common.GinForService(&workerConfig)
@@ -91,6 +92,8 @@ func Serve(cfg config.C) {
 	// defer asynqClient.Close() // Do no close the async connection because it is a shared redis connection
 
 	asynqClient.Ping()
+
+	c := connectors.NewConnectorsService(cfg, db, e, asynqClient, logger)
 
 	router.GET("/healthz", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 1*time.Second)
@@ -158,8 +161,33 @@ func Serve(cfg config.C) {
 
 	mux := asynq.NewServeMux()
 
-	oauth2TaskHandler := oauth2.NewTaskHandler(cfg, db, rs, asynqClient, httpf, encrypt, logger)
+	oauth2TaskHandler := oauth2.NewTaskHandler(cfg, db, rs, c, asynqClient, h, e, logger)
 	oauth2TaskHandler.RegisterTasks(mux)
+
+	connectorsService := connectors.NewConnectorsService(cfg, db, e, asynqClient, logger)
+
+	if cfg.GetRoot().Connectors.GetAutoMigrate() {
+		func() {
+			m := rs.NewMutex(
+				connectors.MigrateMutexKeyName,
+				redis.MutexOptionLockFor(cfg.GetRoot().Connectors.GetAutoMigrationLockDurationOrDefault()),
+				redis.MutexOptionRetryFor(cfg.GetRoot().Connectors.GetAutoMigrationLockDurationOrDefault()+1*time.Second),
+				redis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
+				redis.MutexOptionDetailedLockMetadata(),
+			)
+			err := m.Lock(context.Background())
+			if err != nil {
+				panic(err)
+			}
+			defer m.Unlock(context.Background())
+
+			if err := connectorsService.MigrateConnectors(context.Background()); err != nil {
+				panic(err)
+			}
+		}()
+	}
+
+	connectorsService.RegisterTasks(mux)
 
 	var wg sync.WaitGroup
 
@@ -177,9 +205,10 @@ func Serve(cfg config.C) {
 	scheduler := newScheduler(
 		rs,
 		asyncSchedulerHealthChecker,
-		oauth2TaskHandler,
 		logBuilder.WithComponent("scheduler").Build(),
-	)
+	).
+		addRegistrar(oauth2TaskHandler).
+		addRegistrar(connectorsService)
 
 	wg.Add(1)
 	go func() {

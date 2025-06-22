@@ -6,6 +6,7 @@ import (
 )
 
 type Image interface {
+	Clone() Image
 	GetUrl() string
 }
 
@@ -66,6 +67,15 @@ func (i *ImagePublicUrl) GetUrl() string {
 	return i.PublicUrl
 }
 
+func (i *ImagePublicUrl) Clone() Image {
+	if i == nil {
+		return nil
+	}
+
+	clone := *i
+	return &clone
+}
+
 type ImageBase64 struct {
 	MimeType string `json:"mime_type" yaml:"mime_type"`
 	Base64   string `json:"base64" yaml:"base64"`
@@ -73,4 +83,13 @@ type ImageBase64 struct {
 
 func (i *ImageBase64) GetUrl() string {
 	return fmt.Sprintf("data:%s;base64,%s", i.MimeType, i.Base64)
+}
+
+func (i *ImageBase64) Clone() Image {
+	if i == nil {
+		return nil
+	}
+
+	clone := *i
+	return &clone
 }

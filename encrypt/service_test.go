@@ -51,6 +51,16 @@ func TestService(t *testing.T) {
 	}
 	require.NoError(t, db.CreateConnection(context.Background(), &connection))
 
+	connectorVersion := database.ConnectorVersion{
+		ID:                  uuid.New(),
+		Version:             1,
+		State:               database.ConnectorVersionStatePrimary,
+		Type:                "test",
+		Hash:                "test",
+		EncryptedDefinition: "test",
+	}
+	require.NoError(t, db.UpsertConnectorVersion(context.Background(), &connectorVersion))
+
 	t.Run("string", func(t *testing.T) {
 		t.Run("roundtrip global", func(t *testing.T) {
 			encryptedBase64, err := s.EncryptStringGlobal(context.Background(), someString)
@@ -69,6 +79,16 @@ func TestService(t *testing.T) {
 			require.NotEqual(t, someString, encryptedBase64)
 
 			decrypted, err := s.DecryptStringForConnection(context.Background(), connection, encryptedBase64)
+			require.NoError(t, err)
+			require.Equal(t, someString, decrypted)
+		})
+		t.Run("roundtrip connector", func(t *testing.T) {
+			encryptedBase64, err := s.EncryptStringForConnector(context.Background(), connectorVersion, someString)
+			require.NoError(t, err)
+			require.NotEmpty(t, encryptedBase64)
+			require.NotEqual(t, someString, encryptedBase64)
+
+			decrypted, err := s.DecryptStringForConnector(context.Background(), connectorVersion, encryptedBase64)
 			require.NoError(t, err)
 			require.Equal(t, someString, decrypted)
 		})
@@ -92,6 +112,16 @@ func TestService(t *testing.T) {
 			require.NotEqual(t, someBytes, encryptedBytes)
 
 			decrypted, err := s.DecryptForConnection(context.Background(), connection, encryptedBytes)
+			require.NoError(t, err)
+			require.Equal(t, someBytes, decrypted)
+		})
+		t.Run("roundtrip connector", func(t *testing.T) {
+			encryptedBytes, err := s.EncryptForConnector(context.Background(), connectorVersion, someBytes)
+			require.NoError(t, err)
+			require.NotEmpty(t, encryptedBytes)
+			require.NotEqual(t, someBytes, encryptedBytes)
+
+			decrypted, err := s.DecryptForConnector(context.Background(), connectorVersion, encryptedBytes)
 			require.NoError(t, err)
 			require.Equal(t, someBytes, decrypted)
 		})

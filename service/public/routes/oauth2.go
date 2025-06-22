@@ -7,6 +7,7 @@ import (
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/connectors"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -152,6 +153,7 @@ func NewOauth2Routes(
 	authService auth.A,
 	db database.DB,
 	redis redis.R,
+	c connectors.C,
 	httpf httpf.F,
 	encrypt encrypt.E,
 	logger *slog.Logger,
@@ -163,6 +165,6 @@ func NewOauth2Routes(
 		redis:       redis,
 		httpf:       httpf,
 		encrypt:     encrypt,
-		oauthf:      oauth2.NewFactory(cfg, db, redis, httpf, encrypt, logger),
+		oauthf:      oauth2.NewFactory(cfg, db, redis, c, httpf, encrypt, logger),
 	}
 }

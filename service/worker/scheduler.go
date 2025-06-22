@@ -5,7 +5,6 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/aplog"
-	"github.com/rmorlok/authproxy/oauth2"
 	"github.com/rmorlok/authproxy/redis"
 	"log/slog"
 	"os"
@@ -17,25 +16,28 @@ import (
 
 const mutexLockTime = 2 * time.Minute
 
-type scheduler struct {
-	redis               redis.R
-	healthCheckFunc     func(isScheduler bool, err error)
-	oauth2TaskRegistrar oauth2.TaskRegistrar
-	mtx                 sync.Mutex
-	mgr                 *asynq.PeriodicTaskManager
-	wg                  sync.WaitGroup
-	done                chan struct{}
-	rsMtx               redis.Mutex
-	logger              *slog.Logger
+type CronRegistrar interface {
+	GetCronTasks() []*asynq.PeriodicTaskConfig
 }
 
-func newScheduler(rs redis.R, hc func(isScheduler bool, err error), tr oauth2.TaskRegistrar, l *slog.Logger) *scheduler {
+type scheduler struct {
+	redis           redis.R
+	healthCheckFunc func(isScheduler bool, err error)
+	registrars      []CronRegistrar
+	mtx             sync.Mutex
+	mgr             *asynq.PeriodicTaskManager
+	wg              sync.WaitGroup
+	done            chan struct{}
+	rsMtx           redis.Mutex
+	logger          *slog.Logger
+}
+
+func newScheduler(rs redis.R, hc func(isScheduler bool, err error), l *slog.Logger) *scheduler {
 	return &scheduler{
-		redis:               rs,
-		healthCheckFunc:     hc,
-		oauth2TaskRegistrar: tr,
-		logger:              l,
-		done:                make(chan struct{}),
+		redis:           rs,
+		healthCheckFunc: hc,
+		logger:          l,
+		done:            make(chan struct{}),
 		rsMtx: rs.NewMutex("worker:scheduler_master",
 			redis.MutexOptionLockFor(mutexLockTime),
 			redis.MutexOptionDetailedLockMetadata(),
@@ -43,9 +45,19 @@ func newScheduler(rs redis.R, hc func(isScheduler bool, err error), tr oauth2.Ta
 	}
 }
 
+func (s *scheduler) addRegistrar(cr CronRegistrar) *scheduler {
+	s.registrars = append(s.registrars, cr)
+	return s
+}
+
 func (s *scheduler) GetConfigs() ([]*asynq.PeriodicTaskConfig, error) {
 	configs := make([]*asynq.PeriodicTaskConfig, 0)
-	configs = append(configs, s.oauth2TaskRegistrar.GetCronTasks()...)
+
+	// This should be updated to handler errors as many of these will come from database records...
+	for _, r := range s.registrars {
+		configs = append(configs, r.GetCronTasks()...)
+	}
+
 	return configs, nil
 }
 

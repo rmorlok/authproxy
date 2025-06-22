@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/connectors"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -18,18 +19,37 @@ import (
 )
 
 type ConnectionsRoutes struct {
-	cfg         config.C
-	authService auth.A
-	db          database.DB
-	redis       redis.R
-	httpf       httpf.F
-	encrypt     encrypt.E
-	oauthf      oauth2.Factory
+	cfg        config.C
+	auth       auth.A
+	connectors connectors.C
+	db         database.DB
+	redis      redis.R
+	httpf      httpf.F
+	encrypt    encrypt.E
+	oauthf     oauth2.Factory
 }
 
 type InitiateConnectionRequest struct {
-	ConnectorId string `json:"connector_id"`
+	// Id of the connector to initiate the connector for
+	ConnectorId uuid.UUID `json:"connector_id"`
+
+	// Version of the connector to initiate connection for; if not specified defaults to primary version.
+	ConnectorVersion uint64 `json:"connector_version,omitempty"`
+
+	// The URL to return to after connection is completed.
 	ReturnToUrl string `json:"return_to_url"`
+}
+
+func (icr *InitiateConnectionRequest) Validate() error {
+	if icr.ConnectorId == uuid.Nil {
+		return fmt.Errorf("connector_id is required")
+	}
+
+	return nil
+}
+
+func (icr *InitiateConnectionRequest) HasVersion() bool {
+	return icr.ConnectorVersion > 0
 }
 
 type InitiateConnectionResponseType string
@@ -64,38 +84,49 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 		return
 	}
 
-	var connector config.Connector
-	found := false
-	for _, c := range r.cfg.GetRoot().Connectors {
-		if c.Id == req.ConnectorId {
-			connector = c
-			found = true
-		}
+	if err := req.Validate(); err != nil {
+		gctx.PureJSON(http.StatusBadRequest, Error{err.Error()})
+		return
 	}
 
-	if !found {
+	var err error
+	var cv *connectors.ConnectorVersion
+	if req.HasVersion() {
+		cv, err = r.connectors.GetConnectorVersion(ctx, req.ConnectorId, req.ConnectorVersion)
+	} else {
+		cv, err = r.connectors.GetConnectorVersionForState(ctx, req.ConnectorId, database.ConnectorVersionStatePrimary)
+	}
+
+	if err != nil {
+		gctx.PureJSON(http.StatusInternalServerError, Error{err.Error()})
+		return
+	}
+
+	if cv == nil {
 		gctx.PureJSON(http.StatusBadRequest, Error{fmt.Sprintf("connector '%s' not found", req.ConnectorId)})
 		return
 	}
 
 	connection := database.Connection{
-		ID:          uuid.New(),
-		ConnectorId: connector.Id,
-		State:       database.ConnectionStateCreated,
+		ID:               uuid.New(),
+		ConnectorId:      cv.ID,
+		ConnectorVersion: cv.Version,
+		State:            database.ConnectionStateCreated,
 	}
 
-	err := r.db.CreateConnection(ctx, &connection)
+	err = r.db.CreateConnection(ctx, &connection)
 	if err != nil {
 		gctx.PureJSON(http.StatusInternalServerError, Error{err.Error()})
 	}
 
+	connector := cv.GetDefinition()
 	if _, ok := connector.Auth.(*config.AuthOAuth2); ok {
 		if req.ReturnToUrl == "" {
 			gctx.PureJSON(http.StatusBadRequest, Error{"must specify return_to_url"})
 			return
 		}
 
-		o2 := r.oauthf.NewOAuth2(connection, connector)
+		o2 := r.oauthf.NewOAuth2(connection, cv)
 		url, err := o2.SetStateAndGeneratePublicUrl(ctx, ra.MustGetActor(), req.ReturnToUrl)
 		if err != nil {
 			gctx.PureJSON(http.StatusInternalServerError, Error{err.Error()})
@@ -118,7 +149,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 type ConnectionJson struct {
 	ID          uuid.UUID                `json:"id"`
 	State       database.ConnectionState `json:"state"`
-	ConnectorId string                   `json:"connector_id"`
+	ConnectorId uuid.UUID                `json:"connector_id"`
 	CreatedAt   time.Time                `json:"created_at"`
 	UpdatedAt   time.Time                `json:"updated_at"`
 }
@@ -182,7 +213,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 				return
 			}
 
-			if field != string(database.ConnectionOrderByCreatedAt) {
+			if !database.IsValidConnectionOrderByField(field) {
 				gctx.PureJSON(http.StatusBadRequest, Error{fmt.Sprintf("invalid sort field '%s'", field)})
 				return
 			}
@@ -234,10 +265,10 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 }
 
 func (r *ConnectionsRoutes) Register(g gin.IRouter) {
-	g.POST("/connections/_initiate", r.authService.Required(), r.initiate)
-	g.GET("/connections", r.authService.Required(), r.list)
-	g.GET("/connections/:id", r.authService.Required(), r.get)
-	g.POST("/connections/:id/_proxy", r.authService.Required(), r.proxy)
+	g.POST("/connections/_initiate", r.auth.Required(), r.initiate)
+	g.GET("/connections", r.auth.Required(), r.list)
+	g.GET("/connections/:id", r.auth.Required(), r.get)
+	g.POST("/connections/:id/_proxy", r.auth.Required(), r.proxy)
 }
 
 func NewConnectionsRoutes(
@@ -245,17 +276,19 @@ func NewConnectionsRoutes(
 	authService auth.A,
 	db database.DB,
 	redis redis.R,
+	c connectors.C,
 	httpf httpf.F,
 	encrypt encrypt.E,
 	logger *slog.Logger,
 ) *ConnectionsRoutes {
 	return &ConnectionsRoutes{
-		cfg:         cfg,
-		authService: authService,
-		db:          db,
-		redis:       redis,
-		httpf:       httpf,
-		encrypt:     encrypt,
-		oauthf:      oauth2.NewFactory(cfg, db, redis, httpf, encrypt, logger),
+		cfg:        cfg,
+		auth:       authService,
+		connectors: c,
+		db:         db,
+		redis:      redis,
+		httpf:      httpf,
+		encrypt:    encrypt,
+		oauthf:     oauth2.NewFactory(cfg, db, redis, c, httpf, encrypt, logger),
 	}
 }

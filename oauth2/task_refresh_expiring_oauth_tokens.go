@@ -2,6 +2,7 @@ package oauth2
 
 import (
 	"context"
+	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/config"
@@ -26,10 +27,12 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 		return nil
 	}
 
-	connectorIdToConnector := make(map[string]*config.Connector)
+	connectorIdToConnector := make(map[uuid.UUID]*config.Connector)
 	refreshWithin := th.cfg.GetRoot().Oauth.GetRefreshTokensTimeBeforeExpiryOrDefault()
 
-	for _, connector := range th.cfg.GetRoot().Connectors {
+	// Establish the smallest value of refreshWithIn for all active connector versions
+	// TODO: migrate this to use the database stored versions
+	for _, connector := range th.cfg.GetRoot().Connectors.GetConnectors() {
 		connectorIdToConnector[connector.Id] = &connector
 
 		if o2, ok := connector.Auth.(*config.AuthOAuth2); ok {
@@ -40,7 +43,7 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 		}
 	}
 
-	th.logger.Info("Tokens being refreshed within", "within", refreshWithin)
+	logger.Info("Tokens being refreshed within", "within", refreshWithin)
 	queuedForRefresh := 0
 	err := th.db.EnumerateOAuth2TokensExpiringWithin(
 		ctx,
@@ -63,7 +66,7 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 		},
 	)
 
-	th.logger.Info("Completed queuing for expiring OAuth tokens", "queued", queuedForRefresh)
+	logger.Info("Completed queuing for expiring OAuth tokens", "queued", queuedForRefresh)
 
 	return err
 }

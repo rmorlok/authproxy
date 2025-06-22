@@ -63,14 +63,16 @@ func (r *ConnectionsRoutes) proxy(gctx *gin.Context) {
 
 	// TODO: add security checking for ownership
 
-	var connector *config.Connector
-	for _, c := range r.cfg.GetRoot().Connectors {
-		if c.Id == connection.ConnectorId {
-			connector = &c
-		}
+	cv, err := r.connectors.GetConnectorVersion(ctx, connection.ConnectorId, connection.ConnectorVersion)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 	}
 
-	if connector == nil {
+	if cv == nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().
 			WithResponseMsg("could not find connector for connection").
@@ -99,8 +101,9 @@ func (r *ConnectionsRoutes) proxy(gctx *gin.Context) {
 		return
 	}
 
+	connector := cv.GetDefinition()
 	if _, ok := connector.Auth.(*config.AuthOAuth2); ok {
-		o2 := r.oauthf.NewOAuth2(*connection, *connector)
+		o2 := r.oauthf.NewOAuth2(*connection, cv)
 		resp, err := o2.ProxyRequest(ctx, &proxyRequest)
 		if err != nil {
 			api_common.NewHttpStatusErrorBuilder().

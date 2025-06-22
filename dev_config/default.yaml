@@ -37,7 +37,10 @@ redis:
 oauth:
   roundtrip_ttl: 60m
 connectors:
-  - id: google-drive
+  auto_migrate: true
+  auto_migration_lock_duration: 30s
+  load_from_list:
+  - type: google-drive
     version: 1
     display_name: Google Drive
     logo:
@@ -68,7 +71,7 @@ connectors:
           required: false
           reason: |
             We need to be able to see what's been going on in drive
-  - id: google-calendar
+  - type: google-calendar
     version: 1
     display_name: Google Calendar
     logo:
@@ -91,7 +94,7 @@ connectors:
         - id: https://www.googleapis.com/auth/calendar.readonly
           reason: |
             We need to be able to read the calendar
-  - id: greenhouse
+  - type: greenhouse
     version: 1
     display_name: Greenhouse
     logo:

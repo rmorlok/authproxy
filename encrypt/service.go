@@ -34,16 +34,18 @@ func NewTestEncryptService(
 		cfg.GetRoot().SystemAuth.GlobalAESKey = &config.KeyDataRandomBytes{}
 	}
 
-	return cfg, &service{
-		cfg: cfg,
-		db:  db,
-	}
+	return cfg, NewEncryptService(cfg, db)
 }
 
 func NewEncryptService(
 	cfg config.C,
 	db database.DB,
 ) E {
+	if cfg != nil && cfg.GetRoot().DevSettings.IsFakeEncryptionEnabled() {
+		doBase64Encode := !cfg.GetRoot().DevSettings.IsFakeEncryptionSkipBase64Enabled()
+		return NewFakeEncryptService(doBase64Encode)
+	}
+
 	return &service{
 		cfg: cfg,
 		db:  db,
@@ -97,6 +99,10 @@ func (s *service) EncryptForConnection(ctx context.Context, connection database.
 	return s.EncryptGlobal(ctx, data)
 }
 
+func (s *service) EncryptForConnector(ctx context.Context, connection database.ConnectorVersion, data []byte) ([]byte, error) {
+	return s.EncryptGlobal(ctx, data)
+}
+
 func (s *service) DecryptGlobal(ctx context.Context, data []byte) ([]byte, error) {
 	globalAESKey, err := s.getGlobalAESKey(ctx)
 	if err != nil {
@@ -131,6 +137,10 @@ func (s *service) DecryptForConnection(ctx context.Context, connection database.
 	return s.DecryptGlobal(ctx, data)
 }
 
+func (s *service) DecryptForConnector(ctx context.Context, cv database.ConnectorVersion, data []byte) ([]byte, error) {
+	return s.DecryptGlobal(ctx, data)
+}
+
 func (s *service) EncryptStringGlobal(ctx context.Context, data string) (string, error) {
 	encryptedData, err := s.EncryptGlobal(ctx, []byte(data))
 	if err != nil {
@@ -143,6 +153,16 @@ func (s *service) EncryptStringGlobal(ctx context.Context, data string) (string,
 
 func (s *service) EncryptStringForConnection(ctx context.Context, connection database.Connection, data string) (string, error) {
 	encryptedData, err := s.EncryptForConnection(ctx, connection, []byte(data))
+	if err != nil {
+		return "", err
+	}
+
+	encodedData := base64.StdEncoding.EncodeToString(encryptedData)
+	return encodedData, nil
+}
+
+func (s *service) EncryptStringForConnector(ctx context.Context, cv database.ConnectorVersion, data string) (string, error) {
+	encryptedData, err := s.EncryptForConnector(ctx, cv, []byte(data))
 	if err != nil {
 		return "", err
 	}
@@ -172,6 +192,20 @@ func (s *service) DecryptStringForConnection(ctx context.Context, connection dat
 	}
 
 	decryptedData, err := s.DecryptForConnection(ctx, connection, decodedData)
+	if err != nil {
+		return "", err
+	}
+
+	return string(decryptedData), nil
+}
+
+func (s *service) DecryptStringForConnector(ctx context.Context, cv database.ConnectorVersion, base64Data string) (string, error) {
+	decodedData, err := base64.StdEncoding.DecodeString(base64Data)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to decode base64 string")
+	}
+
+	decryptedData, err := s.DecryptForConnector(ctx, cv, decodedData)
 	if err != nil {
 		return "", err
 	}

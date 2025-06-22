@@ -7,7 +7,10 @@ import (
 	"fmt"
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/apctx"
+	"github.com/rmorlok/authproxy/sqlh"
 	"github.com/rmorlok/authproxy/util"
 	"gorm.io/gorm"
 	"time"
@@ -86,16 +89,50 @@ const (
 
 type ConnectorVersion struct {
 	ID                  uuid.UUID             `gorm:"column:id;primaryKey"`
-	Version             int64                 `gorm:"column:version;primaryKey"`
+	Version             uint64                `gorm:"column:version;primaryKey"`
 	State               ConnectorVersionState `gorm:"column:state"`
 	Type                string                `gorm:"column:type"`
-	DisplayName         string                `gorm:"column:display_name"`
-	Description         string                `gorm:"column:description"`
-	Logo                string                `gorm:"column:logo"`
+	Hash                string                `gorm:"column:hash"`
 	EncryptedDefinition string                `gorm:"column:encrypted_definition"`
 	CreatedAt           time.Time             `gorm:"column:created_at"`
 	UpdatedAt           time.Time             `gorm:"column:updated_at"`
 	DeletedAt           gorm.DeletedAt        `gorm:"column:deleted_at;index"`
+}
+
+func (cv *ConnectorVersion) Validate() error {
+	result := &multierror.Error{}
+
+	if cv.ID == uuid.Nil {
+		result = multierror.Append(result, errors.New("id is required"))
+	}
+
+	if cv.Version == 0 {
+		result = multierror.Append(result, errors.New("version is required"))
+	}
+
+	switch cv.State {
+	case ConnectorVersionStateDraft,
+		ConnectorVersionStatePrimary,
+		ConnectorVersionStateActive,
+		ConnectorVersionStateArchived:
+		// Valid state
+	default:
+		result = multierror.Append(result, errors.New("invalid connector version state"))
+	}
+
+	if cv.Hash == "" {
+		result = multierror.Append(result, errors.New("hash is required"))
+	}
+
+	if cv.Type == "" {
+		result = multierror.Append(result, errors.New("type is required"))
+	}
+
+	if cv.EncryptedDefinition == "" {
+		result = multierror.Append(result, errors.New("encrypted definition is required"))
+	}
+
+	return result.ErrorOrNil()
 }
 
 // Connector object is returned from queries for connectors, with one record per id. It aggregates some information
@@ -106,11 +143,238 @@ type Connector struct {
 	States        ConnectorVersionStates
 }
 
-func (db *gormDB) GetConnectorVersion(ctx context.Context, id uuid.UUID, version int64) (*ConnectorVersion, error) {
+func (db *gormDB) GetConnectorVersion(ctx context.Context, id uuid.UUID, version uint64) (*ConnectorVersion, error) {
 	sess := db.session(ctx)
 
 	var cv ConnectorVersion
 	result := sess.First(&cv, "id = ? AND version = ?", id, version)
+	if result.Error != nil {
+		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	return &cv, nil
+}
+
+type UpsertConnectorVersionResult struct {
+	ConnectorVersion *ConnectorVersion
+	State            ConnectorVersionState
+	Version          uint64
+}
+
+func (db *gormDB) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersion) error {
+	if cv == nil {
+		return errors.New("connector version is nil")
+	}
+
+	if validationErr := cv.Validate(); validationErr != nil {
+		return validationErr
+	}
+
+	if cv.State != ConnectorVersionStateDraft && cv.State != ConnectorVersionStatePrimary {
+		return errors.New("can only upsert connector version as draft or primary")
+	}
+
+	return db.gorm.Transaction(func(tx *gorm.DB) error {
+		sqlDb, err := tx.DB()
+		if err != nil {
+			return err
+		}
+
+		sqb := sq.StatementBuilder.RunWith(sqlDb)
+
+		exitingState, defaultUsed, err := sqlh.ScanWithDefault(sqb.
+			Select("state").
+			From("connector_versions").
+			Where(sq.Eq{"id": cv.ID, "version": cv.Version}).
+			QueryRowContext(ctx), ConnectorVersionStateDraft)
+
+		existingRow := !defaultUsed
+		if err != nil {
+			return err
+		}
+
+		if existingRow {
+			if exitingState != ConnectorVersionStateDraft {
+				return errors.New("cannot modify non-draft connector")
+			}
+
+			result, err := sqb.Update("connector_versions").
+				Set("state", cv.State).
+				Set("type", cv.Type).
+				Set("encrypted_definition", cv.EncryptedDefinition).
+				Set("updated_at", apctx.GetClock(ctx).Now()).
+				Where(sq.Eq{"id": cv.ID, "version": cv.Version}).
+				Exec()
+			if err != nil {
+				return err
+			}
+
+			count, err := result.RowsAffected()
+			if err != nil {
+				return err
+			}
+
+			if count != 1 {
+				return errors.Errorf("expected to update 1 row for connector version, got %d", count)
+			}
+		} else {
+			// No existing row at this version. Need to verify if there are existing rows, the new version is
+			// existing version + 1
+			maxVersion := uint64(0)
+			err := sqb.
+				Select("COALESCE(MAX(version), 0)").
+				From("connector_versions").
+				Where(sq.Eq{"id": cv.ID}).
+				QueryRowContext(ctx).
+				Scan(&maxVersion)
+
+			if err != nil {
+				return err
+			}
+
+			if maxVersion != 0 && maxVersion+1 != cv.Version {
+				return errors.New("cannot insert connector version at non-sequential version")
+			}
+
+			_, err = sqb.Insert("connector_versions").
+				Columns(
+					"id",
+					"version",
+					"state",
+					"type",
+					"hash",
+					"encrypted_definition",
+					"created_at",
+					"updated_at",
+				).
+				Values(
+					cv.ID,
+					cv.Version,
+					cv.State,
+					cv.Type,
+					cv.Hash,
+					cv.EncryptedDefinition,
+					apctx.GetClock(ctx).Now(),
+					apctx.GetClock(ctx).Now(),
+				).
+				Exec()
+			if err != nil {
+				return err
+			}
+		}
+
+		if cv.State == ConnectorVersionStatePrimary {
+			// New primary version, update any previous primary to active
+			result, err := sqb.Update("connector_versions").
+				Set("state", ConnectorVersionStateActive).
+				Where(sq.And{
+					sq.Eq{"id": cv.ID, "state": ConnectorVersionStatePrimary},
+					sq.NotEq{"version": cv.Version},
+				}).
+				Exec()
+			if err != nil {
+				return err
+			}
+
+			count, err := result.RowsAffected()
+			if err != nil {
+				return err
+			}
+			db.logger.Debug("updated connector versions from primary to active", "count", count)
+		}
+
+		return nil
+	})
+}
+
+func (db *gormDB) GetConnectorVersionForTypeAndVersion(ctx context.Context, typ string, version uint64) (*ConnectorVersion, error) {
+	sess := db.session(ctx)
+
+	var cv ConnectorVersion
+	result := sess.Order("created_at DESC").First(&cv, "type = ? AND version = ?", typ, version)
+	if result.Error != nil {
+		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	return &cv, nil
+}
+
+func (db *gormDB) GetConnectorVersionForType(ctx context.Context, typ string) (*ConnectorVersion, error) {
+	sess := db.session(ctx)
+
+	var cv ConnectorVersion
+	result := sess.Order("created_at DESC").Order("version DESC").First(&cv, "type = ?", typ)
+	if result.Error != nil {
+		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	return &cv, nil
+}
+
+func (db *gormDB) GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state ConnectorVersionState) (*ConnectorVersion, error) {
+	sess := db.session(ctx)
+
+	var cv ConnectorVersion
+	result := sess.Order("version DESC").First(&cv, "id = ? AND state = ?", id, state)
+	if result.Error != nil {
+		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	return &cv, nil
+}
+
+func (db *gormDB) NewestConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error) {
+	sess := db.session(ctx)
+
+	var cv ConnectorVersion
+	result := sess.Order("version DESC").First(&cv, "id = ?", id)
+	if result.Error != nil {
+		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
+			return nil, nil
+		}
+		return nil, result.Error
+	}
+
+	if result.RowsAffected == 0 {
+		return nil, nil
+	}
+
+	return &cv, nil
+}
+
+func (db *gormDB) NewestPublishedConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error) {
+	sess := db.session(ctx)
+
+	var cv ConnectorVersion
+	result := sess.Where(`state in ("primary", "active")`).Order("version DESC").First(&cv, "id = ?", id)
 	if result.Error != nil {
 		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
 			return nil, nil
@@ -133,6 +397,17 @@ const (
 	ConnectorOrderByDisplayName ConnectorOrderByField = "display_name"
 )
 
+func IsValidConnectorOrderByField[T string | ConnectorOrderByField](field T) bool {
+	switch ConnectorOrderByField(field) {
+	case ConnectorOrderByCreatedAt,
+		ConnectorOrderByUpdatedAt,
+		ConnectorOrderByDisplayName:
+		return true
+	default:
+		return false
+	}
+}
+
 type ListConnectorsExecutor interface {
 	FetchPage(context.Context) PageResult[Connector]
 	Enumerate(context.Context, func(PageResult[Connector]) (keepGoing bool, err error)) error
@@ -142,6 +417,7 @@ type ListConnectorsBuilder interface {
 	ListConnectorsExecutor
 	Limit(int32) ListConnectorsBuilder
 	ForType(string) ListConnectorsBuilder
+	ForId(uuid.UUID) ListConnectorsBuilder
 	ForConnectorVersionState(ConnectorVersionState) ListConnectorsBuilder
 	OrderBy(ConnectorOrderByField, OrderBy) ListConnectorsBuilder
 	IncludeDeleted() ListConnectorsBuilder
@@ -153,6 +429,7 @@ type listConnectorsFilters struct {
 	Offset            int32                   `json:"offset"`
 	StatesVal         []ConnectorVersionState `json:"states,omitempty"`
 	TypeVal           []string                `json:"types,omitempty"`
+	IdsVal            []uuid.UUID             `json:"ids,omitempty"`
 	OrderByFieldVal   *ConnectorOrderByField  `json:"order_by_field"`
 	OrderByVal        *OrderBy                `json:"order_by"`
 	IncludeDeletedVal bool                    `json:"include_deleted,omitempty"`
@@ -170,6 +447,11 @@ func (l *listConnectorsFilters) ForConnectorVersionState(state ConnectorVersionS
 
 func (l *listConnectorsFilters) ForType(t string) ListConnectorsBuilder {
 	l.TypeVal = []string{t}
+	return l
+}
+
+func (l *listConnectorsFilters) ForId(id uuid.UUID) ListConnectorsBuilder {
+	l.IdsVal = []uuid.UUID{id}
 	return l
 }
 
@@ -239,9 +521,6 @@ rr.id,
 rr.version,
 rr.state,
 rr.type,
-COALESCE(rr.display_name, ""),
-COALESCE(rr.description, ""),
-COALESCE(rr.logo, ""),
 COALESCE(rr.encrypted_definition, ""),
 rr.created_at,
 rr.updated_at,
@@ -257,6 +536,10 @@ cvc.versions as total_versions
 
 	if len(l.TypeVal) > 0 {
 		query = query.Where("rr.type IN ?", l.TypeVal)
+	}
+
+	if len(l.IdsVal) > 0 {
+		query = query.Where("rr.id IN ?", l.IdsVal)
 	}
 
 	if len(l.StatesVal) > 0 {
@@ -298,9 +581,6 @@ cvc.versions as total_versions
 			&c.Version,
 			&c.State,
 			&c.Type,
-			&c.DisplayName,
-			&c.Description,
-			&c.Logo,
 			&c.EncryptedDefinition,
 			&c.CreatedAt,
 			&c.UpdatedAt,

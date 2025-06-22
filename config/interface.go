@@ -6,6 +6,9 @@ import (
 )
 
 type C interface {
+	// Validate checks that the configuration is valid
+	Validate() error
+
 	// GetRoot gets the root of the configuration; the data loaded from a configuration file
 	GetRoot() *Root
 
@@ -25,6 +28,10 @@ type C interface {
 
 type config struct {
 	root *Root
+}
+
+func (c *config) Validate() error {
+	return c.root.Validate()
 }
 
 func (c *config) GetRoot() *Root {
