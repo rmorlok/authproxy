@@ -55,12 +55,13 @@ func getStateRedisKey(u uuid.UUID) string {
 func (o *OAuth2) saveStateToRedis(ctx context.Context, actor database.Actor, stateId uuid.UUID, returnToUrl string) error {
 	ttl := o.cfg.GetRoot().Oauth.GetRoundTripTtlOrDefault()
 	s := &state{
-		Id:           stateId,
-		ActorId:      actor.ID,
-		ConnectorId:  o.cv.ID,
-		ConnectionId: o.connection.ID,
-		ExpiresAt:    time.Now().Add(ttl),
-		ReturnToUrl:  returnToUrl,
+		Id:               stateId,
+		ActorId:          actor.ID,
+		ConnectorId:      o.cv.ID,
+		ConnectorVersion: o.cv.Version,
+		ConnectionId:     o.connection.ID,
+		ExpiresAt:        time.Now().Add(ttl),
+		ReturnToUrl:      returnToUrl,
 	}
 	result := o.redis.Client().Set(ctx, getStateRedisKey(stateId), s, ttl)
 	if result.Err() != nil {
@@ -84,6 +85,11 @@ func getOAuth2State(
 	actor database.Actor,
 	stateId uuid.UUID,
 ) (*OAuth2, error) {
+	logger.DebugContext(ctx, "getting oauth state",
+		"state_id", stateId,
+		"actor_id", actor.ID,
+	)
+
 	result := redis.Client().Get(ctx, getStateRedisKey(stateId))
 
 	if result.Err() != nil {
