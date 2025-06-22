@@ -94,6 +94,98 @@ func (c *Connector) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
+// UnmarshalJSON implements custom JSON unmarshalling for the Connector struct
+func (c *Connector) UnmarshalJSON(data []byte) error {
+	// Define a temporary struct with the same fields as Connector
+	// but with Logo and Auth as json.RawMessage to capture their raw JSON
+	type TempConnector struct {
+		Id          uuid.UUID       `json:"id"`
+		Type        string          `json:"type"`
+		Version     uint64          `json:"version,omitempty"`
+		State       string          `json:"state,omitempty"`
+		DisplayName string          `json:"display_name"`
+		Logo        json.RawMessage `json:"logo"`
+		Description string          `json:"description"`
+		Auth        json.RawMessage `json:"auth"`
+	}
+
+	var temp TempConnector
+
+	// Unmarshal into the temporary struct
+	if err := json.Unmarshal(data, &temp); err != nil {
+		return err
+	}
+
+	// Copy the simple fields
+	c.Id = temp.Id
+	c.Type = temp.Type
+	c.Version = temp.Version
+	c.State = temp.State
+	c.DisplayName = temp.DisplayName
+	c.Description = temp.Description
+
+	// Handle Logo if it's not null
+	if len(temp.Logo) > 0 && string(temp.Logo) != "null" {
+		// Try to determine the type of image from the JSON
+		var logoMap map[string]interface{}
+		if err := json.Unmarshal(temp.Logo, &logoMap); err != nil {
+			return err
+		}
+
+		var logo common.Image
+		if _, ok := logoMap["public_url"]; ok {
+			// It's an ImagePublicUrl
+			var imgPublicUrl common.ImagePublicUrl
+			if err := json.Unmarshal(temp.Logo, &imgPublicUrl); err != nil {
+				return err
+			}
+			logo = &imgPublicUrl
+		} else if _, ok := logoMap["base64"]; ok {
+			// It's an ImageBase64
+			var imgBase64 common.ImageBase64
+			if err := json.Unmarshal(temp.Logo, &imgBase64); err != nil {
+				return err
+			}
+			logo = &imgBase64
+		}
+
+		c.Logo = logo
+	}
+
+	// Handle Auth if it's not null
+	if len(temp.Auth) > 0 && string(temp.Auth) != "null" {
+		// Try to determine the type of auth from the JSON
+		var authMap map[string]interface{}
+		if err := json.Unmarshal(temp.Auth, &authMap); err != nil {
+			return err
+		}
+
+		var auth Auth
+		if typeVal, ok := authMap["type"]; ok {
+			switch AuthType(typeVal.(string)) {
+			case AuthTypeOAuth2:
+				// It's an AuthOAuth2
+				var authOAuth2 AuthOAuth2
+				if err := json.Unmarshal(temp.Auth, &authOAuth2); err != nil {
+					return err
+				}
+				auth = &authOAuth2
+			case AuthTypeAPIKey:
+				// It's an AuthApiKey
+				var authApiKey AuthApiKey
+				if err := json.Unmarshal(temp.Auth, &authApiKey); err != nil {
+					return err
+				}
+				auth = &authApiKey
+			}
+		}
+
+		c.Auth = auth
+	}
+
+	return nil
+}
+
 func (c *Connector) Clone() *Connector {
 	if c == nil {
 		return nil
