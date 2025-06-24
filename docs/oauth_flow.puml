@@ -3,17 +3,16 @@ actor User
 participant "Single Page App" as SPA
 participant "Browser" as browser
 participant "AuthProxy Public" as public
-participant "AuthProxy API" as API
 database "Redis" as Redis
 database "Database" as db
 participant "3rd Party Authorization Server" as 3pAuthServer
 
 User -> SPA: Connect connector
-SPA -> API: POST /api/connections/_initiate
+SPA -> public: POST /api/connections/_initiate
 
-API -> db: Create connection record
-API -> Redis: state_id = actor_id,connector_id,connection_id
-API --> SPA: redirect url to auth with auth token,state id
+public -> db: Create connection record
+public -> Redis: state_id = actor_id,connector_id,connection_id
+public --> SPA: redirect url to auth with auth token,state id
 
 SPA -> browser: http://auth/auth_token=...&state_id=...
 browser -> public: GET http://auth/auth_token=...&state_id=...

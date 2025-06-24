@@ -16,7 +16,6 @@ export default function App() {
     useEffect(() => {
         // Load auth state and providers when the app starts
         dispatch(loadAuthStateAsync());
-        dispatch(loadProvidersAsync());
     }, [dispatch]);
 
     if(authStatus === 'checking' || authStatus === 'redirecting') {

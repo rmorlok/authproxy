@@ -1,11 +1,26 @@
 import { ApiUser } from './api/auth';
 
 // Connector models
-export interface Connector {
+export interface ConnectorVersion {
   id: string;
+  version: number;
+  state: ConnectorVersionState;
+  type: string;
   display_name: string;
   description: string;
   logo: string;
+}
+
+export interface Connector extends ConnectorVersion {
+  versions: number;
+  states: ConnectorVersionState[];
+}
+
+export enum ConnectorVersionState {
+  DRAFT = 'draft',
+  PRIMARY = 'primary',
+  ACTIVE = 'active',
+  ARCHIVED = 'archived'
 }
 
 export interface ListConnectorsResponse {

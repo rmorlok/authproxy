@@ -15,15 +15,8 @@ const initialState: AuthState = {
     providers: []
 };
 
-export const loadProvidersAsync = createAsyncThunk(
-    'auth/loadProviders',
-    async () => {
-        const response = await auth.listProviders();
-        return response.data;
-    });
-
-export const loadAuthStateAsync = createAsyncThunk(
-    'auth/loadState',
+export const establishSessionAsync = createAsyncThunk(
+    'auth/establishSession',
     async () => {
     const response = await auth.getUser();
     return response.data;
