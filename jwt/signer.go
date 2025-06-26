@@ -20,11 +20,11 @@ type signer struct {
 func (s *signer) SignUrlQuery(urlVal string) string {
 	parsedUrl, err := url.Parse(urlVal)
 	if err != nil {
-		return urlVal + "?jwt=" + s.token
+		return urlVal + "?auth_token=" + s.token
 	}
 
 	query := parsedUrl.Query()
-	query.Set("jwt", s.token)
+	query.Set("auth_token", s.token)
 	parsedUrl.RawQuery = query.Encode()
 
 	return parsedUrl.String()

@@ -9,7 +9,7 @@ import (
 
 const (
 	JwtHeaderKey  = "Authorization"
-	JwtQueryParam = "jwt"
+	JwtQueryParam = "auth_token"
 )
 
 type A interface {
