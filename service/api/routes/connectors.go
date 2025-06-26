@@ -51,7 +51,8 @@ type ListConnectorsRequestQueryParams struct {
 	Cursor     *string                         `form:"cursor"`
 	LimitVal   *int32                          `form:"limit"`
 	StateVal   *database.ConnectorVersionState `form:"state"`
-	OrderByVal *string                         `json:"order_by"`
+	TypeVal    *string                         `form:"type"`
+	OrderByVal *string                         `form:"order_by"`
 }
 
 type ListConnectorsResponseJson struct {
@@ -127,6 +128,10 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 
 		if req.LimitVal != nil {
 			b = b.Limit(*req.LimitVal)
+		}
+
+		if req.TypeVal != nil {
+			b = b.ForType(*req.TypeVal)
 		}
 
 		if req.StateVal != nil {
