@@ -3,7 +3,7 @@ package admin_api
 import (
 	"context"
 	"fmt"
-	"github.com/gin-gonic/contrib/cors"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
@@ -28,10 +28,10 @@ func GetCorsConfig(cfg config.C) *cors.Config {
 	marketplaceUrl := root.Marketplace.GetBaseUrl()
 
 	return root.Public.CorsVal.ToGinCorsConfig(&cors.Config{
-		AllowedOrigins:   []string{marketplaceUrl},
-		AllowedMethods:   []string{"GET", "POST", "PUT", "PATCH", "HEAD"},
-		AllowedHeaders:   []string{"Origin", "Authorization", "Content-Type"},
-		ExposedHeaders:   []string{"Cache-Control", "Content-Language", "Content-Length", "Content-Type", "Expires", "Last-Modified", "Pragma"},
+		AllowOrigins:     []string{marketplaceUrl},
+		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "HEAD"},
+		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
+		ExposeHeaders:    []string{"Cache-Control", "Content-Language", "Content-Length", "Content-Type", "Expires", "Last-Modified", "Pragma"},
 		AllowCredentials: true,
 		MaxAge:           12 * time.Hour,
 	})
@@ -59,6 +59,7 @@ func GetGinServer(
 
 	corsConfig := GetCorsConfig(cfg)
 	if corsConfig != nil {
+		logger.Info("Enabling CORS")
 		server.Use(cors.New(*corsConfig))
 	}
 

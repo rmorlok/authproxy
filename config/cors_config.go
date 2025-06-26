@@ -1,6 +1,6 @@
 package config
 
-import "github.com/gin-gonic/contrib/cors"
+import "github.com/gin-contrib/cors"
 
 type CorsConfig struct {
 	AllowedOrigins   []string       `json:"allowed_origins,omitempty" yaml:"allowed_origins,omitempty"`
@@ -22,19 +22,19 @@ func (c *CorsConfig) ToGinCorsConfig(defaults *cors.Config) *cors.Config {
 	}
 
 	if c.AllowedOrigins != nil {
-		result.AllowedOrigins = c.AllowedOrigins
+		result.AllowOrigins = c.AllowedOrigins
 	}
 
 	if c.AllowedMethods != nil {
-		result.AllowedMethods = c.AllowedMethods
+		result.AllowMethods = c.AllowedMethods
 	}
 
 	if c.AllowedHeaders != nil {
-		result.AllowedHeaders = c.AllowedHeaders
+		result.AllowHeaders = c.AllowedHeaders
 	}
 
 	if c.ExposedHeaders != nil {
-		result.ExposedHeaders = c.ExposedHeaders
+		result.ExposeHeaders = c.ExposedHeaders
 	}
 
 	if c.MaxAge != nil {
