@@ -1,6 +1,6 @@
 import {configureStore, ThunkAction, Action} from '@reduxjs/toolkit';
 import counterReducer from './counterSlice';
-import authReducer from './authSlice';
+import authReducer from './sessionSlice';
 import connectorsReducer from './connectorsSlice';
 import connectionsReducer from './connectionsSlice';
 

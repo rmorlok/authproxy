@@ -25,6 +25,7 @@ type Resolver struct {
 	apiUrl         string
 	adminApiUrl    string
 	authUrl        string
+	marketplaceUrl string
 }
 
 func WithConfigParams(cmd *cobra.Command) *Resolver {
@@ -41,6 +42,7 @@ func WithConfigParams(cmd *cobra.Command) *Resolver {
 	cmd.Flags().StringVar(&r.authUrl, "authUrl", "", "Auth service base URL")
 	cmd.Flags().StringVar(&r.apiUrl, "apiUrl", "", "API service base URL")
 	cmd.Flags().StringVar(&r.adminApiUrl, "adminApiUrl", "", "Admin API service base URL")
+	cmd.Flags().StringVar(&r.marketplaceUrl, "marketplaceUrl", "", "Marketplace service base URL")
 
 	cmd.Flags().StringVar(&r.configFile, "config", "", ".authproxy.yaml config file to use.")
 
@@ -234,4 +236,17 @@ func (j *Resolver) ResolveAuthUrl() (string, error) {
 	}
 
 	return root.AuthUrl(), nil
+}
+
+func (j *Resolver) ResolveMarketplaceUrl() (string, error) {
+	if j.marketplaceUrl != "" {
+		return j.marketplaceUrl, nil
+	}
+
+	root, err := j.resolveRoot()
+	if err != nil {
+		return "", err
+	}
+
+	return root.MarketplaceUrl(), nil
 }

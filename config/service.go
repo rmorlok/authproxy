@@ -8,10 +8,11 @@ import (
 type ServiceId string
 
 const (
-	ServiceIdAdminApi ServiceId = "admin-api"
-	ServiceIdApi      ServiceId = "api"
-	ServiceIdPublic   ServiceId = "public"
-	ServiceIdWorker   ServiceId = "worker"
+	ServiceIdAdminApi    ServiceId = "admin-api"
+	ServiceIdApi         ServiceId = "api"
+	ServiceIdPublic      ServiceId = "public"
+	ServiceIdWorker      ServiceId = "worker"
+	ServiceIdMarketplace ServiceId = "marketplace"
 )
 
 func AllServiceIds() []ServiceId {
@@ -20,6 +21,7 @@ func AllServiceIds() []ServiceId {
 		ServiceIdApi,
 		ServiceIdPublic,
 		ServiceIdWorker,
+		ServiceIdMarketplace,
 	}
 }
 

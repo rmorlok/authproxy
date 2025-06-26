@@ -7,9 +7,10 @@ type Root struct {
 	AdminPrivateKeyPathVal string `json:"admin_private_key_path" yaml:"admin_private_key_path"`
 	AdminSharedKeyPathVal  string `json:"admin_shared_key_path" yaml:"admin_shared_key_path"`
 	ServerVal              struct {
-		ApiVal      string `json:"api" yaml:"api"`
-		AdminApiVal string `json:"admin_api" yaml:"admin_api"`
-		AuthVal     string `json:"auth" yaml:"auth"`
+		ApiVal         string `json:"api" yaml:"api"`
+		AdminApiVal    string `json:"admin_api" yaml:"admin_api"`
+		AuthVal        string `json:"auth" yaml:"auth"`
+		MarketplaceVal string `json:"marketplace" yaml:"marketplace"`
 	} `json:"server" yaml:"server"`
 }
 
@@ -72,4 +73,12 @@ func (r *Root) AuthUrl() string {
 	}
 
 	return r.ServerVal.AuthVal
+}
+
+func (r *Root) MarketplaceUrl() string {
+	if r == nil {
+		return ""
+	}
+
+	return r.ServerVal.MarketplaceVal
 }

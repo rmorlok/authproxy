@@ -9,14 +9,23 @@ import (
 	"time"
 )
 
+// ServicePublicStaticContentConfig is a configuration to have the public service serve static content in addition
+// to its other functions. This can be used to serve the marketplace SPA directly.
+type ServicePublicStaticContentConfig struct {
+	MountAtPath   string `json:"mount_at" yaml:"mount_at"`
+	ServeFromPath string `json:"serve_from" yaml:"serve_from"`
+}
+
 type ServicePublic struct {
-	PortVal                  StringValue    `json:"port" yaml:"port"`
-	HealthCheckPortVal       StringValue    `json:"health_check_port,omitempty" yaml:"health_check_port,omitempty"`
-	DomainVal                string         `json:"domain" yaml:"domain"`
-	IsHttpsVal               bool           `json:"https" yaml:"https"`
-	SessionTimeoutVal        *HumanDuration `json:"session_timeout" yaml:"session_timeout"`
-	CookieDomainVal          *string        `json:"cookie_domain" yaml:"cookie_domain"`
-	XsrfRequestQueueDepthVal *int           `json:"xsrf_request_queue_depth" yaml:"xsrf_request_queue_depth"`
+	PortVal                  StringValue                       `json:"port" yaml:"port"`
+	HealthCheckPortVal       StringValue                       `json:"health_check_port,omitempty" yaml:"health_check_port,omitempty"`
+	DomainVal                string                            `json:"domain" yaml:"domain"`
+	IsHttpsVal               bool                              `json:"https" yaml:"https"`
+	SessionTimeoutVal        *HumanDuration                    `json:"session_timeout" yaml:"session_timeout"`
+	CookieDomainVal          *string                           `json:"cookie_domain" yaml:"cookie_domain"`
+	XsrfRequestQueueDepthVal *int                              `json:"xsrf_request_queue_depth" yaml:"xsrf_request_queue_depth"`
+	StaticVal                *ServicePublicStaticContentConfig `json:"static,omitempty" yaml:"static,omitempty"`
+	CorsVal                  *CorsConfig                       `json:"cors,omitempty" yaml:"cors,omitempty"`
 }
 
 func (s *ServicePublic) UnmarshalYAML(value *yaml.Node) error {

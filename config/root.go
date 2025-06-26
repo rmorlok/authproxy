@@ -10,18 +10,20 @@ import (
 )
 
 type Root struct {
-	AdminApi    ServiceAdminApi `json:"admin_api" yaml:"admin_api"`
-	Api         ServiceApi      `json:"api" yaml:"api"`
-	Public      ServicePublic   `json:"public" yaml:"public"`
-	Worker      ServiceWorker   `json:"worker" yaml:"worker"`
-	SystemAuth  SystemAuth      `json:"system_auth" yaml:"system_auth"`
-	Database    Database        `json:"database" yaml:"database"`
-	Logging     LoggingConfig   `json:"logging,omitempty" yaml:"logging,omitempty"`
-	Redis       Redis           `json:"redis" yaml:"redis"`
-	Oauth       OAuth           `json:"oauth" yaml:"oauth"`
-	ErrorPages  ErrorPages      `json:"error_pages" yaml:"error_pages"`
-	Connectors  *Connectors     `json:"connectors" yaml:"connectors"`
-	DevSettings *DevSettings    `json:"dev_settings,omitempty" yaml:"dev_settings,omitempty"`
+	AdminApi        ServiceAdminApi    `json:"admin_api" yaml:"admin_api"`
+	Api             ServiceApi         `json:"api" yaml:"api"`
+	Public          ServicePublic      `json:"public" yaml:"public"`
+	Worker          ServiceWorker      `json:"worker" yaml:"worker"`
+	Marketplace     ServiceMarketplace `json:"marketplace" yaml:"marketplace"`
+	HostApplication HostApplication    `json:"host_application" yaml:"host_application"`
+	SystemAuth      SystemAuth         `json:"system_auth" yaml:"system_auth"`
+	Database        Database           `json:"database" yaml:"database"`
+	Logging         LoggingConfig      `json:"logging,omitempty" yaml:"logging,omitempty"`
+	Redis           Redis              `json:"redis" yaml:"redis"`
+	Oauth           OAuth              `json:"oauth" yaml:"oauth"`
+	ErrorPages      ErrorPages         `json:"error_pages" yaml:"error_pages"`
+	Connectors      *Connectors        `json:"connectors" yaml:"connectors"`
+	DevSettings     *DevSettings       `json:"dev_settings,omitempty" yaml:"dev_settings,omitempty"`
 }
 
 func (r *Root) GetRootLogger() *slog.Logger {
@@ -38,6 +40,10 @@ func (r *Root) Validate() error {
 	if r.Connectors == nil {
 		result = multierror.Append(result, errors.New("connectors block is required"))
 	} else if err := r.Connectors.Validate(); err != nil {
+		result = multierror.Append(result, err)
+	}
+
+	if err := r.HostApplication.Validate(); err != nil {
 		result = multierror.Append(result, err)
 	}
 

@@ -14,6 +14,7 @@ type ServiceApi struct {
 	HealthCheckPortVal StringValue `json:"health_check_port,omitempty" yaml:"health_check_port,omitempty"`
 	DomainVal          string      `json:"domain" yaml:"domain"`
 	IsHttpsVal         bool        `json:"https" yaml:"https"`
+	CorsVal            *CorsConfig `json:"cors,omitempty" yaml:"cors,omitempty"`
 }
 
 func (s *ServiceApi) UnmarshalYAML(value *yaml.Node) error {

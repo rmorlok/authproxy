@@ -1,22 +1,16 @@
 import * as React from 'react';
-import { useEffect } from 'react';
 import LoadingPage from "./LoadingPage";
 import { BrowserRouter, Route, Routes, Outlet, Navigate } from "react-router-dom";
-import SignIn from "./SignIn";
 import { useSelector, useDispatch } from "react-redux";
-import { selectAuthStatus, loadAuthStateAsync, loadProvidersAsync } from "./store";
+import { selectAuthStatus, initiateSessionAsync } from "./store";
 import Layout from './components/Layout';
 import ConnectorList from './components/ConnectorList';
 import ConnectionList from './components/ConnectionList';
+import {InternalError} from "./InternalError";
 
 export default function App() {
     const dispatch = useDispatch();
     const authStatus = useSelector(selectAuthStatus);
-
-    useEffect(() => {
-        // Load auth state and providers when the app starts
-        dispatch(loadAuthStateAsync());
-    }, [dispatch]);
 
     if(authStatus === 'checking' || authStatus === 'redirecting') {
         return (
@@ -35,7 +29,7 @@ const GuestRoute = () => {
     return authStatus === 'unauthenticated' ? (
         <Outlet />
     ) : (
-        <Navigate to="/" replace />
+        <Navigate to="/internal-error" replace />
     );
 };
 
@@ -56,7 +50,7 @@ export function Router() {
           <Routes>
               { /* Things people can see unauthenticated */ }
               <Route element={<GuestRoute />}>
-                  <Route path={'/login'} Component={SignIn}/>
+                  <Route path={'/internal-error'} Component={InternalError}/>
               </Route>
 
               { /* Things only authenticated users can see */ }

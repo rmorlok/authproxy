@@ -13,7 +13,7 @@ import {
 } from '@mui/material';
 import { Link, Outlet } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
-import { logout, selectUser } from '../store';
+import { terminate, selectActorId } from '../store';
 import { useState } from 'react';
 
 /**
@@ -21,7 +21,7 @@ import { useState } from 'react';
  */
 const Layout: React.FC = () => {
   const dispatch = useDispatch();
-  const user = useSelector(selectUser);
+  const actor_id = useSelector(selectActorId);
   const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
   const open = Boolean(anchorEl);
 
@@ -35,7 +35,7 @@ const Layout: React.FC = () => {
 
   const handleLogout = () => {
     handleClose();
-    dispatch(logout());
+    dispatch(terminate());
   };
 
   return (
@@ -64,7 +64,7 @@ const Layout: React.FC = () => {
             >
               Connections
             </Button>
-            {user && (
+            {actor_id && (
               <>
                 <IconButton
                   onClick={handleMenu}
@@ -76,8 +76,8 @@ const Layout: React.FC = () => {
                   aria-expanded={open ? 'true' : undefined}
                 >
                   <Avatar 
-                    alt={user.name} 
-                    src={user.picture}
+                    alt={actor_id}
+                    src="/assets/avatar.png"
                     sx={{ width: 32, height: 32 }}
                   />
                 </IconButton>
@@ -92,7 +92,7 @@ const Layout: React.FC = () => {
                 >
                   <MenuItem disabled>
                     <Typography variant="body2">
-                      {user.name}
+                      {actor_id}
                     </Typography>
                   </MenuItem>
                   <MenuItem onClick={handleLogout}>Logout</MenuItem>

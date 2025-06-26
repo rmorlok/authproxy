@@ -1,14 +1,14 @@
 import type {Meta, StoryObj} from '@storybook/react';
-import LoadingPage from "../LoadingPage";
+import {InternalError} from "../InternalError";
 
 const meta = {
-    title: 'Common/LoadingPage',
-    component: LoadingPage,
+    title: 'Common/InternalError',
+    component: InternalError,
     parameters: {
         // More on how to position stories at: https://storybook.js.org/docs/configure/story-layout
         layout: 'fullscreen',
     },
-} satisfies Meta<typeof LoadingPage>;
+} satisfies Meta<typeof InternalError>;
 
 export default meta;
 

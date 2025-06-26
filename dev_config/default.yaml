@@ -1,13 +1,23 @@
 public:
   port: 8080
+
 api:
   port: 8081
+
 admin_api:
   port: 8082
+
 worker:
   health_check_port:
     env_var: HEALTH_CHECK_PORT
     default: 8083
+
+host_application:
+  initiate_session_url: http://localhost:8888/_initiate_session
+
+marketplace:
+  port: 5173
+
 system_auth:
   cookie_domain: localhost:8080
   jwt_signing_key:
@@ -19,23 +29,29 @@ system_auth:
     keys_path: ./dev_config/keys/admin
   global_aes_key:
     env_var_base64: GLOBAL_AES_KEY
+
 error_pages:
   general: https://example.com
+
 database:
   provider: sqlite
   auto_migrate: true
   auto_migration_lock_duration: 30s
   path: ./tmp/dev.db
+
 logging:
   type: tint
   level: debug
+
 #redis:
 #  provider: miniredis
 redis:
   provider: redis
   address: localhost:6379
+
 oauth:
   roundtrip_ttl: 60m
+
 connectors:
   auto_migrate: true
   auto_migration_lock_duration: 30s

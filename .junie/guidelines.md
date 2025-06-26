@@ -4,7 +4,7 @@ This document provides guidelines and instructions for developing and maintainin
 applications to manage the authentication to other 3rd party systems. It is an embedded iPaaS without the focus on moving data. 
 
 This project exposes several backend services that can either be run individually or as one from the command line. The `admin-api` is a service 
-intended for running in  a restricted environment of the host application to provide ways to administer and monitor auth proxy itself, but not 
+intended for running in  a restricted environment of the host application to provide ways to administer and monitor session proxy itself, but not 
 to be consumed by end users  of the host application in any way. The `api` service is the primary way the host application would consume this 
 project, using it to configure  connectors, create connections, and make requests to 3rd party systems where AuthProxy handles adding the 
 necessary authentication to the requests.
@@ -14,7 +14,7 @@ provides the portal UI for listing connectors to the user and starting the conne
 endpoints used as part of the OAuth redirect flow.
 
 The `api` and `admin-api` services use JWT for authentication. `public` uses sessions. To get a session on `public` the `api` returns responses that include
-a JWT with a nonce to transfer the user's auth from the JWT to the session. This might or might not be temporary.
+a JWT with a nonce to transfer the user's session from the JWT to the session. This might or might not be temporary.
 
 ## Build and Configuration Instructions
 
@@ -137,7 +137,7 @@ The project provides testing utilities in the `test_utils` package:
 The project is organized into multiple packages:
 - `api_common`: Common API utilities
 - `apctx`: Context-related utilities
-- `auth`: Authentication logic
+- `session`: Authentication logic
 - `config`: Configuration handling
 - `database`: Database access and models
 - `encrypt`: Encryption utilities

@@ -9,15 +9,14 @@ import (
 	"time"
 )
 
-type ServiceAdminApi struct {
-	PortVal            StringValue `json:"port" yaml:"port"`
+type ServiceMarketplace struct {
+	PortVal            StringValue `json:"port,omitempty" yaml:"port"`
 	HealthCheckPortVal StringValue `json:"health_check_port,omitempty" yaml:"health_check_port,omitempty"`
-	DomainVal          string      `json:"domain" yaml:"domain"`
-	IsHttpsVal         bool        `json:"https" yaml:"https"`
-	CorsVal            *CorsConfig `json:"cors,omitempty" yaml:"cors,omitempty"`
+	DomainVal          string      `json:"domain,omitempty" yaml:"domain,omitempty"`
+	IsHttpsVal         bool        `json:"https,omitempty" yaml:"https,omitempty"`
 }
 
-func (s *ServiceAdminApi) UnmarshalYAML(value *yaml.Node) error {
+func (s *ServiceMarketplace) UnmarshalYAML(value *yaml.Node) error {
 	// Ensure the node is a mapping node
 	if value.Kind != yaml.MappingNode {
 		return fmt.Errorf("service worker expected a mapping node, got %s", KindToString(value.Kind))
@@ -56,7 +55,7 @@ func (s *ServiceAdminApi) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	// Let the rest unmarshall normally
-	type RawType ServiceAdminApi
+	type RawType ServiceMarketplace
 	raw := (*RawType)(s)
 	if err := value.Decode(raw); err != nil {
 		return err
@@ -69,47 +68,47 @@ func (s *ServiceAdminApi) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
-func (s *ServiceAdminApi) Port() uint64 {
+func (s *ServiceMarketplace) Port() uint64 {
 	portS, err := s.PortVal.GetValue(context.Background())
 	if err != nil {
-		panic("failed to obtain port from admin api config")
+		panic("failed to obtain port from marketplace config")
 	}
 
 	port, err := strconv.ParseUint(portS, 10, 64)
 	if err != nil {
-		panic(fmt.Sprintf("failed to parse port '%s' from admin api config", portS))
+		panic(fmt.Sprintf("failed to parse port '%s' from marketplace config", portS))
 	}
 
 	return port
 }
 
-func (s *ServiceAdminApi) HealthCheckPort() uint64 {
+func (s *ServiceMarketplace) HealthCheckPort() uint64 {
 	if s.HealthCheckPortVal == nil {
 		return s.Port()
 	}
 
 	portS, err := s.HealthCheckPortVal.GetValue(context.Background())
 	if err != nil {
-		panic("failed to obtain health check port from admin api config")
+		panic("failed to obtain health check port from marketplace config")
 	}
 
 	port, err := strconv.ParseUint(portS, 10, 64)
 	if err != nil {
-		panic(fmt.Sprintf("failed to parse health check port '%s' from admin api config", portS))
+		panic(fmt.Sprintf("failed to parse health check port '%s' from marketplace config", portS))
 	}
 
 	return port
 }
 
-func (s *ServiceAdminApi) IsHttps() bool {
+func (s *ServiceMarketplace) IsHttps() bool {
 	return s.IsHttpsVal
 }
 
-func (s *ServiceAdminApi) Domain() string {
+func (s *ServiceMarketplace) Domain() string {
 	return s.DomainVal
 }
 
-func (s *ServiceAdminApi) GetBaseUrl() string {
+func (s *ServiceMarketplace) GetBaseUrl() string {
 	proto := "http"
 	if s.IsHttps() {
 		proto = "https"
@@ -127,24 +126,24 @@ func (s *ServiceAdminApi) GetBaseUrl() string {
 	}
 }
 
-func (s *ServiceAdminApi) SupportsSession() bool {
-	return false
+func (s *ServiceMarketplace) SupportsSession() bool {
+	return true
 }
 
-func (s *ServiceAdminApi) SessionTimeout() time.Duration {
-	return 0 * time.Second
+func (s *ServiceMarketplace) GetId() ServiceId {
+	return ServiceIdMarketplace
 }
 
-func (s *ServiceAdminApi) CookieDomain() string {
-	return ""
-}
-
-func (s *ServiceAdminApi) XsrfRequestQueueDepth() int {
+func (s *ServiceMarketplace) SessionTimeout() time.Duration {
 	return 0
 }
 
-func (s *ServiceAdminApi) GetId() ServiceId {
-	return ServiceIdAdminApi
+func (s *ServiceMarketplace) CookieDomain() string {
+	return ""
 }
 
-var _ Service = (*ServiceAdminApi)(nil)
+func (s *ServiceMarketplace) XsrfRequestQueueDepth() int {
+	return 0
+}
+
+var _ Service = (*ServiceMarketplace)(nil)

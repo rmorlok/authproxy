@@ -1,5 +1,3 @@
-import { ApiUser } from './api/auth';
-
 // Connector models
 export interface ConnectorVersion {
   id: string;

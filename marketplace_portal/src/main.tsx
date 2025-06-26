@@ -1,22 +1,34 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
-import {BrowserRouter} from "react-router-dom";
 import {ThemeProvider} from '@emotion/react';
 import {CssBaseline} from '@mui/material';
 import theme from './theme';
 import App from './App';
 import { Provider } from 'react-redux';
 import { store } from './store';
-import {useDispatch} from "react-redux";
-import {loadAuthStateAsync, AppDispatch} from "./store";
+import { ApiSessionInitiateRequest } from "./api";
+import {initiateSessionAsync, AppDispatch} from "./store";
 
-// Remove?
-// import { createTheme, ThemeProvider } from '@mui/material/styles';
-//
-// const defaultTheme = createTheme();
 
-// Trigger auth state to load as soon as the page loads.
-store.dispatch(loadAuthStateAsync());
+// Construct auth parameters from either window variable or URL query parameter
+const params: ApiSessionInitiateRequest = {
+    return_to_url: window.location.origin,
+};
+if ((window as any).AUTHPROXY_AUTH_TOKEN) {
+    params.auth_token = (window as any).AUTHPROXY_AUTH_TOKEN;
+} else {
+    const urlParams = new URLSearchParams(window.location.search);
+    const authToken = urlParams.get('auth_token');
+    if (authToken) {
+        params.auth_token = authToken;
+    }
+}
+
+const currentPath = window.location.pathname;
+if (currentPath !== '/internal-error') {
+    // Trigger auth state to load as soon as the page loads.
+    store.dispatch(initiateSessionAsync(params));
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
