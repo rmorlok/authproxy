@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/api_common"
@@ -28,18 +29,32 @@ func rateErrorHandler(c *gin.Context, info ratelimit.Info) {
 	c.String(429, "Too many requests. Try again in "+time.Until(info.ResetTime).String())
 }
 
-func GetGinServer(cfg config.C, db database.DB, redis redis.R, c connectors.C, e encrypt.E, logger *slog.Logger) (server *gin.Engine, healthChecker *gin.Engine) {
-	authService := auth.NewService(cfg, &cfg.GetRoot().AdminApi, db, redis, logger)
+func GetGinServer(
+	cfg config.C,
+	db database.DB,
+	redis redis.R,
+	c connectors.C,
+	e encrypt.E,
+	logger *slog.Logger,
+) (server *gin.Engine, healthChecker *gin.Engine) {
+	root := cfg.GetRoot()
+	authService := auth.NewService(cfg, &root.AdminApi, db, redis, logger)
 
 	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
 		Rate:  1 * time.Minute,
 		Limit: 3,
 	})
 
-	server = api_common.GinForService(&cfg.GetRoot().AdminApi)
+	server = api_common.GinForService(&root.AdminApi)
 
-	if cfg.GetRoot().Public.Port() != cfg.GetRoot().Public.HealthCheckPort() {
-		healthChecker = api_common.GinForService(&cfg.GetRoot().AdminApi)
+	corsConfig := root.AdminApi.CorsVal.ToGinCorsConfig(nil)
+	if corsConfig != nil {
+		logger.Info("Enabling CORS")
+		server.Use(cors.New(*corsConfig))
+	}
+
+	if root.Public.Port() != root.Public.HealthCheckPort() {
+		healthChecker = api_common.GinForService(&root.AdminApi)
 	} else {
 		healthChecker = server
 	}
@@ -72,6 +87,7 @@ func GetGinServer(cfg config.C, db database.DB, redis redis.R, c connectors.C, e
 }
 
 func Serve(cfg config.C) {
+	root := cfg.GetRoot()
 	aplog.SetDefaultLog(cfg.GetRootLogger())
 	logBuilder := aplog.NewBuilder(cfg.GetRootLogger())
 	logBuilder = logBuilder.WithService("admin-api")
@@ -87,17 +103,17 @@ func Serve(cfg config.C) {
 	}
 	defer rs.Close()
 
-	db, err := database.NewConnectionForRoot(cfg.GetRoot(), logger)
+	db, err := database.NewConnectionForRoot(root, logger)
 	if err != nil {
 		panic(err)
 	}
 
-	if cfg.GetRoot().Database.GetAutoMigrate() {
+	if root.Database.GetAutoMigrate() {
 		func() {
 			m := rs.NewMutex(
 				database.MigrateMutexKeyName,
-				redis.MutexOptionLockFor(cfg.GetRoot().Database.GetAutoMigrationLockDuration()),
-				redis.MutexOptionRetryFor(cfg.GetRoot().Database.GetAutoMigrationLockDuration()+1*time.Second),
+				redis.MutexOptionLockFor(root.Database.GetAutoMigrationLockDuration()),
+				redis.MutexOptionRetryFor(root.Database.GetAutoMigrationLockDuration()+1*time.Second),
 				redis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
 				redis.MutexOptionDetailedLockMetadata(),
 			)
@@ -117,12 +133,12 @@ func Serve(cfg config.C) {
 	asynqClient := asynq.NewClientFromRedisClient(rs.Client())
 	c := connectors.NewConnectorsService(cfg, db, e, asynqClient, logger)
 
-	if cfg.GetRoot().Connectors.GetAutoMigrate() {
+	if root.Connectors.GetAutoMigrate() {
 		func() {
 			m := rs.NewMutex(
 				connectors.MigrateMutexKeyName,
-				redis.MutexOptionLockFor(cfg.GetRoot().Connectors.GetAutoMigrationLockDurationOrDefault()),
-				redis.MutexOptionRetryFor(cfg.GetRoot().Connectors.GetAutoMigrationLockDurationOrDefault()+1*time.Second),
+				redis.MutexOptionLockFor(root.Connectors.GetAutoMigrationLockDurationOrDefault()),
+				redis.MutexOptionRetryFor(root.Connectors.GetAutoMigrationLockDurationOrDefault()+1*time.Second),
 				redis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
 				redis.MutexOptionDetailedLockMetadata(),
 			)
@@ -144,14 +160,14 @@ func Serve(cfg config.C) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		api_common.RunGin(server, fmt.Sprintf(":%d", cfg.GetRoot().AdminApi.Port()), logger)
+		api_common.RunGin(server, fmt.Sprintf(":%d", root.AdminApi.Port()), logger)
 	}()
 
 	if server != healthChecker {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			api_common.RunGin(healthChecker, fmt.Sprintf(":%d", cfg.GetRoot().AdminApi.HealthCheckPort()), logger)
+			api_common.RunGin(healthChecker, fmt.Sprintf(":%d", root.AdminApi.HealthCheckPort()), logger)
 		}()
 	}
 

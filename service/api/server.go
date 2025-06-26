@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
+	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	"github.com/pkg/errors"
@@ -40,17 +41,24 @@ func GetGinServer(
 	encrypt encrypt.E,
 	logger *slog.Logger,
 ) (server *gin.Engine, healthChecker *gin.Engine) {
-	authService := auth.NewService(cfg, &cfg.GetRoot().Api, db, redis, logger)
+	root := cfg.GetRoot()
+	authService := auth.NewService(cfg, &root.Api, db, redis, logger)
 
 	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
 		Rate:  1 * time.Minute,
 		Limit: 10_000,
 	})
 
-	server = api_common.GinForService(&cfg.GetRoot().Api)
+	server = api_common.GinForService(&root.Api)
 
-	if cfg.GetRoot().Public.Port() != cfg.GetRoot().Public.HealthCheckPort() {
-		healthChecker = api_common.GinForService(&cfg.GetRoot().Api)
+	corsConfig := root.Api.CorsVal.ToGinCorsConfig(nil)
+	if corsConfig != nil {
+		logger.Info("Enabling CORS")
+		server.Use(cors.New(*corsConfig))
+	}
+
+	if root.Public.Port() != root.Public.HealthCheckPort() {
+		healthChecker = api_common.GinForService(&root.Api)
 	} else {
 		healthChecker = server
 	}
@@ -110,6 +118,7 @@ func GetGinServer(
 }
 
 func Serve(cfg config.C) {
+	root := cfg.GetRoot()
 	aplog.SetDefaultLog(cfg.GetRootLogger())
 	logBuilder := aplog.NewBuilder(cfg.GetRootLogger())
 	logBuilder = logBuilder.WithService("api")
@@ -125,17 +134,17 @@ func Serve(cfg config.C) {
 	}
 	defer rs.Close()
 
-	db, err := database.NewConnectionForRoot(cfg.GetRoot(), logger)
+	db, err := database.NewConnectionForRoot(root, logger)
 	if err != nil {
 		panic(err)
 	}
 
-	if cfg.GetRoot().Database.GetAutoMigrate() {
+	if root.Database.GetAutoMigrate() {
 		func() {
 			m := rs.NewMutex(
 				database.MigrateMutexKeyName,
-				redis.MutexOptionLockFor(cfg.GetRoot().Database.GetAutoMigrationLockDuration()),
-				redis.MutexOptionRetryFor(cfg.GetRoot().Database.GetAutoMigrationLockDuration()+1*time.Second),
+				redis.MutexOptionLockFor(root.Database.GetAutoMigrationLockDuration()),
+				redis.MutexOptionRetryFor(root.Database.GetAutoMigrationLockDuration()+1*time.Second),
 				redis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
 				redis.MutexOptionDetailedLockMetadata(),
 			)
@@ -156,12 +165,12 @@ func Serve(cfg config.C) {
 	asynqClient := asynq.NewClientFromRedisClient(rs.Client())
 	c := connectors.NewConnectorsService(cfg, db, e, asynqClient, logger)
 
-	if cfg.GetRoot().Connectors.GetAutoMigrate() {
+	if root.Connectors.GetAutoMigrate() {
 		func() {
 			m := rs.NewMutex(
 				connectors.MigrateMutexKeyName,
-				redis.MutexOptionLockFor(cfg.GetRoot().Connectors.GetAutoMigrationLockDurationOrDefault()),
-				redis.MutexOptionRetryFor(cfg.GetRoot().Connectors.GetAutoMigrationLockDurationOrDefault()+1*time.Second),
+				redis.MutexOptionLockFor(root.Connectors.GetAutoMigrationLockDurationOrDefault()),
+				redis.MutexOptionRetryFor(root.Connectors.GetAutoMigrationLockDurationOrDefault()+1*time.Second),
 				redis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
 				redis.MutexOptionDetailedLockMetadata(),
 			)
@@ -183,14 +192,14 @@ func Serve(cfg config.C) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		api_common.RunGin(server, fmt.Sprintf(":%d", cfg.GetRoot().Api.Port()), logger)
+		api_common.RunGin(server, fmt.Sprintf(":%d", root.Api.Port()), logger)
 	}()
 
 	if server != healthChecker {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			api_common.RunGin(healthChecker, fmt.Sprintf(":%d", cfg.GetRoot().Api.HealthCheckPort()), logger)
+			api_common.RunGin(healthChecker, fmt.Sprintf(":%d", root.Api.HealthCheckPort()), logger)
 		}()
 	}
 
