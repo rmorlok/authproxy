@@ -1,4 +1,4 @@
-# AuthProxy Backend API
+# AuthProxy
 
 ## Running Locally
 
