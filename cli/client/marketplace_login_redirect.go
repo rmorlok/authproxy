@@ -12,6 +12,8 @@ import (
 	"time"
 )
 
+const marketplaceLoginRedirectPath = "/marketplace-login-redirect"
+
 func httpServerForMarketplaceLoginRedirect(
 	validRedirectUrl string,
 	marketplaceUrl string,
@@ -19,7 +21,7 @@ func httpServerForMarketplaceLoginRedirect(
 ) func(w http.ResponseWriter, req *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
 
-		if req.Method != "GET" || req.URL.Path != "/marketplace-login-redirect" {
+		if req.Method != "GET" || req.URL.Path != marketplaceLoginRedirectPath {
 			log.Printf("[404] %s %s", req.Method, req.URL)
 			w.Header().Set("Content-Type", "text/html")
 			w.WriteHeader(404)
@@ -115,9 +117,9 @@ func cmdMarketplaceLoginRedirect() *cobra.Command {
 				return err
 			}
 
-			marketplaceUrl, err := resolver.ResolveMarketplaceUrl()
+			marketplaceUrl, _ := resolver.ResolveMarketplaceUrl()
 
-			validRedirectUrl := fmt.Sprintf("%s://%s:%d/marketplace-login-redirect", proto, ip, port)
+			validRedirectUrl := fmt.Sprintf("%s://%s:%d%s", proto, ip, port, marketplaceLoginRedirectPath)
 			log.Printf("Configure host_application.initiate_session_url to %s", validRedirectUrl)
 
 			server := &http.Server{

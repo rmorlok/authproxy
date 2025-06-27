@@ -92,13 +92,14 @@ func writeJsonErrorResponse(w http.ResponseWriter, statusCode int, message strin
 
 func cmdRawProxy() *cobra.Command {
 	var (
-		resolver *config.Resolver
-		proxyTo  string
-		ip       string
-		port     int
-		proto    string
-		pemPath  string
-		keyPath  string
+		resolver                       *config.Resolver
+		proxyTo                        string
+		enableMarketplaceLoginRedirect bool
+		ip                             string
+		port                           int
+		proto                          string
+		pemPath                        string
+		keyPath                        string
 	)
 
 	cmd := &cobra.Command{
@@ -137,9 +138,32 @@ func cmdRawProxy() *cobra.Command {
 			log.Printf("Setting up raw-proxy to the host: %s", proxyTo)
 			log.Printf("Serving proxy on %s:%d", ip, port)
 
+			proxyHandler := httpProxyForHost(*proxyToUrl, signer)
+			handler := proxyHandler
+
+			if enableMarketplaceLoginRedirect {
+				marketplaceUrl, _ := resolver.ResolveMarketplaceUrl()
+				tb, err := resolver.ResolveBuilder()
+				if err != nil {
+					return err
+				}
+
+				validRedirectUrl := fmt.Sprintf("%s://%s:%d%s", proto, ip, port, marketplaceLoginRedirectPath)
+				log.Printf("Configure host_application.initiate_session_url to %s", validRedirectUrl)
+				marketplaceRedirectHandler := httpServerForMarketplaceLoginRedirect(validRedirectUrl, marketplaceUrl, tb)
+
+				handler = func(w http.ResponseWriter, req *http.Request) {
+					if req.URL.Path == marketplaceLoginRedirectPath {
+						marketplaceRedirectHandler(w, req)
+						return
+					}
+
+					proxyHandler(w, req)
+				}
+			}
 			server := &http.Server{
 				Addr:    fmt.Sprintf("%s:%d", ip, port),
-				Handler: http.HandlerFunc(httpProxyForHost(*proxyToUrl, signer)),
+				Handler: http.HandlerFunc(handler),
 				// Disable HTTP/2.
 				TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
 			}
@@ -155,6 +179,7 @@ func cmdRawProxy() *cobra.Command {
 
 	resolver = config.WithConfigParams(cmd)
 	cmd.Flags().StringVar(&proxyTo, "proxyTo", "", "The service name or URL to proxy to")
+	cmd.Flags().BoolVar(&enableMarketplaceLoginRedirect, "enableMarketplaceLoginRedirect", false, "Enable the marketplace login redirect handler, in addition to proxying other calls")
 	cmd.Flags().StringVar(&ip, "ip", "127.0.0.1", "The IP to listen on")
 	cmd.Flags().IntVar(&port, "port", 8888, "The port to listen on")
 	cmd.Flags().StringVar(&proto, "proto", "http", "The protocol to use (http or https)")

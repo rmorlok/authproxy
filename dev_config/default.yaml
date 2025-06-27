@@ -13,7 +13,7 @@ worker:
     default: 8083
 
 host_application:
-  initiate_session_url: http://127.0.0.1:8889/marketplace-login-redirect
+  initiate_session_url: http://127.0.0.1:8888/marketplace-login-redirect
 
 marketplace:
   port: 5173
