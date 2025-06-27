@@ -23,9 +23,19 @@ go run ./cli/server serve --config=./dev_config/default.yaml all
 Run the client to proxy authenticated calls to the backend:
 
 ```bash
-go run ./cli/client raw-proxy --proxyTo=api
+go run ./cli/client raw-proxy --enableMarketplaceLoginRedirect=true --proxyTo=api
 ```
 
+Run the marketplace UI:
+
+```bash
+cd marketplace_portal
+nvm use v18.16.0
+yarn
+yarn dev
+```
+
+### Viewing Background Tasks
 To manage tasks in asynq, install the [asynq cli](https://github.com/hibiken/asynq/blob/master/tools/asynq/README.md):
 
 ```bash
