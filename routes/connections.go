@@ -345,7 +345,6 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 	g.POST("/connections/_initiate", r.auth.Required(), r.initiate)
 	g.GET("/connections", r.auth.Required(), r.list)
 	g.GET("/connections/:id", r.auth.Required(), r.get)
-	g.POST("/connections/:id/_proxy", r.auth.Required(), r.proxy)
 }
 
 func NewConnectionsRoutes(

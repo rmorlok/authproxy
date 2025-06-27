@@ -17,7 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/redis"
-	routes2 "github.com/rmorlok/authproxy/routes"
+	common_routes "github.com/rmorlok/authproxy/routes"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -106,13 +106,15 @@ func GetGinServer(
 		KeyFunc:      rateKeyFunc,
 	})
 
-	routesConnectors := routes2.NewConnectorsRoutes(cfg, authService, c)
-	routesConnections := routes2.NewConnectionsRoutes(cfg, authService, db, redis, c, httpf, encrypt, logger)
+	routesConnectors := common_routes.NewConnectorsRoutes(cfg, authService, c)
+	routesConnections := common_routes.NewConnectionsRoutes(cfg, authService, db, redis, c, httpf, encrypt, logger)
+	routesProxy := common_routes.NewConnectionsProxyRoutes(cfg, authService, db, redis, c, httpf, encrypt, logger)
 
-	api := server.Group("/api", rl)
+	api := server.Group("/api/v1", rl)
 
 	routesConnectors.Register(api)
 	routesConnections.Register(api)
+	routesProxy.Register(api)
 
 	return server, healthChecker
 }

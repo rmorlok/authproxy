@@ -132,7 +132,7 @@ func (r *SessionRoutes) terminate(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, gin.H{})
 }
 
-func (r *SessionRoutes) Register(g *gin.Engine) {
+func (r *SessionRoutes) Register(g gin.IRouter) {
 	g.POST("/session/_initiate", r.authService.Optional(), r.initiate)
 	g.POST("/session/_terminate", r.authService.Optional(), r.terminate)
 }

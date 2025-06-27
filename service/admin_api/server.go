@@ -73,7 +73,7 @@ func GetGinServer(
 		})
 	})
 
-	api := server.Group("/api", authService.AdminOnly())
+	api := server.Group("/api/v1", authService.AdminOnly())
 	{
 		mw := ratelimit.RateLimiter(rlstore, &ratelimit.Options{
 			ErrorHandler: rateErrorHandler,

@@ -38,7 +38,7 @@ func cmdListConnectors() *cobra.Command {
 				return errors.New("api url not specified")
 			}
 
-			connectionsUrl := fmt.Sprintf("%s/api/connectors", apiUrl)
+			connectionsUrl := fmt.Sprintf("%s/api/v1/connectors", apiUrl)
 
 			client := resty.New()
 

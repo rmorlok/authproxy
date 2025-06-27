@@ -24,6 +24,8 @@ type ServicePublic struct {
 	SessionTimeoutVal        *HumanDuration                    `json:"session_timeout" yaml:"session_timeout"`
 	CookieDomainVal          *string                           `json:"cookie_domain" yaml:"cookie_domain"`
 	XsrfRequestQueueDepthVal *int                              `json:"xsrf_request_queue_depth" yaml:"xsrf_request_queue_depth"`
+	EnableMarketplaceApisVal *bool                             `json:"enable_marketplace_apis,omitempty" yaml:"enable_marketplace_apis,omitempty"`
+	EnableProxyVal           *bool                             `json:"enable_proxy,omitempty" yaml:"enable_proxy,omitempty"`
 	StaticVal                *ServicePublicStaticContentConfig `json:"static,omitempty" yaml:"static,omitempty"`
 	CorsVal                  *CorsConfig                       `json:"cors,omitempty" yaml:"cors,omitempty"`
 }
@@ -168,6 +170,28 @@ func (s *ServicePublic) XsrfRequestQueueDepth() int {
 	}
 
 	return *s.XsrfRequestQueueDepthVal
+}
+
+// EnableMarketplaceApis determines if the APIs to support the marketplace are exposed on the public API to make
+// them available via session. Defaults to true if not set. Disable this feature if the host application is wrapping
+// the API service directly with its own custom marketplace app.
+func (s *ServicePublic) EnableMarketplaceApis() bool {
+	if s == nil || s.EnableMarketplaceApisVal == nil {
+		return true
+	}
+
+	return *s.EnableMarketplaceApisVal
+}
+
+// EnableProxy determines if proxying to 3rd parties is enabled on the public service. Defaults to false if unspecified.
+// Enabling the 3rd party proxy on public can allow custom logic in the marketplace where the client makes calls
+// directly to the 3rd party. This increases the surface area for security risks, however.
+func (s *ServicePublic) EnableProxy() bool {
+	if s == nil || s.EnableProxyVal == nil {
+		return false
+	}
+
+	return *s.EnableProxyVal
 }
 
 var _ Service = (*ServicePublic)(nil)

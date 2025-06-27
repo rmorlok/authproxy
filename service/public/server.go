@@ -16,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/redis"
+	common_routes "github.com/rmorlok/authproxy/routes"
 	"github.com/rmorlok/authproxy/service/public/routes"
 	"log/slog"
 	"net/http"
@@ -25,9 +26,10 @@ import (
 
 func GetCorsConfig(cfg config.C) *cors.Config {
 	root := cfg.GetRoot()
+	public := root.Public
 	marketplaceUrl := root.Marketplace.GetBaseUrl()
 
-	return root.Public.CorsVal.ToGinCorsConfig(&cors.Config{
+	return public.CorsVal.ToGinCorsConfig(&cors.Config{
 		AllowOrigins:     []string{marketplaceUrl},
 		AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "HEAD"},
 		AllowHeaders:     []string{"Origin", "Authorization", "Content-Type"},
@@ -47,12 +49,13 @@ func GetGinServer(
 	logger *slog.Logger,
 ) (server *gin.Engine, healthChecker *gin.Engine) {
 	root := cfg.GetRoot()
-	authService := auth.NewService(cfg, &root.Public, db, redis, logger)
+	public := root.Public
+	authService := auth.NewService(cfg, &public, db, redis, logger)
 
-	server = api_common.GinForService(&root.Public)
+	server = api_common.GinForService(&public)
 
-	if root.Public.Port() != root.Public.HealthCheckPort() {
-		healthChecker = api_common.GinForService(&root.Public)
+	if public.Port() != public.HealthCheckPort() {
+		healthChecker = api_common.GinForService(&public)
 	} else {
 		healthChecker = server
 	}
@@ -63,9 +66,9 @@ func GetGinServer(
 		server.Use(cors.New(*corsConfig))
 	}
 
-	if root.Public.StaticVal != nil {
+	if public.StaticVal != nil {
 		// Static content
-		server.Use(static.Serve(root.Public.StaticVal.MountAtPath, static.LocalFile(root.Public.StaticVal.ServeFromPath, true)))
+		server.Use(static.Serve(public.StaticVal.MountAtPath, static.LocalFile(public.StaticVal.ServeFromPath, true)))
 	}
 
 	healthChecker.GET("/ping", func(c *gin.Context) {
@@ -107,15 +110,38 @@ func GetGinServer(
 	})
 
 	routesOauth2 := routes.NewOauth2Routes(cfg, authService, db, redis, c, httpf, encrypt, logger)
-	routesSession := routes.NewSessionRoutes(cfg, authService, db, redis, httpf, encrypt, logger)
 	routesOauth2.Register(server)
-	routesSession.Register(server)
 
+	var api *gin.RouterGroup
+	if public.EnableMarketplaceApis() {
+		if api == nil {
+			api = server.Group("/api/v1")
+		}
+
+		routesSession := routes.NewSessionRoutes(cfg, authService, db, redis, httpf, encrypt, logger)
+		routesSession.Register(api)
+
+		routesConnectors := common_routes.NewConnectorsRoutes(cfg, authService, c)
+		routesConnectors.Register(api)
+
+		routesConnections := common_routes.NewConnectionsRoutes(cfg, authService, db, redis, c, httpf, encrypt, logger)
+		routesConnections.Register(api)
+	}
+
+	if public.EnableProxy() {
+		if api == nil {
+			api = server.Group("/api/v1")
+		}
+
+		proxyRoutes := common_routes.NewConnectionsProxyRoutes(cfg, authService, db, redis, c, httpf, encrypt, logger)
+		proxyRoutes.Register(api)
+	}
 	return server, healthChecker
 }
 
 func Serve(cfg config.C) {
 	root := cfg.GetRoot()
+	public := root.Public
 	aplog.SetDefaultLog(cfg.GetRootLogger())
 	logBuilder := aplog.NewBuilder(cfg.GetRootLogger())
 	logBuilder = logBuilder.WithService("public")
@@ -189,14 +215,14 @@ func Serve(cfg config.C) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		api_common.RunGin(server, fmt.Sprintf(":%d", root.Public.Port()), logger)
+		api_common.RunGin(server, fmt.Sprintf(":%d", public.Port()), logger)
 	}()
 
 	if server != healthChecker {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			api_common.RunGin(healthChecker, fmt.Sprintf(":%d", root.Public.HealthCheckPort()), logger)
+			api_common.RunGin(healthChecker, fmt.Sprintf(":%d", public.HealthCheckPort()), logger)
 		}()
 	}
 

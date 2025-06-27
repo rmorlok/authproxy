@@ -6,10 +6,28 @@ import (
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/connectors"
+	"github.com/rmorlok/authproxy/database"
+	"github.com/rmorlok/authproxy/encrypt"
+	"github.com/rmorlok/authproxy/httpf"
+	"github.com/rmorlok/authproxy/oauth2"
 	"github.com/rmorlok/authproxy/proxy"
+	"github.com/rmorlok/authproxy/redis"
+	"log/slog"
 )
 
-func (r *ConnectionsRoutes) proxy(gctx *gin.Context) {
+type ConnectionsProxyRoutes struct {
+	cfg        config.C
+	auth       auth.A
+	connectors connectors.C
+	db         database.DB
+	redis      redis.R
+	httpf      httpf.F
+	encrypt    encrypt.E
+	oauthf     oauth2.Factory
+}
+
+func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	ra := auth.GetAuthFromGinContext(gctx)
 	if !ra.IsAuthenticated() {
@@ -121,5 +139,31 @@ func (r *ConnectionsRoutes) proxy(gctx *gin.Context) {
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
 		return
+	}
+}
+
+func (r *ConnectionsProxyRoutes) Register(g gin.IRouter) {
+	g.POST("/connections/:id/_proxy", r.auth.Required(), r.proxy)
+}
+
+func NewConnectionsProxyRoutes(
+	cfg config.C,
+	authService auth.A,
+	db database.DB,
+	redis redis.R,
+	c connectors.C,
+	httpf httpf.F,
+	encrypt encrypt.E,
+	logger *slog.Logger,
+) *ConnectionsProxyRoutes {
+	return &ConnectionsProxyRoutes{
+		cfg:        cfg,
+		auth:       authService,
+		connectors: c,
+		db:         db,
+		redis:      redis,
+		httpf:      httpf,
+		encrypt:    encrypt,
+		oauthf:     oauth2.NewFactory(cfg, db, redis, c, httpf, encrypt, logger),
 	}
 }
