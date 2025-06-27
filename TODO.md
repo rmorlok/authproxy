@@ -9,3 +9,4 @@
 
 * https://github.com/stephenafamo/bob
 * https://github.com/Synoptiq/go-fluxus
+* [GoVisual](https://github.com/doganarif/GoVisual/tree/main)
