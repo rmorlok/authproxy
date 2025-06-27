@@ -80,7 +80,7 @@ func GetGinServer(
 			KeyFunc:      rateKeyFunc,
 		})
 
-		api.GET("/domains", mw, ListDomains)
+		api.GET("/todo", mw, func(c *gin.Context) {})
 	}
 
 	return server, healthChecker

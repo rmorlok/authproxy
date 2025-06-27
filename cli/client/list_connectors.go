@@ -4,15 +4,16 @@ import (
 	"fmt"
 	"github.com/go-resty/resty/v2"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/cli/client/config"
-	"github.com/rmorlok/authproxy/service/api/routes"
+	routes2 "github.com/rmorlok/authproxy/routes"
 	"github.com/spf13/cobra"
 )
 
 func cmdListConnectors() *cobra.Command {
 	var (
 		resolver *config.Resolver
-		out      Output[routes.ConnectorJson]
+		out      Output[routes2.ConnectorJson]
 
 		state string
 		typ   string
@@ -41,8 +42,8 @@ func cmdListConnectors() *cobra.Command {
 
 			client := resty.New()
 
-			var response routes.ListConnectorsResponseJson
-			var apiErr routes.Error
+			var response routes2.ListConnectorsResponseJson
+			var apiErr api_common.ErrorResponse
 			var resp *resty.Response
 
 			req := signer.SignRestyRequest(client.R()).
@@ -88,7 +89,7 @@ func cmdListConnectors() *cobra.Command {
 	}
 
 	resolver = config.WithConfigParams(cmd)
-	out = OutputMultiple[routes.ConnectorJson](cmd)
+	out = OutputMultiple[routes2.ConnectorJson](cmd)
 
 	cmd.Flags().StringVar(&state, "state", "", "Only show connectors in the specified state")
 	cmd.Flags().StringVar(&typ, "type", "", "Only show connectors of the specified type")

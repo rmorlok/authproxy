@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/connectors"
@@ -74,18 +75,30 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 
 	ra := auth.GetAuthFromGinContext(gctx)
 	if !ra.IsAuthenticated() {
-		gctx.PureJSON(http.StatusUnauthorized, Error{"unauthorized"})
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusUnauthorized().
+			WithResponseMsg("unauthorized").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
 	var req InitiateConnectionRequest
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		gctx.PureJSON(http.StatusBadRequest, Error{err.Error()})
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
 	if err := req.Validate(); err != nil {
-		gctx.PureJSON(http.StatusBadRequest, Error{err.Error()})
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
@@ -98,12 +111,20 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	}
 
 	if err != nil {
-		gctx.PureJSON(http.StatusInternalServerError, Error{err.Error()})
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
 	if cv == nil {
-		gctx.PureJSON(http.StatusBadRequest, Error{fmt.Sprintf("connector '%s' not found", req.ConnectorId)})
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsgf("connector '%s' not found", req.ConnectorId).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
@@ -116,20 +137,32 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 
 	err = r.db.CreateConnection(ctx, &connection)
 	if err != nil {
-		gctx.PureJSON(http.StatusInternalServerError, Error{err.Error()})
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 	}
 
 	connector := cv.GetDefinition()
 	if _, ok := connector.Auth.(*config.AuthOAuth2); ok {
 		if req.ReturnToUrl == "" {
-			gctx.PureJSON(http.StatusBadRequest, Error{"must specify return_to_url"})
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithResponseMsg("must specify return_to_url").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
 			return
 		}
 
 		o2 := r.oauthf.NewOAuth2(connection, cv)
 		url, err := o2.SetStateAndGeneratePublicUrl(ctx, ra.MustGetActor(), req.ReturnToUrl)
 		if err != nil {
-			gctx.PureJSON(http.StatusInternalServerError, Error{err.Error()})
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusInternalServerError().
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
 			return
 		}
 
@@ -143,7 +176,11 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 		return
 	}
 
-	gctx.PureJSON(http.StatusInternalServerError, Error{"unsupported connector auth type"})
+	api_common.NewHttpStatusErrorBuilder().
+		WithStatusInternalServerError().
+		WithResponseMsg("unsupported connector auth type").
+		BuildStatusError().
+		WriteGinResponse(r.cfg, gctx)
 }
 
 type ConnectionJson struct {
@@ -183,7 +220,12 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 	var err error
 
 	if err = gctx.ShouldBindQuery(&req); err != nil {
-		gctx.PureJSON(http.StatusBadRequest, Error{err.Error()})
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg(err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
@@ -192,7 +234,11 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 	if req.Cursor != nil {
 		ex, err = r.db.ListConnectionsFromCursor(ctx, *req.Cursor)
 		if err != nil {
-			gctx.PureJSON(http.StatusBadRequest, Error{err.Error()})
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
 			return
 		}
 	} else {
@@ -209,12 +255,21 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 		if req.OrderByVal != nil {
 			field, order, err := database.SplitOrderByParam(*req.OrderByVal)
 			if err != nil {
-				gctx.PureJSON(http.StatusBadRequest, Error{err.Error()})
+				api_common.NewHttpStatusErrorBuilder().
+					WithStatusBadRequest().
+					WithInternalErr(err).
+					WithResponseMsg(err.Error()).
+					BuildStatusError().
+					WriteGinResponse(r.cfg, gctx)
 				return
 			}
 
 			if !database.IsValidConnectionOrderByField(field) {
-				gctx.PureJSON(http.StatusBadRequest, Error{fmt.Sprintf("invalid sort field '%s'", field)})
+				api_common.NewHttpStatusErrorBuilder().
+					WithStatusBadRequest().
+					WithResponseMsgf("invalid sort field '%s'", field).
+					BuildStatusError().
+					WriteGinResponse(r.cfg, gctx)
 				return
 			}
 
@@ -227,7 +282,11 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 	result := ex.FetchPage(ctx)
 
 	if result.Error != nil {
-		gctx.PureJSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(result.Error).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 	}
 
 	gctx.PureJSON(http.StatusOK, ListConnectionResponseJson{
@@ -240,22 +299,40 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	id, err := uuid.Parse(gctx.Param("id"))
 	if err != nil {
-		gctx.PureJSON(http.StatusBadRequest, Error{err.Error()})
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
 	if id == uuid.Nil {
-		gctx.PureJSON(http.StatusBadRequest, Error{"id is required"})
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 	}
 
 	c, err := r.db.GetConnection(ctx, id)
 	if err != nil {
-		gctx.PureJSON(http.StatusBadRequest, Error{err.Error()})
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
 	if c == nil {
-		gctx.PureJSON(http.StatusNotFound, Error{"connection not found"})
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsg("connection not found").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 		return
 	}
 

@@ -1,10 +1,9 @@
 package routes
 
 import (
-	"fmt"
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/connectors"
@@ -72,18 +71,30 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 	connectorIdStr := gctx.Param("id")
 
 	if connectorIdStr == "" {
-		gctx.PureJSON(http.StatusBadRequest, Error{"id is required"})
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
 	connectorId, err := uuid.Parse(connectorIdStr)
 	if err != nil {
-		gctx.PureJSON(http.StatusBadRequest, Error{errors.Wrap(err, "failed to parse connector id").Error()})
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
 	if connectorId == uuid.Nil {
-		gctx.PureJSON(http.StatusBadRequest, Error{"id is required"})
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 	}
 
 	result := r.connectors.
@@ -93,12 +104,20 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 		FetchPage(ctx)
 
 	if result.Error != nil {
-		gctx.PureJSON(http.StatusInternalServerError, Error{result.Error.Error()})
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(result.Error).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
 	if len(result.Results) == 0 {
-		gctx.PureJSON(http.StatusNotFound, Error{"connector not found"})
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsgf("connector '%s' not found", connectorId).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
@@ -110,7 +129,12 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	var req ListConnectorsRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		gctx.PureJSON(http.StatusBadRequest, Error{err.Error()})
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg(err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
@@ -120,7 +144,12 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 	if req.Cursor != nil {
 		ex, err = r.connectors.ListConnectorsFromCursor(ctx, *req.Cursor)
 		if err != nil {
-			gctx.PureJSON(http.StatusBadRequest, Error{err.Error()})
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusInternalServerError().
+				WithInternalErr(err).
+				WithResponseMsg("failed to list connectors from cursor").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
 			return
 		}
 	} else {
@@ -141,12 +170,21 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 		if req.OrderByVal != nil {
 			field, order, err := database.SplitOrderByParam(*req.OrderByVal)
 			if err != nil {
-				gctx.PureJSON(http.StatusBadRequest, Error{err.Error()})
+				api_common.NewHttpStatusErrorBuilder().
+					WithStatusBadRequest().
+					WithInternalErr(err).
+					WithResponseMsg(err.Error()).
+					BuildStatusError().
+					WriteGinResponse(r.cfg, gctx)
 				return
 			}
 
 			if !database.IsValidConnectorOrderByField(field) {
-				gctx.PureJSON(http.StatusBadRequest, Error{fmt.Sprintf("invalid sort field '%s'", field)})
+				api_common.NewHttpStatusErrorBuilder().
+					WithStatusBadRequest().
+					WithResponseMsgf("invalid sort field '%s'", field).
+					BuildStatusError().
+					WriteGinResponse(r.cfg, gctx)
 				return
 			}
 

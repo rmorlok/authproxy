@@ -40,13 +40,16 @@ func (e *HttpStatusError) ResponseMsgOrDefault() string {
 	return httpStatusText(e.Status)
 }
 
-type errorResponse struct {
+// ErrorResponse is the standardized error response format for authproxy as it gets serialized to JSON. This normally
+// shouldn't be constructed directly but rather constructed using the provided builder. This struct can be used to
+// parse errors returned from the authproxy API.
+type ErrorResponse struct {
 	Error      string `json:"error"`
 	StackTrace string `json:"stack_trace,omitempty"`
 }
 
-func (e *HttpStatusError) toErrorResponse(cfg Debuggable) *errorResponse {
-	resp := &errorResponse{
+func (e *HttpStatusError) toErrorResponse(cfg Debuggable) *ErrorResponse {
+	resp := &ErrorResponse{
 		Error: e.ResponseMsgOrDefault(),
 	}
 

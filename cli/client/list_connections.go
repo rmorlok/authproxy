@@ -4,15 +4,16 @@ import (
 	"fmt"
 	"github.com/go-resty/resty/v2"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/cli/client/config"
-	"github.com/rmorlok/authproxy/service/api/routes"
+	routes2 "github.com/rmorlok/authproxy/routes"
 	"github.com/spf13/cobra"
 )
 
 func cmdListConnections() *cobra.Command {
 	var (
 		resolver *config.Resolver
-		out      Output[routes.ConnectionJson]
+		out      Output[routes2.ConnectionJson]
 
 		state string
 		order string
@@ -40,8 +41,8 @@ func cmdListConnections() *cobra.Command {
 
 			client := resty.New()
 
-			var response routes.ListConnectionResponseJson
-			var apiErr routes.Error
+			var response routes2.ListConnectionResponseJson
+			var apiErr api_common.ErrorResponse
 			var resp *resty.Response
 
 			req := signer.SignRestyRequest(client.R()).
@@ -84,7 +85,7 @@ func cmdListConnections() *cobra.Command {
 	}
 
 	resolver = config.WithConfigParams(cmd)
-	out = OutputMultiple[routes.ConnectionJson](cmd)
+	out = OutputMultiple[routes2.ConnectionJson](cmd)
 
 	cmd.Flags().StringVar(&state, "state", "", "Only show connections in the specified state")
 	cmd.Flags().StringVar(&order, "order", "", "Order records by the specified field. Should be of the form \"field DESC|ASC\".")

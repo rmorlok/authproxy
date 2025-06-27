@@ -17,7 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/redis"
-	"github.com/rmorlok/authproxy/service/api/routes"
+	routes2 "github.com/rmorlok/authproxy/routes"
 	"log/slog"
 	"net/http"
 	"sync"
@@ -106,8 +106,8 @@ func GetGinServer(
 		KeyFunc:      rateKeyFunc,
 	})
 
-	routesConnectors := routes.NewConnectorsRoutes(cfg, authService, c)
-	routesConnections := routes.NewConnectionsRoutes(cfg, authService, db, redis, c, httpf, encrypt, logger)
+	routesConnectors := routes2.NewConnectorsRoutes(cfg, authService, c)
+	routesConnections := routes2.NewConnectionsRoutes(cfg, authService, db, redis, c, httpf, encrypt, logger)
 
 	api := server.Group("/api", rl)
 
