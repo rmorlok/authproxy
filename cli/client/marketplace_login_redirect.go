@@ -37,7 +37,7 @@ func httpServerForMarketplaceLoginRedirect(
 		<p>Path '%s' does not eixst on this server. Configure the <tt>host_application.initiate_session_url</tt> to '%s'</p>
 	</body>
 </html>
-`, validRedirectUrl)))
+`, req.URL, validRedirectUrl)))
 			return
 		}
 
