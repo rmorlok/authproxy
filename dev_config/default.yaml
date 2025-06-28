@@ -3,7 +3,7 @@ public:
   cookie:
     same_site: lax
   tls:
-    auto_gen_path: ../dev_config/keys/tls/
+    auto_gen_path: ./dev_config/keys/tls/
 
 api:
   port: 8081

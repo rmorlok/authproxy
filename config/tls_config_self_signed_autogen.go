@@ -8,6 +8,7 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"github.com/mitchellh/go-homedir"
 	"math/big"
 	"os"
 	"path/filepath"
@@ -32,8 +33,17 @@ func (a *TlsConfigSelfSignedAutogen) TlsConfig(ctx context.Context) (*tls.Config
 		return nil, fmt.Errorf("auto gen path must be specified")
 	}
 
-	certPath := filepath.Join(a.AutoGenPath, autogenCertFileName)
-	keyPath := filepath.Join(a.AutoGenPath, autogenKeyFileName)
+	path := a.AutoGenPath
+	if _, err := os.Stat(path); err != nil {
+		// attempt home path expansion
+		path, err = homedir.Expand(path)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	certPath := filepath.Join(path, autogenCertFileName)
+	keyPath := filepath.Join(path, autogenKeyFileName)
 
 	// Check if files already exist
 	_, certErr := os.Stat(certPath)
