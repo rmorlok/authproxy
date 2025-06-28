@@ -55,9 +55,11 @@ func TestAuthServiceWithDb(serviceId config.ServiceId, cfg config.C, db database
 	}
 
 	cfg, r := redis.MustApplyTestConfig(cfg)
-	s := NewService(cfg, cfg.MustGetService(serviceId), db, r, cfg.GetRootLogger())
+	s := cfg.MustGetService(serviceId)
 
-	return cfg, s, &AuthTestUtil{cfg: cfg, s: s.(*service), serviceId: serviceId}
+	hs := NewService(cfg, s.(config.HttpService), db, r, cfg.GetRootLogger())
+
+	return cfg, hs, &AuthTestUtil{cfg: cfg, s: hs.(*service), serviceId: serviceId}
 }
 
 func (atu *AuthTestUtil) NewSignedRequestForActorId(method, url string, body io.Reader, actorId string) (*http.Request, error) {

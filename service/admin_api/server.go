@@ -2,7 +2,6 @@ package admin_api
 
 import (
 	"context"
-	"fmt"
 	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -36,16 +35,17 @@ func GetGinServer(
 	c connectors.C,
 	e encrypt.E,
 	logger *slog.Logger,
-) (server *gin.Engine, healthChecker *gin.Engine) {
+) (httpServer *http.Server, httpHealthChecker *http.Server, err error) {
 	root := cfg.GetRoot()
-	authService := auth.NewService(cfg, &root.AdminApi, db, redis, logger)
+	service := &root.AdminApi
+	authService := auth.NewService(cfg, service, db, redis, logger)
 
 	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
 		Rate:  1 * time.Minute,
-		Limit: 3,
+		Limit: 300,
 	})
 
-	server = api_common.GinForService(&root.AdminApi)
+	server := api_common.GinForService(service)
 
 	corsConfig := root.AdminApi.CorsVal.ToGinCorsConfig(nil)
 	if corsConfig != nil {
@@ -53,8 +53,9 @@ func GetGinServer(
 		server.Use(cors.New(*corsConfig))
 	}
 
+	var healthChecker *gin.Engine
 	if root.Public.Port() != root.Public.HealthCheckPort() {
-		healthChecker = api_common.GinForService(&root.AdminApi)
+		healthChecker = api_common.GinForService(service)
 	} else {
 		healthChecker = server
 	}
@@ -83,7 +84,7 @@ func GetGinServer(
 		api.GET("/todo", mw, func(c *gin.Context) {})
 	}
 
-	return server, healthChecker
+	return service.GetServerAndHealthChecker(server, healthChecker)
 }
 
 func Serve(cfg config.C) {
@@ -154,20 +155,29 @@ func Serve(cfg config.C) {
 		}()
 	}
 
-	server, healthChecker := GetGinServer(cfg, db, rs, c, e, logger)
+	server, healthChecker, err := GetGinServer(cfg, db, rs, c, e, logger)
+	if err != nil {
+		panic(err)
+	}
 
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		api_common.RunGin(server, fmt.Sprintf(":%d", root.AdminApi.Port()), logger)
+		err := api_common.RunServer(server, logger)
+		if err != nil {
+			logger.Error(err.Error())
+		}
 	}()
 
-	if server != healthChecker {
+	if healthChecker != nil {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
-			api_common.RunGin(healthChecker, fmt.Sprintf(":%d", root.AdminApi.HealthCheckPort()), logger)
+			err := api_common.RunServer(healthChecker, logger)
+			if err != nil {
+				logger.Error(err.Error())
+			}
 		}()
 	}
 

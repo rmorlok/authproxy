@@ -6,12 +6,11 @@ import (
 	"github.com/rmorlok/authproxy/config/common"
 	"gopkg.in/yaml.v3"
 	"strconv"
-	"time"
 )
 
 type ServiceWorker struct {
-	HealthCheckPortVal StringValue `json:"heath_check_port" yaml:"heath_check_port"`
-	ConcurrencyVal     StringValue `json:"concurrency" yaml:"concurrency"`
+	ServiceCommon
+	ConcurrencyVal StringValue `json:"concurrency" yaml:"concurrency"`
 }
 
 func (s *ServiceWorker) UnmarshalYAML(value *yaml.Node) error {
@@ -20,8 +19,12 @@ func (s *ServiceWorker) UnmarshalYAML(value *yaml.Node) error {
 		return fmt.Errorf("service worker expected a mapping node, got %s", KindToString(value.Kind))
 	}
 
+	sc, err := commonServiceUnmarshalYAML(value)
+	if err != nil {
+		return err
+	}
+
 	var concurrencyVal StringValue = &StringValueDirect{Value: "0"}
-	var healthCheckPortVal StringValue = &StringValueDirect{Value: "0"}
 
 	// Handle custom unmarshalling for some attributes. Iterate through the mapping node's content,
 	// which will be sequences of keys, then values.
@@ -38,10 +41,6 @@ func (s *ServiceWorker) UnmarshalYAML(value *yaml.Node) error {
 				return err
 			}
 			matched = true
-		case "health_check_port":
-			if healthCheckPortVal, err = common.StringValueUnmarshalYAML(valueNode); err != nil {
-				return err
-			}
 		}
 
 		if matched {
@@ -60,74 +59,23 @@ func (s *ServiceWorker) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	// Set the custom unmarshalled types
+	raw.ServiceCommon = sc
 	raw.ConcurrencyVal = concurrencyVal
-	raw.HealthCheckPortVal = healthCheckPortVal
 
 	return nil
 }
 
-func (s *ServiceWorker) Port() uint64 {
-	return s.HealthCheckPort()
-}
-
 func (s *ServiceWorker) HealthCheckPort() uint64 {
-	portS, err := s.HealthCheckPortVal.GetValue(context.Background())
-	if err != nil {
-		panic("failed to obtain health check port from worker config")
+	p := s.ServiceCommon.healthCheckPort()
+	if p != nil {
+		return *p
 	}
 
-	port, err := strconv.ParseUint(portS, 10, 64)
-	if err != nil {
-		panic(fmt.Sprintf("failed to parse health check port '%s' from worker config", portS))
-	}
-
-	return port
-}
-
-func (s *ServiceWorker) IsHttps() bool {
-	return false
-}
-
-func (s *ServiceWorker) Domain() string {
-	return ""
-}
-
-func (s *ServiceWorker) GetBaseUrl() string {
-	proto := "http"
-	if s.IsHttps() {
-		proto = "https"
-	}
-
-	domain := "localhost"
-	if s.Domain() != "" {
-		domain = s.Domain()
-	}
-
-	if s.Port() == 80 {
-		return fmt.Sprintf("%s://%s", proto, domain)
-	} else {
-		return fmt.Sprintf("%s://%s:%d", proto, domain, s.Port())
-	}
-}
-
-func (s *ServiceWorker) SupportsSession() bool {
-	return false
+	return 0
 }
 
 func (s *ServiceWorker) GetId() ServiceId {
 	return ServiceIdWorker
-}
-
-func (s *ServiceWorker) SessionTimeout() time.Duration {
-	return 0
-}
-
-func (s *ServiceWorker) CookieDomain() string {
-	return ""
-}
-
-func (s *ServiceWorker) XsrfRequestQueueDepth() int {
-	return 0
 }
 
 func (s *ServiceWorker) GetConcurrency(ctx context.Context) int {

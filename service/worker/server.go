@@ -224,7 +224,11 @@ func Serve(cfg config.C) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
-		if err := api_common.RunGin(router, fmt.Sprintf(":%d", cfg.GetRoot().Worker.HealthCheckPort()), logger); err != nil {
+		httpServer := &http.Server{
+			Addr:    fmt.Sprintf(":%d", cfg.GetRoot().Worker.HealthCheckPort()),
+			Handler: router,
+		}
+		if err := api_common.RunServer(httpServer, logger); err != nil {
 			log.Fatalf("could not run gin server: %v", err)
 		}
 		logger.Info("Gin shutdown complete")

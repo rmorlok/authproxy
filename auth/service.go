@@ -13,7 +13,7 @@ type service struct {
 	config config.C
 
 	// The service using this authentication
-	service config.Service
+	service config.HttpService
 
 	// logger interface, default is no logging at all
 	logger *slog.Logger
@@ -23,7 +23,7 @@ type service struct {
 }
 
 // NewService makes an auth service
-func NewService(cfg config.C, svc config.Service, db database.DB, redis redis.R, logger *slog.Logger) A {
+func NewService(cfg config.C, svc config.HttpService, db database.DB, redis redis.R, logger *slog.Logger) A {
 	if cfg == nil {
 		panic("config is required")
 	}

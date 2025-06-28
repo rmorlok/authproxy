@@ -1,18 +1,19 @@
 package config
 
 import (
+	"crypto/tls"
 	"github.com/rmorlok/authproxy/util"
+	"net/http"
 	"time"
 )
 
 type ServiceId string
 
 const (
-	ServiceIdAdminApi    ServiceId = "admin-api"
-	ServiceIdApi         ServiceId = "api"
-	ServiceIdPublic      ServiceId = "public"
-	ServiceIdWorker      ServiceId = "worker"
-	ServiceIdMarketplace ServiceId = "marketplace"
+	ServiceIdAdminApi ServiceId = "admin-api"
+	ServiceIdApi      ServiceId = "api"
+	ServiceIdPublic   ServiceId = "public"
+	ServiceIdWorker   ServiceId = "worker"
 )
 
 func AllServiceIds() []ServiceId {
@@ -21,7 +22,6 @@ func AllServiceIds() []ServiceId {
 		ServiceIdApi,
 		ServiceIdPublic,
 		ServiceIdWorker,
-		ServiceIdMarketplace,
 	}
 }
 
@@ -50,14 +50,28 @@ func AllValidServiceIds(ids []string) bool {
 }
 
 type Service interface {
-	Port() uint64
+	GetId() ServiceId
 	HealthCheckPort() uint64
+}
+
+type HttpService interface {
+	Service
+	Port() uint64
 	IsHttps() bool
+	TlsConfig() (*tls.Config, error)
 	Domain() string
 	GetBaseUrl() string
 	SupportsSession() bool
-	GetId() ServiceId
+	GetServerAndHealthChecker(
+		server http.Handler,
+		healthChecker http.Handler,
+	) (httpServer *http.Server, httpHealthChecker *http.Server, err error)
+}
+
+type HttpServiceWithSession interface {
+	HttpService
 	SessionTimeout() time.Duration
 	CookieDomain() string
+	CookieSameSite() http.SameSite
 	XsrfRequestQueueDepth() int
 }

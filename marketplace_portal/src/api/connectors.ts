@@ -6,7 +6,7 @@ import { Connector, ListConnectorsResponse } from '../models';
  * @returns Promise with the list of connectors
  */
 export const listConnectors = () => {
-  return client.get<ListConnectorsResponse>('/connectors');
+  return client.get<ListConnectorsResponse>('/api/v1/connectors');
 };
 
 /**
@@ -15,7 +15,7 @@ export const listConnectors = () => {
  * @returns Promise with the connector details
  */
 export const getConnector = (id: string) => {
-  return client.get<Connector>(`/connectors/${id}`);
+  return client.get<Connector>(`/api/v1/connectors/${id}`);
 };
 
 export const connectors = {

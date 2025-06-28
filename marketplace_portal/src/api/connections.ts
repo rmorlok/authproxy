@@ -20,7 +20,7 @@ export const listConnections = (state?: string, cursor?: string, limit?: number)
   if (cursor) params.cursor = cursor;
   if (limit) params.limit = limit;
   
-  return client.get<ListConnectionsResponse>('/connections', { params });
+  return client.get<ListConnectionsResponse>('/api/v1/connections', { params });
 };
 
 /**
@@ -29,7 +29,7 @@ export const listConnections = (state?: string, cursor?: string, limit?: number)
  * @returns Promise with the connection details
  */
 export const getConnection = (id: string) => {
-  return client.get<Connection>(`/connections/${id}`);
+  return client.get<Connection>(`/api/v1/connections/${id}`);
 };
 
 /**
@@ -44,7 +44,7 @@ export const initiateConnection = (connectorId: string, returnToUrl: string) => 
     return_to_url: returnToUrl
   };
   
-  return client.post<InitiateConnectionRedirectResponse>('/connections/_initiate', request);
+  return client.post<InitiateConnectionRedirectResponse>('/api/v1/connections/_initiate', request);
 };
 
 export const connections = {

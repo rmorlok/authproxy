@@ -25,7 +25,7 @@ const initiate = (params: ApiSessionInitiateRequest) => {
     if (params.auth_token) {
         headers.Authorization = `Bearer ${params.auth_token}`;
     }
-    return client.post<ApiSessionInitiateResponse>('/session/_initiate', {
+    return client.post<ApiSessionInitiateResponse>('/api/v1/session/_initiate', {
         return_to_url: params.return_to_url,
     }, {
         headers: headers,
@@ -33,7 +33,7 @@ const initiate = (params: ApiSessionInitiateRequest) => {
 }
 
 const terminate = () => {
-    return client.post<ApiSessionTerminateResponse>('/session/_terminate');
+    return client.post<ApiSessionTerminateResponse>('/api/v1/session/_terminate');
 }
 
 const session = {

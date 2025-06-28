@@ -8,6 +8,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/api_common"
+	"github.com/rmorlok/authproxy/config"
 	"net/http"
 	"time"
 )
@@ -153,6 +154,11 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 		return errors.Errorf("server %s does not support session", s.service.GetId())
 	}
 
+	sessionService, ok := s.service.(config.HttpServiceWithSession)
+	if !ok {
+		return errors.Errorf("server %s is misconfigured; it inidicates it supports session but does not implement appropriate interfaces", s.service.GetId())
+	}
+
 	var err error
 	var sess *session
 
@@ -179,7 +185,7 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 		sess = &session{
 			Id:        uuid.New(),
 			ActorId:   ra.GetActor().ID,
-			ExpiresAt: apctx.GetClock(ctx).Now().Add(s.service.SessionTimeout()),
+			ExpiresAt: apctx.GetClock(ctx).Now().Add(sessionService.SessionTimeout()),
 		}
 	}
 
@@ -195,7 +201,8 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 }
 
 func (s *service) extendSession(ctx context.Context, sess *session, w http.ResponseWriter) error {
-	validCsrfValuesLimit := s.service.XsrfRequestQueueDepth()
+	sessionService := s.service.(config.HttpServiceWithSession)
+	validCsrfValuesLimit := sessionService.XsrfRequestQueueDepth()
 
 	// Generate a new UUID to push onto the list.
 	newCsrfValue := uuid.New()
@@ -221,8 +228,9 @@ func (s *service) extendSession(ctx context.Context, sess *session, w http.Respo
 }
 
 func (s *service) setSessionCookie(ctx context.Context, w http.ResponseWriter, sess session) {
+	sessionService := s.service.(config.HttpServiceWithSession)
 	cookieExpiration := 0 // session cookie
-	if s.service.SessionTimeout() != 0 {
+	if sessionService.SessionTimeout() != 0 {
 		cookieExpiration = int(sess.ExpiresAt.Sub(apctx.GetClock(ctx).Now()).Seconds())
 	}
 
@@ -231,10 +239,10 @@ func (s *service) setSessionCookie(ctx context.Context, w http.ResponseWriter, s
 		Value:    sess.Id.String(),
 		HttpOnly: true,
 		Path:     "/",
-		Domain:   s.service.CookieDomain(),
+		Domain:   sessionService.CookieDomain(),
 		MaxAge:   cookieExpiration,
 		Secure:   s.service.IsHttps(),
-		SameSite: http.SameSiteLaxMode,
+		SameSite: sessionService.CookieSameSite(),
 	})
 }
 
@@ -248,12 +256,13 @@ func (s *service) EndSession(ctx context.Context, w http.ResponseWriter, ra Requ
 		}
 	}
 
+	sessionService := s.service.(config.HttpServiceWithSession)
 	sessionCookie := http.Cookie{
 		Name:     sessionCookieName,
 		Value:    "",
 		HttpOnly: false,
 		Path:     "/",
-		Domain:   s.service.CookieDomain(),
+		Domain:   sessionService.CookieDomain(),
 		MaxAge:   -1,
 		Expires:  time.Unix(0, 0),
 		Secure:   s.service.IsHttps(),

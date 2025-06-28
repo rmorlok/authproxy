@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/gin-gonic/gin"
+	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/config"
 	"log"
 	"log/slog"
@@ -43,21 +44,24 @@ func GinForService(service config.Service) *gin.Engine {
 	return engine
 }
 
-// RunGin attaches the router to a http.Server and starts listening and serving HTTP requests. It handles termination
-// signals automatically.
-func RunGin(engine *gin.Engine, address string, logger *slog.Logger) (err error) {
-	srv := &http.Server{
-		Addr:    address, // or your desired port
-		Handler: engine,
-	}
-
+// RunServer Runs a HTTP server and handles termination signals automatically.
+func RunServer(srv *http.Server, logger *slog.Logger) (err error) {
 	// Create channel to listen for signals
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
 	go func() {
-		if err = srv.ListenAndServe(); err != nil {
-			if err == http.ErrServerClosed {
+		var err error
+		if srv.TLSConfig != nil {
+			logger.Info("Starting Gin server with TLS...")
+			err = srv.ListenAndServeTLS("", "")
+		} else {
+			logger.Info("Starting Gin server...")
+			err = srv.ListenAndServe()
+		}
+
+		if err != nil {
+			if errors.Is(err, http.ErrServerClosed) {
 				err = nil
 				return
 			}

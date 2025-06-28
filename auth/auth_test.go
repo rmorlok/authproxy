@@ -130,11 +130,16 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 		adminSigningKey := &config.KeyDataRandomBytes{}
 		b.cfg = config.FromRoot(&config.Root{
 			Public: config.ServicePublic{
-				PortVal:                  &config.StringValueDirect{Value: "8080"},
-				DomainVal:                "example.com",
-				IsHttpsVal:               false,
-				SessionTimeoutVal:        &config.HumanDuration{Duration: 10 * time.Hour},
-				CookieDomainVal:          util.ToPtr("example.com"),
+				ServiceHttp: config.ServiceHttp{
+					PortVal:    &config.StringValueDirect{Value: "8080"},
+					DomainVal:  "example.com",
+					IsHttpsVal: false,
+				},
+				CookieVal: &config.CookieConfig{
+					DomainVal: util.ToPtr("example.com"),
+				},
+				SessionTimeoutVal: &config.HumanDuration{Duration: 10 * time.Hour},
+
 				XsrfRequestQueueDepthVal: util.ToPtr(5),
 			},
 			SystemAuth: config.SystemAuth{
@@ -171,7 +176,7 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 		}
 	}
 
-	auth := NewService(b.cfg, b.cfg.MustGetService(b.service), b.db, b.redis, test_utils.NewTestLogger())
+	auth := NewService(b.cfg, b.cfg.MustGetService(b.service).(config.HttpService), b.db, b.redis, test_utils.NewTestLogger())
 
 	b.ginEngine = gin.New()
 

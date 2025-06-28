@@ -1,5 +1,7 @@
 public:
   port: 8080
+  cookie:
+    same_site: lax
 
 api:
   port: 8081
