@@ -211,7 +211,11 @@ func (s *ServiceHttp) GetBaseUrl() string {
 }
 
 func (s *ServiceHttp) TlsConfig() (*tls.Config, error) {
-	return nil, nil
+	if s.TlsVal == nil {
+		return nil, nil
+	}
+
+	return s.TlsVal.TlsConfig(context.Background())
 }
 
 // GetServerAndHealthChecker returns a configured HTTP server based on the handler provided along with the configuration
