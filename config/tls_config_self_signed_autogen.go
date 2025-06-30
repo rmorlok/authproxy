@@ -6,10 +6,12 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
 	"github.com/mitchellh/go-homedir"
 	"math/big"
+	"net"
 	"os"
 	"path/filepath"
 	"time"
@@ -24,7 +26,7 @@ const (
 	autogenKeyFileName  = "key.pem"
 )
 
-func (a *TlsConfigSelfSignedAutogen) TlsConfig(ctx context.Context) (*tls.Config, error) {
+func (a *TlsConfigSelfSignedAutogen) TlsConfig(ctx context.Context, s HttpService) (*tls.Config, error) {
 	if a == nil {
 		return nil, nil
 	}
@@ -56,12 +58,33 @@ func (a *TlsConfigSelfSignedAutogen) TlsConfig(ctx context.Context) (*tls.Config
 			return nil, fmt.Errorf("failed to generate private key: %v", err)
 		}
 
+		domain := "localhost"
+		if s.Domain() != "" {
+			domain = s.Domain()
+		}
+
+		var ip_addresses []net.IP
+		if domain == "localhost" {
+			ip_addresses = []net.IP{net.ParseIP("127.0.0.1")}
+		}
+
+		// Create a more complete certificate template
 		template := x509.Certificate{
 			SerialNumber: big.NewInt(1),
-			NotBefore:    time.Now(),
-			NotAfter:     time.Now().Add(time.Hour * 24 * 365), // 1 year validity
-			KeyUsage:     x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
-			ExtKeyUsage:  []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+			Subject: pkix.Name{
+				Organization: []string{"AuthProxy Development Certificate"},
+				CommonName:   domain,
+			},
+			NotBefore:   time.Now(),
+			NotAfter:    time.Now().Add(time.Hour * 24 * 365), // 1 year validity
+			KeyUsage:    x509.KeyUsageKeyEncipherment | x509.KeyUsageDigitalSignature,
+			ExtKeyUsage: []x509.ExtKeyUsage{x509.ExtKeyUsageServerAuth},
+			// Add Subject Alternative Names for localhost and 127.0.0.1
+			DNSNames:    []string{domain},
+			IPAddresses: ip_addresses,
+			// Make this a self-signed CA certificate
+			IsCA:                  true,
+			BasicConstraintsValid: true,
 		}
 
 		derBytes, err := x509.CreateCertificate(rand.Reader, &template, &template, &priv.PublicKey, priv)
@@ -96,6 +119,12 @@ func (a *TlsConfigSelfSignedAutogen) TlsConfig(ctx context.Context) (*tls.Config
 			return nil, fmt.Errorf("failed to write key.pem: %v", err)
 		}
 		keyOut.Close()
+
+		fmt.Println("Generated new self-signed certificate for development. To avoid browser warnings:")
+		fmt.Println("1. Import this certificate into your system trust store:")
+		fmt.Printf("   %s\n", certPath)
+		fmt.Println("2. Or use the -k flag with curl for testing:")
+		fmt.Println(fmt.Sprintf("   curl -k %s/ping", s.GetBaseUrl()))
 	}
 
 	// Load certificate and key
@@ -107,6 +136,7 @@ func (a *TlsConfigSelfSignedAutogen) TlsConfig(ctx context.Context) (*tls.Config
 	return &tls.Config{
 		Certificates: []tls.Certificate{cert},
 	}, nil
+
 }
 
 var _ TlsConfig = (*TlsConfigSelfSignedAutogen)(nil)

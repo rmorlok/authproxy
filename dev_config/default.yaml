@@ -1,7 +1,7 @@
 public:
   port: 8080
   cookie:
-    same_site: lax
+    same_site: strict
   tls:
     auto_gen_path: ./dev_config/keys/tls/
 

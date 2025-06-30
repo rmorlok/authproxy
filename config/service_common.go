@@ -215,7 +215,7 @@ func (s *ServiceHttp) TlsConfig() (*tls.Config, error) {
 		return nil, nil
 	}
 
-	return s.TlsVal.TlsConfig(context.Background())
+	return s.TlsVal.TlsConfig(context.Background(), s)
 }
 
 // GetServerAndHealthChecker returns a configured HTTP server based on the handler provided along with the configuration
