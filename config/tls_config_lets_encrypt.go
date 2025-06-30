@@ -15,7 +15,7 @@ type TlsConfigLetsEncrypt struct {
 	CacheDir      string         `json:"cache_dir" yaml:"cache_dir"`
 }
 
-func (tle *TlsConfigLetsEncrypt) TlsConfig(ctx context.Context, s HttpService) (*tls.Config, error) {
+func (tle *TlsConfigLetsEncrypt) TlsConfig(ctx context.Context, s HttpServiceLike) (*tls.Config, error) {
 	if tle == nil {
 		return nil, nil
 	}

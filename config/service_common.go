@@ -40,7 +40,7 @@ func commonServiceUnmarshalYAML(value *yaml.Node) (ServiceCommon, error) {
 		}
 
 		if matched {
-			// Remove the key/value from the raw unmarshalling, and pull back our index
+			// Remove the key/value from the raw unmarshalling and pull back our index
 			// because of the changing slice size to the left of what we are indexing
 			value.Content = append(value.Content[:i], value.Content[i+2:]...)
 			i -= 2
@@ -129,7 +129,7 @@ func httpServiceUnmarshalYAML(value *yaml.Node) (ServiceHttp, error) {
 		}
 
 		if matched {
-			// Remove the key/value from the raw unmarshalling, and pull back our index
+			// Remove the key/value from the raw unmarshalling and pull back our index
 			// because of the changing slice size to the left of what we are indexing
 			value.Content = append(value.Content[:i], value.Content[i+2:]...)
 			i -= 2
@@ -185,7 +185,7 @@ func (s *ServiceHttp) HealthCheckPort() uint64 {
 }
 
 func (s *ServiceHttp) IsHttps() bool {
-	return s.IsHttpsVal
+	return s.TlsVal != nil || s.IsHttpsVal
 }
 
 func (s *ServiceHttp) Domain() string {

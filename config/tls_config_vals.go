@@ -66,7 +66,7 @@ func (tcv *TlsConfigVals) UnmarshalYAML(value *yaml.Node) error {
 	return nil
 }
 
-func (tcv *TlsConfigVals) TlsConfig(ctx context.Context) (*tls.Config, error) {
+func (tcv *TlsConfigVals) TlsConfig(ctx context.Context, s HttpServiceLike) (*tls.Config, error) {
 	if tcv == nil {
 		return nil, nil
 	}

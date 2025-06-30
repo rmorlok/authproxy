@@ -26,7 +26,7 @@ const (
 	autogenKeyFileName  = "key.pem"
 )
 
-func (a *TlsConfigSelfSignedAutogen) TlsConfig(ctx context.Context, s HttpService) (*tls.Config, error) {
+func (a *TlsConfigSelfSignedAutogen) TlsConfig(ctx context.Context, s HttpServiceLike) (*tls.Config, error) {
 	if a == nil {
 		return nil, nil
 	}

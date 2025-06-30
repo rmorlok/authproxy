@@ -8,7 +8,12 @@ import (
 )
 
 type TlsConfig interface {
-	TlsConfig(ctx context.Context, s HttpService) (*tls.Config, error)
+	TlsConfig(ctx context.Context, s HttpServiceLike) (*tls.Config, error)
+}
+
+type HttpServiceLike interface {
+	Domain() string
+	GetBaseUrl() string
 }
 
 func UnmarshallYamlTlsConfigString(data string) (TlsConfig, error) {
