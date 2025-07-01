@@ -1,7 +1,7 @@
 public:
   port: 8080
   cookie:
-    same_site: strict
+    same_site: none
   tls:
     auto_gen_path: ./dev_config/keys/tls/
 
@@ -20,7 +20,7 @@ host_application:
   initiate_session_url: http://127.0.0.1:8888/marketplace-login-redirect
 
 marketplace:
-  port: 5173
+  base_url: http://localhost:5173
 
 system_auth:
   cookie_domain: localhost:8080
