@@ -1,7 +1,7 @@
 import React from 'react';
 import { Meta, StoryObj } from '@storybook/react';
 import ConnectorCard, { ConnectorCardSkeleton } from '../components/ConnectorCard';
-import { Connector } from '../models';
+import { Connector, ConnectorVersionState } from '../models';
 
 const meta: Meta<typeof ConnectorCard> = {
   title: 'Components/ConnectorCard',
@@ -17,14 +17,30 @@ type Story = StoryObj<typeof ConnectorCard>;
 
 const mockConnector: Connector = {
   id: 'google-calendar',
+  version: 1,
+  state: ConnectorVersionState.ACTIVE,
+  type: 'oauth',
   display_name: 'Google Calendar',
   description: 'Connect to your Google Calendar to manage events and appointments.',
   logo: 'https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg',
+  versions: 1,
+  states: [ConnectorVersionState.ACTIVE],
 };
 
 export const Default: Story = {
   args: {
     connector: mockConnector,
+    onConnect: (id) => console.log(`Connect clicked for ${id}`),
+    isConnecting: false,
+  },
+};
+
+export const WithHighlight: Story = {
+  args: {
+    connector: {
+      ...mockConnector,
+      highlight: '**Sync your calendar** with Google Calendar to manage events, appointments, and meetings. Features include:\n\n• Event creation and management\n• Meeting scheduling\n• Reminder notifications\n• Calendar sharing',
+    },
     onConnect: (id) => console.log(`Connect clicked for ${id}`),
     isConnecting: false,
   },

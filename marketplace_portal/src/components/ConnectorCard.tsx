@@ -9,6 +9,8 @@ import {
   Box,
   Skeleton
 } from '@mui/material';
+import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Connector } from '../models';
 
 interface ConnectorCardProps {
@@ -18,6 +20,14 @@ interface ConnectorCardProps {
 }
 
 /**
+ * Truncate text to fit in card design
+ */
+const truncateText = (text: string, maxLength: number = 120): string => {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength).trim() + '...';
+};
+
+/**
  * Component to display a single connector with its details
  */
 const ConnectorCard: React.FC<ConnectorCardProps> = ({ 
@@ -25,6 +35,9 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
   onConnect,
   isConnecting
 }) => {
+  // Use highlight field if available, otherwise use truncated description
+  const displayText = connector.highlight || truncateText(connector.description);
+
   return (
     <Card sx={{ maxWidth: 345, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <CardMedia
@@ -37,9 +50,39 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
         <Typography gutterBottom variant="h5" component="div">
           {connector.display_name}
         </Typography>
-        <Typography variant="body2" color="text.secondary">
-          {connector.description}
-        </Typography>
+        <Box sx={{ 
+          '& p': { margin: 0, fontSize: '0.875rem', color: 'text.secondary' },
+          '& strong': { color: 'text.primary' },
+          '& em': { color: 'text.secondary' },
+          '& code': { 
+            backgroundColor: 'action.hover', 
+            padding: '2px 4px', 
+            borderRadius: '4px',
+            fontSize: '0.8rem'
+          }
+        }}>
+          <ReactMarkdown 
+            remarkPlugins={[remarkGfm]}
+            components={{
+              // Override paragraph to remove default margins
+              p: ({ children }) => <Typography variant="body2" color="text.secondary">{children}</Typography>,
+              // Override strong to use primary color
+              strong: ({ children }) => <Typography component="span" sx={{ fontWeight: 'bold', color: 'text.primary' }}>{children}</Typography>,
+              // Override em to use secondary color
+              em: ({ children }) => <Typography component="span" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>{children}</Typography>,
+              // Override code to use custom styling
+              code: ({ children }) => <Typography component="code" sx={{ 
+                backgroundColor: 'action.hover', 
+                padding: '2px 4px', 
+                borderRadius: '4px',
+                fontSize: '0.8rem',
+                fontFamily: 'monospace'
+              }}>{children}</Typography>
+            }}
+          >
+            {displayText}
+          </ReactMarkdown>
+        </Box>
       </CardContent>
       <CardActions>
         <Button 

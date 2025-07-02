@@ -6,6 +6,7 @@ export interface ConnectorVersion {
   type: string;
   display_name: string;
   description: string;
+  highlight?: string;
   logo: string;
 }
 
