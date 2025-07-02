@@ -40,7 +40,7 @@ const ProtectedRoutes = () => {
     return authStatus !== 'unauthenticated' ? (
         <Outlet />
     ) : (
-        <Navigate to="/login" replace />
+        <Navigate to="/internal-error" replace />
     );
 };
 
