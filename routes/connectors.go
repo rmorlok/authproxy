@@ -18,6 +18,7 @@ type ConnectorJson struct {
 	State       database.ConnectorVersionState `json:"state"`
 	Type        string                         `json:"type"`
 	DisplayName string                         `json:"display_name"`
+	Highlight   string                         `json:"highlight,omitempty"`
 	Description string                         `json:"description"`
 	Logo        string                         `json:"logo"`
 
@@ -37,6 +38,7 @@ func ConnectorToJson(c *connectors.Connector) ConnectorJson {
 		Version:     c.Version,
 		State:       c.State,
 		Type:        c.Type,
+		Highlight:   def.Highlight,
 		DisplayName: def.DisplayName,
 		Description: def.Description,
 		Logo:        logo,

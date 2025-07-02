@@ -61,16 +61,19 @@ connectors:
   auto_migration_lock_duration: 30s
   load_from_list:
   - type: google-drive
-    version: 1
     display_name: Google Drive
     logo:
       public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/1024px-Google_Drive_icon_%282020%29.svg.png?20221103153031
+    highlight: |
+      This is a [quick](https://example.com) description.
     description: | 
       This integration connects Google Drive to Acme app. This has the following advantages:
       
       1. Some reason
       2. Some other reason
       3. Even better reason
+      
+      More information [here](https://example.com) if interested.
     auth:
       type: OAuth2
       client_id:

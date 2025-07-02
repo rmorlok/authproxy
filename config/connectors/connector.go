@@ -37,6 +37,7 @@ type Connector struct {
 
 	DisplayName string       `json:"display_name" yaml:"display_name"`
 	Logo        common.Image `json:"logo" yaml:"logo"`
+	Highlight   string       `json:"highlight,omitempty" yaml:"highlight,omitempty"`
 	Description string       `json:"description" yaml:"description"`
 	Auth        Auth         `json:"auth" yaml:"auth"`
 }
@@ -105,6 +106,7 @@ func (c *Connector) UnmarshalJSON(data []byte) error {
 		State       string          `json:"state,omitempty"`
 		DisplayName string          `json:"display_name"`
 		Logo        json.RawMessage `json:"logo"`
+		Highlight   string          `json:"highlight"`
 		Description string          `json:"description"`
 		Auth        json.RawMessage `json:"auth"`
 	}
@@ -121,6 +123,7 @@ func (c *Connector) UnmarshalJSON(data []byte) error {
 	c.Type = temp.Type
 	c.Version = temp.Version
 	c.State = temp.State
+	c.Highlight = temp.Highlight
 	c.DisplayName = temp.DisplayName
 	c.Description = temp.Description
 
