@@ -63,6 +63,20 @@ func (j *service) Optional() gin.HandlerFunc {
 	}
 }
 
+func (j *service) OptionalXsrfNotRequired() gin.HandlerFunc {
+	return func(c *gin.Context) {
+		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			a := GetAuthFromRequest(r)
+			if a.IsAuthenticated() {
+				c.Set(authContextKey, a)
+			}
+
+			c.Next()
+		})
+		j.TraceXsrfNotRequired(_next, c.Abort).ServeHTTP(c.Writer, c.Request)
+	}
+}
+
 // AdminOnly middleware allows access for admins only
 func (j *service) AdminOnly() gin.HandlerFunc {
 	return func(c *gin.Context) {

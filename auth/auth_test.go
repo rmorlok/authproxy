@@ -34,17 +34,18 @@ type route struct {
 }
 
 type TestGinServerBuilder struct {
-	testName           string
-	pingCounter        int
-	service            config.ServiceId
-	cfg                config.C
-	db                 database.DB
-	redis              redis.R
-	ginEngine          *gin.Engine
-	openRoutes         []route
-	optionalAuthRoutes []route
-	requiredAuthRoutes []route
-	adminAuthRoutes    []route
+	testName                          string
+	pingCounter                       int
+	service                           config.ServiceId
+	cfg                               config.C
+	db                                database.DB
+	redis                             redis.R
+	ginEngine                         *gin.Engine
+	openRoutes                        []route
+	optionalAuthRoutes                []route
+	optionalXsrfNotRequiredAuthRoutes []route
+	requiredAuthRoutes                []route
+	adminAuthRoutes                   []route
 }
 
 func NewTestGinServerBuilder(testName string) *TestGinServerBuilder {
@@ -85,6 +86,18 @@ func (b *TestGinServerBuilder) WithOptionalAuthRoute(method, path string, handle
 
 func (b *TestGinServerBuilder) WithGetPingOptionalAuthRoute(path string) *TestGinServerBuilder {
 	return b.WithOptionalAuthRoute(http.MethodGet, path, func(c *gin.Context, a A) {
+		b.pingCounter++
+		c.PureJSON(200, gin.H{"ok": true})
+	})
+}
+
+func (b *TestGinServerBuilder) WithOptionalXsrfNotRequiredAuthRoute(method, path string, handler HandlerFunc) *TestGinServerBuilder {
+	b.optionalXsrfNotRequiredAuthRoutes = append(b.optionalXsrfNotRequiredAuthRoutes, route{path: path, handler: handler, method: method})
+	return b
+}
+
+func (b *TestGinServerBuilder) WithGetPingOptionalXsrfNotRequiredAuthRoute(path string) *TestGinServerBuilder {
+	return b.WithOptionalXsrfNotRequiredAuthRoute(http.MethodGet, path, func(c *gin.Context, a A) {
 		b.pingCounter++
 		c.PureJSON(200, gin.H{"ok": true})
 	})
@@ -186,6 +199,10 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 
 	for _, r := range b.optionalAuthRoutes {
 		b.ginEngine.Handle(r.method, r.path, auth.Optional(), func(gctx *gin.Context) { r.handler(gctx, auth) })
+	}
+
+	for _, r := range b.optionalXsrfNotRequiredAuthRoutes {
+		b.ginEngine.Handle(r.method, r.path, auth.OptionalXsrfNotRequired(), func(gctx *gin.Context) { r.handler(gctx, auth) })
 	}
 
 	for _, r := range b.requiredAuthRoutes {
@@ -408,6 +425,16 @@ func TestAuth(t *testing.T) {
 			require.Equal(t, gin.H{"ok": true}, resp)
 			require.Equal(t, 1, ts.GetPingCount())
 		})
+		t.Run("optional xsrf not required auth route", func(t *testing.T) {
+			ts := NewTestGinServerBuilder(t.Name()).
+				WithGetPingOptionalXsrfNotRequiredAuthRoute("/ping").
+				Build()
+
+			resp, statusCode, debugHeader := ts.GET(ctx, "/ping")
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 1, ts.GetPingCount())
+		})
 		t.Run("required auth route", func(t *testing.T) {
 			ts := NewTestGinServerBuilder(t.Name()).
 				WithGetPingRequiredAuthRoute("/ping").
@@ -590,6 +617,23 @@ func TestAuth(t *testing.T) {
 			require.Equal(t, gin.H{"ok": true}, resp)
 			require.Equal(t, 1, ts.GetPingCount())
 		})
+		t.Run("optional xsrf not required auth route", func(t *testing.T) {
+			ts := NewTestGinServerBuilder(t.Name()).
+				WithGetPingOptionalXsrfNotRequiredAuthRoute("/ping").
+				Build()
+
+			s := jwt.NewJwtTokenBuilder().
+				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				WithServiceId(ts.Service).
+				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+				MustSignerCtx(ctx)
+
+			resp, statusCode, debugHeader := ts.GetWithSigner(ctx, "/ping", s.SignAuthHeader)
+
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 1, ts.GetPingCount())
+		})
 		t.Run("required auth route", func(t *testing.T) {
 			ts := NewTestGinServerBuilder(t.Name()).
 				WithGetPingRequiredAuthRoute("/ping").
@@ -627,6 +671,22 @@ func TestAuth(t *testing.T) {
 			t.Run("optional auth route", func(t *testing.T) {
 				ts := NewTestGinServerBuilder(t.Name()).
 					WithGetPingOptionalAuthRoute("/ping").
+					Build()
+
+				s := jwt.NewJwtTokenBuilder().
+					WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+					WithAudience("invalid").
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+					MustSignerCtx(ctx)
+
+				_, statusCode, debugHeader := ts.GetWithSigner(ctx, "/ping", s.SignAuthHeader)
+
+				require.Equal(t, http.StatusUnauthorized, statusCode, debugHeader)
+				require.Equal(t, 0, ts.GetPingCount())
+			})
+			t.Run("optional xsrf not required auth route", func(t *testing.T) {
+				ts := NewTestGinServerBuilder(t.Name()).
+					WithGetPingOptionalXsrfNotRequiredAuthRoute("/ping").
 					Build()
 
 				s := jwt.NewJwtTokenBuilder().
@@ -758,6 +818,132 @@ func TestAuth(t *testing.T) {
 			resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/initiate-session"))
 			require.Equal(t, http.StatusOK, statusCode, debugHeader)
 			require.Equal(t, gin.H{"ok": true}, resp)
+
+			ts.XSRFToken = ""
+
+			resp, statusCode, debugHeader = ts.GET(ctx, "/ping-get")
+			require.Equal(t, http.StatusOK, statusCode, debugHeader) // Does not require xsrf
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 1, ts.GetPingCount())
+
+			ts.XSRFToken = ""
+
+			resp, statusCode, debugHeader = ts.POST(ctx, "/ping-post", gin.H{})
+			require.Equal(t, http.StatusForbidden, statusCode, debugHeader) // Requires xsrf
+			require.Equal(t, 1, ts.GetPingCount())
+		})
+	})
+	t.Run("session initiate via post", func(t *testing.T) {
+		setup := func(t *testing.T) TestSetup {
+			return NewTestGinServerBuilder(t.Name()).
+				WithOptionalXsrfNotRequiredAuthRoute(http.MethodPost, "/initiate-session", func(gctx *gin.Context, auth A) {
+					ra := GetAuthFromGinContext(gctx)
+					if ra.IsAuthenticated() {
+						err := auth.EstablishGinSession(gctx, ra)
+						if err != nil {
+							api_common.NewHttpStatusErrorBuilder().
+								WithInternalErr(err).
+								BuildStatusError().
+								WriteGinResponse(api_common.NewMockDebuggable(true), gctx)
+							return
+						}
+
+						gctx.PureJSON(http.StatusOK, gin.H{"ok": true, "session": true})
+					} else {
+						gctx.PureJSON(http.StatusOK, gin.H{"ok": true, "session": false})
+					}
+				}).
+				WithOptionalXsrfNotRequiredAuthRoute(http.MethodPost, "/end-session", func(gctx *gin.Context, auth A) {
+					ra := GetAuthFromGinContext(gctx)
+					if ra.IsAuthenticated() {
+						err := auth.EndGinSession(gctx, ra)
+						if err != nil {
+							api_common.NewHttpStatusErrorBuilder().
+								WithInternalErr(err).
+								BuildStatusError().
+								WriteGinResponse(api_common.NewMockDebuggable(true), gctx)
+							return
+						}
+
+						gctx.PureJSON(http.StatusOK, gin.H{"ok": true, "terminated": true})
+					} else {
+						gctx.PureJSON(http.StatusOK, gin.H{"ok": true, "terminated": false})
+					}
+				}).
+				WithGetPingRequiredAuthRoute("/ping-get").
+				WithPostPingRequiredAuthRoute("/ping-post").
+				Build()
+		}
+
+		t.Run("full flow", func(t *testing.T) {
+			ts := setup(t)
+
+			// No session
+			resp, statusCode, debugHeader := ts.GET(ctx, "/ping-get")
+			require.Equal(t, http.StatusUnauthorized, statusCode, debugHeader)
+			require.Equal(t, 0, ts.GetPingCount())
+
+			resp, statusCode, debugHeader = ts.POST(ctx, "/ping-post", gin.H{})
+			require.Equal(t, http.StatusUnauthorized, statusCode, debugHeader)
+			require.Equal(t, 0, ts.GetPingCount())
+
+			resp, statusCode, debugHeader = ts.POST(ctx, "/initiate-session", gin.H{})
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true, "session": false}, resp)
+
+			resp, statusCode, debugHeader = ts.POST(ctx, "/end-session", gin.H{})
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true, "terminated": false}, resp)
+
+			s := jwt.NewJwtTokenBuilder().
+				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				WithServiceId(ts.Service).
+				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+				MustSignerCtx(ctx)
+
+			// Start session (note that this is a post, but it does not require xsrf)
+			resp, statusCode, debugHeader = ts.POST(ctx, s.SignUrlQuery("/initiate-session"), gin.H{})
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true, "session": true}, resp)
+
+			resp, statusCode, debugHeader = ts.GET(ctx, "/ping-get")
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 1, ts.GetPingCount())
+
+			resp, statusCode, debugHeader = ts.POST(ctx, "/ping-post", gin.H{})
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 2, ts.GetPingCount())
+
+			resp, statusCode, debugHeader = ts.POST(ctx, "/end-session", gin.H{})
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true, "terminated": true}, resp)
+			require.Equal(t, 2, ts.GetPingCount())
+
+			// No session again
+			resp, statusCode, debugHeader = ts.GET(ctx, "/ping-get")
+			require.Equal(t, http.StatusUnauthorized, statusCode, debugHeader)
+			require.Equal(t, 2, ts.GetPingCount())
+
+			resp, statusCode, debugHeader = ts.POST(ctx, "/ping-post", gin.H{})
+			require.Equal(t, http.StatusUnauthorized, statusCode, debugHeader)
+			require.Equal(t, 2, ts.GetPingCount())
+		})
+
+		t.Run("requires xsrf for post but not for get", func(t *testing.T) {
+			ts := setup(t)
+
+			s := jwt.NewJwtTokenBuilder().
+				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				WithServiceId(ts.Service).
+				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+				MustSignerCtx(ctx)
+
+			// Start session (note no XSRF required for the post)
+			resp, statusCode, debugHeader := ts.POST(ctx, s.SignUrlQuery("/initiate-session"), gin.H{})
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true, "session": true}, resp)
 
 			ts.XSRFToken = ""
 

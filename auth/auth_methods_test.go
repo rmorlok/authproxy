@@ -398,7 +398,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				req := httptest.NewRequest("GET", "/", nil)
 				req.Header.Add(JwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
 				w := httptest.NewRecorder()
-				ra, err := raw.establishAuthFromRequest(testContext, req, w)
+				ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
 				require.NoError(t, err)
 				require.True(t, ra.IsAuthenticated())
 				require.Equal(t, testClaims().Actor.ID, ra.MustGetActor().ExternalId)
@@ -428,7 +428,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				req := httptest.NewRequest("GET", "/", nil)
 				req.Header.Add(JwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
 				w := httptest.NewRecorder()
-				ra, err := raw.establishAuthFromRequest(testContext, req, w)
+				ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
 				require.NoError(t, err)
 				require.True(t, ra.IsAuthenticated())
 				require.Equal(t, testClaims().Actor.ID, ra.MustGetActor().ExternalId)
@@ -451,7 +451,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				req := httptest.NewRequest("GET", "/", nil)
 				req.Header.Add(JwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
 				w := httptest.NewRecorder()
-				ra, err := raw.establishAuthFromRequest(testContext, req, w)
+				ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
 				require.NoError(t, err)
 				require.True(t, ra.IsAuthenticated())
 				require.Equal(t, testClaims().Actor.ID, ra.MustGetActor().ExternalId)
@@ -474,7 +474,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				Build()
 
 			w := httptest.NewRecorder()
-			_, err = raw.establishAuthFromRequest(futureCtx, req, w)
+			_, err = raw.establishAuthFromRequest(futureCtx, true, req, w)
 			require.NotNil(t, err)
 
 			actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.ID)
@@ -488,7 +488,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			req := httptest.NewRequest("GET", "/", nil)
 			req.Header.Add(JwtHeaderKey, "Bearer: bad bad token")
 			w := httptest.NewRecorder()
-			_, err := raw.establishAuthFromRequest(testContext, req, w)
+			_, err := raw.establishAuthFromRequest(testContext, true, req, w)
 			require.NotNil(t, err)
 
 			actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.ID)
@@ -505,7 +505,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 
 			req := httptest.NewRequest("GET", "/blah?auth_token="+tok, nil)
 			w := httptest.NewRecorder()
-			ra, err := raw.establishAuthFromRequest(testContext, req, w)
+			ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
 			require.NoError(t, err)
 			require.True(t, ra.IsAuthenticated())
 
@@ -524,7 +524,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 
 			req := httptest.NewRequest("GET", "/blah?auth_token="+tok, nil)
 			w := httptest.NewRecorder()
-			_, err = raw.establishAuthFromRequest(futureCtx, req, w)
+			_, err = raw.establishAuthFromRequest(futureCtx, true, req, w)
 			require.NotNil(t, err)
 		})
 		t.Run("bad token", func(t *testing.T) {
@@ -532,7 +532,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 
 			req := httptest.NewRequest("GET", "/blah?auth_token=blah", nil)
 			w := httptest.NewRecorder()
-			_, err := raw.establishAuthFromRequest(testContext, req, w)
+			_, err := raw.establishAuthFromRequest(testContext, true, req, w)
 			require.NotNil(t, err)
 		})
 	})

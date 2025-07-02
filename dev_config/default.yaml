@@ -95,7 +95,7 @@ connectors:
     version: 1
     display_name: Google Calendar
     logo:
-      public_url: https://en.wikipedia.org/wiki/Google_Calendar#/media/File:Google_Calendar_icon_(2020).svg
+      public_url: https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg
     description: |
       Sync your Google Calendar
     auth:

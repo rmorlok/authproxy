@@ -44,7 +44,7 @@ func (s *session) IsExpired(ctx context.Context) bool {
 // establishAuthFromSession loads auth from an existing session. It is used as part of the process of attempting
 // to establish auth for a request. It takes an optional claims which would have come from any JWT present on
 // the request previously.
-func (s *service) establishAuthFromSession(ctx context.Context, r *http.Request, w http.ResponseWriter, fromJwt RequestAuth) (RequestAuth, error) {
+func (s *service) establishAuthFromSession(ctx context.Context, requireSessionXsrf bool, r *http.Request, w http.ResponseWriter, fromJwt RequestAuth) (RequestAuth, error) {
 	if !s.service.SupportsSession() {
 		// This service doesn't support sessions, so do nothing
 		return fromJwt, nil
@@ -98,7 +98,7 @@ func (s *service) establishAuthFromSession(ctx context.Context, r *http.Request,
 		// must validate if the XSRF token is present if this request is for a non-GET request.
 
 		// Check for XSRF token in the header for non-GET requests
-		if r.Method != http.MethodGet {
+		if requireSessionXsrf && r.Method != http.MethodGet {
 			xsrfTokenHeader := r.Header.Get(xsrfHeaderKey)
 			if xsrfTokenHeader == "" {
 				return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
@@ -294,7 +294,7 @@ func (s *service) tryReadSessionFromRedis(ctx context.Context, sessionId uuid.UU
 	result := s.redis.Client().Get(ctx, getRedisSessionKey(sessionId))
 
 	if result.Err() != nil {
-		if result.Err() == redis.Nil {
+		if errors.Is(result.Err(), redis.Nil) {
 			// Not an error, just no session in redis
 			return nil, nil
 		}

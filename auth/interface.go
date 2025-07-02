@@ -19,6 +19,7 @@ type A interface {
 
 	Required() gin.HandlerFunc
 	Optional() gin.HandlerFunc
+	OptionalXsrfNotRequired() gin.HandlerFunc
 	AdminOnly() gin.HandlerFunc
 	// RBAC(roles ...string) gin.HandlerFunc
 

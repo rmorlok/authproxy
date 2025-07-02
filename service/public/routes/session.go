@@ -133,7 +133,7 @@ func (r *SessionRoutes) terminate(gctx *gin.Context) {
 }
 
 func (r *SessionRoutes) Register(g gin.IRouter) {
-	g.POST("/session/_initiate", r.authService.Optional(), r.initiate)
+	g.POST("/session/_initiate", r.authService.OptionalXsrfNotRequired(), r.initiate)
 	g.POST("/session/_terminate", r.authService.Optional(), r.terminate)
 }
 

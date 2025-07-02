@@ -41,20 +41,24 @@ func SetAuthOnRequestContext(r *http.Request, auth RequestAuth) *http.Request {
 
 // Auth middleware adds auth from session and populates actor info
 func (j *service) Auth(next http.Handler, abort func()) http.Handler {
-	return j.auth(true, abort)(next)
+	return j.auth(true, true, abort)(next)
 }
 
 // Trace middleware doesn't require valid actor but if actor info presented populates info
 func (j *service) Trace(next http.Handler, abort func()) http.Handler {
-	return j.auth(false, abort)(next)
+	return j.auth(false, true, abort)(next)
+}
+
+func (j *service) TraceXsrfNotRequired(next http.Handler, abort func()) http.Handler {
+	return j.auth(false, false, abort)(next)
 }
 
 // auth implements all logic for authentication (reqAuth=true) and tracing (reqAuth=false)
-func (j *service) auth(requireAuth bool, abort func()) func(http.Handler) http.Handler {
+func (j *service) auth(requireAuth bool, requireSessionXsrf bool, abort func()) func(http.Handler) http.Handler {
 	f := func(h http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
-			requestAuth, err := j.establishAuthFromRequest(ctx, r, w)
+			requestAuth, err := j.establishAuthFromRequest(ctx, requireSessionXsrf, r, w)
 			if err != nil {
 				// We treat any errors as a failure, even if the resulting status is unauthorized. Not passing
 				// a JWT will just result in you requesting this endpoint without authentication, but passing a bad
