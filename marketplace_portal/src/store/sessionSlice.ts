@@ -73,8 +73,10 @@ export const sessionSlice = createSlice({
             .addCase(initiateSessionAsync.rejected, (state, action) => {
                 state.status = 'unauthenticated';
                 state.actor_id = null;
-                // Let React Router handle the navigation instead of using window.location.href
-            });
+                setTimeout(() => {
+                    window.location.href = action.payload?.redirect_url || '/internal-error';
+                }, 0);
+        });
     },
 });
 
