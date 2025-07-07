@@ -42,7 +42,7 @@ export const initiateSessionAsync = createAsyncThunk<
             }
 
             // Default error response
-            return rejectWithValue({ redirect_url: '/internal-error' });
+            return rejectWithValue({ redirect_url: import.meta.env.VITE_PUBLIC_BASE_URL + '/error' });
         }
     }
 );
@@ -74,7 +74,7 @@ export const sessionSlice = createSlice({
                 state.status = 'unauthenticated';
                 state.actor_id = null;
                 setTimeout(() => {
-                    window.location.href = action.payload?.redirect_url || '/internal-error';
+                    window.location.href = action.payload?.redirect_url || import.meta.env.VITE_PUBLIC_BASE_URL + '/error';
                 }, 0);
         });
     },

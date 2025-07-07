@@ -21,6 +21,10 @@ type C interface {
 	// GetFallbackConnectorLogo gets a logo to use if not specified for a connector configuration
 	GetFallbackConnectorLogo() string
 
+	// GetErrorPageUrl gets a URL to an error page for the specified error. If explicitly set in Root.ErrorPages, it
+	// uses that value. If not, falls back to defaults
+	GetErrorPageUrl(ErrorPage) string
+
 	// GetRootLogger returns the root logger instance configured for the application. This will always
 	// return a logger, defaulting to a none logger if nothing is configured.
 	GetRootLogger() *slog.Logger
@@ -61,6 +65,10 @@ func (c *config) GetFallbackConnectorLogo() string {
 
 func (c *config) GetRootLogger() *slog.Logger {
 	return c.root.GetRootLogger()
+}
+
+func (c *config) GetErrorPageUrl(ep ErrorPage) string {
+	return c.root.ErrorPages.urlForError(ep, c.root.Public.GetBaseUrl())
 }
 
 func LoadConfig(path string) (C, error) {

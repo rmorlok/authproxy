@@ -24,11 +24,8 @@ if ((window as any).AUTHPROXY_AUTH_TOKEN) {
     }
 }
 
-const currentPath = window.location.pathname;
-if (currentPath !== '/internal-error') {
-    // Trigger auth state to load as soon as the page loads.
-    store.dispatch(initiateSessionAsync(params));
-}
+// Trigger auth state to load as soon as the page loads.
+store.dispatch(initiateSessionAsync(params));
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>

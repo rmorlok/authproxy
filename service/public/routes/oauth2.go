@@ -33,27 +33,37 @@ func (r *Oauth2Routes) callback(gctx *gin.Context) {
 	ra := auth.GetAuthFromGinContext(gctx)
 	if !ra.IsAuthenticated() {
 		api_common.AddGinDebugHeader(r.cfg, gctx, "auth not present on context")
-		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.GetUnauthorized())
+		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, config.ErrorTemplateValues{
+			Error:       config.ErrorPageUnauthorized,
+			Description: "Request is not part of an authenticated session.",
+		})
 		return
 	}
 
 	if gctx.Query("state") == "" {
 		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.New("failed to bind state param"))
-		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+		gctx.Redirect(http.StatusFound, r.cfg.GetErrorPageUrl(config.ErrorPageInternalError))
+		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, config.ErrorTemplateValues{
+			Error: config.ErrorPageInternalError,
+		})
 		return
 	}
 
 	stateUUID, err := uuid.Parse(gctx.Query("state"))
 	if err != nil {
 		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to parse state param to UUID"))
-		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, config.ErrorTemplateValues{
+			Error: config.ErrorPageInternalError,
+		})
 		return
 	}
 
 	oauthState, err := r.oauthf.GetOAuth2State(ctx, ra.MustGetActor(), stateUUID) // Get the OAuth2 state
 	if err != nil {
 		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to get oauth2 state"))
-		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, config.ErrorTemplateValues{
+			Error: config.ErrorPageInternalError,
+		})
 		return
 	}
 
@@ -61,14 +71,18 @@ func (r *Oauth2Routes) callback(gctx *gin.Context) {
 		err = r.authService.EndGinSession(gctx, ra)
 		if err != nil {
 			api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to end gin session"))
-			gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+			r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, config.ErrorTemplateValues{
+				Error: config.ErrorPageInternalError,
+			})
 		}
 	}
 
 	redirectUrl, err := oauthState.CallbackFrom3rdParty(ctx, gctx.Request.URL.Query())
 	if err != nil {
 		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to handle oauth2 callback"))
-		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, config.ErrorTemplateValues{
+			Error: config.ErrorPageInternalError,
+		})
 		return
 	}
 
@@ -85,7 +99,9 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 	ra := auth.GetAuthFromGinContext(gctx)
 	if !ra.IsAuthenticated() {
 		api_common.AddGinDebugHeader(r.cfg, gctx, "auth not present on context")
-		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.GetUnauthorized())
+		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, config.ErrorTemplateValues{
+			Error: config.ErrorPageInternalError,
+		})
 		return
 	}
 
@@ -96,46 +112,60 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 		err := r.authService.EstablishGinSession(gctx, ra)
 		if err != nil {
 			api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to establish gin session"))
-			gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+			r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, config.ErrorTemplateValues{
+				Error: config.ErrorPageInternalError,
+			})
 		}
 	}
 
 	var req RedirectParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
 		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to bind redirect params"))
-		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, config.ErrorTemplateValues{
+			Error: config.ErrorPageInternalError,
+		})
 		return
 	}
 
 	if req.StateId == "" {
 		api_common.AddGinDebugHeader(r.cfg, gctx, "state_id is required")
-		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, config.ErrorTemplateValues{
+			Error: config.ErrorPageInternalError,
+		})
 		return
 	}
 
 	stateId, err := uuid.Parse(req.StateId)
 	if err != nil {
 		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to parse state_id"))
-		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, config.ErrorTemplateValues{
+			Error: config.ErrorPageInternalError,
+		})
 	}
 
 	o2, err := r.oauthf.GetOAuth2State(ctx, ra.MustGetActor(), stateId)
 	if err != nil {
 		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to get oauth2 state"))
-		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, config.ErrorTemplateValues{
+			Error: config.ErrorPageInternalError,
+		})
 		return
 	}
 
 	err = o2.RecordCancelSessionAfterAuth(ctx, shouldCancelSession)
 	if err != nil {
 		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to record cancel session after auth"))
-		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, config.ErrorTemplateValues{
+			Error: config.ErrorPageInternalError,
+		})
 	}
 
 	redirectUrl, err := o2.GenerateAuthUrl(ctx, ra.MustGetActor())
 	if err != nil {
 		api_common.AddGinDebugHeaderError(r.cfg, gctx, errors.Wrap(err, "failed to generate oauth2 redirect url"))
-		gctx.Redirect(http.StatusFound, r.cfg.GetRoot().ErrorPages.Fallback)
+		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, config.ErrorTemplateValues{
+			Error: config.ErrorPageInternalError,
+		})
 		return
 	}
 

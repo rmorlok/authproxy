@@ -3,6 +3,7 @@ package oauth2
 import (
 	"context"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/config"
 	"net/url"
 )
 
@@ -25,7 +26,7 @@ func (o *OAuth2) getPublicCallbackUrl() (string, error) {
 }
 
 func (o *OAuth2) CallbackFrom3rdParty(ctx context.Context, query url.Values) (string, error) {
-	errorRedirectPage := o.cfg.GetRoot().ErrorPages.Fallback
+	errorRedirectPage := o.cfg.GetErrorPageUrl(config.ErrorPageInternalError)
 
 	if o.state == nil {
 		return errorRedirectPage, errors.New("state is nil")

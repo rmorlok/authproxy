@@ -6,7 +6,7 @@ import { selectAuthStatus, initiateSessionAsync } from "./store";
 import Layout from './components/Layout';
 import ConnectorList from './components/ConnectorList';
 import ConnectionList from './components/ConnectionList';
-import {InternalError} from "./InternalError";
+import { Error } from "./Error";
 
 export default function App() {
     const dispatch = useDispatch();
@@ -23,16 +23,6 @@ export default function App() {
     );
 }
 
-const GuestRoute = () => {
-    const authStatus = useSelector(selectAuthStatus);
-
-    return authStatus === 'unauthenticated' ? (
-        <Outlet />
-    ) : (
-        <Navigate to="/internal-error" replace />
-    );
-};
-
 const ProtectedRoutes = () => {
     const authStatus = useSelector(selectAuthStatus);
 
@@ -40,7 +30,7 @@ const ProtectedRoutes = () => {
     return authStatus !== 'unauthenticated' ? (
         <Outlet />
     ) : (
-        <Navigate to="/internal-error" replace />
+        <Error title={"Unauthorized"} body1={"You are not authorized to access this page. Please login to continue."} body2={"If you are not already logged in, please click the button below to login."} />
     );
 };
 
@@ -48,11 +38,6 @@ export function Router() {
   return (
       <BrowserRouter>
           <Routes>
-              { /* Things people can see unauthenticated */ }
-              <Route element={<GuestRoute />}>
-                  <Route path={'/internal-error'} Component={InternalError}/>
-              </Route>
-
               { /* Things only authenticated users can see */ }
               <Route element={<ProtectedRoutes />}>
                   <Route element={<Layout />}>

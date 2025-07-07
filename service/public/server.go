@@ -119,6 +119,9 @@ func GetGinServer(
 		})
 	})
 
+	routesError := routes.NewErrorRoutes(cfg)
+	routesError.Register(server)
+
 	routesOauth2 := routes.NewOauth2Routes(cfg, authService, db, redis, c, httpf, encrypt, logger)
 	routesOauth2.Register(server)
 
