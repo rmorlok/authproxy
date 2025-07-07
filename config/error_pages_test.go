@@ -1,8 +1,10 @@
 package config
 
 import (
+	"encoding/json"
 	"github.com/gin-gonic/gin"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -138,6 +140,74 @@ func TestErrorPages_RenderRenderOrRedirect(t *testing.T) {
 		ep.RenderRenderOrRedirect(c, ErrorTemplateValues{Error: "unknown"})
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		assert.Contains(t, w.Body.String(), "Error Occurred")
+	})
+}
+
+func TestErrorPages_UnmarshalJSON(t *testing.T) {
+	t.Run("with simple fields", func(t *testing.T) {
+		jsonData := `{
+			"not_found": "https://example.com/404",
+			"unauthorized": "https://example.com/401",
+			"internal_error": "https://example.com/500"
+		}`
+
+		var ep ErrorPages
+		err := json.Unmarshal([]byte(jsonData), &ep)
+		require.NoError(t, err)
+
+		assert.Equal(t, "https://example.com/404", ep.NotFound)
+		assert.Equal(t, "https://example.com/401", ep.Unauthorized)
+		assert.Equal(t, "https://example.com/500", ep.InternalError)
+		assert.Nil(t, ep.Template)
+	})
+
+	t.Run("with template as string", func(t *testing.T) {
+		jsonData := `{
+			"template": "custom template"
+		}`
+
+		var ep ErrorPages
+		err := json.Unmarshal([]byte(jsonData), &ep)
+		require.NoError(t, err)
+
+		assert.NotNil(t, ep.Template)
+		val, err := ep.Template.GetValue(nil)
+		require.NoError(t, err)
+		assert.Equal(t, "custom template", val)
+	})
+
+	t.Run("with template as object with value", func(t *testing.T) {
+		jsonData := `{
+			"template": {
+				"value": "custom template"
+			}
+		}`
+
+		var ep ErrorPages
+		err := json.Unmarshal([]byte(jsonData), &ep)
+		require.NoError(t, err)
+
+		assert.NotNil(t, ep.Template)
+		val, err := ep.Template.GetValue(nil)
+		require.NoError(t, err)
+		assert.Equal(t, "custom template", val)
+	})
+
+	t.Run("with template as object with base64", func(t *testing.T) {
+		jsonData := `{
+			"template": {
+				"base64": "Y3VzdG9tIHRlbXBsYXRl"
+			}
+		}`
+
+		var ep ErrorPages
+		err := json.Unmarshal([]byte(jsonData), &ep)
+		require.NoError(t, err)
+
+		assert.NotNil(t, ep.Template)
+		val, err := ep.Template.GetValue(nil)
+		require.NoError(t, err)
+		assert.Equal(t, "custom template", val)
 	})
 }
 

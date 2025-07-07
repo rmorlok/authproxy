@@ -30,6 +30,7 @@ var (
 	UnmarshallYamlStringValue       = common.UnmarshallYamlStringValue
 	UnmarshallYamlStringValueString = common.UnmarshallYamlStringValueString
 	StringValueUnmarshalYAML        = common.StringValueUnmarshalYAML
+	StringValueUnmarshalJSON        = common.StringValueUnmarshalJSON
 )
 
 // Re-export types from the connectors sub-package
