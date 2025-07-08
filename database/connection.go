@@ -61,6 +61,15 @@ func (db *gormDB) GetConnection(ctx context.Context, id uuid.UUID) (*Connection,
 	return &c, nil
 }
 
+func (db *gormDB) DeleteConnection(ctx context.Context, id uuid.UUID) error {
+	sess := db.session(ctx)
+	result := sess.Delete(&Connection{}, id)
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
+}
+
 type ConnectionOrderByField string
 
 const (

@@ -81,6 +81,20 @@ func (mr *MockDBMockRecorder) CreateConnection(ctx, c interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateConnection", reflect.TypeOf((*MockDB)(nil).CreateConnection), ctx, c)
 }
 
+// DeleteConnection mocks base method.
+func (m *MockDB) DeleteConnection(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteConnection", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteConnection indicates an expected call of DeleteConnection.
+func (mr *MockDBMockRecorder) DeleteConnection(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteConnection", reflect.TypeOf((*MockDB)(nil).DeleteConnection), ctx, id)
+}
+
 // EnumerateOAuth2TokensExpiringWithin mocks base method.
 func (m *MockDB) EnumerateOAuth2TokensExpiringWithin(ctx context.Context, duration time.Duration, callback func([]*database.OAuth2TokenWithConnection, bool) (bool, error)) error {
 	m.ctrl.T.Helper()

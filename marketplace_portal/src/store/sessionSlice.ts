@@ -52,7 +52,7 @@ export const sessionSlice = createSlice({
     initialState,
     reducers: {
         terminate: (state) => {
-            state.status = 'unauthenticated';
+            state.status = 'checking';
             state.actor_id = null;
 
             setTimeout(async () => {

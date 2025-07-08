@@ -3,7 +3,9 @@ package database
 import (
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/apctx"
+	"github.com/rmorlok/authproxy/test_utils"
 	"github.com/stretchr/testify/assert"
+	"gorm.io/gorm"
 	clock "k8s.io/utils/clock/testing"
 	"testing"
 	"time"
@@ -26,6 +28,67 @@ func TestConnections(t *testing.T) {
 		assert.Equal(t, c.State, ConnectionStateCreated)
 		assert.Equal(t, now, c.CreatedAt)
 		assert.Equal(t, now, c.UpdatedAt)
+	})
+	t.Run("delete connection", func(t *testing.T) {
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw("delete_connection", nil)
+		defer rawDb.Close()
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		type connectionResult struct {
+			Id    string
+			State string
+			gorm.DeletedAt
+		}
+
+		test_utils.AssertSql(t, rawDb, `
+			SELECT id,state, deleted_at FROM connections;
+		`, []connectionResult{})
+
+		u := uuid.New()
+		err := db.CreateConnection(ctx, &Connection{ID: u, State: ConnectionStateCreated})
+		assert.NoError(t, err)
+
+		test_utils.AssertSql(t, rawDb, `
+			SELECT id,state, deleted_at FROM connections;
+		`, []connectionResult{
+			{
+				Id:        u.String(),
+				State:     string(ConnectionStateCreated),
+				DeletedAt: gorm.DeletedAt{},
+			},
+		})
+
+		// Delete a connection that does not exist
+		err = db.DeleteConnection(ctx, uuid.New())
+		assert.NoError(t, err)
+
+		// Unchanged
+		test_utils.AssertSql(t, rawDb, `
+			SELECT id,state, deleted_at FROM connections;
+		`, []connectionResult{
+			{
+				Id:        u.String(),
+				State:     string(ConnectionStateCreated),
+				DeletedAt: gorm.DeletedAt{},
+			},
+		})
+
+		err = db.DeleteConnection(ctx, u)
+		assert.NoError(t, err)
+
+		test_utils.AssertSql(t, rawDb, `
+			SELECT id,state, deleted_at FROM connections;
+		`, []connectionResult{
+			{
+				Id:    u.String(),
+				State: string(ConnectionStateCreated),
+				DeletedAt: gorm.DeletedAt{
+					Time:  now,
+					Valid: true,
+				},
+			},
+		})
 	})
 	t.Run("list connections", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig("connection_round_trip", nil)
