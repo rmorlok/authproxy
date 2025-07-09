@@ -90,6 +90,68 @@ func TestConnections(t *testing.T) {
 			},
 		})
 	})
+	t.Run("set connection state", func(t *testing.T) {
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw("set_connection_state", nil)
+		defer rawDb.Close()
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		type connectionResult struct {
+			Id        string
+			State     string
+			UpdatedAt time.Time
+		}
+
+		test_utils.AssertSql(t, rawDb, `
+			SELECT id,state, updated_at FROM connections;
+		`, []connectionResult{})
+
+		u := uuid.New()
+		err := db.CreateConnection(ctx, &Connection{ID: u, State: ConnectionStateCreated})
+		assert.NoError(t, err)
+
+		test_utils.AssertSql(t, rawDb, `
+			SELECT id,state, updated_at FROM connections;
+		`, []connectionResult{
+			{
+				Id:        u.String(),
+				State:     string(ConnectionStateCreated),
+				UpdatedAt: now,
+			},
+		})
+
+		newNow := time.Date(1955, time.November, 6, 6, 29, 0, 0, time.UTC)
+		ctx = apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(newNow)).Build()
+
+		// Attempt update for connection that does not exist
+		err = db.SetConnectionState(ctx, uuid.New(), ConnectionStateReady)
+		assert.ErrorIs(t, err, ErrNotFound)
+
+		// Unchanged
+		test_utils.AssertSql(t, rawDb, `
+			SELECT id,state, updated_at FROM connections;
+		`, []connectionResult{
+			{
+				Id:        u.String(),
+				State:     string(ConnectionStateCreated),
+				UpdatedAt: now,
+			},
+		})
+
+		err = db.SetConnectionState(ctx, u, ConnectionStateReady)
+		assert.NoError(t, err)
+
+		test_utils.AssertSql(t, rawDb, `
+			SELECT id,state, updated_at FROM connections;
+		`, []connectionResult{
+			{
+				Id:        u.String(),
+				State:     string(ConnectionStateReady),
+				UpdatedAt: newNow,
+			},
+		})
+	})
+
 	t.Run("list connections", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig("connection_round_trip", nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)

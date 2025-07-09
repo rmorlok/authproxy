@@ -44,6 +44,7 @@ type DB interface {
 	GetConnection(ctx context.Context, id uuid.UUID) (*Connection, error)
 	CreateConnection(ctx context.Context, c *Connection) error
 	DeleteConnection(ctx context.Context, id uuid.UUID) error
+	SetConnectionState(ctx context.Context, id uuid.UUID, state ConnectionState) error
 	ListConnectionsBuilder() ListConnectionsBuilder
 	ListConnectionsFromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error)
 

@@ -2,8 +2,10 @@ package database
 
 import (
 	"context"
+	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/util"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
@@ -13,9 +15,11 @@ import (
 type ConnectionState string
 
 const (
-	ConnectionStateCreated  ConnectionState = "created"
-	ConnectionStateReady    ConnectionState = "ready"
-	ConnectionStateDisabled ConnectionState = "disabled"
+	ConnectionStateCreated       ConnectionState = "created"
+	ConnectionStateReady         ConnectionState = "ready"
+	ConnectionStateDisabled      ConnectionState = "disabled"
+	ConnectionStateDisconnecting ConnectionState = "disconnecting"
+	ConnectionStateDisconnected  ConnectionState = "disconnected"
 )
 
 type Connection struct {
@@ -67,6 +71,41 @@ func (db *gormDB) DeleteConnection(ctx context.Context, id uuid.UUID) error {
 	if result.Error != nil {
 		return result.Error
 	}
+	return nil
+}
+
+func (db *gormDB) SetConnectionState(ctx context.Context, id uuid.UUID, state ConnectionState) error {
+	sqlDb, err := db.gorm.DB()
+	if err != nil {
+		return err
+	}
+
+	sqb := sq.StatementBuilder.RunWith(sqlDb)
+
+	result, err := sqb.
+		Update("connections").
+		Set("state", state).
+		Set("updated_at", apctx.GetClock(ctx).Now()).
+		Where("id = ?", id).
+		ExecContext(ctx)
+
+	if err != nil {
+		return err
+	}
+
+	count, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if count == 0 {
+		return ErrNotFound
+	}
+
+	if count > 1 {
+		return ErrViolation
+	}
+
 	return nil
 }
 

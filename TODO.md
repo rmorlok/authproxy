@@ -3,6 +3,7 @@
 * Be consistent between ID and Id
 * Migrate off of gorm
 * Switch out JSON library for a more performant one
+* Change not found behavior from nil to custom error
 
 # Other things to check out
 

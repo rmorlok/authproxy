@@ -20,8 +20,8 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 		WithTask(t).
 		WithCtx(ctx).
 		Build()
-	logger.Info("Refresh expiring oauth tokens task started")
-	defer logger.Info("Refresh expiring oauth tokens task completed")
+	logger.Info("refresh expiring oauth tokens task started")
+	defer logger.Info("refresh expiring oauth tokens task completed")
 
 	if !th.cfg.GetRoot().Oauth.GetRefreshTokensInBackgroundOrDefault() {
 		return nil
@@ -43,7 +43,7 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 		}
 	}
 
-	logger.Info("Tokens being refreshed within", "within", refreshWithin)
+	logger.Info("tokens being refreshed within", "within", refreshWithin)
 	queuedForRefresh := 0
 	err := th.db.EnumerateOAuth2TokensExpiringWithin(
 		ctx,
@@ -55,10 +55,16 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 					return true, err
 				}
 
-				_, err = th.asynq.EnqueueContext(ctx, t)
+				ti, err := th.asynq.EnqueueContext(ctx, t)
 				if err != nil {
 					return true, err
 				}
+				logger.Debug(
+					"token refresh task enqueued for connection",
+					"connection_id", tokenWithConnection.ConnectionID,
+					"token_id", tokenWithConnection.ID,
+					"task_id", ti.ID,
+				)
 				queuedForRefresh++
 			}
 
@@ -66,7 +72,7 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 		},
 	)
 
-	logger.Info("Completed queuing for expiring OAuth tokens", "queued", queuedForRefresh)
+	logger.Info("completed queuing for expiring OAuth tokens", "queued", queuedForRefresh)
 
 	return err
 }

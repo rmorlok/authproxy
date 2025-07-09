@@ -404,6 +404,20 @@ func (mr *MockDBMockRecorder) Ping(ctx interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockDB)(nil).Ping), ctx)
 }
 
+// SetConnectionState mocks base method.
+func (m *MockDB) SetConnectionState(ctx context.Context, id uuid.UUID, state database.ConnectionState) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetConnectionState", ctx, id, state)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetConnectionState indicates an expected call of SetConnectionState.
+func (mr *MockDBMockRecorder) SetConnectionState(ctx, id, state interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectionState", reflect.TypeOf((*MockDB)(nil).SetConnectionState), ctx, id, state)
+}
+
 // UpsertActor mocks base method.
 func (m *MockDB) UpsertActor(ctx context.Context, actor *jwt.Actor) (*database.Actor, error) {
 	m.ctrl.T.Helper()
