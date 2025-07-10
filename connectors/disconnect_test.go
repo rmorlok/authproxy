@@ -70,10 +70,10 @@ func TestDisconnectConnection(t *testing.T) {
 
 			})
 
-		taskID, err := svc.DisconnectConnection(ctx, connectionId)
+		taskInfo, err := svc.DisconnectConnection(ctx, connectionId)
 
 		assert.NoError(t, err)
-		assert.Equal(t, "mock-task-id", taskID)
+		assert.Equal(t, "mock-task-id", taskInfo.AsynqId)
 	})
 
 	t.Run("database not found error", func(t *testing.T) {
@@ -84,10 +84,10 @@ func TestDisconnectConnection(t *testing.T) {
 			SetConnectionState(gomock.Any(), connectionId, database.ConnectionStateDisconnecting).
 			Return(database.ErrNotFound)
 
-		taskID, err := svc.DisconnectConnection(ctx, connectionId)
+		taskInfo, err := svc.DisconnectConnection(ctx, connectionId)
 
 		assert.Error(t, err)
-		assert.Equal(t, "", taskID)
+		assert.Nil(t, taskInfo)
 	})
 
 	t.Run("database internal error", func(t *testing.T) {
@@ -98,10 +98,10 @@ func TestDisconnectConnection(t *testing.T) {
 			SetConnectionState(gomock.Any(), connectionId, database.ConnectionStateDisconnecting).
 			Return(errors.New("some error"))
 
-		taskID, err := svc.DisconnectConnection(ctx, connectionId)
+		taskInfo, err := svc.DisconnectConnection(ctx, connectionId)
 
 		assert.Error(t, err)
-		assert.Equal(t, "", taskID)
+		assert.Nil(t, taskInfo)
 	})
 
 	t.Run("task creation error", func(t *testing.T) {
@@ -117,9 +117,9 @@ func TestDisconnectConnection(t *testing.T) {
 			EnqueueContext(gomock.Any(), gomock.Any()).
 			Return((*asynq.TaskInfo)(nil), errors.New("enqueue error"))
 
-		taskID, err := svc.DisconnectConnection(ctx, connectionId)
+		taskInfo, err := svc.DisconnectConnection(ctx, connectionId)
 
 		assert.Error(t, err)
-		assert.Equal(t, "", taskID)
+		assert.Nil(t, taskInfo)
 	})
 }

@@ -341,10 +341,102 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, DatabaseConnectionToJson(*c))
 }
 
+type DisconnectResponseJson struct {
+	TaskId     string         `json:"task_id"`
+	Connection ConnectionJson `json:"connection"`
+}
+
+func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	id, err := uuid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if id == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+	}
+
+	// The Auth check is duplicative of the annotation for the route, but being done since are pulling auth anyway.
+	ra := auth.GetAuthFromGinContext(gctx)
+	if !ra.IsAuthenticated() {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusUnauthorized().
+			WithResponseMsg("unauthorized").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	c, err := r.db.GetConnection(ctx, id)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if c == nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsg("connection not found").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	ti, err := r.connectors.DisconnectConnection(ctx, id)
+	if err != nil {
+		api_common.HttpStatusErrorBuilderFromError(err).
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	taskId, err := ti.
+		BindToActor(util.ToPtr(ra.MustGetActor())).
+		ToSecureEncryptedString(ctx, r.encrypt)
+
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	// Hard code the disconnecting state to avoid race condictions with task workers
+	c.State = database.ConnectionStateDisconnected
+
+	response := DisconnectResponseJson{
+		TaskId:     taskId,
+		Connection: DatabaseConnectionToJson(*c),
+	}
+
+	gctx.PureJSON(http.StatusOK, response)
+}
+
 func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 	g.POST("/connections/_initiate", r.auth.Required(), r.initiate)
 	g.GET("/connections", r.auth.Required(), r.list)
 	g.GET("/connections/:id", r.auth.Required(), r.get)
+	g.POST("/connections/:id/_disconnect", r.auth.Required(), r.disconnect)
 }
 
 func NewConnectionsRoutes(

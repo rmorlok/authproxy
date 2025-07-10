@@ -5,6 +5,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/database"
+	"github.com/rmorlok/authproxy/tasks"
 )
 
 // C is the interface for the connectors service
@@ -45,7 +46,7 @@ type C interface {
 
 	// DisconnectConnection disconnects a connection. This is a state transition that queues work to do any cleanup
 	// with the 3rd party.
-	DisconnectConnection(ctx context.Context, id uuid.UUID) (taskId string, err error)
+	DisconnectConnection(ctx context.Context, id uuid.UUID) (taskInfo *tasks.TaskInfo, err error)
 
 	/*
 	 * Task manager interface functions.

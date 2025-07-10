@@ -3,9 +3,11 @@ package connectors
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/aplog"
+	"github.com/rmorlok/authproxy/database"
 )
 
 const taskTypeDisconnectConnection = "connectors:disconnect_connection"
@@ -27,8 +29,37 @@ func (s *service) disconnectConnection(ctx context.Context, t *asynq.Task) error
 		WithTask(t).
 		WithCtx(ctx).
 		Build()
-	logger.Info("Disconnect connection task started")
-	defer logger.Info("Disconnect connection task completed")
+	logger.Info("disconnect connection task started")
+	defer logger.Info("disconnect connection task completed")
+
+	var p disconnectConnectionTaskPayload
+	if err := json.Unmarshal(t.Payload(), &p); err != nil {
+		return fmt.Errorf("%s json.Unmarshal failed: %v: %w", taskTypeDisconnectConnection, err, asynq.SkipRetry)
+	}
+
+	if p.ConnectionId == uuid.Nil {
+		return fmt.Errorf("%s connection id not specified: %w", taskTypeDisconnectConnection, asynq.SkipRetry)
+	}
+
+	logger = aplog.NewBuilder(logger).
+		WithConnectionId(p.ConnectionId).
+		Build()
+
+	logger.Info("disconnecting connection")
+
+	logger.Debug("marking connection as disconnected")
+	err := s.db.SetConnectionState(ctx, p.ConnectionId, database.ConnectionStateDisconnected)
+	if err != nil {
+		logger.Error("failed to mark connection as disconnected", "error", err)
+		return err
+	}
+
+	logger.Debug("deleting connection")
+	err = s.db.DeleteConnection(ctx, p.ConnectionId)
+	if err != nil {
+		logger.Error("failed to delete connection", "error", err)
+		return err
+	}
 
 	return nil
 }

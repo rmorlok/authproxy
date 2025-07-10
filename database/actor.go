@@ -58,6 +58,10 @@ func (a *Actor) ToJwtActor() jwt.Actor {
 	}
 }
 
+func (a *Actor) GetID() uuid.UUID {
+	return a.ID
+}
+
 // IsAdmin is a helper to wrap the Admin attribute
 func (a *Actor) IsAdmin() bool {
 	if a == nil {
