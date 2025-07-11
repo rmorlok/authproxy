@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
+	"github.com/rmorlok/authproxy/encrypt"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -128,4 +129,24 @@ func TestFromAsynqTask(t *testing.T) {
 		// Verify the result is nil
 		assert.Nil(t, result)
 	})
+}
+
+func TestRoundTrip(t *testing.T) {
+	ctx := context.Background()
+	e := encrypt.NewFakeEncryptService(false)
+	taskInfo := &TaskInfo{
+		TrackedVia: TrackedViaAsynq,
+		ActorId:    uuid.New(),
+		AsynqId:    "test-id",
+		AsynqQueue: "test-queue",
+		AsynqType:  "test-type",
+	}
+
+	encryptedString, err := taskInfo.ToSecureEncryptedString(ctx, e)
+	require.NoError(t, err)
+
+	decryptedTaskInfo, err := FromSecureEncryptedString(ctx, e, encryptedString)
+	require.NoError(t, err)
+
+	assert.Equal(t, taskInfo, decryptedTaskInfo)
 }

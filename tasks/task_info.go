@@ -34,6 +34,7 @@ func (ti *TaskInfo) BindToActor(actor Actor) *TaskInfo {
 
 type Encrypt interface {
 	EncryptGlobal(ctx context.Context, data []byte) ([]byte, error)
+	DecryptGlobal(ctx context.Context, data []byte) ([]byte, error)
 }
 
 func (ti *TaskInfo) ToSecureEncryptedString(ctx context.Context, e Encrypt) (string, error) {
@@ -61,4 +62,24 @@ func FromAsynqTask(task *asynq.TaskInfo) *TaskInfo {
 		AsynqQueue: task.Queue,
 		AsynqType:  task.Type,
 	}
+}
+
+func FromSecureEncryptedString(ctx context.Context, e Encrypt, s string) (*TaskInfo, error) {
+	encryptedData, err := base64.StdEncoding.DecodeString(s)
+	if err != nil {
+		return nil, err
+	}
+
+	decryptedData, err := e.DecryptGlobal(ctx, encryptedData)
+	if err != nil {
+		return nil, err
+	}
+
+	var taskInfo TaskInfo
+	err = json.Unmarshal(decryptedData, &taskInfo)
+	if err != nil {
+		return nil, err
+	}
+
+	return &taskInfo, nil
 }
