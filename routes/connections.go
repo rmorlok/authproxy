@@ -16,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/util"
 	"log/slog"
 	"net/http"
+	"net/url"
 	"time"
 )
 
@@ -422,10 +423,10 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 	}
 
 	// Hard code the disconnecting state to avoid race condictions with task workers
-	c.State = database.ConnectionStateDisconnected
+	c.State = database.ConnectionStateDisconnecting
 
 	response := DisconnectResponseJson{
-		TaskId:     taskId,
+		TaskId:     url.QueryEscape(taskId),
 		Connection: DatabaseConnectionToJson(*c),
 	}
 

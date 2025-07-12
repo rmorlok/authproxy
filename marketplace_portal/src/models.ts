@@ -32,6 +32,7 @@ export enum ConnectionState {
   CREATED = 'created',
   CONNECTED = 'connected',
   FAILED = 'failed',
+  DISCONNECTING = 'disconnecting',
   DISCONNECTED = 'disconnected'
 }
 
@@ -65,4 +66,29 @@ export interface InitiateConnectionResponse {
 
 export interface InitiateConnectionRedirectResponse extends InitiateConnectionResponse {
   redirect_url: string;
+}
+
+// Task models
+export enum TaskState {
+  UNKNOWN = 'unknown',
+  ACTIVE = 'active',
+  PENDING = 'pending',
+  SCHEDULED = 'scheduled',
+  RETRY = 'retry',
+  ARCHIVED = 'archived',
+  COMPLETED = 'completed',
+  AGGREGATING = 'aggregating'
+}
+
+export interface TaskInfoJson {
+  id: string;
+  type: string;
+  state: TaskState;
+  updated_at?: string;
+}
+
+// Disconnect models
+export interface DisconnectResponseJson {
+  task_id: string;
+  connection: Connection;
 }

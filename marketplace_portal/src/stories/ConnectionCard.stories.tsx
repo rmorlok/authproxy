@@ -5,11 +5,13 @@ import { Connection, ConnectionState } from '../models';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import connectorsReducer from '../store/connectorsSlice';
+import connectionsReducer from '../store/connectionsSlice';
 
-// Create a mock store with connectors
+// Create a mock store with connectors and connections
 const mockStore = configureStore({
   reducer: {
     connectors: connectorsReducer,
+    connections: connectionsReducer,
   },
   preloadedState: {
     connectors: {
@@ -23,6 +25,16 @@ const mockStore = configureStore({
       ],
       status: 'succeeded',
       error: null,
+    },
+    connections: {
+      items: [],
+      status: 'idle',
+      error: null,
+      initiatingConnection: false,
+      initiationError: null,
+      disconnectingConnection: false,
+      disconnectionError: null,
+      currentTaskId: null
     },
   },
 });
@@ -78,6 +90,15 @@ export const Failed: Story = {
   },
 };
 
+export const Disconnecting: Story = {
+  args: {
+    connection: {
+      ...mockConnection,
+      state: ConnectionState.DISCONNECTING,
+    },
+  },
+};
+
 export const Disconnected: Story = {
   args: {
     connection: {
@@ -94,6 +115,55 @@ export const UnknownConnector: Story = {
       connector_id: 'unknown-connector',
     },
   },
+};
+
+export const WithTaskInProgress: Story = {
+  args: {
+    connection: {
+      ...mockConnection,
+      state: ConnectionState.DISCONNECTING,
+    },
+  },
+  decorators: [
+    (Story) => {
+      const store = configureStore({
+        reducer: {
+          connectors: connectorsReducer,
+          connections: connectionsReducer,
+        },
+        preloadedState: {
+          connectors: {
+            items: [
+              {
+                id: 'google-calendar',
+                display_name: 'Google Calendar',
+                description: 'Connect to your Google Calendar to manage events and appointments.',
+                logo: 'https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg',
+              },
+            ],
+            status: 'succeeded',
+            error: null,
+          },
+          connections: {
+            items: [],
+            status: 'idle',
+            error: null,
+            initiatingConnection: false,
+            initiationError: null,
+            disconnectingConnection: true,
+            disconnectionError: null,
+            currentTaskId: 'task-123'
+          },
+        },
+      });
+
+      return (
+        <Provider store={store}>
+          <Story />
+        </Provider>
+      );
+    },
+  ],
 };
 
 export const Skeleton: Story = {

@@ -3,7 +3,9 @@ import {
   Connection, 
   ListConnectionsResponse, 
   InitiateConnectionRequest, 
-  InitiateConnectionRedirectResponse 
+  InitiateConnectionRedirectResponse,
+  DisconnectResponseJson,
+  TaskInfoJson
 } from '../models';
 
 /**
@@ -15,11 +17,11 @@ import {
  */
 export const listConnections = (state?: string, cursor?: string, limit?: number) => {
   const params: Record<string, string | number> = {};
-  
+
   if (state) params.state = state;
   if (cursor) params.cursor = cursor;
   if (limit) params.limit = limit;
-  
+
   return client.get<ListConnectionsResponse>('/api/v1/connections', { params });
 };
 
@@ -43,12 +45,32 @@ export const initiateConnection = (connectorId: string, returnToUrl: string) => 
     connector_id: connectorId,
     return_to_url: returnToUrl
   };
-  
+
   return client.post<InitiateConnectionRedirectResponse>('/api/v1/connections/_initiate', request);
+};
+
+/**
+ * Disconnect a connection
+ * @param id The ID of the connection to disconnect
+ * @returns Promise with the disconnect response
+ */
+export const disconnectConnection = (id: string) => {
+  return client.post<DisconnectResponseJson>(`/api/v1/connections/${id}/_disconnect`);
+};
+
+/**
+ * Get task information
+ * @param id The ID of the task to get
+ * @returns Promise with the task information
+ */
+export const getTask = (id: string) => {
+  return client.get<TaskInfoJson>(`/api/v1/tasks/${id}`);
 };
 
 export const connections = {
   list: listConnections,
   get: getConnection,
-  initiate: initiateConnection
+  initiate: initiateConnection,
+  disconnect: disconnectConnection,
+  getTask: getTask
 };
