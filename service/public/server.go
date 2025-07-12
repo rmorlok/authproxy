@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
+	"github.com/rmorlok/authproxy/apasynq"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/auth"
@@ -53,6 +54,7 @@ func GetGinServer(
 	db database.DB,
 	redis redis.R,
 	c connectors.C,
+	asynqInspector apasynq.Inspector,
 	httpf httpf.F,
 	encrypt encrypt.E,
 	logger *slog.Logger,
@@ -139,6 +141,9 @@ func GetGinServer(
 
 		routesConnections := common_routes.NewConnectionsRoutes(cfg, authService, db, redis, c, httpf, encrypt, logger)
 		routesConnections.Register(api)
+
+		routesTasks := common_routes.NewTaskRoutes(cfg, authService, encrypt, asynqInspector)
+		routesTasks.Register(api)
 	}
 
 	if service.EnableProxy() {
@@ -198,6 +203,7 @@ func Serve(cfg config.C) {
 	h := httpf.CreateFactory(cfg, rs)
 	e := encrypt.NewEncryptService(cfg, db)
 	asynqClient := asynq.NewClientFromRedisClient(rs.Client())
+	asynqInspector := asynq.NewInspectorFromRedisClient(rs.Client())
 	c := connectors.NewConnectorsService(cfg, db, e, asynqClient, logger)
 
 	if root.Connectors.GetAutoMigrate() {
@@ -221,7 +227,7 @@ func Serve(cfg config.C) {
 		}()
 	}
 
-	server, healthChecker, err := GetGinServer(cfg, db, rs, c, h, e, logger)
+	server, healthChecker, err := GetGinServer(cfg, db, rs, c, asynqInspector, h, e, logger)
 	if err != nil {
 		panic(err)
 	}
