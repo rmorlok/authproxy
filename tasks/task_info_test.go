@@ -71,7 +71,7 @@ func TestToSecureEncryptedString(t *testing.T) {
 	mockEncryptedData := []byte("encrypted-data")
 
 	// Expected base64 encoded result
-	expectedResult := base64.StdEncoding.EncodeToString(mockEncryptedData)
+	expectedResult := base64.RawURLEncoding.EncodeToString(mockEncryptedData)
 
 	t.Run("successful encryption", func(t *testing.T) {
 		// Setup expectations
