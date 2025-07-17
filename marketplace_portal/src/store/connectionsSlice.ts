@@ -1,7 +1,6 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from './store';
-import { Connection, ConnectionState, TaskState } from '../models';
-import { connections } from '../api';
+import {connections, tasks, Connection, ConnectionState, TaskState, DisconnectResponseJson} from '../api';
 
 interface ConnectionsState {
   items: Connection[];
@@ -43,25 +42,10 @@ export const initiateConnectionAsync = createAsyncThunk(
 
 export const disconnectConnectionAsync = createAsyncThunk(
   'connections/disconnectConnection',
-  async (connectionId: string) => {
+  async (connectionId: string, { dispatch }) : Promise<DisconnectResponseJson> => {
     const response = await connections.disconnect(connectionId);
+
     return response.data;
-  }
-);
-
-export const pollTaskStatusAsync = createAsyncThunk(
-  'connections/pollTaskStatus',
-  async (taskId: string, { dispatch }) => {
-    const response = await connections.getTask(taskId);
-    const taskInfo = response.data;
-
-    if (taskInfo.state === TaskState.COMPLETED) {
-      // Refresh connections when task is completed
-      await dispatch(fetchConnectionsAsync());
-      return { completed: true, taskInfo };
-    }
-
-    return { completed: false, taskInfo };
   }
 );
 
@@ -122,13 +106,6 @@ export const connectionsSlice = createSlice({
       .addCase(disconnectConnectionAsync.rejected, (state, action) => {
         state.disconnectingConnection = false;
         state.disconnectionError = action.error.message || 'Failed to disconnect connection';
-      })
-
-      // Poll task status
-      .addCase(pollTaskStatusAsync.fulfilled, (state, action) => {
-        if (action.payload.completed) {
-          state.currentTaskId = null;
-        }
       });
   },
 });

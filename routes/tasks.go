@@ -3,6 +3,7 @@ package routes
 import (
 	"errors"
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/apasynq"
 	"github.com/rmorlok/authproxy/api_common"
@@ -39,14 +40,11 @@ const (
 	// TaskStateRetry indicates that the task has previously failed and scheduled to be processed some time in the future.
 	TaskStateRetry = "retry"
 
-	// TaskStateArchived indicates that the task is archived and stored for inspection purposes.
-	TaskStateArchived = "archived"
+	// TaskStateArchived indicates that the task exhausted retries
+	TaskStateFailed = "failed"
 
 	// TaskStateCompleted indicates that the task is processed successfully and retained until the retention TTL expires.
 	TaskStateCompleted = "completed"
-
-	// TaskStateAggregating indicates that the task is waiting in a group to be aggregated into one task.
-	TaskStateAggregating = "aggregating"
 )
 
 type TaskInfoJson struct {
@@ -68,11 +66,14 @@ func TaskInfoToJson(encryptedId string, ti *asynq.TaskInfo) *TaskInfoJson {
 	case asynq.TaskStateRetry:
 		ts = TaskStateRetry
 	case asynq.TaskStateArchived:
-		ts = TaskStateArchived
+		// Archived implies that retries were exhausted. See documentation:
+		// https://github.com/hibiken/asynq/wiki/Life-of-a-Task
+		ts = TaskStateFailed
 	case asynq.TaskStateCompleted:
 		ts = TaskStateCompleted
 	case asynq.TaskStateAggregating:
-		ts = TaskStateAggregating
+		// This isn't something we need to expose to clients. Just flag the task as pending work.
+		ts = TaskStatePending
 	}
 
 	updatedAt := time.Time{}
@@ -147,6 +148,15 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().
 			WithResponseMsg("invalid task info: data missing").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if ti.ActorId != uuid.Nil && ti.ActorId != ra.MustGetActor().ID {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusForbidden().
+			WithResponseMsg("not authorized to view task").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
 		return

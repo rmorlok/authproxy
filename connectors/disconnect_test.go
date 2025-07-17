@@ -9,6 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/database"
 	"github.com/stretchr/testify/require"
 	"testing"
+	"time"
 
 	"github.com/google/uuid"
 	mockAsynq "github.com/rmorlok/authproxy/apasynq/mock"
@@ -50,7 +51,7 @@ func TestDisconnectConnection(t *testing.T) {
 		taskMatcher := gomock.AssignableToTypeOf(&asynq.Task{})
 		asynqMock.
 			EXPECT().
-			EnqueueContext(gomock.Any(), taskMatcher).
+			EnqueueContext(gomock.Any(), taskMatcher, asynq.Retention(10*time.Minute)).
 			DoAndReturn(func(_ context.Context, task *asynq.Task, _ ...asynq.Option) (*asynq.TaskInfo, error) {
 				// Verify the task type
 				assert.Equal(t, "connectors:disconnect_connection", task.Type())
@@ -114,7 +115,7 @@ func TestDisconnectConnection(t *testing.T) {
 
 		asynqMock.
 			EXPECT().
-			EnqueueContext(gomock.Any(), gomock.Any()).
+			EnqueueContext(gomock.Any(), gomock.Any(), asynq.Retention(10*time.Minute)).
 			Return((*asynq.TaskInfo)(nil), errors.New("enqueue error"))
 
 		taskInfo, err := svc.DisconnectConnection(ctx, connectionId)

@@ -149,7 +149,7 @@ func (ep *ErrorPages) urlForError(error ErrorPage, publicBaseUrl string) string 
 
 	query := parsedUrl.Query()
 	query.Set("error", string(error))
-	parsedUrl.Path = "/error"
+	parsedUrl.Path = "error"
 	parsedUrl.RawQuery = query.Encode()
 
 	return parsedUrl.String()

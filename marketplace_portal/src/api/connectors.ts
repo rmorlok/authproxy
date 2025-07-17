@@ -1,5 +1,33 @@
 import { client } from './client';
-import { Connector, ListConnectorsResponse } from '../models';
+
+// Connector models
+export interface ConnectorVersion {
+  id: string;
+  version: number;
+  state: ConnectorVersionState;
+  type: string;
+  display_name: string;
+  description: string;
+  highlight?: string;
+  logo: string;
+}
+
+export interface Connector extends ConnectorVersion {
+  versions: number;
+  states: ConnectorVersionState[];
+}
+
+export enum ConnectorVersionState {
+  DRAFT = 'draft',
+  PRIMARY = 'primary',
+  ACTIVE = 'active',
+  ARCHIVED = 'archived'
+}
+
+export interface ListConnectorsResponse {
+  items: Connector[];
+  cursor?: string;
+}
 
 /**
  * Get a list of all available connectors

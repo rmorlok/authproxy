@@ -1,15 +1,15 @@
 import {configureStore, ThunkAction, Action} from '@reduxjs/toolkit';
-import counterReducer from './counterSlice';
 import authReducer from './sessionSlice';
 import connectorsReducer from './connectorsSlice';
 import connectionsReducer from './connectionsSlice';
+import toastsReducer from './toastsSlice';
 
 export const store = configureStore({
     reducer: {
-        counter: counterReducer,
         auth: authReducer,
         connectors: connectorsReducer,
         connections: connectionsReducer,
+        toasts: toastsReducer,
     },
 });
 

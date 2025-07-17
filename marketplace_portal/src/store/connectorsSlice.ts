@@ -1,7 +1,6 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from './store';
-import { Connector } from '../models';
-import { connectors } from '../api';
+import { connectors, Connector } from '../api';
 
 interface ConnectorsState {
   items: Connector[];

@@ -17,7 +17,7 @@ import {
 } from '../store';
 import ConnectorCard, { ConnectorCardSkeleton } from './ConnectorCard';
 import { AppDispatch } from '../store';
-import { initiateConnectionAsync } from '../store/connectionsSlice';
+import { initiateConnectionAsync } from '../store';
 
 /**
  * Component to display a list of available connectors

@@ -15,18 +15,14 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
-  Snackbar,
-  Alert
 } from '@mui/material';
-import { Connection, ConnectionState, TaskState } from '../models';
+import {tasks, Connection, ConnectionState, canBeDisconnected, PollForTaskResult, DisconnectResponseJson} from '../api';
 import { useSelector, useDispatch } from 'react-redux';
-import { 
-  selectConnectors, 
-  disconnectConnectionAsync, 
-  pollTaskStatusAsync,
-  selectCurrentTaskId
+import {
+  selectConnectors,
+  disconnectConnectionAsync,
+  AppDispatch, addToast, fetchConnectionsAsync,
 } from '../store';
-
 interface ConnectionCardProps {
   connection: Connection;
 }
@@ -35,17 +31,12 @@ interface ConnectionCardProps {
  * Component to display a single connection with its details
  */
 const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
-  const dispatch = useDispatch();
+  const dispatch = useDispatch<AppDispatch>();
   const connectors = useSelector(selectConnectors);
-  const currentTaskId = useSelector(selectCurrentTaskId);
   const connector = connectors.find(c => c.id === connection.connector_id);
 
   // State for confirmation dialog
   const [openDialog, setOpenDialog] = useState(false);
-  // State for toast notification
-  const [openToast, setOpenToast] = useState(false);
-  const [toastMessage, setToastMessage] = useState('');
-  const [toastSeverity, setToastSeverity] = useState<'success' | 'error'>('success');
 
   // Format the date
   const createdDate = new Date(connection.created_at).toLocaleDateString();
@@ -69,10 +60,6 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
       statusColor = 'default';
   }
 
-  // Check if the connection can be disconnected
-  const canDisconnect = connection.state !== ConnectionState.DISCONNECTING && 
-                        connection.state !== ConnectionState.DISCONNECTED;
-
   // Handle disconnect button click
   const handleDisconnectClick = () => {
     setOpenDialog(true);
@@ -88,30 +75,34 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
     setOpenDialog(false);
     try {
       // Dispatch the disconnect action
-      await dispatch(disconnectConnectionAsync(connection.id) as any);
+      const disconnectResult = await dispatch(disconnectConnectionAsync(connection.id));
+      const responsePayload = disconnectResult.payload;
 
-      // Set up polling for task status
-      if (currentTaskId) {
-        const pollInterval = setInterval(async () => {
-          const result = await dispatch(pollTaskStatusAsync(currentTaskId) as any);
-          if (result.payload.completed) {
-            clearInterval(pollInterval);
-            setToastMessage('Connection successfully disconnected');
-            setToastSeverity('success');
-            setOpenToast(true);
-          }
-        }, 2000); // Poll every 2 seconds
+      if (responsePayload &&
+          typeof responsePayload === 'object' &&
+          'task_id' in responsePayload) {
+
+        const taskPollResult =
+            await tasks.pollForTaskFinalized((responsePayload as DisconnectResponseJson).task_id);
+        if (taskPollResult.result !== PollForTaskResult.FINALIZED) {
+            addToast({
+              message: 'Error while checking for status of disconnect',
+              type: 'warning',
+              durationMs: 4000,
+            });
+        }
       }
-    } catch (error) {
-      setToastMessage('Failed to disconnect connection');
-      setToastSeverity('error');
-      setOpenToast(true);
-    }
-  };
 
-  // Handle toast close
-  const handleToastClose = () => {
-    setOpenToast(false);
+    } catch (error) {
+      addToast({
+        message: 'Failed to disconnect connection',
+        type: 'error',
+        durationMs: 6000,
+      });
+    }
+
+    // Refresh the connections list
+    await dispatch(fetchConnectionsAsync());
   };
 
   return (
@@ -148,7 +139,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
         </Typography>
       </CardContent>
 
-      {canDisconnect && (
+      {canBeDisconnected(connection) && (
         <CardActions>
           <Button 
             size="small" 
@@ -179,18 +170,6 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
           </Button>
         </DialogActions>
       </Dialog>
-
-      {/* Toast Notification */}
-      <Snackbar
-        open={openToast}
-        autoHideDuration={6000}
-        onClose={handleToastClose}
-        anchorOrigin={{ vertical: 'bottom', horizontal: 'center' }}
-      >
-        <Alert onClose={handleToastClose} severity={toastSeverity} sx={{ width: '100%' }}>
-          {toastMessage}
-        </Alert>
-      </Snackbar>
     </Card>
   );
 };

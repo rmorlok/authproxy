@@ -1,5 +1,9 @@
 # AuthProxy
 
+AuthProxy is an open source, embeddable integration platform-as-a-service (iPaaS). It offloads the work of managing
+the connection lifecycle to 3rd party systems so your application can call to those systems using an authenticating
+proxy and stay focussed on the business logic of your product.
+
 ## Running Locally
 
 Create a network for the asynq system to interact with redis:
@@ -35,6 +39,20 @@ yarn
 yarn dev
 ```
 
+### Viewing Redis Data
+
+```bash
+docker run -d --name redisinsight -p 5540:5540 -v redisinsight:/data --network authproxy redis/redisinsight:latest 
+```
+
+Add a connection to redis. Connect to the redis server using the following URI:
+
+```
+redis://default@redis-server:6379
+```
+
+![redis-insight-add-db.jpg](docs/images/redis-insight-add-db.jpg)
+
 ### Viewing Background Tasks
 To manage tasks in asynq, install the [asynq cli](https://github.com/hibiken/asynq/blob/master/tools/asynq/README.md):
 
@@ -52,6 +70,7 @@ run the web monitoring tool:
 
 ```bash
 docker run --rm \
+    -d \
     --name asynqmon \
     --network authproxy \
     -p 8090:8080 \
@@ -64,6 +83,9 @@ open the web ui:
 ```bash
 open http://localhost:8090
 ```
+
+![asynqmon.jpg](docs/images/asynqmon.jpg)
+
 ## Client Config
 
 The client cli looks for a config file at `~/.authproxy.yaml`:

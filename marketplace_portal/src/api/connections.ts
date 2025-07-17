@@ -1,12 +1,56 @@
 import { client } from './client';
-import { 
-  Connection, 
-  ListConnectionsResponse, 
-  InitiateConnectionRequest, 
-  InitiateConnectionRedirectResponse,
-  DisconnectResponseJson,
-  TaskInfoJson
-} from '../models';
+
+// Connection models
+export enum ConnectionState {
+  CREATED = 'created',
+  CONNECTED = 'connected',
+  FAILED = 'failed',
+  DISCONNECTING = 'disconnecting',
+  DISCONNECTED = 'disconnected'
+}
+
+export interface Connection {
+  id: string;
+  connector_id: string;
+  state: ConnectionState;
+  created_at: string;
+  updated_at: string;
+}
+
+export function canBeDisconnected(connection: Connection): boolean {
+  return connection.state !== ConnectionState.DISCONNECTING &&
+      connection.state !== ConnectionState.DISCONNECTED;
+}
+
+export interface ListConnectionsResponse {
+  items: Connection[];
+  cursor?: string;
+}
+
+// Request models
+export interface InitiateConnectionRequest {
+  connector_id: string;
+  return_to_url: string;
+}
+
+export enum InitiateConnectionResponseType {
+  REDIRECT = 'redirect'
+}
+
+export interface InitiateConnectionResponse {
+  id: string;
+  type: InitiateConnectionResponseType;
+}
+
+export interface InitiateConnectionRedirectResponse extends InitiateConnectionResponse {
+  redirect_url: string;
+}
+
+// Disconnect models
+export interface DisconnectResponseJson {
+  task_id: string;
+  connection: Connection;
+}
 
 /**
  * Get a list of all connections
@@ -58,19 +102,9 @@ export const disconnectConnection = (id: string) => {
   return client.post<DisconnectResponseJson>(`/api/v1/connections/${id}/_disconnect`);
 };
 
-/**
- * Get task information
- * @param id The ID of the task to get
- * @returns Promise with the task information
- */
-export const getTask = (id: string) => {
-  return client.get<TaskInfoJson>(`/api/v1/tasks/${id}`);
-};
-
 export const connections = {
   list: listConnections,
   get: getConnection,
   initiate: initiateConnection,
   disconnect: disconnectConnection,
-  getTask: getTask
 };

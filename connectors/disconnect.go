@@ -4,9 +4,11 @@ import (
 	"context"
 	"errors"
 	"github.com/google/uuid"
+	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/tasks"
+	"time"
 )
 
 func (s *service) DisconnectConnection(
@@ -33,7 +35,7 @@ func (s *service) DisconnectConnection(
 		return nil, err
 	}
 
-	ti, err := s.ac.EnqueueContext(ctx, t)
+	ti, err := s.ac.EnqueueContext(ctx, t, asynq.Retention(10*time.Minute))
 	if err != nil {
 		return nil, err
 	}

@@ -6,6 +6,7 @@ import (
 	"errors"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
+	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/apasynq/mock"
 	auth2 "github.com/rmorlok/authproxy/auth"
@@ -74,6 +75,29 @@ func TestTasks(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("unauthorized actor", func(t *testing.T) {
+			// Create a valid TaskInfo
+			taskInfo := &tasks.TaskInfo{
+				TrackedVia: tasks.TrackedViaAsynq,
+				AsynqId:    "test-id",
+				AsynqQueue: "test-queue",
+				AsynqType:  "test-type",
+				ActorId:    uuid.New(),
+			}
+
+			// Encrypt the TaskInfo
+			ctx := context.Background()
+			encryptedTaskInfo, err := taskInfo.ToSecureEncryptedString(ctx, tu.EncryptService)
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "unauthorized-actor")
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
 		})
 
 		t.Run("task not found", func(t *testing.T) {

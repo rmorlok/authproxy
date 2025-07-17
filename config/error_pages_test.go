@@ -45,7 +45,7 @@ func TestErrorPages_urlForError(t *testing.T) {
 		assert.Equal(t, "", ep.urlForError(ErrorPageInternalError, "invalid-url"))
 		// For unknown error types, it constructs a URL
 		// The url.Parse function treats "invalid-url" as a path, not a host
-		assert.Equal(t, "/error?error=unknown", ep.urlForError("unknown", "invalid-url"))
+		assert.Equal(t, "error?error=unknown", ep.urlForError("unknown", "invalid-url"))
 	})
 
 	t.Run("with nil ErrorPages", func(t *testing.T) {
