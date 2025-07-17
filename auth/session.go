@@ -21,7 +21,7 @@ const (
 type session struct {
 	Id              uuid.UUID `json:"id"`
 	ActorId         uuid.UUID `json:"actor_id"`
-	ValidCsrfValues []string  `json:"valid_csrf_values"`
+	ValidXsrfValues []string  `json:"-"` // Serialized separately in a different key
 	ExpiresAt       time.Time `json:"expires_at"`
 }
 
@@ -107,17 +107,17 @@ func (s *service) establishAuthFromSession(ctx context.Context, requireSessionXs
 					Build()
 			}
 
-			isValidCsrf := false
+			isValidXsrf := false
 
 			// Validate the XSRF token against valid CSRF values in the session
-			for _, validToken := range sess.ValidCsrfValues {
+			for _, validToken := range sess.ValidXsrfValues {
 				if xsrfTokenHeader == validToken {
-					isValidCsrf = true
+					isValidXsrf = true
 					break
 				}
 			}
 
-			if !isValidCsrf {
+			if !isValidXsrf {
 				return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
 					WithStatusForbidden().
 					WithResponseMsg("invalid XSRF token").
@@ -202,27 +202,24 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 
 func (s *service) extendSession(ctx context.Context, sess *session, w http.ResponseWriter) error {
 	sessionService := s.service.(config.HttpServiceWithSession)
-	validCsrfValuesLimit := sessionService.XsrfRequestQueueDepth()
+	validXsrfValuesLimit := int64(sessionService.XsrfRequestQueueDepth())
 
 	// Generate a new UUID to push onto the list.
-	newCsrfValue := uuid.New()
+	newXsrfValue := uuid.New()
 
-	// Push the new value onto the session's list.
-	sess.ValidCsrfValues = append(sess.ValidCsrfValues, newCsrfValue.String())
-
-	// Truncate the list to the specified depth, treating it as a queue.
-	if len(sess.ValidCsrfValues) > validCsrfValuesLimit {
-		sess.ValidCsrfValues = sess.ValidCsrfValues[len(sess.ValidCsrfValues)-validCsrfValuesLimit:]
-	}
+	pipe := s.redis.Client().Pipeline()
+	pipe.Set(ctx, getRedisSessionJsonKey(sess.Id), sess, sess.ExpiresAt.Sub(apctx.GetClock(ctx).Now()))
+	pipe.LPush(ctx, getRedisXsrfKey(sess.Id), newXsrfValue.String())
+	pipe.LTrim(ctx, getRedisXsrfKey(sess.Id), 0, validXsrfValuesLimit)
+	pipe.Expire(ctx, getRedisXsrfKey(sess.Id), sess.ExpiresAt.Sub(apctx.GetClock(ctx).Now()))
 
 	// Write the session to Redis
-	key := getRedisSessionKey(sess.Id)
-	if err := s.redis.Client().Set(ctx, key, sess, sess.ExpiresAt.Sub(apctx.GetClock(ctx).Now())).Err(); err != nil {
+	if _, err := pipe.Exec(ctx); err != nil {
 		return errors.Wrap(err, "failed to write session to redis")
 	}
 
 	// Pass down the new XSRF token
-	w.Header().Set(xsrfHeaderKey, newCsrfValue.String())
+	w.Header().Set(xsrfHeaderKey, newXsrfValue.String())
 
 	return nil
 }
@@ -273,12 +270,23 @@ func (s *service) EndSession(ctx context.Context, w http.ResponseWriter, ra Requ
 	return nil
 }
 
-func getRedisSessionKey(sessionId uuid.UUID) string {
-	return "session:" + sessionId.String()
+func getRedisSessionKeys(sessionId uuid.UUID) []string {
+	return []string{
+		getRedisSessionJsonKey(sessionId),
+		getRedisXsrfKey(sessionId),
+	}
+}
+
+func getRedisSessionJsonKey(sessionId uuid.UUID) string {
+	return "session:" + sessionId.String() + ":json"
+}
+
+func getRedisXsrfKey(sessionId uuid.UUID) string {
+	return "session:" + sessionId.String() + ":xsrf"
 }
 
 func (s *service) deleteSessionFromRedis(ctx context.Context, sessionId uuid.UUID) error {
-	if err := s.redis.Client().Del(ctx, getRedisSessionKey(sessionId)).Err(); err != nil {
+	if err := s.redis.Client().Del(ctx, getRedisSessionKeys(sessionId)...).Err(); err != nil {
 		if err == redis.Nil {
 			// Key does not exist, this is not an error
 			return nil
@@ -291,19 +299,24 @@ func (s *service) deleteSessionFromRedis(ctx context.Context, sessionId uuid.UUI
 
 // tryReadSessionFromRedis attempts to get session from Redis. Returns nil if the session does not exist, or is expired.
 func (s *service) tryReadSessionFromRedis(ctx context.Context, sessionId uuid.UUID) (*session, error) {
-	result := s.redis.Client().Get(ctx, getRedisSessionKey(sessionId))
+	pipe := s.redis.Client().Pipeline()
 
-	if result.Err() != nil {
-		if errors.Is(result.Err(), redis.Nil) {
+	jsonData := pipe.Get(ctx, getRedisSessionJsonKey(sessionId))
+	xsrfData := pipe.LRange(ctx, getRedisXsrfKey(sessionId), 0, -1)
+
+	_, err := pipe.Exec(ctx)
+
+	if err != nil {
+		if errors.Is(err, redis.Nil) {
 			// Not an error, just no session in redis
 			return nil, nil
 		}
 
-		return nil, errors.Wrapf(result.Err(), "failed to get session from redis for id %s", sessionId.String())
+		return nil, errors.Wrapf(err, "failed to get session from redis for id %s", sessionId.String())
 	}
 
 	var sess session
-	if err := result.Scan(&sess); err != nil {
+	if err := jsonData.Scan(&sess); err != nil {
 		return nil, errors.Wrap(err, "failed to parse session from redis value")
 	}
 
@@ -314,6 +327,10 @@ func (s *service) tryReadSessionFromRedis(ctx context.Context, sessionId uuid.UU
 	if sess.IsExpired(ctx) {
 		// this is not an error, treat it like there is no session
 		return nil, nil
+	}
+
+	if sess.ValidXsrfValues, err = xsrfData.Result(); err != nil {
+		return nil, errors.Wrap(err, "failed to get XSRF values from redis")
 	}
 
 	return &sess, nil
