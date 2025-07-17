@@ -16,7 +16,6 @@ import (
 	"github.com/rmorlok/authproxy/util"
 	"log/slog"
 	"net/http"
-	"net/url"
 	"time"
 )
 
@@ -426,7 +425,7 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 	c.State = database.ConnectionStateDisconnecting
 
 	response := DisconnectResponseJson{
-		TaskId:     url.QueryEscape(taskId),
+		TaskId:     taskId,
 		Connection: DatabaseConnectionToJson(*c),
 	}
 

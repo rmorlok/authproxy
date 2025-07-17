@@ -48,7 +48,7 @@ func (ti *TaskInfo) ToSecureEncryptedString(ctx context.Context, e Encrypt) (str
 		return "", err
 	}
 
-	return base64.StdEncoding.EncodeToString(encryptedData), nil
+	return base64.RawURLEncoding.EncodeToString(encryptedData), nil
 }
 
 func FromAsynqTask(task *asynq.TaskInfo) *TaskInfo {
@@ -65,7 +65,7 @@ func FromAsynqTask(task *asynq.TaskInfo) *TaskInfo {
 }
 
 func FromSecureEncryptedString(ctx context.Context, e Encrypt, s string) (*TaskInfo, error) {
-	encryptedData, err := base64.StdEncoding.DecodeString(s)
+	encryptedData, err := base64.RawURLEncoding.DecodeString(s)
 	if err != nil {
 		return nil, err
 	}

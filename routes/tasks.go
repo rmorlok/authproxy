@@ -48,10 +48,10 @@ const (
 )
 
 type TaskInfoJson struct {
-	Id        string    `json:"id"`
-	Type      string    `json:"type"`
-	State     TaskState `json:"state"`
-	UpdatedAt time.Time `json:"updated_at,omitempty"`
+	Id        string     `json:"id"`
+	Type      string     `json:"type"`
+	State     TaskState  `json:"state"`
+	UpdatedAt *time.Time `json:"updated_at,omitempty"`
 }
 
 func TaskInfoToJson(encryptedId string, ti *asynq.TaskInfo) *TaskInfoJson {
@@ -84,11 +84,16 @@ func TaskInfoToJson(encryptedId string, ti *asynq.TaskInfo) *TaskInfoJson {
 		updatedAt = ti.CompletedAt
 	}
 
+	var updatedAtPtr *time.Time
+	if !updatedAt.IsZero() {
+		updatedAtPtr = &updatedAt
+	}
+
 	return &TaskInfoJson{
 		Id:        encryptedId,
 		Type:      ti.Type,
 		State:     ts,
-		UpdatedAt: updatedAt,
+		UpdatedAt: updatedAtPtr,
 	}
 }
 
