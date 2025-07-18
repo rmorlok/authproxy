@@ -9,6 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/database"
+	"github.com/rmorlok/authproxy/encrypt"
 	jwt2 "github.com/rmorlok/authproxy/jwt"
 	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/util"
@@ -56,8 +57,9 @@ func TestAuthServiceWithDb(serviceId config.ServiceId, cfg config.C, db database
 
 	cfg, r := redis.MustApplyTestConfig(cfg)
 	s := cfg.MustGetService(serviceId)
+	e := encrypt.NewFakeEncryptService(false)
 
-	hs := NewService(cfg, s.(config.HttpService), db, r, cfg.GetRootLogger())
+	hs := NewService(cfg, s.(config.HttpService), db, r, e, cfg.GetRootLogger())
 
 	return cfg, hs, &AuthTestUtil{cfg: cfg, s: hs.(*service), serviceId: serviceId}
 }

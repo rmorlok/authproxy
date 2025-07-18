@@ -24,7 +24,7 @@ import (
 
 func TestAuth_Token(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, test_utils.NewTestLogger())
+	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 
 	res, err := j.Token(testContext, testClaims())
 	require.NoError(t, err)
@@ -36,7 +36,7 @@ func TestAuth_Token(t *testing.T) {
 
 func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, test_utils.NewTestLogger())
+	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 
 	claims := jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -94,7 +94,7 @@ func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 
 func TestAuth_RoundtripPublicPrivate(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, test_utils.NewTestLogger())
+	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 
 	claims := jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -130,7 +130,7 @@ func TestAuth_RoundtripPublicPrivate(t *testing.T) {
 
 func TestAuth_SecretKey(t *testing.T) {
 	cfg := config.FromRoot(&testConfigSecretKey)
-	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, test_utils.NewTestLogger())
+	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 
 	claims := jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
@@ -171,7 +171,7 @@ func TestAuth_SecretKey(t *testing.T) {
 
 func TestAuth_Parse(t *testing.T) {
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, test_utils.NewTestLogger())
+	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 	t.Run("valid", func(t *testing.T) {
 		tok, err := j.Token(testContext, testClaims())
 		require.NoError(t, err)
@@ -278,7 +278,7 @@ func TestAuth_Parse(t *testing.T) {
 				},
 			},
 		})
-		serv2 := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, test_utils.NewTestLogger())
+		serv2 := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 
 		tb2, err := jwt2.NewJwtTokenBuilder().WithConfigKey(testContext, cfg.GetRoot().SystemAuth.JwtSigningKey)
 		require.NoError(t, err)
@@ -329,7 +329,7 @@ func TestAuth_Parse(t *testing.T) {
 				},
 			},
 		})
-		adminSrv := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, test_utils.NewTestLogger())
+		adminSrv := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 
 		t.Run("valid", func(t *testing.T) {
 			token, err := jwt2.NewJwtTokenBuilder().
@@ -383,7 +383,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 	setup := func(t *testing.T) {
 		cfg := config.FromRoot(&testConfigPublicPrivateKey)
 		cfg, db = database.MustApplyBlankTestDbConfig(t.Name(), cfg)
-		a = NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), db, nil, test_utils.NewTestLogger())
+		a = NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), db, nil, nil, test_utils.NewTestLogger())
 		raw = a.(*service)
 	}
 

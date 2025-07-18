@@ -2,6 +2,7 @@ package auth
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -18,6 +19,12 @@ const (
 	xsrfHeaderKey     = "X-XSRF-TOKEN"
 )
 
+type Encrypt interface {
+	EncryptGlobal(ctx context.Context, data []byte) ([]byte, error)
+	DecryptGlobal(ctx context.Context, data []byte) ([]byte, error)
+}
+
+// session is the object stored in redis to track the session
 type session struct {
 	Id              uuid.UUID `json:"id"`
 	ActorId         uuid.UUID `json:"actor_id"`
@@ -41,6 +48,54 @@ func (s *session) IsExpired(ctx context.Context) bool {
 	return s.ExpiresAt.Before(apctx.GetClock(ctx).Now())
 }
 
+func (s *session) GetSessionId() sessionId {
+	return sessionId{
+		Id:      s.Id,
+		ActorId: s.ActorId,
+	}
+}
+
+// sessionId is the data used to compute a secure id that is sent as the session cookie. This data overlaps with
+// data in the session itself so that sessions can't be hijacked by changing data in redis
+type sessionId struct {
+	Id      uuid.UUID `json:"id"`
+	ActorId uuid.UUID `json:"actor_id"`
+}
+
+func (s *sessionId) GetSessionCookieId(e Encrypt) (string, error) {
+	data, err := json.Marshal(s)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to marshal session id")
+	}
+
+	encrypted, err := e.EncryptGlobal(context.Background(), data)
+	if err != nil {
+		return "", errors.Wrap(err, "failed to encrypt session id")
+	}
+
+	return base64.RawURLEncoding.EncodeToString(encrypted), nil
+}
+
+func fromSessionCookieId(val string, e Encrypt) (sessionId, error) {
+	data, err := base64.RawURLEncoding.DecodeString(val)
+	if err != nil {
+		return sessionId{}, errors.Wrap(err, "failed to decode session id")
+	}
+
+	decrypted, err := e.DecryptGlobal(context.Background(), data)
+	if err != nil {
+		return sessionId{}, errors.Wrap(err, "failed to decrypt session id")
+	}
+
+	var sid sessionId
+	err = json.Unmarshal(decrypted, &sid)
+	if err != nil {
+		return sessionId{}, errors.Wrap(err, "failed to unmarshal session id")
+	}
+
+	return sid, nil
+}
+
 // establishAuthFromSession loads auth from an existing session. It is used as part of the process of attempting
 // to establish auth for a request. It takes an optional claims which would have come from any JWT present on
 // the request previously.
@@ -61,13 +116,13 @@ func (s *service) establishAuthFromSession(ctx context.Context, requireSessionXs
 		return fromJwt, errors.Wrap(err, "failed to read session cookie")
 	}
 
-	// Parse the session ID from the cookie's value
-	sessionId, err := uuid.Parse(sessionCookie.Value)
-	if err != nil {
+	// Parse the session cookie ID from the cookie's value
+	sessionCookieId, err := fromSessionCookieId(sessionCookie.Value, s.encrypt)
+	if err != nil || sessionCookieId.Id == uuid.Nil {
 		return fromJwt, errors.Wrap(err, "invalid session ID in cookie")
 	}
 
-	sess, err := s.tryReadSessionFromRedis(ctx, sessionId)
+	sess, err := s.tryReadSessionFromRedis(ctx, sessionCookieId.Id)
 	if err != nil {
 		return fromJwt, errors.Wrap(err, "failed to read session from redis")
 	}
@@ -77,12 +132,22 @@ func (s *service) establishAuthFromSession(ctx context.Context, requireSessionXs
 		return fromJwt, nil
 	}
 
+	// Sanity check
+	if sess.Id != sessionCookieId.Id {
+		return NewUnauthenticatedRequestAuth(), errors.Errorf("session id mismatch: %s != %s", sess.Id.String(), sessionCookieId.Id.String())
+	}
+
+	// Sanity check to avoid session hijacking in redis
+	if sess.Id != sessionCookieId.Id || sess.ActorId != sessionCookieId.ActorId {
+		return NewUnauthenticatedRequestAuth(), errors.Errorf("session actor mismatch: %s != %s", sess.ActorId.String(), sessionCookieId.ActorId.String())
+	}
+
 	if fromJwt.IsAuthenticated() {
 		// Sanity check that this session is for the same actor
 		if sess.ActorId != fromJwt.GetActor().ID {
 			// The two do not agree. Cancel the previous session as this is a new user. Service will need to
 			// re-establish session if it wants it.
-			err = s.deleteSessionFromRedis(ctx, sessionId)
+			err = s.deleteSessionFromRedis(ctx, sessionCookieId.Id)
 			if err != nil {
 				return NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to delete session from redis")
 			}
@@ -194,7 +259,10 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 		return errors.Wrap(err, "failed to establish session")
 	}
 
-	s.setSessionCookie(ctx, w, *sess)
+	if s.setSessionCookie(ctx, w, *sess) != nil {
+		return errors.Wrap(err, "failed to set session cookie")
+	}
+
 	ra.setSessionId(&sess.Id)
 
 	return nil
@@ -224,16 +292,22 @@ func (s *service) extendSession(ctx context.Context, sess *session, w http.Respo
 	return nil
 }
 
-func (s *service) setSessionCookie(ctx context.Context, w http.ResponseWriter, sess session) {
+func (s *service) setSessionCookie(ctx context.Context, w http.ResponseWriter, sess session) error {
 	sessionService := s.service.(config.HttpServiceWithSession)
 	cookieExpiration := 0 // session cookie
 	if sessionService.SessionTimeout() != 0 {
 		cookieExpiration = int(sess.ExpiresAt.Sub(apctx.GetClock(ctx).Now()).Seconds())
 	}
 
+	sessId := sess.GetSessionId()
+	val, err := sessId.GetSessionCookieId(s.encrypt)
+	if err != nil {
+		return errors.Wrap(err, "failed to get session cookie id")
+	}
+
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookieName,
-		Value:    sess.Id.String(),
+		Value:    val,
 		HttpOnly: true,
 		Path:     "/",
 		Domain:   sessionService.CookieDomain(),
@@ -241,6 +315,8 @@ func (s *service) setSessionCookie(ctx context.Context, w http.ResponseWriter, s
 		Secure:   s.service.IsHttps(),
 		SameSite: sessionService.CookieSameSite(),
 	})
+
+	return nil
 }
 
 // EndSession terminates a session that is in progress by clearing the session information from redis and clearing

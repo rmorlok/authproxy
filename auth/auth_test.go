@@ -9,6 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/database"
+	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/jwt"
 	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/test_utils"
@@ -189,7 +190,9 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 		}
 	}
 
-	auth := NewService(b.cfg, b.cfg.MustGetService(b.service).(config.HttpService), b.db, b.redis, test_utils.NewTestLogger())
+	e := encrypt.NewFakeEncryptService(true)
+
+	auth := NewService(b.cfg, b.cfg.MustGetService(b.service).(config.HttpService), b.db, b.redis, e, test_utils.NewTestLogger())
 
 	b.ginEngine = gin.New()
 

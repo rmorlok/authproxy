@@ -61,7 +61,7 @@ func GetGinServer(
 ) (httpServer *http.Server, httpHealthChecker *http.Server, err error) {
 	root := cfg.GetRoot()
 	service := &root.Public
-	authService := auth.NewService(cfg, service, db, redis, logger)
+	authService := auth.NewService(cfg, service, db, redis, encrypt, logger)
 
 	server := api_common.GinForService(service)
 
