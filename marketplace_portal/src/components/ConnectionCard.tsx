@@ -120,7 +120,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
   };
 
   return (
-    <Card sx={{ maxWidth: 345, height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Card sx={{ width: 300, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <CardHeader
         avatar={
           connector ? (

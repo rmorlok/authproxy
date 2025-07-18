@@ -39,7 +39,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
   const displayText = connector.highlight || truncateText(connector.description);
 
   return (
-    <Card sx={{ maxWidth: 345, height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Card sx={{ width: 300, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <CardMedia
         component="img"
         height="140"
