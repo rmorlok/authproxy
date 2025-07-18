@@ -27,24 +27,28 @@ type ConnectorJson struct {
 }
 
 func ConnectorToJson(c *connectors.Connector) ConnectorJson {
-	def := c.GetDefinition()
+	result := ConnectorVersionToJson(&c.ConnectorVersion)
+	result.Versions = c.TotalVersions
+	result.States = c.States
+	return result
+}
+
+func ConnectorVersionToJson(cv *connectors.ConnectorVersion) ConnectorJson {
+	def := cv.GetDefinition()
 	logo := ""
 	if def.Logo != nil {
 		logo = def.Logo.GetUrl()
 	}
 
 	return ConnectorJson{
-		Id:          c.ID,
-		Version:     c.Version,
-		State:       c.State,
-		Type:        c.Type,
+		Id:          cv.ID,
+		Version:     cv.Version,
+		State:       cv.State,
+		Type:        cv.Type,
 		Highlight:   def.Highlight,
 		DisplayName: def.DisplayName,
 		Description: def.Description,
 		Logo:        logo,
-
-		Versions: c.TotalVersions,
-		States:   c.States,
 	}
 }
 

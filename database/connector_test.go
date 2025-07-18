@@ -38,6 +38,25 @@ INSERT INTO connector_versions
 		require.Equal(t, "gmail", v.Type)
 		require.Equal(t, ConnectorVersionStateActive, v.State)
 
+		results, err := db.GetConnectorVersions(ctx, []ConnectorVersionId{
+			{uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1},
+		})
+		require.NoError(t, err)
+		require.Len(t, results, 1)
+		require.Equal(t, "gmail", results[ConnectorVersionId{uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1}].Type)
+		require.Equal(t, ConnectorVersionStateActive, results[ConnectorVersionId{uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1}].State)
+
+		results, err = db.GetConnectorVersions(ctx, []ConnectorVersionId{
+			{uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1},
+			{uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), 2},
+		})
+		require.NoError(t, err)
+		require.Len(t, results, 2)
+		require.Equal(t, "gmail", results[ConnectorVersionId{uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1}].Type)
+		require.Equal(t, ConnectorVersionStateActive, results[ConnectorVersionId{uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1}].State)
+		require.Equal(t, "gmail", results[ConnectorVersionId{uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), 2}].Type)
+		require.Equal(t, ConnectorVersionStatePrimary, results[ConnectorVersionId{uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), 2}].State)
+
 		// Version doesn't exist
 		v, err = db.GetConnectorVersion(ctx, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 99)
 		require.NoError(t, err)

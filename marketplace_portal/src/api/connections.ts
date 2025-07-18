@@ -1,4 +1,5 @@
 import { client } from './client';
+import {Connector} from "./connectors";
 
 // Connection models
 export enum ConnectionState {
@@ -11,7 +12,7 @@ export enum ConnectionState {
 
 export interface Connection {
   id: string;
-  connector_id: string;
+  connector: Connector;
   state: ConnectionState;
   created_at: string;
   updated_at: string;

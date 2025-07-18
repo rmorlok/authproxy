@@ -17,23 +17,31 @@ import {
   DialogTitle,
 } from '@mui/material';
 import {tasks, Connection, ConnectionState, canBeDisconnected, PollForTaskResult, DisconnectResponseJson} from '../api';
-import { useSelector, useDispatch } from 'react-redux';
+import { useDispatch } from 'react-redux';
 import {
-  selectConnectors,
   disconnectConnectionAsync,
   AppDispatch, addToast, fetchConnectionsAsync,
 } from '../store';
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 interface ConnectionCardProps {
   connection: Connection;
 }
+
+const truncateText = (text: string, maxLength: number = 120): string => {
+  if (text.length <= maxLength) return text;
+  return text.substring(0, maxLength).trim() + '...';
+};
 
 /**
  * Component to display a single connection with its details
  */
 const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
   const dispatch = useDispatch<AppDispatch>();
-  const connectors = useSelector(selectConnectors);
-  const connector = connectors.find(c => c.id === connection.connector_id);
+  const connector = connection.connector;
+
+  // Use highlight field if available, otherwise use truncated description
+  const displayText = connector.highlight || truncateText(connector.description);
 
   // State for confirmation dialog
   const [openDialog, setOpenDialog] = useState(false);
@@ -90,6 +98,12 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
               type: 'warning',
               durationMs: 4000,
             });
+        } else {
+          addToast({
+            message: 'Successfully disconnected connection',
+            type: 'success',
+            durationMs: 2000,
+          });
         }
       }
 
@@ -120,23 +134,48 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
           )
         }
         title={connector ? connector.display_name : 'Unknown Connector'}
+        action={(<Chip
+            label={connection.state}
+            color={statusColor}
+            size="small"
+            variant="outlined"
+        />)}
         subheader={`Connected on ${createdDate}`}
       />
       <CardContent sx={{ flexGrow: 1 }}>
-        <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-          <Typography variant="body2" color="text.secondary">
-            Status:
-          </Typography>
-          <Chip 
-            label={connection.state} 
-            color={statusColor} 
-            size="small" 
-            variant="outlined"
-          />
+        <Box sx={{
+          '& p': { margin: 0, fontSize: '0.875rem', color: 'text.secondary' },
+          '& strong': { color: 'text.primary' },
+          '& em': { color: 'text.secondary' },
+          '& code': {
+            backgroundColor: 'action.hover',
+            padding: '2px 4px',
+            borderRadius: '4px',
+            fontSize: '0.8rem'
+          }
+        }}>
+          <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                // Override paragraph to remove default margins
+                p: ({ children }) => <Typography variant="body2" color="text.secondary">{children}</Typography>,
+                // Override strong to use primary color
+                strong: ({ children }) => <Typography component="span" sx={{ fontWeight: 'bold', color: 'text.primary' }}>{children}</Typography>,
+                // Override em to use secondary color
+                em: ({ children }) => <Typography component="span" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>{children}</Typography>,
+                // Override code to use custom styling
+                code: ({ children }) => <Typography component="code" sx={{
+                  backgroundColor: 'action.hover',
+                  padding: '2px 4px',
+                  borderRadius: '4px',
+                  fontSize: '0.8rem',
+                  fontFamily: 'monospace'
+                }}>{children}</Typography>
+              }}
+          >
+            {displayText}
+          </ReactMarkdown>
         </Box>
-        <Typography variant="body2" color="text.secondary">
-          ID: {connection.id}
-        </Typography>
       </CardContent>
 
       {canBeDisconnected(connection) && (

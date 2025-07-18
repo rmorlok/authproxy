@@ -214,6 +214,21 @@ func (mr *MockDBMockRecorder) GetConnectorVersionForTypeAndVersion(ctx, typ, ver
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersionForTypeAndVersion", reflect.TypeOf((*MockDB)(nil).GetConnectorVersionForTypeAndVersion), ctx, typ, version)
 }
 
+// GetConnectorVersions mocks base method.
+func (m *MockDB) GetConnectorVersions(ctx context.Context, requested []database.ConnectorVersionId) (map[database.ConnectorVersionId]*database.ConnectorVersion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetConnectorVersions", ctx, requested)
+	ret0, _ := ret[0].(map[database.ConnectorVersionId]*database.ConnectorVersion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetConnectorVersions indicates an expected call of GetConnectorVersions.
+func (mr *MockDBMockRecorder) GetConnectorVersions(ctx, requested interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersions", reflect.TypeOf((*MockDB)(nil).GetConnectorVersions), ctx, requested)
+}
+
 // GetOAuth2Token mocks base method.
 func (m *MockDB) GetOAuth2Token(ctx context.Context, connectionId uuid.UUID) (*database.OAuth2Token, error) {
 	m.ctrl.T.Helper()

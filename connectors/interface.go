@@ -8,6 +8,8 @@ import (
 	"github.com/rmorlok/authproxy/tasks"
 )
 
+type ConnectorVersionId = database.ConnectorVersionId
+
 // C is the interface for the connectors service
 type C interface {
 	/*
@@ -24,8 +26,12 @@ type C interface {
 	/*
 	 * Get connector version
 	 */
+
 	// GetConnectorVersion returns the specified version of a connector.
 	GetConnectorVersion(ctx context.Context, id uuid.UUID, version uint64) (*ConnectorVersion, error)
+
+	// GetConnectorVersions Retrieves multiple connector versions at once.
+	GetConnectorVersions(ctx context.Context, requested []ConnectorVersionId) (map[ConnectorVersionId]*ConnectorVersion, error)
 
 	// GetConnectorVersionForState returns the most recent version of the connector for the specified state.
 	GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state database.ConnectorVersionState) (*ConnectorVersion, error)

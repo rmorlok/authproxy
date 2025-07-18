@@ -18,6 +18,11 @@ import (
 
 type ConnectorVersionState string
 
+type ConnectorVersionId struct {
+	Id      uuid.UUID
+	Version uint64
+}
+
 // Value implements the driver.Valuer interface for ConnectorVersionState
 func (s ConnectorVersionState) Value() (driver.Value, error) {
 	return string(s), nil
@@ -160,6 +165,50 @@ func (db *gormDB) GetConnectorVersion(ctx context.Context, id uuid.UUID, version
 	}
 
 	return &cv, nil
+}
+
+func (db *gormDB) GetConnectorVersions(
+	ctx context.Context,
+	requested []ConnectorVersionId,
+) (map[ConnectorVersionId]*ConnectorVersion, error) {
+	if len(requested) == 0 {
+		return nil, nil
+	}
+
+	ids := make(map[ConnectorVersionId]struct{}, len(requested))
+	for _, id := range requested {
+		ids[id] = struct{}{}
+	}
+
+	sess := db.session(ctx)
+
+	query := sess
+	for i, id := range requested {
+		if i == 0 {
+			query = query.Where("(id = ? AND version = ?)", id.Id, id.Version)
+		} else {
+			query = query.Or("(id = ? AND version = ?)", id.Id, id.Version)
+		}
+	}
+
+	var versions []ConnectorVersion
+	result := query.Find(&versions)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+
+	versionMap := make(map[ConnectorVersionId]*ConnectorVersion, len(versions))
+	for i := range versions {
+		id := ConnectorVersionId{
+			Id:      versions[i].ID,
+			Version: versions[i].Version,
+		}
+		if _, exists := ids[id]; exists {
+			versionMap[id] = &versions[i]
+		}
+	}
+
+	return versionMap, nil
 }
 
 type UpsertConnectorVersionResult struct {

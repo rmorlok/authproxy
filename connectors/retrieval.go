@@ -27,6 +27,30 @@ func (s *service) GetConnectorVersion(ctx context.Context, id uuid.UUID, version
 	return wrapped, nil
 }
 
+func (s *service) GetConnectorVersions(ctx context.Context, requested []ConnectorVersionId) (map[ConnectorVersionId]*ConnectorVersion, error) {
+	results, err := s.db.GetConnectorVersions(ctx, requested)
+	if err != nil {
+		return nil, err
+	}
+
+	if results == nil {
+		return nil, nil
+	}
+
+	wrappedResults := make(map[ConnectorVersionId]*ConnectorVersion, len(results))
+	for id, cv := range results {
+		wrappedResults[id] = wrapConnectorVersion(*cv, s)
+
+		// Make sure we can load the connector definition from the encrypted value
+		_, err = wrappedResults[id].getDefinition()
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return wrappedResults, nil
+}
+
 func (s *service) GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state database.ConnectorVersionState) (*ConnectorVersion, error) {
 	cv, err := s.db.GetConnectorVersionForState(ctx, id, state)
 	if err != nil {

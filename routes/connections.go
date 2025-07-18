@@ -184,20 +184,31 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 }
 
 type ConnectionJson struct {
-	ID          uuid.UUID                `json:"id"`
-	State       database.ConnectionState `json:"state"`
-	ConnectorId uuid.UUID                `json:"connector_id"`
-	CreatedAt   time.Time                `json:"created_at"`
-	UpdatedAt   time.Time                `json:"updated_at"`
+	ID        uuid.UUID                `json:"id"`
+	State     database.ConnectionState `json:"state"`
+	Connector ConnectorJson            `json:"connector"`
+	CreatedAt time.Time                `json:"created_at"`
+	UpdatedAt time.Time                `json:"updated_at"`
 }
 
-func DatabaseConnectionToJson(conn database.Connection) ConnectionJson {
+func DatabaseConnectionToJson(cv *connectors.ConnectorVersion, conn database.Connection) ConnectionJson {
+	connector := ConnectorJson{
+		Id:          conn.ConnectorId,
+		DisplayName: "Unknown",
+		Type:        "unknown",
+		Description: "Unknown connector",
+	}
+
+	if cv != nil {
+		connector = ConnectorVersionToJson(cv)
+	}
+
 	return ConnectionJson{
-		ID:          conn.ID,
-		State:       conn.State,
-		ConnectorId: conn.ConnectorId,
-		CreatedAt:   conn.CreatedAt,
-		UpdatedAt:   conn.UpdatedAt,
+		ID:        conn.ID,
+		State:     conn.State,
+		Connector: connector,
+		CreatedAt: conn.CreatedAt,
+		UpdatedAt: conn.UpdatedAt,
 	}
 }
 
@@ -287,10 +298,26 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 			WithInternalErr(result.Error).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	connectorVersions, err := r.connectors.GetConnectorVersions(ctx, connectors.GetConnectorVersionIdsForConnections(result.Results))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
 	}
 
 	gctx.PureJSON(http.StatusOK, ListConnectionResponseJson{
-		Items:  util.Map(result.Results, DatabaseConnectionToJson),
+		Items: util.Map(result.Results, func(c database.Connection) ConnectionJson {
+			return DatabaseConnectionToJson(
+				connectorVersions[connectors.ConnectorVersionId{c.ConnectorId, c.ConnectorVersion}],
+				c,
+			)
+		}),
 		Cursor: result.Cursor,
 	})
 }
@@ -336,9 +363,19 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 		return
 	}
 
+	cv, err := r.connectors.GetConnectorVersion(ctx, c.ConnectorId, c.ConnectorVersion)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
 	// TODO: add security checking for ownership
 
-	gctx.PureJSON(http.StatusOK, DatabaseConnectionToJson(*c))
+	gctx.PureJSON(http.StatusOK, DatabaseConnectionToJson(cv, *c))
 }
 
 type DisconnectResponseJson struct {
@@ -389,6 +426,16 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 		return
 	}
 
+	cv, err := r.connectors.GetConnectorVersion(ctx, c.ConnectorId, c.ConnectorVersion)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
 	if c == nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusNotFound().
@@ -426,7 +473,7 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 
 	response := DisconnectResponseJson{
 		TaskId:     taskId,
-		Connection: DatabaseConnectionToJson(*c),
+		Connection: DatabaseConnectionToJson(cv, *c),
 	}
 
 	gctx.PureJSON(http.StatusOK, response)
