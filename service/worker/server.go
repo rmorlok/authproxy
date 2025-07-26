@@ -93,7 +93,7 @@ func Serve(cfg config.C) {
 
 	asynqClient.Ping()
 
-	c := connectors.NewConnectorsService(cfg, db, e, asynqClient, logger)
+	c := connectors.NewConnectorsService(cfg, db, e, rs, h, asynqClient, logger)
 
 	router.GET("/healthz", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 1*time.Second)
@@ -164,7 +164,7 @@ func Serve(cfg config.C) {
 	oauth2TaskHandler := oauth2.NewTaskHandler(cfg, db, rs, c, asynqClient, h, e, logger)
 	oauth2TaskHandler.RegisterTasks(mux)
 
-	connectorsService := connectors.NewConnectorsService(cfg, db, e, asynqClient, logger)
+	connectorsService := connectors.NewConnectorsService(cfg, db, e, rs, h, asynqClient, logger)
 
 	if cfg.GetRoot().Connectors.GetAutoMigrate() {
 		func() {

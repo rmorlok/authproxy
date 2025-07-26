@@ -1,11 +1,38 @@
 package connectors
 
 import (
+	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
+	mockAsynq "github.com/rmorlok/authproxy/apasynq/mock"
+	mockLog "github.com/rmorlok/authproxy/aplog/mock"
+	"github.com/rmorlok/authproxy/connectors/interface"
+	mockDb "github.com/rmorlok/authproxy/database/mock"
+	mockE "github.com/rmorlok/authproxy/encrypt/mock"
+	mockF "github.com/rmorlok/authproxy/httpf/mock"
+	mockR "github.com/rmorlok/authproxy/redis/mock"
 	"testing"
 
 	"github.com/rmorlok/authproxy/database"
 )
+
+func FullMockService(tb testing.TB, ctrl *gomock.Controller) (*service, *mockDb.MockDB, *mockR.MockR, *mockF.MockF, *mockAsynq.MockClient, *mockE.MockE) {
+	db := mockDb.NewMockDB(ctrl)
+	ac := mockAsynq.NewMockClient(ctrl)
+	rs := mockR.NewMockR(ctrl)
+	h := mockF.NewMockF(ctrl)
+	encrypt := mockE.NewMockE(ctrl)
+	logger, _ := mockLog.NewTestLogger(tb)
+
+	return &service{
+		cfg:     nil,
+		db:      db,
+		encrypt: encrypt,
+		ac:      ac,
+		httpf:   h,
+		redis:   rs,
+		logger:  logger,
+	}, db, rs, h, ac, encrypt
+}
 
 func TestGetConnectorVersionIdsForConnections(t *testing.T) {
 	u1 := uuid.MustParse("11111111-1111-1111-1111-111111111111")
@@ -14,17 +41,17 @@ func TestGetConnectorVersionIdsForConnections(t *testing.T) {
 	tests := []struct {
 		name        string
 		connections []database.Connection
-		expected    []ConnectorVersionId
+		expected    []_interface.ConnectorVersionId
 	}{
 		{
 			name:        "empty input",
 			connections: nil,
-			expected:    []ConnectorVersionId{},
+			expected:    []_interface.ConnectorVersionId{},
 		},
 		{
 			name:        "single connection",
 			connections: []database.Connection{{ConnectorId: u1, ConnectorVersion: 1}},
-			expected:    []ConnectorVersionId{{Id: u1, Version: 1}},
+			expected:    []_interface.ConnectorVersionId{{Id: u1, Version: 1}},
 		},
 		{
 			name: "multiple unique connections",
@@ -32,7 +59,7 @@ func TestGetConnectorVersionIdsForConnections(t *testing.T) {
 				{ConnectorId: u1, ConnectorVersion: 1},
 				{ConnectorId: u2, ConnectorVersion: 2},
 			},
-			expected: []ConnectorVersionId{
+			expected: []_interface.ConnectorVersionId{
 				{Id: u1, Version: 1},
 				{Id: u2, Version: 2},
 			},
@@ -43,7 +70,7 @@ func TestGetConnectorVersionIdsForConnections(t *testing.T) {
 				{ConnectorId: u1, ConnectorVersion: 1},
 				{ConnectorId: u1, ConnectorVersion: 1},
 			},
-			expected: []ConnectorVersionId{
+			expected: []_interface.ConnectorVersionId{
 				{Id: u1, Version: 1},
 			},
 		},
@@ -53,7 +80,7 @@ func TestGetConnectorVersionIdsForConnections(t *testing.T) {
 				{ConnectorId: u1, ConnectorVersion: 1},
 				{ConnectorId: u1, ConnectorVersion: 2},
 			},
-			expected: []ConnectorVersionId{
+			expected: []_interface.ConnectorVersionId{
 				{Id: u1, Version: 1},
 				{Id: u1, Version: 2},
 			},
@@ -64,7 +91,7 @@ func TestGetConnectorVersionIdsForConnections(t *testing.T) {
 				{ConnectorId: u1, ConnectorVersion: 1},
 				{ConnectorId: u2, ConnectorVersion: 1},
 			},
-			expected: []ConnectorVersionId{
+			expected: []_interface.ConnectorVersionId{
 				{Id: u1, Version: 1},
 				{Id: u2, Version: 1},
 			},
@@ -81,11 +108,11 @@ func TestGetConnectorVersionIdsForConnections(t *testing.T) {
 	}
 }
 
-func compareResults(got, expected []ConnectorVersionId) bool {
+func compareResults(got, expected []_interface.ConnectorVersionId) bool {
 	if len(got) != len(expected) {
 		return false
 	}
-	gotMap := make(map[ConnectorVersionId]struct{}, len(got))
+	gotMap := make(map[_interface.ConnectorVersionId]struct{}, len(got))
 	for _, id := range got {
 		gotMap[id] = struct{}{}
 	}

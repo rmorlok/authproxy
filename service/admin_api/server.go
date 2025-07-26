@@ -11,8 +11,10 @@ import (
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/connectors"
+	"github.com/rmorlok/authproxy/connectors/interface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
+	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/redis"
 	"log/slog"
 	"net/http"
@@ -32,7 +34,7 @@ func GetGinServer(
 	cfg config.C,
 	db database.DB,
 	redis redis.R,
-	c connectors.C,
+	c _interface.C,
 	e encrypt.E,
 	logger *slog.Logger,
 ) (httpServer *http.Server, httpHealthChecker *http.Server, err error) {
@@ -130,9 +132,10 @@ func Serve(cfg config.C) {
 		}()
 	}
 
+	h := httpf.CreateFactory(cfg, rs)
 	e := encrypt.NewEncryptService(cfg, db)
 	asynqClient := asynq.NewClientFromRedisClient(rs.Client())
-	c := connectors.NewConnectorsService(cfg, db, e, asynqClient, logger)
+	c := connectors.NewConnectorsService(cfg, db, e, rs, h, asynqClient, logger)
 
 	if root.Connectors.GetAutoMigrate() {
 		func() {

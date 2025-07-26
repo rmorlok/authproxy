@@ -16,3 +16,5 @@ func (a *AuthApiKey) Clone() Auth {
 	clone := *a
 	return &clone
 }
+
+var _ Auth = (*AuthApiKey)(nil)

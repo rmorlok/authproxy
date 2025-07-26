@@ -21,13 +21,6 @@ var redisClient *redis.Client
 var redisOnce sync.Once
 var redisErr error
 
-type R interface {
-	Ping(ctx context.Context) bool
-	Close() error
-	Client() *redis.Client
-	NewMutex(key string, options ...MutexOption) Mutex
-}
-
 type wrapper struct {
 	client     *redis.Client
 	secretKey  config.KeyData

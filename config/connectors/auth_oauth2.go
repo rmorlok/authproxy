@@ -15,6 +15,7 @@ type AuthOAuth2 struct {
 	Scopes        []Scope                 `json:"scopes" yaml:"scopes"`
 	Authorization AuthOauth2Authorization `json:"authorization" yaml:"authorization"`
 	Token         AuthOauth2Token         `json:"token" yaml:"token"`
+	Revocation    *AuthOauth2Revocation   `json:"revocation,omitempty" yaml:"revocation,omitempty"`
 }
 
 func (i *AuthOAuth2) UnmarshalYAML(value *yaml.Node) error {
@@ -220,3 +221,5 @@ func (a *AuthOAuth2) Clone() Auth {
 
 	return &clone
 }
+
+var _ Auth = (*AuthOAuth2)(nil)

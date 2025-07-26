@@ -1,71 +1,24 @@
 package connectors
 
 import (
-	"context"
-	"encoding/json"
-	cfg "github.com/rmorlok/authproxy/config/connectors"
+	iface "github.com/rmorlok/authproxy/connectors/interface"
 	"github.com/rmorlok/authproxy/database"
-	"github.com/rmorlok/authproxy/util"
-	"sync"
 )
 
-// ConnectorVersion is a wrapper for the lower level database equivalent that handles things like decrypting the
-// configuration, checking upgradability, etc.
-type ConnectorVersion struct {
-	database.ConnectorVersion
-
-	mu  sync.RWMutex
-	s   *service
-	def *cfg.Connector
+// Connector object is returned from queries for connectors, with one record per id. It aggregates some information
+// across all versions for a connector.
+type Connector struct {
+	ConnectorVersion
+	TotalVersions int64
+	States        database.ConnectorVersionStates
 }
 
-func wrapConnectorVersion(cv database.ConnectorVersion, s *service) *ConnectorVersion {
-	return &ConnectorVersion{
-		ConnectorVersion: cv,
-		s:                s,
-	}
+func (c *Connector) GetTotalVersions() int64 {
+	return c.TotalVersions
 }
 
-func (cv *ConnectorVersion) GetDefinition() *cfg.Connector {
-	return util.Must(cv.getDefinition())
+func (c *Connector) GetStates() database.ConnectorVersionStates {
+	return c.States
 }
 
-func (cv *ConnectorVersion) getDefinition() (*cfg.Connector, error) {
-	cv.mu.RLock()
-	defer cv.mu.RUnlock()
-	if cv.def == nil {
-		decrypted, err := cv.s.encrypt.DecryptStringForConnector(context.Background(), cv.ConnectorVersion, cv.EncryptedDefinition)
-		if err != nil {
-			return nil, err
-		}
-
-		var def cfg.Connector
-		err = json.Unmarshal([]byte(decrypted), &def)
-		if err != nil {
-			return nil, err
-		}
-		cv.def = &def
-	}
-
-	return cv.def, nil
-}
-
-func (cv *ConnectorVersion) setDefinition(def *cfg.Connector) error {
-	cv.mu.Lock()
-	defer cv.mu.Unlock()
-
-	jsonBytes, err := json.Marshal(def)
-	if err != nil {
-		return err
-	}
-
-	encrypted, err := cv.s.encrypt.EncryptStringForConnector(context.Background(), cv.ConnectorVersion, string(jsonBytes))
-	if err != nil {
-		return err
-	}
-	cv.Hash = def.Hash()
-	cv.EncryptedDefinition = encrypted
-	cv.def = def
-
-	return nil
-}
+var _ iface.Connector = (*Connector)(nil)

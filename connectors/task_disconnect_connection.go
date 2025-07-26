@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
+	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/database"
 )
@@ -47,8 +48,35 @@ func (s *service) disconnectConnection(ctx context.Context, t *asynq.Task) error
 
 	logger.Info("disconnecting connection")
 
+	logger.Debug("getting connection")
+	connection, err := s.db.GetConnection(ctx, p.ConnectionId)
+	if err != nil {
+		if errors.Is(database.ErrNotFound, err) {
+			logger.Error("connection not found", "error", err)
+			return nil
+		}
+
+		return err
+	}
+
+	logger.Debug("getting connector for connection")
+	cv, err := s.getConnectorVersion(ctx, connection.ConnectorId, connection.ConnectorVersion)
+	if err != nil {
+		logger.Error("failed to get connector for connection", "error", err)
+		return err
+	}
+
+	if cv.supportsRevokeCredentials() {
+		logger.Info("revoking credentials")
+		err = cv.revokeCredentials(ctx, s, *connection)
+		if err != nil {
+			logger.Error("failed to revoke credentials", "error", err)
+			return errors.Wrap(err, "failed to revoke credentials")
+		}
+	}
+
 	logger.Debug("marking connection as disconnected")
-	err := s.db.SetConnectionState(ctx, p.ConnectionId, database.ConnectionStateDisconnected)
+	err = s.db.SetConnectionState(ctx, p.ConnectionId, database.ConnectionStateDisconnected)
 	if err != nil {
 		logger.Error("failed to mark connection as disconnected", "error", err)
 		return err

@@ -9,7 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/connectors"
+	connIface "github.com/rmorlok/authproxy/connectors/interface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -57,15 +57,15 @@ func (o *OAuth2) saveStateToRedis(ctx context.Context, actor database.Actor, sta
 	s := &state{
 		Id:               stateId,
 		ActorId:          actor.ID,
-		ConnectorId:      o.cv.ID,
-		ConnectorVersion: o.cv.Version,
+		ConnectorId:      o.cv.GetID(),
+		ConnectorVersion: o.cv.GetVersion(),
 		ConnectionId:     o.connection.ID,
 		ExpiresAt:        time.Now().Add(ttl),
 		ReturnToUrl:      returnToUrl,
 	}
 	result := o.redis.Client().Set(ctx, getStateRedisKey(stateId), s, ttl)
 	if result.Err() != nil {
-		return errors.Wrapf(result.Err(), "failed to set state in redis for connector %s", o.cv.ID)
+		return errors.Wrapf(result.Err(), "failed to set state in redis for connector %s", o.cv.GetID())
 	}
 
 	o.state = s
@@ -78,7 +78,7 @@ func getOAuth2State(
 	cfg config.C,
 	db database.DB,
 	redis redis.R,
-	c connectors.C,
+	c connIface.C,
 	httpf httpf.F,
 	encrypt encrypt.E,
 	logger *slog.Logger,

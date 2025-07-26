@@ -8,6 +8,8 @@ import (
 	"github.com/rmorlok/authproxy/apasynq"
 	mockAsynq "github.com/rmorlok/authproxy/apasynq/mock"
 	mockLog "github.com/rmorlok/authproxy/aplog/mock"
+	cfg "github.com/rmorlok/authproxy/config/connectors"
+	"github.com/rmorlok/authproxy/connectors/mock"
 	"github.com/rmorlok/authproxy/database"
 	mockDb "github.com/rmorlok/authproxy/database/mock"
 	mockEncrypt "github.com/rmorlok/authproxy/encrypt/mock"
@@ -19,8 +21,16 @@ import (
 func TestTaskDisconnectConnection(t *testing.T) {
 	ctx := context.Background()
 	connectionId := uuid.New()
+	connectorId := uuid.New()
 
-	setup := func(t *testing.T) (*service, *mockDb.MockDB, *mockAsynq.MockClient, *gomock.Controller) {
+	apiKeyConnector := &cfg.Connector{
+		Id:          connectorId,
+		Version:     1,
+		DisplayName: "Test Connector",
+		Auth:        &cfg.AuthApiKey{},
+	}
+
+	setupWithMocks := func(t *testing.T) (*service, *mockDb.MockDB, *mockAsynq.MockClient, *mockEncrypt.MockE, *gomock.Controller) {
 		ctrl := gomock.NewController(t)
 		db := mockDb.NewMockDB(ctrl)
 		ac := mockAsynq.NewMockClient(ctrl)
@@ -33,12 +43,14 @@ func TestTaskDisconnectConnection(t *testing.T) {
 			encrypt: encrypt,
 			ac:      ac,
 			logger:  logger,
-		}, db, ac, ctrl
+		}, db, ac, encrypt, ctrl
 	}
 
 	t.Run("successfully disconnect connection", func(t *testing.T) {
-		svc, dbMock, _, ctrl := setup(t)
+		svc, dbMock, _, e, ctrl := setupWithMocks(t)
 		defer ctrl.Finish()
+
+		mock.MockConnectionRetrieval(context.Background(), dbMock, e, connectionId, apiKeyConnector)
 
 		dbMock.
 			EXPECT().
@@ -59,8 +71,10 @@ func TestTaskDisconnectConnection(t *testing.T) {
 	})
 
 	t.Run("is retriable on database state update error", func(t *testing.T) {
-		svc, dbMock, _, ctrl := setup(t)
+		svc, dbMock, _, e, ctrl := setupWithMocks(t)
 		defer ctrl.Finish()
+
+		mock.MockConnectionRetrieval(context.Background(), dbMock, e, connectionId, apiKeyConnector)
 
 		dbMock.
 			EXPECT().
@@ -76,8 +90,10 @@ func TestTaskDisconnectConnection(t *testing.T) {
 	})
 
 	t.Run("is retriable on database delete error", func(t *testing.T) {
-		svc, dbMock, _, ctrl := setup(t)
+		svc, dbMock, _, e, ctrl := setupWithMocks(t)
 		defer ctrl.Finish()
+
+		mock.MockConnectionRetrieval(context.Background(), dbMock, e, connectionId, apiKeyConnector)
 
 		dbMock.
 			EXPECT().

@@ -4,7 +4,7 @@ import (
 	"context"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/connectors"
+	connIface "github.com/rmorlok/authproxy/connectors/interface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -13,7 +13,7 @@ import (
 )
 
 type Factory interface {
-	NewOAuth2(connection database.Connection, connector *connectors.ConnectorVersion) *OAuth2
+	NewOAuth2(connection database.Connection, connector connIface.ConnectorVersion) *OAuth2
 	GetOAuth2State(ctx context.Context, actor database.Actor, stateId uuid.UUID) (*OAuth2, error)
 }
 
@@ -21,13 +21,13 @@ type factory struct {
 	cfg        config.C
 	db         database.DB
 	redis      redis.R
-	connectors connectors.C
+	connectors connIface.C
 	httpf      httpf.F
 	encrypt    encrypt.E
 	logger     *slog.Logger
 }
 
-func NewFactory(cfg config.C, db database.DB, redis redis.R, c connectors.C, httpf httpf.F, encrypt encrypt.E, logger *slog.Logger) Factory {
+func NewFactory(cfg config.C, db database.DB, redis redis.R, c connIface.C, httpf httpf.F, encrypt encrypt.E, logger *slog.Logger) Factory {
 	return &factory{
 		cfg:        cfg,
 		db:         db,
@@ -39,7 +39,7 @@ func NewFactory(cfg config.C, db database.DB, redis redis.R, c connectors.C, htt
 	}
 }
 
-func (f *factory) NewOAuth2(connection database.Connection, connector *connectors.ConnectorVersion) *OAuth2 {
+func (f *factory) NewOAuth2(connection database.Connection, connector connIface.ConnectorVersion) *OAuth2 {
 	return newOAuth2(
 		f.cfg,
 		f.db,

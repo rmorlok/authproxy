@@ -6,7 +6,7 @@ import (
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/connectors"
+	connIface "github.com/rmorlok/authproxy/connectors/interface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/util"
 	"net/http"
@@ -26,14 +26,14 @@ type ConnectorJson struct {
 	States   database.ConnectorVersionStates `json:"states,omitempty"`
 }
 
-func ConnectorToJson(c *connectors.Connector) ConnectorJson {
-	result := ConnectorVersionToJson(&c.ConnectorVersion)
-	result.Versions = c.TotalVersions
-	result.States = c.States
+func ConnectorToJson(c connIface.Connector) ConnectorJson {
+	result := ConnectorVersionToJson(c)
+	result.Versions = c.GetTotalVersions()
+	result.States = c.GetStates()
 	return result
 }
 
-func ConnectorVersionToJson(cv *connectors.ConnectorVersion) ConnectorJson {
+func ConnectorVersionToJson(cv connIface.ConnectorVersion) ConnectorJson {
 	def := cv.GetDefinition()
 	logo := ""
 	if def.Logo != nil {
@@ -41,10 +41,10 @@ func ConnectorVersionToJson(cv *connectors.ConnectorVersion) ConnectorJson {
 	}
 
 	return ConnectorJson{
-		Id:          cv.ID,
-		Version:     cv.Version,
-		State:       cv.State,
-		Type:        cv.Type,
+		Id:          cv.GetID(),
+		Version:     cv.GetVersion(),
+		State:       cv.GetState(),
+		Type:        cv.GetType(),
 		Highlight:   def.Highlight,
 		DisplayName: def.DisplayName,
 		Description: def.Description,
@@ -67,7 +67,7 @@ type ListConnectorsResponseJson struct {
 
 type ConnectorsRoutes struct {
 	cfg         config.C
-	connectors  connectors.C
+	connectors  connIface.C
 	authService auth.A
 }
 
@@ -145,7 +145,7 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 	}
 
 	var err error
-	var ex connectors.ListConnectorsExecutor
+	var ex connIface.ListConnectorsExecutor
 
 	if req.Cursor != nil {
 		ex, err = r.connectors.ListConnectorsFromCursor(ctx, *req.Cursor)
@@ -217,7 +217,7 @@ func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 	g.GET("/connectors/:id", r.authService.Required(), r.get)
 }
 
-func NewConnectorsRoutes(cfg config.C, authService auth.A, c connectors.C) *ConnectorsRoutes {
+func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *ConnectorsRoutes {
 	return &ConnectorsRoutes{
 		cfg:         cfg,
 		authService: authService,

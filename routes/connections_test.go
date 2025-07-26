@@ -6,7 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	"github.com/rmorlok/authproxy/apasynq/mock"
+	asynqmock "github.com/rmorlok/authproxy/apasynq/mock"
 	auth2 "github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/connectors"
@@ -14,7 +14,9 @@ import (
 	"github.com/rmorlok/authproxy/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/redis"
+	redismock "github.com/rmorlok/authproxy/redis/mock"
 	"github.com/rmorlok/authproxy/test_utils"
+	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"net/http"
 	"net/http/httptest"
@@ -29,15 +31,32 @@ func TestConnections(t *testing.T) {
 		Db       database.DB
 	}
 
+	connectorId := uuid.MustParse("10000000-0000-0000-0000-000000000001")
+	connectorVersion := uint64(1)
+
 	setup := func(t *testing.T, cfg config.C) (*TestSetup, func()) {
+		cfg = config.FromRoot(&config.Root{
+			Connectors: &config.Connectors{
+				LoadFromList: []config.Connector{
+					{
+						Id:          connectorId,
+						Version:     connectorVersion,
+						Type:        "test-connector",
+						DisplayName: "Test Connector",
+					},
+				},
+			},
+		})
 		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
 		cfg, rds := redis.MustApplyTestConfig(cfg)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(config.ServiceIdApi, cfg, db)
 		h := httpf2.CreateFactory(cfg, rds)
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
 		ctrl := gomock.NewController(t)
-		ac := mock.NewMockClient(ctrl)
-		c := connectors.NewConnectorsService(cfg, db, e, ac, test_utils.NewTestLogger())
+		ac := asynqmock.NewMockClient(ctrl)
+		rs := redismock.NewMockR(ctrl)
+		c := connectors.NewConnectorsService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
+		assert.NoError(t, c.MigrateConnectors(context.Background()))
 		cr := NewConnectionsRoutes(cfg, auth, db, rds, c, h, e, test_utils.NewTestLogger())
 		r := gin.Default()
 		cr.Register(r)
@@ -56,7 +75,12 @@ func TestConnections(t *testing.T) {
 		tu, done := setup(t, nil)
 		defer done()
 		u := uuid.New()
-		err := tu.Db.CreateConnection(context.Background(), &database.Connection{ID: u, State: database.ConnectionStateCreated})
+		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
+			ID:               u,
+			ConnectorId:      connectorId,
+			ConnectorVersion: connectorVersion,
+			State:            database.ConnectionStateCreated,
+		})
 		require.NoError(t, err)
 
 		t.Run("unauthorized", func(t *testing.T) {

@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/connectors"
+	connIface "github.com/rmorlok/authproxy/connectors/interface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -22,7 +23,7 @@ import (
 type ConnectionsRoutes struct {
 	cfg        config.C
 	auth       auth.A
-	connectors connectors.C
+	connectors connIface.C
 	db         database.DB
 	redis      redis.R
 	httpf      httpf.F
@@ -103,7 +104,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	}
 
 	var err error
-	var cv *connectors.ConnectorVersion
+	var cv connIface.ConnectorVersion
 	if req.HasVersion() {
 		cv, err = r.connectors.GetConnectorVersion(ctx, req.ConnectorId, req.ConnectorVersion)
 	} else {
@@ -130,8 +131,8 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 
 	connection := database.Connection{
 		ID:               uuid.New(),
-		ConnectorId:      cv.ID,
-		ConnectorVersion: cv.Version,
+		ConnectorId:      cv.GetID(),
+		ConnectorVersion: cv.GetVersion(),
 		State:            database.ConnectionStateCreated,
 	}
 
@@ -191,7 +192,7 @@ type ConnectionJson struct {
 	UpdatedAt time.Time                `json:"updated_at"`
 }
 
-func DatabaseConnectionToJson(cv *connectors.ConnectorVersion, conn database.Connection) ConnectionJson {
+func DatabaseConnectionToJson(cv connIface.ConnectorVersion, conn database.Connection) ConnectionJson {
 	connector := ConnectorJson{
 		Id:          conn.ConnectorId,
 		DisplayName: "Unknown",
@@ -314,7 +315,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, ListConnectionResponseJson{
 		Items: util.Map(result.Results, func(c database.Connection) ConnectionJson {
 			return DatabaseConnectionToJson(
-				connectorVersions[connectors.ConnectorVersionId{c.ConnectorId, c.ConnectorVersion}],
+				connectorVersions[connIface.ConnectorVersionId{c.ConnectorId, c.ConnectorVersion}],
 				c,
 			)
 		}),
@@ -491,7 +492,7 @@ func NewConnectionsRoutes(
 	authService auth.A,
 	db database.DB,
 	redis redis.R,
-	c connectors.C,
+	c connIface.C,
 	httpf httpf.F,
 	encrypt encrypt.E,
 	logger *slog.Logger,

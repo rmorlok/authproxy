@@ -4,7 +4,7 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/apasynq"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/connectors"
+	connIface "github.com/rmorlok/authproxy/connectors/interface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -16,7 +16,7 @@ type taskHandler struct {
 	cfg        config.C
 	db         database.DB
 	redis      redis.R
-	connectors connectors.C
+	connectors connIface.C
 	asynq      apasynq.Client
 	httpf      httpf.F
 	encrypt    encrypt.E
@@ -33,7 +33,7 @@ func NewTaskHandler(
 	cfg config.C,
 	db database.DB,
 	redis redis.R,
-	c connectors.C,
+	c connIface.C,
 	ac apasynq.Client,
 	httpf httpf.F,
 	encrypt encrypt.E,

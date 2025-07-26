@@ -3,10 +3,15 @@ package connectors
 import (
 	"context"
 	"github.com/google/uuid"
+	connIface "github.com/rmorlok/authproxy/connectors/interface"
 	"github.com/rmorlok/authproxy/database"
 )
 
-func (s *service) GetConnectorVersion(ctx context.Context, id uuid.UUID, version uint64) (*ConnectorVersion, error) {
+func (s *service) GetConnectorVersion(ctx context.Context, id uuid.UUID, version uint64) (connIface.ConnectorVersion, error) {
+	return s.getConnectorVersion(ctx, id, version)
+}
+
+func (s *service) getConnectorVersion(ctx context.Context, id uuid.UUID, version uint64) (*ConnectorVersion, error) {
 	cv, err := s.db.GetConnectorVersion(ctx, id, version)
 	if err != nil {
 		return nil, err
@@ -27,7 +32,7 @@ func (s *service) GetConnectorVersion(ctx context.Context, id uuid.UUID, version
 	return wrapped, nil
 }
 
-func (s *service) GetConnectorVersions(ctx context.Context, requested []ConnectorVersionId) (map[ConnectorVersionId]*ConnectorVersion, error) {
+func (s *service) GetConnectorVersions(ctx context.Context, requested []connIface.ConnectorVersionId) (map[connIface.ConnectorVersionId]connIface.ConnectorVersion, error) {
 	results, err := s.db.GetConnectorVersions(ctx, requested)
 	if err != nil {
 		return nil, err
@@ -37,21 +42,23 @@ func (s *service) GetConnectorVersions(ctx context.Context, requested []Connecto
 		return nil, nil
 	}
 
-	wrappedResults := make(map[ConnectorVersionId]*ConnectorVersion, len(results))
+	wrappedResults := make(map[connIface.ConnectorVersionId]connIface.ConnectorVersion, len(results))
 	for id, cv := range results {
-		wrappedResults[id] = wrapConnectorVersion(*cv, s)
+		tmp := wrapConnectorVersion(*cv, s)
 
 		// Make sure we can load the connector definition from the encrypted value
-		_, err = wrappedResults[id].getDefinition()
+		_, err = tmp.getDefinition()
 		if err != nil {
 			return nil, err
 		}
+
+		wrappedResults[id] = tmp
 	}
 
 	return wrappedResults, nil
 }
 
-func (s *service) GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state database.ConnectorVersionState) (*ConnectorVersion, error) {
+func (s *service) GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state database.ConnectorVersionState) (connIface.ConnectorVersion, error) {
 	cv, err := s.db.GetConnectorVersionForState(ctx, id, state)
 	if err != nil {
 		return nil, err
