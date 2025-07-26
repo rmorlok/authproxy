@@ -52,7 +52,7 @@ func getStateRedisKey(u uuid.UUID) string {
 	return fmt.Sprintf("oauth2:state:%s", u.String())
 }
 
-func (o *OAuth2) saveStateToRedis(ctx context.Context, actor database.Actor, stateId uuid.UUID, returnToUrl string) error {
+func (o *oAuth2Connection) saveStateToRedis(ctx context.Context, actor database.Actor, stateId uuid.UUID, returnToUrl string) error {
 	ttl := o.cfg.GetRoot().Oauth.GetRoundTripTtlOrDefault()
 	s := &state{
 		Id:               stateId,
@@ -84,7 +84,7 @@ func getOAuth2State(
 	logger *slog.Logger,
 	actor database.Actor,
 	stateId uuid.UUID,
-) (*OAuth2, error) {
+) (OAuth2Connection, error) {
 	logger.DebugContext(ctx, "getting oauth state",
 		"state_id", stateId,
 		"actor_id", actor.ID,

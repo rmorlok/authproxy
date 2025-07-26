@@ -7,11 +7,11 @@ import (
 	"net/url"
 )
 
-func (o *OAuth2) SupportsRevokeRefreshToken() bool {
+func (o *oAuth2Connection) SupportsRevokeRefreshToken() bool {
 	return o.auth.Revocation != nil && o.auth.Revocation.Endpoint != ""
 }
 
-func (o *OAuth2) RevokeRefreshToken(ctx context.Context) error {
+func (o *oAuth2Connection) RevokeRefreshToken(ctx context.Context) error {
 	if o.auth.Revocation == nil {
 		// Connector does not support token revocation
 		return nil

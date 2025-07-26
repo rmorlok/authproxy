@@ -60,7 +60,7 @@ func (th *taskHandler) refreshOauth2Token(ctx context.Context, t *asynq.Task) er
 		return fmt.Errorf("oauth token not found for connection %v: %w", connection.ID, asynq.SkipRetry)
 	}
 
-	o2 := th.factory.NewOAuth2(*connection, cv)
+	o2 := th.factory.NewOAuth2(*connection, cv).(*oAuth2Connection)
 	_, err = o2.refreshAccessToken(ctx, token, refreshModeAlways)
 	return err
 }

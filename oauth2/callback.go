@@ -7,7 +7,7 @@ import (
 	"net/url"
 )
 
-func (o *OAuth2) getPublicCallbackUrl() (string, error) {
+func (o *oAuth2Connection) getPublicCallbackUrl() (string, error) {
 	if o.cfg == nil {
 		return "", errors.New("config is nil")
 	}
@@ -25,7 +25,7 @@ func (o *OAuth2) getPublicCallbackUrl() (string, error) {
 	return u.String(), nil
 }
 
-func (o *OAuth2) CallbackFrom3rdParty(ctx context.Context, query url.Values) (string, error) {
+func (o *oAuth2Connection) CallbackFrom3rdParty(ctx context.Context, query url.Values) (string, error) {
 	errorRedirectPage := o.cfg.GetErrorPageUrl(config.ErrorPageInternalError)
 
 	if o.state == nil {

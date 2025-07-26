@@ -12,11 +12,6 @@ import (
 	"log/slog"
 )
 
-type Factory interface {
-	NewOAuth2(connection database.Connection, connector connIface.ConnectorVersion) *OAuth2
-	GetOAuth2State(ctx context.Context, actor database.Actor, stateId uuid.UUID) (*OAuth2, error)
-}
-
 type factory struct {
 	cfg        config.C
 	db         database.DB
@@ -39,7 +34,7 @@ func NewFactory(cfg config.C, db database.DB, redis redis.R, c connIface.C, http
 	}
 }
 
-func (f *factory) NewOAuth2(connection database.Connection, connector connIface.ConnectorVersion) *OAuth2 {
+func (f *factory) NewOAuth2(connection database.Connection, connector connIface.ConnectorVersion) OAuth2Connection {
 	return newOAuth2(
 		f.cfg,
 		f.db,
@@ -53,7 +48,7 @@ func (f *factory) NewOAuth2(connection database.Connection, connector connIface.
 	)
 }
 
-func (f *factory) GetOAuth2State(ctx context.Context, actor database.Actor, stateId uuid.UUID) (*OAuth2, error) {
+func (f *factory) GetOAuth2State(ctx context.Context, actor database.Actor, stateId uuid.UUID) (OAuth2Connection, error) {
 	return getOAuth2State(
 		ctx,
 		f.cfg,

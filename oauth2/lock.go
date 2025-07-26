@@ -5,7 +5,7 @@ import (
 	"time"
 )
 
-func (o *OAuth2) tokenMutex() redis.Mutex {
+func (o *oAuth2Connection) tokenMutex() redis.Mutex {
 	return o.redis.NewMutex(
 		"oauth2-token-"+o.connection.ID.String(),
 		redis.MutexOptionRetryFor(o.auth.Token.GetRefreshTimeout()),

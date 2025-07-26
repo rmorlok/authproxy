@@ -12,7 +12,7 @@ import (
 	"net/url"
 )
 
-func (o *OAuth2) proxyToplevel() *gentleman.Client {
+func (o *oAuth2Connection) proxyToplevel() *gentleman.Client {
 	// TODO: add middlewares
 	return gentleman.New()
 }
@@ -24,7 +24,7 @@ const (
 	refreshModeAlways
 )
 
-func (o *OAuth2) refreshAccessToken(ctx context.Context, token *database.OAuth2Token, mode refreshMode) (*database.OAuth2Token, error) {
+func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *database.OAuth2Token, mode refreshMode) (*database.OAuth2Token, error) {
 	m := o.tokenMutex()
 	err := m.Lock(ctx)
 	if err != nil {
@@ -93,7 +93,7 @@ func (o *OAuth2) refreshAccessToken(ctx context.Context, token *database.OAuth2T
 	return newToken, nil
 }
 
-func (o *OAuth2) getValidToken(ctx context.Context) (*database.OAuth2Token, error) {
+func (o *oAuth2Connection) getValidToken(ctx context.Context) (*database.OAuth2Token, error) {
 	token, err := o.db.GetOAuth2Token(ctx, o.connection.ID)
 	if err != nil {
 		return nil, err
@@ -119,7 +119,7 @@ func (o *OAuth2) getValidToken(ctx context.Context) (*database.OAuth2Token, erro
 	return token, nil
 }
 
-func (o *OAuth2) ProxyRequest(ctx context.Context, req *proxy.ProxyRequest) (*proxy.ProxyResponse, error) {
+func (o *oAuth2Connection) ProxyRequest(ctx context.Context, req *proxy.ProxyRequest) (*proxy.ProxyResponse, error) {
 	token, err := o.getValidToken(ctx)
 	if err != nil {
 		return nil, err
@@ -145,8 +145,8 @@ func (o *OAuth2) ProxyRequest(ctx context.Context, req *proxy.ProxyRequest) (*pr
 	return proxy.ProxyResponseFromGentlemen(resp)
 }
 
-func (o *OAuth2) ProxyRequestRaw(ctx context.Context, req *proxy.ProxyRequest, w http.ResponseWriter) error {
+func (o *oAuth2Connection) ProxyRequestRaw(ctx context.Context, req *proxy.ProxyRequest, w http.ResponseWriter) error {
 	return nil
 }
 
-var _ proxy.Proxy = (*OAuth2)(nil)
+var _ proxy.Proxy = (*oAuth2Connection)(nil)

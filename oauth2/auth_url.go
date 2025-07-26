@@ -13,7 +13,7 @@ import (
 	"strings"
 )
 
-func (o *OAuth2) getPublicRedirectUrl(ctx context.Context, stateId uuid.UUID, actor database.Actor) (string, error) {
+func (o *oAuth2Connection) getPublicRedirectUrl(ctx context.Context, stateId uuid.UUID, actor database.Actor) (string, error) {
 	if o.cfg == nil {
 		return "", errors.New("config is nil")
 	}
@@ -53,7 +53,7 @@ func (o *OAuth2) getPublicRedirectUrl(ctx context.Context, stateId uuid.UUID, ac
 	return u.String(), nil
 }
 
-func (o *OAuth2) GenerateAuthUrl(ctx context.Context, actor database.Actor) (string, error) {
+func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor database.Actor) (string, error) {
 	if !o.auth.ClientId.HasValue(ctx) {
 		return "", errors.Errorf("client id does not have value for connector %s", o.cv.GetID())
 	}
@@ -106,7 +106,7 @@ func (o *OAuth2) GenerateAuthUrl(ctx context.Context, actor database.Actor) (str
 // SetStateAndGeneratePublicUrl starts the OAuth process. It creates a state record for the connection authorization
 // flow, which begins the TTL for when that connection must be completed. Returns a redirect URL to our Public redirect.
 // This redirect will read from state, validate everything, then cookie the user and redirect to the 3rd party.
-func (o *OAuth2) SetStateAndGeneratePublicUrl(
+func (o *oAuth2Connection) SetStateAndGeneratePublicUrl(
 	ctx context.Context,
 	actor database.Actor,
 	returnToUrl string,

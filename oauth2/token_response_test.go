@@ -85,7 +85,7 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 				tt.setupMocks(mockDB, mockEncrypt)
 			}
 
-			oauth := &OAuth2{
+			oauth := &oAuth2Connection{
 				db:      mockDB,
 				encrypt: mockEncrypt,
 				auth: &config.AuthOAuth2{

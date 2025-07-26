@@ -14,7 +14,7 @@ import (
 	"log/slog"
 )
 
-type OAuth2 struct {
+type oAuth2Connection struct {
 	cfg        config.C
 	db         database.DB
 	redis      redis.R
@@ -29,6 +29,8 @@ type OAuth2 struct {
 	state      *state
 }
 
+var _ OAuth2Connection = (*oAuth2Connection)(nil)
+
 func newOAuth2(
 	cfg config.C,
 	db database.DB,
@@ -39,14 +41,14 @@ func newOAuth2(
 	httpf httpf.F,
 	connection database.Connection,
 	cv connIface.ConnectorVersion,
-) *OAuth2 {
+) *oAuth2Connection {
 	connector := cv.GetDefinition()
 	auth, ok := connector.Auth.(*config.AuthOAuth2)
 	if !ok {
 		panic(fmt.Sprintf("connector id %s is not an oauth2 connector", connector.Id))
 	}
 
-	return &OAuth2{
+	return &oAuth2Connection{
 		cfg:        cfg,
 		db:         db,
 		redis:      redis,
@@ -61,7 +63,7 @@ func newOAuth2(
 	}
 }
 
-func (o *OAuth2) RecordCancelSessionAfterAuth(ctx context.Context, shouldCancel bool) error {
+func (o *oAuth2Connection) RecordCancelSessionAfterAuth(ctx context.Context, shouldCancel bool) error {
 	if shouldCancel == o.state.CancelSessionAfterAuth {
 		return nil
 	}
@@ -77,6 +79,6 @@ func (o *OAuth2) RecordCancelSessionAfterAuth(ctx context.Context, shouldCancel 
 	return nil
 }
 
-func (o *OAuth2) CancelSessionAfterAuth() bool {
+func (o *oAuth2Connection) CancelSessionAfterAuth() bool {
 	return o.state.CancelSessionAfterAuth
 }

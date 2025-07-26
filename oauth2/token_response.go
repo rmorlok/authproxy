@@ -24,7 +24,7 @@ type tokenResponse struct {
 
 // createDbTokenFromResponse deserializes an oauth token from a refresh or authorization code response. It deserializes
 // the response, and then inserts a token into the databse. It returns the newly created token.
-func (o *OAuth2) createDbTokenFromResponse(ctx context.Context, resp *gentleman.Response, refreshFrom *database.OAuth2Token) (*database.OAuth2Token, error) {
+func (o *oAuth2Connection) createDbTokenFromResponse(ctx context.Context, resp *gentleman.Response, refreshFrom *database.OAuth2Token) (*database.OAuth2Token, error) {
 	jsonResp := tokenResponse{}
 	err := resp.JSON(&jsonResp)
 	if err != nil {
