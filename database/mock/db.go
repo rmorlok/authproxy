@@ -81,6 +81,20 @@ func (mr *MockDBMockRecorder) CreateConnection(ctx, c interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateConnection", reflect.TypeOf((*MockDB)(nil).CreateConnection), ctx, c)
 }
 
+// DeleteAllOAuth2TokensForConnection mocks base method.
+func (m *MockDB) DeleteAllOAuth2TokensForConnection(ctx context.Context, connectionId uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteAllOAuth2TokensForConnection", ctx, connectionId)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteAllOAuth2TokensForConnection indicates an expected call of DeleteAllOAuth2TokensForConnection.
+func (mr *MockDBMockRecorder) DeleteAllOAuth2TokensForConnection(ctx, connectionId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAllOAuth2TokensForConnection", reflect.TypeOf((*MockDB)(nil).DeleteAllOAuth2TokensForConnection), ctx, connectionId)
+}
+
 // DeleteConnection mocks base method.
 func (m *MockDB) DeleteConnection(ctx context.Context, id uuid.UUID) error {
 	m.ctrl.T.Helper()
@@ -93,6 +107,20 @@ func (m *MockDB) DeleteConnection(ctx context.Context, id uuid.UUID) error {
 func (mr *MockDBMockRecorder) DeleteConnection(ctx, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteConnection", reflect.TypeOf((*MockDB)(nil).DeleteConnection), ctx, id)
+}
+
+// DeleteOAuth2Token mocks base method.
+func (m *MockDB) DeleteOAuth2Token(ctx context.Context, tokenId uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteOAuth2Token", ctx, tokenId)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteOAuth2Token indicates an expected call of DeleteOAuth2Token.
+func (mr *MockDBMockRecorder) DeleteOAuth2Token(ctx, tokenId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteOAuth2Token", reflect.TypeOf((*MockDB)(nil).DeleteOAuth2Token), ctx, tokenId)
 }
 
 // EnumerateOAuth2TokensExpiringWithin mocks base method.

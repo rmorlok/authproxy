@@ -62,7 +62,9 @@ type DB interface {
 		accessTokenExpiresAt *time.Time,
 		scopes string,
 	) (*OAuth2Token, error)
-
+	DeleteOAuth2Token(ctx context.Context, tokenId uuid.UUID) error
+	DeleteAllOAuth2TokensForConnection(ctx context.Context, connectionId uuid.UUID) error
+	
 	// EnumerateOAuth2TokensExpiringWithin enumerates OAuth2 tokens that are expiring within a specified time interval
 	// of now. This includes tokens that are already expired. Deleted tokens are not considered, nor are tokens tied
 	// to a deleted connection.

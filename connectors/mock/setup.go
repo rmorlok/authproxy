@@ -13,24 +13,6 @@ import (
 	mockE "github.com/rmorlok/authproxy/encrypt/mock"
 )
 
-type connectorVersionMatcher struct {
-	expectedId      uuid.UUID
-	expectedVersion uint64
-}
-
-func (m connectorVersionMatcher) Matches(x interface{}) bool {
-	cv, ok := x.(database.ConnectorVersion)
-	if !ok {
-		return false
-	}
-
-	return cv.ID == m.expectedId && cv.Version == m.expectedVersion
-}
-
-func (m connectorVersionMatcher) String() string {
-	return fmt.Sprintf("is ConnectorVersion with ID=%s, Version=%d", m.expectedId, m.expectedVersion)
-}
-
 // MockConnectionRetrieval sets up the service to retrieve a connection with an associated connector any number of times
 func MockConnectionRetrieval(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.MockE, connUuuid uuid.UUID, c *cfg.Connector) {
 	clock := apctx.GetClock(ctx)
@@ -86,9 +68,9 @@ func MockConnectorRetrival(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.
 		EXPECT().
 		DecryptStringForConnector(
 			gomock.Any(),
-			connectorVersionMatcher{
-				expectedId:      c.Id,
-				expectedVersion: c.Version,
+			mockDb.ConnectorVersionMatcher{
+				ExpectedId:      c.Id,
+				ExpectedVersion: c.Version,
 			},
 			encryptedDefinition).
 		Return(string(connJson), nil).

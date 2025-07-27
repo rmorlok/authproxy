@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/apctx"
@@ -50,16 +51,52 @@ func (db *gormDB) GetOAuth2Token(
 
 	if result.Error != nil {
 		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
-			return nil, nil
+			return nil, ErrNotFound
 		}
 		return nil, result.Error
 	}
 
 	if result.RowsAffected == 0 {
-		return nil, nil
+		return nil, ErrNotFound
 	}
 
 	return &t, nil
+}
+
+func (db *gormDB) DeleteOAuth2Token(
+	ctx context.Context,
+	tokenId uuid.UUID,
+) error {
+	sess := db.session(ctx)
+	result := sess.Delete(&OAuth2Token{}, tokenId)
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
+}
+
+func (db *gormDB) DeleteAllOAuth2TokensForConnection(
+	ctx context.Context,
+	connectionId uuid.UUID,
+) error {
+	sqlDb, err := db.gorm.DB()
+	if err != nil {
+		return err
+	}
+
+	sqb := sq.StatementBuilder.RunWith(sqlDb)
+	now := apctx.GetClock(ctx).Now()
+
+	_, err = sqb.
+		Update("oauth2_tokens").
+		Set("deleted_at", now).
+		Where("connection_id = ?", connectionId).
+		ExecContext(ctx)
+
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func (db *gormDB) InsertOAuth2Token(

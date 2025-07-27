@@ -180,18 +180,18 @@ func (mr *MockOAuth2ConnectionMockRecorder) RecordCancelSessionAfterAuth(ctx, sh
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordCancelSessionAfterAuth", reflect.TypeOf((*MockOAuth2Connection)(nil).RecordCancelSessionAfterAuth), ctx, shouldCancel)
 }
 
-// RevokeRefreshToken mocks base method.
-func (m *MockOAuth2Connection) RevokeRefreshToken(ctx context.Context) error {
+// RevokeTokens mocks base method.
+func (m *MockOAuth2Connection) RevokeTokens(ctx context.Context) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RevokeRefreshToken", ctx)
+	ret := m.ctrl.Call(m, "RevokeTokens", ctx)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// RevokeRefreshToken indicates an expected call of RevokeRefreshToken.
-func (mr *MockOAuth2ConnectionMockRecorder) RevokeRefreshToken(ctx interface{}) *gomock.Call {
+// RevokeTokens indicates an expected call of RevokeTokens.
+func (mr *MockOAuth2ConnectionMockRecorder) RevokeTokens(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeRefreshToken", reflect.TypeOf((*MockOAuth2Connection)(nil).RevokeRefreshToken), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeTokens", reflect.TypeOf((*MockOAuth2Connection)(nil).RevokeTokens), ctx)
 }
 
 // SetStateAndGeneratePublicUrl mocks base method.
@@ -209,16 +209,16 @@ func (mr *MockOAuth2ConnectionMockRecorder) SetStateAndGeneratePublicUrl(ctx, ac
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetStateAndGeneratePublicUrl", reflect.TypeOf((*MockOAuth2Connection)(nil).SetStateAndGeneratePublicUrl), ctx, actor, returnToUrl)
 }
 
-// SupportsRevokeRefreshToken mocks base method.
-func (m *MockOAuth2Connection) SupportsRevokeRefreshToken() bool {
+// SupportsRevokeTokens mocks base method.
+func (m *MockOAuth2Connection) SupportsRevokeTokens() bool {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SupportsRevokeRefreshToken")
+	ret := m.ctrl.Call(m, "SupportsRevokeTokens")
 	ret0, _ := ret[0].(bool)
 	return ret0
 }
 
-// SupportsRevokeRefreshToken indicates an expected call of SupportsRevokeRefreshToken.
-func (mr *MockOAuth2ConnectionMockRecorder) SupportsRevokeRefreshToken() *gomock.Call {
+// SupportsRevokeTokens indicates an expected call of SupportsRevokeTokens.
+func (mr *MockOAuth2ConnectionMockRecorder) SupportsRevokeTokens() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SupportsRevokeRefreshToken", reflect.TypeOf((*MockOAuth2Connection)(nil).SupportsRevokeRefreshToken))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SupportsRevokeTokens", reflect.TypeOf((*MockOAuth2Connection)(nil).SupportsRevokeTokens))
 }

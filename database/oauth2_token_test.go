@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/apctx"
+	"github.com/rmorlok/authproxy/sqlh"
 	"github.com/rmorlok/authproxy/util"
 	"github.com/stretchr/testify/require"
 	"gorm.io/gorm"
@@ -54,7 +55,7 @@ func TestOAuth2Token_IsAccessTokenExpired(t *testing.T) {
 
 func TestOAuth2Tokens(t *testing.T) {
 	t.Run("round trip", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig("nonce_round_trip", nil)
+		_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -86,7 +87,7 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.Equal(t, "encryptedAccessToken", tok2.EncryptedAccessToken)
 	})
 	t.Run("no tokens", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig("nonce_round_trip", nil)
+		_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -105,11 +106,11 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.NoError(t, err)
 
 		tok, err := db.GetOAuth2Token(ctx, connectionId2)
-		require.NoError(t, err)
+		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, tok)
 	})
 	t.Run("replaces previous when tagging previous", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig("nonce_round_trip", nil)
+		_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -158,7 +159,7 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.Equal(t, "encryptedAccessToken2", tok2.EncryptedAccessToken)
 	})
 	t.Run("replaces previous when not tagging previous", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig("nonce_round_trip", nil)
+		_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -205,6 +206,116 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.Nil(t, tok2.RefreshedFromID)
 		require.Equal(t, "encryptedRefreshToken2", tok2.EncryptedRefreshToken)
 		require.Equal(t, "encryptedAccessToken2", tok2.EncryptedAccessToken)
+	})
+	t.Run("delete token", func(t *testing.T) {
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		connectionId := uuid.New()
+
+		tok, err := db.InsertOAuth2Token(
+			ctx,
+			connectionId,
+			nil,
+			"encryptedRefreshToken",
+			"encryptedAccessToken",
+			nil,
+			"scope1 scope2",
+		)
+		require.NoError(t, err)
+
+		connectionId2 := uuid.New()
+		_, err = db.InsertOAuth2Token(
+			ctx,
+			connectionId2,
+			nil,
+			"encryptedRefreshToken2",
+			"encryptedAccessToken2",
+			nil,
+			"scope1",
+		)
+		require.NoError(t, err)
+
+		require.Equal(t, 2, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM oauth2_tokens"))
+
+		tok2, err := db.GetOAuth2Token(ctx, connectionId)
+		require.NoError(t, err)
+		require.NotNil(t, tok2)
+
+		err = db.DeleteOAuth2Token(ctx, tok.ID)
+		require.NoError(t, err)
+
+		tok3, err := db.GetOAuth2Token(ctx, connectionId)
+		require.ErrorIs(t, err, ErrNotFound)
+		require.Nil(t, tok3)
+
+		require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM oauth2_tokens WHERE deleted_at IS NOT NULL"))
+
+		tok4, err := db.GetOAuth2Token(ctx, connectionId2)
+		require.NoError(t, err)
+		require.NotNil(t, tok4)
+	})
+	t.Run("delete all tokens for connection", func(t *testing.T) {
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		connectionId := uuid.New()
+
+		tok, err := db.InsertOAuth2Token(
+			ctx,
+			connectionId,
+			nil,
+			"encryptedRefreshToken",
+			"encryptedAccessToken",
+			nil,
+			"scope1 scope2",
+		)
+		require.NoError(t, err)
+
+		tok2, err := db.InsertOAuth2Token(
+			ctx,
+			connectionId,
+			&tok.ID,
+			"encryptedRefreshToken2",
+			"encryptedAccessToken2",
+			nil,
+			"scope1 scope2",
+		)
+		require.NoError(t, err)
+
+		connectionId2 := uuid.New()
+		_, err = db.InsertOAuth2Token(
+			ctx,
+			connectionId2,
+			nil,
+			"encryptedRefreshToken3",
+			"encryptedAccessToken3",
+			nil,
+			"scope1",
+		)
+		require.NoError(t, err)
+
+		require.Equal(t, 3, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM oauth2_tokens"))
+
+		tok3, err := db.GetOAuth2Token(ctx, connectionId)
+		require.NoError(t, err)
+		require.NotNil(t, tok3)
+		require.Equal(t, tok2.ID, tok3.ID)
+
+		err = db.DeleteAllOAuth2TokensForConnection(ctx, connectionId)
+		require.NoError(t, err)
+
+		tok4, err := db.GetOAuth2Token(ctx, connectionId)
+		require.ErrorIs(t, err, ErrNotFound)
+		require.Nil(t, tok4)
+
+		require.Equal(t, 2, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM oauth2_tokens WHERE deleted_at IS NOT NULL"))
+
+		tok5, err := db.GetOAuth2Token(ctx, connectionId2)
+		require.NoError(t, err)
+		require.NotNil(t, tok5)
 	})
 }
 

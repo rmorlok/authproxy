@@ -28,6 +28,6 @@ type OAuth2Connection interface {
 	CallbackFrom3rdParty(ctx context.Context, query url.Values) (string, error)
 	ProxyRequest(ctx context.Context, req *proxy.ProxyRequest) (*proxy.ProxyResponse, error)
 	ProxyRequestRaw(ctx context.Context, req *proxy.ProxyRequest, w http.ResponseWriter) error
-	SupportsRevokeRefreshToken() bool
-	RevokeRefreshToken(ctx context.Context) error
+	SupportsRevokeTokens() bool
+	RevokeTokens(ctx context.Context) error
 }
