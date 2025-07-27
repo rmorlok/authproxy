@@ -72,11 +72,12 @@ connectors:
       1. Some reason
       2. Some other reason
       3. Even better reason
+      4. More reasons
       
       More information [here](https://example.com) if interested.
     auth:
       type: OAuth2
-      client_id:
+      clientid:
         env_var: GOOGLE_CLIENT_ID
       client_secret:
         env_var: GOOGLE_CLIENT_SECRET
@@ -86,6 +87,8 @@ connectors:
           prompt: consent
       token:
         endpoint: https://oauth2.googleapis.com/token
+      revocation:
+        endpoint: https://oauth2.googleapis.com/revoke
       scopes:
         - id: https://www.googleapis.com/auth/drive.readonly
           reason: |
@@ -108,7 +111,7 @@ connectors:
     logo:
       public_url: https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg
     description: |
-      Allow the agent to manage your calendar on your behalf. It's like having your own personal assistant!
+      Allow the agent to manage your calendar on your behalf. It's like having your own personal assistant!!
     auth:
       type: OAuth2
       client_id:
@@ -121,6 +124,8 @@ connectors:
           prompt: consent
       token:
         endpoint: https://oauth2.googleapis.com/token
+      revocation:
+        endpoint: https://oauth2.googleapis.com/revoke
       scopes:
         - id: https://www.googleapis.com/auth/calendar.readonly
           reason: |
@@ -130,7 +135,7 @@ connectors:
     logo:
       public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Gmail_icon_%282020%29.svg/2880px-Gmail_icon_%282020%29.svg.png
     description: |
-      Have the agent respond to your emails without you needing to be involved.
+      Have the agent respond to your emails without you needing to be involved. Like magic.
     auth:
       type: OAuth2
       client_id:
@@ -143,6 +148,8 @@ connectors:
           prompt: consent
       token:
         endpoint: https://oauth2.googleapis.com/token
+      revocation:
+        endpoint: https://oauth2.googleapis.com/revoke
       scopes:
         - id: https://www.googleapis.com/auth/gmail.readonly
           reason: |

@@ -87,6 +87,7 @@ func (a *AuthOAuth2) UnmarshalJSON(data []byte) error {
 		Scopes        []Scope                 `json:"scopes"`
 		Authorization AuthOauth2Authorization `json:"authorization"`
 		Token         AuthOauth2Token         `json:"token"`
+		Revocation    *AuthOauth2Revocation   `json:"revocation,omitempty"`
 	}
 
 	var temp TempAuthOAuth2
@@ -101,6 +102,7 @@ func (a *AuthOAuth2) UnmarshalJSON(data []byte) error {
 	a.Scopes = temp.Scopes
 	a.Authorization = temp.Authorization
 	a.Token = temp.Token
+	a.Revocation = temp.Revocation
 
 	// Handle ClientId if it's not null
 	if len(temp.ClientId) > 0 && string(temp.ClientId) != "null" {
@@ -210,9 +212,14 @@ func (a *AuthOAuth2) Clone() Auth {
 
 	clone := *a
 
-	clone.ClientId = a.ClientId.Clone()
-	clone.ClientSecret = a.ClientSecret.Clone()
+	if a.ClientId != nil {
+		clone.ClientId = a.ClientId.Clone()
+	}
 
+	if a.ClientSecret != nil {
+		clone.ClientSecret = a.ClientSecret.Clone()
+	}
+	
 	scopes := make([]Scope, 0, len(a.Scopes))
 	for _, scope := range a.Scopes {
 		scopes = append(scopes, scope)
