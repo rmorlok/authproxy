@@ -66,12 +66,15 @@ func (s *service) disconnectConnection(ctx context.Context, t *asynq.Task) error
 		return err
 	}
 
-	if cv.supportsRevokeCredentials() {
+	revokeOps := cv.getRevokeCredentialsOperations(s, *connection)
+	if len(revokeOps) > 0 {
 		logger.Info("revoking credentials")
-		err = cv.revokeCredentials(ctx, s, *connection)
-		if err != nil {
-			logger.Error("failed to revoke credentials", "error", err)
-			return errors.Wrap(err, "failed to revoke credentials")
+		for _, op := range revokeOps {
+			err = op(ctx)
+			if err != nil {
+				logger.Error("failed to revoke credentials", "error", err)
+				return errors.Wrap(err, "failed to revoke credentials")
+			}
 		}
 	}
 
