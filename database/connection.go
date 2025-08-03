@@ -32,6 +32,18 @@ type Connection struct {
 	DeletedAt        gorm.DeletedAt  `gorm:"column:deleted_at;index"`
 }
 
+func (c *Connection) GetID() uuid.UUID {
+	return c.ID
+}
+
+func (c *Connection) GetConnectorId() uuid.UUID {
+	return c.ConnectorId
+}
+
+func (c *Connection) GetConnectorVersion() uint64 {
+	return c.ConnectorVersion
+}
+
 func (db *gormDB) CreateConnection(ctx context.Context, c *Connection) error {
 	sess := db.session(ctx)
 	result := sess.Create(&c)

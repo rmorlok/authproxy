@@ -4,6 +4,7 @@ import (
 	"context"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/request_log"
 	"net/url"
 )
 
@@ -42,7 +43,11 @@ func (o *oAuth2Connection) CallbackFrom3rdParty(ctx context.Context, query url.V
 		return errorRedirectPage, errors.Wrapf(err, "failed to get public callback url")
 	}
 
-	c := o.httpf.NewTopLevel().
+	c := o.httpf.
+		ForRequestType(request_log.RequestTypeOAuth).
+		ForConnection(&o.connection).
+		ForConnectorVersion(o.cv).
+		New().
 		UseContext(ctx)
 
 	clientId, err := o.auth.ClientId.GetValue(ctx)

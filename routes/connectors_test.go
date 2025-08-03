@@ -7,6 +7,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	asynqmock "github.com/rmorlok/authproxy/apasynq/mock"
+	"github.com/rmorlok/authproxy/aplog"
 	auth2 "github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/connectors"
@@ -58,7 +59,7 @@ func TestConnectors(t *testing.T) {
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(config.ServiceIdApi, cfg, db)
 		rs := redismock.NewMockR(ctrl)
-		h := httpf2.CreateFactory(cfg, rs)
+		h := httpf2.CreateFactory(cfg, rs, aplog.NewNoopLogger())
 		c := connectors.NewConnectorsService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		require.NoError(t, c.MigrateConnectors(context.Background()))
 

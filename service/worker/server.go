@@ -63,7 +63,7 @@ func Serve(cfg config.C) {
 		}()
 	}
 
-	h := httpf.CreateFactory(cfg, rs)
+	h := httpf.CreateFactory(cfg, rs, logger)
 	e := encrypt.NewEncryptService(cfg, db)
 
 	workerConfig := cfg.GetRoot().Worker

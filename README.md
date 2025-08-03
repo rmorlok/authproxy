@@ -14,10 +14,10 @@ Create a network for the asynq system to interact with redis:
 docker network create authproxy
 ```
 
-Start redis:
+Start redis (requires search module):
 
 ```bash
-docker run --name redis-server -p 6379:6379 --network authproxy -d redis
+docker run --name redis-server -p 6379:6379 --network authproxy -d redis/redis-stack-server:latest
 ```
 
 Start the AuthProxy backend

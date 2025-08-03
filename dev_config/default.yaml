@@ -47,6 +47,9 @@ logging:
   type: tint
   level: debug
 
+http_logging:
+  enabled: true
+
 #redis:
 #  provider: miniredis
 redis:
@@ -77,7 +80,7 @@ connectors:
       More information [here](https://example.com) if interested.
     auth:
       type: OAuth2
-      clientid:
+      client_id:
         env_var: GOOGLE_CLIENT_ID
       client_secret:
         env_var: GOOGLE_CLIENT_SECRET

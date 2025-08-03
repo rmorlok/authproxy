@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/database"
+	"github.com/rmorlok/authproxy/request_log"
 	"net/url"
 )
 
@@ -63,7 +64,11 @@ func (o *oAuth2Connection) revokeRefreshToken(ctx context.Context, token *databa
 		return err
 	}
 
-	c := o.httpf.NewTopLevel().
+	c := o.httpf.
+		ForRequestType(request_log.RequestTypeOAuth).
+		ForConnection(&o.connection).
+		ForConnectorVersion(o.cv).
+		New().
 		UseContext(ctx)
 
 	req := c.Request().
@@ -122,7 +127,11 @@ func (o *oAuth2Connection) revokeAccessToken(ctx context.Context, token *databas
 		return err
 	}
 
-	c := o.httpf.NewTopLevel().
+	c := o.httpf.
+		ForRequestType(request_log.RequestTypeOAuth).
+		ForConnectorVersion(o.cv).
+		ForConnection(&o.connection).
+		New().
 		UseContext(ctx)
 
 	req := c.Request().

@@ -26,7 +26,31 @@ func NewFactoryWithMockingClient(ctrl *gomock.Controller) *MockF {
 
 	h.
 		EXPECT().
-		NewTopLevel().
+		ForRequestInfo(gomock.Any()).
+		Return(h).
+		AnyTimes()
+
+	h.
+		EXPECT().
+		ForRequestType(gomock.Any()).
+		Return(h).
+		AnyTimes()
+
+	h.
+		EXPECT().
+		ForConnectorVersion(gomock.Any()).
+		Return(h).
+		AnyTimes()
+
+	h.
+		EXPECT().
+		ForConnection(gomock.Any()).
+		Return(h).
+		AnyTimes()
+
+	h.
+		EXPECT().
+		New().
 		Return(cli).
 		AnyTimes()
 

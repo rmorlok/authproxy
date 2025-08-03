@@ -132,7 +132,7 @@ func Serve(cfg config.C) {
 		}()
 	}
 
-	h := httpf.CreateFactory(cfg, rs)
+	h := httpf.CreateFactory(cfg, rs, logger)
 	e := encrypt.NewEncryptService(cfg, db)
 	asynqClient := asynq.NewClientFromRedisClient(rs.Client())
 	c := connectors.NewConnectorsService(cfg, db, e, rs, h, asynqClient, logger)

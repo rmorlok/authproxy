@@ -7,6 +7,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	asynqmock "github.com/rmorlok/authproxy/apasynq/mock"
+	"github.com/rmorlok/authproxy/aplog"
 	auth2 "github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/connectors"
@@ -50,7 +51,7 @@ func TestConnections(t *testing.T) {
 		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
 		cfg, rds := redis.MustApplyTestConfig(cfg)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(config.ServiceIdApi, cfg, db)
-		h := httpf2.CreateFactory(cfg, rds)
+		h := httpf2.CreateFactory(cfg, rds, aplog.NewNoopLogger())
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
 		ctrl := gomock.NewController(t)
 		ac := asynqmock.NewMockClient(ctrl)

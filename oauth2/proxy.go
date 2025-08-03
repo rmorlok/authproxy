@@ -7,14 +7,18 @@ import (
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/proxy"
+	"github.com/rmorlok/authproxy/request_log"
 	"gopkg.in/h2non/gentleman.v2"
 	"net/http"
 	"net/url"
 )
 
 func (o *oAuth2Connection) proxyToplevel() *gentleman.Client {
-	// TODO: add middlewares
-	return gentleman.New()
+	return o.httpf.
+		ForRequestType(request_log.RequestTypeProxy).
+		ForConnection(&o.connection).
+		ForConnectorVersion(o.cv).
+		New()
 }
 
 type refreshMode int
