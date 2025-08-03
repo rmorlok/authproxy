@@ -28,6 +28,9 @@ func CreateFactory(cfg config.C, r redis.R, logger *slog.Logger) F {
 		cfg:    cfg,
 		r:      r,
 		logger: logger,
+		requestInfo: request_log.RequestInfo{
+			Type: request_log.RequestTypeGlobal,
+		},
 	}
 }
 
