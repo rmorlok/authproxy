@@ -4,17 +4,18 @@ import (
 	"crypto/tls"
 	"encoding/json"
 	"fmt"
-	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/cli/client/config"
-	server_config "github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/jwt"
-	"github.com/spf13/cobra"
 	"io"
 	"log"
 	"net/http"
 	"net/url"
 	"os"
 	"strings"
+
+	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/cli/client/config"
+	server_config "github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/jwt"
+	"github.com/spf13/cobra"
 )
 
 func httpProxyForHost(baseUrl url.URL, signer jwt.Signer) func(w http.ResponseWriter, req *http.Request) {
@@ -45,6 +46,7 @@ func httpProxyForHost(baseUrl url.URL, signer jwt.Signer) func(w http.ResponseWr
 			errStr := fmt.Sprintf("Error creating request: %s", err.Error())
 			fmt.Fprintln(os.Stderr, errStr)
 			writeJsonErrorResponse(w, http.StatusInternalServerError, errStr)
+			return
 		}
 
 		signer.SignAuthHeader(r)
@@ -54,6 +56,7 @@ func httpProxyForHost(baseUrl url.URL, signer jwt.Signer) func(w http.ResponseWr
 			errStr := fmt.Sprintf("Error sending request: %s", err.Error())
 			fmt.Fprintln(os.Stderr, errStr)
 			writeJsonErrorResponse(w, http.StatusInternalServerError, errStr)
+			return
 		}
 
 		defer func() {
