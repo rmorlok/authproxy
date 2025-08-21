@@ -49,6 +49,7 @@ logging:
 
 http_logging:
   enabled: true
+  full_request_recording: always
 
 #redis:
 #  provider: miniredis

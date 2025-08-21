@@ -19,6 +19,12 @@ type HttpLogging struct {
 	// Retention is how long the high-level logs should be retained. If unset, defaults to 30 days.
 	Retention *HumanDuration `json:"retention" yaml:"retention"`
 
+	// MaxRequestSize is the max size of request that will be stored. Values over this will be truncated.
+	MaxRequestSize *HumanByteSize `json:"max_request_size,omitempty" yaml:"max_request_size,omitempty"`
+
+	// MaxResponseSize is the max size of the response that will be stored. Values over this will be truncated.
+	MaxResponseSize *HumanByteSize `json:"max_response_size,omitempty" yaml:"max_response_size,omitempty"`
+
 	// FullRequestRecording flags if the full body/headers be logged for requests. Defaults to never, or can be enabled
 	// with API calls to specific resources, or always on.
 	FullRequestRecording *FullRequestRecording `json:"full_request_recording,omitempty" yaml:"full_request_recording,omitempty"`
@@ -69,4 +75,30 @@ func (d *HttpLogging) GetFullRequestRetention() time.Duration {
 	}
 
 	return d.FullRequestRetention.Duration
+}
+
+func (d *HttpLogging) GetMaxRequestSize() uint64 {
+	if !d.IsEnabled() {
+		return 0
+	}
+
+	if d.MaxRequestSize == nil {
+		// Default value is 250kb
+		return 250 * 1024
+	}
+
+	return d.MaxRequestSize.Value()
+}
+
+func (d *HttpLogging) GetMaxResponseSize() uint64 {
+	if !d.IsEnabled() {
+		return 0
+	}
+
+	if d.MaxResponseSize == nil {
+		// Default value is 250kb
+		return 250 * 1024
+	}
+
+	return d.MaxResponseSize.Value()
 }

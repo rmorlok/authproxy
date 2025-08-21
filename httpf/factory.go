@@ -1,14 +1,15 @@
 package httpf
 
 import (
+	"log/slog"
+	"net/http"
+	"sync"
+
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/request_log"
 	"gopkg.in/h2non/gentleman.v2"
 	"gopkg.in/h2non/gentleman.v2/plugins/transport"
-	"log/slog"
-	"net/http"
-	"sync"
 )
 
 type clientFactory struct {
@@ -76,6 +77,8 @@ func (f *clientFactory) New() *gentleman.Client {
 		if root.HttpLogging.IsEnabled() {
 			expiration := root.HttpLogging.GetRetention()
 			recordFullRequest := root.HttpLogging.GetFullRequestRecording() == config.FullRequestRecordingAlways
+			maxFullRequestSize := root.HttpLogging.GetMaxRequestSize()
+			maxFullResponseSize := root.HttpLogging.GetMaxResponseSize()
 			fullRequestExpiration := root.HttpLogging.GetFullRequestRetention()
 
 			l := request_log.NewRedisLogger(
@@ -85,6 +88,8 @@ func (f *clientFactory) New() *gentleman.Client {
 				expiration,
 				recordFullRequest,
 				fullRequestExpiration,
+				maxFullRequestSize,
+				maxFullResponseSize,
 				http.DefaultTransport,
 			)
 

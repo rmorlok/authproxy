@@ -1,11 +1,15 @@
 package request_log
 
 import (
+	"bytes"
 	"context"
-	"github.com/rmorlok/authproxy/redis"
+	"encoding/json"
+	"io"
 	"log/slog"
 	"net/http"
 	"time"
+
+	"github.com/rmorlok/authproxy/redis"
 )
 
 type redisLogger struct {
@@ -15,6 +19,8 @@ type redisLogger struct {
 	expiration            time.Duration
 	recordFullRequest     bool
 	fullRequestExpiration time.Duration
+	maxFullRequestSize    uint64
+	maxFullResponseSize   uint64
 	transport             http.RoundTripper
 }
 
@@ -25,6 +31,8 @@ func NewRedisLogger(
 	expiration time.Duration,
 	recordFullRequest bool,
 	fullRequestExpiration time.Duration,
+	maxFullRequestSize uint64,
+	maxFullResponseSize uint64,
 	transport http.RoundTripper,
 ) Logger {
 	return &redisLogger{
@@ -34,12 +42,18 @@ func NewRedisLogger(
 		expiration:            expiration,
 		recordFullRequest:     recordFullRequest,
 		fullRequestExpiration: fullRequestExpiration,
+		maxFullRequestSize:    maxFullRequestSize,
+		maxFullResponseSize:   maxFullResponseSize,
 		transport:             transport,
 	}
 }
 
 // storeEntryInRedis stores the log entry in Redis
-func (t *redisLogger) storeEntryInRedis(entry *Entry) {
+func (t *redisLogger) storeEntryInRedis(
+	entry *Entry,
+	requestBodyBuf *bytes.Buffer,
+	responseBodyReader *io.PipeReader,
+) {
 	// Get the Redis client
 	client := t.r.Client()
 	pipeline := client.Pipeline()
@@ -47,13 +61,6 @@ func (t *redisLogger) storeEntryInRedis(entry *Entry) {
 	vals := make(map[string]interface{})
 	t.requestInfo.setRedisRecordFields(vals)
 	entry.setRedisRecordFields(vals)
-
-	// Convert the entry to JSON
-	//entryJSON, err := json.Marshal(entry)
-	//if err != nil {
-	//	t.logger.Error("error marshaling HTTP log entry", "error", err, "entry_id", entry.ID.String())
-	//	return
-	//}
 
 	// Store the entry
 	err := pipeline.HSet(context.Background(), redisLogKey(entry.ID), vals).Err()
@@ -66,6 +73,38 @@ func (t *redisLogger) storeEntryInRedis(entry *Entry) {
 	if err != nil {
 		t.logger.Error("error setting expiry for log entry in Redis", "error", err, "entry_id", entry.ID.String())
 		return
+	}
+
+	if t.recordFullRequest {
+		if requestBodyBuf != nil {
+			requestData, err := io.ReadAll(requestBodyBuf)
+			if err != nil {
+				t.logger.Error("error reading full request body", "error", err, "entry_id", entry.ID.String())
+				entry.Request.Body = []byte(err.Error())
+			} else {
+				entry.Request.Body = requestData
+			}
+		}
+
+		if responseBodyReader != nil {
+			responseData, err := io.ReadAll(responseBodyReader)
+			if err != nil {
+				t.logger.Error("error reading full request body", "error", err, "entry_id", entry.ID.String())
+				entry.Response.Body = []byte(err.Error())
+			} else {
+				entry.Response.Body = responseData
+			}
+		}
+
+		jsonData, err := json.Marshal(entry)
+		if err != nil {
+			t.logger.Error("error serializing entry to JSON", "error", err, "entry_id", entry.ID.String())
+		} else {
+			err = pipeline.Set(context.Background(), redisFullLogKey(entry.ID), jsonData, t.fullRequestExpiration).Err()
+			if err != nil {
+				t.logger.Error("error storing full HTTP log entry in Redis", "error", err, "entry_id", entry.ID.String())
+			}
+		}
 	}
 
 	cmdErr, err := pipeline.Exec(context.Background())

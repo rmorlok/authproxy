@@ -8,6 +8,7 @@ import (
 // Re-export types from the common sub-package
 type (
 	HumanDuration           = common.HumanDuration
+	HumanByteSize           = common.HumanByteSize
 	Image                   = common.Image
 	ImageBase64             = common.ImageBase64
 	ImagePublicUrl          = common.ImagePublicUrl

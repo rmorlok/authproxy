@@ -2,6 +2,7 @@ package request_log
 
 import (
 	"fmt"
+
 	"github.com/google/uuid"
 )
 
@@ -18,7 +19,7 @@ const (
 	fieldMethod              = "m"
 	fieldHost                = "h"
 	fieldScheme              = "sch"
-	fieldPath                = "u"
+	fieldPath                = "p"
 	fieldResponseStatusCode  = "sc"
 	fieldResponseError       = "err"
 	fieldRequestHttpVersion  = "reqv"
@@ -33,6 +34,6 @@ func redisLogKey(requestId uuid.UUID) string {
 	return fmt.Sprintf("rl:%s", requestId.String())
 }
 
-func redisLogDetailKey(requestId uuid.UUID) string {
-	return fmt.Sprintf("rld:%s", requestId.String())
+func redisFullLogKey(requestId uuid.UUID) string {
+	return fmt.Sprintf("rlf:%s", requestId.String())
 }
