@@ -4,6 +4,11 @@ import (
 	"context"
 	context2 "context"
 	"fmt"
+	"log"
+	"net/http"
+	"sync"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/api_common"
@@ -15,10 +20,6 @@ import (
 	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/oauth2"
 	"github.com/rmorlok/authproxy/redis"
-	"log"
-	"net/http"
-	"sync"
-	"time"
 )
 
 func Serve(cfg config.C) {

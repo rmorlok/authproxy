@@ -58,10 +58,13 @@ func (t *redisLogger) storeEntryInRedis(
 	client := t.r.Client()
 	pipeline := client.Pipeline()
 
-	vals := make(map[string]interface{})
-	t.requestInfo.setRedisRecordFields(vals)
-	entry.setRedisRecordFields(vals)
+	er := EntryRecord{}
+	t.requestInfo.setRedisRecordFields(&er)
+	entry.setRedisRecordFields(&er)
 
+	vals := make(map[string]interface{})
+	er.setRedisRecordFields(vals)
+	
 	// Store the entry
 	err := pipeline.HSet(context.Background(), redisLogKey(entry.ID), vals).Err()
 	if err != nil {

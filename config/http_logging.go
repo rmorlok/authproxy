@@ -16,6 +16,10 @@ type HttpLogging struct {
 	// and responses, but not the body or headers unless additional configuration is present below.
 	Enabled bool `json:"enabled" yaml:"enabled"`
 
+	// AutoMigrate controls if the migration to build the indexes for http logging happens automatically on startup.
+	// If this value is not specified in the config, it defaults to true.
+	AutoMigrate *bool `json:"auto_migrate,omitempty" yaml:"auto_migrate,omitempty"`
+
 	// Retention is how long the high-level logs should be retained. If unset, defaults to 30 days.
 	Retention *HumanDuration `json:"retention" yaml:"retention"`
 
@@ -39,6 +43,18 @@ func (d *HttpLogging) IsEnabled() bool {
 	}
 
 	return d.Enabled
+}
+
+func (d *HttpLogging) GetAutoMigrate() bool {
+	if !d.IsEnabled() {
+		return false
+	}
+
+	if d.AutoMigrate == nil {
+		return true
+	}
+
+	return *d.AutoMigrate
 }
 
 func (d *HttpLogging) GetRetention() time.Duration {

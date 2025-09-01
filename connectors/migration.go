@@ -3,6 +3,7 @@ package connectors
 import (
 	"context"
 	"encoding/json"
+
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
@@ -10,6 +11,8 @@ import (
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/util"
+	"github.com/rmorlok/authproxy/util/pagination"
+
 	"strings"
 )
 
@@ -243,11 +246,11 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 		// No connector id means that connector type must be unique by id
 		b := s.db.ListConnectorsBuilder().
 			ForType(configConnector.Type).
-			OrderBy(database.ConnectorOrderByCreatedAt, database.OrderByDesc).
+			OrderBy(database.ConnectorOrderByCreatedAt, pagination.OrderByDesc).
 			Limit(100)
 
 		results := make([]database.Connector, 0)
-		err := b.Enumerate(ctx, func(result database.PageResult[database.Connector]) (keepGoing bool, err error) {
+		err := b.Enumerate(ctx, func(result pagination.PageResult[database.Connector]) (keepGoing bool, err error) {
 			results = append(results, result.Results...)
 			return true, nil
 		})

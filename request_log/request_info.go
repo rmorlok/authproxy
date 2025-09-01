@@ -19,24 +19,15 @@ type RequestInfo struct {
 	ConnectionId     uuid.UUID
 }
 
-func (r *RequestInfo) setRedisRecordFields(vals map[string]interface{}) {
+func (r *RequestInfo) setRedisRecordFields(er *EntryRecord) {
 	t := r.Type
 	if t == "" {
 		t = RequestTypeGlobal
 	}
 
-	vals[fieldType] = string(t)
-
-	if r.ConnectorType != "" {
-		vals[fieldConnectorType] = r.ConnectorType
-	}
-
-	if r.ConnectorId != uuid.Nil {
-		vals[fieldConnectorVersion] = r.ConnectorVersion
-		vals[fieldConnectorId] = r.ConnectorId.String()
-	}
-
-	if r.ConnectionId != uuid.Nil {
-		vals[fieldConnectionId] = r.ConnectionId.String()
-	}
+	er.Type = t
+	er.ConnectorType = r.ConnectorType
+	er.ConnectorId = r.ConnectorId
+	er.ConnectorVersion = r.ConnectorVersion
+	er.ConnectionId = r.ConnectionId
 }

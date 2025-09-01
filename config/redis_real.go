@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
+
 	"github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/config/common"
 	"gopkg.in/yaml.v3"
@@ -42,10 +43,16 @@ func (d *RedisReal) GetProvider() RedisProvider {
 }
 
 func (d *RedisReal) ToRedisOptions(ctx context.Context) (*redis.Options, error) {
+	protocol := 2 // Needed because RESP3 is unstable for Redis Search
+	if d.Protocol == 3 {
+		// This will break the request log features
+		protocol = 3
+	}
+
 	options := redis.Options{
 		Addr:                  d.Address,
 		Network:               d.Network,
-		Protocol:              d.Protocol,
+		Protocol:              protocol,
 		DB:                    d.DB, // Redis database to connect to
 		ContextTimeoutEnabled: true,
 	}

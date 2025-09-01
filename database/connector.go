@@ -5,6 +5,8 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
+	"time"
+
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
@@ -12,8 +14,8 @@ import (
 	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/sqlh"
 	"github.com/rmorlok/authproxy/util"
+	"github.com/rmorlok/authproxy/util/pagination"
 	"gorm.io/gorm"
-	"time"
 )
 
 type ConnectorVersionState string
@@ -458,8 +460,8 @@ func IsValidConnectorOrderByField[T string | ConnectorOrderByField](field T) boo
 }
 
 type ListConnectorsExecutor interface {
-	FetchPage(context.Context) PageResult[Connector]
-	Enumerate(context.Context, func(PageResult[Connector]) (keepGoing bool, err error)) error
+	FetchPage(context.Context) pagination.PageResult[Connector]
+	Enumerate(context.Context, func(pagination.PageResult[Connector]) (keepGoing bool, err error)) error
 }
 
 type ListConnectorsBuilder interface {
@@ -468,7 +470,7 @@ type ListConnectorsBuilder interface {
 	ForType(string) ListConnectorsBuilder
 	ForId(uuid.UUID) ListConnectorsBuilder
 	ForConnectorVersionState(ConnectorVersionState) ListConnectorsBuilder
-	OrderBy(ConnectorOrderByField, OrderBy) ListConnectorsBuilder
+	OrderBy(ConnectorOrderByField, pagination.OrderBy) ListConnectorsBuilder
 	IncludeDeleted() ListConnectorsBuilder
 }
 
@@ -480,7 +482,7 @@ type listConnectorsFilters struct {
 	TypeVal           []string                `json:"types,omitempty"`
 	IdsVal            []uuid.UUID             `json:"ids,omitempty"`
 	OrderByFieldVal   *ConnectorOrderByField  `json:"order_by_field"`
-	OrderByVal        *OrderBy                `json:"order_by"`
+	OrderByVal        *pagination.OrderBy     `json:"order_by"`
 	IncludeDeletedVal bool                    `json:"include_deleted,omitempty"`
 }
 
@@ -504,7 +506,7 @@ func (l *listConnectorsFilters) ForId(id uuid.UUID) ListConnectorsBuilder {
 	return l
 }
 
-func (l *listConnectorsFilters) OrderBy(field ConnectorOrderByField, by OrderBy) ListConnectorsBuilder {
+func (l *listConnectorsFilters) OrderBy(field ConnectorOrderByField, by pagination.OrderBy) ListConnectorsBuilder {
 	l.OrderByFieldVal = &field
 	l.OrderByVal = &by
 	return l
@@ -517,7 +519,7 @@ func (l *listConnectorsFilters) IncludeDeleted() ListConnectorsBuilder {
 
 func (l *listConnectorsFilters) FromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error) {
 	db := l.db
-	parsed, err := parseCursor[listConnectorsFilters](ctx, db.secretKey, cursor)
+	parsed, err := pagination.ParseCursor[listConnectorsFilters](ctx, db.secretKey, cursor)
 
 	if err != nil {
 		return nil, err
@@ -529,7 +531,7 @@ func (l *listConnectorsFilters) FromCursor(ctx context.Context, cursor string) (
 	return l, nil
 }
 
-func (l *listConnectorsFilters) fetchPage(ctx context.Context) PageResult[Connector] {
+func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageResult[Connector] {
 
 	q := l.db.session(ctx)
 
@@ -617,7 +619,7 @@ cvc.versions as total_versions
 	rows, err := q.Raw(sql, args...).Rows()
 
 	if err != nil {
-		return PageResult[Connector]{Error: err}
+		return pagination.PageResult[Connector]{Error: err}
 	}
 
 	var connectors []Connector
@@ -638,7 +640,7 @@ cvc.versions as total_versions
 			&c.TotalVersions,
 		)
 		if err != nil {
-			return PageResult[Connector]{Error: err}
+			return pagination.PageResult[Connector]{Error: err}
 		}
 
 		connectors = append(connectors, c)
@@ -649,24 +651,24 @@ cvc.versions as total_versions
 	cursor := ""
 	hasMore := int32(len(connectors)) > l.LimitVal
 	if hasMore {
-		cursor, err = makeCursor(ctx, l.db.secretKey, l)
+		cursor, err = pagination.MakeCursor(ctx, l.db.secretKey, l)
 		if err != nil {
-			return PageResult[Connector]{Error: err}
+			return pagination.PageResult[Connector]{Error: err}
 		}
 	}
 
-	return PageResult[Connector]{
+	return pagination.PageResult[Connector]{
 		HasMore: hasMore,
 		Results: connectors[:util.MinInt32(l.LimitVal, int32(len(connectors)))],
 		Cursor:  cursor,
 	}
 }
 
-func (l *listConnectorsFilters) FetchPage(ctx context.Context) PageResult[Connector] {
+func (l *listConnectorsFilters) FetchPage(ctx context.Context) pagination.PageResult[Connector] {
 	return l.fetchPage(ctx)
 }
 
-func (l *listConnectorsFilters) Enumerate(ctx context.Context, callback func(PageResult[Connector]) (keepGoing bool, err error)) error {
+func (l *listConnectorsFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[Connector]) (keepGoing bool, err error)) error {
 	var err error
 	keepGoing := true
 	hasMore := true

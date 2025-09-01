@@ -2,6 +2,11 @@ package admin_api
 
 import (
 	"context"
+	"log/slog"
+	"net/http"
+	"sync"
+	"time"
+
 	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
@@ -18,11 +23,8 @@ import (
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/redis"
+	"github.com/rmorlok/authproxy/request_log"
 	common_routes "github.com/rmorlok/authproxy/routes"
-	"log/slog"
-	"net/http"
-	"sync"
-	"time"
 )
 
 func rateKeyFunc(c *gin.Context) string {
@@ -114,6 +116,7 @@ func GetGinServer(
 	routesConnections := common_routes.NewConnectionsRoutes(cfg, authService, db, redis, c, httpf, encrypt, logger)
 	routesProxy := common_routes.NewConnectionsProxyRoutes(cfg, authService, db, redis, c, httpf, encrypt, logger)
 	routesTasks := common_routes.NewTaskRoutes(cfg, authService, encrypt, asynqInspector)
+	routesRequestLog := common_routes.NewRequestLogRoutes(cfg, authService, c, db, redis, encrypt)
 
 	api := server.Group("/api/v1", rl)
 
@@ -121,6 +124,7 @@ func GetGinServer(
 	routesConnections.Register(api)
 	routesProxy.Register(api)
 	routesTasks.Register(api)
+	routesRequestLog.Register(api)
 
 	return service.GetServerAndHealthChecker(server, healthChecker)
 }
@@ -169,6 +173,14 @@ func Serve(cfg config.C) {
 	}
 
 	h := httpf.CreateFactory(cfg, rs, logger)
+
+	if root.HttpLogging.GetAutoMigrate() {
+		err := request_log.Migrate(context.Background(), rs, logger)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	e := encrypt.NewEncryptService(cfg, db)
 	asynqClient := asynq.NewClientFromRedisClient(rs.Client())
 	asynqInspector := asynq.NewInspectorFromRedisClient(rs.Client())

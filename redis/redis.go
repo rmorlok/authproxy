@@ -2,14 +2,15 @@ package redis
 
 import (
 	"context"
+	"log"
+	"log/slog"
+	"sync"
+
 	"github.com/alicebob/miniredis"
 	"github.com/bsm/redislock"
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/config"
-	"log"
-	"log/slog"
-	"sync"
 )
 
 var miniredisServer *miniredis.Miniredis
@@ -71,7 +72,8 @@ func NewMiniredis(redisConfig *config.RedisMiniredis, secretKey config.KeyData, 
 
 			// Configure the Redis client to use the miniredis instance
 			miniredisClient = redis.NewClient(&redis.Options{
-				Addr: miniredisServer.Addr(),
+				Addr:     miniredisServer.Addr(),
+				Protocol: 2, // Needed because RESP3 is unstable for Redis Search
 			})
 
 			// Test the connection to ensure it's working

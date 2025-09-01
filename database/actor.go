@@ -2,15 +2,17 @@ package database
 
 import (
 	"context"
+	"strings"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/jwt"
 	"github.com/rmorlok/authproxy/util"
+	"github.com/rmorlok/authproxy/util/pagination"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"strings"
-	"time"
 )
 
 type ActorOrderByField string
@@ -254,24 +256,24 @@ func (db *gormDB) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 }
 
 type ListActorsExecutor interface {
-	FetchPage(context.Context) PageResult[Actor]
-	Enumerate(context.Context, func(PageResult[Actor]) (keepGoing bool, err error)) error
+	FetchPage(context.Context) pagination.PageResult[Actor]
+	Enumerate(context.Context, func(pagination.PageResult[Actor]) (keepGoing bool, err error)) error
 }
 
 type ListActorsBuilder interface {
 	ListActorsExecutor
 	Limit(int32) ListActorsBuilder
-	OrderBy(ActorOrderByField, OrderBy) ListActorsBuilder
+	OrderBy(ActorOrderByField, pagination.OrderBy) ListActorsBuilder
 	IncludeDeleted() ListActorsBuilder
 }
 
 type listActorsFilters struct {
-	db                *gormDB            `json:"-"`
-	LimitVal          int32              `json:"limit"`
-	Offset            int32              `json:"offset"`
-	OrderByFieldVal   *ActorOrderByField `json:"order_by_field"`
-	OrderByVal        *OrderBy           `json:"order_by"`
-	IncludeDeletedVal bool               `json:"include_deleted,omitempty"`
+	db                *gormDB             `json:"-"`
+	LimitVal          int32               `json:"limit"`
+	Offset            int32               `json:"offset"`
+	OrderByFieldVal   *ActorOrderByField  `json:"order_by_field"`
+	OrderByVal        *pagination.OrderBy `json:"order_by"`
+	IncludeDeletedVal bool                `json:"include_deleted,omitempty"`
 }
 
 func (l *listActorsFilters) Limit(limit int32) ListActorsBuilder {
@@ -279,7 +281,7 @@ func (l *listActorsFilters) Limit(limit int32) ListActorsBuilder {
 	return l
 }
 
-func (l *listActorsFilters) OrderBy(field ActorOrderByField, by OrderBy) ListActorsBuilder {
+func (l *listActorsFilters) OrderBy(field ActorOrderByField, by pagination.OrderBy) ListActorsBuilder {
 	l.OrderByFieldVal = &field
 	l.OrderByVal = &by
 	return l
@@ -292,7 +294,7 @@ func (l *listActorsFilters) IncludeDeleted() ListActorsBuilder {
 
 func (l *listActorsFilters) FromCursor(ctx context.Context, cursor string) (ListActorsExecutor, error) {
 	db := l.db
-	parsed, err := parseCursor[listActorsFilters](ctx, db.secretKey, cursor)
+	parsed, err := pagination.ParseCursor[listActorsFilters](ctx, db.secretKey, cursor)
 
 	if err != nil {
 		return nil, err
@@ -325,12 +327,12 @@ func (l *listActorsFilters) applyRestrictions(ctx context.Context) *gorm.DB {
 	return q
 }
 
-func (l *listActorsFilters) fetchPage(ctx context.Context) PageResult[Actor] {
+func (l *listActorsFilters) fetchPage(ctx context.Context) pagination.PageResult[Actor] {
 	var err error
 	var actors []Actor
 	result := l.applyRestrictions(ctx).Find(&actors)
 	if result.Error != nil {
-		return PageResult[Actor]{Error: result.Error}
+		return pagination.PageResult[Actor]{Error: result.Error}
 	}
 
 	l.Offset = l.Offset + int32(len(actors)) - 1 // we request one more than the page size we return
@@ -338,24 +340,24 @@ func (l *listActorsFilters) fetchPage(ctx context.Context) PageResult[Actor] {
 	cursor := ""
 	hasMore := int32(len(actors)) > l.LimitVal
 	if hasMore {
-		cursor, err = makeCursor(ctx, l.db.secretKey, l)
+		cursor, err = pagination.MakeCursor(ctx, l.db.secretKey, l)
 		if err != nil {
-			return PageResult[Actor]{Error: err}
+			return pagination.PageResult[Actor]{Error: err}
 		}
 	}
 
-	return PageResult[Actor]{
+	return pagination.PageResult[Actor]{
 		HasMore: hasMore,
 		Results: actors[:util.MinInt32(l.LimitVal, int32(len(actors)))],
 		Cursor:  cursor,
 	}
 }
 
-func (l *listActorsFilters) FetchPage(ctx context.Context) PageResult[Actor] {
+func (l *listActorsFilters) FetchPage(ctx context.Context) pagination.PageResult[Actor] {
 	return l.fetchPage(ctx)
 }
 
-func (l *listActorsFilters) Enumerate(ctx context.Context, callback func(PageResult[Actor]) (keepGoing bool, err error)) error {
+func (l *listActorsFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[Actor]) (keepGoing bool, err error)) error {
 	var err error
 	keepGoing := true
 	hasMore := true

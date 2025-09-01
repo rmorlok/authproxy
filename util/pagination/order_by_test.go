@@ -1,8 +1,9 @@
-package database
+package pagination
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSplitOrderByParam(t *testing.T) {

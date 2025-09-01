@@ -4,6 +4,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/test_utils"
+	"github.com/rmorlok/authproxy/util/pagination"
 	"github.com/stretchr/testify/assert"
 	"gorm.io/gorm"
 	clock "k8s.io/utils/clock/testing"
@@ -225,7 +226,7 @@ func TestConnections(t *testing.T) {
 		t.Run("reverse order", func(t *testing.T) {
 			var allResults []Connection
 			q := db.ListConnectionsBuilder().Limit(7).OrderBy(ConnectionOrderByCreatedAt, OrderByDesc)
-			err := q.Enumerate(ctx, func(result PageResult[Connection]) (bool, error) {
+			err := q.Enumerate(ctx, func(result pagination.PageResult[Connection]) (bool, error) {
 				allResults = append(allResults, result.Results...)
 				return true, nil
 			})

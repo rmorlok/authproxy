@@ -2,14 +2,16 @@ package database
 
 import (
 	"context"
+	"time"
+
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/util"
+	"github.com/rmorlok/authproxy/util/pagination"
 	"gorm.io/gorm"
 	"gorm.io/gorm/clause"
-	"time"
 )
 
 type ConnectionState string
@@ -137,15 +139,15 @@ func IsValidConnectionOrderByField[T string | ConnectionOrderByField](field T) b
 }
 
 type ListConnectionsExecutor interface {
-	FetchPage(context.Context) PageResult[Connection]
-	Enumerate(context.Context, func(PageResult[Connection]) (keepGoing bool, err error)) error
+	FetchPage(context.Context) pagination.PageResult[Connection]
+	Enumerate(context.Context, func(pagination.PageResult[Connection]) (keepGoing bool, err error)) error
 }
 
 type ListConnectionsBuilder interface {
 	ListConnectionsExecutor
 	Limit(int32) ListConnectionsBuilder
 	ForConnectionState(ConnectionState) ListConnectionsBuilder
-	OrderBy(ConnectionOrderByField, OrderBy) ListConnectionsBuilder
+	OrderBy(ConnectionOrderByField, pagination.OrderBy) ListConnectionsBuilder
 	IncludeDeleted() ListConnectionsBuilder
 }
 
@@ -155,7 +157,7 @@ type listConnectionsFilters struct {
 	Offset            int32                   `json:"offset"`
 	StatesVal         []ConnectionState       `json:"states,omitempty"`
 	OrderByFieldVal   *ConnectionOrderByField `json:"order_by_field"`
-	OrderByVal        *OrderBy                `json:"order_by"`
+	OrderByVal        *pagination.OrderBy     `json:"order_by"`
 	IncludeDeletedVal bool                    `json:"include_deleted,omitempty"`
 }
 
@@ -169,7 +171,7 @@ func (l *listConnectionsFilters) ForConnectionState(state ConnectionState) ListC
 	return l
 }
 
-func (l *listConnectionsFilters) OrderBy(field ConnectionOrderByField, by OrderBy) ListConnectionsBuilder {
+func (l *listConnectionsFilters) OrderBy(field ConnectionOrderByField, by pagination.OrderBy) ListConnectionsBuilder {
 	l.OrderByFieldVal = &field
 	l.OrderByVal = &by
 	return l
@@ -182,7 +184,7 @@ func (l *listConnectionsFilters) IncludeDeleted() ListConnectionsBuilder {
 
 func (l *listConnectionsFilters) FromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error) {
 	db := l.db
-	parsed, err := parseCursor[listConnectionsFilters](ctx, db.secretKey, cursor)
+	parsed, err := pagination.ParseCursor[listConnectionsFilters](ctx, db.secretKey, cursor)
 
 	if err != nil {
 		return nil, err
@@ -219,12 +221,12 @@ func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) *gorm.DB
 	return q
 }
 
-func (l *listConnectionsFilters) fetchPage(ctx context.Context) PageResult[Connection] {
+func (l *listConnectionsFilters) fetchPage(ctx context.Context) pagination.PageResult[Connection] {
 	var err error
 	var connections []Connection
 	result := l.applyRestrictions(ctx).Find(&connections)
 	if result.Error != nil {
-		return PageResult[Connection]{Error: result.Error}
+		return pagination.PageResult[Connection]{Error: result.Error}
 	}
 
 	l.Offset = l.Offset + int32(len(connections)) - 1 // we request one more than the page size we return
@@ -232,24 +234,24 @@ func (l *listConnectionsFilters) fetchPage(ctx context.Context) PageResult[Conne
 	cursor := ""
 	hasMore := int32(len(connections)) > l.LimitVal
 	if hasMore {
-		cursor, err = makeCursor(ctx, l.db.secretKey, l)
+		cursor, err = pagination.MakeCursor(ctx, l.db.secretKey, l)
 		if err != nil {
-			return PageResult[Connection]{Error: err}
+			return pagination.PageResult[Connection]{Error: err}
 		}
 	}
 
-	return PageResult[Connection]{
+	return pagination.PageResult[Connection]{
 		HasMore: hasMore,
 		Results: connections[:util.MinInt32(l.LimitVal, int32(len(connections)))],
 		Cursor:  cursor,
 	}
 }
 
-func (l *listConnectionsFilters) FetchPage(ctx context.Context) PageResult[Connection] {
+func (l *listConnectionsFilters) FetchPage(ctx context.Context) pagination.PageResult[Connection] {
 	return l.fetchPage(ctx)
 }
 
-func (l *listConnectionsFilters) Enumerate(ctx context.Context, callback func(PageResult[Connection]) (keepGoing bool, err error)) error {
+func (l *listConnectionsFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[Connection]) (keepGoing bool, err error)) error {
 	var err error
 	keepGoing := true
 	hasMore := true

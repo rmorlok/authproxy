@@ -9,6 +9,8 @@ import (
 	connIface "github.com/rmorlok/authproxy/connectors/interface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/util"
+	"github.com/rmorlok/authproxy/util/pagination"
+
 	"net/http"
 )
 
@@ -174,7 +176,7 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 		}
 
 		if req.OrderByVal != nil {
-			field, order, err := database.SplitOrderByParam(*req.OrderByVal)
+			field, order, err := pagination.SplitOrderByParam[database.ConnectorOrderByField](*req.OrderByVal)
 			if err != nil {
 				api_common.NewHttpStatusErrorBuilder().
 					WithStatusBadRequest().

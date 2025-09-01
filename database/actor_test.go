@@ -2,14 +2,16 @@ package database
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/jwt"
 	"github.com/rmorlok/authproxy/util"
+	"github.com/rmorlok/authproxy/util/pagination"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
-	"testing"
-	"time"
 )
 
 func TestActor(t *testing.T) {
@@ -268,7 +270,7 @@ func TestActor(t *testing.T) {
 		t.Run("reverse order", func(t *testing.T) {
 			var allResults []Actor
 			q := db.ListActorsBuilder().Limit(7).OrderBy(ActorOrderByCreatedAt, OrderByDesc)
-			err := q.Enumerate(ctx, func(result PageResult[Actor]) (bool, error) {
+			err := q.Enumerate(ctx, func(result pagination.PageResult[Actor]) (bool, error) {
 				allResults = append(allResults, result.Results...)
 				return true, nil
 			})

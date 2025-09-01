@@ -2,9 +2,11 @@ package connectors
 
 import (
 	"context"
+
 	"github.com/google/uuid"
 	iface "github.com/rmorlok/authproxy/connectors/interface"
 	"github.com/rmorlok/authproxy/database"
+	"github.com/rmorlok/authproxy/util/pagination"
 )
 
 func wrapConnector(c database.Connector, s *service) *Connector {
@@ -21,9 +23,9 @@ type listWrapper struct {
 	s *service
 }
 
-func (l *listWrapper) convertPageResult(result database.PageResult[database.Connector]) database.PageResult[iface.Connector] {
+func (l *listWrapper) convertPageResult(result pagination.PageResult[database.Connector]) pagination.PageResult[iface.Connector] {
 	if result.Error != nil {
-		return database.PageResult[iface.Connector]{Error: result.Error}
+		return pagination.PageResult[iface.Connector]{Error: result.Error}
 	}
 
 	versions := make([]iface.Connector, 0, len(result.Results))
@@ -31,7 +33,7 @@ func (l *listWrapper) convertPageResult(result database.PageResult[database.Conn
 		versions = append(versions, wrapConnector(r, l.s))
 	}
 
-	return database.PageResult[iface.Connector]{
+	return pagination.PageResult[iface.Connector]{
 		Results: versions,
 		Error:   result.Error,
 		HasMore: result.HasMore,
@@ -47,12 +49,12 @@ func (l *listWrapper) executor() database.ListConnectorsExecutor {
 	}
 }
 
-func (l *listWrapper) FetchPage(ctx context.Context) database.PageResult[iface.Connector] {
+func (l *listWrapper) FetchPage(ctx context.Context) pagination.PageResult[iface.Connector] {
 	return l.convertPageResult(l.executor().FetchPage(ctx))
 }
 
-func (l *listWrapper) Enumerate(ctx context.Context, callback func(database.PageResult[iface.Connector]) (keepGoing bool, err error)) error {
-	return l.executor().Enumerate(ctx, func(result database.PageResult[database.Connector]) (keepGoing bool, err error) {
+func (l *listWrapper) Enumerate(ctx context.Context, callback func(pagination.PageResult[iface.Connector]) (keepGoing bool, err error)) error {
+	return l.executor().Enumerate(ctx, func(result pagination.PageResult[database.Connector]) (keepGoing bool, err error) {
 		return callback(l.convertPageResult(result))
 	})
 }
@@ -85,7 +87,7 @@ func (l *listWrapper) ForConnectorVersionState(s database.ConnectorVersionState)
 	}
 }
 
-func (l *listWrapper) OrderBy(f database.ConnectorOrderByField, o database.OrderBy) iface.ListConnectorsBuilder {
+func (l *listWrapper) OrderBy(f database.ConnectorOrderByField, o pagination.OrderBy) iface.ListConnectorsBuilder {
 	return &listWrapper{
 		l: l.l.OrderBy(f, o),
 		s: l.s,

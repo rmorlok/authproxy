@@ -2,6 +2,11 @@ package admin_api
 
 import (
 	"context"
+	"log/slog"
+	"net/http"
+	"sync"
+	"time"
+
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
@@ -17,13 +22,10 @@ import (
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/redis"
+	"github.com/rmorlok/authproxy/request_log"
 	common_routes "github.com/rmorlok/authproxy/routes"
 	"github.com/rmorlok/authproxy/service/public/routes"
 	"github.com/rmorlok/authproxy/util"
-	"log/slog"
-	"net/http"
-	"sync"
-	"time"
 )
 
 func GetCorsConfig(cfg config.C) *cors.Config {
@@ -202,6 +204,14 @@ func Serve(cfg config.C) {
 	}
 
 	h := httpf.CreateFactory(cfg, rs, logger)
+
+	if root.HttpLogging.GetAutoMigrate() {
+		err := request_log.Migrate(context.Background(), rs, logger)
+		if err != nil {
+			panic(err)
+		}
+	}
+
 	e := encrypt.NewEncryptService(cfg, db)
 	asynqClient := asynq.NewClientFromRedisClient(rs.Client())
 	asynqInspector := asynq.NewInspectorFromRedisClient(rs.Client())

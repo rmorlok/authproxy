@@ -1,10 +1,16 @@
 package request_log
 
 import (
-	"github.com/google/uuid"
 	"net/url"
 	"time"
+
+	"github.com/google/uuid"
 )
+
+// This file contains Entry/EntryRequest/EntryResponse structs which represent the request
+// as it was captured from the HTTP request. This value is serialized to JSON to store the
+// full request. To represent the redacted version of the request, an EntryRecord is used,
+// which is a subset of the EntryRequest and organized for searching.
 
 type EntryRequest struct {
 	URL           string              `json:"u"`
@@ -15,23 +21,23 @@ type EntryRequest struct {
 	Body          []byte              `json:"b,omitempty"`
 }
 
-func (e *EntryRequest) setRedisRecordFields(vals map[string]interface{}) {
+func (e *EntryRequest) setRedisRecordFields(er *EntryRecord) {
 	if e == nil {
 		return
 	}
 
 	if parsedURL, err := url.Parse(e.URL); err == nil {
-		vals[fieldScheme] = parsedURL.Scheme
-		vals[fieldHost] = parsedURL.Host
-		vals[fieldPath] = parsedURL.Path
+		er.Scheme = parsedURL.Scheme
+		er.Host = parsedURL.Host
+		er.Path = parsedURL.Path
 	}
 
-	vals[fieldMethod] = e.Method
-	vals[fieldRequestHttpVersion] = e.HttpVersion
-	vals[fieldRequestSizeBytes] = e.ContentLength
+	er.Method = e.Method
+	er.RequestHttpVersion = e.HttpVersion
+	er.RequestSizeBytes = e.ContentLength
 
 	if e.Headers != nil && e.Headers["Content-Type"] != nil && len(e.Headers["Content-Type"]) > 0 {
-		vals[fieldRequestMimeTypes] = e.Headers["Content-Type"][0]
+		er.RequestMimeType = e.Headers["Content-Type"][0]
 	}
 }
 
@@ -44,28 +50,20 @@ type EntryResponse struct {
 	Err           string              `json:"err,omitempty"`
 }
 
-func (e *EntryResponse) setRedisRecordFields(vals map[string]interface{}) {
+func (e *EntryResponse) setRedisRecordFields(er *EntryRecord) {
 	if e == nil {
 		return
 	}
 
-	if e.HttpVersion != "" {
-		vals[fieldResponseHttpVersion] = e.HttpVersion
-	}
+	er.ResponseHttpVersion = e.HttpVersion
 
 	if e.Headers != nil && e.Headers["Content-Type"] != nil && len(e.Headers["Content-Type"]) > 0 {
-		vals[fieldResponseMimeTypes] = e.Headers["Content-Type"][0]
+		er.ResponseMimeType = e.Headers["Content-Type"][0]
 	}
 
-	vals[fieldResponseSizeBytes] = e.ContentLength
-
-	if e.StatusCode != 0 {
-		vals[fieldResponseStatusCode] = e.StatusCode
-	}
-
-	if e.Err != "" {
-		vals[fieldResponseError] = e.Err
-	}
+	er.ResponseSizeBytes = e.ContentLength
+	er.ResponseStatusCode = e.StatusCode
+	er.ResponseError = e.Err
 }
 
 type Entry struct {
@@ -77,19 +75,16 @@ type Entry struct {
 	Response      EntryResponse `json:"res"`
 }
 
-func (e *Entry) setRedisRecordFields(vals map[string]interface{}) {
+func (e *Entry) setRedisRecordFields(er *EntryRecord) {
 	if e == nil {
 		return
 	}
 
-	vals[fieldRequestId] = e.ID.String()
-	vals[fieldTimestamp] = e.Timestamp
-	vals[fieldDurationMs] = e.Duration
+	er.RequestId = e.ID
+	er.Timestamp = e.Timestamp
+	er.Duration = e.Duration
+	er.CorrelationId = e.CorrelationID
 
-	if e.CorrelationID != "" {
-		vals[fieldCorrelationId] = e.CorrelationID
-	}
-
-	e.Request.setRedisRecordFields(vals)
-	e.Response.setRedisRecordFields(vals)
+	e.Request.setRedisRecordFields(er)
+	e.Response.setRedisRecordFields(er)
 }

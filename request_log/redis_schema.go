@@ -1,9 +1,13 @@
 package request_log
 
 import (
+	"context"
 	"fmt"
+	"log/slog"
+	"time"
 
 	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/redis"
 )
 
 const (
@@ -24,10 +28,10 @@ const (
 	fieldResponseError       = "err"
 	fieldRequestHttpVersion  = "reqv"
 	fieldRequestSizeBytes    = "reqsz"
-	fieldRequestMimeTypes    = "reqmt"
+	fieldRequestMimeType     = "reqmt"
 	fieldResponseHttpVersion = "rspv"
 	fieldResponseSizeBytes   = "rspsz"
-	fieldResponseMimeTypes   = "rspmt"
+	fieldResponseMimeType    = "rspmt"
 )
 
 func redisLogKey(requestId uuid.UUID) string {
@@ -36,4 +40,57 @@ func redisLogKey(requestId uuid.UUID) string {
 
 func redisFullLogKey(requestId uuid.UUID) string {
 	return fmt.Sprintf("rlf:%s", requestId.String())
+}
+
+// MigrateMutexKeyName is the key that can be used when locking to perform a migration in redis.
+const MigrateMutexKeyName = "request-log-migrate-lock"
+
+const RequestLogRedisIndexName = "request_log_index_v1"
+
+func Migrate(ctx context.Context, rs redis.R, l *slog.Logger) error {
+	m := rs.NewMutex(
+		MigrateMutexKeyName,
+		redis.MutexOptionLockFor(5*time.Second),
+		redis.MutexOptionRetryFor(6*time.Second),
+		redis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 2*time.Second),
+		redis.MutexOptionDetailedLockMetadata(),
+	)
+	err := m.Lock(context.Background())
+	if err != nil {
+		panic(err)
+	}
+	defer m.Unlock(context.Background())
+
+	l.Info("checking if request log redis index exists")
+	client := rs.Client()
+	_, err = client.Info(context.Background(), RequestLogRedisIndexName).Result()
+	if err == nil {
+		l.Info("request log redis index already exists")
+		return nil
+	}
+
+	l.Info("creating request log redis index")
+	_, err = client.Do(ctx, "FT.CREATE", RequestLogRedisIndexName,
+		"ON", "HASH",
+		"PREFIX", "1", "rl:",
+		"NOHL",
+		"SCHEMA",
+		fieldType, "TEXT", "NOSTEM",
+		fieldCorrelationId, "TEXT", "NOSTEM",
+		fieldConnectionId, "TEXT", "NOSTEM",
+		fieldConnectorType, "TEXT", "NOSTEM",
+		fieldConnectorId, "TEXT", "NOSTEM",
+		fieldMethod, "TEXT", "NOSTEM",
+		fieldPath, "TEXT", "NOSTEM",
+		fieldResponseStatusCode, "NUMERIC",
+		fieldConnectorVersion, "NUMERIC",
+		fieldTimestamp, "NUMERIC", "SORTABLE",
+	).Result()
+	if err != nil {
+		l.Error("failed to create request log redis index", "error", err.Error())
+		return err
+	}
+
+	l.Info("request log redis index created")
+	return nil
 }

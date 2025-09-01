@@ -2,6 +2,7 @@ package routes
 
 import (
 	"fmt"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/api_common"
@@ -15,6 +16,8 @@ import (
 	"github.com/rmorlok/authproxy/oauth2"
 	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/util"
+	"github.com/rmorlok/authproxy/util/pagination"
+
 	"log/slog"
 	"net/http"
 	"time"
@@ -265,7 +268,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 		}
 
 		if req.OrderByVal != nil {
-			field, order, err := database.SplitOrderByParam(*req.OrderByVal)
+			field, order, err := pagination.SplitOrderByParam[database.ConnectionOrderByField](*req.OrderByVal)
 			if err != nil {
 				api_common.NewHttpStatusErrorBuilder().
 					WithStatusBadRequest().
