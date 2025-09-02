@@ -4,6 +4,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/sqlh"
+	"github.com/rmorlok/authproxy/util/pagination"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
@@ -78,7 +79,7 @@ INSERT INTO connector_versions
 
 		pr := db.ListConnectorsBuilder().
 			ForType("gmail").
-			OrderBy(ConnectorOrderByCreatedAt, OrderByDesc).
+			OrderBy(ConnectorOrderByCreatedAt, pagination.OrderByDesc).
 			FetchPage(ctx)
 		require.NoError(t, pr.Error)
 		require.Len(t, pr.Results, 2)

@@ -225,7 +225,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("reverse order", func(t *testing.T) {
 			var allResults []Connection
-			q := db.ListConnectionsBuilder().Limit(7).OrderBy(ConnectionOrderByCreatedAt, OrderByDesc)
+			q := db.ListConnectionsBuilder().Limit(7).OrderBy(ConnectionOrderByCreatedAt, pagination.OrderByDesc)
 			err := q.Enumerate(ctx, func(result pagination.PageResult[Connection]) (bool, error) {
 				allResults = append(allResults, result.Results...)
 				return true, nil

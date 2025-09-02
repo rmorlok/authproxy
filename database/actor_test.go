@@ -269,7 +269,7 @@ func TestActor(t *testing.T) {
 
 		t.Run("reverse order", func(t *testing.T) {
 			var allResults []Actor
-			q := db.ListActorsBuilder().Limit(7).OrderBy(ActorOrderByCreatedAt, OrderByDesc)
+			q := db.ListActorsBuilder().Limit(7).OrderBy(ActorOrderByCreatedAt, pagination.OrderByDesc)
 			err := q.Enumerate(ctx, func(result pagination.PageResult[Actor]) (bool, error) {
 				allResults = append(allResults, result.Results...)
 				return true, nil
