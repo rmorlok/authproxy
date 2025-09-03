@@ -5,21 +5,14 @@ import (
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
-	connIface "github.com/rmorlok/authproxy/connectors/interface"
-	"github.com/rmorlok/authproxy/database"
-	"github.com/rmorlok/authproxy/encrypt"
-	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/request_log"
 	"github.com/rmorlok/authproxy/util/pagination"
 )
 
 type RequestLogRoutes struct {
-	cfg        config.C
-	auth       auth.A
-	connectors connIface.C
-	db         database.DB
-	redis      redis.R
-	encrypt    encrypt.E
+	cfg  config.C
+	auth auth.A
+	rl   request_log.LogRetriever
 }
 
 type ListRequestsQuery struct {
@@ -50,15 +43,13 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	rl := request_log.NewRetrievalService(r.redis, r.cfg.GetRoot().SystemAuth.GlobalAESKey)
-
 	var ex request_log.ListRequestExecutor
 
 	if req.Cursor != nil {
-		ex, err = rl.ListRequestsFromCursor(gctx, *req.Cursor)
+		ex, err = r.rl.ListRequestsFromCursor(gctx, *req.Cursor)
 		if err != nil {
 			api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
+				WithStatusBadRequest().
 				WithInternalErr(err).
 				WithResponseMsg("failed to list requests from cursor").
 				BuildStatusError().
@@ -66,7 +57,7 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 			return
 		}
 	} else {
-		b := rl.NewListRequestsBuilder()
+		b := r.rl.NewListRequestsBuilder()
 
 		if req.LimitVal != nil {
 			b = b.Limit(*req.LimitVal)
@@ -114,17 +105,11 @@ func (r *RequestLogRoutes) Register(g gin.IRouter) {
 func NewRequestLogRoutes(
 	cfg config.C,
 	auth auth.A,
-	connectors connIface.C,
-	db database.DB,
-	redis redis.R,
-	encrypt encrypt.E,
+	rl request_log.LogRetriever,
 ) *RequestLogRoutes {
 	return &RequestLogRoutes{
-		cfg:        cfg,
-		auth:       auth,
-		connectors: connectors,
-		db:         db,
-		redis:      redis,
-		encrypt:    encrypt,
+		cfg:  cfg,
+		auth: auth,
+		rl:   rl,
 	}
 }

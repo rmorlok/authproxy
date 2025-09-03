@@ -112,11 +112,13 @@ func GetGinServer(
 		KeyFunc:      rateKeyFunc,
 	})
 
+	rlr := request_log.NewRetrievalService(redis, cfg.GetGlobalKey())
+
 	routesConnectors := common_routes.NewConnectorsRoutes(cfg, authService, c)
 	routesConnections := common_routes.NewConnectionsRoutes(cfg, authService, db, redis, c, httpf, encrypt, logger)
 	routesProxy := common_routes.NewConnectionsProxyRoutes(cfg, authService, db, redis, c, httpf, encrypt, logger)
 	routesTasks := common_routes.NewTaskRoutes(cfg, authService, encrypt, asynqInspector)
-	routesRequestLog := common_routes.NewRequestLogRoutes(cfg, authService, c, db, redis, encrypt)
+	routesRequestLog := common_routes.NewRequestLogRoutes(cfg, authService, rlr)
 
 	api := server.Group("/api/v1", rl)
 

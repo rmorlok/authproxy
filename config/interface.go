@@ -28,6 +28,10 @@ type C interface {
 	// GetRootLogger returns the root logger instance configured for the application. This will always
 	// return a logger, defaulting to a none logger if nothing is configured.
 	GetRootLogger() *slog.Logger
+
+	// GetGlobalKey returns the global key for the application. This is used for symmetric encryption of data in things
+	// like cursors, JWTs, etc.
+	GetGlobalKey() KeyData
 }
 
 type config struct {
@@ -69,6 +73,18 @@ func (c *config) GetRootLogger() *slog.Logger {
 
 func (c *config) GetErrorPageUrl(ep ErrorPage) string {
 	return c.root.ErrorPages.urlForError(ep, c.root.Public.GetBaseUrl())
+}
+
+func (c *config) GetGlobalKey() KeyData {
+	if c == nil {
+		return nil
+	}
+
+	if c.root == nil {
+		return nil
+	}
+
+	return c.root.SystemAuth.GlobalAESKey
 }
 
 func LoadConfig(path string) (C, error) {
