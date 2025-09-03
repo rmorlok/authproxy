@@ -2,19 +2,36 @@ package request_log
 
 import (
 	"context"
+	"encoding/json"
 
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
+	"github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/redis"
+	apredis "github.com/rmorlok/authproxy/redis"
 )
 
 type redisLogRetriever struct {
-	r         redis.R        `json:"-"`
+	r         apredis.R      `json:"-"`
 	cursorKey config.KeyData `json:"-"`
 }
 
-func (r *redisLogRetriever) GetFullLog(id uuid.UUID) (*Entry, error) {
-	return nil, nil
+func (r *redisLogRetriever) GetFullLog(ctx context.Context, id uuid.UUID) (*Entry, error) {
+	client := r.r.Client()
+	data, err := client.Get(ctx, redisFullLogKey(id)).Result()
+
+	if errors.Is(err, redis.Nil) {
+		return nil, ErrNotFound
+	} else if err != nil {
+		return nil, err
+	}
+
+	var entry Entry
+	if err := json.Unmarshal([]byte(data), &entry); err != nil {
+		return nil, err
+	}
+
+	return &entry, nil
 }
 
 func (r *redisLogRetriever) NewListRequestsBuilder() ListRequestBuilder {
@@ -35,7 +52,7 @@ func (r *redisLogRetriever) ListRequestsFromCursor(ctx context.Context, cursor s
 	return b.FromCursor(ctx, cursor)
 }
 
-func NewRetrievalService(r redis.R, cursorKey config.KeyData) LogRetriever {
+func NewRetrievalService(r apredis.R, cursorKey config.KeyData) LogRetriever {
 	return &redisLogRetriever{
 		r:         r,
 		cursorKey: cursorKey,

@@ -76,18 +76,18 @@ func (m *MockLogRetriever) EXPECT() *MockLogRetrieverMockRecorder {
 }
 
 // GetFullLog mocks base method.
-func (m *MockLogRetriever) GetFullLog(id uuid.UUID) (*request_log.Entry, error) {
+func (m *MockLogRetriever) GetFullLog(ctx context.Context, id uuid.UUID) (*request_log.Entry, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetFullLog", id)
+	ret := m.ctrl.Call(m, "GetFullLog", ctx, id)
 	ret0, _ := ret[0].(*request_log.Entry)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetFullLog indicates an expected call of GetFullLog.
-func (mr *MockLogRetrieverMockRecorder) GetFullLog(id interface{}) *gomock.Call {
+func (mr *MockLogRetrieverMockRecorder) GetFullLog(ctx, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFullLog", reflect.TypeOf((*MockLogRetriever)(nil).GetFullLog), id)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetFullLog", reflect.TypeOf((*MockLogRetriever)(nil).GetFullLog), ctx, id)
 }
 
 // ListRequestsFromCursor mocks base method.

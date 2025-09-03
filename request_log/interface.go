@@ -16,7 +16,7 @@ type Logger interface {
 //
 //go:generate mockgen -source=./interface.go -destination=./mock/service.go -package=mock
 type LogRetriever interface {
-	GetFullLog(id uuid.UUID) (*Entry, error)
+	GetFullLog(ctx context.Context, id uuid.UUID) (*Entry, error)
 	NewListRequestsBuilder() ListRequestBuilder
 	ListRequestsFromCursor(ctx context.Context, cursor string) (ListRequestExecutor, error)
 }

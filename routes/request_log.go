@@ -1,7 +1,11 @@
 package routes
 
 import (
+	"errors"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
+	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
@@ -25,6 +29,61 @@ type ListRequestsResponseJson struct {
 	Items  []request_log.EntryRecord `json:"items"`
 	Cursor string                    `json:"cursor,omitempty"`
 	Total  *int64                    `json:"total,omitempty"`
+}
+
+func (r *RequestLogRoutes) get(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+
+	logIdStr := gctx.Param("id")
+
+	if logIdStr == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	logId, err := uuid.Parse(logIdStr)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if logId == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+	}
+
+	entry, err := r.rl.GetFullLog(ctx, logId)
+
+	if err != nil {
+		if errors.Is(err, request_log.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("request log not found").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, entry)
 }
 
 func (r *RequestLogRoutes) list(gctx *gin.Context) {
@@ -99,6 +158,7 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 }
 
 func (r *RequestLogRoutes) Register(g gin.IRouter) {
+	g.GET("/request-log/:id", r.auth.Required(), r.get)
 	g.GET("/request-log", r.auth.Required(), r.list)
 }
 
