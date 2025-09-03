@@ -6,7 +6,7 @@ import (
 	"log/slog"
 	"sync"
 
-	"github.com/alicebob/miniredis"
+	"github.com/alicebob/miniredis/v2"
 	"github.com/bsm/redislock"
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"

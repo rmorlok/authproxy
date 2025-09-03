@@ -6,7 +6,7 @@ require (
 	code.cloudfoundry.org/bytefmt v0.45.0
 	github.com/JGLTechnologies/gin-rate-limit v1.5.4
 	github.com/Masterminds/squirrel v1.5.4
-	github.com/alicebob/miniredis v2.5.0+incompatible
+	github.com/alicebob/miniredis/v2 v2.35.0
 	github.com/bsm/redislock v0.9.4
 	github.com/fatih/color v1.18.0
 	github.com/gin-contrib/cors v1.7.6
@@ -38,8 +38,6 @@ require (
 )
 
 require (
-	github.com/RediSearch/redisearch-go v1.1.1 // indirect
-	github.com/alicebob/gopher-json v0.0.0-20230218143504-906a9b012302 // indirect
 	github.com/bytedance/sonic v1.13.3 // indirect
 	github.com/bytedance/sonic/loader v0.2.4 // indirect
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
@@ -52,7 +50,6 @@ require (
 	github.com/go-playground/universal-translator v0.18.1 // indirect
 	github.com/go-playground/validator/v10 v10.26.0 // indirect
 	github.com/goccy/go-json v0.10.5 // indirect
-	github.com/gomodule/redigo v1.9.2 // indirect
 	github.com/h2non/parth v0.0.0-20190131123155-b4df798d6542 // indirect
 	github.com/hashicorp/errwrap v1.0.0 // indirect
 	github.com/inconshreveable/mousetrap v1.1.0 // indirect

@@ -48,12 +48,13 @@ func NewRedisLogger(
 	}
 }
 
-// storeEntryInRedis stores the log entry in Redis
+// storeEntryInRedis stores the log entry in Redis. Note that this method logs errors as well as returns them because
+// errors will be ignored where this is called.
 func (t *redisLogger) storeEntryInRedis(
 	entry *Entry,
 	requestBodyBuf *bytes.Buffer,
 	responseBodyReader *io.PipeReader,
-) {
+) error {
 	// Get the Redis client
 	client := t.r.Client()
 	pipeline := client.Pipeline()
@@ -64,18 +65,18 @@ func (t *redisLogger) storeEntryInRedis(
 
 	vals := make(map[string]interface{})
 	er.setRedisRecordFields(vals)
-	
+
 	// Store the entry
 	err := pipeline.HSet(context.Background(), redisLogKey(entry.ID), vals).Err()
 	if err != nil {
 		t.logger.Error("error storing HTTP log entry in Redis", "error", err, "entry_id", entry.ID.String())
-		return
+		return err
 	}
 
 	err = pipeline.Expire(context.Background(), redisLogKey(entry.ID), t.expiration).Err()
 	if err != nil {
 		t.logger.Error("error setting expiry for log entry in Redis", "error", err, "entry_id", entry.ID.String())
-		return
+		return err
 	}
 
 	if t.recordFullRequest {
@@ -113,13 +114,15 @@ func (t *redisLogger) storeEntryInRedis(
 	cmdErr, err := pipeline.Exec(context.Background())
 	if err != nil {
 		t.logger.Error("error storing HTTP log entry in Redis", "error", err, "entry_id", entry.ID.String())
-		return
+		return err
 	}
 
 	for _, cmd := range cmdErr {
 		if cmd.Err() != nil {
 			t.logger.Error("error storing HTTP log entry in Redis", "error", cmd.Err(), "entry_id", entry.ID.String())
-			return
+			return err
 		}
 	}
+
+	return nil
 }
