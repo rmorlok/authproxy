@@ -1,6 +1,9 @@
 package routes
 
 import (
+	"log/slog"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -13,8 +16,6 @@ import (
 	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/oauth2"
 	"github.com/rmorlok/authproxy/redis"
-	"log/slog"
-	"net/http"
 )
 
 type SessionRoutes struct {
@@ -42,7 +43,7 @@ type InitiateSuccessResponse struct {
 }
 
 // initiate is called when the marketplace portal loads to attempt to establish a session with the server. The session
-// might already exist, or the app might have been provided with a nonce JWT to exechange for a session, which would
+// might already exist, or the app might have been provided with a nonce JWT to exchange for a session, which would
 // have been provided as the normal auth header.
 //
 // If we are successful setting up a session, return any configuration information needed by the marketplace. If session

@@ -7,6 +7,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
+	"github.com/rmorlok/authproxy/apasynq"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/auth"
@@ -18,6 +19,7 @@ import (
 	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/request_log"
+	common_routes "github.com/rmorlok/authproxy/routes"
 
 	"log/slog"
 	"net/http"
@@ -38,17 +40,14 @@ func GetGinServer(
 	db database.DB,
 	redis redis.R,
 	c _interface.C,
+	asynqInspector apasynq.Inspector,
+	httpf httpf.F,
 	e encrypt.E,
 	logger *slog.Logger,
 ) (httpServer *http.Server, httpHealthChecker *http.Server, err error) {
 	root := cfg.GetRoot()
 	service := &root.AdminApi
 	authService := auth.NewService(cfg, service, db, redis, e, logger)
-
-	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
-		Rate:  1 * time.Minute,
-		Limit: 300,
-	})
 
 	server := api_common.GinForService(service)
 
@@ -79,15 +78,15 @@ func GetGinServer(
 		})
 	})
 
-	api := server.Group("/api/v1", authService.AdminOnly())
-	{
-		mw := ratelimit.RateLimiter(rlstore, &ratelimit.Options{
-			ErrorHandler: rateErrorHandler,
-			KeyFunc:      rateKeyFunc,
-		})
+	rlr := request_log.NewRetrievalService(redis, cfg.GetGlobalKey())
 
-		api.GET("/todo", mw, func(c *gin.Context) {})
-	}
+	routesRequestLog := common_routes.NewRequestLogRoutes(cfg, authService, rlr)
+
+	api := server.Group("/api/v1", authService.AdminOnly())
+	routesRequestLog.Register(api)
+
+	routesSession := common_routes.NewSessionRoutes(cfg, authService, db, redis, httpf, e, logger)
+	routesSession.Register(api)
 
 	return service.GetServerAndHealthChecker(server, healthChecker)
 }
@@ -169,7 +168,8 @@ func Serve(cfg config.C) {
 		}()
 	}
 
-	server, healthChecker, err := GetGinServer(cfg, db, rs, c, e, logger)
+	asynqInspector := asynq.NewInspectorFromRedisClient(rs.Client())
+	server, healthChecker, err := GetGinServer(cfg, db, rs, c, asynqInspector, h, e, logger)
 	if err != nil {
 		panic(err)
 	}

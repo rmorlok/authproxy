@@ -136,7 +136,7 @@ func GetGinServer(
 			api = server.Group("/api/v1")
 		}
 
-		routesSession := routes.NewSessionRoutes(cfg, authService, db, redis, httpf, encrypt, logger)
+		routesSession := common_routes.NewSessionRoutes(cfg, authService, db, redis, httpf, encrypt, logger)
 		routesSession.Register(api)
 
 		routesConnectors := common_routes.NewConnectorsRoutes(cfg, authService, c)

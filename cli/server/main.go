@@ -1,6 +1,10 @@
 package main
 
 import (
+	"os"
+	"strings"
+	"sync"
+
 	"github.com/fatih/color"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
@@ -12,9 +16,6 @@ import (
 	public "github.com/rmorlok/authproxy/service/public"
 	"github.com/rmorlok/authproxy/service/worker"
 	"github.com/spf13/cobra"
-	"os"
-	"strings"
-	"sync"
 )
 
 var cfgFile string
@@ -103,7 +104,7 @@ func cmdRoutes() *cobra.Command {
 		Short: "Print routes exposed by app",
 		Run: func(cmd *cobra.Command, args []string) {
 			println("Admin API:")
-			server, _, _ := admin_api.GetGinServer(cfg, nil, nil, nil, nil, nil)
+			server, _, _ := admin_api.GetGinServer(cfg, nil, nil, nil, nil, nil, nil, nil)
 			api_common.PrintRoutes(server.Handler.(*gin.Engine))
 
 			println("\n\nAPI:")
