@@ -35,7 +35,7 @@ go run ./cli/client raw-proxy --enableMarketplaceLoginRedirect=true --proxyTo=ap
 Run the marketplace UI:
 
 ```bash
-cd marketplace_portal
+cd ui/marketplace
 nvm use v18.16.0
 yarn
 yarn dev

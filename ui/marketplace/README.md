@@ -1,4 +1,4 @@
-# Client
+# Marketplace UI
 
 Install it and run:
 
