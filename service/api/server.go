@@ -2,57 +2,32 @@ package admin_api
 
 import (
 	"context"
-	"log/slog"
 	"net/http"
 	"sync"
 	"time"
 
-	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/hibiken/asynq"
-	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/apasynq"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/connectors"
-	"github.com/rmorlok/authproxy/connectors/interface"
-	"github.com/rmorlok/authproxy/database"
-	"github.com/rmorlok/authproxy/encrypt"
-	"github.com/rmorlok/authproxy/httpf"
-	"github.com/rmorlok/authproxy/redis"
-	"github.com/rmorlok/authproxy/request_log"
 	common_routes "github.com/rmorlok/authproxy/routes"
+	"github.com/rmorlok/authproxy/service"
 )
 
-func rateKeyFunc(c *gin.Context) string {
-	return c.ClientIP()
-}
-
-func rateErrorHandler(c *gin.Context, info ratelimit.Info) {
-	c.String(429, "Too many requests. Try again in "+time.Until(info.ResetTime).String())
-}
-
-func GetGinServer(
-	cfg config.C,
-	db database.DB,
-	redis redis.R,
-	c _interface.C,
-	asynqInspector apasynq.Inspector,
-	httpf httpf.F,
-	encrypt encrypt.E,
-	logger *slog.Logger,
-) (httpServer *http.Server, httpHealthChecker *http.Server, err error) {
-	root := cfg.GetRoot()
+func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpHealthChecker *http.Server, err error) {
+	root := dm.GetConfigRoot()
+	logger := dm.GetLogger()
 	service := &root.Api
-	authService := auth.NewService(cfg, service, db, redis, encrypt, logger)
-
-	rlstore := ratelimit.InMemoryStore(&ratelimit.InMemoryOptions{
-		Rate:  1 * time.Minute,
-		Limit: 10_000,
-	})
+	authService := auth.NewService(
+		dm.GetConfig(),
+		service,
+		dm.GetDatabase(),
+		dm.GetRedisWrapper(),
+		dm.GetEncryptService(),
+		dm.GetLogger(),
+	)
 
 	server := api_common.GinForService(service)
 
@@ -84,11 +59,11 @@ func GetGinServer(
 		redisChan := make(chan bool, 1)
 
 		go func() {
-			dbChan <- db.Ping(ctx)
+			dbChan <- dm.GetDatabase().Ping(ctx)
 		}()
 
 		go func() {
-			redisChan <- redis.Ping(ctx)
+			redisChan <- dm.GetRedisWrapper().Ping(ctx)
 		}()
 
 		dbOk := <-dbChan
@@ -107,20 +82,44 @@ func GetGinServer(
 		})
 	})
 
-	rl := ratelimit.RateLimiter(rlstore, &ratelimit.Options{
-		ErrorHandler: rateErrorHandler,
-		KeyFunc:      rateKeyFunc,
-	})
+	routesConnectors := common_routes.NewConnectorsRoutes(
+		dm.GetConfig(),
+		authService,
+		dm.GetConnectorsService(),
+	)
+	routesConnections := common_routes.NewConnectionsRoutes(
+		dm.GetConfig(),
+		authService,
+		dm.GetDatabase(),
+		dm.GetRedisWrapper(),
+		dm.GetConnectorsService(),
+		dm.GetHttpf(),
+		dm.GetEncryptService(),
+		logger,
+	)
+	routesProxy := common_routes.NewConnectionsProxyRoutes(
+		dm.GetConfig(),
+		authService,
+		dm.GetDatabase(),
+		dm.GetRedisWrapper(),
+		dm.GetConnectorsService(),
+		dm.GetHttpf(),
+		dm.GetEncryptService(),
+		logger,
+	)
+	routesTasks := common_routes.NewTaskRoutes(
+		dm.GetConfig(),
+		authService,
+		dm.GetEncryptService(),
+		dm.GetAsyncInspector(),
+	)
+	routesRequestLog := common_routes.NewRequestLogRoutes(
+		dm.GetConfig(),
+		authService,
+		dm.GetRequestLogRetriever(),
+	)
 
-	rlr := request_log.NewRetrievalService(redis, cfg.GetGlobalKey())
-
-	routesConnectors := common_routes.NewConnectorsRoutes(cfg, authService, c)
-	routesConnections := common_routes.NewConnectionsRoutes(cfg, authService, db, redis, c, httpf, encrypt, logger)
-	routesProxy := common_routes.NewConnectionsProxyRoutes(cfg, authService, db, redis, c, httpf, encrypt, logger)
-	routesTasks := common_routes.NewTaskRoutes(cfg, authService, encrypt, asynqInspector)
-	routesRequestLog := common_routes.NewRequestLogRoutes(cfg, authService, rlr)
-
-	api := server.Group("/api/v1", rl)
+	api := server.Group("/api/v1")
 
 	routesConnectors.Register(api)
 	routesConnections.Register(api)
@@ -132,85 +131,20 @@ func GetGinServer(
 }
 
 func Serve(cfg config.C) {
-	root := cfg.GetRoot()
-	aplog.SetDefaultLog(cfg.GetRootLogger())
-	logBuilder := aplog.NewBuilder(cfg.GetRootLogger())
-	logBuilder = logBuilder.WithService("api")
-	logger := logBuilder.Build()
+	dm := service.NewDependencyManager("api", cfg)
+	aplog.SetDefaultLog(dm.GetRootLogger())
+	logger := dm.GetLogger()
 
 	if !cfg.IsDebugMode() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	rs, err := redis.New(context.Background(), cfg, logger)
-	if err != nil {
-		panic(err)
-	}
-	defer rs.Close()
+	// Close redis connections when we exit
+	defer dm.GetRedisWrapper().Close()
 
-	db, err := database.NewConnectionForRoot(root, logger)
-	if err != nil {
-		panic(err)
-	}
+	dm.AutoMigrateAll()
 
-	if root.Database.GetAutoMigrate() {
-		func() {
-			m := rs.NewMutex(
-				database.MigrateMutexKeyName,
-				redis.MutexOptionLockFor(root.Database.GetAutoMigrationLockDuration()),
-				redis.MutexOptionRetryFor(root.Database.GetAutoMigrationLockDuration()+1*time.Second),
-				redis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
-				redis.MutexOptionDetailedLockMetadata(),
-			)
-			err := m.Lock(context.Background())
-			if err != nil {
-				panic(errors.Wrap(err, "failed to establish lock for database migration"))
-			}
-			defer m.Unlock(context.Background())
-
-			if err := db.Migrate(context.Background()); err != nil {
-				panic(err)
-			}
-		}()
-	}
-
-	h := httpf.CreateFactory(cfg, rs, logger)
-
-	if root.HttpLogging.GetAutoMigrate() {
-		err := request_log.Migrate(context.Background(), rs, logger)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	e := encrypt.NewEncryptService(cfg, db)
-	asynqClient := asynq.NewClientFromRedisClient(rs.Client())
-	asynqInspector := asynq.NewInspectorFromRedisClient(rs.Client())
-
-	c := connectors.NewConnectorsService(cfg, db, e, rs, h, asynqClient, logger)
-
-	if root.Connectors.GetAutoMigrate() {
-		func() {
-			m := rs.NewMutex(
-				connectors.MigrateMutexKeyName,
-				redis.MutexOptionLockFor(root.Connectors.GetAutoMigrationLockDurationOrDefault()),
-				redis.MutexOptionRetryFor(root.Connectors.GetAutoMigrationLockDurationOrDefault()+1*time.Second),
-				redis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
-				redis.MutexOptionDetailedLockMetadata(),
-			)
-			err := m.Lock(context.Background())
-			if err != nil {
-				panic(err)
-			}
-			defer m.Unlock(context.Background())
-
-			if err := c.MigrateConnectors(context.Background()); err != nil {
-				panic(err)
-			}
-		}()
-	}
-
-	server, healthChecker, err := GetGinServer(cfg, db, rs, c, asynqInspector, h, e, logger)
+	server, healthChecker, err := GetGinServer(dm)
 	if err != nil {
 		panic(err)
 	}

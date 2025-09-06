@@ -14,58 +14,18 @@ import (
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/connectors"
-	"github.com/rmorlok/authproxy/database"
-	"github.com/rmorlok/authproxy/encrypt"
-	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/oauth2"
-	"github.com/rmorlok/authproxy/redis"
+	"github.com/rmorlok/authproxy/service"
 )
 
 func Serve(cfg config.C) {
-	aplog.SetDefaultLog(cfg.GetRootLogger())
-	logBuilder := aplog.NewBuilder(cfg.GetRootLogger())
-	logBuilder = logBuilder.WithService("worker")
-	logger := logBuilder.Build()
+	dm := service.NewDependencyManager("worker", cfg)
+	aplog.SetDefaultLog(dm.GetRootLogger())
+	logger := dm.GetLogger()
 
 	if !cfg.IsDebugMode() {
 		gin.SetMode(gin.ReleaseMode)
 	}
-
-	rs, err := redis.New(context.Background(), cfg, logger)
-	if err != nil {
-		panic(err)
-	}
-	defer rs.Close()
-
-	db, err := database.NewConnectionForRoot(cfg.GetRoot(), logger)
-	if err != nil {
-		panic(err)
-	}
-
-	if cfg.GetRoot().Database.GetAutoMigrate() {
-		func() {
-			m := rs.NewMutex(
-				database.MigrateMutexKeyName,
-				redis.MutexOptionLockFor(cfg.GetRoot().Database.GetAutoMigrationLockDuration()),
-				redis.MutexOptionRetryFor(cfg.GetRoot().Database.GetAutoMigrationLockDuration()+1*time.Second),
-				redis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
-				redis.MutexOptionDetailedLockMetadata(),
-			)
-			err := m.Lock(context.Background())
-			if err != nil {
-				panic(err)
-			}
-			defer m.Unlock(context.Background())
-
-			if err := db.Migrate(context.Background()); err != nil {
-				panic(err)
-			}
-		}()
-	}
-
-	h := httpf.CreateFactory(cfg, rs, logger)
-	e := encrypt.NewEncryptService(cfg, db)
 
 	workerConfig := cfg.GetRoot().Worker
 	router := api_common.GinForService(&workerConfig)
@@ -89,12 +49,7 @@ func Serve(cfg config.C) {
 		asyncIsScheduler = isScheduler
 	}
 
-	asynqClient := asynq.NewClientFromRedisClient(rs.Client())
-	// defer asynqClient.Close() // Do no close the async connection because it is a shared redis connection
-
-	asynqClient.Ping()
-
-	c := connectors.NewConnectorsService(cfg, db, e, rs, h, asynqClient, logger)
+	dm.GetAsyncClient().Ping()
 
 	router.GET("/healthz", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 1*time.Second)
@@ -105,15 +60,15 @@ func Serve(cfg config.C) {
 		asynqClientChan := make(chan bool, 1)
 
 		go func() {
-			dbChan <- db.Ping(ctx)
+			dbChan <- dm.GetDatabase().Ping(ctx)
 		}()
 
 		go func() {
-			redisChan <- rs.Ping(ctx)
+			redisChan <- dm.GetRedisWrapper().Ping(ctx)
 		}()
 
 		go func() {
-			if err := asynqClient.Ping(); err != nil {
+			if err := dm.GetAsyncClient().Ping(); err != nil {
 				asynqClientChan <- false
 			} else {
 				asynqClientChan <- true
@@ -140,17 +95,19 @@ func Serve(cfg config.C) {
 		})
 	})
 
+	dm.AutoMigrateAll()
+
 	ctx := context.Background()
 
 	srv := asynq.NewServerFromRedisClient(
-		rs.Client(),
+		dm.GetRedisClient(),
 		asynq.Config{
 			HealthCheckFunc: asyncHealthChecker,
 			Concurrency:     workerConfig.GetConcurrency(context.Background()),
 			BaseContext: func() context2.Context {
 				return ctx
 			},
-			Logger:   &asyncLogger{inner: logBuilder.WithComponent("asynq").Build()},
+			Logger:   &asyncLogger{inner: dm.GetLogBuilder().WithComponent("asynq").Build()},
 			LogLevel: asynq.InfoLevel,
 			Queues: map[string]int{
 				"default": 5,
@@ -158,37 +115,20 @@ func Serve(cfg config.C) {
 		},
 	)
 
-	logBuilder.Build().Info("TEST LOG")
-
 	mux := asynq.NewServeMux()
 
-	oauth2TaskHandler := oauth2.NewTaskHandler(cfg, db, rs, c, asynqClient, h, e, logger)
+	oauth2TaskHandler := oauth2.NewTaskHandler(
+		cfg,
+		dm.GetDatabase(),
+		dm.GetRedisWrapper(),
+		dm.GetConnectorsService(),
+		dm.GetAsyncClient(),
+		dm.GetHttpf(),
+		dm.GetEncryptService(),
+		logger,
+	)
 	oauth2TaskHandler.RegisterTasks(mux)
-
-	connectorsService := connectors.NewConnectorsService(cfg, db, e, rs, h, asynqClient, logger)
-
-	if cfg.GetRoot().Connectors.GetAutoMigrate() {
-		func() {
-			m := rs.NewMutex(
-				connectors.MigrateMutexKeyName,
-				redis.MutexOptionLockFor(cfg.GetRoot().Connectors.GetAutoMigrationLockDurationOrDefault()),
-				redis.MutexOptionRetryFor(cfg.GetRoot().Connectors.GetAutoMigrationLockDurationOrDefault()+1*time.Second),
-				redis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
-				redis.MutexOptionDetailedLockMetadata(),
-			)
-			err := m.Lock(context.Background())
-			if err != nil {
-				panic(err)
-			}
-			defer m.Unlock(context.Background())
-
-			if err := connectorsService.MigrateConnectors(context.Background()); err != nil {
-				panic(err)
-			}
-		}()
-	}
-
-	connectorsService.RegisterTasks(mux)
+	dm.GetConnectorsService().RegisterTasks(mux)
 
 	var wg sync.WaitGroup
 
@@ -204,12 +144,12 @@ func Serve(cfg config.C) {
 	}()
 
 	scheduler := newScheduler(
-		rs,
+		dm.GetRedisWrapper(),
 		asyncSchedulerHealthChecker,
-		logBuilder.WithComponent("scheduler").Build(),
+		dm.GetLogBuilder().WithComponent("scheduler").Build(),
 	).
 		addRegistrar(oauth2TaskHandler).
-		addRegistrar(connectorsService)
+		addRegistrar(dm.GetConnectorsService())
 
 	wg.Add(1)
 	go func() {

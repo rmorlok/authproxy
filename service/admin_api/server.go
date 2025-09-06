@@ -1,53 +1,33 @@
 package admin_api
 
 import (
-	"context"
+	"net/http"
+	"sync"
 
-	ratelimit "github.com/JGLTechnologies/gin-rate-limit"
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
-	"github.com/hibiken/asynq"
-	"github.com/rmorlok/authproxy/apasynq"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/connectors"
-	"github.com/rmorlok/authproxy/connectors/interface"
-	"github.com/rmorlok/authproxy/database"
-	"github.com/rmorlok/authproxy/encrypt"
-	"github.com/rmorlok/authproxy/httpf"
-	"github.com/rmorlok/authproxy/redis"
-	"github.com/rmorlok/authproxy/request_log"
 	common_routes "github.com/rmorlok/authproxy/routes"
-
-	"log/slog"
-	"net/http"
-	"sync"
-	"time"
+	"github.com/rmorlok/authproxy/service"
 )
 
-func rateKeyFunc(c *gin.Context) string {
-	return c.ClientIP()
-}
-
-func rateErrorHandler(c *gin.Context, info ratelimit.Info) {
-	c.String(429, "Too many requests. Try again in "+time.Until(info.ResetTime).String())
-}
-
 func GetGinServer(
-	cfg config.C,
-	db database.DB,
-	redis redis.R,
-	c _interface.C,
-	asynqInspector apasynq.Inspector,
-	httpf httpf.F,
-	e encrypt.E,
-	logger *slog.Logger,
+	dm *service.DependencyManager,
 ) (httpServer *http.Server, httpHealthChecker *http.Server, err error) {
-	root := cfg.GetRoot()
+	root := dm.GetConfigRoot()
 	service := &root.AdminApi
-	authService := auth.NewService(cfg, service, db, redis, e, logger)
+	logger := dm.GetLogger()
+	authService := auth.NewService(
+		dm.GetConfig(),
+		service,
+		dm.GetDatabase(),
+		dm.GetRedisWrapper(),
+		dm.GetEncryptService(),
+		logger,
+	)
 
 	server := api_common.GinForService(service)
 
@@ -78,98 +58,43 @@ func GetGinServer(
 		})
 	})
 
-	rlr := request_log.NewRetrievalService(redis, cfg.GetGlobalKey())
-
-	routesRequestLog := common_routes.NewRequestLogRoutes(cfg, authService, rlr)
+	routesRequestLog := common_routes.NewRequestLogRoutes(
+		dm.GetConfig(),
+		authService,
+		dm.GetRequestLogRetriever(),
+	)
 
 	api := server.Group("/api/v1", authService.AdminOnly())
 	routesRequestLog.Register(api)
 
-	routesSession := common_routes.NewSessionRoutes(cfg, authService, db, redis, httpf, e, logger)
+	routesSession := common_routes.NewSessionRoutes(
+		dm.GetConfig(),
+		authService,
+		dm.GetDatabase(),
+		dm.GetRedisWrapper(),
+		dm.GetHttpf(),
+		dm.GetEncryptService(),
+		logger,
+	)
 	routesSession.Register(api)
 
 	return service.GetServerAndHealthChecker(server, healthChecker)
 }
 
 func Serve(cfg config.C) {
-	root := cfg.GetRoot()
-	aplog.SetDefaultLog(cfg.GetRootLogger())
-	logBuilder := aplog.NewBuilder(cfg.GetRootLogger())
-	logBuilder = logBuilder.WithService("admin-api")
-	logger := logBuilder.Build()
+	dm := service.NewDependencyManager("admin-api", cfg)
+	aplog.SetDefaultLog(dm.GetRootLogger())
+	logger := dm.GetLogger()
 
 	if !cfg.IsDebugMode() {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	rs, err := redis.New(context.Background(), cfg, logger)
-	if err != nil {
-		panic(err)
-	}
-	defer rs.Close()
+	defer dm.GetRedisWrapper().Close()
 
-	db, err := database.NewConnectionForRoot(root, logger)
-	if err != nil {
-		panic(err)
-	}
+	dm.AutoMigrateAll()
 
-	if root.Database.GetAutoMigrate() {
-		func() {
-			m := rs.NewMutex(
-				database.MigrateMutexKeyName,
-				redis.MutexOptionLockFor(root.Database.GetAutoMigrationLockDuration()),
-				redis.MutexOptionRetryFor(root.Database.GetAutoMigrationLockDuration()+1*time.Second),
-				redis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
-				redis.MutexOptionDetailedLockMetadata(),
-			)
-			err := m.Lock(context.Background())
-			if err != nil {
-				panic(err)
-			}
-			defer m.Unlock(context.Background())
-
-			if err := db.Migrate(context.Background()); err != nil {
-				panic(err)
-			}
-		}()
-	}
-
-	h := httpf.CreateFactory(cfg, rs, logger)
-
-	if root.HttpLogging.GetAutoMigrate() {
-		err := request_log.Migrate(context.Background(), rs, logger)
-		if err != nil {
-			panic(err)
-		}
-	}
-
-	e := encrypt.NewEncryptService(cfg, db)
-	asynqClient := asynq.NewClientFromRedisClient(rs.Client())
-	c := connectors.NewConnectorsService(cfg, db, e, rs, h, asynqClient, logger)
-
-	if root.Connectors.GetAutoMigrate() {
-		func() {
-			m := rs.NewMutex(
-				connectors.MigrateMutexKeyName,
-				redis.MutexOptionLockFor(root.Connectors.GetAutoMigrationLockDurationOrDefault()),
-				redis.MutexOptionRetryFor(root.Connectors.GetAutoMigrationLockDurationOrDefault()+1*time.Second),
-				redis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
-				redis.MutexOptionDetailedLockMetadata(),
-			)
-			err := m.Lock(context.Background())
-			if err != nil {
-				panic(err)
-			}
-			defer m.Unlock(context.Background())
-
-			if err := c.MigrateConnectors(context.Background()); err != nil {
-				panic(err)
-			}
-		}()
-	}
-
-	asynqInspector := asynq.NewInspectorFromRedisClient(rs.Client())
-	server, healthChecker, err := GetGinServer(cfg, db, rs, c, asynqInspector, h, e, logger)
+	server, healthChecker, err := GetGinServer(dm)
 	if err != nil {
 		panic(err)
 	}

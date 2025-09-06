@@ -11,6 +11,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/service"
 	"github.com/rmorlok/authproxy/service/admin_api"
 	api "github.com/rmorlok/authproxy/service/api"
 	public "github.com/rmorlok/authproxy/service/public"
@@ -104,15 +105,15 @@ func cmdRoutes() *cobra.Command {
 		Short: "Print routes exposed by app",
 		Run: func(cmd *cobra.Command, args []string) {
 			println("Admin API:")
-			server, _, _ := admin_api.GetGinServer(cfg, nil, nil, nil, nil, nil, nil, nil)
+			server, _, _ := admin_api.GetGinServer(service.NewDependencyManager("admin-api", cfg))
 			api_common.PrintRoutes(server.Handler.(*gin.Engine))
 
 			println("\n\nAPI:")
-			server, _, _ = api.GetGinServer(cfg, nil, nil, nil, nil, nil, nil, nil)
+			server, _, _ = api.GetGinServer(service.NewDependencyManager("api", cfg))
 			api_common.PrintRoutes(server.Handler.(*gin.Engine))
 
 			println("\n\nPublic:")
-			server, _, _ = public.GetGinServer(cfg, nil, nil, nil, nil, nil, nil, nil)
+			server, _, _ = public.GetGinServer(service.NewDependencyManager("public", cfg))
 			api_common.PrintRoutes(server.Handler.(*gin.Engine))
 		},
 	}
