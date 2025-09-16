@@ -1,13 +1,14 @@
 package routes
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"net/http"
-	"net/http/httptest"
-	"testing"
 )
 
 func TestErrorRoutes(t *testing.T) {

@@ -2,6 +2,12 @@ package auth
 
 import (
 	"fmt"
+	"net/http"
+	"net/http/httptest"
+	"strings"
+	"testing"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -15,11 +21,6 @@ import (
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
 	test_clock "k8s.io/utils/clock/testing"
-	"net/http"
-	"net/http/httptest"
-	"strings"
-	"testing"
-	"time"
 )
 
 func TestAuth_Token(t *testing.T) {
@@ -273,7 +274,7 @@ func TestAuth_Parse(t *testing.T) {
 				},
 			},
 			AdminApi: config.ServiceAdminApi{
-				config.ServiceHttp{
+				ServiceHttp: config.ServiceHttp{
 					PortVal: &config.StringValueDirect{Value: "8080"},
 				},
 			},
@@ -324,7 +325,7 @@ func TestAuth_Parse(t *testing.T) {
 				},
 			},
 			AdminApi: config.ServiceAdminApi{
-				config.ServiceHttp{
+				ServiceHttp: config.ServiceHttp{
 					PortVal: &config.StringValueDirect{Value: "8080"},
 				},
 			},
@@ -713,7 +714,7 @@ var testConfigPublicPrivateKey = config.Root{
 		},
 	},
 	AdminApi: config.ServiceAdminApi{
-		config.ServiceHttp{
+		ServiceHttp: config.ServiceHttp{
 			PortVal: &config.StringValueDirect{Value: "8080"},
 		},
 	},
@@ -733,7 +734,7 @@ var testConfigSecretKey = config.Root{
 		},
 	},
 	AdminApi: config.ServiceAdminApi{
-		config.ServiceHttp{
+		ServiceHttp: config.ServiceHttp{
 			PortVal: &config.StringValueDirect{Value: "8080"},
 		},
 	},

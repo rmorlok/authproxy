@@ -38,7 +38,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 	}
 
 	var healthChecker *gin.Engine
-	if root.Public.Port() != root.Public.HealthCheckPort() {
+	if service.Port() != service.HealthCheckPort() {
 		healthChecker = api_common.GinForService(service)
 	} else {
 		healthChecker = server
@@ -153,6 +153,7 @@ func Serve(cfg config.C) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		logger.Info("running service", "addr", server.Addr)
 		err := api_common.RunServer(server, logger)
 		if err != nil {
 			logger.Error(err.Error())
@@ -163,6 +164,7 @@ func Serve(cfg config.C) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			logger.Info("running health checker", "addr", healthChecker.Addr)
 			err := api_common.RunServer(healthChecker, logger)
 			if err != nil {
 				logger.Error(err.Error())

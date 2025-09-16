@@ -21,7 +21,7 @@ import (
 
 func GetCorsConfig(cfg config.C) *cors.Config {
 	root := cfg.GetRoot()
-	public := root.Public
+	service := root.Public
 
 	var baseConfig *cors.Config
 	if root.Marketplace != nil &&
@@ -40,7 +40,7 @@ func GetCorsConfig(cfg config.C) *cors.Config {
 		}
 	}
 
-	return public.CorsVal.ToGinCorsConfig(baseConfig)
+	return service.CorsVal.ToGinCorsConfig(baseConfig)
 }
 
 func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpHealthChecker *http.Server, err error) {
@@ -114,7 +114,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		})
 	})
 
-	routesError := routes.NewErrorRoutes(dm.GetConfig())
+	routesError := common_routes.NewErrorRoutes(dm.GetConfig())
 	routesError.Register(server)
 
 	routesOauth2 := routes.NewOauth2Routes(
@@ -215,6 +215,7 @@ func Serve(cfg config.C) {
 	wg.Add(1)
 	go func() {
 		defer wg.Done()
+		logger.Info("running service", "addr", server.Addr)
 		err := api_common.RunServer(server, logger)
 		if err != nil {
 			logger.Error(err.Error())
@@ -225,6 +226,7 @@ func Serve(cfg config.C) {
 		wg.Add(1)
 		go func() {
 			defer wg.Done()
+			logger.Info("running healt checker", "addr", healthChecker.Addr)
 			err := api_common.RunServer(healthChecker, logger)
 			if err != nil {
 				logger.Error(err.Error())

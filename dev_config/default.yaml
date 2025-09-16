@@ -10,6 +10,13 @@ api:
 
 admin_api:
   port: 8082
+  ui:
+    enabled: true
+    base_url: http://localhost:5174/
+  cookie:
+    same_site: none
+  tls:
+    auto_gen_path: ./dev_config/keys/tls/
 
 worker:
   health_check_port:
