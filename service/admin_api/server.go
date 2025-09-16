@@ -93,6 +93,7 @@ func GetGinServer(
 	if service.SupportsSession() && service.SupportsUi() {
 		routesSession := common_routes.NewSessionRoutes(
 			dm.GetConfig(),
+			service.Ui,
 			authService,
 			dm.GetDatabase(),
 			dm.GetRedisWrapper(),

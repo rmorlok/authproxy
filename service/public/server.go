@@ -137,6 +137,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 
 		routesSession := common_routes.NewSessionRoutes(
 			dm.GetConfig(),
+			&root.HostApplication,
 			authService,
 			dm.GetDatabase(),
 			dm.GetRedisWrapper(),

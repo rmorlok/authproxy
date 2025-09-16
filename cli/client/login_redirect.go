@@ -3,25 +3,36 @@ package main
 import (
 	"crypto/tls"
 	"fmt"
-	"github.com/rmorlok/authproxy/cli/client/config"
-	"github.com/rmorlok/authproxy/jwt"
-	"github.com/spf13/cobra"
 	"log"
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/rmorlok/authproxy/cli/client/config"
+	"github.com/rmorlok/authproxy/jwt"
+	"github.com/spf13/cobra"
 )
 
-const marketplaceLoginRedirectPath = "/marketplace-login-redirect"
+const loginRedirectPath = "/login-redirect"
 
-func httpServerForMarketplaceLoginRedirect(
+func httpServerForLoginRedirect(
 	validRedirectUrl string,
 	marketplaceUrl string,
+	adminUiUrl string,
 	tb jwt.TokenBuilder,
 ) func(w http.ResponseWriter, req *http.Request) {
 	return func(w http.ResponseWriter, req *http.Request) {
 
-		if req.Method != "GET" || req.URL.Path != marketplaceLoginRedirectPath {
+		if req.Method != "GET" || req.URL.Path != loginRedirectPath {
+			configProps := make([]string, 0)
+			if marketplaceUrl != "" {
+				configProps = append(configProps, "<tt>host_application.initiate_session_url</tt>")
+			}
+
+			if adminUiUrl != "" {
+				configProps = append(configProps, "<tt>admin_api.ui.initiate_session_url</tt>")
+			}
+
 			log.Printf("[404] %s %s", req.Method, req.URL)
 			w.Header().Set("Content-Type", "text/html")
 			w.WriteHeader(404)
@@ -34,10 +45,10 @@ func httpServerForMarketplaceLoginRedirect(
 	</head>
 	<body>
 		<h1>Not Found</h1>
-		<p>Path '%s' does not eixst on this server. Configure the <tt>host_application.initiate_session_url</tt> to '%s'</p>
+		<p>Path '%s' does not eixst on this server. Configure %s to '%s'</p>
 	</body>
 </html>
-`, req.URL, validRedirectUrl)))
+`, req.URL, strings.Join(configProps, " and "), validRedirectUrl)))
 			return
 		}
 
@@ -63,7 +74,17 @@ func httpServerForMarketplaceLoginRedirect(
 			return
 		}
 
-		if marketplaceUrl != "" && !strings.HasPrefix(returnTo, marketplaceUrl) {
+		if (marketplaceUrl != "" && !strings.HasPrefix(returnTo, marketplaceUrl)) &&
+			(adminUiUrl != "" && !strings.HasPrefix(returnTo, adminUiUrl)) {
+			tmp := make([]string, 0)
+			if marketplaceUrl != "" {
+				tmp = append(tmp, fmt.Sprintf("marketplace app at '%s'", marketplaceUrl))
+			}
+
+			if adminUiUrl != "" {
+				tmp = append(tmp, fmt.Sprintf("admin ui at '%s'", adminUiUrl))
+			}
+
 			log.Printf("[404] %s %s", req.Method, req.URL)
 			w.Header().Set("Content-Type", "text/html")
 			w.WriteHeader(400)
@@ -76,10 +97,10 @@ func httpServerForMarketplaceLoginRedirect(
 	</head>
 	<body>
 		<h1>Invalid Return To</h1>
-		<p>Requested return to url '%s' is not from the the marketplace app at '%s'</p>
+		<p>Requested return to url '%s' is not from the %s</p>
 	</body>
 </html>
-`, returnTo, marketplaceUrl)))
+`, returnTo, strings.Join(tmp, " or "))))
 			return
 		}
 
@@ -109,8 +130,8 @@ func cmdMarketplaceLoginRedirect() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "marketplace-login-redirect",
-		Short: "Login redirect handler for marketplace SPA to simulate host application",
+		Use:   "login-redirect",
+		Short: "Login redirect handler for marketplace SPA and/or admin SPA to simulate host application",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			tb, err := resolver.ResolveBuilder()
 			if err != nil {
@@ -118,13 +139,24 @@ func cmdMarketplaceLoginRedirect() *cobra.Command {
 			}
 
 			marketplaceUrl, _ := resolver.ResolveMarketplaceUrl()
+			adminUiUrl, _ := resolver.ResolveAdminUiUrl()
 
-			validRedirectUrl := fmt.Sprintf("%s://%s:%d%s", proto, ip, port, marketplaceLoginRedirectPath)
-			log.Printf("Configure host_application.initiate_session_url to %s", validRedirectUrl)
+			if marketplaceUrl == "" && adminUiUrl == "" {
+				return fmt.Errorf("neither marketplace url nor admin ui url specified")
+			}
+
+			validRedirectUrl := fmt.Sprintf("%s://%s:%d%s", proto, ip, port, loginRedirectPath)
+			if marketplaceUrl != "" {
+				log.Printf("Configure host_application.initiate_session_url to %s", validRedirectUrl)
+			}
+
+			if adminUiUrl != "" {
+				log.Printf("Configure admin_api.ui.initiate_session_url to %s", validRedirectUrl)
+			}
 
 			server := &http.Server{
 				Addr:    fmt.Sprintf("%s:%d", ip, port),
-				Handler: http.HandlerFunc(httpServerForMarketplaceLoginRedirect(validRedirectUrl, marketplaceUrl, tb)),
+				Handler: http.HandlerFunc(httpServerForLoginRedirect(validRedirectUrl, marketplaceUrl, adminUiUrl, tb)),
 				// Disable HTTP/2.
 				TLSNextProto: make(map[string]func(*http.Server, *tls.Conn, http.Handler)),
 			}

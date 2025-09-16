@@ -18,15 +18,25 @@ import (
 	"github.com/rmorlok/authproxy/redis"
 )
 
+// SessionInitiateUrlGenerator is any object that can generate the URLs to redirect the
+// user to for initiating a session.
+type SessionInitiateUrlGenerator interface {
+	// GetInitiateSessionUrl returns the URL to redirect the user to for initiating a session.
+	// The returnToUrl is the URL the user should be redirected to after the session is established. The return
+	// value is the fully encoded URL that should be used.
+	GetInitiateSessionUrl(returnToUrl string) string
+}
+
 type SessionRoutes struct {
-	cfg         config.C
-	authService auth.A
-	db          database.DB
-	redis       redis.R
-	httpf       httpf.F
-	encrypt     encrypt.E
-	oauthf      oauth2.Factory
-	logger      *slog.Logger
+	cfg                         config.C
+	sessionInitiateUrlGenerator SessionInitiateUrlGenerator
+	authService                 auth.A
+	db                          database.DB
+	redis                       redis.R
+	httpf                       httpf.F
+	encrypt                     encrypt.E
+	oauthf                      oauth2.Factory
+	logger                      *slog.Logger
 }
 
 type InitiateParams struct {
@@ -73,7 +83,7 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 		logger.Debug("request was not authenticated, returning redirect url")
 		api_common.AddGinDebugHeader(r.cfg, gctx, "auth not present on context")
 		gctx.PureJSON(http.StatusUnauthorized, InitiateFailureResponse{
-			RedirectUrl: r.cfg.GetRoot().HostApplication.GetInitiateSessionUrl(req.ReturnToUrl),
+			RedirectUrl: r.sessionInitiateUrlGenerator.GetInitiateSessionUrl(req.ReturnToUrl),
 		})
 		return
 	}
@@ -140,6 +150,7 @@ func (r *SessionRoutes) Register(g gin.IRouter) {
 
 func NewSessionRoutes(
 	cfg config.C,
+	sessionInitiateUrlGenerator SessionInitiateUrlGenerator,
 	authService auth.A,
 	db database.DB,
 	redis redis.R,
@@ -148,12 +159,13 @@ func NewSessionRoutes(
 	logger *slog.Logger,
 ) *SessionRoutes {
 	return &SessionRoutes{
-		cfg:         cfg,
-		authService: authService,
-		db:          db,
-		redis:       redis,
-		httpf:       httpf,
-		encrypt:     encrypt,
-		logger:      logger,
+		cfg:                         cfg,
+		sessionInitiateUrlGenerator: sessionInitiateUrlGenerator,
+		authService:                 authService,
+		db:                          db,
+		redis:                       redis,
+		httpf:                       httpf,
+		encrypt:                     encrypt,
+		logger:                      logger,
 	}
 }

@@ -2,14 +2,15 @@ package config
 
 import (
 	"fmt"
+	"os"
+	"os/user"
+	"strings"
+
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/jwt"
 	"github.com/spf13/cobra"
-	"os"
-	"os/user"
-	"strings"
 )
 
 // Resolver is an interface that will pull config information from a combination of defaults, config file, and
@@ -26,6 +27,7 @@ type Resolver struct {
 	adminApiUrl    string
 	authUrl        string
 	marketplaceUrl string
+	adminUiUrl     string
 }
 
 func WithConfigParams(cmd *cobra.Command) *Resolver {
@@ -43,6 +45,7 @@ func WithConfigParams(cmd *cobra.Command) *Resolver {
 	cmd.Flags().StringVar(&r.apiUrl, "apiUrl", "", "API service base URL")
 	cmd.Flags().StringVar(&r.adminApiUrl, "adminApiUrl", "", "Admin API service base URL")
 	cmd.Flags().StringVar(&r.marketplaceUrl, "marketplaceUrl", "", "Marketplace service base URL")
+	cmd.Flags().StringVar(&r.adminUiUrl, "adminUiUrl", "", "Admin UI service base URL")
 
 	cmd.Flags().StringVar(&r.configFile, "config", "", ".authproxy.yaml config file to use.")
 
@@ -249,4 +252,17 @@ func (j *Resolver) ResolveMarketplaceUrl() (string, error) {
 	}
 
 	return root.MarketplaceUrl(), nil
+}
+
+func (j *Resolver) ResolveAdminUiUrl() (string, error) {
+	if j.adminUiUrl != "" {
+		return j.adminUiUrl, nil
+	}
+
+	root, err := j.resolveRoot()
+	if err != nil {
+		return "", err
+	}
+
+	return root.AdminUiUrl(), nil
 }

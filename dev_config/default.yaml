@@ -13,6 +13,7 @@ admin_api:
   ui:
     enabled: true
     base_url: http://localhost:5174
+    initiate_session_url: http://127.0.0.1:8888/login-redirect
   cookie:
     same_site: none
   tls:
@@ -24,7 +25,7 @@ worker:
     default: 8083
 
 host_application:
-  initiate_session_url: http://127.0.0.1:8888/marketplace-login-redirect
+  initiate_session_url: http://127.0.0.1:8888/login-redirect
 
 marketplace:
   base_url: http://localhost:5173

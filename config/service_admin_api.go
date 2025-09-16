@@ -3,6 +3,7 @@ package config
 import (
 	"context"
 	"fmt"
+	"net/url"
 
 	"github.com/rmorlok/authproxy/config/common"
 	"github.com/rmorlok/authproxy/util"
@@ -62,7 +63,7 @@ func (s *ServiceAdminApi) UiBaseUrl() string {
 	if !s.Ui.BaseUrl.HasValue(context.Background()) {
 		return ""
 	}
-	
+
 	return util.Must(s.Ui.BaseUrl.GetValue(context.Background()))
 }
 
@@ -77,6 +78,14 @@ func (s *ServiceAdminApi) GetId() ServiceId {
 type ServiceAdminUi struct {
 	Enabled bool        `json:"enabled" yaml:"enabled"`
 	BaseUrl StringValue `json:"base_url" yaml:"base_url"`
+
+	// InitiateSessionUrl is the URL that will be redirected to in order to establish a session for an actor. This
+	// happens if the admin portal is accessed without coming from a pre-authorized context. This URL should
+	// take a `redirect_url` query parameter where the actor should be redirected to following successful authentication.
+	// When redirecting to `redirect_url`, the host application should append an `auth_token` query param with a signed
+	// JWT for authenticating the user. This JWT should use a nonce and expiration to protect against session
+	// hijacking
+	InitiateSessionUrl string `json:"initiate_session_url" yaml:"initiate_session_url"`
 }
 
 func (s *ServiceAdminUi) UnmarshalYAML(value *yaml.Node) error {
@@ -123,6 +132,19 @@ func (s *ServiceAdminUi) UnmarshalYAML(value *yaml.Node) error {
 	raw.BaseUrl = baseUrlVal
 
 	return nil
+}
+
+func (s *ServiceAdminUi) GetInitiateSessionUrl(returnTo string) string {
+	u, err := url.Parse(s.InitiateSessionUrl)
+	if err != nil {
+		return s.InitiateSessionUrl
+	}
+
+	q := u.Query()
+	q.Set("return_to", returnTo)
+	u.RawQuery = q.Encode()
+
+	return u.String()
 }
 
 var _ HttpService = (*ServiceAdminApi)(nil)

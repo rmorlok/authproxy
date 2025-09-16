@@ -11,6 +11,7 @@ type Root struct {
 		AdminApiVal    string `json:"admin_api" yaml:"admin_api"`
 		AuthVal        string `json:"auth" yaml:"auth"`
 		MarketplaceVal string `json:"marketplace" yaml:"marketplace"`
+		AdminUiVal     string `json:"admin_ui" yaml:"admin_ui"`
 	} `json:"server" yaml:"server"`
 }
 
@@ -81,4 +82,12 @@ func (r *Root) MarketplaceUrl() string {
 	}
 
 	return r.ServerVal.MarketplaceVal
+}
+
+func (r *Root) AdminUiUrl() string {
+	if r == nil {
+		return ""
+	}
+
+	return r.ServerVal.AdminUiVal
 }
