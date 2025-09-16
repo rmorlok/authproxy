@@ -13,7 +13,26 @@ type CorsConfig struct {
 
 func (c *CorsConfig) ToGinCorsConfig(defaults *cors.Config) *cors.Config {
 	if c == nil {
-		return defaults
+		if defaults == nil {
+			return nil
+		}
+
+		updated := *defaults
+
+		if updated.AllowOrigins != nil {
+			// The gin-contrib/cors library does not allow trailing slashes in the allowed origins
+			processedOrigins := make([]string, len(updated.AllowOrigins))
+			for i, origin := range updated.AllowOrigins {
+				if len(origin) > 0 && origin[len(origin)-1] == '/' {
+					processedOrigins[i] = origin[:len(origin)-1]
+				} else {
+					processedOrigins[i] = origin
+				}
+			}
+			updated.AllowOrigins = processedOrigins
+		}
+
+		return &updated
 	}
 
 	result := cors.Config{}
@@ -22,7 +41,18 @@ func (c *CorsConfig) ToGinCorsConfig(defaults *cors.Config) *cors.Config {
 	}
 
 	if c.AllowedOrigins != nil {
-		result.AllowOrigins = c.AllowedOrigins
+
+		// The gin-contrib/cors library does not allow trailing slashes in the allowed origins
+		processedOrigins := make([]string, len(c.AllowedOrigins))
+		for i, origin := range c.AllowedOrigins {
+			if len(origin) > 0 && origin[len(origin)-1] == '/' {
+				processedOrigins[i] = origin[:len(origin)-1]
+			} else {
+				processedOrigins[i] = origin
+			}
+		}
+
+		result.AllowOrigins = processedOrigins
 	}
 
 	if c.AllowedMethods != nil {

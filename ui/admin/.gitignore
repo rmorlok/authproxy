@@ -49,6 +49,7 @@ dist-ssr
 
 *storybook.log
 
+.yarn
 .yarn/*
 !.yarn/releases
 !.yarn/plugins

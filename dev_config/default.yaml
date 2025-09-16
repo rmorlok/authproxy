@@ -12,7 +12,7 @@ admin_api:
   port: 8082
   ui:
     enabled: true
-    base_url: http://localhost:5174/
+    base_url: http://localhost:5174
   cookie:
     same_site: none
   tls:
