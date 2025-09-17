@@ -3,7 +3,10 @@ package config
 import (
 	"context"
 	"fmt"
+	"net/http"
 	"net/url"
+	"strings"
+	"time"
 
 	"github.com/rmorlok/authproxy/config/common"
 	"github.com/rmorlok/authproxy/util"
@@ -17,6 +20,68 @@ type ServiceAdminApi struct {
 	XsrfRequestQueueDepthVal *int                              `json:"xsrf_request_queue_depth" yaml:"xsrf_request_queue_depth"`
 	StaticVal                *ServicePublicStaticContentConfig `json:"static,omitempty" yaml:"static,omitempty"`
 	CookieVal                *CookieConfig                     `json:"cookie,omitempty" yaml:"cookie,omitempty"`
+}
+
+func (s *ServiceAdminApi) SessionTimeout() time.Duration {
+	if !s.SupportsSession() {
+		panic("admin api not configured to support session")
+	}
+
+	if s.SessionTimeoutVal == nil {
+		return 1 * time.Hour
+	}
+
+	return s.SessionTimeoutVal.Duration
+}
+
+func (s *ServiceAdminApi) CookieDomain() string {
+	if !s.SupportsSession() {
+		panic("admin api not configured to support session")
+	}
+
+	if s.CookieVal != nil && s.CookieVal.DomainVal != nil {
+		return *s.CookieVal.DomainVal
+	}
+
+	return s.DomainVal
+}
+
+func (s *ServiceAdminApi) CookieSameSite() http.SameSite {
+	if !s.SupportsSession() {
+		panic("admin api not configured to support session")
+	}
+
+	if s.CookieVal != nil && s.CookieVal.SameSiteVal != nil {
+		switch strings.ToLower(*s.CookieVal.SameSiteVal) {
+		case "none":
+			return http.SameSiteNoneMode
+		case "lax":
+			return http.SameSiteLaxMode
+		case "strict":
+			return http.SameSiteStrictMode
+		default:
+			return http.SameSiteDefaultMode
+		}
+	}
+
+	if s.StaticVal != nil {
+		// Assume the marketplace is being served from public service, so same site is ok
+		return http.SameSiteStrictMode
+	}
+
+	return http.SameSiteNoneMode
+}
+
+func (s *ServiceAdminApi) XsrfRequestQueueDepth() int {
+	if !s.SupportsSession() {
+		panic("admin api not configured to support session")
+	}
+
+	if s.XsrfRequestQueueDepthVal == nil {
+		return 100
+	}
+
+	return *s.XsrfRequestQueueDepthVal
 }
 
 func (s *ServiceAdminApi) UnmarshalYAML(value *yaml.Node) error {
@@ -148,3 +213,4 @@ func (s *ServiceAdminUi) GetInitiateSessionUrl(returnTo string) string {
 }
 
 var _ HttpService = (*ServiceAdminApi)(nil)
+var _ HttpServiceWithSession = (*ServiceAdminApi)(nil)

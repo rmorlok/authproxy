@@ -42,7 +42,7 @@ export const initiateSessionAsync = createAsyncThunk<
             }
 
             // Default error response
-            return rejectWithValue({ redirect_url: new URL('/error', import.meta.env.VITE_ADMIN_BASE_URL).toString() });
+            return rejectWithValue({ redirect_url: new URL('error', import.meta.env.VITE_ADMIN_BASE_URL).toString() });
         }
     }
 );
