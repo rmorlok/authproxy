@@ -2,9 +2,10 @@ package auth
 
 import (
 	"context"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	jwt2 "github.com/rmorlok/authproxy/jwt"
-	"net/http"
 )
 
 const (
@@ -17,18 +18,25 @@ type A interface {
 	 * Gin middlewares for establishing auth
 	 */
 
-	Required() gin.HandlerFunc
-	Optional() gin.HandlerFunc
-	OptionalXsrfNotRequired() gin.HandlerFunc
-	AdminOnly() gin.HandlerFunc
-	// RBAC(roles ...string) gin.HandlerFunc
+	Required(validators ...ActorValidator) gin.HandlerFunc
+	Optional(validators ...ActorValidator) gin.HandlerFunc
+	OptionalXsrfNotRequired(validators ...ActorValidator) gin.HandlerFunc
+	AdminOnly(validators ...ActorValidator) gin.HandlerFunc
 
 	/*
 	 * Middleware not specific to a framework
 	 */
 
-	Auth(next http.Handler, abort func()) http.Handler  // Auth middleware adds auth from session and populates actor info
-	Trace(next http.Handler, abort func()) http.Handler // Trace middleware doesn't require valid actor but if actor info presented populates info
+	// Auth middleware adds auth from session and populates actor info
+	Auth(next http.Handler, abort func(), validators ...ActorValidator) http.Handler
+
+	// Trace middleware doesn't require a valid actor but if an actor is present it populates the actor info. If present
+	// the actor is validated against the supplied validators.
+	Trace(next http.Handler, abort func(), validators ...ActorValidator) http.Handler
+
+	// TraceXsrfNotRequired is the same as the Trace middleware except that it doesn't require a valid Xsrf token if session
+	// auth is being used.
+	TraceXsrfNotRequired(next http.Handler, abort func(), validators ...ActorValidator) http.Handler
 
 	/*
 	 * Other helpers to set and get authentication.
@@ -62,6 +70,11 @@ type A interface {
 	// session id cookies on the response. This method provides a gin wrapper for the more generalized version of a
 	// similar name.
 	EndGinSession(gctx *gin.Context, ra RequestAuth) error
+
+	// WithDefaultActorValidators returns a new service with the given actor validators added to the list of validators
+	// that are used to validate actors. The original service will not be modified. The validators are applied to all
+	// requests that are authenticated. Unauthenticated requests will not be affected.
+	WithDefaultActorValidators(validators ...ActorValidator) A
 }
 
 var _ A = &service{}

@@ -4,6 +4,14 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"io"
+	"net/http"
+	"net/http/cookiejar"
+	"net/http/httptest"
+	"net/url"
+	"testing"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/api_common"
@@ -15,13 +23,6 @@ import (
 	"github.com/rmorlok/authproxy/test_utils"
 	"github.com/rmorlok/authproxy/util"
 	"github.com/stretchr/testify/require"
-	"io"
-	"net/http"
-	"net/http/cookiejar"
-	"net/http/httptest"
-	"net/url"
-	"testing"
-	"time"
 )
 
 // HandlerFunc mirrors gin.HandlerFunc but injects the auth object into the handler so you can do things like
@@ -29,9 +30,10 @@ import (
 type HandlerFunc func(c *gin.Context, a A)
 
 type route struct {
-	method  string
-	path    string
-	handler HandlerFunc
+	method     string
+	path       string
+	handler    HandlerFunc
+	validators []ActorValidator
 }
 
 type TestGinServerBuilder struct {
@@ -47,10 +49,16 @@ type TestGinServerBuilder struct {
 	optionalXsrfNotRequiredAuthRoutes []route
 	requiredAuthRoutes                []route
 	adminAuthRoutes                   []route
+	defaultValidators                 []ActorValidator
 }
 
 func NewTestGinServerBuilder(testName string) *TestGinServerBuilder {
 	return &TestGinServerBuilder{testName: testName}
+}
+
+func (b *TestGinServerBuilder) WithDefaultValidator(v ActorValidator) *TestGinServerBuilder {
+	b.defaultValidators = append(b.defaultValidators, v)
+	return b
 }
 
 func (b *TestGinServerBuilder) WithConfig(cfg config.C) *TestGinServerBuilder {
@@ -80,59 +88,59 @@ func (b *TestGinServerBuilder) WithGetPingOpenRoute(path string) *TestGinServerB
 	})
 }
 
-func (b *TestGinServerBuilder) WithOptionalAuthRoute(method, path string, handler HandlerFunc) *TestGinServerBuilder {
-	b.optionalAuthRoutes = append(b.optionalAuthRoutes, route{path: path, handler: handler, method: method})
+func (b *TestGinServerBuilder) WithOptionalAuthRoute(method, path string, handler HandlerFunc, validators ...ActorValidator) *TestGinServerBuilder {
+	b.optionalAuthRoutes = append(b.optionalAuthRoutes, route{path: path, handler: handler, method: method, validators: validators})
 	return b
 }
 
-func (b *TestGinServerBuilder) WithGetPingOptionalAuthRoute(path string) *TestGinServerBuilder {
+func (b *TestGinServerBuilder) WithGetPingOptionalAuthRoute(path string, validators ...ActorValidator) *TestGinServerBuilder {
 	return b.WithOptionalAuthRoute(http.MethodGet, path, func(c *gin.Context, a A) {
 		b.pingCounter++
 		c.PureJSON(200, gin.H{"ok": true})
-	})
+	}, validators...)
 }
 
-func (b *TestGinServerBuilder) WithOptionalXsrfNotRequiredAuthRoute(method, path string, handler HandlerFunc) *TestGinServerBuilder {
-	b.optionalXsrfNotRequiredAuthRoutes = append(b.optionalXsrfNotRequiredAuthRoutes, route{path: path, handler: handler, method: method})
+func (b *TestGinServerBuilder) WithOptionalXsrfNotRequiredAuthRoute(method, path string, handler HandlerFunc, validators ...ActorValidator) *TestGinServerBuilder {
+	b.optionalXsrfNotRequiredAuthRoutes = append(b.optionalXsrfNotRequiredAuthRoutes, route{path: path, handler: handler, method: method, validators: validators})
 	return b
 }
 
-func (b *TestGinServerBuilder) WithGetPingOptionalXsrfNotRequiredAuthRoute(path string) *TestGinServerBuilder {
+func (b *TestGinServerBuilder) WithGetPingOptionalXsrfNotRequiredAuthRoute(path string, validators ...ActorValidator) *TestGinServerBuilder {
 	return b.WithOptionalXsrfNotRequiredAuthRoute(http.MethodGet, path, func(c *gin.Context, a A) {
 		b.pingCounter++
 		c.PureJSON(200, gin.H{"ok": true})
-	})
+	}, validators...)
 }
 
-func (b *TestGinServerBuilder) WithRequiredAuthRoute(method, path string, handler HandlerFunc) *TestGinServerBuilder {
-	b.requiredAuthRoutes = append(b.requiredAuthRoutes, route{path: path, handler: handler, method: method})
+func (b *TestGinServerBuilder) WithRequiredAuthRoute(method, path string, handler HandlerFunc, validators ...ActorValidator) *TestGinServerBuilder {
+	b.requiredAuthRoutes = append(b.requiredAuthRoutes, route{path: path, handler: handler, method: method, validators: validators})
 	return b
 }
 
-func (b *TestGinServerBuilder) WithGetPingRequiredAuthRoute(path string) *TestGinServerBuilder {
+func (b *TestGinServerBuilder) WithGetPingRequiredAuthRoute(path string, validators ...ActorValidator) *TestGinServerBuilder {
 	return b.WithRequiredAuthRoute(http.MethodGet, path, func(c *gin.Context, a A) {
 		b.pingCounter++
 		c.PureJSON(200, gin.H{"ok": true})
-	})
+	}, validators...)
 }
 
-func (b *TestGinServerBuilder) WithPostPingRequiredAuthRoute(path string) *TestGinServerBuilder {
+func (b *TestGinServerBuilder) WithPostPingRequiredAuthRoute(path string, validators ...ActorValidator) *TestGinServerBuilder {
 	return b.WithRequiredAuthRoute(http.MethodPost, path, func(c *gin.Context, a A) {
 		b.pingCounter++
 		c.PureJSON(200, gin.H{"ok": true})
-	})
+	}, validators...)
 }
 
-func (b *TestGinServerBuilder) WithAdminAuthRoute(method, path string, handler HandlerFunc) *TestGinServerBuilder {
-	b.adminAuthRoutes = append(b.adminAuthRoutes, route{path: path, handler: handler, method: method})
+func (b *TestGinServerBuilder) WithAdminAuthRoute(method, path string, handler HandlerFunc, validators ...ActorValidator) *TestGinServerBuilder {
+	b.adminAuthRoutes = append(b.adminAuthRoutes, route{path: path, handler: handler, method: method, validators: validators})
 	return b
 }
 
-func (b *TestGinServerBuilder) WithGetPingAdminAuthRoute(path string) *TestGinServerBuilder {
+func (b *TestGinServerBuilder) WithGetPingAdminAuthRoute(path string, validators ...ActorValidator) *TestGinServerBuilder {
 	return b.WithAdminAuthRoute(http.MethodGet, path, func(c *gin.Context, a A) {
 		b.pingCounter++
 		c.PureJSON(200, gin.H{"ok": true})
-	})
+	}, validators...)
 }
 
 func (b *TestGinServerBuilder) Build() TestSetup {
@@ -194,6 +202,9 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 
 	auth := NewService(b.cfg, b.cfg.MustGetService(b.service).(config.HttpService), b.db, b.redis, e, test_utils.NewTestLogger())
 
+	if len(b.defaultValidators) > 0 {
+		auth = auth.WithDefaultActorValidators(b.defaultValidators...)
+	}
 	b.ginEngine = gin.New()
 
 	for _, r := range b.openRoutes {
@@ -201,19 +212,19 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 	}
 
 	for _, r := range b.optionalAuthRoutes {
-		b.ginEngine.Handle(r.method, r.path, auth.Optional(), func(gctx *gin.Context) { r.handler(gctx, auth) })
+		b.ginEngine.Handle(r.method, r.path, auth.Optional(r.validators...), func(gctx *gin.Context) { r.handler(gctx, auth) })
 	}
 
 	for _, r := range b.optionalXsrfNotRequiredAuthRoutes {
-		b.ginEngine.Handle(r.method, r.path, auth.OptionalXsrfNotRequired(), func(gctx *gin.Context) { r.handler(gctx, auth) })
+		b.ginEngine.Handle(r.method, r.path, auth.OptionalXsrfNotRequired(r.validators...), func(gctx *gin.Context) { r.handler(gctx, auth) })
 	}
 
 	for _, r := range b.requiredAuthRoutes {
-		b.ginEngine.Handle(r.method, r.path, auth.Required(), func(gctx *gin.Context) { r.handler(gctx, auth) })
+		b.ginEngine.Handle(r.method, r.path, auth.Required(r.validators...), func(gctx *gin.Context) { r.handler(gctx, auth) })
 	}
 
 	for _, r := range b.adminAuthRoutes {
-		b.ginEngine.Handle(r.method, r.path, auth.AdminOnly(), func(gctx *gin.Context) { r.handler(gctx, auth) })
+		b.ginEngine.Handle(r.method, r.path, auth.AdminOnly(r.validators...), func(gctx *gin.Context) { r.handler(gctx, auth) })
 	}
 
 	return TestSetup{
@@ -273,8 +284,8 @@ func (ts *TestSetup) MustGetValidUninitializedAdminUser(ctx context.Context) dat
 
 // MustGetValidUser gives an user that can sign JWTs. This method makes sure the admin exists in the database
 // regardless of if they have interacted with the system previously.
-func (ts *TestSetup) MustGetValidUser(ctx context.Context) database.Actor {
-	a, err := ts.Db.GetActorByExternalId(ctx, "jimmycarter")
+func (ts *TestSetup) MustGetValidUserByExternalId(ctx context.Context, externalId string) database.Actor {
+	a, err := ts.Db.GetActorByExternalId(ctx, externalId)
 	if err != nil {
 		panic(err)
 	}
@@ -282,7 +293,7 @@ func (ts *TestSetup) MustGetValidUser(ctx context.Context) database.Actor {
 	if a == nil {
 		a = &database.Actor{
 			ID:         uuid.New(),
-			ExternalId: "jimmycarter",
+			ExternalId: externalId,
 			Email:      "jimmycarter@example.com",
 		}
 		if err := ts.Db.CreateActor(ctx, a); err != nil {
@@ -291,6 +302,10 @@ func (ts *TestSetup) MustGetValidUser(ctx context.Context) database.Actor {
 	}
 
 	return *a
+}
+
+func (ts *TestSetup) MustGetValidUser(ctx context.Context) database.Actor {
+	return ts.MustGetValidUserByExternalId(ctx, "jimmycarter")
 }
 
 func (ts *TestSetup) GetPingCount() int {
@@ -403,6 +418,14 @@ func (ts *TestSetup) MustGetInvalidAdminUser(ctx context.Context) database.Actor
 	}
 }
 
+func actorIsBobDole(actor *database.Actor) (bool, string) {
+	if actor.ExternalId == "bobdole" {
+		return true, ""
+	}
+
+	return false, "invalid actor external id"
+}
+
 func TestAuth(t *testing.T) {
 	t.Setenv("AUTHPROXY_DEBUG_MODE", "true")
 
@@ -484,6 +507,65 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, gin.H{"ok": true}, resp)
 				require.Equal(t, 1, ts.GetPingCount())
 			})
+			t.Run("optional auth route with default validator", func(t *testing.T) {
+				ts := NewTestGinServerBuilder(t.Name()).
+					WithGetPingOptionalAuthRoute("/ping").
+					WithDefaultValidator(actorIsBobDole).
+					Build()
+
+				s := jwt.NewJwtTokenBuilder().
+					WithActorId(ts.MustGetValidUserByExternalId(ctx, "bobdole").ExternalId).
+					WithServiceId(ts.Service).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+					MustSignerCtx(ctx)
+
+				resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
+
+				require.Equal(t, http.StatusOK, statusCode, debugHeader)
+				require.Equal(t, gin.H{"ok": true}, resp)
+				require.Equal(t, 1, ts.GetPingCount())
+
+				s = jwt.NewJwtTokenBuilder().
+					WithActorId(ts.MustGetValidUserByExternalId(ctx, "jimmycarter").ExternalId).
+					WithServiceId(ts.Service).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+					MustSignerCtx(ctx)
+
+				resp, statusCode, debugHeader = ts.GET(ctx, s.SignUrlQuery("/ping"))
+
+				require.Equal(t, http.StatusForbidden, statusCode, debugHeader)
+				require.Equal(t, gin.H{"error": "invalid actor external id"}, resp)
+				require.Equal(t, 1, ts.GetPingCount()) // Not incremented
+			})
+			t.Run("optional auth route with validator", func(t *testing.T) {
+				ts := NewTestGinServerBuilder(t.Name()).
+					WithGetPingOptionalAuthRoute("/ping", actorIsBobDole).
+					Build()
+
+				s := jwt.NewJwtTokenBuilder().
+					WithActorId(ts.MustGetValidUserByExternalId(ctx, "bobdole").ExternalId).
+					WithServiceId(ts.Service).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+					MustSignerCtx(ctx)
+
+				resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
+
+				require.Equal(t, http.StatusOK, statusCode, debugHeader)
+				require.Equal(t, gin.H{"ok": true}, resp)
+				require.Equal(t, 1, ts.GetPingCount())
+
+				s = jwt.NewJwtTokenBuilder().
+					WithActorId(ts.MustGetValidUserByExternalId(ctx, "jimmycarter").ExternalId).
+					WithServiceId(ts.Service).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+					MustSignerCtx(ctx)
+
+				resp, statusCode, debugHeader = ts.GET(ctx, s.SignUrlQuery("/ping"))
+
+				require.Equal(t, http.StatusForbidden, statusCode, debugHeader)
+				require.Equal(t, gin.H{"error": "invalid actor external id"}, resp)
+				require.Equal(t, 1, ts.GetPingCount()) // Not incremented
+			})
 			t.Run("required auth route", func(t *testing.T) {
 				ts := NewTestGinServerBuilder(t.Name()).
 					WithGetPingRequiredAuthRoute("/ping").
@@ -499,6 +581,65 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, http.StatusOK, statusCode, debugHeader)
 				require.Equal(t, gin.H{"ok": true}, resp)
 				require.Equal(t, 1, ts.GetPingCount())
+			})
+			t.Run("required auth route with default validator", func(t *testing.T) {
+				ts := NewTestGinServerBuilder(t.Name()).
+					WithGetPingRequiredAuthRoute("/ping").
+					WithDefaultValidator(actorIsBobDole).
+					Build()
+
+				s := jwt.NewJwtTokenBuilder().
+					WithActorId(ts.MustGetValidUserByExternalId(ctx, "bobdole").ExternalId).
+					WithServiceId(ts.Service).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+					MustSignerCtx(ctx)
+
+				resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
+
+				require.Equal(t, http.StatusOK, statusCode, debugHeader)
+				require.Equal(t, gin.H{"ok": true}, resp)
+				require.Equal(t, 1, ts.GetPingCount())
+
+				s = jwt.NewJwtTokenBuilder().
+					WithActorId(ts.MustGetValidUserByExternalId(ctx, "jimmycarter").ExternalId).
+					WithServiceId(ts.Service).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+					MustSignerCtx(ctx)
+
+				resp, statusCode, debugHeader = ts.GET(ctx, s.SignUrlQuery("/ping"))
+
+				require.Equal(t, http.StatusForbidden, statusCode, debugHeader)
+				require.Equal(t, gin.H{"error": "invalid actor external id"}, resp)
+				require.Equal(t, 1, ts.GetPingCount()) // Not incremented
+			})
+			t.Run("required auth route with validator", func(t *testing.T) {
+				ts := NewTestGinServerBuilder(t.Name()).
+					WithGetPingRequiredAuthRoute("/ping", actorIsBobDole).
+					Build()
+
+				s := jwt.NewJwtTokenBuilder().
+					WithActorId(ts.MustGetValidUserByExternalId(ctx, "bobdole").ExternalId).
+					WithServiceId(ts.Service).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+					MustSignerCtx(ctx)
+
+				resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
+
+				require.Equal(t, http.StatusOK, statusCode, debugHeader)
+				require.Equal(t, gin.H{"ok": true}, resp)
+				require.Equal(t, 1, ts.GetPingCount())
+
+				s = jwt.NewJwtTokenBuilder().
+					WithActorId(ts.MustGetValidUserByExternalId(ctx, "jimmycarter").ExternalId).
+					WithServiceId(ts.Service).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+					MustSignerCtx(ctx)
+
+				resp, statusCode, debugHeader = ts.GET(ctx, s.SignUrlQuery("/ping"))
+
+				require.Equal(t, http.StatusForbidden, statusCode, debugHeader)
+				require.Equal(t, gin.H{"error": "invalid actor external id"}, resp)
+				require.Equal(t, 1, ts.GetPingCount()) // Not incremented
 			})
 		})
 		t.Run("admin actor", func(t *testing.T) {

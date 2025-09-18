@@ -5,8 +5,10 @@ package auth
 */
 
 import (
-	"github.com/gin-gonic/gin"
 	"net/http"
+
+	"github.com/gin-gonic/gin"
+	"github.com/rmorlok/authproxy/api_common"
 )
 
 // GetAuthFromGinContext returns auth info from a request. This auth info can be authenticated or unauthenticated.
@@ -36,72 +38,68 @@ func MustGetAuthFromGinContext(c *gin.Context) RequestAuth {
 	return ra
 }
 
-func (j *service) Required() gin.HandlerFunc {
+// Required middleware requires authentication and validates the actor. There must be an authenticated actor, and
+// the actor must pass the validators passed here and defaulted in the service.
+func (j *service) Required(validators ...ActorValidator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			a := GetAuthFromRequest(r)
-			if a.IsAuthenticated() {
-				c.Set(authContextKey, a)
-				c.Next()
-			}
-		})
-		j.Auth(_next, c.Abort).ServeHTTP(c.Writer, c.Request)
-	}
-}
 
-func (j *service) Optional() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			a := GetAuthFromRequest(r)
-			if a.IsAuthenticated() {
-				c.Set(authContextKey, a)
-			}
-
-			c.Next()
-		})
-		j.Trace(_next, c.Abort).ServeHTTP(c.Writer, c.Request)
-	}
-}
-
-func (j *service) OptionalXsrfNotRequired() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			a := GetAuthFromRequest(r)
-			if a.IsAuthenticated() {
-				c.Set(authContextKey, a)
-			}
-
-			c.Next()
-		})
-		j.TraceXsrfNotRequired(_next, c.Abort).ServeHTTP(c.Writer, c.Request)
-	}
-}
-
-// AdminOnly middleware allows access for admins only
-func (j *service) AdminOnly() gin.HandlerFunc {
-	return func(c *gin.Context) {
-		success := false
-		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			a := GetAuthFromRequest(r)
+			// This check is duplicative of the one in Auth, but it's here for clarity.
 			if !a.IsAuthenticated() {
-				http.Error(c.Writer, "Unauthorized", http.StatusUnauthorized)
+				api_common.NewHttpStatusErrorBuilder().
+					WithStatusUnauthorized().
+					BuildStatusError().
+					WriteResponse(j.config, w)
+				c.Abort()
 				return
 			}
 
-			if !a.MustGetActor().Admin {
-				http.Error(c.Writer, "Access denied", http.StatusForbidden)
-				return
-			}
-
-			// This is really duplicative of the above
-			success = a.MustGetActor().Admin
-			if success {
-				c.Set(authContextKey, a)
-				c.Next()
-			}
+			c.Set(authContextKey, a)
+			c.Next()
 		})
-		j.Auth(_next, c.Abort).ServeHTTP(c.Writer, c.Request)
+		j.Auth(_next, c.Abort, validators...).ServeHTTP(c.Writer, c.Request)
 	}
+}
+
+// Optional middleware allows access for unauthenticated users. If the user is authenticated, it validates the
+// actor with the supplied validators and the defaults for the service.
+func (j *service) Optional(validators ...ActorValidator) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			a := GetAuthFromRequest(r)
+			if a.IsAuthenticated() {
+				c.Set(authContextKey, a)
+			}
+
+			c.Next()
+		})
+		j.Trace(_next, c.Abort, validators...).ServeHTTP(c.Writer, c.Request)
+	}
+}
+
+// OptionalXsrfNotRequired middleware allows access for unauthenticated users and requests in session that do not have
+// Xsrf. If the user is authenticated, it validates the actor with the supplied validators and the defaults for the
+// service.
+func (j *service) OptionalXsrfNotRequired(validators ...ActorValidator) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			a := GetAuthFromRequest(r)
+			if a.IsAuthenticated() {
+				c.Set(authContextKey, a)
+			}
+
+			c.Next()
+		})
+		j.TraceXsrfNotRequired(_next, c.Abort, validators...).ServeHTTP(c.Writer, c.Request)
+	}
+}
+
+// AdminOnly middleware requires and authenticates an admin actor. It applies the validators passed in addition to the
+// admin validator and the default validators for the service.
+func (j *service) AdminOnly(validators ...ActorValidator) gin.HandlerFunc {
+	combined := combineActorValidators(validators, []ActorValidator{ActorValidatorIsAdmin})
+	return j.Required(combined...)
 }
 
 func (j *service) EstablishGinSession(c *gin.Context, ra RequestAuth) error {

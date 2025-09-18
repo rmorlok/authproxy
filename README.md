@@ -29,7 +29,7 @@ go run ./cli/server serve --config=./dev_config/default.yaml all
 Run the client to proxy authenticated calls to the backend:
 
 ```bash
-go run ./cli/client raw-proxy --enableMarketplaceLoginRedirect=true --proxyTo=api
+go run ./cli/client raw-proxy --enableLoginRedirect=true --proxyTo=api
 ```
 
 Run the marketplace UI:

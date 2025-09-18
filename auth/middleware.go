@@ -1,8 +1,9 @@
 package auth
 
 import (
-	"github.com/rmorlok/authproxy/api_common"
 	"net/http"
+
+	"github.com/rmorlok/authproxy/api_common"
 )
 
 /*
@@ -40,21 +41,24 @@ func SetAuthOnRequestContext(r *http.Request, auth RequestAuth) *http.Request {
 }
 
 // Auth middleware adds auth from session and populates actor info
-func (j *service) Auth(next http.Handler, abort func()) http.Handler {
-	return j.auth(true, true, abort)(next)
+func (j *service) Auth(next http.Handler, abort func(), validators ...ActorValidator) http.Handler {
+	return j.auth(true, true, abort, validators)(next)
 }
 
-// Trace middleware doesn't require valid actor but if actor info presented populates info
-func (j *service) Trace(next http.Handler, abort func()) http.Handler {
-	return j.auth(false, true, abort)(next)
+// Trace middleware doesn't require a valid actor but if an actor is present it populates the actor info. If present
+// the actor is validated against the supplied validators.
+func (j *service) Trace(next http.Handler, abort func(), validators ...ActorValidator) http.Handler {
+	return j.auth(false, true, abort, validators)(next)
 }
 
-func (j *service) TraceXsrfNotRequired(next http.Handler, abort func()) http.Handler {
-	return j.auth(false, false, abort)(next)
+// TraceXsrfNotRequired is the same as the Trace middleware except that it doesn't require a valid Xsrf token if session
+// auth is being used.
+func (j *service) TraceXsrfNotRequired(next http.Handler, abort func(), validators ...ActorValidator) http.Handler {
+	return j.auth(false, false, abort, validators)(next)
 }
 
 // auth implements all logic for authentication (reqAuth=true) and tracing (reqAuth=false)
-func (j *service) auth(requireAuth bool, requireSessionXsrf bool, abort func()) func(http.Handler) http.Handler {
+func (j *service) auth(requireAuth bool, requireSessionXsrf bool, abort func(), validators []ActorValidator) func(http.Handler) http.Handler {
 	f := func(h http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -76,6 +80,20 @@ func (j *service) auth(requireAuth bool, requireSessionXsrf bool, abort func()) 
 					WriteResponse(j.config, w)
 				abort()
 				return
+			}
+
+			if requestAuth.IsAuthenticated() {
+				combinedValidators := combineActorValidators(j.defaultActorValidators, validators)
+				valid, reason := validateAllActorValidators(combinedValidators, requestAuth.GetActor())
+				if !valid {
+					api_common.NewHttpStatusErrorBuilder().
+						WithStatusForbidden().
+						WithResponseMsg(reason).
+						BuildStatusError().
+						WriteResponse(j.config, w)
+					abort()
+					return
+				}
 			}
 
 			r = SetAuthOnRequestContext(r, requestAuth) // populate auth/actor info to request context

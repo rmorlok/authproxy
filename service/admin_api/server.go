@@ -49,7 +49,7 @@ func GetGinServer(
 		dm.GetRedisWrapper(),
 		dm.GetEncryptService(),
 		logger,
-	)
+	).WithDefaultActorValidators(auth.ActorValidatorIsAdmin)
 
 	server := api_common.GinForService(service)
 
@@ -86,7 +86,6 @@ func GetGinServer(
 		dm.GetRequestLogRetriever(),
 	)
 
-	// api := server.Group("/api/v1", authService.AdminOnly())
 	api := server.Group("/api/v1")
 	routesRequestLog.Register(api)
 
