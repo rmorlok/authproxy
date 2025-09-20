@@ -7,6 +7,7 @@ import Layout from './components/Layout';
 import ConnectorList from './components/ConnectorList';
 import ConnectionList from './components/ConnectionList';
 import { Error } from "./Error";
+import Dashboard from "./dashboard/Dashboard";
 
 export default function App() {
     const dispatch = useDispatch();
@@ -19,7 +20,7 @@ export default function App() {
     }
 
     return (
-        <Router />
+        <Dashboard />
     );
 }
 

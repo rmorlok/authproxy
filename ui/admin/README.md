@@ -15,3 +15,8 @@ View components
 yarn storybook
 open http://localhost:6007
 ```
+
+# Theme / Components
+
+The files in [dashboard](src/dashboard) and [shared-theme](src/shared-theme) are from the [MUI Dashboard](https://mui.com/material-ui/getting-started/templates/dashboard/) template. That project is also
+MIT licensed. See link for details.
