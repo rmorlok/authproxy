@@ -5,6 +5,7 @@ import ListItemButton from '@mui/material/ListItemButton';
 import ListItemIcon from '@mui/material/ListItemIcon';
 import ListItemText from '@mui/material/ListItemText';
 import Stack from '@mui/material/Stack';
+import { Link, useLocation } from 'react-router-dom';
 import HomeRoundedIcon from '@mui/icons-material/HomeRounded';
 import PowerRoundedIcon from '@mui/icons-material/Power';
 import LinkRoundedIcon from '@mui/icons-material/Link';
@@ -16,12 +17,12 @@ import InfoRoundedIcon from '@mui/icons-material/InfoRounded';
 import HelpRoundedIcon from '@mui/icons-material/HelpRounded';
 
 const mainListItems = [
-  { text: 'Home', icon: <HomeRoundedIcon /> },
-  { text: 'Connectors', icon: <PowerRoundedIcon /> },
-  { text: 'Connections', icon: <LinkRoundedIcon /> },
-  { text: 'Requests', icon: <HttpRoundedIcon /> },
-  { text: 'Tasks', icon: <AssignmentRoundedIcon /> },
-  { text: 'Actors', icon: <PeopleRoundedIcon /> },
+  { text: 'Home', icon: <HomeRoundedIcon />, link: '/home' },
+  { text: 'Connectors', icon: <PowerRoundedIcon />, link: '/connectors' },
+  { text: 'Connections', icon: <LinkRoundedIcon />, link: '/connections' },
+  { text: 'Requests', icon: <HttpRoundedIcon />, link: '/requests' },
+  { text: 'Tasks', icon: <AssignmentRoundedIcon />, link: '/tasks' },
+  { text: 'Actors', icon: <PeopleRoundedIcon />, link: '/actors' },
 ];
 
 const secondaryListItems = [
@@ -31,12 +32,14 @@ const secondaryListItems = [
 ];
 
 export default function MenuContent() {
-  return (
+    const location = useLocation();
+
+    return (
     <Stack sx={{ flexGrow: 1, p: 1, justifyContent: 'space-between' }}>
       <List dense>
         {mainListItems.map((item, index) => (
           <ListItem key={index} disablePadding sx={{ display: 'block' }}>
-            <ListItemButton selected={index === 0}>
+            <ListItemButton selected={location.pathname.startsWith(item.link)} component={Link} to={item.link}>
               <ListItemIcon>{item.icon}</ListItemIcon>
               <ListItemText primary={item.text} />
             </ListItemButton>

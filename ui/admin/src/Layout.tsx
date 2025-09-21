@@ -19,6 +19,7 @@ import {
     datePickersCustomizations,
     treeViewCustomizations,
 } from './theme/customizations';
+import Copyright from "./components/Copyright";
 
 const xThemeComponents = {
     ...chartsCustomizations,
@@ -56,6 +57,7 @@ export default function Layout(props: { disableCustomTheme?: boolean }) {
                     >
                         <Header />
                         <Outlet />
+                        <Copyright sx={{ my: 4 }} />
                     </Stack>
                 </Box>
             </Box>
