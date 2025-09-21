@@ -17,6 +17,8 @@ interface AppThemeProps {
   themeComponents?: ThemeOptions['components'];
 }
 
+// We currently have the custom theme disabled for the site. We might want to remove.
+
 export default function AppTheme(props: AppThemeProps) {
   const { children, disableCustomTheme, themeComponents } = props;
   const theme = React.useMemo(() => {
