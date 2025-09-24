@@ -57,6 +57,7 @@ export const columns: GridColDef[] = [
 
 export default function Connections() {
     const [rows, setRows] = useState<Connection[]>([]);
+    const [rowCount, setRowCount] = useState<number>(-1);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -75,6 +76,7 @@ export default function Connections() {
         pageRequestCacheRef.current = new Set();
         setHasNextPage(false);
         setPage(0);
+        setRowCount(-1);
     };
 
     const fetchPage = async (targetPage: number) => {
@@ -118,7 +120,13 @@ export default function Connections() {
 
             const data = responsesCacheRef.current[targetPage];
             setRows(data?.items || []);
-            setHasNextPage(!!data?.cursor);
+
+            const hnp = !!data?.cursor;
+            setHasNextPage(hnp);
+
+            if(!hnp) {
+                setRowCount(responsesCacheRef.current.map((v) => v.items.length).reduceRight((acc, val)=> acc+val, 0));
+            }
         } catch (e: any) {
             setError(e?.message || 'Failed to load connections');
         } finally {
@@ -138,7 +146,6 @@ export default function Connections() {
         fetchPage(page);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, stateFilter, pageSize]);
-
 
     const stateOptions = useMemo(() => [
         { label: 'All', value: '' },
@@ -191,9 +198,7 @@ export default function Connections() {
                         if (model.page !== page) setPage(model.page);
                     }}
                     pageSizeOptions={[2, 5, 10, 20, 50, 100]}
-                    rowCount={hasNextPage
-                        ? -1
-                        : responsesCacheRef.current.map((v) => v.items.length).reduceRight((acc, val)=> acc+val, 0) /* this is a weird bug that requires this */}
+                    rowCount={rowCount}
                     hideFooterSelectedRowCount
                     disableColumnResize
                     density="compact"
@@ -226,9 +231,7 @@ export default function Connections() {
                     }}
                 />
                 <Typography>
-                    Page: {page}; HasNextPage: {String(hasNextPage)}; Row Count: {hasNextPage
-                    ? -1
-                    : responsesCacheRef.current.map((v) => v.items.length).reduceRight((acc, val)=> acc+val, 0) /* this is a weird bug that requires this */}
+                    Page: {page}; HasNextPage: {String(hasNextPage)}; Row Count: {rowCount}
                 </Typography>
                 {error && (
                     <Typography color="error" sx={{ mt: 1 }}>{error}</Typography>
