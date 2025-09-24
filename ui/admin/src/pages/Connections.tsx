@@ -3,22 +3,22 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import { DataGrid, GridColDef } from '@mui/x-data-grid';
+import {DataGrid, GridColDef, GridPaginationMeta} from '@mui/x-data-grid';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
-import { Connection, ConnectionState, listConnections } from '../api';
+import {Connection, ConnectionState, listConnections, ListConnectionsResponse} from '../api';
 
 function renderState(state: ConnectionState) {
     const colors: Record<ConnectionState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
-        [ConnectionState.CREATED]: 'default',
+        [ConnectionState.CREATED]: 'primary',
         [ConnectionState.CONNECTED]: 'success',
         [ConnectionState.FAILED]: 'error',
-        [ConnectionState.DISCONNECTING]: 'info',
-        [ConnectionState.DISCONNECTED]: 'warning'
+        [ConnectionState.DISCONNECTING]: 'warning',
+        [ConnectionState.DISCONNECTED]: 'default'
     };
 
     return <Chip label={state} color={colors[state]} size="small" />;
@@ -62,54 +62,63 @@ export default function Connections() {
 
     const [page, setPage] = useState<number>(0);
     const [pageSize, setPageSize] = useState<number>(20);
+    const [hasNextPage, setHasNextPage] = useState<boolean>(false);
 
     const [stateFilter, setStateFilter] = useState<string>(''); // empty = all
 
-    // Cursor management: cursors[pageIndex] gives the cursor to fetch that page
-    const cursorsRef = useRef<(string | undefined)[]>([undefined]);
     // Simple cache to allow going back without re-fetching
-    const pageCacheRef = useRef<Map<number, Connection[]>>(new Map());
-
-    const hasNextRef = useRef<boolean>(true); // if last fetch returned no cursor => at end
+    const responsesCacheRef = useRef<ListConnectionsResponse[]>([]);
+    const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
     const resetPagination = () => {
-        cursorsRef.current = [undefined];
-        pageCacheRef.current = new Map();
-        hasNextRef.current = true;
+        responsesCacheRef.current = [];
+        pageRequestCacheRef.current = new Set();
+        setHasNextPage(false);
         setPage(0);
     };
 
     const fetchPage = async (targetPage: number) => {
         // Require stepping forward: if asking to jump ahead more than one page and cursor missing, fetch sequentially
         setLoading(true);
+        setHasNextPage(false);
         setError(null);
         try {
             // If we have it cached, use it
-            const cached = pageCacheRef.current.get(targetPage);
+            const cached = responsesCacheRef.current[targetPage];
             if (cached) {
-                setRows(cached);
+                setRows(cached.items);
                 setLoading(false);
+                setHasNextPage(!!cached.cursor);
                 return;
             }
 
             // If we don't know the cursor for this page yet, advance sequentially from the last known
-            while (cursorsRef.current.length <= targetPage) {
-                const cursorForNext = cursorsRef.current[cursorsRef.current.length - 1];
-                const resp = await listConnections(stateFilter || undefined, cursorForNext, pageSize);
-                const items = resp.data.items;
-                const nextCursor = resp.data.cursor;
-                const newPageIndex = cursorsRef.current.length - 1; // the page we just fetched
-                pageCacheRef.current.set(newPageIndex, items);
-                // Store cursor for the next page
-                cursorsRef.current.push(nextCursor);
-                if (!nextCursor) {
-                    hasNextRef.current = false;
-                    break;
+            while (responsesCacheRef.current.length <= targetPage && (
+                responsesCacheRef.current.length === 0 ||
+                !!responsesCacheRef.current[responsesCacheRef.current.length - 1].cursor
+                )
+            ) {
+                // Avoid multiple calls for the same page
+                if (pageRequestCacheRef.current.has(targetPage)) {
+                    return;
                 }
+                pageRequestCacheRef.current.add(targetPage);
+
+                const thisPage = responsesCacheRef.current.length;
+                const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
+                const resp = await listConnections(stateFilter || undefined, prevResp?.cursor, pageSize);
+
+                if(resp.status !== 200) {
+                    setError("Failed to fetch page of results from server");
+                    return;
+                }
+
+                responsesCacheRef.current[thisPage] = resp.data; // This handles cases where the same page is requested multiple times
             }
 
-            const data = pageCacheRef.current.get(targetPage) || [];
-            setRows(data);
+            const data = responsesCacheRef.current[targetPage];
+            setRows(data?.items || []);
+            setHasNextPage(!!data?.cursor);
         } catch (e: any) {
             setError(e?.message || 'Failed to load connections');
         } finally {
@@ -171,15 +180,20 @@ export default function Connections() {
                         params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'
                     }
                     loading={loading}
+                    sortingMode="server"
                     paginationMode="server"
                     paginationModel={{ page, pageSize }}
+                    paginationMeta={{hasNextPage}}
                     onPaginationModelChange={(model) => {
+                        console.log(model);
                         // DataGrid uses 0-based page index
                         if (model.pageSize !== pageSize) setPageSize(model.pageSize);
                         if (model.page !== page) setPage(model.page);
                     }}
-                    rowCount={hasNextRef.current ? (page + 2) * pageSize : page * pageSize + rows.length}
-                    pageSizeOptions={[10, 20, 50, 100]}
+                    pageSizeOptions={[2, 5, 10, 20, 50, 100]}
+                    rowCount={hasNextPage
+                        ? -1
+                        : responsesCacheRef.current.map((v) => v.items.length).reduceRight((acc, val)=> acc+val, 0) /* this is a weird bug that requires this */}
                     hideFooterSelectedRowCount
                     disableColumnResize
                     density="compact"
@@ -211,6 +225,11 @@ export default function Connections() {
                         },
                     }}
                 />
+                <Typography>
+                    Page: {page}; HasNextPage: {String(hasNextPage)}; Row Count: {hasNextPage
+                    ? -1
+                    : responsesCacheRef.current.map((v) => v.items.length).reduceRight((acc, val)=> acc+val, 0) /* this is a weird bug that requires this */}
+                </Typography>
                 {error && (
                     <Typography color="error" sx={{ mt: 1 }}>{error}</Typography>
                 )}
