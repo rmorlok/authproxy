@@ -1,5 +1,6 @@
 import * as React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -86,16 +87,25 @@ export const columns: GridColDef<Connection>[] = [
 ];
 
 export default function Connections() {
+    const [searchParams, setSearchParams] = useSearchParams();
     const [rows, setRows] = useState<Connection[]>([]);
     const [rowCount, setRowCount] = useState<number>(-1);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    const [page, setPage] = useState<number>(0);
-    const [pageSize, setPageSize] = useState<number>(20);
+    // Initialize from URL params
+    const qpPage = Number(searchParams.get('page'));
+    const initialPage = Number.isFinite(qpPage) && qpPage >= 0 ? qpPage : 0;
+    const initialStateFilter = searchParams.get('state') ?? '';
+    const qpPageSize = Number(searchParams.get('pageSize'));
+    const defaultPageSize = 20;
+    const initialPageSize = Number.isFinite(qpPageSize) && qpPageSize > 0 ? qpPageSize : defaultPageSize;
+
+    const [page, setPage] = useState<number>(initialPage);
+    const [pageSize, setPageSize] = useState<number>(initialPageSize);
     const [hasNextPage, setHasNextPage] = useState<boolean>(false);
 
-    const [stateFilter, setStateFilter] = useState<string>(''); // empty = all
+    const [stateFilter, setStateFilter] = useState<string>(initialStateFilter); // empty = all
 
     // Simple cache to allow going back without re-fetching
     const responsesCacheRef = useRef<ListConnectionsResponse[]>([]);
@@ -163,6 +173,57 @@ export default function Connections() {
             setLoading(false);
         }
     };
+
+    // Sync state to URL when page, stateFilter or pageSize changes
+    useEffect(() => {
+        const params = new URLSearchParams(searchParams);
+        // Only write when different to avoid loops
+        const curPage = params.get('page');
+        const curState = params.get('state') ?? '';
+        const curPageSize = params.get('pageSize');
+        const desiredPage = String(page);
+        const desiredState = stateFilter || '';
+        const desiredPageSize = String(pageSize);
+        let changed = false;
+        if (curPage !== desiredPage) { params.set('page', desiredPage); changed = true; }
+        if (curState !== desiredState) {
+            if (desiredState) params.set('state', desiredState); else params.delete('state');
+            changed = true;
+        }
+        // Only include pageSize in URL if it's not the default
+        if (desiredPageSize !== String(defaultPageSize)) {
+            if (curPageSize !== desiredPageSize) { params.set('pageSize', desiredPageSize); changed = true; }
+        } else if (curPageSize) {
+            params.delete('pageSize');
+            changed = true;
+        }
+        if (changed) {
+            setSearchParams(params, { replace: true });
+        }
+    }, [page, stateFilter, pageSize, setSearchParams, searchParams]);
+
+    // React to URL changes (back/forward or external navigation)
+    useEffect(() => {
+        const urlPageRaw = searchParams.get('page');
+        const urlPage = urlPageRaw ? Number(urlPageRaw) : 0;
+        const safePage = Number.isFinite(urlPage) && urlPage >= 0 ? urlPage : 0;
+        const urlState = searchParams.get('state') ?? '';
+        const urlPageSizeRaw = searchParams.get('pageSize');
+        const urlPageSize = urlPageSizeRaw ? Number(urlPageSizeRaw) : defaultPageSize;
+        const safePageSize = Number.isFinite(urlPageSize) && urlPageSize > 0 ? urlPageSize : defaultPageSize;
+
+        // If URL differs from component state, update component state
+        if (safePage !== page) {
+            setPage(safePage);
+        }
+        if (urlState !== stateFilter) {
+            setStateFilter(urlState);
+        }
+        if (safePageSize !== pageSize) {
+            setPageSize(safePageSize);
+        }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [searchParams]);
 
     // Initial load and when filter/pageSize changes
     useEffect(() => {
