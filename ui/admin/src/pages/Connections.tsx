@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import {DataGrid, GridColDef, GridPaginationMeta} from '@mui/x-data-grid';
+import {DataGrid, GridColDef} from '@mui/x-data-grid';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import FormControl from '@mui/material/FormControl';
@@ -11,6 +11,7 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import {Connection, ConnectionState, listConnections, ListConnectionsResponse} from '../api';
+import dayjs from 'dayjs';
 
 function renderState(state: ConnectionState) {
     const colors: Record<ConnectionState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -24,18 +25,39 @@ function renderState(state: ConnectionState) {
     return <Chip label={state} color={colors[state]} size="small" />;
 }
 
-export const columns: GridColDef[] = [
+export const columns: GridColDef<Connection>[] = [
     { field: 'id',
         headerName: 'ID',
-        flex: 1.5,
-        minWidth: 200
+        flex: 0.8,
+        minWidth: 110
     },
     {
         field: 'state',
         headerName: 'State',
-        flex: 0.5,
+        flex: 0.4,
         minWidth: 80,
         renderCell: (params) => renderState(params.value as ConnectionState),
+    },
+    {
+        field: 'connector.type',
+        headerName: 'Connector Type',
+        flex: 0.5,
+        minWidth: 80,
+        valueGetter: (_, row) => row.connector.type,
+    },
+    {
+        field: 'connector.id',
+        headerName: 'Connector ID',
+        flex: 0.8,
+        minWidth: 80,
+        valueGetter: (_, row) => row.connector.id,
+    },
+    {
+        field: 'connector.version',
+        headerName: 'Connector Version',
+        flex: 0.4,
+        minWidth: 80,
+        valueGetter: (_, row) => row.connector.version,
     },
     {
         field: 'created_at',
@@ -44,6 +66,10 @@ export const columns: GridColDef[] = [
         align: 'right',
         flex: 1,
         minWidth: 80,
+        valueGetter: (value, _) => {
+            return dayjs(value).format('MMM DD, YYYY, h:mm A');
+        }
+
     },
     {
         field: 'updated_at',
@@ -52,6 +78,10 @@ export const columns: GridColDef[] = [
         align: 'right',
         flex: 1,
         minWidth: 100,
+        valueGetter: (value) => {
+            return dayjs(value).format('MMM DD, YYYY, h:mm A');
+        }
+
     },
 ];
 
