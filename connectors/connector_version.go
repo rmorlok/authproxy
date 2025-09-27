@@ -3,12 +3,14 @@ package connectors
 import (
 	"context"
 	"encoding/json"
+	"sync"
+	"time"
+
 	"github.com/google/uuid"
 	cfg "github.com/rmorlok/authproxy/config/connectors"
 	iface "github.com/rmorlok/authproxy/connectors/interface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/util"
-	"sync"
 )
 
 // ConnectorVersion is a wrapper for the lower level database equivalent that handles things like decrypting the
@@ -50,6 +52,14 @@ func (cv *ConnectorVersion) GetHash() string {
 
 func (cv *ConnectorVersion) GetDefinition() *cfg.Connector {
 	return util.Must(cv.getDefinition())
+}
+
+func (cv *ConnectorVersion) GetCreatedAt() time.Time {
+	return cv.ConnectorVersion.CreatedAt
+}
+
+func (cv *ConnectorVersion) GetUpdatedAt() time.Time {
+	return cv.ConnectorVersion.UpdatedAt
 }
 
 func (cv *ConnectorVersion) getDefinition() (*cfg.Connector, error) {

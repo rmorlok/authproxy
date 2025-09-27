@@ -38,15 +38,15 @@ export const columns: GridColDef<ConnectorVersion>[] = [
     {
         field: 'version',
         headerName: 'Version',
-        flex: 0.8,
-        minWidth: 110,
+        flex: 0.4,
+        minWidth: 80,
         sortable: true,
     },
     {
         field: 'state',
         headerName: 'State',
-        flex: 0.4,
-        minWidth: 80,
+        flex: 0.3,
+        minWidth: 60,
         sortable: true,
         renderCell: (params) => renderState(params.value as ConnectorVersionState),
     },
@@ -55,7 +55,7 @@ export const columns: GridColDef<ConnectorVersion>[] = [
         headerName: 'Type',
         flex: 0.5,
         minWidth: 80,
-        sortable: false,
+        sortable: true,
     },
     {
         field: 'display_name',
@@ -66,7 +66,7 @@ export const columns: GridColDef<ConnectorVersion>[] = [
     },
     {
         field: 'description',
-        headerName: 'Connector ID',
+        headerName: 'Description',
         flex: 0.8,
         minWidth: 80,
         sortable: false,
@@ -95,7 +95,7 @@ export const columns: GridColDef<ConnectorVersion>[] = [
         headerName: 'Created At',
         flex: 1,
         minWidth: 80,
-        sortable: false,
+        sortable: true,
         valueGetter: (value, _) => {
             return dayjs(value).format('MMM DD, YYYY, h:mm A');
         }
@@ -118,10 +118,10 @@ export default function Connectors() {
     const defaultPageSize = 20;
     const stateOptions = useMemo(() => [
         { label: 'All', value: '' },
-        { label: 'Created', value: ConnectorVersionState.DRAFT },
-        { label: 'Failed', value: ConnectorVersionState.PRIMARY },
-        { label: 'Connected', value: ConnectorVersionState.ACTIVE },
-        { label: 'Disconnecting', value: ConnectorVersionState.ARCHIVED },
+        { label: 'Draft', value: ConnectorVersionState.DRAFT },
+        { label: 'Primary', value: ConnectorVersionState.PRIMARY },
+        { label: 'Active', value: ConnectorVersionState.ACTIVE },
+        { label: 'Archived', value: ConnectorVersionState.ARCHIVED },
     ], []);
     const stateVals = useMemo(() => stateOptions.map(opt => opt.value), [stateOptions]);
 

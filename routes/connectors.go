@@ -1,6 +1,8 @@
 package routes
 
 import (
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/api_common"
@@ -23,6 +25,8 @@ type ConnectorJson struct {
 	Highlight   string                         `json:"highlight,omitempty"`
 	Description string                         `json:"description"`
 	Logo        string                         `json:"logo"`
+	CreatedAt   time.Time                      `json:"created_at"`
+	UpdatedAt   time.Time                      `json:"updated_at"`
 
 	Versions int64                           `json:"versions,omitempty"`
 	States   database.ConnectorVersionStates `json:"states,omitempty"`
@@ -51,6 +55,8 @@ func ConnectorVersionToJson(cv connIface.ConnectorVersion) ConnectorJson {
 		DisplayName: def.DisplayName,
 		Description: def.Description,
 		Logo:        logo,
+		CreatedAt:   cv.GetCreatedAt(),
+		UpdatedAt:   cv.GetUpdatedAt(),
 	}
 }
 

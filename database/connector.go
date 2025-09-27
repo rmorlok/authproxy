@@ -443,16 +443,22 @@ func (db *gormDB) NewestPublishedConnectorVersionForId(ctx context.Context, id u
 type ConnectorOrderByField string
 
 const (
-	ConnectorOrderByCreatedAt   ConnectorOrderByField = "created_at"
-	ConnectorOrderByUpdatedAt   ConnectorOrderByField = "updated_at"
-	ConnectorOrderByDisplayName ConnectorOrderByField = "display_name"
+	ConnectorOrderById        ConnectorOrderByField = "id"
+	ConnectorOrderByVersion   ConnectorOrderByField = "version"
+	ConnectorOrderByState     ConnectorOrderByField = "state"
+	ConnectorOrderByCreatedAt ConnectorOrderByField = "created_at"
+	ConnectorOrderByUpdatedAt ConnectorOrderByField = "updated_at"
+	ConnectorOrderByType      ConnectorOrderByField = "type"
 )
 
 func IsValidConnectorOrderByField[T string | ConnectorOrderByField](field T) bool {
 	switch ConnectorOrderByField(field) {
-	case ConnectorOrderByCreatedAt,
+	case ConnectorOrderById,
+		ConnectorOrderByVersion,
+		ConnectorOrderByState,
+		ConnectorOrderByCreatedAt,
 		ConnectorOrderByUpdatedAt,
-		ConnectorOrderByDisplayName:
+		ConnectorOrderByType:
 		return true
 	default:
 		return false
@@ -568,14 +574,14 @@ func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageRe
     `
 
 	query := sq.Select(`
-rr.id,
-rr.version,
-rr.state,
-rr.type,
-COALESCE(rr.encrypted_definition, ""),
-rr.created_at,
-rr.updated_at,
-rr.deleted_at,
+rr.id as id,
+rr.version as version,
+rr.state as state,
+rr.type as type,
+COALESCE(rr.encrypted_definition, "") as encrypted_definition,
+rr.created_at as created_at,
+rr.updated_at as updated_at,
+rr.deleted_at as deleted_at,
 cvc.states as states, 
 cvc.versions as total_versions
 `).
