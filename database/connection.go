@@ -126,12 +126,21 @@ func (db *gormDB) SetConnectionState(ctx context.Context, id uuid.UUID, state Co
 type ConnectionOrderByField string
 
 const (
+	ConnectionOrderById        ConnectionOrderByField = "id"
+	ConnectionOrderByState     ConnectionOrderByField = "state"
 	ConnectionOrderByCreatedAt ConnectionOrderByField = "created_at"
+	ConnectionOrderByUpdatedAt ConnectionOrderByField = "updated_at"
 )
 
 func IsValidConnectionOrderByField[T string | ConnectionOrderByField](field T) bool {
 	switch ConnectionOrderByField(field) {
+	case ConnectionOrderById:
+		return true
+	case ConnectionOrderByState:
+		return true
 	case ConnectionOrderByCreatedAt:
+		return true
+	case ConnectionOrderByUpdatedAt:
 		return true
 	default:
 		return false
@@ -215,7 +224,7 @@ func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) *gorm.DB
 	}
 
 	if l.OrderByFieldVal != nil {
-		q.Order(clause.OrderByColumn{Column: clause.Column{Name: string(*l.OrderByFieldVal)}, Desc: true})
+		q.Order(clause.OrderByColumn{Column: clause.Column{Name: string(*l.OrderByFieldVal)}, Desc: l.OrderByVal.IsDesc()})
 	}
 
 	return q

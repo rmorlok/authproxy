@@ -21,6 +21,23 @@ func (o *OrderBy) String() string {
 	return string(*o)
 }
 
+func (o *OrderBy) IsDesc() bool {
+	if o == nil {
+		return false
+	}
+
+	return *o == OrderByDesc
+}
+
+func (o *OrderBy) IsAsc() bool {
+	if o == nil {
+		// Assume asc unless specified.
+		return true
+	}
+
+	return *o == OrderByAsc
+}
+
 // SplitOrderByParam is a helper function that can be used for query params to take the field plus
 // direction as a single string value. e.g. "created_at DESC" This method will split the two parts
 // and return the field and the order. If the direction is omitted, ASC will be assumed. If the param

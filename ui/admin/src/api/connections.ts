@@ -54,19 +54,24 @@ export interface DisconnectResponseJson {
 }
 
 /**
+ * Parameters used for listing connections.
+ * This interface defines the criteria and options available for querying connection data.
+ *
+ * @interface
+ */
+export interface ListConnectionsParams {
+    state?: ConnectionState;
+    cursor?: string;
+    limit?: number;
+    order_by?: string;
+}
+
+/**
  * Get a list of all connections
- * @param state Optional state filter
- * @param cursor Optional cursor for pagination
- * @param limit Optional limit for pagination
+ * @param params The parameters for filtering and pagination
  * @returns Promise with the list of connections
  */
-export const listConnections = (state?: string, cursor?: string, limit?: number) => {
-  const params: Record<string, string | number> = {};
-
-  if (state) params.state = state;
-  if (cursor) params.cursor = cursor;
-  if (limit) params.limit = limit;
-
+export const listConnections = (params: ListConnectionsParams) => {
   return client.get<ListConnectionsResponse>('/api/v1/connections', { params });
 };
 

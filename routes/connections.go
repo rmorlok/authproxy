@@ -220,7 +220,7 @@ type ListConnectionRequestQuery struct {
 	Cursor     *string                   `form:"cursor"`
 	LimitVal   *int32                    `form:"limit"`
 	StateVal   *database.ConnectionState `form:"state"`
-	OrderByVal *string                   `json:"order_by"`
+	OrderByVal *string                   `form:"order_by"`
 }
 
 type ListConnectionResponseJson struct {

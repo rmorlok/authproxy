@@ -3,16 +3,16 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import {DataGrid, GridColDef} from '@mui/x-data-grid';
+import {DataGrid, GridColDef, GridSortModel} from '@mui/x-data-grid';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
-import {Connection, ConnectionState, listConnections, ListConnectionsResponse} from '../api';
+import {Connection, ConnectionState, listConnections, ListConnectionsParams, ListConnectionsResponse} from '../api';
 import dayjs from 'dayjs';
-import {useQueryState, parseAsInteger, parseAsStringLiteral} from 'nuqs'
+import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
 
 function renderState(state: ConnectionState) {
     const colors: Record<ConnectionState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -30,13 +30,15 @@ export const columns: GridColDef<Connection>[] = [
     { field: 'id',
         headerName: 'ID',
         flex: 0.8,
-        minWidth: 110
+        minWidth: 110,
+        sortable: true,
     },
     {
         field: 'state',
         headerName: 'State',
         flex: 0.4,
         minWidth: 80,
+        sortable: true,
         renderCell: (params) => renderState(params.value as ConnectionState),
     },
     {
@@ -44,6 +46,7 @@ export const columns: GridColDef<Connection>[] = [
         headerName: 'Connector Type',
         flex: 0.5,
         minWidth: 80,
+        sortable: false,
         valueGetter: (_, row) => row.connector.type,
     },
     {
@@ -51,6 +54,7 @@ export const columns: GridColDef<Connection>[] = [
         headerName: 'Connector ID',
         flex: 0.8,
         minWidth: 80,
+        sortable: false,
         valueGetter: (_, row) => row.connector.id,
     },
     {
@@ -58,6 +62,7 @@ export const columns: GridColDef<Connection>[] = [
         headerName: 'Connector Version',
         flex: 0.4,
         minWidth: 80,
+        sortable: false,
         valueGetter: (_, row) => row.connector.version,
     },
     {
@@ -67,6 +72,7 @@ export const columns: GridColDef<Connection>[] = [
         align: 'right',
         flex: 1,
         minWidth: 80,
+        sortable: true,
         valueGetter: (value, _) => {
             return dayjs(value).format('MMM DD, YYYY, h:mm A');
         }
@@ -79,6 +85,7 @@ export const columns: GridColDef<Connection>[] = [
         align: 'right',
         flex: 1,
         minWidth: 100,
+        sortable: true,
         valueGetter: (value) => {
             return dayjs(value).format('MMM DD, YYYY, h:mm A');
         }
@@ -105,13 +112,24 @@ export default function Connections() {
 
     const [page, setPage] = useQueryState<number>('page', parseAsInteger.withDefault(1));
     const [pageSize, setPageSize] = useQueryState<number>('page_size', parseAsInteger.withDefault(defaultPageSize));
-    const [hasNextPage, setHasNextPage] = useState<boolean>(false);
-
     const [stateFilter, setStateFilter] = useQueryState<string>('state', parseAsStringLiteral(stateVals).withDefault('')); // empty = all
+    const [sort, setSort] = useQueryState<string>('sort', parseAsString.withDefault(''));
+
+    const [hasNextPage, setHasNextPage] = useState<boolean>(false);
 
     // Simple cache to allow going back without re-fetching
     const responsesCacheRef = useRef<ListConnectionsResponse[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
+
+    const handleSortModelChange = React.useCallback((sortModel: GridSortModel) => {
+        if(sortModel.length === 0) {
+            setSort('');
+        } else {
+            const sortField = sortModel[0].field;
+            const sortDir = sortModel[0].sort === 'desc' ? 'desc' : 'asc';
+            setSort(`${sortField} ${sortDir}`);
+        }
+    }, []);
 
     const resetPagination = () => {
         responsesCacheRef.current = [];
@@ -151,7 +169,14 @@ export default function Connections() {
 
                 const thisPage = responsesCacheRef.current.length;
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
-                const resp = await listConnections(stateFilter || undefined, prevResp?.cursor, pageSize);
+
+                const params: ListConnectionsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
+                    state: (stateFilter as ConnectionState) || undefined,
+                    order_by: sort || undefined,
+                    limit: pageSize,
+                };
+
+                const resp = await listConnections(params);
 
                 if(resp.status !== 200) {
                     setError("Failed to fetch page of results from server");
@@ -183,12 +208,12 @@ export default function Connections() {
         resetPagination();
         fetchPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [stateFilter, pageSize]);
+    }, [pageSize, sort, stateFilter]);
 
     useEffect(() => {
         fetchPage(page);
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [page, stateFilter, pageSize]);
+    }, [page, pageSize, sort, stateFilter]); // TODO: only page?
 
     return (
         <Box sx={{width: '100%', maxWidth: {sm: '100%', md: '1700px'}}}>
@@ -222,6 +247,7 @@ export default function Connections() {
                     }
                     loading={loading}
                     sortingMode="server"
+                    onSortModelChange={handleSortModelChange}
                     paginationMode="server"
                     paginationModel={{ page: page-1, pageSize }}
                     paginationMeta={{hasNextPage}}
