@@ -56,7 +56,7 @@ func TestSplitOrderByParam(t *testing.T) {
 
 func TestOrderBy_String(t *testing.T) {
 	var ob *OrderBy
-	require.Equal(t, "", ob.String())
+	require.Equal(t, "ASC", ob.String())
 
 	ob = util.ToPtr(OrderByAsc)
 	require.Equal(t, "ASC", ob.String())
@@ -76,10 +76,10 @@ func TestOrderBy_IsDesc(t *testing.T) {
 
 func TestOrderBy_IsAsc(t *testing.T) {
 	var ob *OrderBy
-	require.True(t, ob.IsDesc())
+	require.True(t, ob.IsAsc())
 
 	ob = util.ToPtr(OrderByAsc)
-	require.True(t, ob.IsDesc())
+	require.True(t, ob.IsAsc())
 	ob = util.ToPtr(OrderByDesc)
-	require.False(t, ob.IsDesc())
+	require.False(t, ob.IsAsc())
 }
