@@ -24,6 +24,7 @@
     "@reduxjs/toolkit": "^2.2.2",
     "axios": "^1.6.8",
     "dayjs": "^1.11.18",
+    "nuqs": "^2.6.0",
     "react": "latest",
     "react-dom": "latest",
     "react-markdown": "^10.1.0",

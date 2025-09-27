@@ -1,5 +1,6 @@
 import * as React from 'react';
 import LoadingPage from "./LoadingPage";
+import { NuqsAdapter } from 'nuqs/adapters/react'
 import { RouterProvider } from "react-router-dom";
 import { useSelector } from "react-redux";
 import { selectAuthStatus } from "./store";
@@ -15,6 +16,8 @@ export default function App() {
     }
 
     return (
-        <RouterProvider router={router} />
+        <NuqsAdapter>
+            <RouterProvider router={router} />
+        </NuqsAdapter>
     );
 }

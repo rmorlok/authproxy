@@ -1,6 +1,5 @@
 import * as React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useSearchParams } from 'react-router-dom';
 import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -13,6 +12,7 @@ import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import {Connection, ConnectionState, listConnections, ListConnectionsResponse} from '../api';
 import dayjs from 'dayjs';
+import {useQueryState, parseAsInteger, parseAsStringLiteral} from 'nuqs'
 
 function renderState(state: ConnectionState) {
     const colors: Record<ConnectionState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -87,25 +87,27 @@ export const columns: GridColDef<Connection>[] = [
 ];
 
 export default function Connections() {
-    const [searchParams, setSearchParams] = useSearchParams();
+    const defaultPageSize = 20;
+    const stateOptions = useMemo(() => [
+        { label: 'All', value: '' },
+        { label: 'Created', value: ConnectionState.CREATED },
+        { label: 'Connected', value: ConnectionState.CONNECTED },
+        { label: 'Failed', value: ConnectionState.FAILED },
+        { label: 'Disconnecting', value: ConnectionState.DISCONNECTING },
+        { label: 'Disconnected', value: ConnectionState.DISCONNECTED },
+    ], []);
+    const stateVals = useMemo(() => stateOptions.map(opt => opt.value), [stateOptions]);
+
     const [rows, setRows] = useState<Connection[]>([]);
     const [rowCount, setRowCount] = useState<number>(-1);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Initialize from URL params
-    const qpPage = Number(searchParams.get('page'));
-    const initialPage = Number.isFinite(qpPage) && qpPage >= 0 ? qpPage : 0;
-    const initialStateFilter = searchParams.get('state') ?? '';
-    const qpPageSize = Number(searchParams.get('pageSize'));
-    const defaultPageSize = 20;
-    const initialPageSize = Number.isFinite(qpPageSize) && qpPageSize > 0 ? qpPageSize : defaultPageSize;
-
-    const [page, setPage] = useState<number>(initialPage);
-    const [pageSize, setPageSize] = useState<number>(initialPageSize);
+    const [page, setPage] = useQueryState<number>('page', parseAsInteger.withDefault(1));
+    const [pageSize, setPageSize] = useQueryState<number>('page_size', parseAsInteger.withDefault(defaultPageSize));
     const [hasNextPage, setHasNextPage] = useState<boolean>(false);
 
-    const [stateFilter, setStateFilter] = useState<string>(initialStateFilter); // empty = all
+    const [stateFilter, setStateFilter] = useQueryState<string>('state', parseAsStringLiteral(stateVals).withDefault('')); // empty = all
 
     // Simple cache to allow going back without re-fetching
     const responsesCacheRef = useRef<ListConnectionsResponse[]>([]);
@@ -115,18 +117,19 @@ export default function Connections() {
         responsesCacheRef.current = [];
         pageRequestCacheRef.current = new Set();
         setHasNextPage(false);
-        setPage(0);
+        setPage(1);
         setRowCount(-1);
     };
 
-    const fetchPage = async (targetPage: number) => {
+    const fetchPage = async (targetPageOneBased: number) => {
+        const targetPageZeroBased = targetPageOneBased - 1;
         // Require stepping forward: if asking to jump ahead more than one page and cursor missing, fetch sequentially
         setLoading(true);
         setHasNextPage(false);
         setError(null);
         try {
             // If we have it cached, use it
-            const cached = responsesCacheRef.current[targetPage];
+            const cached = responsesCacheRef.current[targetPageZeroBased];
             if (cached) {
                 setRows(cached.items);
                 setLoading(false);
@@ -135,16 +138,16 @@ export default function Connections() {
             }
 
             // If we don't know the cursor for this page yet, advance sequentially from the last known
-            while (responsesCacheRef.current.length <= targetPage && (
+            while (responsesCacheRef.current.length <= targetPageZeroBased && (
                 responsesCacheRef.current.length === 0 ||
                 !!responsesCacheRef.current[responsesCacheRef.current.length - 1].cursor
                 )
             ) {
                 // Avoid multiple calls for the same page
-                if (pageRequestCacheRef.current.has(targetPage)) {
+                if (pageRequestCacheRef.current.has(targetPageZeroBased)) {
                     return;
                 }
-                pageRequestCacheRef.current.add(targetPage);
+                pageRequestCacheRef.current.add(targetPageZeroBased);
 
                 const thisPage = responsesCacheRef.current.length;
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
@@ -158,7 +161,7 @@ export default function Connections() {
                 responsesCacheRef.current[thisPage] = resp.data; // This handles cases where the same page is requested multiple times
             }
 
-            const data = responsesCacheRef.current[targetPage];
+            const data = responsesCacheRef.current[targetPageZeroBased];
             setRows(data?.items || []);
 
             const hnp = !!data?.cursor;
@@ -174,62 +177,11 @@ export default function Connections() {
         }
     };
 
-    // Sync state to URL when page, stateFilter or pageSize changes
-    useEffect(() => {
-        const params = new URLSearchParams(searchParams);
-        // Only write when different to avoid loops
-        const curPage = params.get('page');
-        const curState = params.get('state') ?? '';
-        const curPageSize = params.get('pageSize');
-        const desiredPage = String(page);
-        const desiredState = stateFilter || '';
-        const desiredPageSize = String(pageSize);
-        let changed = false;
-        if (curPage !== desiredPage) { params.set('page', desiredPage); changed = true; }
-        if (curState !== desiredState) {
-            if (desiredState) params.set('state', desiredState); else params.delete('state');
-            changed = true;
-        }
-        // Only include pageSize in URL if it's not the default
-        if (desiredPageSize !== String(defaultPageSize)) {
-            if (curPageSize !== desiredPageSize) { params.set('pageSize', desiredPageSize); changed = true; }
-        } else if (curPageSize) {
-            params.delete('pageSize');
-            changed = true;
-        }
-        if (changed) {
-            setSearchParams(params, { replace: true });
-        }
-    }, [page, stateFilter, pageSize, setSearchParams, searchParams]);
-
-    // React to URL changes (back/forward or external navigation)
-    useEffect(() => {
-        const urlPageRaw = searchParams.get('page');
-        const urlPage = urlPageRaw ? Number(urlPageRaw) : 0;
-        const safePage = Number.isFinite(urlPage) && urlPage >= 0 ? urlPage : 0;
-        const urlState = searchParams.get('state') ?? '';
-        const urlPageSizeRaw = searchParams.get('pageSize');
-        const urlPageSize = urlPageSizeRaw ? Number(urlPageSizeRaw) : defaultPageSize;
-        const safePageSize = Number.isFinite(urlPageSize) && urlPageSize > 0 ? urlPageSize : defaultPageSize;
-
-        // If URL differs from component state, update component state
-        if (safePage !== page) {
-            setPage(safePage);
-        }
-        if (urlState !== stateFilter) {
-            setStateFilter(urlState);
-        }
-        if (safePageSize !== pageSize) {
-            setPageSize(safePageSize);
-        }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [searchParams]);
-
     // Initial load and when filter/pageSize changes
     useEffect(() => {
         // Reset cursors/cache and immediately fetch first page to ensure initial load
         resetPagination();
-        fetchPage(0);
+        fetchPage(1);
     // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [stateFilter, pageSize]);
 
@@ -237,15 +189,6 @@ export default function Connections() {
         fetchPage(page);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, stateFilter, pageSize]);
-
-    const stateOptions = useMemo(() => [
-        { label: 'All', value: '' },
-        { label: 'Created', value: ConnectionState.CREATED },
-        { label: 'Connected', value: ConnectionState.CONNECTED },
-        { label: 'Failed', value: ConnectionState.FAILED },
-        { label: 'Disconnecting', value: ConnectionState.DISCONNECTING },
-        { label: 'Disconnected', value: ConnectionState.DISCONNECTED },
-    ], []);
 
     return (
         <Box sx={{width: '100%', maxWidth: {sm: '100%', md: '1700px'}}}>
@@ -280,13 +223,13 @@ export default function Connections() {
                     loading={loading}
                     sortingMode="server"
                     paginationMode="server"
-                    paginationModel={{ page, pageSize }}
+                    paginationModel={{ page: page-1, pageSize }}
                     paginationMeta={{hasNextPage}}
                     onPaginationModelChange={(model) => {
                         console.log(model);
                         // DataGrid uses 0-based page index
                         if (model.pageSize !== pageSize) setPageSize(model.pageSize);
-                        if (model.page !== page) setPage(model.page);
+                        if (model.page !== page-1) setPage(model.page+1);
                     }}
                     pageSizeOptions={[2, 5, 10, 20, 50, 100]}
                     rowCount={rowCount}
@@ -321,9 +264,6 @@ export default function Connections() {
                         },
                     }}
                 />
-                <Typography>
-                    Page: {page}; HasNextPage: {String(hasNextPage)}; Row Count: {rowCount}
-                </Typography>
                 {error && (
                     <Typography color="error" sx={{ mt: 1 }}>{error}</Typography>
                 )}
