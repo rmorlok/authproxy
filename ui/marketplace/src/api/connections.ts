@@ -3,71 +3,76 @@ import {Connector} from "./connectors";
 
 // Connection models
 export enum ConnectionState {
-  CREATED = 'created',
-  CONNECTED = 'connected',
-  FAILED = 'failed',
-  DISCONNECTING = 'disconnecting',
-  DISCONNECTED = 'disconnected'
+    CREATED = 'created',
+    CONNECTED = 'connected',
+    FAILED = 'failed',
+    DISCONNECTING = 'disconnecting',
+    DISCONNECTED = 'disconnected'
 }
 
 export interface Connection {
-  id: string;
-  connector: Connector;
-  state: ConnectionState;
-  created_at: string;
-  updated_at: string;
+    id: string;
+    connector: Connector;
+    state: ConnectionState;
+    created_at: string;
+    updated_at: string;
 }
 
 export function canBeDisconnected(connection: Connection): boolean {
-  return connection.state !== ConnectionState.DISCONNECTING &&
-      connection.state !== ConnectionState.DISCONNECTED;
+    return connection.state !== ConnectionState.DISCONNECTING &&
+        connection.state !== ConnectionState.DISCONNECTED;
 }
 
 export interface ListConnectionsResponse {
-  items: Connection[];
-  cursor?: string;
+    items: Connection[];
+    cursor?: string;
 }
 
 // Request models
 export interface InitiateConnectionRequest {
-  connector_id: string;
-  return_to_url: string;
+    connector_id: string;
+    return_to_url: string;
 }
 
 export enum InitiateConnectionResponseType {
-  REDIRECT = 'redirect'
+    REDIRECT = 'redirect'
 }
 
 export interface InitiateConnectionResponse {
-  id: string;
-  type: InitiateConnectionResponseType;
+    id: string;
+    type: InitiateConnectionResponseType;
 }
 
 export interface InitiateConnectionRedirectResponse extends InitiateConnectionResponse {
-  redirect_url: string;
+    redirect_url: string;
 }
 
 // Disconnect models
 export interface DisconnectResponseJson {
-  task_id: string;
-  connection: Connection;
+    task_id: string;
+    connection: Connection;
+}
+
+/**
+ * Parameters used for listing connections.
+ * This interface defines the criteria and options available for querying connection data.
+ *
+ * @interface
+ */
+export interface ListConnectionsParams {
+    state?: ConnectionState;
+    cursor?: string;
+    limit?: number;
+    order_by?: string;
 }
 
 /**
  * Get a list of all connections
- * @param state Optional state filter
- * @param cursor Optional cursor for pagination
- * @param limit Optional limit for pagination
+ * @param params The parameters for filtering and pagination
  * @returns Promise with the list of connections
  */
-export const listConnections = (state?: string, cursor?: string, limit?: number) => {
-  const params: Record<string, string | number> = {};
-
-  if (state) params.state = state;
-  if (cursor) params.cursor = cursor;
-  if (limit) params.limit = limit;
-
-  return client.get<ListConnectionsResponse>('/api/v1/connections', { params });
+export const listConnections = (params: ListConnectionsParams) => {
+    return client.get<ListConnectionsResponse>('/api/v1/connections', { params });
 };
 
 /**
@@ -76,7 +81,7 @@ export const listConnections = (state?: string, cursor?: string, limit?: number)
  * @returns Promise with the connection details
  */
 export const getConnection = (id: string) => {
-  return client.get<Connection>(`/api/v1/connections/${id}`);
+    return client.get<Connection>(`/api/v1/connections/${id}`);
 };
 
 /**
@@ -86,12 +91,12 @@ export const getConnection = (id: string) => {
  * @returns Promise with the initiation response
  */
 export const initiateConnection = (connectorId: string, returnToUrl: string) => {
-  const request: InitiateConnectionRequest = {
-    connector_id: connectorId,
-    return_to_url: returnToUrl
-  };
+    const request: InitiateConnectionRequest = {
+        connector_id: connectorId,
+        return_to_url: returnToUrl
+    };
 
-  return client.post<InitiateConnectionRedirectResponse>('/api/v1/connections/_initiate', request);
+    return client.post<InitiateConnectionRedirectResponse>('/api/v1/connections/_initiate', request);
 };
 
 /**
@@ -100,12 +105,12 @@ export const initiateConnection = (connectorId: string, returnToUrl: string) => 
  * @returns Promise with the disconnect response
  */
 export const disconnectConnection = (id: string) => {
-  return client.post<DisconnectResponseJson>(`/api/v1/connections/${id}/_disconnect`);
+    return client.post<DisconnectResponseJson>(`/api/v1/connections/${id}/_disconnect`);
 };
 
 export const connections = {
-  list: listConnections,
-  get: getConnection,
-  initiate: initiateConnection,
-  disconnect: disconnectConnection,
+    list: listConnections,
+    get: getConnection,
+    initiate: initiateConnection,
+    disconnect: disconnectConnection,
 };
