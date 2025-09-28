@@ -100,13 +100,23 @@ func GetGinServer(
 		authService,
 		dm.GetRequestLogRetriever(),
 	)
+	routesActors := common_routes.NewActorsRoutes(
+		dm.GetConfig(),
+		authService,
+		dm.GetDatabase(),
+		dm.GetRedisWrapper(),
+		dm.GetHttpf(),
+		dm.GetEncryptService(),
+		logger,
+	)
 
 	api := server.Group("/api/v1")
 
 	routesConnectors.Register(api)
 	routesConnections.Register(api)
 	routesRequestLog.Register(api)
-
+	routesActors.Register(api)
+	
 	if service.SupportsSession() && service.SupportsUi() {
 		routesSession := common_routes.NewSessionRoutes(
 			dm.GetConfig(),

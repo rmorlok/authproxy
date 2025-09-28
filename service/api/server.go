@@ -118,6 +118,15 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		authService,
 		dm.GetRequestLogRetriever(),
 	)
+	routesActors := common_routes.NewActorsRoutes(
+		dm.GetConfig(),
+		authService,
+		dm.GetDatabase(),
+		dm.GetRedisWrapper(),
+		dm.GetHttpf(),
+		dm.GetEncryptService(),
+		logger,
+	)
 
 	api := server.Group("/api/v1")
 
@@ -126,6 +135,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 	routesProxy.Register(api)
 	routesTasks.Register(api)
 	routesRequestLog.Register(api)
+	routesActors.Register(api)
 
 	return service.GetServerAndHealthChecker(server, healthChecker)
 }

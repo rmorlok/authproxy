@@ -22,8 +22,26 @@ const (
 	ActorOrderByUpdatedAt  ActorOrderByField = "updated_at"
 	ActorOrderByEmail      ActorOrderByField = "email"
 	ActorOrderByExternalId ActorOrderByField = "external_id"
+	ActorOrderByAdmin      ActorOrderByField = "admin"
+	ActorOrderBySuperAdmin ActorOrderByField = "super_admin"
 	ActorOrderByDeletedAt  ActorOrderByField = "deleted_at"
 )
+
+// IsValidActorOrderByField checks if the given value is a valid ActorOrderByField.
+func IsValidActorOrderByField[T string | ActorOrderByField](field T) bool {
+	switch ActorOrderByField(field) {
+	case ActorOrderByCreatedAt,
+		ActorOrderByUpdatedAt,
+		ActorOrderByEmail,
+		ActorOrderByExternalId,
+		ActorOrderByAdmin,
+		ActorOrderBySuperAdmin,
+		ActorOrderByDeletedAt:
+		return true
+	default:
+		return false
+	}
+}
 
 // Actor is some entity taking action within the system.
 type Actor struct {
@@ -255,6 +273,15 @@ func (db *gormDB) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 	return result, nil
 }
 
+func (db *gormDB) DeleteActor(ctx context.Context, id uuid.UUID) error {
+	sess := db.session(ctx)
+	result := sess.Delete(&Actor{}, id)
+	if result.Error != nil {
+		return result.Error
+	}
+	return nil
+}
+
 type ListActorsExecutor interface {
 	FetchPage(context.Context) pagination.PageResult[Actor]
 	Enumerate(context.Context, func(pagination.PageResult[Actor]) (keepGoing bool, err error)) error
@@ -262,6 +289,10 @@ type ListActorsExecutor interface {
 
 type ListActorsBuilder interface {
 	ListActorsExecutor
+	ForExternalId(externalId string) ListActorsBuilder
+	ForEmail(email string) ListActorsBuilder
+	ForIsAdmin(isAdmin bool) ListActorsBuilder
+	ForIsSuperAdmin(isSuperAdmin bool) ListActorsBuilder
 	Limit(int32) ListActorsBuilder
 	OrderBy(ActorOrderByField, pagination.OrderBy) ListActorsBuilder
 	IncludeDeleted() ListActorsBuilder
@@ -274,6 +305,10 @@ type listActorsFilters struct {
 	OrderByFieldVal   *ActorOrderByField  `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy `json:"order_by"`
 	IncludeDeletedVal bool                `json:"include_deleted,omitempty"`
+	ExternalIdVal     *string             `json:"external_id,omitempty"`
+	EmailVal          *string             `json:"email,omitempty"`
+	IsAdminVal        *bool               `json:"is_admin,omitempty"`
+	IsSuperAdminVal   *bool               `json:"is_super_admin,omitempty"`
 }
 
 func (l *listActorsFilters) Limit(limit int32) ListActorsBuilder {
@@ -289,6 +324,26 @@ func (l *listActorsFilters) OrderBy(field ActorOrderByField, by pagination.Order
 
 func (l *listActorsFilters) IncludeDeleted() ListActorsBuilder {
 	l.IncludeDeletedVal = true
+	return l
+}
+
+func (l *listActorsFilters) ForExternalId(externalId string) ListActorsBuilder {
+	l.ExternalIdVal = &externalId
+	return l
+}
+
+func (l *listActorsFilters) ForEmail(email string) ListActorsBuilder {
+	l.EmailVal = &email
+	return l
+}
+
+func (l *listActorsFilters) ForIsAdmin(isAdmin bool) ListActorsBuilder {
+	l.IsAdminVal = &isAdmin
+	return l
+}
+
+func (l *listActorsFilters) ForIsSuperAdmin(isSuperAdmin bool) ListActorsBuilder {
+	l.IsSuperAdminVal = &isSuperAdmin
 	return l
 }
 

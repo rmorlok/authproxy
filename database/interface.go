@@ -2,9 +2,10 @@ package database
 
 import (
 	"context"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/jwt"
-	"time"
 )
 
 //go:generate mockgen -source=./interface.go -destination=./mock/db.go -package=mock
@@ -20,6 +21,7 @@ type DB interface {
 	GetActorByExternalId(ctx context.Context, externalId string) (*Actor, error)
 	CreateActor(ctx context.Context, actor *Actor) error
 	UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, error)
+	DeleteActor(ctx context.Context, id uuid.UUID) error
 	ListActorsBuilder() ListActorsBuilder
 	ListActorsFromCursor(ctx context.Context, cursor string) (ListActorsExecutor, error)
 
@@ -64,7 +66,7 @@ type DB interface {
 	) (*OAuth2Token, error)
 	DeleteOAuth2Token(ctx context.Context, tokenId uuid.UUID) error
 	DeleteAllOAuth2TokensForConnection(ctx context.Context, connectionId uuid.UUID) error
-	
+
 	// EnumerateOAuth2TokensExpiringWithin enumerates OAuth2 tokens that are expiring within a specified time interval
 	// of now. This includes tokens that are already expired. Deleted tokens are not considered, nor are tokens tied
 	// to a deleted connection.
