@@ -109,6 +109,20 @@ func (mr *MockDBMockRecorder) DeleteConnection(ctx, id interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteConnection", reflect.TypeOf((*MockDB)(nil).DeleteConnection), ctx, id)
 }
 
+// DeleteActor mocks base method.
+func (m *MockDB) DeleteActor(ctx context.Context, id uuid.UUID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteActor", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteActor indicates an expected call of DeleteActor.
+func (mr *MockDBMockRecorder) DeleteActor(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteActor", reflect.TypeOf((*MockDB)(nil).DeleteActor), ctx, id)
+}
+
 // DeleteOAuth2Token mocks base method.
 func (m *MockDB) DeleteOAuth2Token(ctx context.Context, tokenId uuid.UUID) error {
 	m.ctrl.T.Helper()
