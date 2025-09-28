@@ -318,4 +318,70 @@ func TestActor(t *testing.T) {
 		var nila *Actor
 		require.True(t, nila.IsNormalActor())
 	})
+	t.Run("DeleteActor soft delete and IncludeDeleted listing", func(t *testing.T) {
+		setup(t)
+
+		// create a single actor
+		id := uuid.New()
+		a := &Actor{ID: id, ExternalId: id.String(), Email: "delete-me@example.com"}
+		require.NoError(t, db.CreateActor(ctx, a))
+
+		// delete it
+		require.NoError(t, db.DeleteActor(ctx, id))
+
+		// direct get should return nil (soft-deleted)
+		got, err := db.GetActor(ctx, id)
+		require.NoError(t, err)
+		require.Nil(t, got)
+
+		// default listing should not include deleted
+		page := db.ListActorsBuilder().FetchPage(ctx)
+		require.NoError(t, page.Error)
+		require.Len(t, page.Results, 0)
+
+		// IncludeDeleted should bring it back
+		page = db.ListActorsBuilder().IncludeDeleted().FetchPage(ctx)
+		require.NoError(t, page.Error)
+		require.Len(t, page.Results, 1)
+		require.Equal(t, id, page.Results[0].ID)
+		require.False(t, page.Results[0].DeletedAt.Time.IsZero())
+	})
+
+	t.Run("GetID and ToJwtActor", func(t *testing.T) {
+		setup(t)
+
+		id := uuid.New()
+		a := &Actor{ID: id, ExternalId: "user/" + id.String(), Email: "id@example.com", Admin: false, SuperAdmin: false}
+		require.Equal(t, id, a.GetID())
+
+		ja := a.ToJwtActor()
+		require.Equal(t, a.ExternalId, ja.ID)
+		require.Equal(t, a.Email, ja.Email)
+		require.Equal(t, a.Admin, ja.Admin)
+		require.Equal(t, a.SuperAdmin, ja.SuperAdmin)
+	})
+
+	t.Run("IsValidActorOrderByField", func(t *testing.T) {
+		// Valid values (typed)
+		require.True(t, IsValidActorOrderByField(ActorOrderByCreatedAt))
+		require.True(t, IsValidActorOrderByField(ActorOrderByUpdatedAt))
+		require.True(t, IsValidActorOrderByField(ActorOrderByEmail))
+		require.True(t, IsValidActorOrderByField(ActorOrderByExternalId))
+		require.True(t, IsValidActorOrderByField(ActorOrderByAdmin))
+		require.True(t, IsValidActorOrderByField(ActorOrderBySuperAdmin))
+		require.True(t, IsValidActorOrderByField(ActorOrderByDeletedAt))
+
+		// Valid values (as strings)
+		require.True(t, IsValidActorOrderByField("created_at"))
+		require.True(t, IsValidActorOrderByField("updated_at"))
+		require.True(t, IsValidActorOrderByField("email"))
+		require.True(t, IsValidActorOrderByField("external_id"))
+		require.True(t, IsValidActorOrderByField("admin"))
+		require.True(t, IsValidActorOrderByField("super_admin"))
+		require.True(t, IsValidActorOrderByField("deleted_at"))
+
+		// Invalid values
+		require.False(t, IsValidActorOrderByField(ActorOrderByField("nope")))
+		require.False(t, IsValidActorOrderByField("nope"))
+	})
 }
