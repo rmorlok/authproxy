@@ -11,7 +11,7 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import {
-    listConnectors, ConnectorVersionState, ConnectorVersion, ListConnectorsResponse, ListConnectorsParams
+    listConnectors, ConnectorVersionState, ConnectorVersion, ListResponse, ListConnectorsParams
 } from '../api';
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
@@ -138,7 +138,7 @@ export default function Connectors() {
     const [hasNextPage, setHasNextPage] = useState<boolean>(false);
 
     // Simple cache to allow going back without re-fetching
-    const responsesCacheRef = useRef<ListConnectorsResponse[]>([]);
+    const responsesCacheRef = useRef<ListResponse<ConnectorVersion>[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
     const handleSortModelChange = React.useCallback((sortModel: GridSortModel) => {

@@ -10,7 +10,7 @@ import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
-import {Connection, ConnectionState, listConnections, ListConnectionsParams, ListConnectionsResponse} from '../api';
+import {Connection, ConnectionState, listConnections, ListConnectionsParams, ListResponse} from '../api';
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
 
@@ -118,7 +118,7 @@ export default function Connections() {
     const [hasNextPage, setHasNextPage] = useState<boolean>(false);
 
     // Simple cache to allow going back without re-fetching
-    const responsesCacheRef = useRef<ListConnectionsResponse[]>([]);
+    const responsesCacheRef = useRef<ListResponse<Connection>[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
     const handleSortModelChange = React.useCallback((sortModel: GridSortModel) => {

@@ -1,5 +1,6 @@
 import { client } from './client';
 import {Connector} from "./connectors";
+import {ListResponse} from "./common";
 
 // Connection models
 export enum ConnectionState {
@@ -21,11 +22,6 @@ export interface Connection {
 export function canBeDisconnected(connection: Connection): boolean {
   return connection.state !== ConnectionState.DISCONNECTING &&
       connection.state !== ConnectionState.DISCONNECTED;
-}
-
-export interface ListConnectionsResponse {
-  items: Connection[];
-  cursor?: string;
 }
 
 // Request models
@@ -72,7 +68,7 @@ export interface ListConnectionsParams {
  * @returns Promise with the list of connections
  */
 export const listConnections = (params: ListConnectionsParams) => {
-  return client.get<ListConnectionsResponse>('/api/v1/connections', { params });
+  return client.get<ListResponse<Connection>>('/api/v1/connections', { params });
 };
 
 /**
