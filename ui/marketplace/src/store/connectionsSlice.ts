@@ -28,7 +28,7 @@ export const fetchConnectionsAsync = createAsyncThunk(
     'connections/fetchConnections',
     async (state?: string) => {
         let allItems: Connection[] = [];
-        const params: ListConnectionsParams = state ? {state: state as ConnectionState, limit: 100} : {limit: 100}
+        const params: ListConnectionsParams = state ? {state: state as ConnectionState, limit: 100} : {limit: 100};
         let response = await connections.list(params);
         if(response.status === 200 && response.data.items) {
             allItems = allItems.concat(response.data.items);

@@ -1,6 +1,6 @@
 import { createAsyncThunk, createSlice } from '@reduxjs/toolkit';
 import type { RootState } from './store';
-import { connectors, Connector } from '../api';
+import {connectors, Connector, ListConnectorsParams, connections} from '../api';
 
 interface ConnectorsState {
   items: Connector[];
@@ -17,8 +17,23 @@ const initialState: ConnectorsState = {
 export const fetchConnectorsAsync = createAsyncThunk(
   'connectors/fetchConnectors',
   async () => {
-    const response = await connectors.list();
-    return response.data.items;
+      let allItems: Connector[] = [];
+      const params: ListConnectorsParams = {limit: 100};
+      let response = await connectors.list(params);
+      if(response.status === 200 && response.data.items) {
+          allItems = allItems.concat(response.data.items);
+      }
+
+      while(response.data.cursor && response.data.cursor !== "") {
+          response = await connectors.list({cursor: response.data.cursor});
+          if(response.status === 200) {
+              allItems = allItems.concat(response.data.items);
+          } else {
+              return allItems;
+          }
+      }
+
+      return allItems;
   }
 );
 

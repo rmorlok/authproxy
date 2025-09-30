@@ -1,4 +1,5 @@
 import { client } from './client';
+import {ListResponse} from "./common";
 
 // Connector models
 export interface ConnectorVersion {
@@ -24,17 +25,19 @@ export enum ConnectorVersionState {
   ARCHIVED = 'archived'
 }
 
-export interface ListConnectorsResponse {
-  items: Connector[];
-  cursor?: string;
+export interface ListConnectorsParams {
+    state?: ConnectorVersionState;
+    cursor?: string;
+    limit?: number;
+    order_by?: string;
 }
 
 /**
  * Get a list of all available connectors
  * @returns Promise with the list of connectors
  */
-export const listConnectors = () => {
-  return client.get<ListConnectorsResponse>('/api/v1/connectors');
+export const listConnectors = (params: ListConnectorsParams) => {
+  return client.get<ListResponse<Connector>>('/api/v1/connectors', { params });
 };
 
 /**

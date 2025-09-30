@@ -22,7 +22,7 @@ const shouldIncludeXsrfToken = (config: any): boolean => {
 
 export const client = axios.create({
     baseURL: import.meta.env.VITE_PUBLIC_BASE_URL,
-    timeout: 200,
+    timeout: 10000,
     withCredentials: true,
     headers: {
         'Accept': 'application/json'

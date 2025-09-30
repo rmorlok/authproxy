@@ -1,5 +1,7 @@
+export * from './actors';
 export * from './backoff';
 export * from './error';
+export * from './common';
 export * from './connectors';
 export * from './connections';
 export * from './session';
