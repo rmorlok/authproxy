@@ -51,7 +51,7 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 			Headers:       req.Header,
 			ContentLength: req.ContentLength,
 		},
-		Duration: time.Since(startTime),
+		MillisecondDuration: MillisecondDuration(time.Since(startTime)),
 	}
 
 	// If there was an error, log it

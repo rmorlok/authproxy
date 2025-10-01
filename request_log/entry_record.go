@@ -16,27 +16,27 @@ import (
 // JSON tagging on this struct is used so the same data structure can be passed directly to endpoint
 // responses. It is not use for internal storage.
 type EntryRecord struct {
-	Type                RequestType   `json:"type"`
-	RequestId           uuid.UUID     `json:"request_id"`
-	CorrelationId       string        `json:"correlation_id,omitempty"`
-	Timestamp           time.Time     `json:"timestamp"`
-	Duration            time.Duration `json:"duration"`
-	ConnectionId        uuid.UUID     `json:"connection_id,omitempty"`
-	ConnectorType       string        `json:"connector_type,omitempty"`
-	ConnectorId         uuid.UUID     `json:"connector_id,omitempty"`
-	ConnectorVersion    uint64        `json:"connector_version,omitempty"`
-	Method              string        `json:"method"`
-	Host                string        `json:"host"`
-	Scheme              string        `json:"scheme"`
-	Path                string        `json:"path"`
-	ResponseStatusCode  int           `json:"response_status_code,omitempty"`
-	ResponseError       string        `json:"response_error,omitempty"`
-	RequestHttpVersion  string        `json:"request_http_version,omitempty"`
-	RequestSizeBytes    int64         `json:"request_size_bytes,omitempty"`
-	RequestMimeType     string        `json:"request_mime_type,omitempty"`
-	ResponseHttpVersion string        `json:"response_http_version,omitempty"`
-	ResponseSizeBytes   int64         `json:"response_size_bytes,omitempty"`
-	ResponseMimeType    string        `json:"response_mime_type,omitempty"`
+	Type                RequestType         `json:"type"`
+	RequestId           uuid.UUID           `json:"request_id"`
+	CorrelationId       string              `json:"correlation_id,omitempty"`
+	Timestamp           time.Time           `json:"timestamp"`
+	MillisecondDuration MillisecondDuration `json:"duration"`
+	ConnectionId        uuid.UUID           `json:"connection_id,omitempty"`
+	ConnectorType       string              `json:"connector_type,omitempty"`
+	ConnectorId         uuid.UUID           `json:"connector_id,omitempty"`
+	ConnectorVersion    uint64              `json:"connector_version,omitempty"`
+	Method              string              `json:"method"`
+	Host                string              `json:"host"`
+	Scheme              string              `json:"scheme"`
+	Path                string              `json:"path"`
+	RequestHttpVersion  string              `json:"request_http_version,omitempty"`
+	RequestSizeBytes    int64               `json:"request_size_bytes,omitempty"`
+	RequestMimeType     string              `json:"request_mime_type,omitempty"`
+	ResponseStatusCode  int                 `json:"response_status_code,omitempty"`
+	ResponseError       string              `json:"response_error,omitempty"`
+	ResponseHttpVersion string              `json:"response_http_version,omitempty"`
+	ResponseSizeBytes   int64               `json:"response_size_bytes,omitempty"`
+	ResponseMimeType    string              `json:"response_mime_type,omitempty"`
 }
 
 func (e *EntryRecord) setRedisRecordFields(vals map[string]interface{}) {
@@ -46,7 +46,7 @@ func (e *EntryRecord) setRedisRecordFields(vals map[string]interface{}) {
 		vals[fieldCorrelationId] = e.CorrelationId
 	}
 	vals[fieldTimestamp] = e.Timestamp.UnixMilli()
-	vals[fieldDurationMs] = int64(e.Duration)
+	vals[fieldDurationMs] = e.MillisecondDuration.Duration().Milliseconds()
 	if e.ConnectionId != uuid.Nil {
 		vals[fieldConnectionId] = e.ConnectionId.String()
 	}
@@ -61,9 +61,7 @@ func (e *EntryRecord) setRedisRecordFields(vals map[string]interface{}) {
 	vals[fieldHost] = e.Host
 	vals[fieldScheme] = e.Scheme
 	vals[fieldPath] = e.Path
-	if e.ResponseStatusCode == 0 {
-		vals[fieldResponseStatusCode] = e.ResponseStatusCode
-	}
+	vals[fieldResponseStatusCode] = e.ResponseStatusCode
 	if e.ResponseError != "" {
 		vals[fieldResponseError] = e.ResponseError
 	}
@@ -106,8 +104,8 @@ func EntryRecordFromRedisFields(vals map[string]string) (*EntryRecord, error) {
 	}
 	er.Timestamp = time.Unix(0, timestampMillis*int64(time.Millisecond))
 
-	if er.Duration, err = time.ParseDuration(vals[fieldDurationMs] + "ms"); err != nil {
-		return nil, errors.Wrap(err, "failed to parse duration")
+	if er.MillisecondDuration, err = parseMillisecondDuration(vals[fieldDurationMs]); err != nil {
+		return nil, err
 	}
 
 	if er.ConnectionId, err = uuid.Parse(vals[fieldConnectionId]); err != nil {

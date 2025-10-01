@@ -67,12 +67,12 @@ func (e *EntryResponse) setRedisRecordFields(er *EntryRecord) {
 }
 
 type Entry struct {
-	ID            uuid.UUID     `json:"id"`
-	CorrelationID string        `json:"cid"`
-	Timestamp     time.Time     `json:"ts"`
-	Duration      time.Duration `json:"dur"`
-	Request       EntryRequest  `json:"req"`
-	Response      EntryResponse `json:"res"`
+	ID                  uuid.UUID           `json:"id"`
+	CorrelationID       string              `json:"cid"`
+	Timestamp           time.Time           `json:"ts"`
+	MillisecondDuration MillisecondDuration `json:"dur"`
+	Request             EntryRequest        `json:"req"`
+	Response            EntryResponse       `json:"res"`
 }
 
 func (e *Entry) setRedisRecordFields(er *EntryRecord) {
@@ -82,7 +82,7 @@ func (e *Entry) setRedisRecordFields(er *EntryRecord) {
 
 	er.RequestId = e.ID
 	er.Timestamp = e.Timestamp
-	er.Duration = e.Duration
+	er.MillisecondDuration = e.MillisecondDuration
 	er.CorrelationId = e.CorrelationID
 
 	e.Request.setRedisRecordFields(er)
