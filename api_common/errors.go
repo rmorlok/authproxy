@@ -3,9 +3,10 @@ package api_common
 import (
 	"encoding/json"
 	"fmt"
+	"net/http"
+
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
-	"net/http"
 )
 
 // HttpStatusError is an error that allows inner code to drive final HTTP errors. Has two tracks for error messages:
@@ -54,8 +55,6 @@ func (e *HttpStatusError) toErrorResponse(cfg Debuggable) *ErrorResponse {
 	}
 
 	if cfg.IsDebugMode() {
-		resp.Error = e.Error()
-
 		if e.InternalErr != nil {
 			resp.StackTrace = fmt.Sprintf("%+v", e.InternalErr)
 		}

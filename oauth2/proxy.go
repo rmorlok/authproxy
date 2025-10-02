@@ -106,14 +106,23 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 func (o *oAuth2Connection) getValidToken(ctx context.Context) (*database.OAuth2Token, error) {
 	token, err := o.db.GetOAuth2Token(ctx, o.connection.ID)
 	if err != nil {
+		if errors.Is(database.ErrNotFound, err) {
+			return nil, api_common.
+				NewHttpStatusErrorBuilder().
+				WithStatus(422).
+				WithResponseMsg("no valid oauth token found").
+				WithInternalErr(err).
+				Build()
+		}
+
 		return nil, err
 	}
 
 	if token == nil {
 		return nil, api_common.
 			NewHttpStatusErrorBuilder().
-			WithStatus(422).
-			WithResponseMsg("no valid oauth token found").
+			WithStatusInternalServerError().
+			WithResponseMsg("token unexpectedly nil").
 			WithInternalErr(err).
 			Build()
 	}
