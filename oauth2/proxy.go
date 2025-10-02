@@ -3,19 +3,25 @@ package oauth2
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/url"
+
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/proxy"
 	"github.com/rmorlok/authproxy/request_log"
 	"gopkg.in/h2non/gentleman.v2"
-	"net/http"
-	"net/url"
 )
 
-func (o *oAuth2Connection) proxyToplevel() *gentleman.Client {
+type RequestType request_log.RequestType
+
+const RequestTypeProxy = RequestType(request_log.RequestTypeProxy)
+const RequestTypeOauth = RequestType(request_log.RequestTypeOAuth)
+
+func (o *oAuth2Connection) newHttpClient(rt RequestType) *gentleman.Client {
 	return o.httpf.
-		ForRequestType(request_log.RequestTypeProxy).
+		ForRequestType(request_log.RequestType(rt)).
 		ForConnection(&o.connection).
 		ForConnectorVersion(o.cv).
 		New()
@@ -66,7 +72,7 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 	}
 
 	// Prepare a refresh token request
-	client := o.proxyToplevel()
+	client := o.newHttpClient(RequestTypeOauth)
 	refreshReq := client.
 		UseContext(ctx).
 		Request().
@@ -134,7 +140,7 @@ func (o *oAuth2Connection) ProxyRequest(ctx context.Context, req *proxy.ProxyReq
 		return nil, err
 	}
 
-	r := o.proxyToplevel().
+	r := o.newHttpClient(RequestTypeProxy).
 		UseContext(ctx).
 		Request().
 		SetHeader("Authorization", "Bearer "+accessToken)

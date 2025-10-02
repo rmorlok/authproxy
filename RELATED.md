@@ -14,3 +14,5 @@ This is a list of related products in the API Integration space and (eventually)
   * Unified data ingestion for agents
 * [Pipedream](https://pipedream.com/)
   * Low-code integration platform?
+* [Composio](https://composio.dev)
+  * AI agent auth and actions and triggers
