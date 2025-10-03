@@ -14,7 +14,7 @@ func TestEntryRecord(t *testing.T) {
 		Type:                RequestTypeOAuth,
 		RequestId:           uuid.New(),
 		CorrelationId:       "some-correlation-id",
-		Timestamp:           time.Unix(0, time.Now().UnixMilli()*int64(time.Millisecond)), // There will be sub-millisecond loss of precision here
+		Timestamp:           time.UnixMilli(1234567),
 		MillisecondDuration: MillisecondDuration(2 * time.Second),
 		ConnectionId:        uuid.New(),
 		ConnectorType:       "some-type",
