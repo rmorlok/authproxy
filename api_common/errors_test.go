@@ -72,7 +72,7 @@ func TestHttpStatusError_WriteGinResponse(t *testing.T) {
 			&HttpStatusError{Status: http.StatusForbidden, ResponseMsg: "Forbidden", InternalErr: errors.New("internal error text")},
 			true,
 			http.StatusForbidden,
-			`{"error":"internal error text","stack_trace":".*"}`,
+			`{"error":"Forbidden","stack_trace":"internal error text.*"}`,
 		},
 	}
 

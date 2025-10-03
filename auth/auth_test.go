@@ -468,7 +468,7 @@ func TestAuth(t *testing.T) {
 
 			resp, statusCode, debugHeader := ts.GET(ctx, "/ping")
 			require.Equal(t, http.StatusUnauthorized, statusCode, debugHeader)
-			require.Equal(t, gin.H{"error": "HTTP 401: Unauthorized"}, resp)
+			require.Equal(t, gin.H{"error": "Unauthorized"}, resp)
 			require.Equal(t, 0, ts.GetPingCount())
 		})
 	})
