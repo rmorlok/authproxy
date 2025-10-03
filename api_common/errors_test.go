@@ -1,13 +1,14 @@
 package api_common
 
 import (
-	"github.com/gin-gonic/gin"
-	"github.com/pkg/errors"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
 	"strings"
 	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/pkg/errors"
 )
 
 func TestHttpStatusError_Error(t *testing.T) {
@@ -119,7 +120,7 @@ func TestHttpStatusError_WriteResponse(t *testing.T) {
 			&HttpStatusError{Status: http.StatusNotFound, ResponseMsg: "Not Found", InternalErr: errors.New("internal error text")},
 			true,
 			http.StatusNotFound,
-			`{"error":"internal error text","stack_trace":".*"}`,
+			`{"error":"Not Found","stack_trace":"internal error text.*"}`,
 		},
 	}
 
