@@ -102,7 +102,7 @@ func EntryRecordFromRedisFields(vals map[string]string) (*EntryRecord, error) {
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to parse timestamp")
 	}
-	er.Timestamp = time.Unix(0, timestampMillis*int64(time.Millisecond))
+	er.Timestamp = time.Unix(0, timestampMillis*int64(time.Millisecond)).In(time.UTC)
 
 	if er.MillisecondDuration, err = parseMillisecondDuration(vals[fieldDurationMs]); err != nil {
 		return nil, err
