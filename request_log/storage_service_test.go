@@ -212,7 +212,7 @@ func TestDirectStore_WritesKeys(t *testing.T) {
 	rl.requestInfo.setRedisRecordFields(&er)
 	entry.setRedisRecordFields(&er)
 
-	vals := make(map[string]interface{})
+	vals := make(map[string]string)
 	er.setRedisRecordFields(vals)
 	if len(vals) == 0 {
 		t.Fatalf("constructed vals unexpectedly empty")

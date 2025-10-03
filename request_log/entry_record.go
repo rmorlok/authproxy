@@ -39,14 +39,14 @@ type EntryRecord struct {
 	ResponseMimeType    string              `json:"response_mime_type,omitempty"`
 }
 
-func (e *EntryRecord) setRedisRecordFields(vals map[string]interface{}) {
+func (e *EntryRecord) setRedisRecordFields(vals map[string]string) {
 	vals[fieldType] = string(e.Type)
 	vals[fieldRequestId] = e.RequestId.String()
-	if e.CorrelationId == "" {
+	if e.CorrelationId != "" {
 		vals[fieldCorrelationId] = e.CorrelationId
 	}
-	vals[fieldTimestamp] = e.Timestamp.UnixMilli()
-	vals[fieldDurationMs] = e.MillisecondDuration.Duration().Milliseconds()
+	vals[fieldTimestamp] = strconv.FormatInt(e.Timestamp.UnixMilli(), 10)
+	vals[fieldDurationMs] = strconv.FormatInt(e.MillisecondDuration.Duration().Milliseconds(), 10)
 	if e.ConnectionId != uuid.Nil {
 		vals[fieldConnectionId] = e.ConnectionId.String()
 	}
@@ -55,27 +55,27 @@ func (e *EntryRecord) setRedisRecordFields(vals map[string]interface{}) {
 	}
 	if e.ConnectorId != uuid.Nil {
 		vals[fieldConnectorId] = e.ConnectorId.String()
-		vals[fieldConnectorVersion] = e.ConnectorVersion
+		vals[fieldConnectorVersion] = strconv.FormatInt(int64(e.ConnectorVersion), 10)
 	}
 	vals[fieldMethod] = e.Method
 	vals[fieldHost] = e.Host
 	vals[fieldScheme] = e.Scheme
 	vals[fieldPath] = e.Path
-	vals[fieldResponseStatusCode] = e.ResponseStatusCode
+	vals[fieldResponseStatusCode] = strconv.FormatInt(int64(e.ResponseStatusCode), 10)
 	if e.ResponseError != "" {
 		vals[fieldResponseError] = e.ResponseError
 	}
 	if e.RequestHttpVersion != "" {
 		vals[fieldRequestHttpVersion] = e.RequestHttpVersion
 	}
-	vals[fieldRequestSizeBytes] = e.RequestSizeBytes
+	vals[fieldRequestSizeBytes] = strconv.FormatInt(e.RequestSizeBytes, 10)
 	if e.RequestMimeType != "" {
 		vals[fieldRequestMimeType] = e.RequestMimeType
 	}
 	if e.ResponseHttpVersion != "" {
 		vals[fieldResponseHttpVersion] = e.ResponseHttpVersion
 	}
-	vals[fieldResponseSizeBytes] = e.ResponseSizeBytes
+	vals[fieldResponseSizeBytes] = strconv.FormatInt(e.ResponseSizeBytes, 10)
 	if e.ResponseMimeType != "" {
 		vals[fieldResponseMimeType] = e.ResponseMimeType
 	}

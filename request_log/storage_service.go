@@ -63,7 +63,7 @@ func (t *redisLogger) storeEntryInRedis(
 	t.requestInfo.setRedisRecordFields(&er)
 	entry.setRedisRecordFields(&er)
 
-	vals := make(map[string]interface{})
+	vals := make(map[string]string)
 	er.setRedisRecordFields(vals)
 
 	// Store the entry
