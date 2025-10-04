@@ -1,16 +1,17 @@
 package oauth2
 
 import (
-	"github.com/rmorlok/authproxy/redis"
+	"github.com/rmorlok/authproxy/apredis"
 	"time"
 )
 
-func (o *oAuth2Connection) tokenMutex() redis.Mutex {
-	return o.redis.NewMutex(
+func (o *oAuth2Connection) tokenMutex() apredis.Mutex {
+	return apredis.NewMutex(
+		o.r,
 		"oauth2-token-"+o.connection.ID.String(),
-		redis.MutexOptionRetryFor(o.auth.Token.GetRefreshTimeout()),
-		redis.MutexOptionLockFor(o.auth.Token.GetRefreshTimeout()),
-		redis.MutexOptionRetryExponentialBackoff(50*time.Millisecond, 1*time.Second),
-		redis.MutexOptionDetailedLockMetadata(),
+		apredis.MutexOptionRetryFor(o.auth.Token.GetRefreshTimeout()),
+		apredis.MutexOptionLockFor(o.auth.Token.GetRefreshTimeout()),
+		apredis.MutexOptionRetryExponentialBackoff(50*time.Millisecond, 1*time.Second),
+		apredis.MutexOptionDetailedLockMetadata(),
 	)
 }

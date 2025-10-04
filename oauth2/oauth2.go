@@ -5,19 +5,19 @@ import (
 	"fmt"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/apctx"
+	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/config"
 	connIface "github.com/rmorlok/authproxy/connectors/interface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
-	"github.com/rmorlok/authproxy/redis"
 	"log/slog"
 )
 
 type oAuth2Connection struct {
 	cfg        config.C
 	db         database.DB
-	redis      redis.R
+	r          apredis.Client
 	connectors connIface.C
 	encrypt    encrypt.E
 	logger     *slog.Logger
@@ -34,7 +34,7 @@ var _ OAuth2Connection = (*oAuth2Connection)(nil)
 func newOAuth2(
 	cfg config.C,
 	db database.DB,
-	redis redis.R,
+	r apredis.Client,
 	c connIface.C,
 	encrypt encrypt.E,
 	logger *slog.Logger,
@@ -51,7 +51,7 @@ func newOAuth2(
 	return &oAuth2Connection{
 		cfg:        cfg,
 		db:         db,
-		redis:      redis,
+		r:          r,
 		connectors: c,
 		encrypt:    encrypt,
 		logger:     logger,
@@ -71,7 +71,7 @@ func (o *oAuth2Connection) RecordCancelSessionAfterAuth(ctx context.Context, sho
 	o.state.CancelSessionAfterAuth = shouldCancel
 	ttl := o.state.ExpiresAt.Sub(apctx.GetClock(ctx).Now())
 
-	result := o.redis.Client().Set(ctx, getStateRedisKey(o.state.Id), o.state, ttl)
+	result := o.r.Set(ctx, getStateRedisKey(o.state.Id), o.state, ttl)
 	if result.Err() != nil {
 		return errors.Wrapf(result.Err(), "failed to set state in redis for session status for connector %s", o.cv.GetID())
 	}

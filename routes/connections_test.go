@@ -8,14 +8,14 @@ import (
 	"github.com/google/uuid"
 	asynqmock "github.com/rmorlok/authproxy/apasynq/mock"
 	"github.com/rmorlok/authproxy/aplog"
+	"github.com/rmorlok/authproxy/apredis"
+	redismock "github.com/rmorlok/authproxy/apredis/mock"
 	auth2 "github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/connectors"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/httpf"
-	"github.com/rmorlok/authproxy/redis"
-	redismock "github.com/rmorlok/authproxy/redis/mock"
 	"github.com/rmorlok/authproxy/test_utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -49,13 +49,13 @@ func TestConnections(t *testing.T) {
 			},
 		})
 		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
-		cfg, rds := redis.MustApplyTestConfig(cfg)
+		cfg, rds := apredis.MustApplyTestConfig(cfg)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(config.ServiceIdApi, cfg, db)
 		h := httpf2.CreateFactory(cfg, rds, aplog.NewNoopLogger())
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
 		ctrl := gomock.NewController(t)
 		ac := asynqmock.NewMockClient(ctrl)
-		rs := redismock.NewMockR(ctrl)
+		rs := redismock.NewMockClient(ctrl)
 		c := connectors.NewConnectorsService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		assert.NoError(t, c.MigrateConnectors(context.Background()))
 		cr := NewConnectionsRoutes(cfg, auth, db, rds, c, h, e, test_utils.NewTestLogger())

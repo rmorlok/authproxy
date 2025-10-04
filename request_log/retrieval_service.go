@@ -7,17 +7,17 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
+	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/config"
-	apredis "github.com/rmorlok/authproxy/redis"
 )
 
 type redisLogRetriever struct {
-	r         apredis.R      `json:"-"`
+	r         apredis.Client `json:"-"`
 	cursorKey config.KeyData `json:"-"`
 }
 
 func (r *redisLogRetriever) GetFullLog(ctx context.Context, id uuid.UUID) (*Entry, error) {
-	client := r.r.Client()
+	client := r.r
 	data, err := client.Get(ctx, redisFullLogKey(id)).Result()
 
 	if errors.Is(err, redis.Nil) {
@@ -52,7 +52,7 @@ func (r *redisLogRetriever) ListRequestsFromCursor(ctx context.Context, cursor s
 	return b.FromCursor(ctx, cursor)
 }
 
-func NewRetrievalService(r apredis.R, cursorKey config.KeyData) LogRetriever {
+func NewRetrievalService(r apredis.Client, cursorKey config.KeyData) LogRetriever {
 	return &redisLogRetriever{
 		r:         r,
 		cursorKey: cursorKey,

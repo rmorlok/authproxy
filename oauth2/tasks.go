@@ -3,19 +3,19 @@ package oauth2
 import (
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/apasynq"
+	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/config"
 	connIface "github.com/rmorlok/authproxy/connectors/interface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
-	"github.com/rmorlok/authproxy/redis"
 	"log/slog"
 )
 
 type taskHandler struct {
 	cfg        config.C
 	db         database.DB
-	redis      redis.R
+	redis      apredis.Client
 	connectors connIface.C
 	asynq      apasynq.Client
 	httpf      httpf.F
@@ -32,7 +32,7 @@ type TaskRegistrar interface {
 func NewTaskHandler(
 	cfg config.C,
 	db database.DB,
-	redis redis.R,
+	redis apredis.Client,
 	c connIface.C,
 	ac apasynq.Client,
 	httpf httpf.F,

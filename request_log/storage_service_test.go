@@ -12,11 +12,10 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/redis/go-redis/v9"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 
-	apredis "github.com/rmorlok/authproxy/redis"
+	"github.com/rmorlok/authproxy/apredis"
 )
 
 type fakeTransport struct {
@@ -40,22 +39,22 @@ func (f *fakeTransport) RoundTrip(req *http.Request) (*http.Response, error) {
 	return resp, nil
 }
 
-func newTestRedis(t *testing.T) (apredis.R, *redis.Client) {
+func newTestRedis(t *testing.T) apredis.Client {
 	t.Helper()
 	_, r := apredis.MustApplyTestConfig(nil)
-	return r, r.Client()
+	return r
 }
 
 func newNoopLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-func waitForKey(t *testing.T, c *redis.Client, pattern string, timeout time.Duration) ([]string, error) {
+func waitForKey(t *testing.T, r apredis.Client, pattern string, timeout time.Duration) ([]string, error) {
 	t.Helper()
 	ctx := context.Background()
 	deadline := time.Now().Add(timeout)
 	for time.Now().Before(deadline) {
-		keys, err := c.Keys(ctx, pattern).Result()
+		keys, err := r.Keys(ctx, pattern).Result()
 		if err != nil {
 			return nil, err
 		}
@@ -67,9 +66,9 @@ func waitForKey(t *testing.T, c *redis.Client, pattern string, timeout time.Dura
 	return nil, context.DeadlineExceeded
 }
 
-func getTTL(t *testing.T, c *redis.Client, key string) time.Duration {
+func getTTL(t *testing.T, r apredis.Client, key string) time.Duration {
 	t.Helper()
-	d, err := c.TTL(context.Background(), key).Result()
+	d, err := r.TTL(context.Background(), key).Result()
 	if err != nil {
 		t.Fatalf("TTL error: %v", err)
 	}
@@ -77,7 +76,7 @@ func getTTL(t *testing.T, c *redis.Client, key string) time.Duration {
 }
 
 func TestStoreSummaryOnly_NoFullLog(t *testing.T) {
-	r, client := newTestRedis(t)
+	r := newTestRedis(t)
 	logger := newNoopLogger()
 
 	ft := &fakeTransport{status: 200, respBody: "ok", readReqBody: true}
@@ -101,16 +100,16 @@ func TestStoreSummaryOnly_NoFullLog(t *testing.T) {
 	io.Copy(io.Discard, resp.Body)
 	resp.Body.Close()
 
-	keys, err := waitForKey(t, client, "rl:*", 500*time.Millisecond)
+	keys, err := waitForKey(t, r, "rl:*", 500*time.Millisecond)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(keys))
 	summaryKey := keys[0]
 
 	// No full log expected
-	fullKeys, _ := client.Keys(context.Background(), "rlf:*").Result()
+	fullKeys, _ := r.Keys(context.Background(), "rlf:*").Result()
 	require.Equal(t, 0, len(fullKeys))
 
-	vals, err := client.HGetAll(context.Background(), summaryKey).Result()
+	vals, err := r.HGetAll(context.Background(), summaryKey).Result()
 	require.NoError(t, err)
 	// Sanity checks on required fields
 	require.Equal(t, string(RequestTypeProxy), vals[fieldType])
@@ -122,13 +121,13 @@ func TestStoreSummaryOnly_NoFullLog(t *testing.T) {
 	require.Equal(t, "/path", vals[fieldPath])
 
 	// TTL roughly equals expiration
-	ttl := getTTL(t, client, summaryKey)
+	ttl := getTTL(t, r, summaryKey)
 	require.GreaterOrEqual(t, ttl, 9*time.Minute)
 	require.LessOrEqual(t, ttl, 10*time.Minute)
 }
 
 func TestStoreFullRequestAndResponse_JSONStored(t *testing.T) {
-	r, client := newTestRedis(t)
+	r := newTestRedis(t)
 	logger := newNoopLogger()
 
 	ft := &fakeTransport{status: 201, respBody: "respdata", readReqBody: true}
@@ -155,27 +154,27 @@ func TestStoreFullRequestAndResponse_JSONStored(t *testing.T) {
 	resp.Body.Close()
 
 	// Summary must exist
-	keys, err := waitForKey(t, client, "rl:*", 500*time.Millisecond)
+	keys, err := waitForKey(t, r, "rl:*", 500*time.Millisecond)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(keys))
 	summaryKey := keys[0]
 
 	// Full entry must exist
-	fullKeys, err := waitForKey(t, client, "rlf:*", 500*time.Millisecond)
+	fullKeys, err := waitForKey(t, r, "rlf:*", 500*time.Millisecond)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(fullKeys))
 	fullKey := fullKeys[0]
 
 	// Validate TTLs
-	ttlSummary := getTTL(t, client, summaryKey)
+	ttlSummary := getTTL(t, r, summaryKey)
 	require.GreaterOrEqual(t, ttlSummary, 90*time.Second)
 	require.LessOrEqual(t, ttlSummary, 2*time.Minute)
-	ttlFull := getTTL(t, client, fullKey)
+	ttlFull := getTTL(t, r, fullKey)
 	require.GreaterOrEqual(t, ttlFull, 30*time.Second)
 	require.LessOrEqual(t, ttlFull, 1*time.Minute)
 
 	// Validate full entry content
-	data, err := client.Get(context.Background(), fullKey).Bytes()
+	data, err := r.Get(context.Background(), fullKey).Bytes()
 	require.NoError(t, err)
 	var e Entry
 	require.NoError(t, json.Unmarshal(data, &e))
@@ -187,7 +186,7 @@ func TestStoreFullRequestAndResponse_JSONStored(t *testing.T) {
 }
 
 func TestDirectStore_WritesKeys(t *testing.T) {
-	r, client := newTestRedis(t)
+	r := newTestRedis(t)
 	logger := newNoopLogger()
 
 	ft := &fakeTransport{status: 200, respBody: "ok", readReqBody: false}
@@ -223,14 +222,14 @@ func TestDirectStore_WritesKeys(t *testing.T) {
 	require.NoError(t, err)
 
 	key := redisLogKey(entry.ID)
-	m, err := client.HGetAll(context.Background(), key).Result()
+	m, err := r.HGetAll(context.Background(), key).Result()
 
 	require.NoError(t, err)
 	require.NotEmpty(t, m)
 }
 
 func TestErrorRoundTrip_StoresError(t *testing.T) {
-	r, client := newTestRedis(t)
+	r := newTestRedis(t)
 	logger := newNoopLogger()
 
 	// Transport that returns error
@@ -253,10 +252,10 @@ func TestErrorRoundTrip_StoresError(t *testing.T) {
 	req, _ := http.NewRequest("GET", "http://err.example.com", nil)
 	_, _ = l.RoundTrip(req)
 
-	keys, err := waitForKey(t, client, "rl:*", 500*time.Millisecond)
+	keys, err := waitForKey(t, r, "rl:*", 500*time.Millisecond)
 	require.NoError(t, err)
 	require.Equal(t, 1, len(keys))
-	vals, err := client.HGetAll(context.Background(), keys[0]).Result()
+	vals, err := r.HGetAll(context.Background(), keys[0]).Result()
 	require.NoError(t, err)
 
 	// Error message should be present (not empty)

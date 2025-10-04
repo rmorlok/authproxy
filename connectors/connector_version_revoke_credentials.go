@@ -11,7 +11,7 @@ func (cv *ConnectorVersion) getRevokeCredentialsOperations(c *service, conn data
 	auth := def.Auth
 
 	if _, ok := auth.(*config.AuthOAuth2); ok {
-		o2f := oauth2.NewFactory(c.cfg, c.db, c.redis, c, c.httpf, c.encrypt, c.logger)
+		o2f := oauth2.NewFactory(c.cfg, c.db, c.r, c, c.httpf, c.encrypt, c.logger)
 		o2 := o2f.NewOAuth2(conn, cv)
 
 		if o2.SupportsRevokeTokens() {

@@ -5,7 +5,7 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/aplog"
-	"github.com/rmorlok/authproxy/redis"
+	"github.com/rmorlok/authproxy/apredis"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -21,26 +21,26 @@ type CronRegistrar interface {
 }
 
 type scheduler struct {
-	redis           redis.R
+	r               apredis.Client
 	healthCheckFunc func(isScheduler bool, err error)
 	registrars      []CronRegistrar
 	mtx             sync.Mutex
 	mgr             *asynq.PeriodicTaskManager
 	wg              sync.WaitGroup
 	done            chan struct{}
-	rsMtx           redis.Mutex
+	rsMtx           apredis.Mutex
 	logger          *slog.Logger
 }
 
-func newScheduler(rs redis.R, hc func(isScheduler bool, err error), l *slog.Logger) *scheduler {
+func newScheduler(r apredis.Client, hc func(isScheduler bool, err error), l *slog.Logger) *scheduler {
 	return &scheduler{
-		redis:           rs,
+		r:               r,
 		healthCheckFunc: hc,
 		logger:          l,
 		done:            make(chan struct{}),
-		rsMtx: rs.NewMutex("worker:scheduler_master",
-			redis.MutexOptionLockFor(mutexLockTime),
-			redis.MutexOptionDetailedLockMetadata(),
+		rsMtx: apredis.NewMutex(r, "worker:scheduler_master",
+			apredis.MutexOptionLockFor(mutexLockTime),
+			apredis.MutexOptionDetailedLockMetadata(),
 		),
 	}
 }
@@ -75,7 +75,7 @@ func (s *scheduler) start(ctx context.Context) error {
 	var err error
 	s.mgr, err = asynq.NewPeriodicTaskManager(
 		asynq.PeriodicTaskManagerOpts{
-			RedisUniversalClient:       s.redis.Client(),
+			RedisUniversalClient:       s.r,
 			PeriodicTaskConfigProvider: s,
 			SyncInterval:               10 * time.Second,
 			SchedulerOpts: &asynq.SchedulerOpts{
@@ -176,7 +176,7 @@ func (s *scheduler) Run() error {
 						s.rsMtx.Unlock(ctx)
 						return err
 					}
-				} else if !redis.MutexIsErrNotObtained(err) {
+				} else if !apredis.MutexIsErrNotObtained(err) {
 					s.shutdown()
 					s.healthCheckFunc(false, err)
 					if lastErr == nil {

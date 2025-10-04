@@ -7,13 +7,13 @@ import (
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/apasynq"
 	"github.com/rmorlok/authproxy/apasynq/mock"
+	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/connectors/interface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
 	hmock "github.com/rmorlok/authproxy/httpf/mock"
-	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/test_utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -24,7 +24,7 @@ import (
 func TestService(t *testing.T) {
 	var cfg config.C
 	var db database.DB
-	var rs redis.R
+	var r apredis.Client
 	var h httpf.F
 	var rawDb *sql.DB
 	var service _interface.C
@@ -43,7 +43,7 @@ func TestService(t *testing.T) {
 		})
 
 		cfg, db, rawDb = database.MustApplyBlankTestDbConfigRaw(t.Name(), cfg)
-		cfg, rs = redis.MustApplyTestConfig(cfg)
+		cfg, r = apredis.MustApplyTestConfig(cfg)
 		e := encrypt.NewEncryptService(cfg, db)
 		logger := slog.Default()
 		ctrl := gomock.NewController(t)
@@ -51,7 +51,7 @@ func TestService(t *testing.T) {
 		asynqClient = mock.NewMockClient(ctrl)
 		h = hmock.NewMockF(ctrl)
 
-		service = NewConnectorsService(cfg, db, e, rs, h, asynqClient, logger)
+		service = NewConnectorsService(cfg, db, e, r, h, asynqClient, logger)
 
 		return func() {
 			ctrl.Finish()

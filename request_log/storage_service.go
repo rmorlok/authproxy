@@ -9,11 +9,11 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/rmorlok/authproxy/redis"
+	"github.com/rmorlok/authproxy/apredis"
 )
 
 type redisLogger struct {
-	r                     redis.R
+	r                     apredis.Client
 	logger                *slog.Logger
 	requestInfo           RequestInfo
 	expiration            time.Duration
@@ -25,7 +25,7 @@ type redisLogger struct {
 }
 
 func NewRedisLogger(
-	r redis.R,
+	r apredis.Client,
 	logger *slog.Logger,
 	requestInfo RequestInfo,
 	expiration time.Duration,
@@ -56,7 +56,7 @@ func (t *redisLogger) storeEntryInRedis(
 	responseBodyReader *io.PipeReader,
 ) error {
 	// Get the Redis client
-	client := t.r.Client()
+	client := t.r
 	pipeline := client.Pipeline()
 
 	er := EntryRecord{}

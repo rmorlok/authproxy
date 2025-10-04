@@ -4,14 +4,15 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"net/http"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/config"
-	"net/http"
-	"time"
 )
 
 const (
@@ -275,7 +276,7 @@ func (s *service) extendSession(ctx context.Context, sess *session, w http.Respo
 	// Generate a new UUID to push onto the list.
 	newXsrfValue := uuid.New()
 
-	pipe := s.redis.Client().Pipeline()
+	pipe := s.r.Pipeline()
 	pipe.Set(ctx, getRedisSessionJsonKey(sess.Id), sess, sess.ExpiresAt.Sub(apctx.GetClock(ctx).Now()))
 	pipe.LPush(ctx, getRedisXsrfKey(sess.Id), newXsrfValue.String())
 	pipe.LTrim(ctx, getRedisXsrfKey(sess.Id), 0, validXsrfValuesLimit)
@@ -362,7 +363,7 @@ func getRedisXsrfKey(sessionId uuid.UUID) string {
 }
 
 func (s *service) deleteSessionFromRedis(ctx context.Context, sessionId uuid.UUID) error {
-	if err := s.redis.Client().Del(ctx, getRedisSessionKeys(sessionId)...).Err(); err != nil {
+	if err := s.r.Del(ctx, getRedisSessionKeys(sessionId)...).Err(); err != nil {
 		if err == redis.Nil {
 			// Key does not exist, this is not an error
 			return nil
@@ -375,7 +376,7 @@ func (s *service) deleteSessionFromRedis(ctx context.Context, sessionId uuid.UUI
 
 // tryReadSessionFromRedis attempts to get session from Redis. Returns nil if the session does not exist, or is expired.
 func (s *service) tryReadSessionFromRedis(ctx context.Context, sessionId uuid.UUID) (*session, error) {
-	pipe := s.redis.Client().Pipeline()
+	pipe := s.r.Pipeline()
 
 	jsonData := pipe.Get(ctx, getRedisSessionJsonKey(sessionId))
 	xsrfData := pipe.LRange(ctx, getRedisXsrfKey(sessionId), 0, -1)

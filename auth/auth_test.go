@@ -15,11 +15,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/api_common"
+	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/jwt"
-	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/test_utils"
 	"github.com/rmorlok/authproxy/util"
 	"github.com/stretchr/testify/require"
@@ -42,7 +42,7 @@ type TestGinServerBuilder struct {
 	service                           config.ServiceId
 	cfg                               config.C
 	db                                database.DB
-	redis                             redis.R
+	r                                 apredis.Client
 	ginEngine                         *gin.Engine
 	openRoutes                        []route
 	optionalAuthRoutes                []route
@@ -71,8 +71,8 @@ func (b *TestGinServerBuilder) WithDb(db database.DB) *TestGinServerBuilder {
 	return b
 }
 
-func (b *TestGinServerBuilder) WitRedis(redis redis.R) *TestGinServerBuilder {
-	b.redis = redis
+func (b *TestGinServerBuilder) WitRedis(r apredis.Client) *TestGinServerBuilder {
+	b.r = r
 	return b
 }
 
@@ -191,16 +191,16 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 		b.cfg, b.db = database.MustApplyBlankTestDbConfig(b.testName, b.cfg)
 	}
 
-	if b.redis == nil {
-		b.cfg, b.redis = redis.MustApplyTestConfig(b.cfg)
-		if b.redis == nil {
+	if b.r == nil {
+		b.cfg, b.r = apredis.MustApplyTestConfig(b.cfg)
+		if b.r == nil {
 			panic("redis is nil")
 		}
 	}
 
 	e := encrypt.NewFakeEncryptService(true)
 
-	auth := NewService(b.cfg, b.cfg.MustGetService(b.service).(config.HttpService), b.db, b.redis, e, test_utils.NewTestLogger())
+	auth := NewService(b.cfg, b.cfg.MustGetService(b.service).(config.HttpService), b.db, b.r, e, test_utils.NewTestLogger())
 
 	if len(b.defaultValidators) > 0 {
 		auth = auth.WithDefaultActorValidators(b.defaultValidators...)
@@ -233,7 +233,7 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 		Gin:         b.ginEngine,
 		Cfg:         b.cfg,
 		Db:          b.db,
-		Redis:       b.redis,
+		R:           b.r,
 		CookieJar:   util.Must(cookiejar.New(nil)),
 	}
 }
@@ -244,7 +244,7 @@ type TestSetup struct {
 	Gin         *gin.Engine
 	Cfg         config.C
 	Db          database.DB
-	Redis       redis.R
+	R           apredis.Client
 	CookieJar   http.CookieJar
 	XSRFToken   string
 }

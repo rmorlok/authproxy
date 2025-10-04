@@ -9,13 +9,13 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/aplog"
+	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/oauth2"
-	"github.com/rmorlok/authproxy/redis"
 )
 
 // SessionInitiateUrlGenerator is any object that can generate the URLs to redirect the
@@ -32,7 +32,7 @@ type SessionRoutes struct {
 	sessionInitiateUrlGenerator SessionInitiateUrlGenerator
 	authService                 auth.A
 	db                          database.DB
-	redis                       redis.R
+	r                           apredis.Client
 	httpf                       httpf.F
 	encrypt                     encrypt.E
 	oauthf                      oauth2.Factory
@@ -153,7 +153,7 @@ func NewSessionRoutes(
 	sessionInitiateUrlGenerator SessionInitiateUrlGenerator,
 	authService auth.A,
 	db database.DB,
-	redis redis.R,
+	r apredis.Client,
 	httpf httpf.F,
 	encrypt encrypt.E,
 	logger *slog.Logger,
@@ -163,7 +163,7 @@ func NewSessionRoutes(
 		sessionInitiateUrlGenerator: sessionInitiateUrlGenerator,
 		authService:                 authService,
 		db:                          db,
-		redis:                       redis,
+		r:                           r,
 		httpf:                       httpf,
 		encrypt:                     encrypt,
 		logger:                      logger,

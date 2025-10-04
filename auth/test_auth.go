@@ -7,11 +7,11 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/apctx"
+	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	jwt2 "github.com/rmorlok/authproxy/jwt"
-	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/util"
 	"io"
 	"net/http"
@@ -55,7 +55,7 @@ func TestAuthServiceWithDb(serviceId config.ServiceId, cfg config.C, db database
 		}
 	}
 
-	cfg, r := redis.MustApplyTestConfig(cfg)
+	cfg, r := apredis.MustApplyTestConfig(cfg)
 	s := cfg.MustGetService(serviceId)
 	e := encrypt.NewFakeEncryptService(false)
 

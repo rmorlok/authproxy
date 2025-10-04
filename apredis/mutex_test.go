@@ -1,20 +1,20 @@
-package redis
+package apredis
 
 import (
 	"context"
-	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/test_utils"
-	"github.com/stretchr/testify/require"
 	"testing"
 	"time"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestMutex(t *testing.T) {
-	r, err := NewMiniredis(nil, &config.KeyDataRandomBytes{}, test_utils.NewTestLogger())
+	r, err := NewMiniredis(nil)
 	require.NoError(t, err)
 	ctx := context.Background()
 
-	m1 := r.NewMutex(
+	m1 := NewMutex(
+		r,
 		"some-mutex",
 		MutexOptionLockFor(250*time.Millisecond),
 		MutexOptionRetryFor(100*time.Millisecond),
@@ -22,7 +22,8 @@ func TestMutex(t *testing.T) {
 		MutexOptionDetailedLockMetadata(),
 	)
 
-	m2 := r.NewMutex(
+	m2 := NewMutex(
+		r,
 		"some-mutex",
 		MutexOptionLockFor(250*time.Millisecond),
 		MutexOptionNoRetry(),

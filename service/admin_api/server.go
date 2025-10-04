@@ -46,7 +46,7 @@ func GetGinServer(
 		dm.GetConfig(),
 		service,
 		dm.GetDatabase(),
-		dm.GetRedisWrapper(),
+		dm.GetRedisClient(),
 		dm.GetEncryptService(),
 		logger,
 	).WithDefaultActorValidators(auth.ActorValidatorIsAdmin)
@@ -89,7 +89,7 @@ func GetGinServer(
 		dm.GetConfig(),
 		authService,
 		dm.GetDatabase(),
-		dm.GetRedisWrapper(),
+		dm.GetRedisClient(),
 		dm.GetConnectorsService(),
 		dm.GetHttpf(),
 		dm.GetEncryptService(),
@@ -104,7 +104,7 @@ func GetGinServer(
 		dm.GetConfig(),
 		authService,
 		dm.GetDatabase(),
-		dm.GetRedisWrapper(),
+		dm.GetRedisClient(),
 		dm.GetHttpf(),
 		dm.GetEncryptService(),
 		logger,
@@ -116,14 +116,14 @@ func GetGinServer(
 	routesConnections.Register(api)
 	routesRequestLog.Register(api)
 	routesActors.Register(api)
-	
+
 	if service.SupportsSession() && service.SupportsUi() {
 		routesSession := common_routes.NewSessionRoutes(
 			dm.GetConfig(),
 			service.Ui,
 			authService,
 			dm.GetDatabase(),
-			dm.GetRedisWrapper(),
+			dm.GetRedisClient(),
 			dm.GetHttpf(),
 			dm.GetEncryptService(),
 			logger,
@@ -148,7 +148,7 @@ func Serve(cfg config.C) {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
-	defer dm.GetRedisWrapper().Close()
+	defer dm.GetRedisClient().Close()
 
 	dm.AutoMigrateAll()
 

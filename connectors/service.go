@@ -2,12 +2,12 @@ package connectors
 
 import (
 	"github.com/rmorlok/authproxy/apasynq"
+	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/config"
 	connIface "github.com/rmorlok/authproxy/connectors/interface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
-	"github.com/rmorlok/authproxy/redis"
 	"log/slog"
 )
 
@@ -15,7 +15,7 @@ type service struct {
 	cfg     config.C
 	db      database.DB
 	encrypt encrypt.E
-	redis   redis.R
+	r       apredis.Client
 	httpf   httpf.F
 	ac      apasynq.Client
 	logger  *slog.Logger
@@ -26,7 +26,7 @@ func NewConnectorsService(
 	cfg config.C,
 	db database.DB,
 	encrypt encrypt.E,
-	redis redis.R,
+	r apredis.Client,
 	httpf httpf.F,
 	ac apasynq.Client,
 	logger *slog.Logger,
@@ -35,7 +35,7 @@ func NewConnectorsService(
 		cfg:     cfg,
 		db:      db,
 		encrypt: encrypt,
-		redis:   redis,
+		r:       r,
 		httpf:   httpf,
 		ac:      ac,
 		logger:  logger,

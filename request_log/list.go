@@ -5,8 +5,8 @@ import (
 	"strings"
 
 	goredis "github.com/redis/go-redis/v9"
+	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/util"
 	"github.com/rmorlok/authproxy/util/pagination"
 )
@@ -29,7 +29,7 @@ type ListRequestBuilder interface {
 }
 
 type listRequestsFilters struct {
-	r               redis.R              `json:"-"`
+	r               apredis.Client       `json:"-"`
 	cursorKey       config.KeyData       `json:"-"`
 	LimitVal        int32                `json:"limit"`
 	Offset          int32                `json:"offset"`
@@ -101,7 +101,7 @@ func (l *listRequestsFilters) fetchPage(ctx context.Context) pagination.PageResu
 	var err error
 	var entries []EntryRecord
 
-	client := l.r.Client()
+	client := l.r
 	query, options := l.apply()
 
 	res, err := client.FTSearchWithArgs(ctx, RequestLogRedisIndexName, query, options).Result()

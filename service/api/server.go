@@ -10,6 +10,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/aplog"
+	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	common_routes "github.com/rmorlok/authproxy/routes"
@@ -24,7 +25,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		dm.GetConfig(),
 		service,
 		dm.GetDatabase(),
-		dm.GetRedisWrapper(),
+		dm.GetRedisClient(),
 		dm.GetEncryptService(),
 		dm.GetLogger(),
 	)
@@ -63,7 +64,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		}()
 
 		go func() {
-			redisChan <- dm.GetRedisWrapper().Ping(ctx)
+			redisChan <- apredis.Ping(ctx, dm.GetRedisClient())
 		}()
 
 		dbOk := <-dbChan
@@ -91,7 +92,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		dm.GetConfig(),
 		authService,
 		dm.GetDatabase(),
-		dm.GetRedisWrapper(),
+		dm.GetRedisClient(),
 		dm.GetConnectorsService(),
 		dm.GetHttpf(),
 		dm.GetEncryptService(),
@@ -101,7 +102,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		dm.GetConfig(),
 		authService,
 		dm.GetDatabase(),
-		dm.GetRedisWrapper(),
+		dm.GetRedisClient(),
 		dm.GetConnectorsService(),
 		dm.GetHttpf(),
 		dm.GetEncryptService(),
@@ -122,7 +123,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		dm.GetConfig(),
 		authService,
 		dm.GetDatabase(),
-		dm.GetRedisWrapper(),
+		dm.GetRedisClient(),
 		dm.GetHttpf(),
 		dm.GetEncryptService(),
 		logger,
@@ -150,7 +151,7 @@ func Serve(cfg config.C) {
 	}
 
 	// Close redis connections when we exit
-	defer dm.GetRedisWrapper().Close()
+	defer dm.GetRedisClient().Close()
 
 	dm.AutoMigrateAll()
 

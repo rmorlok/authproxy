@@ -12,14 +12,14 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/apredis"
+	dbmock "github.com/rmorlok/authproxy/apredis/mock"
 	auth2 "github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/httpf"
 	jwt2 "github.com/rmorlok/authproxy/jwt"
-	"github.com/rmorlok/authproxy/redis"
-	dbmock "github.com/rmorlok/authproxy/redis/mock"
 	"github.com/rmorlok/authproxy/test_utils"
 	"github.com/stretchr/testify/require"
 )
@@ -40,7 +40,7 @@ func TestActorsRoutes(t *testing.T) {
 		// Real DB for actors to simplify pagination/cursor behavior
 		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
 		// Real redis config (in-memory test) for httpf factory
-		cfg, rds := redis.MustApplyTestConfig(cfg)
+		cfg, rds := apredis.MustApplyTestConfig(cfg)
 		// Auth service bound to this DB
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(config.ServiceIdApi, cfg, db)
 		// Test encrypt service and http factory
@@ -54,7 +54,7 @@ func TestActorsRoutes(t *testing.T) {
 
 		// gomock controller (only for redis mock if we needed, but kept for parity)
 		ctrl := gomock.NewController(t)
-		_ = dbmock.NewMockR(ctrl) // not used; ensure gomock finalized
+		_ = dbmock.NewMockClient(ctrl) // not used; ensure gomock finalized
 
 		return &TestSetup{
 			Gin:      r,

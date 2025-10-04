@@ -5,8 +5,8 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/request_log"
 	"gopkg.in/h2non/gentleman.v2"
 	"gopkg.in/h2non/gentleman.v2/plugins/transport"
@@ -14,7 +14,7 @@ import (
 
 type clientFactory struct {
 	cfg         config.C
-	r           redis.R
+	r           apredis.Client
 	logger      *slog.Logger
 	requestInfo request_log.RequestInfo
 
@@ -24,7 +24,7 @@ type clientFactory struct {
 	topLevelOnce sync.Once
 }
 
-func CreateFactory(cfg config.C, r redis.R, logger *slog.Logger) F {
+func CreateFactory(cfg config.C, r apredis.Client, logger *slog.Logger) F {
 	return &clientFactory{
 		cfg:    cfg,
 		r:      r,

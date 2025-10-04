@@ -8,13 +8,13 @@ import (
 	"github.com/google/uuid"
 	asynqmock "github.com/rmorlok/authproxy/apasynq/mock"
 	"github.com/rmorlok/authproxy/aplog"
+	redismock "github.com/rmorlok/authproxy/apredis/mock"
 	auth2 "github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/connectors"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/httpf"
-	redismock "github.com/rmorlok/authproxy/redis/mock"
 	"github.com/rmorlok/authproxy/test_utils"
 	"github.com/stretchr/testify/require"
 	"net/http"
@@ -58,7 +58,7 @@ func TestConnectors(t *testing.T) {
 		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(config.ServiceIdApi, cfg, db)
-		rs := redismock.NewMockR(ctrl)
+		rs := redismock.NewMockClient(ctrl)
 		h := httpf2.CreateFactory(cfg, rs, aplog.NewNoopLogger())
 		c := connectors.NewConnectorsService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		require.NoError(t, c.MigrateConnectors(context.Background()))

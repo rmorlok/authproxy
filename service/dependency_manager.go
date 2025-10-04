@@ -7,15 +7,14 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/pkg/errors"
-	"github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/aplog"
+	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/connectors"
 	connectorsinterface "github.com/rmorlok/authproxy/connectors/interface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
-	rediswrapper "github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/request_log"
 )
 
@@ -24,7 +23,7 @@ type DependencyManager struct {
 	cfg            config.C
 	logBuilder     aplog.Builder
 	logger         *slog.Logger
-	r              rediswrapper.R
+	r              apredis.Client
 	db             database.DB
 	httpf          httpf.F
 	logRetriever   request_log.LogRetriever
@@ -75,20 +74,16 @@ func (dm *DependencyManager) GetLogger() *slog.Logger {
 	return dm.logger
 }
 
-func (dm *DependencyManager) GetRedisWrapper() rediswrapper.R {
+func (dm *DependencyManager) GetRedisClient() apredis.Client {
 	if dm.r == nil {
 		var err error
-		dm.r, err = rediswrapper.New(context.Background(), dm.GetConfig(), dm.GetLogger())
+		dm.r, err = apredis.NewForRoot(context.Background(), dm.GetConfig().GetRoot())
 		if err != nil {
 			panic(err)
 		}
 	}
 
 	return dm.r
-}
-
-func (dm *DependencyManager) GetRedisClient() *redis.Client {
-	return dm.GetRedisWrapper().Client()
 }
 
 func (dm *DependencyManager) GetDatabase() database.DB {
@@ -107,12 +102,13 @@ func (dm *DependencyManager) GetDatabase() database.DB {
 func (dm *DependencyManager) AutoMigrateDatabase() {
 	if dm.GetConfigRoot().Database.GetAutoMigrate() {
 		func() {
-			m := dm.GetRedisWrapper().NewMutex(
+			m := apredis.NewMutex(
+				dm.GetRedisClient(),
 				database.MigrateMutexKeyName,
-				rediswrapper.MutexOptionLockFor(dm.GetConfigRoot().Database.GetAutoMigrationLockDuration()),
-				rediswrapper.MutexOptionRetryFor(dm.GetConfigRoot().Database.GetAutoMigrationLockDuration()+1*time.Second),
-				rediswrapper.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
-				rediswrapper.MutexOptionDetailedLockMetadata(),
+				apredis.MutexOptionLockFor(dm.GetConfigRoot().Database.GetAutoMigrationLockDuration()),
+				apredis.MutexOptionRetryFor(dm.GetConfigRoot().Database.GetAutoMigrationLockDuration()+1*time.Second),
+				apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
+				apredis.MutexOptionDetailedLockMetadata(),
 			)
 			err := m.Lock(context.Background())
 			if err != nil {
@@ -129,7 +125,7 @@ func (dm *DependencyManager) AutoMigrateDatabase() {
 
 func (dm *DependencyManager) GetHttpf() httpf.F {
 	if dm.httpf == nil {
-		dm.httpf = httpf.CreateFactory(dm.GetConfig(), dm.GetRedisWrapper(), dm.GetLogger())
+		dm.httpf = httpf.CreateFactory(dm.GetConfig(), dm.GetRedisClient(), dm.GetLogger())
 	}
 
 	return dm.httpf
@@ -137,7 +133,7 @@ func (dm *DependencyManager) GetHttpf() httpf.F {
 
 func (dm *DependencyManager) GetRequestLogRetriever() request_log.LogRetriever {
 	if dm.logRetriever == nil {
-		dm.logRetriever = request_log.NewRetrievalService(dm.GetRedisWrapper(), dm.GetConfig().GetGlobalKey())
+		dm.logRetriever = request_log.NewRetrievalService(dm.GetRedisClient(), dm.GetConfig().GetGlobalKey())
 	}
 
 	return dm.logRetriever
@@ -145,7 +141,7 @@ func (dm *DependencyManager) GetRequestLogRetriever() request_log.LogRetriever {
 
 func (dm *DependencyManager) AutoMigrateLogRetriever() {
 	if dm.GetConfigRoot().HttpLogging.GetAutoMigrate() {
-		err := request_log.Migrate(context.Background(), dm.GetRedisWrapper(), dm.GetLogger())
+		err := request_log.Migrate(context.Background(), dm.GetRedisClient(), dm.GetLogger())
 		if err != nil {
 			panic(err)
 		}
@@ -182,7 +178,7 @@ func (dm *DependencyManager) GetConnectorsService() connectorsinterface.C {
 			dm.GetConfig(),
 			dm.GetDatabase(),
 			dm.GetEncryptService(),
-			dm.GetRedisWrapper(),
+			dm.GetRedisClient(),
 			dm.GetHttpf(),
 			dm.GetAsyncClient(),
 			dm.GetLogger(),
@@ -195,12 +191,13 @@ func (dm *DependencyManager) GetConnectorsService() connectorsinterface.C {
 func (dm *DependencyManager) AutoMigrateConnectors() {
 	if dm.GetConfigRoot().Connectors.GetAutoMigrate() {
 		func() {
-			m := dm.GetRedisWrapper().NewMutex(
+			m := apredis.NewMutex(
+				dm.GetRedisClient(),
 				connectors.MigrateMutexKeyName,
-				rediswrapper.MutexOptionLockFor(dm.GetConfigRoot().Connectors.GetAutoMigrationLockDurationOrDefault()),
-				rediswrapper.MutexOptionRetryFor(dm.GetConfigRoot().Connectors.GetAutoMigrationLockDurationOrDefault()+1*time.Second),
-				rediswrapper.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
-				rediswrapper.MutexOptionDetailedLockMetadata(),
+				apredis.MutexOptionLockFor(dm.GetConfigRoot().Connectors.GetAutoMigrationLockDurationOrDefault()),
+				apredis.MutexOptionRetryFor(dm.GetConfigRoot().Connectors.GetAutoMigrationLockDurationOrDefault()+1*time.Second),
+				apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
+				apredis.MutexOptionDetailedLockMetadata(),
 			)
 			err := m.Lock(context.Background())
 			if err != nil {

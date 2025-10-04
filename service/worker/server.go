@@ -13,6 +13,7 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/aplog"
+	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/oauth2"
 	"github.com/rmorlok/authproxy/service"
@@ -64,7 +65,7 @@ func Serve(cfg config.C) {
 		}()
 
 		go func() {
-			redisChan <- dm.GetRedisWrapper().Ping(ctx)
+			redisChan <- apredis.Ping(ctx, dm.GetRedisClient())
 		}()
 
 		go func() {
@@ -120,7 +121,7 @@ func Serve(cfg config.C) {
 	oauth2TaskHandler := oauth2.NewTaskHandler(
 		cfg,
 		dm.GetDatabase(),
-		dm.GetRedisWrapper(),
+		dm.GetRedisClient(),
 		dm.GetConnectorsService(),
 		dm.GetAsyncClient(),
 		dm.GetHttpf(),
@@ -144,7 +145,7 @@ func Serve(cfg config.C) {
 	}()
 
 	scheduler := newScheduler(
-		dm.GetRedisWrapper(),
+		dm.GetRedisClient(),
 		asyncSchedulerHealthChecker,
 		dm.GetLogBuilder().WithComponent("scheduler").Build(),
 	).

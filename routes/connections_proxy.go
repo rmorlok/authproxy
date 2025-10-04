@@ -4,6 +4,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/api_common"
+	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/connectors/interface"
@@ -12,7 +13,6 @@ import (
 	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/oauth2"
 	"github.com/rmorlok/authproxy/proxy"
-	"github.com/rmorlok/authproxy/redis"
 	"log/slog"
 )
 
@@ -21,7 +21,7 @@ type ConnectionsProxyRoutes struct {
 	auth       auth.A
 	connectors _interface.C
 	db         database.DB
-	redis      redis.R
+	r          apredis.Client
 	httpf      httpf.F
 	encrypt    encrypt.E
 	oauthf     oauth2.Factory
@@ -150,7 +150,7 @@ func NewConnectionsProxyRoutes(
 	cfg config.C,
 	authService auth.A,
 	db database.DB,
-	redis redis.R,
+	r apredis.Client,
 	c _interface.C,
 	httpf httpf.F,
 	encrypt encrypt.E,
@@ -161,9 +161,9 @@ func NewConnectionsProxyRoutes(
 		auth:       authService,
 		connectors: c,
 		db:         db,
-		redis:      redis,
+		r:          r,
 		httpf:      httpf,
 		encrypt:    encrypt,
-		oauthf:     oauth2.NewFactory(cfg, db, redis, c, httpf, encrypt, logger),
+		oauthf:     oauth2.NewFactory(cfg, db, r, c, httpf, encrypt, logger),
 	}
 }

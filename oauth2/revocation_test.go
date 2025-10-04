@@ -2,6 +2,8 @@ package oauth2
 
 import (
 	"context"
+	"testing"
+
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	mockLog "github.com/rmorlok/authproxy/aplog/mock"
@@ -12,7 +14,6 @@ import (
 	mockH "github.com/rmorlok/authproxy/httpf/mock"
 	"github.com/stretchr/testify/require"
 	genmock "gopkg.in/h2non/gentleman-mock.v2"
-	"testing"
 )
 
 func TestSupportsRevokeRefreshToken(t *testing.T) {
@@ -49,7 +50,7 @@ func TestRevokeRefreshToken(t *testing.T) {
 			cfg:        nil,
 			db:         db,
 			httpf:      h,
-			redis:      nil,
+			r:          nil,
 			connectors: nil,
 			encrypt:    encrypt,
 			logger:     logger,

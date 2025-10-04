@@ -5,20 +5,20 @@ import (
 	"github.com/google/uuid"
 	mockAsynq "github.com/rmorlok/authproxy/apasynq/mock"
 	mockLog "github.com/rmorlok/authproxy/aplog/mock"
+	mockR "github.com/rmorlok/authproxy/apredis/mock"
 	"github.com/rmorlok/authproxy/connectors/interface"
 	mockDb "github.com/rmorlok/authproxy/database/mock"
 	mockE "github.com/rmorlok/authproxy/encrypt/mock"
 	mockF "github.com/rmorlok/authproxy/httpf/mock"
-	mockR "github.com/rmorlok/authproxy/redis/mock"
 	"testing"
 
 	"github.com/rmorlok/authproxy/database"
 )
 
-func FullMockService(tb testing.TB, ctrl *gomock.Controller) (*service, *mockDb.MockDB, *mockR.MockR, *mockF.MockF, *mockAsynq.MockClient, *mockE.MockE) {
+func FullMockService(tb testing.TB, ctrl *gomock.Controller) (*service, *mockDb.MockDB, *mockR.MockClient, *mockF.MockF, *mockAsynq.MockClient, *mockE.MockE) {
 	db := mockDb.NewMockDB(ctrl)
 	ac := mockAsynq.NewMockClient(ctrl)
-	rs := mockR.NewMockR(ctrl)
+	r := mockR.NewMockClient(ctrl)
 	h := mockF.NewMockF(ctrl)
 	encrypt := mockE.NewMockE(ctrl)
 	logger, _ := mockLog.NewTestLogger(tb)
@@ -29,9 +29,9 @@ func FullMockService(tb testing.TB, ctrl *gomock.Controller) (*service, *mockDb.
 		encrypt: encrypt,
 		ac:      ac,
 		httpf:   h,
-		redis:   rs,
+		r:       r,
 		logger:  logger,
-	}, db, rs, h, ac, encrypt
+	}, db, r, h, ac, encrypt
 }
 
 func TestGetConnectorVersionIdsForConnections(t *testing.T) {

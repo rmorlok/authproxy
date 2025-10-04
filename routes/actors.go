@@ -4,12 +4,12 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/api_common"
+	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
-	"github.com/rmorlok/authproxy/redis"
 	"github.com/rmorlok/authproxy/util"
 	"github.com/rmorlok/authproxy/util/pagination"
 
@@ -22,7 +22,7 @@ type ActorsRoutes struct {
 	cfg     config.C
 	auth    auth.A
 	db      database.DB
-	redis   redis.R
+	r       apredis.Client
 	httpf   httpf.F
 	encrypt encrypt.E
 	logger  *slog.Logger
@@ -448,7 +448,7 @@ func NewActorsRoutes(
 	cfg config.C,
 	authService auth.A,
 	db database.DB,
-	redis redis.R,
+	r apredis.Client,
 	httpf httpf.F,
 	encrypt encrypt.E,
 	logger *slog.Logger,
@@ -457,7 +457,7 @@ func NewActorsRoutes(
 		cfg:     cfg,
 		auth:    authService,
 		db:      db,
-		redis:   redis,
+		r:       r,
 		httpf:   httpf,
 		encrypt: encrypt,
 		logger:  logger,

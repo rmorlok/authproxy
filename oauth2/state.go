@@ -8,12 +8,12 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/apctx"
+	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/config"
 	connIface "github.com/rmorlok/authproxy/connectors/interface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
-	"github.com/rmorlok/authproxy/redis"
 	"log/slog"
 	"time"
 )
@@ -63,7 +63,7 @@ func (o *oAuth2Connection) saveStateToRedis(ctx context.Context, actor database.
 		ExpiresAt:        time.Now().Add(ttl),
 		ReturnToUrl:      returnToUrl,
 	}
-	result := o.redis.Client().Set(ctx, getStateRedisKey(stateId), s, ttl)
+	result := o.r.Set(ctx, getStateRedisKey(stateId), s, ttl)
 	if result.Err() != nil {
 		return errors.Wrapf(result.Err(), "failed to set state in redis for connector %s", o.cv.GetID())
 	}
@@ -77,7 +77,7 @@ func getOAuth2State(
 	ctx context.Context,
 	cfg config.C,
 	db database.DB,
-	redis redis.R,
+	r apredis.Client,
 	c connIface.C,
 	httpf httpf.F,
 	encrypt encrypt.E,
@@ -90,7 +90,7 @@ func getOAuth2State(
 		"actor_id", actor.ID,
 	)
 
-	result := redis.Client().Get(ctx, getStateRedisKey(stateId))
+	result := r.Get(ctx, getStateRedisKey(stateId))
 
 	if result.Err() != nil {
 		return nil, errors.Wrapf(result.Err(), "failed to get oauth state from redis for id %s", stateId.String())
@@ -140,10 +140,10 @@ func getOAuth2State(
 
 	// TODO: add connector validation to make sure the connection is of the specified connector type once connections get mapped to connectors
 
-	o := newOAuth2(cfg, db, redis, c, encrypt, logger, httpf, *connection, cv)
+	o := newOAuth2(cfg, db, r, c, encrypt, logger, httpf, *connection, cv)
 	o.state = &s
 
-	deleteResult := redis.Client().Del(ctx, getStateRedisKey(stateId))
+	deleteResult := r.Del(ctx, getStateRedisKey(stateId))
 	if deleteResult.Err() != nil {
 		return nil, errors.Wrapf(result.Err(), "failed to delete oauth state from redis for id %s", stateId.String())
 	}

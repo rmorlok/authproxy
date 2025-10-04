@@ -3,30 +3,30 @@ package oauth2
 import (
 	"context"
 	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/config"
 	connIface "github.com/rmorlok/authproxy/connectors/interface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
-	"github.com/rmorlok/authproxy/redis"
 	"log/slog"
 )
 
 type factory struct {
 	cfg        config.C
 	db         database.DB
-	redis      redis.R
+	redis      apredis.Client
 	connectors connIface.C
 	httpf      httpf.F
 	encrypt    encrypt.E
 	logger     *slog.Logger
 }
 
-func NewFactory(cfg config.C, db database.DB, redis redis.R, c connIface.C, httpf httpf.F, encrypt encrypt.E, logger *slog.Logger) Factory {
+func NewFactory(cfg config.C, db database.DB, r apredis.Client, c connIface.C, httpf httpf.F, encrypt encrypt.E, logger *slog.Logger) Factory {
 	return &factory{
 		cfg:        cfg,
 		db:         db,
-		redis:      redis,
+		redis:      r,
 		connectors: c,
 		httpf:      httpf,
 		encrypt:    encrypt,

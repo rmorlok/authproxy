@@ -1,11 +1,12 @@
-package redis
+package apredis
 
 import (
 	"context"
+	"time"
+
 	"github.com/bsm/redislock"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/apctx"
-	"time"
 )
 
 type Mutex interface {
@@ -113,10 +114,10 @@ func MutexOptionRetryFor(d time.Duration) MutexOption {
 
 // NewMutex creates a new mutex. Unless options are specified this mutex will not retry to obtain the lock. The
 // default lock time is 1 minute.
-func (w *wrapper) NewMutex(key string, options ...MutexOption) Mutex {
+func NewMutex(r Client, key string, options ...MutexOption) Mutex {
 	m := &mutex{
 		key:             key,
-		lockClient:      w.lockClient,
+		lockClient:      redislock.New(r),
 		initialLockTime: 1 * time.Minute,
 	}
 

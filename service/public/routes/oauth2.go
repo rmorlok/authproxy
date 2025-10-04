@@ -5,6 +5,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/api_common"
+	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/connectors/interface"
@@ -12,7 +13,6 @@ import (
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/oauth2"
-	"github.com/rmorlok/authproxy/redis"
 	"log/slog"
 	"net/http"
 )
@@ -21,7 +21,7 @@ type Oauth2Routes struct {
 	cfg         config.C
 	authService auth.A
 	db          database.DB
-	redis       redis.R
+	r           apredis.Client
 	httpf       httpf.F
 	encrypt     encrypt.E
 	oauthf      oauth2.Factory
@@ -182,7 +182,7 @@ func NewOauth2Routes(
 	cfg config.C,
 	authService auth.A,
 	db database.DB,
-	redis redis.R,
+	r apredis.Client,
 	c _interface.C,
 	httpf httpf.F,
 	encrypt encrypt.E,
@@ -192,9 +192,9 @@ func NewOauth2Routes(
 		cfg:         cfg,
 		authService: authService,
 		db:          db,
-		redis:       redis,
+		r:           r,
 		httpf:       httpf,
 		encrypt:     encrypt,
-		oauthf:      oauth2.NewFactory(cfg, db, redis, c, httpf, encrypt, logger),
+		oauthf:      oauth2.NewFactory(cfg, db, r, c, httpf, encrypt, logger),
 	}
 }

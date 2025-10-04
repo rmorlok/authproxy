@@ -7,7 +7,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/rmorlok/authproxy/redis"
+	"github.com/rmorlok/authproxy/apredis"
 )
 
 const (
@@ -47,13 +47,14 @@ const MigrateMutexKeyName = "request-log-migrate-lock"
 
 const RequestLogRedisIndexName = "request_log_index_v1"
 
-func Migrate(ctx context.Context, rs redis.R, l *slog.Logger) error {
-	m := rs.NewMutex(
+func Migrate(ctx context.Context, rs apredis.Client, l *slog.Logger) error {
+	m := apredis.NewMutex(
+		rs,
 		MigrateMutexKeyName,
-		redis.MutexOptionLockFor(5*time.Second),
-		redis.MutexOptionRetryFor(6*time.Second),
-		redis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 2*time.Second),
-		redis.MutexOptionDetailedLockMetadata(),
+		apredis.MutexOptionLockFor(5*time.Second),
+		apredis.MutexOptionRetryFor(6*time.Second),
+		apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 2*time.Second),
+		apredis.MutexOptionDetailedLockMetadata(),
 	)
 	err := m.Lock(context.Background())
 	if err != nil {
@@ -62,7 +63,7 @@ func Migrate(ctx context.Context, rs redis.R, l *slog.Logger) error {
 	defer m.Unlock(context.Background())
 
 	l.Info("checking if request log redis index exists")
-	client := rs.Client()
+	client := rs
 	_, err = client.Info(context.Background(), RequestLogRedisIndexName).Result()
 	if err == nil {
 		l.Info("request log redis index already exists")
