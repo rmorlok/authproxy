@@ -1,6 +1,8 @@
 package connectors
 
 import (
+	"testing"
+
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	mockAsynq "github.com/rmorlok/authproxy/apasynq/mock"
@@ -10,7 +12,6 @@ import (
 	mockDb "github.com/rmorlok/authproxy/database/mock"
 	mockE "github.com/rmorlok/authproxy/encrypt/mock"
 	mockF "github.com/rmorlok/authproxy/httpf/mock"
-	"testing"
 
 	"github.com/rmorlok/authproxy/database"
 )

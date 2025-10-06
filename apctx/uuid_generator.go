@@ -2,6 +2,7 @@ package apctx
 
 import (
 	"context"
+
 	"github.com/google/uuid"
 )
 
@@ -64,6 +65,28 @@ func GetUuidGenerator(ctx context.Context) UuidGenerator {
 	return val.(UuidGenerator)
 }
 
+// WithUuidGenerator sets a UUID generator on the context.
 func WithUuidGenerator(ctx context.Context, generator UuidGenerator) context.Context {
 	return context.WithValue(ctx, uuidGeneratorKey, generator)
+}
+
+type fixedUuidGenerator struct {
+	uuid uuid.UUID
+}
+
+func (g *fixedUuidGenerator) NewUUID() (uuid.UUID, error) {
+	return g.uuid, nil
+}
+
+func (g *fixedUuidGenerator) New() uuid.UUID {
+	return g.uuid
+}
+
+func (g *fixedUuidGenerator) NewString() string {
+	return g.uuid.String()
+}
+
+// WithFixedUuidGenerator sets a fixed UUID generator on the context that will always return the same UUID.
+func WithFixedUuidGenerator(ctx context.Context, u uuid.UUID) context.Context {
+	return WithUuidGenerator(ctx, &fixedUuidGenerator{uuid: u})
 }

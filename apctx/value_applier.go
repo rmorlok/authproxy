@@ -15,8 +15,8 @@ func (va *valueApplier) ContextWith(ctx context.Context) context.Context {
 //
 // e.g. ctx := context.Context().
 //
-//	With(util.Set("dog", "woof")).
-//	With(util.Set("cat", "meow"))
+//	ContextWith(util.Set("dog", "woof")).
+//	ContextWith(util.Set("cat", "meow"))
 func Set(key string, value interface{}) WithApplier {
 	return &valueApplier{key, value}
 }

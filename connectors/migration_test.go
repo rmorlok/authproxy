@@ -3,6 +3,9 @@ package connectors
 import (
 	"context"
 	"database/sql"
+	"log/slog"
+	"testing"
+
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/apasynq"
@@ -17,8 +20,6 @@ import (
 	"github.com/rmorlok/authproxy/test_utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"log/slog"
-	"testing"
 )
 
 func TestService(t *testing.T) {

@@ -6,19 +6,20 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/apctx"
 )
 
 // RoundTrip implements the http.RoundTripper interface
 func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
+	ctx := req.Context()
 	var responseBodyReader *io.PipeReader
 	var requestBodyBuf *bytes.Buffer
 
 	// Generate a unique ID for this request
-	id := uuid.New()
+	id := apctx.GetUuidGenerator(ctx).New()
 
 	// Record start time
-	startTime := time.Now()
+	startTime := apctx.GetClock(ctx).Now()
 
 	if t.recordFullRequest && t.maxFullRequestSize > 0 && req.Body != nil {
 		// Create a buffer to store the request body
@@ -42,8 +43,9 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	// Create a log entry
 	entry := &Entry{
-		ID:        id,
-		Timestamp: startTime,
+		ID:            id,
+		CorrelationID: apctx.CorrelationID(ctx),
+		Timestamp:     startTime,
 		Request: EntryRequest{
 			URL:           req.URL.String(),
 			HttpVersion:   req.Proto,
@@ -61,7 +63,12 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 		entry.Response.Err = err.Error()
 
 		// Store the entry in Redis asynchronously
-		go t.storeEntryInRedis(entry, requestBodyBuf, responseBodyReader)
+		go func() {
+			err := t.persistEntry(entry, requestBodyBuf, responseBodyReader)
+			if err != nil {
+				t.logger.Error("error storing HTTP log entry in Redis", "error", err, "entry_id", entry.ID.String(), "correlation_id", entry.CorrelationID)
+			}
+		}()
 
 		return resp, err
 	}
@@ -92,7 +99,12 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 	}
 
 	// Store the entry in Redis asynchronously
-	go t.storeEntryInRedis(entry, requestBodyBuf, responseBodyReader)
+	go func() {
+		err := t.persistEntry(entry, requestBodyBuf, responseBodyReader)
+		if err != nil {
+			t.logger.Error("error storing HTTP log entry in Redis", "error", err, "entry_id", entry.ID.String(), "correlation_id", entry.CorrelationID)
+		}
+	}()
 
 	return resp, nil
 }

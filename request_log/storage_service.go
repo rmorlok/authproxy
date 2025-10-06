@@ -22,6 +22,7 @@ type redisLogger struct {
 	maxFullRequestSize    uint64
 	maxFullResponseSize   uint64
 	transport             http.RoundTripper
+	persistEntry          func(*Entry, *bytes.Buffer, *io.PipeReader) error // So test can override
 }
 
 func NewRedisLogger(
@@ -35,7 +36,7 @@ func NewRedisLogger(
 	maxFullResponseSize uint64,
 	transport http.RoundTripper,
 ) Logger {
-	return &redisLogger{
+	l := &redisLogger{
 		r:                     r,
 		logger:                logger,
 		requestInfo:           requestInfo,
@@ -46,6 +47,11 @@ func NewRedisLogger(
 		maxFullResponseSize:   maxFullResponseSize,
 		transport:             transport,
 	}
+
+	// Apply default behavior
+	l.persistEntry = l.storeEntryInRedis
+
+	return l
 }
 
 // storeEntryInRedis stores the log entry in Redis. Note that this method logs errors as well as returns them because
