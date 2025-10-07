@@ -59,7 +59,6 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 	// If there was an error, log it
 	if err != nil {
 		entry.Response.StatusCode = http.StatusInternalServerError
-		entry.Response.Headers = make(map[string][]string)
 		entry.Response.Err = err.Error()
 
 		// Store the entry in Redis asynchronously
