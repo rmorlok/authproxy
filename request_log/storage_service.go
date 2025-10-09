@@ -19,8 +19,9 @@ type redisLogger struct {
 	expiration            time.Duration
 	recordFullRequest     bool
 	fullRequestExpiration time.Duration
-	maxFullRequestSize    uint64
-	maxFullResponseSize   uint64
+	maxFullRequestSize    uint64        // The largest full request size to store
+	maxFullResponseSize   uint64        // The largest full response size to store
+	maxResponseWait       time.Duration // The longest amount of time to wait for the full response to be consumed before logging
 	transport             http.RoundTripper
 	persistEntry          func(*Entry, *bytes.Buffer, *io.PipeReader) error // So test can override
 }
@@ -34,6 +35,7 @@ func NewRedisLogger(
 	fullRequestExpiration time.Duration,
 	maxFullRequestSize uint64,
 	maxFullResponseSize uint64,
+	maxResponseWait time.Duration,
 	transport http.RoundTripper,
 ) Logger {
 	l := &redisLogger{
@@ -45,6 +47,7 @@ func NewRedisLogger(
 		fullRequestExpiration: fullRequestExpiration,
 		maxFullRequestSize:    maxFullRequestSize,
 		maxFullResponseSize:   maxFullResponseSize,
+		maxResponseWait:       maxResponseWait,
 		transport:             transport,
 	}
 

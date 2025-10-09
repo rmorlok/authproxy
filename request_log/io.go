@@ -13,23 +13,21 @@ type trackingReader interface {
 	Done() <-chan interface{}
 }
 
-/* // wrappedReadCloser is a ReadCloser that wraps an io.Reader and an io.Closer
-type wrappedReadCloser struct {
-	io.Reader
-	closer     io.ReadCloser
-	pipeWriter *io.PipeWriter
+// noOpTrackingReader is a no-op implementation of trackingReader. Used when there isn't a response body to track.
+type noOpTrackingReader struct{}
+
+func (n *noOpTrackingReader) BytesRead() int64 {
+	return 0
 }
 
-// Read reads from the underlying reader
-func (w *wrappedReadCloser) Read(p []byte) (n int, err error) {
-	return w.Reader.Read(p)
+func (n *noOpTrackingReader) Done() <-chan interface{} {
+	// Done immediately
+	c := make(chan interface{})
+	close(c)
+	return c
 }
 
-// Close closes the underlying closer
-func (w *wrappedReadCloser) Close() error {
-	w.pipeWriter.Close()
-	return w.closer.Close()
-}*/
+var _ trackingReader = &noOpTrackingReader{}
 
 // splitReadCloser combines an io.Reader with multip io.Closer that can be separate.
 // The last closer will determine the return value for close. It also tracks the number of bytes read.
@@ -38,6 +36,14 @@ type splitReadCloser struct {
 	closers   []io.Closer
 	bytesRead int64
 	done      chan interface{}
+}
+
+func newSplitReadCloser(r io.Reader, closers ...io.Closer) *splitReadCloser {
+	return &splitReadCloser{
+		reader:  r,
+		closers: closers,
+		done:    make(chan interface{}),
+	}
 }
 
 // Read delegates to the embedded reader
@@ -79,6 +85,13 @@ type trackingReadCloser struct {
 	io.ReadCloser
 	bytesRead int64
 	done      chan interface{}
+}
+
+func newTrackingReadCloser(r io.ReadCloser) *trackingReadCloser {
+	return &trackingReadCloser{
+		ReadCloser: r,
+		done:       make(chan interface{}),
+	}
 }
 
 // Read delegates to the embedded reader

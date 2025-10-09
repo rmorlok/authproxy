@@ -21,41 +21,40 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 	id := apctx.GetUuidGenerator(ctx).New()
 
 	// Record start time
-	startTime := apctx.GetClock(ctx).Now()
+	clock := apctx.GetClock(ctx)
+	startTime := clock.Now()
 
-	if t.recordFullRequest && t.maxFullRequestSize > 0 && req.Body != nil {
-		// Create a buffer to store the request body
-		requestBodyBuf = &bytes.Buffer{}
+	if req.Body != nil {
+		if t.recordFullRequest && t.maxFullRequestSize > 0 {
+			// Create a buffer to store the request body
+			requestBodyBuf = &bytes.Buffer{}
 
-		// Create a TeeReader that copies to our buffer but passes through all data
-		bodyReader := io.TeeReader(
-			io.LimitReader(req.Body, int64(t.maxFullRequestSize)),
-			requestBodyBuf,
-		)
+			// Create a TeeReader that copies to our buffer but passes through all data
+			bodyReader := io.TeeReader(
+				io.LimitReader(req.Body, int64(t.maxFullRequestSize)),
+				requestBodyBuf,
+			)
 
-		// Split the reader so the data is read from the tee reader, but the close happens on the body
-		split := &splitReadCloser{
-			reader:  bodyReader,
-			closers: []io.Closer{req.Body},
+			// Split the reader so the data is read from the tee reader, but the close happens on the body
+			split := newSplitReadCloser(bodyReader, req.Body)
+
+			// Standardize the tracking of response size regardless of if we are tracking the body
+			requestBodyTrackingReader = split
+
+			// Replace the request body with our reader while preserving the original closer
+			req.Body = split
+		} else {
+			// Track the body size
+			tracking := newTrackingReadCloser(req.Body)
+
+			// Standardize the tracking of response size regardless of if we are tracking the body
+			requestBodyTrackingReader = tracking
+
+			// Replace the body so it goes through our tracking
+			req.Body = tracking
 		}
-
-		// Standardize the tracking of response size regardless of if we are tracking the body
-		requestBodyTrackingReader = split
-
-		// Replace the request body with our reader while preserving the original closer
-		req.Body = split
 	} else {
-		// Track the body size
-		tracking := &trackingReadCloser{
-			ReadCloser: req.Body,
-			done:       make(chan interface{}),
-		}
-
-		// Standardize the tracking of response size regardless of if we are tracking the body
-		requestBodyTrackingReader = tracking
-
-		// Replace the body so it goes through our tracking
-		req.Body = tracking
+		requestBodyTrackingReader = &noOpTrackingReader{}
 	}
 
 	// Execute the request
@@ -78,7 +77,7 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 			Headers:       req.Header,
 			ContentLength: reqContentLength,
 		},
-		MillisecondDuration: MillisecondDuration(time.Since(startTime)),
+		MillisecondDuration: MillisecondDuration(clock.Since(startTime)),
 	}
 
 	// If there was an error, log it
@@ -113,13 +112,7 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 		// Create a TeeReader to copy the response to our writer while still passing it through
 		teeReader := io.TeeReader(io.LimitReader(originalBody, int64(t.maxFullResponseSize)), responseBodyWriter)
 
-		bodyReader := &splitReadCloser{
-			reader: teeReader,
-			closers: []io.Closer{
-				originalBody,
-				responseBodyWriter,
-			},
-		}
+		bodyReader := newSplitReadCloser(teeReader, originalBody, responseBodyWriter)
 
 		// Track the response being read for size as well
 		responseBodyTrackingReader = bodyReader
@@ -128,10 +121,7 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 		resp.Body = bodyReader
 
 	} else {
-		bodyReader := &trackingReadCloser{
-			ReadCloser: resp.Body,
-			done:       make(chan interface{}),
-		}
+		bodyReader := newTrackingReadCloser(resp.Body)
 
 		// Track the response being read for size as well
 		responseBodyTrackingReader = bodyReader
@@ -143,12 +133,13 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Store the entry in Redis asynchronously
 	go func() {
 		select {
+		case <-ctx.Done():
 		case <-responseBodyTrackingReader.Done():
 			if entry.Response.ContentLength <= 0 {
 				entry.Response.ContentLength = responseBodyTrackingReader.BytesRead()
 			}
-		case <-time.After(60 * time.Second):
-			t.logger.Error("timed out waiting for response body to be read; entry will not have accurate size", "entry_id", entry.ID.String(), "correlation_id", entry.CorrelationID)
+		case <-time.After(t.maxResponseWait):
+			t.logger.Error("timed out waiting for response body to be read; entry will not have accurate size", "entry_id", entry.ID.String(), "correlation_id", entry.CorrelationID, "max_wait", t.maxResponseWait.String())
 		}
 
 		err := t.persistEntry(entry, requestBodyBuf, responseBodyReader)

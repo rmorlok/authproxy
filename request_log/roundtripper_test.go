@@ -266,6 +266,7 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 				transport:             mockTransport,
 				expiration:            time.Minute,
 				fullRequestExpiration: time.Minute,
+				maxResponseWait:       60 * time.Second,
 				persistEntry: func(e *Entry, req *bytes.Buffer, resp *io.PipeReader) error {
 					defer wg.Done()
 
@@ -298,6 +299,7 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 				resp.Body.Close()
 			}
 
+			start := time.Now()
 			wg.Wait()
 
 			if test.roundTripErr != nil {
@@ -308,6 +310,10 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 
 			if result == nil {
 				t.Fatal("persistEntry not invoked")
+			}
+
+			if time.Since(start) > time.Second {
+				t.Fatalf("persistEntry took too long: %v; this likely implies a deadlock that was broken by the max request timeout", time.Since(start))
 			}
 
 			// We can't control duration

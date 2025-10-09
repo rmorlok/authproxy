@@ -90,6 +90,7 @@ func TestStoreSummaryOnly_NoFullLog(t *testing.T) {
 		5*time.Minute,  // full expiration (unused)
 		1024,           // max req
 		1024,           // max resp
+		60*time.Second,
 		ft,
 	)
 
@@ -141,6 +142,7 @@ func TestStoreFullRequestAndResponse_JSONStored(t *testing.T) {
 		1*time.Minute, // full expiration
 		1<<20,         // 1MB max req
 		1<<20,         // 1MB max resp
+		60*time.Second,
 		ft,
 	)
 
@@ -190,7 +192,18 @@ func TestDirectStore_WritesKeys(t *testing.T) {
 	logger := newNoopLogger()
 
 	ft := &fakeTransport{status: 200, respBody: "ok", readReqBody: false}
-	ll := NewRedisLogger(r, logger, RequestInfo{Type: RequestTypePublic}, 1*time.Minute, true, 30*time.Second, 1024, 1024, ft)
+	ll := NewRedisLogger(
+		r,
+		logger,
+		RequestInfo{Type: RequestTypePublic},
+		1*time.Minute,
+		true,
+		30*time.Second,
+		1024,
+		1024,
+		60*time.Second,
+		ft,
+	)
 	rl := ll.(*redisLogger)
 
 	entry := &Entry{
@@ -246,6 +259,7 @@ func TestErrorRoundTrip_StoresError(t *testing.T) {
 		1*time.Minute,
 		1024,
 		1024,
+		60*time.Second,
 		errTransport,
 	)
 

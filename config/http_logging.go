@@ -29,6 +29,9 @@ type HttpLogging struct {
 	// MaxResponseSize is the max size of the response that will be stored. Values over this will be truncated.
 	MaxResponseSize *HumanByteSize `json:"max_response_size,omitempty" yaml:"max_response_size,omitempty"`
 
+	// MaxResponseWait is the maximum amount of time to wait for a response before logging it. Defaults to 60 seconds.
+	MaxResponseWait *HumanDuration `json:"max_response_wait" yaml:"max_response_wait"`
+
 	// FullRequestRecording flags if the full body/headers be logged for requests. Defaults to never, or can be enabled
 	// with API calls to specific resources, or always on.
 	FullRequestRecording *FullRequestRecording `json:"full_request_recording,omitempty" yaml:"full_request_recording,omitempty"`
@@ -117,4 +120,12 @@ func (d *HttpLogging) GetMaxResponseSize() uint64 {
 	}
 
 	return d.MaxResponseSize.Value()
+}
+
+func (d *HttpLogging) GetMaxResponseWait() time.Duration {
+	if d.MaxResponseWait == nil {
+		return 60 * time.Second
+	}
+
+	return d.MaxResponseWait.Duration
 }

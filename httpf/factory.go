@@ -79,6 +79,7 @@ func (f *clientFactory) New() *gentleman.Client {
 			recordFullRequest := root.HttpLogging.GetFullRequestRecording() == config.FullRequestRecordingAlways
 			maxFullRequestSize := root.HttpLogging.GetMaxRequestSize()
 			maxFullResponseSize := root.HttpLogging.GetMaxResponseSize()
+			maxResponseWait := root.HttpLogging.GetMaxResponseWait()
 			fullRequestExpiration := root.HttpLogging.GetFullRequestRetention()
 
 			l := request_log.NewRedisLogger(
@@ -90,6 +91,7 @@ func (f *clientFactory) New() *gentleman.Client {
 				fullRequestExpiration,
 				maxFullRequestSize,
 				maxFullResponseSize,
+				maxResponseWait,
 				http.DefaultTransport,
 			)
 
