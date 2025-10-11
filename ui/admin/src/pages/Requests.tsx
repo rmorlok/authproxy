@@ -2,6 +2,7 @@ import * as React from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
+import Drawer from '@mui/material/Drawer';
 import Typography from '@mui/material/Typography';
 import {DataGrid, GridColDef, GridSortModel} from '@mui/x-data-grid';
 import Chip from '@mui/material/Chip';
@@ -224,11 +225,13 @@ export default function Requests() {
     const [rowCount, setRowCount] = useState<number>(-1);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
+    const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
 
     const [page, setPage] = useQueryState<number>('page', parseAsInteger.withDefault(1));
     const [pageSize, setPageSize] = useQueryState<number>('page_size', parseAsInteger.withDefault(defaultPageSize));
     const [typeFilter, setTypeFilter] = useQueryState<string>('type', parseAsStringLiteral(stateVals).withDefault('')); // empty = all
     const [sort, setSort] = useQueryState<string>('sort', parseAsString.withDefault(''));
+    const [requestId, setRequestId] = useQueryState<string>('id', parseAsString.withDefault(''));
 
     const [hasNextPage, setHasNextPage] = useState<boolean>(false);
 
@@ -330,6 +333,10 @@ export default function Requests() {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, pageSize, sort, typeFilter]); // TODO: only page?
 
+    useEffect(() => {
+        setDrawerOpen(requestId !== '');
+    }, [requestId]);
+
     return (
         <Box sx={{width: '100%', maxWidth: {sm: '100%', md: '1700px'}}}>
             <Typography component="h2" variant="h6" sx={{mb: 2}}>
@@ -373,6 +380,13 @@ export default function Requests() {
                     }}
                     pageSizeOptions={[2, 5, 10, 20, 50, 100]}
                     rowCount={rowCount}
+                    onRowSelectionModelChange={(event) => {
+                        if(event.ids.size == 0) {
+                            setRequestId('');
+                        } else {
+                            setRequestId(event.ids.values().next().value);
+                        }
+                    }}
                     hideFooterSelectedRowCount
                     density="compact"
                     autosizeOnMount={true}
@@ -413,6 +427,12 @@ export default function Requests() {
                     <Typography color="error" sx={{ mt: 1 }}>{error}</Typography>
                 )}
             </Grid>
+            <Drawer
+                anchor="right"
+                open={drawerOpen}
+                onClose={() => setRequestId('')}>
+                Some detail here
+            </Drawer>
         </Box>
     );
 }
