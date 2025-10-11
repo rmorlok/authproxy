@@ -37,6 +37,9 @@ type EntryRecord struct {
 	ResponseHttpVersion string              `json:"response_http_version,omitempty"`
 	ResponseSizeBytes   int64               `json:"response_size_bytes,omitempty"`
 	ResponseMimeType    string              `json:"response_mime_type,omitempty"`
+	InternalTimeout     bool                `json:"internal_timeout,omitempty"`
+	RequestCancelled    bool                `json:"request_cancelled,omitempty"`
+	FullRequestRecorded bool                `json:"full_request_recorded,omitempty"`
 }
 
 func (e *EntryRecord) setRedisRecordFields(vals map[string]string) {
@@ -78,6 +81,15 @@ func (e *EntryRecord) setRedisRecordFields(vals map[string]string) {
 	vals[fieldResponseSizeBytes] = strconv.FormatInt(e.ResponseSizeBytes, 10)
 	if e.ResponseMimeType != "" {
 		vals[fieldResponseMimeType] = e.ResponseMimeType
+	}
+	if e.InternalTimeout {
+		vals[fieldInternalTimeout] = "t"
+	}
+	if e.RequestCancelled {
+		vals[fieldRequestCancelled] = "t"
+	}
+	if e.FullRequestRecorded {
+		vals[fieldFullRequestRecorded] = "t"
 	}
 }
 
@@ -146,6 +158,18 @@ func EntryRecordFromRedisFields(vals map[string]string) (*EntryRecord, error) {
 	}
 
 	er.ResponseMimeType = vals[fieldResponseMimeType]
+
+	if vals[fieldInternalTimeout] == "t" {
+		er.InternalTimeout = true
+	}
+
+	if vals[fieldRequestCancelled] == "t" {
+		er.RequestCancelled = true
+	}
+
+	if vals[fieldFullRequestRecorded] == "t" {
+		er.FullRequestRecorded = true
+	}
 
 	return er, nil
 }

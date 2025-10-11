@@ -32,6 +32,9 @@ const (
 	fieldResponseHttpVersion = "rspv"
 	fieldResponseSizeBytes   = "rspsz"
 	fieldResponseMimeType    = "rspmt"
+	fieldInternalTimeout     = "to"
+	fieldRequestCancelled    = "rc"
+	fieldFullRequestRecorded = "f"
 )
 
 func redisLogKey(requestId uuid.UUID) string {

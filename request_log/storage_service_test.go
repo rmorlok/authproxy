@@ -231,7 +231,7 @@ func TestDirectStore_WritesKeys(t *testing.T) {
 	}
 
 	// Call the actual method under test (no body stored)
-	err := rl.storeEntryInRedis(entry, nil, nil)
+	err := rl.storeEntryInRedis(entry)
 	require.NoError(t, err)
 
 	key := redisLogKey(entry.ID)

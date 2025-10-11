@@ -32,6 +32,9 @@ func TestEntryRecord(t *testing.T) {
 		ResponseHttpVersion: "HTTP/1.1",
 		ResponseSizeBytes:   321,
 		ResponseMimeType:    "text/html",
+		InternalTimeout:     true,
+		RequestCancelled:    true,
+		FullRequestRecorded: true,
 	}
 
 	t.Run("it roundtrips from redis fields", func(t *testing.T) {

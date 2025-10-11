@@ -87,7 +87,21 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 
 		// Store the entry in Redis asynchronously
 		go func() {
-			err := t.persistEntry(entry, requestBodyBuf, responseBodyReader)
+			if t.recordFullRequest {
+				if requestBodyBuf != nil {
+					requestData, err := io.ReadAll(requestBodyBuf)
+					if err != nil {
+						t.logger.Error("error reading full request body", "error", err, "entry_id", entry.ID.String())
+						entry.Request.Body = []byte(err.Error())
+					} else {
+						entry.Request.Body = requestData
+					}
+				}
+
+				// Because we are in an error case, the body cannot be assumed to be populated.
+			}
+
+			err := t.persistEntry(entry)
 			if err != nil {
 				t.logger.Error("error storing HTTP log entry in Redis", "error", err, "entry_id", entry.ID.String(), "correlation_id", entry.CorrelationID)
 			}
@@ -132,17 +146,44 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	// Store the entry in Redis asynchronously
 	go func() {
+		if t.recordFullRequest {
+			if requestBodyBuf != nil {
+				requestData, err := io.ReadAll(requestBodyBuf)
+				if err != nil {
+					t.logger.Error("error reading full request body", "error", err, "entry_id", entry.ID.String())
+					entry.Request.Body = []byte(err.Error())
+				} else {
+					entry.Request.Body = requestData
+				}
+			}
+
+			if responseBodyReader != nil {
+				responseData, err := io.ReadAll(responseBodyReader)
+				if err != nil {
+					t.logger.Error("error reading full request body", "error", err, "entry_id", entry.ID.String())
+					entry.Response.Body = []byte(err.Error())
+				} else {
+					entry.Response.Body = responseData
+				}
+			}
+		}
+
+		// This select should immediately return the body reader done if the full request is being recorded. This
+		// is to cover cases where we aren't recording the full response but need to wait for the client to fully
+		// consume the data.
 		select {
 		case <-ctx.Done():
+			entry.RequestCancelled = true
 		case <-responseBodyTrackingReader.Done():
 			if entry.Response.ContentLength <= 0 {
 				entry.Response.ContentLength = responseBodyTrackingReader.BytesRead()
 			}
 		case <-time.After(t.maxResponseWait):
+			entry.InternalTimeout = true
 			t.logger.Error("timed out waiting for response body to be read; entry will not have accurate size", "entry_id", entry.ID.String(), "correlation_id", entry.CorrelationID, "max_wait", t.maxResponseWait.String())
 		}
 
-		err := t.persistEntry(entry, requestBodyBuf, responseBodyReader)
+		err := t.persistEntry(entry)
 		if err != nil {
 			t.logger.Error("error storing HTTP log entry in Redis", "error", err, "entry_id", entry.ID.String(), "correlation_id", entry.CorrelationID)
 		}

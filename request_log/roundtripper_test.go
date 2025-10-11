@@ -2,6 +2,7 @@ package request_log
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"net/http"
 	"net/url"
@@ -266,20 +267,10 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 				transport:             mockTransport,
 				expiration:            time.Minute,
 				fullRequestExpiration: time.Minute,
-				maxResponseWait:       60 * time.Second,
-				persistEntry: func(e *Entry, req *bytes.Buffer, resp *io.PipeReader) error {
+				maxResponseWait:       5 * 60 * time.Second, // This is to make tests run really long if things aren't working
+				persistEntry: func(e *Entry) error {
 					defer wg.Done()
-
 					result = e
-
-					if req != nil {
-						result.Request.Body = req.Bytes()
-					}
-
-					if resp != nil {
-						result.Response.Body, _ = io.ReadAll(resp)
-					}
-
 					return nil
 				},
 			}
@@ -316,13 +307,243 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 				t.Fatalf("persistEntry took too long: %v; this likely implies a deadlock that was broken by the max request timeout", time.Since(start))
 			}
 
-			// We can't control duration
-			result.MillisecondDuration = test.expectedEntry.MillisecondDuration
+			// We freeze time so duration is zero
+			test.expectedEntry.MillisecondDuration = 0
 
 			require.Equal(t, test.response, resp)
 			require.Equal(t, test.expectedEntry, result)
 		})
 	}
+}
+
+func TestRedisLogger_RoundTrip_TimesOutAtConfiguredValue(t *testing.T) {
+	request := &http.Request{
+		Method:     "GET",
+		URL:        util.Must(url.Parse("http://example.com/path?q=1")),
+		Proto:      "HTTP/1.1",
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+			"Some":         []string{"header"},
+		},
+		Body:          io.NopCloser(bytes.NewBufferString(`{"some": "json"}`)),
+		ContentLength: int64(len([]byte(`{"some": "json"}`))),
+	}
+	response := &http.Response{
+		Status:     "200 OK",
+		StatusCode: http.StatusOK,
+		Proto:      "HTTP/2",
+		ProtoMajor: 2,
+		ProtoMinor: 0,
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+			"Other":        []string{"header"},
+		},
+		Body:          io.NopCloser(bytes.NewBufferString(`{"other": "json"}`)),
+		ContentLength: 0, // Unset directly, must be inferred from the response size
+	}
+	expectedEntry := &Entry{
+		ID:               uuid.New(),
+		CorrelationID:    "some-value",
+		Timestamp:        time.Now(),
+		InternalTimeout:  true,
+		RequestCancelled: false,
+		Request: EntryRequest{
+			URL:         "http://example.com/path?q=1",
+			HttpVersion: "HTTP/1.1",
+			Method:      "GET",
+			Headers: http.Header{
+				"Content-Type": []string{"application/json"},
+				"Some":         []string{"header"},
+			},
+			ContentLength: int64(len([]byte(`{"some": "json"}`))),
+			Body:          nil, // Not configured for full request logging
+		},
+		Response: EntryResponse{
+			HttpVersion: "HTTP/2",
+			StatusCode:  http.StatusOK,
+			Headers: http.Header{
+				"Content-Type": []string{"application/json"},
+				"Other":        []string{"header"},
+			},
+			ContentLength: 0,   // Does not get set because body not consumed
+			Body:          nil, // Not configured for full request logging
+		},
+	}
+
+	mockTransport := &mockRoundTripper{}
+	mockTransport.response = response
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	var result *Entry
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	rLogger := &redisLogger{
+		r:                     nil, // We are overriding the persistEntry method, so we don't need a redis client
+		logger:                logger,
+		recordFullRequest:     false,
+		maxFullRequestSize:    0,
+		maxFullResponseSize:   0,
+		transport:             mockTransport,
+		expiration:            time.Minute,
+		fullRequestExpiration: time.Minute,
+		maxResponseWait:       250 * time.Millisecond,
+		persistEntry: func(e *Entry) error {
+			defer wg.Done()
+			result = e
+			return nil
+		},
+	}
+
+	ctx := apctx.
+		NewBuilderBackground().
+		WithFixedUuidGenerator(expectedEntry.ID).
+		WithCorrelationID(expectedEntry.CorrelationID).
+		WithFixedClock(expectedEntry.Timestamp).
+		Build()
+
+	req := request.WithContext(ctx)
+	resp, _ := rLogger.RoundTrip(req)
+
+	if resp != nil && resp.Body != nil {
+		// Do not consume the body to force a timeout
+		// io.ReadAll(resp.Body)
+		// resp.Body.Close()
+	}
+
+	start := time.Now()
+	wg.Wait()
+
+	if result == nil {
+		t.Fatal("persistEntry not invoked")
+	}
+
+	if time.Since(start) > time.Second {
+		t.Fatalf("persistEntry took too long: %v; this likely implies a deadlock that was broken by the max request timeout", time.Since(start))
+	}
+
+	// We freeze time so duration is zero
+	expectedEntry.MillisecondDuration = 0
+
+	require.Equal(t, response, resp)
+	require.Equal(t, expectedEntry, result)
+}
+
+func TestRedisLogger_RoundTrip_TimesOutAtAtContextCancel(t *testing.T) {
+	request := &http.Request{
+		Method:     "GET",
+		URL:        util.Must(url.Parse("http://example.com/path?q=1")),
+		Proto:      "HTTP/1.1",
+		ProtoMajor: 1,
+		ProtoMinor: 1,
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+			"Some":         []string{"header"},
+		},
+		Body:          io.NopCloser(bytes.NewBufferString(`{"some": "json"}`)),
+		ContentLength: int64(len([]byte(`{"some": "json"}`))),
+	}
+	response := &http.Response{
+		Status:     "200 OK",
+		StatusCode: http.StatusOK,
+		Proto:      "HTTP/2",
+		ProtoMajor: 2,
+		ProtoMinor: 0,
+		Header: http.Header{
+			"Content-Type": []string{"application/json"},
+			"Other":        []string{"header"},
+		},
+		Body:          io.NopCloser(bytes.NewBufferString(`{"other": "json"}`)),
+		ContentLength: 0, // Unset directly, must be inferred from the response size
+	}
+	expectedEntry := &Entry{
+		ID:               uuid.New(),
+		CorrelationID:    "some-value",
+		Timestamp:        time.Now(),
+		InternalTimeout:  false,
+		RequestCancelled: true,
+		Request: EntryRequest{
+			URL:         "http://example.com/path?q=1",
+			HttpVersion: "HTTP/1.1",
+			Method:      "GET",
+			Headers: http.Header{
+				"Content-Type": []string{"application/json"},
+				"Some":         []string{"header"},
+			},
+			ContentLength: int64(len([]byte(`{"some": "json"}`))),
+			Body:          nil, // Not configured for full request logging
+		},
+		Response: EntryResponse{
+			HttpVersion: "HTTP/2",
+			StatusCode:  http.StatusOK,
+			Headers: http.Header{
+				"Content-Type": []string{"application/json"},
+				"Other":        []string{"header"},
+			},
+			ContentLength: 0,   // Does not get set because body not consumed
+			Body:          nil, // Not configured for full request logging
+		},
+	}
+
+	mockTransport := &mockRoundTripper{}
+	mockTransport.response = response
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	var result *Entry
+	wg := sync.WaitGroup{}
+	wg.Add(1)
+
+	rLogger := &redisLogger{
+		r:                     nil, // We are overriding the persistEntry method, so we don't need a redis client
+		logger:                logger,
+		recordFullRequest:     false,
+		maxFullRequestSize:    0,
+		maxFullResponseSize:   0,
+		transport:             mockTransport,
+		expiration:            time.Minute,
+		fullRequestExpiration: time.Minute,
+		maxResponseWait:       2 * time.Hour, // Really long so it will wait
+		persistEntry: func(e *Entry) error {
+			defer wg.Done()
+			result = e
+			return nil
+		},
+	}
+
+	ctx := apctx.
+		NewBuilderBackground().
+		WithFixedUuidGenerator(expectedEntry.ID).
+		WithCorrelationID(expectedEntry.CorrelationID).
+		WithFixedClock(expectedEntry.Timestamp).
+		Build()
+	ctx, cancel := context.WithCancel(ctx)
+
+	req := request.WithContext(ctx)
+	resp, _ := rLogger.RoundTrip(req)
+
+	if resp != nil && resp.Body != nil {
+		// Do not consume the body to force a timeout
+		// io.ReadAll(resp.Body)
+		// resp.Body.Close()
+	}
+
+	start := time.Now()
+	cancel()
+	wg.Wait()
+
+	if result == nil {
+		t.Fatal("persistEntry not invoked")
+	}
+
+	if time.Since(start) > time.Second {
+		t.Fatalf("persistEntry took too long: %v; this likely implies a deadlock that was broken by the max request timeout", time.Since(start))
+	}
+
+	// We freeze time so duration is zero
+	expectedEntry.MillisecondDuration = 0
+
+	require.Equal(t, response, resp)
+	require.Equal(t, expectedEntry, result)
 }
 
 type mockRoundTripper struct {

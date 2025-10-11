@@ -71,6 +71,8 @@ type Entry struct {
 	CorrelationID       string              `json:"cid"`
 	Timestamp           time.Time           `json:"ts"`
 	MillisecondDuration MillisecondDuration `json:"dur"`
+	InternalTimeout     bool                `json:"to,omitempty"`
+	RequestCancelled    bool                `json:"rc,omitempty"`
 	Request             EntryRequest        `json:"req"`
 	Response            EntryResponse       `json:"res"`
 }

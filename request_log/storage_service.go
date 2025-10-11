@@ -1,10 +1,8 @@
 package request_log
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
-	"io"
 	"log/slog"
 	"net/http"
 	"time"
@@ -23,7 +21,7 @@ type redisLogger struct {
 	maxFullResponseSize   uint64        // The largest full response size to store
 	maxResponseWait       time.Duration // The longest amount of time to wait for the full response to be consumed before logging
 	transport             http.RoundTripper
-	persistEntry          func(*Entry, *bytes.Buffer, *io.PipeReader) error // So test can override
+	persistEntry          func(*Entry) error // So test can override
 }
 
 func NewRedisLogger(
@@ -61,8 +59,6 @@ func NewRedisLogger(
 // errors will be ignored where this is called.
 func (t *redisLogger) storeEntryInRedis(
 	entry *Entry,
-	requestBodyBuf *bytes.Buffer,
-	responseBodyReader *io.PipeReader,
 ) error {
 	// Get the Redis client
 	client := t.r
@@ -71,6 +67,7 @@ func (t *redisLogger) storeEntryInRedis(
 	er := EntryRecord{}
 	t.requestInfo.setRedisRecordFields(&er)
 	entry.setRedisRecordFields(&er)
+	er.FullRequestRecorded = t.recordFullRequest
 
 	vals := make(map[string]string)
 	er.setRedisRecordFields(vals)
@@ -89,26 +86,6 @@ func (t *redisLogger) storeEntryInRedis(
 	}
 
 	if t.recordFullRequest {
-		if requestBodyBuf != nil {
-			requestData, err := io.ReadAll(requestBodyBuf)
-			if err != nil {
-				t.logger.Error("error reading full request body", "error", err, "entry_id", entry.ID.String())
-				entry.Request.Body = []byte(err.Error())
-			} else {
-				entry.Request.Body = requestData
-			}
-		}
-
-		if responseBodyReader != nil {
-			responseData, err := io.ReadAll(responseBodyReader)
-			if err != nil {
-				t.logger.Error("error reading full request body", "error", err, "entry_id", entry.ID.String())
-				entry.Response.Body = []byte(err.Error())
-			} else {
-				entry.Response.Body = responseData
-			}
-		}
-
 		jsonData, err := json.Marshal(entry)
 		if err != nil {
 			t.logger.Error("error serializing entry to JSON", "error", err, "entry_id", entry.ID.String())
