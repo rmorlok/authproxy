@@ -19,6 +19,7 @@ import dayjs from 'dayjs';
 import duration from 'dayjs/plugin/duration';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
 import {Tooltip} from "@mui/material";
+import RequestDetail from "../components/RequestDetail";
 
 dayjs.extend(duration);
 
@@ -430,8 +431,30 @@ export default function Requests() {
             <Drawer
                 anchor="right"
                 open={drawerOpen}
-                onClose={() => setRequestId('')}>
-                Some detail here
+                onClose={() => setRequestId('')}
+            >
+                <Box sx={{width: {xs: '100vw', sm: 520, md: 720}}}>
+                    {(() => {
+                        const rec = rows.find(r => r.request_id === requestId);
+                        if (!requestId) return null;
+                        if (rec && rec.full_request_recorded === false) {
+                            return (
+                                <Box sx={{p: 2}}>
+                                    <Typography variant="h6" sx={{mb: 1}}>Request Details</Typography>
+                                    <Typography variant="body2" color="text.secondary">
+                                        Full request/response was not recorded for this entry.
+                                    </Typography>
+                                </Box>
+                            );
+                        }
+                        return (
+                            // Lazy import at top not necessary; component is lightweight
+                            // eslint-disable-next-line @typescript-eslint/no-var-requires
+                            // <RequestDetail requestId={requestId} onClose={() => setRequestId('')} />
+                            <RequestDetail requestId={requestId} onClose={() => setRequestId('')} />
+                        );
+                    })()}
+                </Box>
             </Drawer>
         </Box>
     );
