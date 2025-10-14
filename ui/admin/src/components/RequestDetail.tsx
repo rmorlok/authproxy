@@ -18,7 +18,9 @@ import {
     Typography,
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
+import Chip, {ChipProps} from "@mui/material/Chip";
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import {Duration, HttpStatusChip, formatDuration} from '../util'
 import {getRequest, RequestEntry} from '../api';
 
 export interface RequestDetailProps {
@@ -166,7 +168,7 @@ export default function RequestDetail({requestId, onClose}: RequestDetailProps) 
     return (
         <Box sx={{width: {xs: '100vw', sm: 520, md: 720}, maxWidth: '100vw'}} role="presentation">
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{p: 1.5}}>
-                <Typography variant="h6">Request Details</Typography>
+                <Typography variant="h6">Request Detail</Typography>
                 <IconButton onClick={onClose} aria-label="Close details">
                     <CloseIcon/>
                 </IconButton>
@@ -185,11 +187,11 @@ export default function RequestDetail({requestId, onClose}: RequestDetailProps) 
                 <>
                     <Box sx={{p: 2, pb: 1}}>
                         <Stack spacing={1}>
-                            <Typography variant="subtitle2"
-                                        color="text.secondary">{data.req.m} {data.req.u}</Typography>
-                            <Typography variant="body2" color="text.secondary">
-                                Status: {data.res.sc} • Time: {data.dur}ms
-                            </Typography>
+                            <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+                                <HttpStatusChip value={data.res.sc} />
+                                <Typography variant="subtitle2"
+                                            color="text.secondary">{data.req.m} {data.req.u}</Typography>
+                            </Box>
                             {data.res.err && (
                                 <Typography variant="body2" color="error">Error: {data.res.err}</Typography>
                             )}
@@ -197,8 +199,7 @@ export default function RequestDetail({requestId, onClose}: RequestDetailProps) 
                     </Box>
                     <Tabs value={tab} onChange={(_, v) => setTab(v)} variant="scrollable" allowScrollButtonsMobile>
                         <Tab label="Overview"/>
-                        <Tab label="Request Headers"/>
-                        <Tab label="Response Headers"/>
+                        <Tab label="Headers"/>
                         <Tab label="Request Body"/>
                         <Tab label="Response Body"/>
                     </Tabs>
@@ -216,7 +217,7 @@ export default function RequestDetail({requestId, onClose}: RequestDetailProps) 
                                                 ID</TableCell><TableCell>{data.cid}</TableCell></TableRow>
                                         )}
                                         <TableRow><TableCell>Timestamp</TableCell><TableCell>{data.ts}</TableCell></TableRow>
-                                        <TableRow><TableCell>Time</TableCell><TableCell>{data.dur}ms</TableCell></TableRow>
+                                        <TableRow><TableCell>Time</TableCell><TableCell><Duration value={data.dur} /></TableCell></TableRow>
                                         <TableRow><TableCell>Method</TableCell><TableCell>{data.req.m}</TableCell></TableRow>
                                         <TableRow><TableCell>URL</TableCell><TableCell
                                             sx={{wordBreak: 'break-all'}}>{data.req.u}</TableCell></TableRow>
@@ -240,18 +241,14 @@ export default function RequestDetail({requestId, onClose}: RequestDetailProps) 
 
                         {tab === 1 && (
                             <Box>
-                                <Typography variant="subtitle2" sx={{mb: 1}}>Request Headers</Typography>
+                                <Typography variant="subtitle2" sx={{mb: 1}}>Request</Typography>
                                 <HeadersTable headers={data.req.h}/>
-                            </Box>
-                        )}
-                        {tab === 2 && (
-                            <Box>
-                                <Typography variant="subtitle2" sx={{mb: 1}}>Response Headers</Typography>
+                                <Typography variant="subtitle2" sx={{mb: 1}} style={{marginTop: "25px"}}>Response</Typography>
                                 <HeadersTable headers={data.res.h}/>
                             </Box>
                         )}
 
-                        {tab === 3 && (
+                        {tab === 2 && (
                             <Box>
                                 <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{mb: 1}}>
                                     <FormControlLabel
@@ -277,7 +274,7 @@ export default function RequestDetail({requestId, onClose}: RequestDetailProps) 
                             </Box>
                         )}
 
-                        {tab === 4 && (
+                        {tab === 3 && (
                             <Box>
                                 <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{mb: 1}}>
                                     <FormControlLabel
