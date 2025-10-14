@@ -1,7 +1,7 @@
-import Chip from "@mui/material/Chip";
+import Chip, {ChipProps} from "@mui/material/Chip";
 import * as React from "react";
 
-export function HttpStatusChip({value}: {value: number}) {
+export function HttpStatusChip({value, ...chipProps}: {value: number} & ChipProps) {
     let color: "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary" = "default";
     if (value >= 200 && value < 300) {
         color = "success";
@@ -11,5 +11,5 @@ export function HttpStatusChip({value}: {value: number}) {
         color = "error";
     }
 
-    return <Chip label={value} color={color} size="small" />;
+    return <Chip label={value} color={color} size="small" {...chipProps} />;
 }

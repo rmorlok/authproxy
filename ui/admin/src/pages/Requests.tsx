@@ -372,7 +372,7 @@ export default function Requests() {
                 open={drawerOpen}
                 onClose={() => setRequestId('')}
             >
-                <Box sx={{width: {xs: '100vw', sm: 520, md: 720}}}>
+                <Box sx={{width: {xs: '100vw', sm: 520, md: 720}, pl: 2}}>
                     {(() => {
                         const rec = rows.find(r => r.request_id === requestId);
                         if (!requestId) return null;
@@ -387,10 +387,10 @@ export default function Requests() {
                             );
                         }
                         return (
-                            // Lazy import at top not necessary; component is lightweight
-                            // eslint-disable-next-line @typescript-eslint/no-var-requires
-                            // <RequestDetail requestId={requestId} onClose={() => setRequestId('')} />
-                            <RequestDetail requestId={requestId} onClose={() => setRequestId('')} />
+                            <RequestDetail
+                                requestId={requestId}
+                                onClose={() => setRequestId('')}
+                                showOpenFullPage={true} />
                         );
                     })()}
                 </Box>
