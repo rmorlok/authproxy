@@ -1,9 +1,11 @@
-import {BrowserRouter, createBrowserRouter, Navigate, Route, RouterProvider, Routes} from 'react-router-dom';
+import {createBrowserRouter, Navigate} from 'react-router-dom';
 import Layout from "./Layout";
+import ListParent from "./ListParent";
 import HomePage from "./pages/Home";
 import ConnectorsPage from "./pages/Connectors";
 import ConnectionsPage from "./pages/Connections";
 import RequestsPage from "./pages/Requests";
+import RequestDetail from "./pages/RequestDetail";
 import ActorsPage from "./pages/Actors";
 import TasksPage from "./pages/Tasks";
 import * as React from "react";
@@ -35,16 +37,18 @@ export const router = createBrowserRouter([
             },
             {
                 path: 'requests',
-                element: <RequestsPage />,
-                handle: { title: 'Requests' }
+                element: (<ListParent><RequestsPage /></ListParent>),
+                handle: { title: 'Requests' },
+                children: [
+                    {
+                        path: ':id',
+                        element: <RequestDetail />,
+                    }
+                ]
             },
             {
                 path: 'requests/:id',
-                // Reuse the RequestDetail component on a full-page wrapper
-                lazy: async () => ({
-                    Component: (await import('./pages/RequestDetailPage')).default,
-                }),
-                handle: { title: 'Request' }
+                element: <RequestDetail />,
             },
             {
                 path: 'actors',

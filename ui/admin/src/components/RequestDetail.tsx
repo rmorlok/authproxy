@@ -27,11 +27,6 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import {Duration, HttpStatusChip} from '../util'
 import {getRequest, RequestEntry} from '../api';
 
-export interface RequestDetailProps {
-    requestId: string;
-    onClose?: () => void;
-}
-
 function useRequest(id: string | undefined) {
     const [data, setData] = useState<RequestEntry | null>(null);
     const [loading, setLoading] = useState(false);
@@ -316,7 +311,13 @@ function CopyButton({getText}: { getText: () => string }) {
     );
 }
 
-export default function RequestDetail({requestId, onClose}: RequestDetailProps) {
+export interface RequestDetailProps {
+    requestId: string;
+    onClose?: () => void;
+    fullPage?: boolean; // when true, render full width and hide open-in-new
+}
+
+export default function RequestDetail({requestId, onClose, fullPage}: RequestDetailProps) {
     const {data, loading, error} = useRequest(requestId);
     const [tab, setTab] = useState(0);
     const [pretty, setPretty] = useState(true);
@@ -343,18 +344,20 @@ export default function RequestDetail({requestId, onClose}: RequestDetailProps) 
     }, [pretty, resText, data?.res?.h]);
 
     return (
-        <Box sx={{width: {xs: '100vw', sm: 520, md: 720}, maxWidth: '100vw'}} role="presentation">
+        <Box sx={fullPage ? { width: '100%', maxWidth: '100%' } : {width: {xs: '100vw', sm: 520, md: 720}, maxWidth: '100vw'}} role="presentation">
             <Stack direction="row" alignItems="center" justifyContent="space-between" sx={{p: 1.5}}>
                 <Typography variant="h6">Request Detail</Typography>
                 <Stack direction="row" spacing={1} alignItems="center">
                     {/* Copy full menu */}
                     {data && (
                         <>
-                            <Tooltip title="Open full page">
-                                <IconButton size="small" component="a" href={`/requests/${requestId}`} target="_blank" rel="noopener noreferrer" aria-label="Open full page">
-                                    <OpenInNewIcon fontSize="small" />
-                                </IconButton>
-                            </Tooltip>
+                            {!fullPage && (
+                                <Tooltip title="Open full page">
+                                    <IconButton size="small" component="a" href={`/requests/${requestId}`} target="_blank" rel="noopener noreferrer" aria-label="Open full page">
+                                        <OpenInNewIcon fontSize="small" />
+                                    </IconButton>
+                                </Tooltip>
+                            )}
                             <CopyMenu data={data} />
                         </>
                     )}

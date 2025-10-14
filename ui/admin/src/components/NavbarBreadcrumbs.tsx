@@ -23,17 +23,26 @@ export default function NavbarBreadcrumbs() {
         .filter((match) => match.handle && match.handle.title)
         .map((match) => ({
             title: match.handle.title,
-            path: match.pathname
+            path: match.pathname,
+            // @ts-ignore params may exist on match
+            params: (match as any).params as Record<string, string | undefined>,
         }));
 
+    // If the last match has an id param, append it as a third-level breadcrumb
+    let finalCrumbs = crumbs as Array<{ title: string; path: string; params?: Record<string, string | undefined> }>;
+    const last = finalCrumbs[finalCrumbs.length - 1];
+    const idParam = last?.params?.id;
+    if (idParam) {
+        finalCrumbs = [...finalCrumbs, { title: idParam, path: `${last.path}` }];
+    }
 
     return (
         <StyledBreadcrumbs
             aria-label="breadcrumb"
             separator={<NavigateNextRoundedIcon fontSize="small"/>}
         >
-            {crumbs.map((crumb, index) => {
-                if (index === crumbs.length - 1) {
+            {finalCrumbs.map((crumb, index) => {
+                if (index === finalCrumbs.length - 1) {
                     return (
                         <Typography variant="body1" sx={{color: 'text.primary', fontWeight: 600}}>
                             {crumb.title}
