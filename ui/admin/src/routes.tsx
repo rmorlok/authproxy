@@ -39,6 +39,14 @@ export const router = createBrowserRouter([
                 handle: { title: 'Requests' }
             },
             {
+                path: 'requests/:id',
+                // Reuse the RequestDetail component on a full-page wrapper
+                lazy: async () => ({
+                    Component: (await import('./pages/RequestDetailPage')).default,
+                }),
+                handle: { title: 'Request' }
+            },
+            {
                 path: 'actors',
                 element: <ActorsPage />,
                 handle: { title: 'Actors' }

@@ -23,6 +23,7 @@ import {
 } from '@mui/material';
 import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import {Duration, HttpStatusChip} from '../util'
 import {getRequest, RequestEntry} from '../api';
 
@@ -266,6 +267,10 @@ function CopyMenu({data}: {data: RequestEntry}) {
                     <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
                     <ListItemText>Copy as cURL</ListItemText>
                 </MenuItem>
+                <MenuItem onClick={async () => { await navigator.clipboard.writeText(`${window.location.origin}/requests/${data.id}`); handleClose(); }}>
+                    <ListItemIcon><ContentCopyIcon fontSize="small" /></ListItemIcon>
+                    <ListItemText>Copy Admin URL</ListItemText>
+                </MenuItem>
             </Menu>
         </>
     );
@@ -344,7 +349,14 @@ export default function RequestDetail({requestId, onClose}: RequestDetailProps) 
                 <Stack direction="row" spacing={1} alignItems="center">
                     {/* Copy full menu */}
                     {data && (
-                        <CopyMenu data={data} />
+                        <>
+                            <Tooltip title="Open full page">
+                                <IconButton size="small" component="a" href={`/requests/${requestId}`} target="_blank" rel="noopener noreferrer" aria-label="Open full page">
+                                    <OpenInNewIcon fontSize="small" />
+                                </IconButton>
+                            </Tooltip>
+                            <CopyMenu data={data} />
+                        </>
                     )}
                     <IconButton onClick={onClose} aria-label="Close details">
                         <CloseIcon/>
