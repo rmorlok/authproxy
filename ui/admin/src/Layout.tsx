@@ -1,4 +1,3 @@
-import AppTheme from "./shared-theme/AppTheme";
 import CssBaseline from "@mui/material/CssBaseline";
 import Box from "@mui/material/Box";
 import SideMenu from "./components/SideMenu";
@@ -12,26 +11,11 @@ import type {} from '@mui/x-date-pickers-pro/themeAugmentation';
 import type {} from '@mui/x-charts/themeAugmentation';
 import type {} from '@mui/x-data-grid/themeAugmentation';
 import type {} from '@mui/x-tree-view/themeAugmentation';
-
-import {
-    chartsCustomizations,
-    dataGridCustomizations,
-    datePickersCustomizations,
-    treeViewCustomizations,
-} from './theme/customizations';
 import Copyright from "./components/Copyright";
-
-const xThemeComponents = {
-    ...chartsCustomizations,
-    ...dataGridCustomizations,
-    ...datePickersCustomizations,
-    ...treeViewCustomizations,
-};
 
 export default function Layout(props: { disableCustomTheme?: boolean }) {
     return (
-        <AppTheme {...props} themeComponents={xThemeComponents}>
-            <CssBaseline enableColorScheme />
+        <>
             <Box sx={{ display: 'flex' }}>
                 <SideMenu />
                 <AppNavbar />
@@ -61,6 +45,6 @@ export default function Layout(props: { disableCustomTheme?: boolean }) {
                     </Stack>
                 </Box>
             </Box>
-        </AppTheme>
+        </>
     );
 }

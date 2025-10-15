@@ -1,14 +1,19 @@
 import * as React from 'react';
 import * as ReactDOM from 'react-dom/client';
-import {ThemeProvider} from '@emotion/react';
 import {CssBaseline} from '@mui/material';
-import theme from './theme';
+import { ThemeProvider, createTheme } from '@mui/material/styles';
 import App from './App';
 import { Provider } from 'react-redux';
 import { store } from './store';
 import { ApiSessionInitiateRequest } from "./api";
-import {initiateSessionAsync, AppDispatch} from "./store";
+import {initiateSessionAsync} from "./store";
 
+const theme = createTheme({
+    colorSchemes: {
+        light: true,
+        dark: true,
+    },
+});
 
 // Construct auth parameters from either window variable or URL query parameter
 const params: ApiSessionInitiateRequest = {
@@ -31,7 +36,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
         <Provider store={store}>
             <ThemeProvider theme={theme}>
-                <CssBaseline/>
+                <CssBaseline enableColorScheme />
                 <App/>
             </ThemeProvider>
         </Provider>

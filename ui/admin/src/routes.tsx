@@ -14,7 +14,7 @@ import * as React from "react";
 export const router = createBrowserRouter([
     {
         path: '/',
-        element: <Layout disableCustomTheme={true} />,
+        element: <Layout />,
         handle: { title: 'AuthProxy Admin' },
         children: [
             {
