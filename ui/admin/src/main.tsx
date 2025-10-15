@@ -17,7 +17,7 @@ const theme = createTheme({
 
 // Construct auth parameters from either window variable or URL query parameter
 const params: ApiSessionInitiateRequest = {
-    return_to_url: window.location.origin,
+    return_to_url: window.location.href,
 };
 if ((window as any).AUTHPROXY_AUTH_TOKEN) {
     params.auth_token = (window as any).AUTHPROXY_AUTH_TOKEN;
