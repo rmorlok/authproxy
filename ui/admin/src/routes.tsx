@@ -6,6 +6,8 @@ import ConnectorsPage from "./pages/Connectors";
 import ConnectionsPage from "./pages/Connections";
 import RequestsPage from "./pages/Requests";
 import RequestDetail from "./pages/RequestDetail";
+import ConnectorDetail from "./pages/ConnectorDetail";
+import ConnectionDetail from "./pages/ConnectionDetail";
 import ActorsPage from "./pages/Actors";
 import TasksPage from "./pages/Tasks";
 import AboutPage from "./pages/About";
@@ -28,13 +30,33 @@ export const router = createBrowserRouter([
             },
             {
                 path: 'connectors',
-                element: <ConnectorsPage />,
-                handle: { title: 'Connectors' }
+                element: (<ListParent><ConnectorsPage /></ListParent>),
+                handle: { title: 'Connectors' },
+                children: [
+                    {
+                        path: ':id',
+                        element: <ConnectorDetail />,
+                    }
+                ]
+            },
+            {
+                path: 'connectors/:id',
+                element: <ConnectorDetail />,
             },
             {
                 path: 'connections',
-                element: <ConnectionsPage />,
-                handle: { title: 'Connections' }
+                element: (<ListParent><ConnectionsPage /></ListParent>),
+                handle: { title: 'Connections' },
+                children: [
+                    {
+                        path: ':id',
+                        element: <ConnectionDetail />,
+                    }
+                ]
+            },
+            {
+                path: 'connections/:id',
+                element: <ConnectionDetail />,
             },
             {
                 path: 'requests',

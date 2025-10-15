@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
-import {DataGrid, GridColDef, GridSortModel} from '@mui/x-data-grid';
+import {DataGrid, GridColDef, GridEventListener, GridSortModel} from '@mui/x-data-grid';
 import Chip from '@mui/material/Chip';
 import Stack from '@mui/material/Stack';
 import FormControl from '@mui/material/FormControl';
@@ -15,6 +15,7 @@ import {
 } from '../api';
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
+import {useNavigate} from "react-router-dom";
 
 function renderState(state: ConnectorVersionState) {
     const colors: Record<ConnectorVersionState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -123,6 +124,7 @@ export default function Connectors() {
         { label: 'Active', value: ConnectorVersionState.ACTIVE },
         { label: 'Archived', value: ConnectorVersionState.ARCHIVED },
     ], []);
+    const navigate = useNavigate();
     const stateVals = useMemo(() => stateOptions.map(opt => opt.value), [stateOptions]);
 
     const [rows, setRows] = useState<ConnectorVersion[]>([]);
@@ -140,6 +142,23 @@ export default function Connectors() {
     // Simple cache to allow going back without re-fetching
     const responsesCacheRef = useRef<ListResponse<ConnectorVersion>[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
+
+    // Handle row click with meta/ctrl key checking
+    const handleRowClick: GridEventListener<'rowClick'> = (params, event) => {
+        // Get the ID of the clicked row
+        const id = params.id;
+
+        // Determine the URL for this item
+        const itemUrl = `/connectors/${id}`;
+
+        // Handle ctrl/cmd+click or middle click (open in new tab)
+        if (event.ctrlKey || event.metaKey || event.button === 1) {
+            window.open(itemUrl, '_blank');
+        } else {
+            // Regular click - navigate in current tab
+            navigate(itemUrl);
+        }
+    };
 
     const handleSortModelChange = React.useCallback((sortModel: GridSortModel) => {
         if(sortModel.length === 0) {
@@ -256,6 +275,13 @@ export default function Connectors() {
                 </FormControl>
             </Stack>
 
+            <style>
+                {`
+                  .clickable-row {
+                    cursor: pointer;
+                  }
+                `}
+            </style>
             <Grid size={{xs: 12, lg: 12}}>
                 <DataGrid
                     autoHeight
@@ -263,7 +289,7 @@ export default function Connectors() {
                     columns={columns}
                     getRowId={(row) => row.id}
                     getRowClassName={(params) =>
-                        params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'
+                        params.indexRelativeToCurrentPage % 2 === 0 ? 'clickable-row even' : 'clickable-row odd'
                     }
                     loading={loading}
                     sortingMode="server"
@@ -279,6 +305,7 @@ export default function Connectors() {
                     }}
                     pageSizeOptions={[2, 5, 10, 20, 50, 100]}
                     rowCount={rowCount}
+                    onRowClick={handleRowClick}
                     hideFooterSelectedRowCount
                     disableColumnResize
                     density="compact"
