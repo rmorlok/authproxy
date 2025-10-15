@@ -16,3 +16,5 @@ This is a list of related products in the API Integration space and (eventually)
   * Low-code integration platform?
 * [Composio](https://composio.dev)
   * AI agent auth and actions and triggers
+* [Metorial](https://github.com/metorial/metorial)
+  * Similar style platform for managing auth for MCP

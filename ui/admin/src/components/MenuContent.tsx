@@ -26,9 +26,9 @@ const mainListItems = [
 ];
 
 const secondaryListItems = [
-  { text: 'Settings', icon: <SettingsRoundedIcon /> },
-  { text: 'About', icon: <InfoRoundedIcon /> },
-  { text: 'Feedback', icon: <HelpRoundedIcon /> },
+  { text: 'Settings', icon: <SettingsRoundedIcon />, link: '/settings'},
+  { text: 'About', icon: <InfoRoundedIcon />, link: '/about' },
+  { text: 'Feedback', icon: <HelpRoundedIcon />, link: 'https://github.com/rmorlok/authproxy/issues' },
 ];
 
 export default function MenuContent() {
@@ -49,7 +49,7 @@ export default function MenuContent() {
       <List dense>
         {secondaryListItems.map((item, index) => (
           <ListItem key={index} disablePadding sx={{ display: 'block' }}>
-            <ListItemButton>
+            <ListItemButton selected={location.pathname.startsWith(item.link)}  component={Link} to={item.link}>
               <ListItemIcon>{item.icon}</ListItemIcon>
               <ListItemText primary={item.text} />
             </ListItemButton>

@@ -8,6 +8,7 @@ import RequestsPage from "./pages/Requests";
 import RequestDetail from "./pages/RequestDetail";
 import ActorsPage from "./pages/Actors";
 import TasksPage from "./pages/Tasks";
+import AboutPage from "./pages/About";
 import * as React from "react";
 
 export const router = createBrowserRouter([
@@ -59,6 +60,11 @@ export const router = createBrowserRouter([
                 path: 'tasks',
                 element: <TasksPage />,
                 handle: { title: 'Tasks' }
+            },
+            {
+                path: 'about',
+                element: <AboutPage />,
+                handle: { title: 'About' }
             },
         ]
     }
