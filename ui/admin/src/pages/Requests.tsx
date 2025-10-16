@@ -4,7 +4,7 @@ import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
 import Drawer from '@mui/material/Drawer';
 import Typography from '@mui/material/Typography';
-import {DataGrid, GridColDef, GridSortModel} from '@mui/x-data-grid';
+import {DataGrid, GridColDef, GridSortModel, GridEventListener} from '@mui/x-data-grid';
 import Stack from '@mui/material/Stack';
 import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
@@ -179,6 +179,23 @@ export default function Requests() {
     const responsesCacheRef = useRef<ListResponse<RequestEntryRecord>[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
+    // Handle row click with meta/ctrl key checking
+    const handleRowClick: GridEventListener<'rowClick'> = (params, event) => {
+        // Get the ID of the clicked row
+        const id = params.id;
+
+        // Determine the URL for this item
+        const itemUrl = `/requests/${id}`;
+
+        // Handle ctrl/cmd+click or middle click (open in new tab)
+        if (event.ctrlKey || event.metaKey || event.button === 1) {
+            window.open(itemUrl, '_blank');
+        } else {
+            // Regular click - open drawer
+            setRequestId(params.id.toString());
+        }
+    };
+
     const handleSortModelChange = React.useCallback((sortModel: GridSortModel) => {
         if(sortModel.length === 0) {
             setSort('');
@@ -299,12 +316,19 @@ export default function Requests() {
             </Stack>
 
             <Grid size={{xs: 12, lg: 12}}>
+                <style>
+                    {`
+                  .clickable-row {
+                    cursor: pointer;
+                  }
+                `}
+                </style>
                 <DataGrid
                     rows={rows}
                     columns={columns}
                     getRowId={(row) => row.request_id}
                     getRowClassName={(params) =>
-                        params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'
+                        params.indexRelativeToCurrentPage % 2 === 0 ? 'clickable-row even' : 'clickable-row odd'
                     }
                     loading={loading}
                     sortingMode="server"
@@ -320,13 +344,7 @@ export default function Requests() {
                     }}
                     pageSizeOptions={[2, 5, 10, 20, 50, 100]}
                     rowCount={rowCount}
-                    onRowSelectionModelChange={(event) => {
-                        if(event.ids.size == 0) {
-                            setRequestId('');
-                        } else {
-                            setRequestId(event.ids.values().next().value?.toString() || '');
-                        }
-                    }}
+                    onRowClick={handleRowClick}
                     hideFooterSelectedRowCount
                     density="compact"
                     autosizeOnMount={true}
