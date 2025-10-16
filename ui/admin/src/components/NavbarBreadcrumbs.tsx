@@ -3,7 +3,7 @@ import {styled} from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 import Breadcrumbs, {breadcrumbsClasses} from '@mui/material/Breadcrumbs';
 import NavigateNextRoundedIcon from '@mui/icons-material/NavigateNextRounded';
-import {UIMatch, useMatches} from 'react-router-dom';
+import {Link, UIMatch, useMatches} from 'react-router-dom';
 
 
 const StyledBreadcrumbs = styled(Breadcrumbs)(({theme}) => ({
@@ -51,7 +51,7 @@ export default function NavbarBreadcrumbs() {
                 }
 
                 return (
-                    <Typography variant="body1">
+                    <Typography variant="body1" component={Link} to={crumb.path} sx={{color: 'text.primary', textDecoration: 'none'}}>
                         {crumb.title}
                     </Typography>
                 );
