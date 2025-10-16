@@ -143,6 +143,27 @@ export const columns: (GridColDef<RequestEntryRecord> & {hideInitial?: boolean})
         description: 'error message from executing request',
         sortable: false,
     },
+    {
+        field: 'internal_timeout',
+        headerName: 'Timeout',
+        description: 'did request recording timeout before completing',
+        sortable: false,
+        hideInitial: true,
+    },
+    {
+        field: 'request_cancelled',
+        headerName: 'Cancelled',
+        description: 'was the request cancelled before the full body was consumed',
+        sortable: false,
+        hideInitial: true,
+    },
+    {
+        field: 'full_request_recorded',
+        headerName: 'Full',
+        description: 'was the full request/response recorded',
+        sortable: false,
+        hideInitial: true,
+    },
 ];
 
 const columnVisibilityModel = columns.filter(c => c.hideInitial).reduce((acc, col) => {

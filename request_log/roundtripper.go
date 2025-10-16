@@ -70,6 +70,7 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 		ID:            id,
 		CorrelationID: apctx.CorrelationID(ctx),
 		Timestamp:     startTime,
+		Full:          t.recordFullRequest,
 		Request: EntryRequest{
 			URL:           req.URL.String(),
 			HttpVersion:   req.Proto,

@@ -34,7 +34,7 @@ export interface RequestEntryRecord {
     response_size_bytes?: number;   // The size of the response in bytes
     response_mime_type?: string;    // The MIME type of the response
     internal_timeout?: boolean;     // If there was an internal timeout while capture full response size/body
-    request_cancelled?: boolean;    // If the the caller cancelled the request before the full body was consumed
+    request_cancelled?: boolean;    // If the caller cancelled the request before the full body was consumed
     full_request_recorded?: boolean;// If the full request body was recorded; This means you may be able to get the full request
 }
 
@@ -44,6 +44,7 @@ export interface RequestEntry {
     cid: string;                     // Correlation ID
     ts: string;                      // Timestamp
     dur: number;                     // Duration
+    full: boolean;                   // Full data present
     req: {                           // -- Request data --
         u: string;                   // URL
         v: string;                   // HTTP version

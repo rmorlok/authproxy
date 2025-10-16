@@ -26,6 +26,7 @@ import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import {Duration, HttpStatusChip} from '../util'
 import {getRequest, RequestEntry} from '../api';
+import Chip from "@mui/material/Chip";
 
 function useRequest(id: string | undefined) {
     const [data, setData] = useState<RequestEntry | null>(null);
@@ -351,6 +352,7 @@ export default function RequestDetail({requestId, onClose, showOpenFullPage}: Re
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                     <HttpStatusChip value={data.res.sc} size="medium" sx={{ fontSize: '0.9rem' }}/>
                     <Typography variant="h6">{data.req.m} {data.req.u}</Typography>
+                    {!data.full && (<Tooltip title="only partial data is stored"><Chip label="abridged" size="small" sx={{ fontSize: '0.7rem' }}/></Tooltip>) }
                 </Box>
                 {data.res.err && (
                     <Typography variant="body2" color="error">Error: {data.res.err}</Typography>

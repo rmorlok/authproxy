@@ -71,6 +71,7 @@ type Entry struct {
 	CorrelationID       string              `json:"cid"`
 	Timestamp           time.Time           `json:"ts"`
 	MillisecondDuration MillisecondDuration `json:"dur"`
+	Full                bool                `json:"full,omitempty"`
 	InternalTimeout     bool                `json:"to,omitempty"`
 	RequestCancelled    bool                `json:"rc,omitempty"`
 	Request             EntryRequest        `json:"req"`
@@ -86,7 +87,57 @@ func (e *Entry) setRedisRecordFields(er *EntryRecord) {
 	er.Timestamp = e.Timestamp
 	er.MillisecondDuration = e.MillisecondDuration
 	er.CorrelationId = e.CorrelationID
+	er.FullRequestRecorded = e.Full
 
 	e.Request.setRedisRecordFields(er)
 	e.Response.setRedisRecordFields(er)
+}
+
+func NewEntryFromRecord(er *EntryRecord) *Entry {
+	if er == nil {
+		return nil
+	}
+
+	entry := &Entry{
+		ID:                  er.RequestId,
+		CorrelationID:       er.CorrelationId,
+		Timestamp:           er.Timestamp,
+		MillisecondDuration: er.MillisecondDuration,
+		InternalTimeout:     er.InternalTimeout,
+		RequestCancelled:    er.RequestCancelled,
+		Full:                false,
+	}
+
+	// Construct URL from components
+	url := url.URL{
+		Scheme: er.Scheme,
+		Host:   er.Host,
+		Path:   er.Path,
+	}
+
+	// Populate Request
+	entry.Request = EntryRequest{
+		URL:           url.String(),
+		HttpVersion:   er.RequestHttpVersion,
+		Method:        er.Method,
+		ContentLength: er.RequestSizeBytes,
+		Headers:       make(map[string][]string),
+	}
+	if er.RequestMimeType != "" {
+		entry.Request.Headers["Content-Type"] = []string{er.RequestMimeType}
+	}
+
+	// Populate Response
+	entry.Response = EntryResponse{
+		HttpVersion:   er.ResponseHttpVersion,
+		StatusCode:    er.ResponseStatusCode,
+		ContentLength: er.ResponseSizeBytes,
+		Err:           er.ResponseError,
+		Headers:       make(map[string][]string),
+	}
+	if er.ResponseMimeType != "" {
+		entry.Response.Headers["Content-Type"] = []string{er.ResponseMimeType}
+	}
+
+	return entry
 }
