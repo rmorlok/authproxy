@@ -68,6 +68,7 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 				ID:            uuid.New(),
 				CorrelationID: "some-value",
 				Timestamp:     time.Now(),
+				Full:          true,
 				Request: EntryRequest{
 					URL:         "http://example.com/path?q=1",
 					HttpVersion: "HTTP/1.1",
@@ -126,6 +127,7 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 				ID:            uuid.New(),
 				CorrelationID: "some-value",
 				Timestamp:     time.Now(),
+				Full:          true,
 				Request: EntryRequest{
 					URL:         "http://example.com/path?q=1",
 					HttpVersion: "HTTP/1.1",
@@ -184,6 +186,7 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 				ID:            uuid.New(),
 				CorrelationID: "some-value",
 				Timestamp:     time.Now(),
+				Full:          false,
 				Request: EntryRequest{
 					URL:         "http://example.com/path?q=1",
 					HttpVersion: "HTTP/1.1",
@@ -230,6 +233,7 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 				ID:            uuid.New(),
 				CorrelationID: "some-value",
 				Timestamp:     time.Now(),
+				Full:          true,
 				Request: EntryRequest{
 					URL:         "http://example.com/path?q=1",
 					HttpVersion: "HTTP/1.1",
