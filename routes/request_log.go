@@ -22,7 +22,7 @@ type RequestLogRoutes struct {
 type ListRequestsQuery struct {
 	Cursor     *string `form:"cursor"`
 	LimitVal   *int32  `form:"limit"`
-	OrderByVal *string `json:"order_by"`
+	OrderByVal *string `form:"order_by"`
 }
 
 type ListRequestsResponseJson struct {
@@ -107,7 +107,7 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 	if req.Cursor != nil {
 		ex, err = r.rl.ListRequestsFromCursor(gctx, *req.Cursor)
 		if err != nil {
-			api_common.NewHttpStatusErrorBuilder().
+			api_common.HttpStatusErrorBuilderFromError(err).
 				WithStatusBadRequest().
 				WithInternalErr(err).
 				WithResponseMsg("failed to list requests from cursor").
@@ -141,10 +141,9 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 
 	result := ex.FetchPage(ctx)
 	if result.Error != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(result.Error).
-			WithResponseMsg("failed to list requests").
+		api_common.HttpStatusErrorBuilderFromError(result.Error).
+			DefaultStatusBadRequest().
+			DefaultResponseMsg("failed to list requests").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
 		return

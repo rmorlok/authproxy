@@ -2,9 +2,12 @@ package request_log
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 
 	goredis "github.com/redis/go-redis/v9"
+	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/util"
@@ -14,8 +17,30 @@ import (
 type RequestOrderByField string
 
 const (
-	RequestOrderByCreatedAt RequestOrderByField = "created_at"
+	RequestOrderByTimestamp          RequestOrderByField = "timestamp"
+	RequestOrderByType               RequestOrderByField = "type"
+	RequestOrderByCorrelationId      RequestOrderByField = "correlation_id"
+	RequestOrderByConnectionId       RequestOrderByField = "connection_id"
+	RequestOrderByConnectorType      RequestOrderByField = "connector_type"
+	RequestOrderByConnectorId        RequestOrderByField = "connector_id"
+	RequestOrderByMethod             RequestOrderByField = "method"
+	RequestOrderByPath               RequestOrderByField = "path"
+	RequestOrderByResponseStatusCode RequestOrderByField = "response_status_code"
+	RequestOrderByConnectorVersion   RequestOrderByField = "connector_version"
 )
+
+var orderByToRedisSearchField = map[RequestOrderByField]string{
+	RequestOrderByTimestamp:          fieldTimestamp,
+	RequestOrderByType:               fieldType,
+	RequestOrderByCorrelationId:      fieldCorrelationId,
+	RequestOrderByConnectionId:       fieldConnectionId,
+	RequestOrderByConnectorType:      fieldConnectorType,
+	RequestOrderByConnectorId:        fieldConnectorId,
+	RequestOrderByMethod:             fieldMethod,
+	RequestOrderByPath:               fieldPath,
+	RequestOrderByResponseStatusCode: fieldResponseStatusCode,
+	RequestOrderByConnectorVersion:   fieldConnectorVersion,
+}
 
 type ListRequestExecutor interface {
 	FetchPage(context.Context) pagination.PageResult[EntryRecord]
@@ -81,14 +106,16 @@ func (l *listRequestsFilters) apply() (query string, options *goredis.FTSearchOp
 		Desc:      true,
 	}
 
+	if l.OrderByFieldVal != nil {
+		sortBy.FieldName = orderByToRedisSearchField[*l.OrderByFieldVal]
+	}
+
 	if l.OrderByVal != nil {
 		sortBy.Desc = *l.OrderByVal == pagination.OrderByDesc
 		sortBy.Asc = *l.OrderByVal == pagination.OrderByAsc
 	}
 
-	if l.OrderByFieldVal != nil {
-		sortBy.FieldName = string(*l.OrderByFieldVal)
-	}
+	options.SortBy = []goredis.FTSearchSortBy{sortBy}
 
 	if len(clauses) == 0 {
 		clauses = append(clauses, "*")
@@ -97,9 +124,29 @@ func (l *listRequestsFilters) apply() (query string, options *goredis.FTSearchOp
 	return strings.Join(clauses, " "), options
 }
 
+func (l *listRequestsFilters) validate() error {
+	if l.OrderByFieldVal != nil {
+		field := orderByToRedisSearchField[*l.OrderByFieldVal]
+		if field == "" {
+			msg := fmt.Sprintf("invalid order by field '%s'; possible values %s", *l.OrderByFieldVal, util.StringsJoin(util.GetKeys(orderByToRedisSearchField), ", "))
+			return api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithResponseMsg(msg).
+				WithInternalErr(errors.New("invalid order by field")).
+				BuildStatusError()
+		}
+	}
+
+	return nil
+}
+
 func (l *listRequestsFilters) fetchPage(ctx context.Context) pagination.PageResult[EntryRecord] {
 	var err error
 	var entries []EntryRecord
+
+	if err = l.validate(); err != nil {
+		return pagination.PageResult[EntryRecord]{Error: err}
+	}
 
 	client := l.r
 	query, options := l.apply()

@@ -12,3 +12,12 @@ func Map[T any, U any](input []T, transform func(T) U) []U {
 
 	return result
 }
+
+// GetKeys extracts all keys from a map into a slice
+func GetKeys[K comparable, V any](m map[K]V) []K {
+	keys := make([]K, 0, len(m))
+	for k := range m {
+		keys = append(keys, k)
+	}
+	return keys
+}

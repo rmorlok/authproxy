@@ -140,6 +140,8 @@ type HttpStatusErrorBuilder interface {
 
 	WithResponseMsg(msg string) HttpStatusErrorBuilder
 	WithResponseMsgf(format string, args ...interface{}) HttpStatusErrorBuilder
+	DefaultResponseMsg(msg string) HttpStatusErrorBuilder
+	DefaultResponseMsgf(format string, args ...interface{}) HttpStatusErrorBuilder
 	WithInternalErr(err error) HttpStatusErrorBuilder
 	WithWrappedInternalErr(err error, msg string) HttpStatusErrorBuilder
 	WithWrappedInternalErrf(err error, msg string, args ...interface{}) HttpStatusErrorBuilder
@@ -230,6 +232,17 @@ func (b *httpStatusErrorBuilder) WithResponseMsg(msg string) HttpStatusErrorBuil
 func (b *httpStatusErrorBuilder) WithResponseMsgf(format string, args ...interface{}) HttpStatusErrorBuilder {
 	b.err.ResponseMsg = fmt.Sprintf(format, args...)
 	return b
+}
+
+func (b *httpStatusErrorBuilder) DefaultResponseMsg(msg string) HttpStatusErrorBuilder {
+	if b.err.ResponseMsg == "" {
+		b.err.ResponseMsg = msg
+	}
+	return b
+}
+
+func (b *httpStatusErrorBuilder) DefaultResponseMsgf(format string, args ...interface{}) HttpStatusErrorBuilder {
+	return b.DefaultResponseMsg(fmt.Sprintf(format, args...))
 }
 
 func (b *httpStatusErrorBuilder) WithInternalErr(err error) HttpStatusErrorBuilder {
