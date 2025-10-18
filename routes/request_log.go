@@ -23,6 +23,101 @@ type ListRequestsQuery struct {
 	Cursor     *string `form:"cursor"`
 	LimitVal   *int32  `form:"limit"`
 	OrderByVal *string `form:"order_by"`
+
+	/*
+	 * Filters
+	 */
+	RequestType              *string    `form:"request_type"`
+	CorrelationId            *string    `form:"correlation_id"`
+	ConnectionId             *uuid.UUID `form:"connection_id"`
+	ConnectorType            *string    `form:"connector_type"`
+	ConnectorId              *uuid.UUID `form:"connector_id"`
+	ConnectorVersion         *uint64    `form:"connector_version"`
+	Method                   *string    `form:"method"`
+	StatusCode               *int       `form:"status_code"`
+	StatusCodeRangeInclusive *string    `form:"status_code_range"`
+	TimestampRange           *string    `form:"timestamp_range"`
+	Path                     *string    `form:"path"`
+	PathRegex                *string    `form:"path_regex"`
+}
+
+func (q *ListRequestsQuery) ApplyToBuilder(
+	b request_log.ListRequestBuilder,
+) (_ request_log.ListRequestBuilder, err error) {
+	if q.RequestType != nil {
+		b = b.WithRequestType(request_log.RequestType(*q.RequestType))
+	}
+
+	if q.CorrelationId != nil {
+		b = b.WithCorrelationId(*q.CorrelationId)
+	}
+
+	if q.ConnectionId != nil {
+		b = b.WithConnectionId(*q.ConnectionId)
+	}
+
+	if q.ConnectorType != nil {
+		b = b.WithConnectorType(*q.ConnectorType)
+	}
+
+	if q.ConnectorId != nil {
+		b = b.WithConnectorId(*q.ConnectorId)
+	}
+
+	if q.ConnectorVersion != nil {
+		b = b.WithConnectorVersion(*q.ConnectorVersion)
+	}
+
+	if q.Method != nil {
+		b = b.WithMethod(*q.Method)
+	}
+
+	if q.StatusCode != nil && q.StatusCodeRangeInclusive != nil {
+		return nil, api_common.
+			NewHttpStatusErrorBuilder().
+			DefaultStatusBadRequest().
+			WithResponseMsg("cannot specify both status_code and status_code_range").
+			Build()
+	}
+
+	if q.StatusCode != nil {
+		b = b.WithStatusCode(*q.StatusCode)
+	}
+
+	if q.StatusCodeRangeInclusive != nil {
+		b, err = b.WithParsedStatusCodeRange(*q.StatusCodeRangeInclusive)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if q.TimestampRange != nil {
+		b, err = b.WithParsedTimestampRange(*q.TimestampRange)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if q.Path != nil && q.PathRegex != nil {
+		return nil, api_common.
+			NewHttpStatusErrorBuilder().
+			DefaultStatusBadRequest().
+			WithResponseMsg("cannot specify both path and path_regex").
+			Build()
+	}
+
+	if q.Path != nil {
+		b = b.WithPath(*q.Path)
+	}
+
+	if q.PathRegex != nil {
+		b, err = b.WithPathRegex(*q.PathRegex)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	return b, nil
 }
 
 type ListRequestsResponseJson struct {
@@ -117,6 +212,14 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 		}
 	} else {
 		b := r.rl.NewListRequestsBuilder()
+
+		b, err = req.ApplyToBuilder(b)
+		if err != nil {
+			api_common.HttpStatusErrorBuilderFromError(err).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			return
+		}
 
 		if req.LimitVal != nil {
 			b = b.Limit(*req.LimitVal)

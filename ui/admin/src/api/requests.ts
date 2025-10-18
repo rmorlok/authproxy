@@ -70,10 +70,26 @@ export interface RequestEntry {
  * @interface
  */
 export interface ListRequestsParams {
-    type?: RequestType;
     cursor?: string;
     limit?: number;
     order_by?: string;
+
+    /*
+     * Filters
+     */
+
+    request_type?: RequestType;
+    correlation_id?: string;
+    connection_id?: string;
+    connector_type?: string;
+    connector_id?: string;
+    connector_version?: number;
+    method?: string;
+    status_code?: number;
+    status_code_range?: number;
+    timestamp_range?: string;
+    path?: string;
+    path_regex?: number;
 }
 
 /**

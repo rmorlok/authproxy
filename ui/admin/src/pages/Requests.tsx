@@ -267,7 +267,7 @@ export default function Requests() {
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
                 const params: ListRequestsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
-                    type: (typeFilter as RequestType) || undefined,
+                    request_type: (typeFilter as RequestType) || undefined,
                     order_by: sort || undefined,
                     limit: pageSize,
                 };

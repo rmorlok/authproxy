@@ -9,6 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
+	"github.com/stretchr/testify/require"
 )
 
 func TestHttpStatusError_Error(t *testing.T) {
@@ -310,4 +311,22 @@ func TestAsHttpStatusError(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestHttpStatusErrorContains(t *testing.T) {
+	require.False(t, HttpStatusErrorContains(nil, "test"))
+	require.False(t, HttpStatusErrorContains(errors.New("test"), "test"))
+	require.False(t, HttpStatusErrorContains(&HttpStatusError{}, "test"))
+	require.True(t, HttpStatusErrorContains(&HttpStatusError{ResponseMsg: "test"}, "test"))
+	require.True(t, HttpStatusErrorContains(&HttpStatusError{ResponseMsg: "this is a test method"}, "test"))
+	require.True(t, HttpStatusErrorContains(&HttpStatusError{InternalErr: errors.New("test")}, "test"))
+	require.True(t, HttpStatusErrorContains(&HttpStatusError{InternalErr: errors.New("this is a test method")}, "test"))
+}
+
+func TestHttpStatusErrorIsStatusCode(t *testing.T) {
+	require.False(t, HttpStatusErrorIsStatusCode(nil, http.StatusBadRequest))
+	require.False(t, HttpStatusErrorIsStatusCode(errors.New("test"), http.StatusBadRequest))
+	require.False(t, HttpStatusErrorIsStatusCode(&HttpStatusError{}, http.StatusBadRequest))
+	require.False(t, HttpStatusErrorIsStatusCode(&HttpStatusError{Status: http.StatusOK}, http.StatusBadRequest))
+	require.True(t, HttpStatusErrorIsStatusCode(&HttpStatusError{Status: http.StatusBadRequest}, http.StatusBadRequest))
 }

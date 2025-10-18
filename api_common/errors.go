@@ -4,6 +4,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
@@ -290,4 +291,30 @@ func (b *httpStatusErrorBuilder) BuildStatusError() *HttpStatusError {
 
 func (b *httpStatusErrorBuilder) Build() error {
 	return b.BuildStatusError()
+}
+
+// HttpStatusErrorContains checks if the error contains the passed string. This is useful for checking if an error
+// contains a specific string in the response message or internal error. This method will return false if if the passed
+// error is not an HttpStatusError or it does not contain the specified string in either its internal error or response
+// message. This is intended to be used in unit tests.
+func HttpStatusErrorContains(err error, s string) bool {
+	var he *HttpStatusError
+	if errors.As(err, &he) {
+		if strings.Contains(he.ResponseMsg, s) {
+			return true
+		}
+
+		if he.InternalErr != nil && strings.Contains(he.InternalErr.Error(), s) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// HttpStatusErrorIsStatusCode checks if the error is an HttpStatusError with the passed status code. This is intended
+// to be used in unit tests.
+func HttpStatusErrorIsStatusCode(err error, statusCode int) bool {
+	var he *HttpStatusError
+	return errors.As(err, &he) && he.Status == statusCode
 }
