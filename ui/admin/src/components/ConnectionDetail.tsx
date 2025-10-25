@@ -7,6 +7,7 @@ import Stack from '@mui/material/Stack';
 import Chip from '@mui/material/Chip';
 import dayjs from 'dayjs';
 import {Connection, connections, ConnectionState} from '../api';
+import { Link } from "react-router-dom";
 
 function StateChip({state}: { state: ConnectionState }) {
   const colors: Record<ConnectionState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -76,7 +77,11 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
         <Stack direction={{xs: 'column', sm: 'row'}} spacing={4} sx={{mt: 1}}>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">ID</Typography>
-            <Typography variant="body1" sx={{wordBreak: 'break-all'}}>{conn.connector.id}</Typography>
+              <Typography variant="body1" sx={{wordBreak: 'break-all'}}>
+                  <Link to={`/connectors/${conn.connector.id}`} style={{color: 'inherit', textDecoration: 'none'}}>
+                      {conn.connector.id}
+              </Link>
+            </Typography>
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">Type</Typography>
