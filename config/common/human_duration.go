@@ -3,10 +3,17 @@ package common
 import (
 	"fmt"
 	"time"
+
+	"github.com/invopop/jsonschema"
 )
 
 type HumanDuration struct {
 	time.Duration
+}
+
+// JSONSchema customizes the JSON Schema to represent HumanDuration as a string like "60m", "10s", etc.
+func (HumanDuration) JSONSchema() *jsonschema.Schema {
+	return &jsonschema.Schema{Type: "string", Pattern: "^[0-9]+(ns|us|µs|ms|s|m|h)$"}
 }
 
 // MarshalJSON provides custom serialization of the duration to a human-readable string (e.g., "2m").
