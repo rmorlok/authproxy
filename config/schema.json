@@ -2,46 +2,17 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/config/schema.json",
   "$defs": {
-    "Connector": {
-      "properties": {
-        "id": {
-          "$ref": "#/$defs/UUID"
-        },
-        "type": {
-          "type": "string"
-        },
-        "version": {
-          "type": "integer"
-        },
-        "state": {
-          "type": "string"
-        },
-        "display_name": {
-          "type": "string"
-        },
-        "logo": true,
-        "highlight": {
-          "type": "string"
-        },
-        "description": {
-          "type": "string"
-        },
-        "auth": true
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
     "Connectors": {
       "properties": {
         "auto_migrate": {
           "type": "boolean"
         },
         "auto_migration_lock_duration": {
-          "$ref": "#/$defs/HumanDuration"
+          "$ref": "./common/schema.json#/$defs/HumanDuration"
         },
         "load_from_list": {
           "items": {
-            "$ref": "#/$defs/Connector"
+            "$ref": "./connectors/schema.json"
           },
           "type": "array"
         }
@@ -88,7 +59,7 @@
           "type": "array"
         },
         "max_age": {
-          "$ref": "#/$defs/HumanDuration"
+          "$ref": "./common/schema.json#/$defs/HumanDuration"
         },
         "allow_credentials": {
           "type": "boolean"
@@ -146,39 +117,26 @@
           "type": "boolean"
         },
         "retention": {
-          "$ref": "#/$defs/HumanDuration"
+          "$ref": "./common/schema.json#/$defs/HumanDuration"
         },
         "max_request_size": {
-          "$ref": "#/$defs/HumanByteSize"
+          "$ref": "./common/schema.json#/$defs/HumanByteSize"
         },
         "max_response_size": {
-          "$ref": "#/$defs/HumanByteSize"
+          "$ref": "./common/schema.json#/$defs/HumanByteSize"
         },
         "max_response_wait": {
-          "$ref": "#/$defs/HumanDuration"
+          "$ref": "./common/schema.json#/$defs/HumanDuration"
         },
         "full_request_recording": {
           "type": "string"
         },
         "full_request_retention": {
-          "$ref": "#/$defs/HumanDuration"
+          "$ref": "./common/schema.json#/$defs/HumanDuration"
         }
       },
       "additionalProperties": false,
       "type": "object"
-    },
-    "HumanByteSize": {
-      "properties": {
-        "uint64": {
-          "type": "integer"
-        }
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
-    "HumanDuration": {
-      "type": "string",
-      "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$"
     },
     "Marketplace": {
       "properties": {
@@ -190,16 +148,16 @@
     "OAuth": {
       "properties": {
         "initiate_to_redirect_ttl": {
-          "$ref": "#/$defs/HumanDuration"
+          "$ref": "./common/schema.json#/$defs/HumanDuration"
         },
         "round_trip_ttl": {
-          "$ref": "#/$defs/HumanDuration"
+          "$ref": "./common/schema.json#/$defs/HumanDuration"
         },
         "refresh_tokens_in_background": {
           "type": "boolean"
         },
         "refresh_tokens_time_before_expiry": {
-          "$ref": "#/$defs/HumanDuration"
+          "$ref": "./common/schema.json#/$defs/HumanDuration"
         },
         "refresh_tokens_cron_schedule": {
           "type": "string"
@@ -226,7 +184,7 @@
           "$ref": "#/$defs/ServiceAdminUi"
         },
         "session_timeout": {
-          "$ref": "#/$defs/HumanDuration"
+          "$ref": "./common/schema.json#/$defs/HumanDuration"
         },
         "xsrf_request_queue_depth": {
           "type": "integer"
@@ -289,7 +247,7 @@
         },
         "tls": true,
         "session_timeout": {
-          "$ref": "#/$defs/HumanDuration"
+          "$ref": "./common/schema.json#/$defs/HumanDuration"
         },
         "xsrf_request_queue_depth": {
           "type": "integer"
@@ -350,14 +308,6 @@
       },
       "additionalProperties": false,
       "type": "object"
-    },
-    "UUID": {
-      "items": {
-        "type": "integer"
-      },
-      "type": "array",
-      "maxItems": 16,
-      "minItems": 16
     }
   },
   "properties": {

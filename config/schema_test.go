@@ -1,36 +1,18 @@
 package config
 
 import (
-	"bytes"
 	"encoding/json"
 	"io/ioutil"
 	"path/filepath"
 	"strings"
 	"testing"
-
-	jsonschemav5 "github.com/santhosh-tekuri/jsonschema/v5"
 )
 
-// compileSchema compiles schema bytes with jsonschema/v5
-func compileSchema(t *testing.T, schemaBytes []byte) *jsonschemav5.Schema {
-	t.Helper()
-	c := jsonschemav5.NewCompiler()
-	url := "mem://config.schema.json"
-	c.AddResource(url, bytes.NewReader(schemaBytes))
-	s, err := c.Compile(url)
-	if err != nil {
-		t.Fatalf("failed to compile schema: %v", err)
-	}
-	return s
-}
-
 func Test_SchemaAgainstRealData(t *testing.T) {
-	schemaBytes, err := readSchemaBytes()
+	schema, err := compileSchema()
 	if err != nil {
 		t.Fatalf("failed to read schema: %v", err)
 	}
-
-	schema := compileSchema(t, schemaBytes)
 
 	files, err := filepath.Glob("test_data/*.yaml")
 	if err != nil {

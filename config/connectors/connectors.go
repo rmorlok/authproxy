@@ -9,6 +9,9 @@ import (
 	"github.com/rmorlok/authproxy/config/common"
 )
 
+// Connectors is the top-level definition of connectors in the config file.
+//
+// Note that the schema for this object is in the parent package.
 type Connectors struct {
 	AutoMigrate               *bool                 `json:"auto_migrate,omitempty" yaml:"auto_migrate,omitempty"`
 	AutoMigrationLockDuration *common.HumanDuration `json:"auto_migration_lock_duration,omitempty" yaml:"auto_migration_lock_duration,omitempty"`

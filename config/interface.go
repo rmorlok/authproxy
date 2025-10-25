@@ -1,13 +1,11 @@
 package config
 
 import (
-	"bytes"
 	"encoding/json"
 	"log/slog"
 	"os"
 
 	"github.com/pkg/errors"
-	jsonschemav5 "github.com/santhosh-tekuri/jsonschema/v5"
 )
 
 type C interface {
@@ -98,7 +96,7 @@ func LoadConfig(path string) (C, error) {
 		return nil, err
 	}
 
-	schemaBytes, err := readSchemaBytes()
+	schema, err := compileSchema()
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to read config schema")
 	}
@@ -111,18 +109,6 @@ func LoadConfig(path string) (C, error) {
 	var configAsParsedJson interface{}
 	if err := json.Unmarshal(configJsonBytes, &configAsParsedJson); err != nil {
 		return nil, errors.Wrap(err, "failed to unmarshal config JSON for config schema validation")
-	}
-
-	c := jsonschemav5.NewCompiler()
-	url := "mem://config.schema.json"
-	err = c.AddResource(url, bytes.NewReader(schemaBytes))
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to add config schema to compiler for config schema validation")
-	}
-
-	schema, err := c.Compile(url)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to compile config schema for config schema validation")
 	}
 
 	if err := schema.Validate(configAsParsedJson); err != nil {
