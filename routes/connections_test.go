@@ -21,6 +21,7 @@ import (
 	"github.com/rmorlok/authproxy/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/httpf"
 	"github.com/rmorlok/authproxy/test_utils"
+	"github.com/rmorlok/authproxy/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -116,6 +117,52 @@ func TestConnections(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, u, resp.ID)
 			require.Equal(t, database.ConnectionStateCreated, resp.State)
+		})
+	})
+
+	t.Run("force connection state", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+		u := uuid.New()
+		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
+			ID:               u,
+			ConnectorId:      connectorId,
+			ConnectorVersion: connectorVersion,
+			State:            database.ConnectionStateCreated,
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPut, "/connections/"+u.String()+"/_force_state", util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}))
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("invalid uuid", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodPut, "/connections/"+uuid.New().String()+"/_force_state", util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}), "some-actor")
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("valid", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodPut, "/connections/"+u.String()+"/_force_state", util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}), "some-actor")
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ConnectionJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Equal(t, u, resp.ID)
+			require.Equal(t, database.ConnectionStateDisconnected, resp.State)
 		})
 	})
 }

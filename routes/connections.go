@@ -483,11 +483,126 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, response)
 }
 
+type ForceStateRequestJson struct {
+	State database.ConnectionState `json:"state"`
+}
+
+func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	id, err := uuid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if id == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+	}
+
+	// The Auth check is duplicative of the annotation for the route, but being done since are pulling auth anyway.
+	ra := auth.GetAuthFromGinContext(gctx)
+	if !ra.IsAuthenticated() {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusUnauthorized().
+			WithResponseMsg("unauthorized").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	req := ForceStateRequestJson{}
+	err = gctx.BindJSON(&req)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if req.State == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("state is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	c, err := r.db.GetConnection(ctx, id)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if c == nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsg("connection not found").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	cv, err := r.connectors.GetConnectorVersion(ctx, c.ConnectorId, c.ConnectorVersion)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if c.State == req.State {
+		gctx.PureJSON(http.StatusOK, DatabaseConnectionToJson(cv, *c))
+		return
+	}
+
+	err = r.db.SetConnectionState(ctx, id, req.State)
+	if err != nil {
+		api_common.HttpStatusErrorBuilderFromError(err).
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	c, err = r.db.GetConnection(ctx, id)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, DatabaseConnectionToJson(cv, *c))
+}
+
 func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 	g.POST("/connections/_initiate", r.auth.Required(), r.initiate)
 	g.GET("/connections", r.auth.Required(), r.list)
 	g.GET("/connections/:id", r.auth.Required(), r.get)
 	g.POST("/connections/:id/_disconnect", r.auth.Required(), r.disconnect)
+	g.PUT("/connections/:id/_force_state", r.auth.Required(), r.forceState)
 }
 
 func NewConnectionsRoutes(
