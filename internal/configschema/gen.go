@@ -43,7 +43,7 @@ func Generate(outPath string) ([]byte, error) {
 // by reflecting the Go structs and their json tags. The generated file is written
 // to docs/config.schema.json so it can be referenced by editors and tooling.
 func main() {
-	outPath := "docs/config.schema.json"
+	outPath := "config/schema.json"
 	data, err := Generate(outPath)
 	if err != nil {
 		log.Fatalf("failed to generate schema: %v", err)

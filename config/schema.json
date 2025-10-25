@@ -275,7 +275,9 @@
     "ServicePublic": {
       "properties": {
         "health_check_port": true,
-        "port": true,
+        "port": {
+          "type": "integer"
+        },
         "domain": {
           "type": "string"
         },
