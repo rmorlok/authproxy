@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://github.com/rmorlok/authproxy/config/root",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/config/schema.json",
   "$defs": {
     "Connector": {
       "properties": {
