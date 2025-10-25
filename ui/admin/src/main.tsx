@@ -16,17 +16,28 @@ const theme = createTheme({
 });
 
 // Construct auth parameters from either window variable or URL query parameter
+const url = new URL(window.location.href);
+const searchParams = url.searchParams;
+const authTokenFromQuery = searchParams.get('auth_token');
+
+// If we have an auth token in the query string, remove it from the URL bar immediately
+if (authTokenFromQuery) {
+    const cleaned = new URL(url.toString());
+    cleaned.searchParams.delete('auth_token');
+    // Preserve SPA state while cleaning the URL
+    window.history.replaceState(window.history.state, document.title, cleaned.toString());
+}
+
 const params: ApiSessionInitiateRequest = {
-    return_to_url: window.location.href,
+    // Always use the cleaned URL (without auth_token) as the return_to_url
+    return_to_url: (authTokenFromQuery ? (() => { const u = new URL(window.location.href); u.searchParams.delete('auth_token'); return u.toString(); })() : window.location.href),
 };
+
+// Prefer window-provided token (e.g., server-injected), otherwise use token from query string
 if ((window as any).AUTHPROXY_AUTH_TOKEN) {
     params.auth_token = (window as any).AUTHPROXY_AUTH_TOKEN;
-} else {
-    const urlParams = new URLSearchParams(window.location.search);
-    const authToken = urlParams.get('auth_token');
-    if (authToken) {
-        params.auth_token = authToken;
-    }
+} else if (authTokenFromQuery) {
+    params.auth_token = authTokenFromQuery;
 }
 
 // Trigger auth state to load as soon as the page loads.
