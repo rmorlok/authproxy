@@ -49,6 +49,12 @@ export interface DisconnectResponseJson {
   connection: Connection;
 }
 
+export interface ForceConnectionStateRequest {
+    state: ConnectionState;
+}
+
+export interface ForceConnectionStateResponse extends Connection {}
+
 /**
  * Parameters used for listing connections.
  * This interface defines the criteria and options available for querying connection data.
@@ -104,9 +110,23 @@ export const disconnectConnection = (id: string) => {
   return client.post<DisconnectResponseJson>(`/api/v1/connections/${id}/_disconnect`);
 };
 
+/**
+ * Force the state of a connection. Requires admin permissions.
+ * @param id The ID of the connection to force state for
+ * @param state The state to force
+ * @returns Promise with final state of the connection
+ */
+export const forceConnectionState = (id: string, state: ConnectionState) => {
+    const request: ForceConnectionStateRequest = {
+        state: state
+    };
+    return client.put<ForceConnectionStateResponse>(`/api/v1/connections/${id}/_force_state`, request);
+};
+
 export const connections = {
   list: listConnections,
   get: getConnection,
   initiate: initiateConnection,
   disconnect: disconnectConnection,
+  force_state: forceConnectionState,
 };
