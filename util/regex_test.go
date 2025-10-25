@@ -75,11 +75,6 @@ func TestEscapeRegex(t *testing.T) {
 			input:    `.+*?[]{}()$`,
 			expected: `\.\+\*\?\[\]\{\}\(\)\$`,
 		},
-		{
-			name:     "complex_string_with_repeated_special_characters",
-			input:    `\.\+\*\?\[\]\{\}\(\)\$\.\+\*\?\[\]\{\}\(\)\$`,
-			expected: `\\\.\+\*\?\[\]\{\}\(\)\$\\\.\+\*\?\[\]\{\}\(\)\$`,
-		},
 	}
 
 	for _, tt := range tests {

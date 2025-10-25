@@ -1,6 +1,7 @@
 package util
 
 import (
+	"slices"
 	"strconv"
 	"testing"
 
@@ -14,7 +15,9 @@ func TestMap(t *testing.T) {
 }
 
 func TestGetKeys(t *testing.T) {
-	assert.Equal(t, []string{"a", "b", "c"}, GetKeys(map[string]int{"a": 1, "b": 2, "c": 3}))
+	result := GetKeys(map[string]int{"a": 1, "b": 2, "c": 3})
+	slices.Sort(result)
+	assert.Equal(t, []string{"a", "b", "c"}, result)
 
 	var m map[string]int
 	assert.Equal(t, []string{}, GetKeys(m))

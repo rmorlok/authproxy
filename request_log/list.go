@@ -397,7 +397,7 @@ func (l *listRequestsFilters) apply() (query string, options *goredis.FTSearchOp
 	}
 
 	if l.PathRegex != nil {
-		clauses = append(clauses, fmt.Sprintf("@%s:/%s/", fieldPath, l.PathRegex))
+		clauses = append(clauses, fmt.Sprintf("@%s:/%s/", fieldPath, *l.PathRegex))
 	}
 
 	if len(clauses) == 0 {

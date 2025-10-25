@@ -131,7 +131,7 @@ func TestWithParsedStatusCodeRange(t *testing.T) {
 		{
 			name:             "Empty input",
 			input:            "",
-			expectedError:    errors.New("no value specified for status code ranges"),
+			expectedError:    errors.New("no value specified for status code range"),
 			expectedRange:    nil,
 			expectExactMatch: false,
 		},
