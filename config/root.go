@@ -2,11 +2,12 @@ package config
 
 import (
 	"fmt"
+	"log/slog"
+
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/config/common"
 	"github.com/rmorlok/authproxy/util"
 	"gopkg.in/yaml.v3"
-	"log/slog"
 )
 
 type Root struct {
@@ -36,15 +37,16 @@ func (r *Root) GetRootLogger() *slog.Logger {
 }
 
 func (r *Root) Validate() error {
+	vc := &common.ValidationContext{Path: "$"}
 	result := &multierror.Error{}
 
 	if r.Connectors == nil {
-		result = multierror.Append(result, errors.New("connectors block is required"))
-	} else if err := r.Connectors.Validate(); err != nil {
+		result = multierror.Append(result, vc.NewError("connectors block is required"))
+	} else if err := r.Connectors.Validate(vc.PushField("connectors")); err != nil {
 		result = multierror.Append(result, err)
 	}
 
-	if err := r.HostApplication.Validate(); err != nil {
+	if err := r.HostApplication.Validate(vc.PushField("host_application")); err != nil {
 		result = multierror.Append(result, err)
 	}
 

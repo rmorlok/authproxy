@@ -5,6 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
+
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"gopkg.in/yaml.v3"
@@ -31,15 +32,28 @@ type Connector struct {
 	// start with 1 (zero implies unspecified).
 	Version uint64 `json:"version,omitempty" yaml:"version,omitempty"`
 
-	// The release state of the connector. Must either be primary or draft if specified. Defaults to primary
+	// State is the release state of the connector. Must either be primary or draft if specified. Defaults to primary
 	// if unspecified.
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
 
-	DisplayName string       `json:"display_name" yaml:"display_name"`
-	Logo        common.Image `json:"logo" yaml:"logo"`
-	Highlight   string       `json:"highlight,omitempty" yaml:"highlight,omitempty"`
-	Description string       `json:"description" yaml:"description"`
-	Auth        Auth         `json:"auth" yaml:"auth"`
+	// DisplayName is the human readable name of the connector. This is displayed to the user in the marketplace portal.
+	DisplayName string `json:"display_name" yaml:"display_name"`
+
+	// Logo is the logo of the connector. This is displayed to the user in the marketplace portal.
+	Logo common.Image `json:"logo" yaml:"logo"`
+
+	// Highlight is a short blurb about the connector. This is displayed to the user in the marketplace portal.
+	Highlight string `json:"highlight,omitempty" yaml:"highlight,omitempty"`
+
+	// Description is a longer description of the connector. This is displayed to the user in the marketplace portal.
+	Description string `json:"description" yaml:"description"`
+
+	// Auth is how this connector authenticates. Possible values are of type OAuth2 or APIKey. See individual
+	// documentation for each struct for more details.
+	Auth Auth `json:"auth" yaml:"auth"`
+
+	// Probes are a list of probes to run against connections of this connector type to validation the connection.
+	Probes []Probe `json:"probes,omitempty" yaml:"probes,omitempty"`
 }
 
 func (c *Connector) UnmarshalYAML(value *yaml.Node) error {
@@ -207,16 +221,22 @@ func (c *Connector) Clone() *Connector {
 	return &clone
 }
 
-func (c *Connector) Validate() error {
+func (c *Connector) Validate(vc *common.ValidationContext) error {
 	result := &multierror.Error{}
 
 	if c.Type == "" {
-		result = multierror.Append(result, fmt.Errorf("connector must have type"))
+		result = multierror.Append(result, vc.NewErrorfForField("type", "connector must have type"))
 	}
 
 	if c.State != "" {
 		if c.State != "draft" && c.State != "primary" {
-			result = multierror.Append(result, fmt.Errorf("connector state must be either draft or primary"))
+			result = multierror.Append(result, vc.NewErrorfForField("state", "connector state must be either draft or primary"))
+		}
+	}
+
+	for i, probe := range c.Probes {
+		if err := probe.Validate(vc.PushField("probes").PushIndex(i)); err != nil {
+			result = multierror.Append(result, err)
 		}
 	}
 

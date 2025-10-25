@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/config/common"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -162,7 +163,7 @@ func TestConnectors_Validate(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			err := tt.connectors.Validate()
+			err := tt.connectors.Validate(&common.ValidationContext{})
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {
@@ -322,7 +323,7 @@ func TestConnectors_Validate_Exhaustive(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			connectors := FromList([]Connector{tt.conn1, tt.conn2})
-			err := connectors.Validate()
+			err := connectors.Validate(&common.ValidationContext{})
 			if tt.wantErr {
 				assert.Error(t, err)
 				if tt.errMsg != "" {

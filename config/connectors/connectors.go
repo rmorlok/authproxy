@@ -2,10 +2,11 @@ package connectors
 
 import (
 	"fmt"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/config/common"
-	"time"
 )
 
 type Connectors struct {
@@ -38,7 +39,7 @@ func (c *Connectors) GetConnectors() []Connector {
 	return c.LoadFromList
 }
 
-func (c *Connectors) Validate() error {
+func (c *Connectors) Validate(vc *common.ValidationContext) error {
 	result := &multierror.Error{}
 	typeCount := make(map[string]int)
 	typeToHasUuidCount := make(map[string]int)
@@ -59,7 +60,9 @@ func (c *Connectors) Validate() error {
 	// so that the system knows how to manage the upgrade path.
 
 	for i, connector := range c.GetConnectors() {
-		if err := connector.Validate(); err != nil {
+		// We use a blank validation context at the connector level to account for the future of splitting
+		// the connector definition to a separate file.
+		if err := connector.Validate(&common.ValidationContext{}); err != nil {
 			if connector.Id != uuid.Nil && connector.Type != "" {
 				err = multierror.Prefix(err, fmt.Sprintf("connector %s (%s): ", connector.Id.String(), connector.Type))
 			} else if connector.Id != uuid.Nil {
@@ -107,20 +110,20 @@ func (c *Connectors) Validate() error {
 
 	for typ, count := range typeCount {
 		if count > 1 && typeToHasUuidCount[typ] < count && typeToHasVersionCount[typ] < count {
-			result = multierror.Append(result, fmt.Errorf("duplicate connectors exist for type %s without ids or versions specified to fully differentiate", typ))
+			result = multierror.Append(result, vc.NewErrorf("duplicate connectors exist for type %s without ids or versions specified to fully differentiate", typ))
 		}
 	}
 
 	for id, count := range uuidToCount {
 		if count > 1 && count > uuidHasVersionsCount[id] {
-			result = multierror.Append(result, fmt.Errorf("duplicate connectors exist for id %s without differentiated versions", id.String()))
+			result = multierror.Append(result, vc.NewErrorf("duplicate connectors exist for id %s without differentiated versions", id.String()))
 		}
 	}
 
 	for typ, versionCounts := range typeNoUuidVersionCount {
 		for version, count := range versionCounts {
 			if count > 1 {
-				result = multierror.Append(result, fmt.Errorf("duplicate connectors exist for type %s with version %d", typ, version))
+				result = multierror.Append(result, vc.NewErrorf("duplicate connectors exist for type %s with version %d", typ, version))
 			}
 		}
 	}
@@ -128,7 +131,7 @@ func (c *Connectors) Validate() error {
 	for id, versionCounts := range uuidVersionCount {
 		for version, count := range versionCounts {
 			if count > 1 {
-				result = multierror.Append(result, fmt.Errorf("duplicate connectors exist for id %s with version %d", id.String(), version))
+				result = multierror.Append(result, vc.NewErrorf("duplicate connectors exist for id %s with version %d", id.String(), version))
 			}
 		}
 	}
