@@ -1,0 +1,34 @@
+# $schema: ../schema.json
+
+connectors:
+  auto_migrate: true
+  auto_migration_lock_duration: 30s
+  load_from_list:
+  - type: asana
+    id: D21753F8-2E91-43E7-ADEF-8ED80A6086AC
+    version: 1
+    display_name: Asana
+    logo:
+      public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Asana_logo.svg/2880px-Asana_logo.svg.png
+    description: |
+      Allow our agent organize your work
+    auth:
+      type: OAuth2
+      client_id:
+        env_var: ASANA_CLIENT_ID
+      client_secret:
+        env_var: ASANA_CLIENT_SECRET
+      authorization:
+        endpoint: https://app.asana.com/-/oauth_authorize
+      token:
+        endpoint: https://app.asana.com/-/oauth_token
+      scopes:
+        - id: projects:read
+          reason: |
+            We need access to see the projects
+        - id: tasks:read
+          reason: |
+            Allows us to give information about open tasks
+        - id: users:read
+          reason: |
+            Allows us to map work to who is responsible
