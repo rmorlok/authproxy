@@ -6,6 +6,7 @@ import (
 	"os"
 
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/util"
 )
 
 type C interface {
@@ -101,7 +102,7 @@ func LoadConfig(path string) (C, error) {
 		return nil, errors.Wrap(err, "failed to read config schema")
 	}
 
-	configJsonBytes, err := yamlBytesToJSON(content)
+	configJsonBytes, err := util.YamlBytesToJSON(content)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to convert YAML to JSON for config schema validation")
 	}

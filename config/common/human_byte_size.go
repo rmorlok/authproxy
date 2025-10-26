@@ -1,8 +1,9 @@
 package common
 
 import (
-	"code.cloudfoundry.org/bytefmt"
 	"fmt"
+
+	"code.cloudfoundry.org/bytefmt"
 )
 
 type HumanByteSize struct {
@@ -19,7 +20,7 @@ func (b *HumanByteSize) UnmarshalJSON(data []byte) error {
 	// Remove the surrounding quotes from the JSON string
 	s := string(data)
 	if len(s) < 2 || s[0] != '"' || s[len(s)-1] != '"' {
-		return fmt.Errorf("invalid duration format: %s", s)
+		return fmt.Errorf("invalid byte size format: %s", s)
 	}
 	parseBytes, err := bytefmt.ToBytes(s[1 : len(s)-1])
 	if err != nil {

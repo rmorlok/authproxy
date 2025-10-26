@@ -8,7 +8,6 @@ import (
 
 	"github.com/pkg/errors"
 	jsonschemav5 "github.com/santhosh-tekuri/jsonschema/v5"
-	"gopkg.in/yaml.v3"
 )
 
 //go:embed schema.json **/schema*.json
@@ -65,19 +64,4 @@ func compileSchema() (*jsonschemav5.Schema, error) {
 	}
 
 	return schema, nil
-}
-
-// yamlBytesToJSON translates loaded YAML data to JSON as bytes.
-func yamlBytesToJSON(yamlData []byte) ([]byte, error) {
-	var v interface{}
-	if err := yaml.Unmarshal(yamlData, &v); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal YAML")
-	}
-	// YAML numbers default to int/float; ensure JSON-encodable
-	j, err := json.Marshal(v)
-	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal to JSON")
-	}
-
-	return j, nil
 }

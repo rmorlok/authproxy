@@ -69,6 +69,7 @@
       }
     }
   },
+  "required": ["type", "display_name", "logo", "auth"],
   "properties": {
     "id": {
       "$ref": "../common/schema.json#/$defs/UUID"
