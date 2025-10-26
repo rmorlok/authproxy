@@ -13,7 +13,7 @@
     },
     "HumanDuration": {
       "type": "string",
-      "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h)$"
+      "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h|d)$"
     },
     "UUID": {
       "items": {
@@ -22,6 +22,9 @@
       "type": "array",
       "maxItems": 16,
       "minItems": 16
+    },
+    "Image": {
+      "type": "object"
     }
   }
 }

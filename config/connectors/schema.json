@@ -5,16 +5,16 @@
     "OAuth": {
       "properties": {
         "initiate_to_redirect_ttl": {
-          "$ref": "../common/schema.json#$defs/HumanDuration"
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
         },
         "round_trip_ttl": {
-          "$ref": "../common/schema.json#$defs/HumanDuration"
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
         },
         "refresh_tokens_in_background": {
           "type": "boolean"
         },
         "refresh_tokens_time_before_expiry": {
-          "$ref": "../common/schema.json#$defs/HumanDuration"
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
         },
         "refresh_tokens_cron_schedule": {
           "type": "string"
@@ -22,6 +22,51 @@
       },
       "additionalProperties": false,
       "type": "object"
+    },
+    "Probe": {
+      "required": ["id", "period"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "period": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "proxy_http": {
+          "$ref": "#/$defs/ProbeHttp"
+        },
+        "http": {
+          "$ref": "#/$defs/ProbeHttp"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ProbeHttp": {
+      "required": ["method", "url"],
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "header": {
+          "type": "object"
+        },
+        "body_raw": {
+          "type": "string"
+        },
+        "body_json": {
+          "type": "object"
+        },
+        "body": {
+          "type": "string"
+        },
+        "timeout": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        }
+      }
     }
   },
   "properties": {
@@ -40,14 +85,24 @@
     "display_name": {
       "type": "string"
     },
-    "logo": true,
+    "logo": {
+      "$ref": "../common/schema.json#/$defs/Image"
+    },
     "highlight": {
       "type": "string"
     },
     "description": {
       "type": "string"
     },
-    "auth": true
+    "auth": {
+      "type": "object"
+    },
+    "probes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Probe"
+      }
+    }
   },
   "additionalProperties": false,
   "type": "object"
