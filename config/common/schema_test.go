@@ -174,6 +174,89 @@ func TestSchema(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name: "HumanByteSize",
+			Schema: `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/config/common/test.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["test"],
+  "properties": {
+	"test": {
+		"$ref": "./schema.json#/$defs/HumanByteSize"
+    }
+  }
+}`,
+			Tests: []test{
+				{
+					Name:  "bad value",
+					Valid: false,
+					Data:  `{"test": "bad"}`,
+				},
+				{
+					Name:  "wrong type",
+					Valid: false,
+					Data:  `{"test": 99}`,
+				},
+				{
+					Name:  "no unit",
+					Valid: false,
+					Data:  `{"test": "99"}`,
+				},
+				{
+					Name:  "only unit",
+					Valid: false,
+					Data:  `{"test": "mb"}`,
+				},
+				{
+					Name:  "byte",
+					Valid: true,
+					Data:  `{"test": "10b"}`,
+				},
+				{
+					Name:  "kilobyte",
+					Valid: true,
+					Data:  `{"test": "23kb"}`,
+				},
+				{
+					Name:  "EIC kilobyte",
+					Valid: true,
+					Data:  `{"test": "23kib"}`,
+				},
+				{
+					Name:  "megabyte",
+					Valid: true,
+					Data:  `{"test": "23mb"}`,
+				},
+				{
+					Name:  "EIC megabyte",
+					Valid: true,
+					Data:  `{"test": "23mib"}`,
+				},
+				{
+					Name:  "gigabyte",
+					Valid: true,
+					Data:  `{"test": "23gb"}`,
+				},
+				{
+					Name:  "EIC gigabyte",
+					Valid: true,
+					Data:  `{"test": "23gib"}`,
+				},
+				{
+					Name:  "permits space",
+					Valid: true,
+					Data:  `{"test": "23 mb"}`,
+				},
+				{
+					Name:  "case insensitive",
+					Valid: true,
+					Data:  `{"test": "23KB"}`,
+				},
+			},
+		},
 	}
 
 	for _, entity := range entities {
