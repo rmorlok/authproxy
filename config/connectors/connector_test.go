@@ -56,12 +56,12 @@ func TestConnectorRoundtrip(t *testing.T) {
 				Description: "OAuth2 description",
 				Auth: &AuthOAuth2{
 					Type: AuthTypeOAuth2,
-					ClientId: &common.StringValueDirect{
+					ClientId: &common.StringValue{InnerVal: &common.StringValueDirect{
 						Value: "client-id-value",
-					},
-					ClientSecret: &common.StringValueDirect{
+					}},
+					ClientSecret: &common.StringValue{InnerVal: &common.StringValueDirect{
 						Value: "client-secret-value",
-					},
+					}},
 					Scopes: []Scope{
 						{
 							Id:       "scope1",

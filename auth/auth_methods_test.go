@@ -275,7 +275,7 @@ func TestAuth_Parse(t *testing.T) {
 			},
 			AdminApi: config.ServiceAdminApi{
 				ServiceHttp: config.ServiceHttp{
-					PortVal: &config.StringValueDirect{Value: "8080"},
+					PortVal: &config.StringValue{&config.StringValueDirect{Value: "8080"}},
 				},
 			},
 		})
@@ -326,7 +326,7 @@ func TestAuth_Parse(t *testing.T) {
 			},
 			AdminApi: config.ServiceAdminApi{
 				ServiceHttp: config.ServiceHttp{
-					PortVal: &config.StringValueDirect{Value: "8080"},
+					PortVal: &config.StringValue{&config.StringValueDirect{Value: "8080"}},
 				},
 			},
 		})
@@ -715,7 +715,7 @@ var testConfigPublicPrivateKey = config.Root{
 	},
 	AdminApi: config.ServiceAdminApi{
 		ServiceHttp: config.ServiceHttp{
-			PortVal: &config.StringValueDirect{Value: "8080"},
+			PortVal: &config.StringValue{&config.StringValueDirect{Value: "8080"}},
 		},
 	},
 }
@@ -735,7 +735,7 @@ var testConfigSecretKey = config.Root{
 	},
 	AdminApi: config.ServiceAdminApi{
 		ServiceHttp: config.ServiceHttp{
-			PortVal: &config.StringValueDirect{Value: "8080"},
+			PortVal: &config.StringValue{&config.StringValueDirect{Value: "8080"}},
 		},
 	},
 }

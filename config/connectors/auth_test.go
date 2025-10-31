@@ -1,9 +1,10 @@
 package connectors
 
 import (
+	"testing"
+
 	"github.com/rmorlok/authproxy/config/common"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestAuth(t *testing.T) {
@@ -30,12 +31,12 @@ func TestAuth(t *testing.T) {
 			assert.NoError(err)
 			assert.Equal(&AuthOAuth2{
 				Type: AuthTypeOAuth2,
-				ClientId: &common.StringValueDirect{
+				ClientId: &common.StringValue{InnerVal: &common.StringValueDirect{
 					Value: "some-client-id",
-				},
-				ClientSecret: &common.StringValueEnvVar{
+				}},
+				ClientSecret: &common.StringValue{InnerVal: &common.StringValueEnvVar{
 					EnvVar: "GOOGLE_DRIVE_CLIENT_SECRET",
-				},
+				}},
 				Scopes: []Scope{
 					{
 						Id:       "https://www.googleapis.com/auth/drive.readonly",
@@ -66,12 +67,12 @@ type: api-key
 		t.Run("oauth2", func(t *testing.T) {
 			data := &AuthOAuth2{
 				Type: AuthTypeOAuth2,
-				ClientId: &common.StringValueDirect{
+				ClientId: &common.StringValue{InnerVal: &common.StringValueDirect{
 					Value: "some-client-id",
-				},
-				ClientSecret: &common.StringValueEnvVar{
+				}},
+				ClientSecret: &common.StringValue{InnerVal: &common.StringValueEnvVar{
 					EnvVar: "GOOGLE_DRIVE_CLIENT_SECRET",
-				},
+				}},
 				Scopes: []Scope{
 					{
 						Id:       "https://www.googleapis.com/auth/drive.readonly",

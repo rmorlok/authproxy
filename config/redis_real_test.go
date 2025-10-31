@@ -1,8 +1,9 @@
 package config
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestRedisReal(t *testing.T) {
@@ -34,20 +35,17 @@ protocol: 2
 username: bobdole
 password: secret
 `
-			redis, err := UnmarshallYamlRedisString(data)
-			assert.NoError(err)
-			assert.Equal(&RedisReal{
+			expected := &RedisReal{
 				Provider: RedisProviderRedis,
 				Address:  "localhost:6379",
 				Network:  "tcp",
 				Protocol: 2,
-				Username: &StringValueDirect{
-					Value: "bobdole",
-				},
-				Password: &StringValueDirect{
-					Value: "secret",
-				},
-			}, redis)
+				Username: NewStringValueDirectInline("bobdole"),
+				Password: NewStringValueDirectInline("secret"),
+			}
+			redis, err := UnmarshallYamlRedisString(data)
+			assert.NoError(err)
+			assert.Equal(expected, redis)
 		})
 		t.Run("username password env var", func(t *testing.T) {
 			data := `
@@ -67,12 +65,12 @@ password:
 				Address:  "localhost:6379",
 				Network:  "tcp",
 				Protocol: 2,
-				Username: &StringValueEnvVar{
+				Username: &StringValue{&StringValueEnvVar{
 					EnvVar: "REDIS_USERNAME",
-				},
-				Password: &StringValueEnvVar{
+				}},
+				Password: &StringValue{&StringValueEnvVar{
 					EnvVar: "REDIS_PASSWORD",
-				},
+				}},
 			}, redis)
 		})
 	})

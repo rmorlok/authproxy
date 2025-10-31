@@ -22,13 +22,11 @@ type (
 
 // Re-export functions from the common sub-package
 var (
-	KindToString                    = common.KindToString
-	MarshalToYamlString             = common.MarshalToYamlString
-	MustMarshalToYamlString         = common.MustMarshalToYamlString
-	UnmarshallYamlStringValue       = common.UnmarshallYamlStringValue
-	UnmarshallYamlStringValueString = common.UnmarshallYamlStringValueString
-	StringValueUnmarshalYAML        = common.StringValueUnmarshalYAML
-	StringValueUnmarshalJSON        = common.StringValueUnmarshalJSON
+	KindToString               = common.KindToString
+	MarshalToYamlString        = common.MarshalToYamlString
+	MustMarshalToYamlString    = common.MustMarshalToYamlString
+	NewStringValueDirect       = common.NewStringValueDirect
+	NewStringValueDirectInline = common.NewStringValueDirectInline
 )
 
 // Re-export types from the connectors sub-package

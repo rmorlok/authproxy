@@ -61,4 +61,18 @@ func (kb StringValueDirect) MarshalYAML() (interface{}, error) {
 	}, nil
 }
 
+func NewStringValueDirect(value string) *StringValue {
+	return &StringValue{&StringValueDirect{
+		Value:          value,
+		IsDirectString: false,
+	}}
+}
+
+func NewStringValueDirectInline(value string) *StringValue {
+	return &StringValue{&StringValueDirect{
+		Value:          value,
+		IsDirectString: true,
+	}}
+}
+
 var _ StringValueType = (*StringValueDirect)(nil)

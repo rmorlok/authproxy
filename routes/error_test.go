@@ -17,7 +17,7 @@ func TestErrorRoutes(t *testing.T) {
 		ErrorPages: config.ErrorPages{},
 		Public: config.ServicePublic{
 			ServiceHttp: config.ServiceHttp{
-				PortVal:    &config.StringValueDirect{Value: "8080"},
+				PortVal:    &config.StringValue{&config.StringValueDirect{Value: "8080"}},
 				DomainVal:  "localhost",
 				IsHttpsVal: false,
 			},

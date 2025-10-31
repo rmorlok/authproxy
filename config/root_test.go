@@ -60,12 +60,12 @@ connectors:
 				}},
 				Auth: &AuthOAuth2{
 					Type: AuthTypeOAuth2,
-					ClientId: &StringValueDirect{
+					ClientId: &StringValue{&StringValueDirect{
 						Value: "some-client-id",
-					},
-					ClientSecret: &StringValueEnvVar{
+					}},
+					ClientSecret: &StringValue{&StringValueEnvVar{
 						EnvVar: "GOOGLE_DRIVE_CLIENT_SECRET",
-					},
+					}},
 					Scopes: []Scope{
 						{
 							Id:       "https://www.googleapis.com/auth/drive.readonly",

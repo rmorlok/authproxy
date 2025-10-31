@@ -4,60 +4,14 @@ import (
 	"context"
 	"crypto/tls"
 	"fmt"
-	"github.com/rmorlok/authproxy/config/common"
-	"gopkg.in/yaml.v3"
 	"net/http"
 	"strconv"
+
+	"gopkg.in/yaml.v3"
 )
 
 type ServiceCommon struct {
-	HealthCheckPortVal StringValue `json:"health_check_port,omitempty" yaml:"health_check_port,omitempty"`
-}
-
-func commonServiceUnmarshalYAML(value *yaml.Node) (ServiceCommon, error) {
-	// Ensure the node is a mapping node
-	if value.Kind != yaml.MappingNode {
-		return ServiceCommon{}, fmt.Errorf("commonService expected a mapping node, got %s", KindToString(value.Kind))
-	}
-
-	var healthCheckPortVal StringValue = &StringValueDirect{Value: "0"}
-
-	// Handle custom unmarshalling for some attributes. Iterate through the mapping node's content,
-	// which will be sequences of keys, then values.
-	for i := 0; i < len(value.Content); i += 2 {
-		keyNode := value.Content[i]
-		valueNode := value.Content[i+1]
-
-		var err error
-		matched := false
-
-		switch keyNode.Value {
-		case "health_check_port":
-			if healthCheckPortVal, err = common.StringValueUnmarshalYAML(valueNode); err != nil {
-				return ServiceCommon{}, err
-			}
-			matched = true
-		}
-
-		if matched {
-			// Remove the key/value from the raw unmarshalling and pull back our index
-			// because of the changing slice size to the left of what we are indexing
-			value.Content = append(value.Content[:i], value.Content[i+2:]...)
-			i -= 2
-		}
-	}
-
-	// Let the rest unmarshall normally
-	type RawType ServiceCommon
-	raw := &RawType{}
-	if err := value.Decode(raw); err != nil {
-		return ServiceCommon{}, err
-	}
-
-	// Set the custom unmarshalled types
-	raw.HealthCheckPortVal = healthCheckPortVal
-
-	return ServiceCommon(*raw), nil
+	HealthCheckPortVal *StringValue `json:"health_check_port,omitempty" yaml:"health_check_port,omitempty"`
 }
 
 func (s *ServiceCommon) healthCheckPort() *uint64 {
@@ -79,12 +33,12 @@ func (s *ServiceCommon) healthCheckPort() *uint64 {
 }
 
 type ServiceHttp struct {
-	ServiceCommon
-	PortVal    StringValue `json:"port" yaml:"port"`
-	DomainVal  string      `json:"domain" yaml:"domain"`
-	IsHttpsVal bool        `json:"https" yaml:"https"`
-	CorsVal    *CorsConfig `json:"cors,omitempty" yaml:"cors,omitempty"`
-	TlsVal     TlsConfig   `json:"tls,omitempty" yaml:"tls,omitempty"`
+	ServiceCommon `json:",inline" yaml:",inline"`
+	PortVal       *StringValue `json:"port" yaml:"port"`
+	DomainVal     string       `json:"domain" yaml:"domain"`
+	IsHttpsVal    bool         `json:"https" yaml:"https"`
+	CorsVal       *CorsConfig  `json:"cors,omitempty" yaml:"cors,omitempty"`
+	TlsVal        TlsConfig    `json:"tls,omitempty" yaml:"tls,omitempty"`
 }
 
 func httpServiceUnmarshalYAML(value *yaml.Node) (ServiceHttp, error) {
@@ -93,13 +47,6 @@ func httpServiceUnmarshalYAML(value *yaml.Node) (ServiceHttp, error) {
 		return ServiceHttp{}, fmt.Errorf("httpService expected a mapping node, got %s", KindToString(value.Kind))
 	}
 
-	cs, err := commonServiceUnmarshalYAML(value)
-	if err != nil {
-		return ServiceHttp{}, err
-	}
-
-	var portVal StringValue = &StringValueDirect{Value: "0"}
-	var healthCheckPortVal StringValue = nil
 	var tlsConfig TlsConfig
 
 	// Handle custom unmarshalling for some attributes. Iterate through the mapping node's content,
@@ -112,15 +59,6 @@ func httpServiceUnmarshalYAML(value *yaml.Node) (ServiceHttp, error) {
 		matched := false
 
 		switch keyNode.Value {
-		case "port":
-			if portVal, err = common.StringValueUnmarshalYAML(valueNode); err != nil {
-				return ServiceHttp{}, err
-			}
-			matched = true
-		case "health_check_port":
-			if healthCheckPortVal, err = common.StringValueUnmarshalYAML(valueNode); err != nil {
-				return ServiceHttp{}, err
-			}
 		case "tls":
 			if tlsConfig, err = tlsConfigUnmarshalYAML(valueNode); err != nil {
 				return ServiceHttp{}, err
@@ -144,9 +82,6 @@ func httpServiceUnmarshalYAML(value *yaml.Node) (ServiceHttp, error) {
 	}
 
 	// Set the custom unmarshalled types
-	raw.ServiceCommon = cs
-	raw.PortVal = portVal
-	raw.HealthCheckPortVal = healthCheckPortVal
 	raw.TlsVal = tlsConfig
 
 	return ServiceHttp(*raw), nil

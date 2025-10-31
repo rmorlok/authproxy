@@ -21,6 +21,7 @@ func (sv *StringValue) UnmarshalJSON(data []byte) error {
 	// Check for a direct string value
 	if len(data) >= 2 && data[0] == '"' && data[len(data)-1] == '"' {
 		sv.InnerVal = &StringValueDirect{Value: string(data[1 : len(data)-1]), IsDirectString: true}
+		return nil
 	}
 
 	// If it's not a string, it should be an object
