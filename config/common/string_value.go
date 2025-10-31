@@ -19,6 +19,10 @@ type StringValue struct {
 	InnerVal StringValueType
 }
 
+func (sv *StringValue) Inner() StringValueType {
+	return sv.InnerVal
+}
+
 func (sv *StringValue) CloneValue() *StringValue {
 	if sv.InnerVal == nil {
 		return nil
