@@ -40,7 +40,7 @@ type Connector struct {
 	DisplayName string `json:"display_name" yaml:"display_name"`
 
 	// Logo is the logo of the connector. This is displayed to the user in the marketplace portal.
-	Logo common.Image `json:"logo" yaml:"logo"`
+	Logo *common.Image `json:"logo" yaml:"logo"`
 
 	// Highlight is a short blurb about the connector. This is displayed to the user in the marketplace portal.
 	Highlight string `json:"highlight,omitempty" yaml:"highlight,omitempty"`
@@ -62,7 +62,6 @@ func (c *Connector) UnmarshalYAML(value *yaml.Node) error {
 		return fmt.Errorf("connector expected a mapping node, got %s", common.KindToString(value.Kind))
 	}
 
-	var image common.Image
 	var auth Auth
 
 	// Handle custom unmarshalling for some attributes. Iterate through the mapping node's content,
@@ -75,11 +74,6 @@ func (c *Connector) UnmarshalYAML(value *yaml.Node) error {
 		matched := false
 
 		switch keyNode.Value {
-		case "logo":
-			if image, err = common.ImageUnmarshalYAML(valueNode); err != nil {
-				return err
-			}
-			matched = true
 		case "auth":
 			if auth, err = authUnmarshalYAML(valueNode); err != nil {
 				return err
@@ -103,7 +97,6 @@ func (c *Connector) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	// Set the custom unmarshalled types
-	raw.Logo = image
 	raw.Auth = auth
 
 	return nil
@@ -119,7 +112,7 @@ func (c *Connector) UnmarshalJSON(data []byte) error {
 		Version     uint64          `json:"version,omitempty"`
 		State       string          `json:"state,omitempty"`
 		DisplayName string          `json:"display_name"`
-		Logo        json.RawMessage `json:"logo"`
+		Logo        *common.Image   `json:"logo"`
 		Highlight   string          `json:"highlight"`
 		Description string          `json:"description"`
 		Auth        json.RawMessage `json:"auth"`
@@ -139,35 +132,8 @@ func (c *Connector) UnmarshalJSON(data []byte) error {
 	c.State = temp.State
 	c.Highlight = temp.Highlight
 	c.DisplayName = temp.DisplayName
+	c.Logo = temp.Logo
 	c.Description = temp.Description
-
-	// Handle Logo if it's not null
-	if len(temp.Logo) > 0 && string(temp.Logo) != "null" {
-		// Try to determine the type of image from the JSON
-		var logoMap map[string]interface{}
-		if err := json.Unmarshal(temp.Logo, &logoMap); err != nil {
-			return err
-		}
-
-		var logo common.Image
-		if _, ok := logoMap["public_url"]; ok {
-			// It's an ImagePublicUrl
-			var imgPublicUrl common.ImagePublicUrl
-			if err := json.Unmarshal(temp.Logo, &imgPublicUrl); err != nil {
-				return err
-			}
-			logo = &imgPublicUrl
-		} else if _, ok := logoMap["base64"]; ok {
-			// It's an ImageBase64
-			var imgBase64 common.ImageBase64
-			if err := json.Unmarshal(temp.Logo, &imgBase64); err != nil {
-				return err
-			}
-			logo = &imgBase64
-		}
-
-		c.Logo = logo
-	}
 
 	// Handle Auth if it's not null
 	if len(temp.Auth) > 0 && string(temp.Auth) != "null" {
@@ -211,7 +177,7 @@ func (c *Connector) Clone() *Connector {
 	clone := *c
 
 	if c.Logo != nil {
-		clone.Logo = c.Logo.Clone()
+		clone.Logo = c.Logo.CloneImage()
 	}
 
 	if c.Auth != nil {

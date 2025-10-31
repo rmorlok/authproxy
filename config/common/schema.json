@@ -9,14 +9,61 @@
     },
     "HumanDuration": {
       "type": "string",
-      "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h|d)$"
+      "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h|d)$",
+      "description": "A human-readable duration string, e.g., '10s', '20h'."
     },
     "UUID": {
       "type": "string",
-      "pattern": "^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$"
+      "pattern": "^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$",
+      "description": "A UUID, e.g., 'e8f7dda-7b82-476c-99ff-37c8357da4ae'."
+    },
+    "ImagePublicUrlString": {
+      "type": "string",
+      "description": "An image represented as a publicly accessible URL."
+    },
+    "ImagePublicUrl": {
+      "properties": {
+        "public_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "A publicly accessible URL to the image."
+        }
+      },
+      "type": "object",
+      "required": [
+        "public_url"
+      ],
+      "additionalProperties": false,
+      "description": "An image represented as a publicly accessible URL."
+    },
+    "ImageBase64": {
+      "properties": {
+        "mime_type": {
+          "type": "string",
+          "description": "The MIME type of the image, e.g., 'image/jpeg'."
+        },
+        "base64": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "pattern": "^[A-Za-z0-9+/]*(=|==)?$",
+          "description": "The base64 encoded image data."
+        }
+      },
+      "type": "object",
+      "required": [
+        "mime_type",
+        "base64"
+      ],
+      "additionalProperties": false,
+      "description": "An image represented as a base64 encoded string with associated MIME type. This is used to avoid having to store the image on a separate the server. This should be limited to small images less than 100kb in size."
     },
     "Image": {
-      "type": "object"
+      "oneOf": [
+        { "$ref": "#/$defs/ImagePublicUrlString" },
+        { "$ref": "#/$defs/ImagePublicUrl" },
+        { "$ref": "#/$defs/ImageBase64" }
+      ],
+      "description": "An image, either as a publicly accessible URL or as a base64 encoded string."
     }
   }
 }

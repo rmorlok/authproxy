@@ -257,6 +257,74 @@ func TestSchema(t *testing.T) {
 				},
 			},
 		},
+		{
+			Name: "Image",
+			Schema: `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/config/common/test.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["test"],
+  "properties": {
+	"test": {
+		"$ref": "./schema.json#/$defs/Image"
+    }
+  }
+}`,
+			Tests: []test{
+				{
+					Name:  "missing properties",
+					Valid: false,
+					Data:  `{"test": {}}`,
+				},
+				{
+					Name:  "unknown properties",
+					Valid: false,
+					Data:  `{"test": {"foo": "bar"}}`,
+				},
+				{
+					Name:  "wrong type",
+					Valid: false,
+					Data:  `{"test": 99}`,
+				},
+				{
+					Name:  "string is public url",
+					Valid: true,
+					Data:  `{"test": "https://example.com/image.png"}`,
+				},
+				{
+					Name:  "public url",
+					Valid: true,
+					Data:  `{"test": {"public_url": "https://example.com/image.png"}}`,
+				},
+				{
+					Name:  "public url - other attributes",
+					Valid: false,
+					Data:  `{"test": {"public_url": "https://example.com/image.png", "other": "value"}}`,
+				},
+				{
+					Name:  "base64",
+					Valid: true,
+					Data:  `{"test": {"base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=", "mime_type": "image/png"}}`,
+				},
+				{
+					Name:  "base64 - other attributes",
+					Valid: false,
+					Data:  `{"test": {"base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=", "mime_type": "image/png", "other": "value"}}`,
+				},
+				{
+					Name:  "base64 - missing mime type",
+					Valid: false,
+					Data:  `{"test": {"base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="}}`,
+				},
+				{
+					Name:  "base64 - missing data",
+					Valid: false,
+					Data:  `{"test": {"mime_type": "image/png"}}`,
+				},
+			},
+		},
 	}
 
 	for _, entity := range entities {

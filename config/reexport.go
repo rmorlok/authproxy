@@ -25,9 +25,6 @@ var (
 	KindToString                    = common.KindToString
 	MarshalToYamlString             = common.MarshalToYamlString
 	MustMarshalToYamlString         = common.MustMarshalToYamlString
-	UnmarshallYamlImage             = common.UnmarshallYamlImage
-	UnmarshallYamlImageString       = common.UnmarshallYamlImageString
-	ImageUnmarshalYAML              = common.ImageUnmarshalYAML
 	UnmarshallYamlStringValue       = common.UnmarshallYamlStringValue
 	UnmarshallYamlStringValueString = common.UnmarshallYamlStringValueString
 	StringValueUnmarshalYAML        = common.StringValueUnmarshalYAML

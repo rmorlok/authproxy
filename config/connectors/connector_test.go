@@ -2,13 +2,14 @@ package connectors
 
 import (
 	"encoding/json"
+	"testing"
+	"time"
+
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
-	"testing"
-	"time"
 
 	"github.com/rmorlok/authproxy/config/common"
 )
@@ -31,9 +32,9 @@ func TestConnectorRoundtrip(t *testing.T) {
 				Version:     1,
 				State:       "primary",
 				DisplayName: "Test Connector",
-				Logo: &common.ImagePublicUrl{
+				Logo: common.NewPublicUrlImage(common.ImagePublicUrl{
 					PublicUrl: "https://example.com/logo.png",
-				},
+				}),
 				Description: "Test description",
 				Auth: &AuthApiKey{
 					Type: AuthTypeAPIKey,
@@ -48,10 +49,10 @@ func TestConnectorRoundtrip(t *testing.T) {
 				Version:     2,
 				State:       "draft",
 				DisplayName: "OAuth2 Connector",
-				Logo: &common.ImageBase64{
+				Logo: common.NewBase64Image(common.ImageBase64{
 					MimeType: "image/png",
 					Base64:   "dGVzdCBiYXNlNjQgZGF0YQ==", // "test base64 data"
-				},
+				}),
 				Description: "OAuth2 description",
 				Auth: &AuthOAuth2{
 					Type: AuthTypeOAuth2,
