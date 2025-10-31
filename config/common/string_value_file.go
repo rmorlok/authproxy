@@ -2,9 +2,10 @@ package common
 
 import (
 	"context"
+	"os"
+
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
-	"os"
 )
 
 type StringValueFile struct {
@@ -51,7 +52,7 @@ func (kf *StringValueFile) GetValue(ctx context.Context) (string, error) {
 	return string(bytes), nil
 }
 
-func (kf *StringValueFile) Clone() StringValue {
+func (kf *StringValueFile) Clone() StringValueType {
 	if kf == nil {
 		return nil
 	}
@@ -59,3 +60,5 @@ func (kf *StringValueFile) Clone() StringValue {
 	clone := *kf
 	return &clone
 }
+
+var _ StringValueType = (*StringValueFile)(nil)

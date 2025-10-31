@@ -3,12 +3,11 @@ package common
 import (
 	"context"
 	"fmt"
-	"gopkg.in/yaml.v3"
 )
 
-type StringValue interface {
-	Clone() StringValue
-	
+type StringValueType interface {
+	Clone() StringValueType
+
 	// HasValue checks if this value has data.
 	HasValue(ctx context.Context) bool
 
@@ -16,64 +15,34 @@ type StringValue interface {
 	GetValue(ctx context.Context) (string, error)
 }
 
-func UnmarshallYamlStringValueString(data string) (StringValue, error) {
-	return UnmarshallYamlStringValue([]byte(data))
+type StringValue struct {
+	InnerVal StringValueType
 }
 
-func UnmarshallYamlStringValue(data []byte) (StringValue, error) {
-	var rootNode yaml.Node
-
-	if err := yaml.Unmarshal(data, &rootNode); err != nil {
-		return nil, err
+func (sv *StringValue) CloneValue() *StringValue {
+	if sv.InnerVal == nil {
+		return nil
 	}
 
-	return StringValueUnmarshalYAML(rootNode.Content[0])
+	return &StringValue{InnerVal: sv.InnerVal.Clone()}
 }
 
-// StringValueUnmarshalYAML handles unmarshalling from YAML while allowing us to make decisions
-// about how the data is unmarshalled based on the concrete type being represented
-func StringValueUnmarshalYAML(value *yaml.Node) (StringValue, error) {
-	if value.Kind == yaml.ScalarNode {
-		return &StringValueDirect{Value: value.Value}, nil
-	}
-
-	// Ensure the node is a mapping node
-	if value.Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("string value expected a scalar or mapping node, got %s", KindToString(value.Kind))
-	}
-
-	var keyData StringValue
-
-fieldLoop:
-	for i := 0; i < len(value.Content); i += 2 {
-		keyNode := value.Content[i]
-
-		switch keyNode.Value {
-		case "value":
-			keyData = &StringValueDirect{}
-			break fieldLoop
-		case "base64":
-			keyData = &StringValueBase64{}
-			break fieldLoop
-		case "env_var":
-			keyData = &StringValueEnvVar{}
-			break fieldLoop
-		case "env_var_base64":
-			keyData = &StringValueEnvVarBase64{}
-			break fieldLoop
-		case "path":
-			keyData = &StringValueFile{}
-			break fieldLoop
-		}
-	}
-
-	if keyData == nil {
-		return nil, fmt.Errorf("invalid structure for value type; does not match value, base64, env_var, file")
-	}
-
-	if err := value.Decode(keyData); err != nil {
-		return nil, err
-	}
-
-	return keyData, nil
+func (sv *StringValue) Clone() StringValueType {
+	return sv.CloneValue()
 }
+
+func (sv *StringValue) HasValue(ctx context.Context) bool {
+	if sv.InnerVal == nil {
+		return false
+	}
+	return sv.InnerVal.HasValue(ctx)
+}
+
+func (sv *StringValue) GetValue(ctx context.Context) (string, error) {
+	if sv.InnerVal == nil {
+		return "", fmt.Errorf("string value incorrectly configured")
+	}
+	return sv.InnerVal.GetValue(ctx)
+}
+
+var _ StringValueType = (*StringValue)(nil)

@@ -2,6 +2,7 @@ package common
 
 import (
 	"encoding/json"
+	"strings"
 	"testing"
 
 	"github.com/stretchr/testify/require"
@@ -9,7 +10,7 @@ import (
 )
 
 func TestImage(t *testing.T) {
-	t.Run("round trip", func(t *testing.T) {
+	t.Run("round trip starting from objects", func(t *testing.T) {
 		tests := []struct {
 			name  string
 			Image ImageType
@@ -25,13 +26,13 @@ func TestImage(t *testing.T) {
 				name: "public url",
 				Image: &ImagePublicUrl{
 					PublicUrl:      "https://example.com/image.png",
-					IsDirectString: true,
+					IsDirectString: false,
 				},
 			},
 			{
 				name: "base64",
 				Image: &ImageBase64{
-					Base64:   "https://example.com/image.png",
+					Base64:   "ywAAAAAAQABAAACAUwAOw==",
 					MimeType: "image/png",
 				},
 			},
@@ -65,6 +66,53 @@ func TestImage(t *testing.T) {
 	})
 
 	t.Run("yaml", func(t *testing.T) {
+		t.Run("roundtrip", func(t *testing.T) {
+			tests := []struct {
+				name     string
+				data     string
+				expected ImageType
+			}{
+				{
+					name: "inline public url",
+					expected: &ImagePublicUrl{
+						PublicUrl:      "https://example.com/image.png",
+						IsDirectString: true,
+					},
+					data: `https://example.com/image.png`,
+				},
+				{
+					name: "public url",
+					expected: &ImagePublicUrl{
+						PublicUrl:      "https://example.com/image.png",
+						IsDirectString: false,
+					},
+					data: `
+public_url: https://example.com/image.png
+`,
+				},
+				{
+					name: "base64",
+					expected: &ImageBase64{
+						Base64:   "ywAAAAAAQABAAACAUwAOw==",
+						MimeType: "image/png",
+					},
+					data: `
+mime_type: image/png
+base64: ywAAAAAAQABAAACAUwAOw==
+`,
+				},
+			}
+
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) {
+					var image Image
+					err := yaml.Unmarshal([]byte(test.data), &image)
+					require.NoError(t, err)
+					require.Equal(t, test.expected, image.Inner())
+					require.Equal(t, strings.TrimSpace(test.data), strings.TrimSpace(MustMarshalToYamlString(image.Inner())))
+				})
+			}
+		})
 		t.Run("parse", func(t *testing.T) {
 			t.Run("inline public url", func(t *testing.T) {
 				data := `https://example.com/image.png
@@ -125,6 +173,50 @@ base64: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/1J8
 base64: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/1J8qkwAAAAASUVORK5CYII=
 `, MustMarshalToYamlString(data))
 			})
+		})
+	})
+	t.Run("json", func(t *testing.T) {
+		t.Run("roundtrip", func(t *testing.T) {
+			tests := []struct {
+				name     string
+				data     string
+				expected ImageType
+			}{
+				{
+					name: "inline public url",
+					expected: &ImagePublicUrl{
+						PublicUrl:      "https://example.com/image.png",
+						IsDirectString: true,
+					},
+					data: `"https://example.com/image.png"`,
+				},
+				{
+					name: "public url",
+					expected: &ImagePublicUrl{
+						PublicUrl:      "https://example.com/image.png",
+						IsDirectString: false,
+					},
+					data: `{"public_url":"https://example.com/image.png"}`,
+				},
+				{
+					name: "base64",
+					expected: &ImageBase64{
+						Base64:   "ywAAAAAAQABAAACAUwAOw==",
+						MimeType: "image/png",
+					},
+					data: `{"mime_type":"image/png","base64":"ywAAAAAAQABAAACAUwAOw=="}`,
+				},
+			}
+
+			for _, test := range tests {
+				t.Run(test.name, func(t *testing.T) {
+					var image Image
+					err := json.Unmarshal([]byte(test.data), &image)
+					require.NoError(t, err)
+					require.Equal(t, test.expected, image.Inner())
+					require.Equal(t, strings.TrimSpace(test.data), strings.TrimSpace(MustMarshalToJsonString(image.Inner())))
+				})
+			}
 		})
 	})
 }

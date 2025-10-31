@@ -22,7 +22,7 @@ func (kb *StringValueBase64) GetValue(ctx context.Context) (string, error) {
 	return string(decodedBytes), nil
 }
 
-func (kb *StringValueBase64) Clone() StringValue {
+func (kb *StringValueBase64) Clone() StringValueType {
 	if kb == nil {
 		return nil
 	}
@@ -30,3 +30,5 @@ func (kb *StringValueBase64) Clone() StringValue {
 	clone := *kb
 	return &clone
 }
+
+var _ StringValueType = (*StringValueBase64)(nil)

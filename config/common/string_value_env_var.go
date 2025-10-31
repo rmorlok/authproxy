@@ -2,8 +2,9 @@ package common
 
 import (
 	"context"
-	"github.com/pkg/errors"
 	"os"
+
+	"github.com/pkg/errors"
 )
 
 type StringValueEnvVar struct {
@@ -29,7 +30,7 @@ func (kev *StringValueEnvVar) GetValue(ctx context.Context) (string, error) {
 	return val, nil
 }
 
-func (kb *StringValueEnvVar) Clone() StringValue {
+func (kb *StringValueEnvVar) Clone() StringValueType {
 	if kb == nil {
 		return nil
 	}
@@ -37,3 +38,5 @@ func (kb *StringValueEnvVar) Clone() StringValue {
 	clone := *kb
 	return &clone
 }
+
+var _ StringValueType = (*StringValueEnvVar)(nil)

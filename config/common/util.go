@@ -1,7 +1,9 @@
 package common
 
 import (
+	"encoding/json"
 	"fmt"
+
 	"gopkg.in/yaml.v3"
 )
 
@@ -12,6 +14,19 @@ func MarshalToYamlString(v interface{}) (string, error) {
 
 func MustMarshalToYamlString(v interface{}) string {
 	if s, err := MarshalToYamlString(v); err != nil {
+		panic(err)
+	} else {
+		return s
+	}
+}
+
+func MarshalToJsonString(v interface{}) (string, error) {
+	bytes, err := json.Marshal(v)
+	return string(bytes), err
+}
+
+func MustMarshalToJsonString(v interface{}) string {
+	if s, err := MarshalToJsonString(v); err != nil {
 		panic(err)
 	} else {
 		return s
