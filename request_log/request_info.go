@@ -9,6 +9,7 @@ const (
 	RequestTypeProxy  RequestType = "proxy"
 	RequestTypeOAuth  RequestType = "oauth"
 	RequestTypePublic RequestType = "public"
+	RequestTypeProbe  RequestType = "probe"
 )
 
 type RequestInfo struct {
