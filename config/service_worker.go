@@ -24,6 +24,10 @@ func (s *ServiceWorker) GetId() ServiceId {
 }
 
 func (s *ServiceWorker) GetConcurrency(ctx context.Context) int {
+	if s.ConcurrencyVal == nil {
+		return 0
+	}
+
 	val, err := s.ConcurrencyVal.GetValue(ctx)
 	if err != nil {
 		return 0

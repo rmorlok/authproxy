@@ -12,6 +12,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/apctx"
+	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/sqlh"
 	"github.com/rmorlok/authproxy/util"
 	"github.com/rmorlok/authproxy/util/pagination"
@@ -224,6 +225,12 @@ func (db *gormDB) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 		return errors.New("connector version is nil")
 	}
 
+	logger := aplog.NewBuilder(db.logger).
+		WithCtx(ctx).
+		WithConnectorId(cv.ID).
+		Build()
+	logger.Debug("upserting connector version")
+
 	if validationErr := cv.Validate(); validationErr != nil {
 		return validationErr
 	}
@@ -253,6 +260,7 @@ func (db *gormDB) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 
 		if existingRow {
 			if exitingState != ConnectorVersionStateDraft {
+				logger.Error("cannot modify non-draft connector", "existing_state", exitingState)
 				return errors.New("cannot modify non-draft connector")
 			}
 
@@ -273,6 +281,7 @@ func (db *gormDB) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 			}
 
 			if count != 1 {
+				logger.Error("expected to update 1 row for connector version", "got", count)
 				return errors.Errorf("expected to update 1 row for connector version, got %d", count)
 			}
 		} else {
