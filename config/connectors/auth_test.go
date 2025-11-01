@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/rmorlok/authproxy/config/common"
+	"github.com/rmorlok/authproxy/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -40,12 +41,12 @@ func TestAuth(t *testing.T) {
 				Scopes: []Scope{
 					{
 						Id:       "https://www.googleapis.com/auth/drive.readonly",
-						Required: true,
+						Required: nil,
 						Reason:   "We need to be able to view the files\n",
 					},
 					{
 						Id:       "https://www.googleapis.com/auth/drive.activity.readonly",
-						Required: false,
+						Required: util.ToPtr(false),
 						Reason:   "We need to be able to see what's been going on in drive\n",
 					},
 				},
@@ -76,12 +77,12 @@ type: api-key
 				Scopes: []Scope{
 					{
 						Id:       "https://www.googleapis.com/auth/drive.readonly",
-						Required: true,
+						Required: util.ToPtr(true),
 						Reason:   "We need to be able to view the files\n",
 					},
 					{
 						Id:       "https://www.googleapis.com/auth/drive.activity.readonly",
-						Required: false,
+						Required: util.ToPtr(false),
 						Reason:   "We need to be able to see what's been going on in drive\n",
 					},
 				},

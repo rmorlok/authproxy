@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/rmorlok/authproxy/config/connectors"
+	"github.com/rmorlok/authproxy/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -69,12 +70,12 @@ connectors:
 					Scopes: []Scope{
 						{
 							Id:       "https://www.googleapis.com/auth/drive.readonly",
-							Required: true,
+							Required: nil,
 							Reason:   "We need to be able to view the files\n",
 						},
 						{
 							Id:       "https://www.googleapis.com/auth/drive.activity.readonly",
-							Required: false,
+							Required: util.ToPtr(false),
 							Reason:   "We need to be able to see what's been going on in drive\n",
 						},
 					},

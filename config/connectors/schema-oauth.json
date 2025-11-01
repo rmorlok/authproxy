@@ -1,0 +1,121 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/config/connectors/schema-oauth.json",
+  "$defs": {
+    "Scope": {
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "required": {
+          "type": "boolean"
+        },
+        "reason": {
+          "type": "string"
+        }
+      },
+      "required": ["id", "reason"],
+      "type": "object"
+    },
+    "Authorization": {
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "query_overrides": {
+          "type": "object"
+        }
+      },
+      "required": ["endpoint"],
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Token": {
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "query_overrides": {
+          "type": "object"
+        },
+        "form_overrides": {
+          "type": "object"
+        },
+        "refresh_timeout": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "refresh_in_background": {
+          "type": "boolean"
+        },
+        "refresh_time_before_expiry": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        }
+      },
+      "required": ["endpoint"],
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Revocation": {
+      "properties": {
+        "endpoint": {
+          "type": "string"
+        },
+        "query_overrides": {
+          "type": "object"
+        },
+        "form_overrides": {
+          "type": "object"
+        },
+        "supported_tokens": {
+          "enum": ["access_token", "refresh_token", "both"]
+        }
+      },
+      "required": ["endpoint"],
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  "properties": {
+    "type": {
+      "const": "OAuth2"
+    },
+    "client_id": {
+      "$ref": "../common/schema.json#/$defs/StringValue"
+    },
+    "client_secret": {
+      "$ref": "../common/schema.json#/$defs/StringValue"
+    },
+    "authorization": {
+      "$ref": "#/$defs/Authorization"
+    },
+    "token": {
+      "$ref": "#/$defs/Token"
+    },
+    "initiate_to_redirect_ttl": {
+      "$ref": "../common/schema.json#/$defs/HumanDuration"
+    },
+    "round_trip_ttl": {
+      "$ref": "../common/schema.json#/$defs/HumanDuration"
+    },
+    "refresh_tokens_in_background": {
+      "type": "boolean"
+    },
+    "refresh_tokens_time_before_expiry": {
+      "$ref": "../common/schema.json#/$defs/HumanDuration"
+    },
+    "refresh_tokens_cron_schedule": {
+      "type": "string"
+    },
+    "revocation": {
+      "$ref": "#/$defs/Revocation"
+    },
+    "scopes": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/Scope"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "type": "object"
+}

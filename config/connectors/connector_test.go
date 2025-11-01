@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/go-cmp/cmp"
 	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -65,12 +66,12 @@ func TestConnectorRoundtrip(t *testing.T) {
 					Scopes: []Scope{
 						{
 							Id:       "scope1",
-							Required: true,
+							Required: util.ToPtr(true),
 							Reason:   "Required for basic functionality",
 						},
 						{
 							Id:       "scope2",
-							Required: false,
+							Required: util.ToPtr(false),
 							Reason:   "Optional for advanced features",
 						},
 					},

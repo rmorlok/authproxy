@@ -2,6 +2,7 @@ package connectors
 
 import (
 	"fmt"
+
 	"gopkg.in/yaml.v3"
 
 	"github.com/rmorlok/authproxy/config/common"
@@ -12,6 +13,7 @@ type AuthType string
 const (
 	AuthTypeOAuth2 = AuthType("OAuth2")
 	AuthTypeAPIKey = AuthType("api-key")
+	AuthTypeNoAuth = AuthType("no-auth")
 )
 
 type Auth interface {
@@ -55,6 +57,9 @@ fieldLoop:
 				break fieldLoop
 			case AuthTypeAPIKey:
 				auth = &AuthApiKey{}
+				break fieldLoop
+			case AuthTypeNoAuth:
+				auth = &AuthNoAuth{}
 				break fieldLoop
 			}
 		}

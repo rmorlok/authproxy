@@ -2,7 +2,10 @@ package connectors
 
 import (
 	"github.com/rmorlok/authproxy/config/common"
+	"github.com/rmorlok/authproxy/util"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
+
 	"testing"
 )
 
@@ -16,22 +19,24 @@ id: https://www.googleapis.com/auth/drive.readonly
 reason: |
   We need to be able to view the files
 `
-			scope, err := UnmarshallYamlScopeString(data)
+			scope := &Scope{}
+			err := yaml.Unmarshal([]byte(data), scope)
 			assert.NoError(err)
 			assert.Equal("https://www.googleapis.com/auth/drive.readonly", scope.Id)
 			assert.Equal("We need to be able to view the files\n", scope.Reason)
-			assert.True(scope.Required)
+			assert.True(scope.IsRequired())
 		})
 		t.Run("allowed to be not required", func(t *testing.T) {
 			data := `id: https://www.googleapis.com/auth/drive.readonly
 required: false
 reason: We need to be able to view the files
 `
-			scope, err := UnmarshallYamlScopeString(data)
+			scope := &Scope{}
+			err := yaml.Unmarshal([]byte(data), scope)
 			assert.NoError(err)
 			assert.Equal("https://www.googleapis.com/auth/drive.readonly", scope.Id)
 			assert.Equal("We need to be able to view the files", scope.Reason)
-			assert.False(scope.Required)
+			assert.False(scope.IsRequired())
 		})
 	})
 
@@ -39,7 +44,7 @@ reason: We need to be able to view the files
 		t.Run("defaults to required", func(t *testing.T) {
 			data := &Scope{
 				Id:       "https://www.googleapis.com/auth/drive.readonly",
-				Required: false,
+				Required: util.ToPtr(false),
 				Reason:   "We need to be able to view the files",
 			}
 			assert.Equal(`id: https://www.googleapis.com/auth/drive.readonly

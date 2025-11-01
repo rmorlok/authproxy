@@ -47,11 +47,3 @@ const (
 	AuthTypeOAuth2 = connectors.AuthTypeOAuth2
 	AuthTypeAPIKey = connectors.AuthTypeAPIKey
 )
-
-// Re-export functions from the connectors sub-package
-var (
-	UnmarshallYamlAuth        = connectors.UnmarshallYamlAuth
-	UnmarshallYamlAuthString  = connectors.UnmarshallYamlAuthString
-	UnmarshallYamlScope       = connectors.UnmarshallYamlScope
-	UnmarshallYamlScopeString = connectors.UnmarshallYamlScopeString
-)

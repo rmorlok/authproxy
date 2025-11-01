@@ -2,22 +2,19 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/config/connectors/schema.json",
   "$defs": {
-    "OAuth": {
+    "AuthApiKey": {
       "properties": {
-        "initiate_to_redirect_ttl": {
-          "$ref": "../common/schema.json#/$defs/HumanDuration"
-        },
-        "round_trip_ttl": {
-          "$ref": "../common/schema.json#/$defs/HumanDuration"
-        },
-        "refresh_tokens_in_background": {
-          "type": "boolean"
-        },
-        "refresh_tokens_time_before_expiry": {
-          "$ref": "../common/schema.json#/$defs/HumanDuration"
-        },
-        "refresh_tokens_cron_schedule": {
-          "type": "string"
+        "type": {
+          "const": "api-key"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "AuthNoAuth": {
+      "properties": {
+        "type": {
+          "const": "no-auth"
         }
       },
       "additionalProperties": false,
@@ -95,7 +92,11 @@
       "type": "string"
     },
     "auth": {
-      "type": "object"
+      "oneOf": [
+        { "$ref": "./schema-oauth.json" },
+        { "$ref": "#/$defs/AuthApiKey" },
+        { "$ref": "#/$defs/AuthNoAuth" }
+      ]
     },
     "probes": {
       "type": "array",
