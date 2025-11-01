@@ -35,6 +35,7 @@ type (
 	AuthType                = connectors.AuthType
 	AuthApiKey              = connectors.AuthApiKey
 	AuthOAuth2              = connectors.AuthOAuth2
+	AuthNoAuth              = connectors.AuthNoAuth
 	AuthOauth2Authorization = connectors.AuthOauth2Authorization
 	AuthOauth2Token         = connectors.AuthOauth2Token
 	Connector               = connectors.Connector
