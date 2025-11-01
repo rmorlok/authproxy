@@ -2,9 +2,10 @@ package aplog
 
 import (
 	"context"
+	"log/slog"
+
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
-	"log/slog"
 )
 
 type Builder interface {
@@ -14,11 +15,16 @@ type Builder interface {
 	WithCtx(ctx context.Context) Builder
 	WithConnectionId(connectionId uuid.UUID) Builder
 	WithConnectorId(connectionId uuid.UUID) Builder
+	With(args ...any) Builder
 	Build() *slog.Logger
 }
 
 type builder struct {
 	l *slog.Logger
+}
+
+func (b *builder) With(args ...any) Builder {
+	return &builder{l: b.l.With(args...)}
 }
 
 func (b *builder) WithService(serviceId string) Builder {
