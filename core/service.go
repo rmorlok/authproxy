@@ -1,4 +1,4 @@
-package connectors
+package core
 
 import (
 	"log/slog"
@@ -8,7 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/connectors/iface"
+	"github.com/rmorlok/authproxy/core/iface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"

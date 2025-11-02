@@ -15,7 +15,7 @@ import (
 	redismock "github.com/rmorlok/authproxy/apredis/mock"
 	auth2 "github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/connectors"
+	"github.com/rmorlok/authproxy/core"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/httpf"
@@ -61,7 +61,7 @@ func TestConnectors(t *testing.T) {
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(config.ServiceIdApi, cfg, db)
 		rs := redismock.NewMockClient(ctrl)
 		h := httpf2.CreateFactory(cfg, rs, aplog.NewNoopLogger())
-		c := connectors.NewConnectorsService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
+		c := core.NewConnectorsService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		require.NoError(t, c.MigrateConnectors(context.Background()))
 
 		cr := NewConnectorsRoutes(cfg, auth, c)

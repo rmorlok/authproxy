@@ -13,7 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/apctx"
 	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/config"
-	connIface "github.com/rmorlok/authproxy/connectors/iface"
+	connIface "github.com/rmorlok/authproxy/core/iface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"

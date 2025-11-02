@@ -16,7 +16,7 @@ import (
 	redismock "github.com/rmorlok/authproxy/apredis/mock"
 	auth2 "github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/connectors"
+	"github.com/rmorlok/authproxy/core"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/httpf"
@@ -58,7 +58,7 @@ func TestConnections(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		ac := asynqmock.NewMockClient(ctrl)
 		rs := redismock.NewMockClient(ctrl)
-		c := connectors.NewConnectorsService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
+		c := core.NewConnectorsService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		assert.NoError(t, c.MigrateConnectors(context.Background()))
 		cr := NewConnectionsRoutes(cfg, auth, db, rds, c, h, e, test_utils.NewTestLogger())
 		r := gin.Default()

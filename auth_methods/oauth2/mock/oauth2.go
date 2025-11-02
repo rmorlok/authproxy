@@ -13,7 +13,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
 	oauth2 "github.com/rmorlok/authproxy/auth_methods/oauth2"
-	iface "github.com/rmorlok/authproxy/connectors/iface"
+	iface "github.com/rmorlok/authproxy/core/iface"
 	database "github.com/rmorlok/authproxy/database"
 	request_log "github.com/rmorlok/authproxy/request_log"
 )

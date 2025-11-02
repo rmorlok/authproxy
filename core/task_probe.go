@@ -1,4 +1,4 @@
-package connectors
+package core
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/aplog"
-	"github.com/rmorlok/authproxy/connectors/iface"
+	"github.com/rmorlok/authproxy/core/iface"
 	"github.com/rmorlok/authproxy/database"
 )
 

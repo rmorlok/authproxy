@@ -1,9 +1,9 @@
-package connectors
+package core
 
 import (
 	"errors"
 
-	"github.com/rmorlok/authproxy/connectors/iface"
+	"github.com/rmorlok/authproxy/core/iface"
 )
 
 var ErrProbeNotFound = errors.New("probe not found")

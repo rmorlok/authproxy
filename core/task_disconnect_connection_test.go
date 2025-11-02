@@ -1,4 +1,4 @@
-package connectors
+package core
 
 import (
 	"context"
@@ -9,7 +9,7 @@ import (
 	mockAsynq "github.com/rmorlok/authproxy/apasynq/mock"
 	mockLog "github.com/rmorlok/authproxy/aplog/mock"
 	cfg "github.com/rmorlok/authproxy/config/connectors"
-	"github.com/rmorlok/authproxy/connectors/mock"
+	"github.com/rmorlok/authproxy/core/mock"
 	"github.com/rmorlok/authproxy/database"
 	mockDb "github.com/rmorlok/authproxy/database/mock"
 	mockEncrypt "github.com/rmorlok/authproxy/encrypt/mock"

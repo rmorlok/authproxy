@@ -1,11 +1,11 @@
-package connectors
+package core
 
 import (
 	"context"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	cfg "github.com/rmorlok/authproxy/config/connectors"
-	"github.com/rmorlok/authproxy/connectors/mock"
+	"github.com/rmorlok/authproxy/core/mock"
 	"github.com/stretchr/testify/require"
 	"testing"
 )

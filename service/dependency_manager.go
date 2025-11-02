@@ -10,8 +10,8 @@ import (
 	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/connectors"
-	connectorsinterface "github.com/rmorlok/authproxy/connectors/iface"
+	"github.com/rmorlok/authproxy/core"
+	connectorsinterface "github.com/rmorlok/authproxy/core/iface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -174,7 +174,7 @@ func (dm *DependencyManager) GetAsyncInspector() *asynq.Inspector {
 
 func (dm *DependencyManager) GetConnectorsService() connectorsinterface.C {
 	if dm.c == nil {
-		dm.c = connectors.NewConnectorsService(
+		dm.c = core.NewConnectorsService(
 			dm.GetConfig(),
 			dm.GetDatabase(),
 			dm.GetEncryptService(),
@@ -193,7 +193,7 @@ func (dm *DependencyManager) AutoMigrateConnectors() {
 		func() {
 			m := apredis.NewMutex(
 				dm.GetRedisClient(),
-				connectors.MigrateMutexKeyName,
+				core.MigrateMutexKeyName,
 				apredis.MutexOptionLockFor(dm.GetConfigRoot().Connectors.GetAutoMigrationLockDurationOrDefault()),
 				apredis.MutexOptionRetryFor(dm.GetConfigRoot().Connectors.GetAutoMigrationLockDurationOrDefault()+1*time.Second),
 				apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),

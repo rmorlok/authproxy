@@ -8,7 +8,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/api_common"
-	"github.com/rmorlok/authproxy/connectors/iface"
+	"github.com/rmorlok/authproxy/core/iface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/request_log"
 	"gopkg.in/h2non/gentleman.v2"

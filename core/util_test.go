@@ -1,4 +1,4 @@
-package connectors
+package core
 
 import (
 	"testing"
@@ -8,7 +8,7 @@ import (
 	mockAsynq "github.com/rmorlok/authproxy/apasynq/mock"
 	mockLog "github.com/rmorlok/authproxy/aplog/mock"
 	mockR "github.com/rmorlok/authproxy/apredis/mock"
-	"github.com/rmorlok/authproxy/connectors/iface"
+	"github.com/rmorlok/authproxy/core/iface"
 	mockDb "github.com/rmorlok/authproxy/database/mock"
 	mockE "github.com/rmorlok/authproxy/encrypt/mock"
 	mockF "github.com/rmorlok/authproxy/httpf/mock"

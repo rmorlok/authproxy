@@ -1,11 +1,11 @@
-package connectors
+package core
 
 import (
 	"log/slog"
 	"sync"
 
 	"github.com/rmorlok/authproxy/aplog"
-	"github.com/rmorlok/authproxy/connectors/iface"
+	"github.com/rmorlok/authproxy/core/iface"
 	"github.com/rmorlok/authproxy/database"
 )
 

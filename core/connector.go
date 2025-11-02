@@ -1,7 +1,7 @@
-package connectors
+package core
 
 import (
-	"github.com/rmorlok/authproxy/connectors/iface"
+	"github.com/rmorlok/authproxy/core/iface"
 	"github.com/rmorlok/authproxy/database"
 )
 

@@ -1,4 +1,4 @@
-package connectors
+package core
 
 import (
 	"context"
@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	cfg "github.com/rmorlok/authproxy/config/connectors"
-	"github.com/rmorlok/authproxy/connectors/iface"
+	"github.com/rmorlok/authproxy/core/iface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/util"
 )

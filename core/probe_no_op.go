@@ -1,9 +1,9 @@
-package connectors
+package core
 
 import (
 	"context"
 
-	"github.com/rmorlok/authproxy/connectors/iface"
+	"github.com/rmorlok/authproxy/core/iface"
 )
 
 type probeNoOp struct {

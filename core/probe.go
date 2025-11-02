@@ -1,4 +1,4 @@
-package connectors
+package core
 
 import (
 	"context"
@@ -6,7 +6,7 @@ import (
 
 	"github.com/rmorlok/authproxy/apctx"
 	cfg "github.com/rmorlok/authproxy/config/connectors"
-	"github.com/rmorlok/authproxy/connectors/iface"
+	"github.com/rmorlok/authproxy/core/iface"
 )
 
 const (

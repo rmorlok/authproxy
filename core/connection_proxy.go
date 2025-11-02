@@ -1,4 +1,4 @@
-package connectors
+package core
 
 import (
 	"context"
@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/auth_methods/no_auth"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/connectors/iface"
+	"github.com/rmorlok/authproxy/core/iface"
 	"github.com/rmorlok/authproxy/request_log"
 )
 

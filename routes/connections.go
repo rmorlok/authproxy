@@ -10,8 +10,8 @@ import (
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/connectors"
-	connIface "github.com/rmorlok/authproxy/connectors/iface"
+	"github.com/rmorlok/authproxy/core"
+	connIface "github.com/rmorlok/authproxy/core/iface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
@@ -305,7 +305,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	connectorVersions, err := r.connectors.GetConnectorVersions(ctx, connectors.GetConnectorVersionIdsForConnections(result.Results))
+	connectorVersions, err := r.connectors.GetConnectorVersions(ctx, core.GetConnectorVersionIdsForConnections(result.Results))
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().

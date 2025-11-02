@@ -4,7 +4,7 @@ import (
 	"context"
 	"net/http"
 
-	connIface "github.com/rmorlok/authproxy/connectors/iface"
+	connIface "github.com/rmorlok/authproxy/core/iface"
 	"github.com/rmorlok/authproxy/request_log"
 )
 

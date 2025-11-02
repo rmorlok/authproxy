@@ -1,4 +1,4 @@
-package connectors
+package core
 
 import (
 	"github.com/golang/mock/gomock"

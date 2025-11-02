@@ -10,7 +10,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	iface "github.com/rmorlok/authproxy/connectors/iface"
+	iface "github.com/rmorlok/authproxy/core/iface"
 	request_log "github.com/rmorlok/authproxy/request_log"
 )
 

@@ -1,10 +1,10 @@
-package connectors
+package core
 
 import (
 	"bytes"
 	"context"
 
-	"github.com/rmorlok/authproxy/connectors/iface"
+	"github.com/rmorlok/authproxy/core/iface"
 	"github.com/rmorlok/authproxy/request_log"
 )
 

@@ -6,7 +6,7 @@ import (
 	"net/url"
 
 	"github.com/google/uuid"
-	connIface "github.com/rmorlok/authproxy/connectors/iface"
+	connIface "github.com/rmorlok/authproxy/core/iface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/request_log"
 )
