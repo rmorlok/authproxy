@@ -303,6 +303,11 @@ func (db *gormDB) EnumerateConnections(
 	const pageSize = 100
 
 	sess := db.session(ctx)
+
+	if deletedHandling == DeletedHandlingInclude {
+		sess = sess.Unscoped()
+	}
+	
 	offset := 0
 
 	for {

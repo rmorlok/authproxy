@@ -237,4 +237,81 @@ func TestConnections(t *testing.T) {
 			assert.Equal(t, firstUuid, allResults[49].ID)
 		})
 	})
+
+	t.Run("enumerate connections", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig("enumerate_connections", nil)
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		c := clock.NewFakeClock(now)
+		ctx := apctx.NewBuilderBackground().WithClock(c).Build()
+
+		for i := 0; i < 201; i++ {
+			now = now.Add(time.Second)
+			c.SetTime(now)
+
+			u := uuid.New()
+
+			state := ConnectionStateCreated
+			if i%2 == 1 {
+				state = ConnectionStateReady
+			}
+
+			err := db.CreateConnection(ctx, &Connection{ID: u, State: state})
+			assert.NoError(t, err)
+		}
+
+		// A disconnecting connection
+		now = now.Add(time.Second)
+		c.SetTime(now)
+		u := uuid.New()
+		err := db.CreateConnection(ctx, &Connection{ID: u, State: ConnectionStateDisconnecting})
+		assert.NoError(t, err)
+
+		// A deleted connection
+		now = now.Add(time.Second)
+		c.SetTime(now)
+		u = uuid.New()
+		err = db.CreateConnection(ctx, &Connection{ID: u, State: ConnectionStateDisconnected})
+		assert.NoError(t, err)
+		now = now.Add(time.Second)
+		c.SetTime(now)
+		err = db.DeleteConnection(ctx, u)
+		assert.NoError(t, err)
+
+		t.Run("all connections", func(t *testing.T) {
+			total := 0
+			err := db.EnumerateConnections(ctx, DeletedHandlingInclude, nil, func(conns []*Connection, lastPage bool) (stop bool, err error) {
+				total += len(conns)
+				return false, nil
+			})
+			assert.NoError(t, err)
+			assert.Equal(t, 203, total)
+		})
+		t.Run("not deleted", func(t *testing.T) {
+			total := 0
+			err := db.EnumerateConnections(ctx, DeletedHandlingExclude, nil, func(conns []*Connection, lastPage bool) (stop bool, err error) {
+				total += len(conns)
+				return false, nil
+			})
+			assert.NoError(t, err)
+			assert.Equal(t, 202, total)
+		})
+		t.Run("multiple state filter", func(t *testing.T) {
+			total := 0
+			err := db.EnumerateConnections(ctx, DeletedHandlingExclude, []ConnectionState{ConnectionStateCreated, ConnectionStateReady}, func(conns []*Connection, lastPage bool) (stop bool, err error) {
+				total += len(conns)
+				return false, nil
+			})
+			assert.NoError(t, err)
+			assert.Equal(t, 201, total)
+		})
+		t.Run("multiple state filter", func(t *testing.T) {
+			total := 0
+			err := db.EnumerateConnections(ctx, DeletedHandlingExclude, []ConnectionState{ConnectionStateReady}, func(conns []*Connection, lastPage bool) (stop bool, err error) {
+				total += len(conns)
+				return false, nil
+			})
+			assert.NoError(t, err)
+			assert.Equal(t, 100, total)
+		})
+	})
 }
