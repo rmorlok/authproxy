@@ -1,7 +1,7 @@
 package connectors
 
 import (
-	iface "github.com/rmorlok/authproxy/connectors/interface"
+	"github.com/rmorlok/authproxy/connectors/iface"
 	"github.com/rmorlok/authproxy/database"
 )
 

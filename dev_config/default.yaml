@@ -144,17 +144,17 @@ connectors:
         - id: https://www.googleapis.com/auth/calendar.readonly
           reason: |
             We need to be able to read the calendar
-      probes:
-        - id: example
-          period: 1m
-          http:
-            method: GET
-            url: https://example.com/
-        - id: calendar-list
-          period: 30s
-          proxy_http:
-            method: GET
-            url: https://www.googleapis.com/calendar/v3/users/me/calendarList
+    probes:
+      - id: example
+        period: 1m
+        http:
+          method: GET
+          url: https://example.com/
+      - id: calendar-list
+        period: 30s
+        proxy_http:
+          method: GET
+          url: https://www.googleapis.com/calendar/v3/users/me/calendarList
   - type: gmail
     display_name: GMail
     logo:

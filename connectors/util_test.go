@@ -8,7 +8,7 @@ import (
 	mockAsynq "github.com/rmorlok/authproxy/apasynq/mock"
 	mockLog "github.com/rmorlok/authproxy/aplog/mock"
 	mockR "github.com/rmorlok/authproxy/apredis/mock"
-	"github.com/rmorlok/authproxy/connectors/interface"
+	"github.com/rmorlok/authproxy/connectors/iface"
 	mockDb "github.com/rmorlok/authproxy/database/mock"
 	mockE "github.com/rmorlok/authproxy/encrypt/mock"
 	mockF "github.com/rmorlok/authproxy/httpf/mock"
@@ -42,17 +42,17 @@ func TestGetConnectorVersionIdsForConnections(t *testing.T) {
 	tests := []struct {
 		name        string
 		connections []database.Connection
-		expected    []_interface.ConnectorVersionId
+		expected    []iface.ConnectorVersionId
 	}{
 		{
 			name:        "empty input",
 			connections: nil,
-			expected:    []_interface.ConnectorVersionId{},
+			expected:    []iface.ConnectorVersionId{},
 		},
 		{
 			name:        "single connection",
 			connections: []database.Connection{{ConnectorId: u1, ConnectorVersion: 1}},
-			expected:    []_interface.ConnectorVersionId{{Id: u1, Version: 1}},
+			expected:    []iface.ConnectorVersionId{{Id: u1, Version: 1}},
 		},
 		{
 			name: "multiple unique connections",
@@ -60,7 +60,7 @@ func TestGetConnectorVersionIdsForConnections(t *testing.T) {
 				{ConnectorId: u1, ConnectorVersion: 1},
 				{ConnectorId: u2, ConnectorVersion: 2},
 			},
-			expected: []_interface.ConnectorVersionId{
+			expected: []iface.ConnectorVersionId{
 				{Id: u1, Version: 1},
 				{Id: u2, Version: 2},
 			},
@@ -71,7 +71,7 @@ func TestGetConnectorVersionIdsForConnections(t *testing.T) {
 				{ConnectorId: u1, ConnectorVersion: 1},
 				{ConnectorId: u1, ConnectorVersion: 1},
 			},
-			expected: []_interface.ConnectorVersionId{
+			expected: []iface.ConnectorVersionId{
 				{Id: u1, Version: 1},
 			},
 		},
@@ -81,7 +81,7 @@ func TestGetConnectorVersionIdsForConnections(t *testing.T) {
 				{ConnectorId: u1, ConnectorVersion: 1},
 				{ConnectorId: u1, ConnectorVersion: 2},
 			},
-			expected: []_interface.ConnectorVersionId{
+			expected: []iface.ConnectorVersionId{
 				{Id: u1, Version: 1},
 				{Id: u1, Version: 2},
 			},
@@ -92,7 +92,7 @@ func TestGetConnectorVersionIdsForConnections(t *testing.T) {
 				{ConnectorId: u1, ConnectorVersion: 1},
 				{ConnectorId: u2, ConnectorVersion: 1},
 			},
-			expected: []_interface.ConnectorVersionId{
+			expected: []iface.ConnectorVersionId{
 				{Id: u1, Version: 1},
 				{Id: u2, Version: 1},
 			},
@@ -109,11 +109,11 @@ func TestGetConnectorVersionIdsForConnections(t *testing.T) {
 	}
 }
 
-func compareResults(got, expected []_interface.ConnectorVersionId) bool {
+func compareResults(got, expected []iface.ConnectorVersionId) bool {
 	if len(got) != len(expected) {
 		return false
 	}
-	gotMap := make(map[_interface.ConnectorVersionId]struct{}, len(got))
+	gotMap := make(map[iface.ConnectorVersionId]struct{}, len(got))
 	for _, id := range got {
 		gotMap[id] = struct{}{}
 	}

@@ -1,14 +1,17 @@
 package connectors
 
 import (
+	"log/slog"
+	"sync"
+
 	"github.com/rmorlok/authproxy/apasynq"
 	"github.com/rmorlok/authproxy/apredis"
+	"github.com/rmorlok/authproxy/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/config"
-	connIface "github.com/rmorlok/authproxy/connectors/interface"
+	"github.com/rmorlok/authproxy/connectors/iface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
-	"log/slog"
 )
 
 type service struct {
@@ -19,6 +22,9 @@ type service struct {
 	httpf   httpf.F
 	ac      apasynq.Client
 	logger  *slog.Logger
+
+	o2FactoryOnce sync.Once
+	o2Factory     oauth2.Factory
 }
 
 // NewConnectorsService creates a new connectors service
@@ -30,7 +36,7 @@ func NewConnectorsService(
 	httpf httpf.F,
 	ac apasynq.Client,
 	logger *slog.Logger,
-) connIface.C {
+) iface.C {
 	return &service{
 		cfg:     cfg,
 		db:      db,
@@ -42,4 +48,4 @@ func NewConnectorsService(
 	}
 }
 
-var _ connIface.C = (*service)(nil)
+var _ iface.C = (*service)(nil)

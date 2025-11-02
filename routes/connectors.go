@@ -8,7 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
-	connIface "github.com/rmorlok/authproxy/connectors/interface"
+	connIface "github.com/rmorlok/authproxy/connectors/iface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/util"
 	"github.com/rmorlok/authproxy/util/pagination"

@@ -43,31 +43,12 @@ func (s *service) disconnectConnection(ctx context.Context, t *asynq.Task) error
 		return fmt.Errorf("%s connection id not specified: %w", taskTypeDisconnectConnection, asynq.SkipRetry)
 	}
 
-	logger = aplog.NewBuilder(logger).
-		WithConnectionId(p.ConnectionId).
-		Build()
-
-	logger.Info("disconnecting connection")
-
-	logger.Debug("getting connection")
-	connection, err := s.db.GetConnection(ctx, p.ConnectionId)
+	conn, err := s.getConnection(ctx, p.ConnectionId)
 	if err != nil {
-		if errors.Is(database.ErrNotFound, err) {
-			logger.Error("connection not found", "error", err)
-			return nil
-		}
-
-		return err
+		return errors.Wrap(err, "failed to get connection to disconnect connection")
 	}
 
-	logger.Debug("getting connector for connection")
-	cv, err := s.getConnectorVersion(ctx, connection.ConnectorId, connection.ConnectorVersion)
-	if err != nil {
-		logger.Error("failed to get connector for connection", "error", err)
-		return err
-	}
-
-	revokeOps := cv.getRevokeCredentialsOperations(s, *connection)
+	revokeOps := conn.getRevokeCredentialsOperations()
 	if len(revokeOps) > 0 {
 		logger.Info("revoking credentials")
 		for _, op := range revokeOps {
@@ -80,7 +61,7 @@ func (s *service) disconnectConnection(ctx context.Context, t *asynq.Task) error
 	}
 
 	logger.Debug("marking connection as disconnected")
-	err = s.db.SetConnectionState(ctx, p.ConnectionId, database.ConnectionStateDisconnected)
+	err = conn.SetState(ctx, database.ConnectionStateDisconnected)
 	if err != nil {
 		logger.Error("failed to mark connection as disconnected", "error", err)
 		return err

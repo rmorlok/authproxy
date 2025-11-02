@@ -8,7 +8,7 @@ import (
 
 	"github.com/google/uuid"
 	cfg "github.com/rmorlok/authproxy/config/connectors"
-	iface "github.com/rmorlok/authproxy/connectors/interface"
+	"github.com/rmorlok/authproxy/connectors/iface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/util"
 )
@@ -18,9 +18,9 @@ import (
 type ConnectorVersion struct {
 	database.ConnectorVersion
 
-	mu  sync.RWMutex
-	s   *service
-	def *cfg.Connector
+	s     *service
+	defMu sync.RWMutex
+	def   *cfg.Connector
 }
 
 func wrapConnectorVersion(cv database.ConnectorVersion, s *service) *ConnectorVersion {
@@ -63,8 +63,8 @@ func (cv *ConnectorVersion) GetUpdatedAt() time.Time {
 }
 
 func (cv *ConnectorVersion) getDefinition() (*cfg.Connector, error) {
-	cv.mu.RLock()
-	defer cv.mu.RUnlock()
+	cv.defMu.RLock()
+	defer cv.defMu.RUnlock()
 	if cv.def == nil {
 		decrypted, err := cv.s.encrypt.DecryptStringForConnector(context.Background(), cv.ConnectorVersion, cv.EncryptedDefinition)
 		if err != nil {
@@ -83,8 +83,8 @@ func (cv *ConnectorVersion) getDefinition() (*cfg.Connector, error) {
 }
 
 func (cv *ConnectorVersion) setDefinition(def *cfg.Connector) error {
-	cv.mu.Lock()
-	defer cv.mu.Unlock()
+	cv.defMu.Lock()
+	defer cv.defMu.Unlock()
 
 	jsonBytes, err := json.Marshal(def)
 	if err != nil {

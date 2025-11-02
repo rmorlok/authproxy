@@ -11,11 +11,11 @@ import (
 	"github.com/rmorlok/authproxy/aplog"
 	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/auth"
+	"github.com/rmorlok/authproxy/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
-	"github.com/rmorlok/authproxy/oauth2"
 )
 
 // SessionInitiateUrlGenerator is any object that can generate the URLs to redirect the

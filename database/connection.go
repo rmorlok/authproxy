@@ -311,7 +311,7 @@ func (db *gormDB) EnumerateConnections(
 		tx := sess.
 			Table("connections c").
 			Select("c.*").
-			Order("t.created_at DESC").
+			Order("c.created_at DESC").
 			Limit(pageSize + 1).
 			Offset(offset)
 

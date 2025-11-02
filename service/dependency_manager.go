@@ -11,7 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/config"
 	"github.com/rmorlok/authproxy/connectors"
-	connectorsinterface "github.com/rmorlok/authproxy/connectors/interface"
+	connectorsinterface "github.com/rmorlok/authproxy/connectors/iface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"

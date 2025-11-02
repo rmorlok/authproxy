@@ -1,30 +1,32 @@
 package routes
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/apredis"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
-	"github.com/rmorlok/authproxy/connectors/interface"
+	"github.com/rmorlok/authproxy/connectors/iface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/encrypt"
 	"github.com/rmorlok/authproxy/httpf"
-	"github.com/rmorlok/authproxy/oauth2"
-	"github.com/rmorlok/authproxy/proxy"
+	"github.com/rmorlok/authproxy/request_log"
+
 	"log/slog"
 )
 
 type ConnectionsProxyRoutes struct {
 	cfg        config.C
 	auth       auth.A
-	connectors _interface.C
+	connectors iface.C
 	db         database.DB
 	r          apredis.Client
 	httpf      httpf.F
 	encrypt    encrypt.E
-	oauthf     oauth2.Factory
+	logger     *slog.Logger
 }
 
 func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
@@ -60,46 +62,28 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 		return
 	}
 
-	connection, err := r.db.GetConnection(ctx, connectionUuid)
-	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
-		return
-	}
-
-	if connection == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("connection not found").
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
-		return
-	}
-
 	// TODO: add security checking for ownership
 
-	cv, err := r.connectors.GetConnectorVersion(ctx, connection.ConnectorId, connection.ConnectorVersion)
+	conn, err := r.connectors.GetConnection(ctx, connectionUuid)
 	if err != nil {
+		if errors.Is(err, iface.ErrConnectionNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("connection not found").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			return
+		}
+
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
-	}
-
-	if cv == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithResponseMsg("could not find connector for connection").
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
-	var proxyRequest proxy.ProxyRequest
+	var proxyRequest iface.ProxyRequest
 	if err := gctx.ShouldBindJSON(&proxyRequest); err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
@@ -119,27 +103,16 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 		return
 	}
 
-	connector := cv.GetDefinition()
-	if _, ok := connector.Auth.(*config.AuthOAuth2); ok {
-		o2 := r.oauthf.NewOAuth2(*connection, cv)
-		resp, err := o2.ProxyRequest(ctx, &proxyRequest)
-		if err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
-			return
-		}
-
-		gctx.PureJSON(200, resp)
-	} else {
+	resp, err := conn.ProxyRequest(ctx, request_log.RequestTypeProxy, &proxyRequest)
+	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("connector type does not support proxying").
+			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
 		return
 	}
+
+	gctx.PureJSON(200, resp)
 }
 
 func (r *ConnectionsProxyRoutes) Register(g gin.IRouter) {
@@ -151,7 +124,7 @@ func NewConnectionsProxyRoutes(
 	authService auth.A,
 	db database.DB,
 	r apredis.Client,
-	c _interface.C,
+	c iface.C,
 	httpf httpf.F,
 	encrypt encrypt.E,
 	logger *slog.Logger,
@@ -164,6 +137,6 @@ func NewConnectionsProxyRoutes(
 		r:          r,
 		httpf:      httpf,
 		encrypt:    encrypt,
-		oauthf:     oauth2.NewFactory(cfg, db, r, c, httpf, encrypt, logger),
+		logger:     logger,
 	}
 }
