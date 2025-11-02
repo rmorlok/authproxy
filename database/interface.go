@@ -8,6 +8,16 @@ import (
 	"github.com/rmorlok/authproxy/jwt"
 )
 
+type DeletedHandling bool
+
+const (
+	// DeletedHandlingExclude will exclude deleted records from the result set
+	DeletedHandlingExclude DeletedHandling = false
+
+	// DeletedHandlingInclude will include deleted records in the result set
+	DeletedHandlingInclude DeletedHandling = true
+)
+
 //go:generate mockgen -source=./interface.go -destination=./mock/db.go -package=mock
 type DB interface {
 	Migrate(ctx context.Context) error
@@ -50,6 +60,12 @@ type DB interface {
 	SetConnectionState(ctx context.Context, id uuid.UUID, state ConnectionState) error
 	ListConnectionsBuilder() ListConnectionsBuilder
 	ListConnectionsFromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error)
+	EnumerateConnections(
+		ctx context.Context,
+		deletedHandling DeletedHandling,
+		states []ConnectionState,
+		callback func(conns []*Connection, lastPage bool) (stop bool, err error),
+	) error
 
 	/*
 	 * OAuth2 tokens

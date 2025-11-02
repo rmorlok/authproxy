@@ -293,3 +293,59 @@ func (db *gormDB) ListConnectionsFromCursor(ctx context.Context, cursor string) 
 
 	return b.FromCursor(ctx, cursor)
 }
+
+func (db *gormDB) EnumerateConnections(
+	ctx context.Context,
+	deletedHandling DeletedHandling,
+	states []ConnectionState,
+	callback func(conns []*Connection, lastPage bool) (stop bool, err error),
+) error {
+	const pageSize = 100
+
+	sess := db.session(ctx)
+	offset := 0
+
+	for {
+		var connections []*Connection
+
+		tx := sess.
+			Table("connections c").
+			Select("c.*").
+			Order("t.created_at DESC").
+			Limit(pageSize + 1).
+			Offset(offset)
+
+		if deletedHandling == DeletedHandlingExclude {
+			tx = tx.Where("c.deleted_at IS NULL")
+		}
+
+		if len(states) > 0 {
+			tx = tx.Where("c.state IN ?", states)
+		}
+
+		result := tx.Find(&connections)
+
+		if result.Error != nil {
+			return result.Error
+		}
+
+		lastPage := len(connections) < pageSize+1
+
+		if len(connections) > pageSize {
+			connections = connections[:pageSize]
+		}
+
+		stop, err := callback(connections, lastPage)
+		if err != nil {
+			return err
+		}
+
+		if stop || lastPage {
+			break
+		}
+
+		offset += pageSize
+	}
+
+	return nil
+}
