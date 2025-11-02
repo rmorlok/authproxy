@@ -19,7 +19,9 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import FormHelperText from '@mui/material/FormHelperText';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import dayjs from 'dayjs';
+import Tooltip from '@mui/material/Tooltip';
 import {Connection, connections, ConnectionState, canBeDisconnected} from '../api';
 import { Link } from "react-router-dom";
 
@@ -46,6 +48,18 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
   const [selectedState, setSelectedState] = useState<ConnectionState | ''>('');
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Copy-to-clipboard UI state for connection ID
+  const [copied, setCopied] = useState(false);
+  const handleCopyId = async () => {
+    try {
+      await navigator.clipboard.writeText(conn?.id || '');
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch (e) {
+      // ignore
+    }
+  };
 
   const stateOptions = useMemo(() => Object.values(ConnectionState), []);
 
@@ -156,7 +170,29 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
 
       <Box>
         <Typography variant="subtitle2" color="text.secondary">Connection ID</Typography>
-        <Typography variant="body1" sx={{wordBreak: 'break-all'}}>{conn.id}</Typography>
+        <Stack direction="row" spacing={1} alignItems="center" sx={{mt: 0.5}}>
+          <Typography
+            variant="body1"
+            component="code"
+            sx={{
+              wordBreak: 'break-all',
+              fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Roboto Mono", monospace',
+              bgcolor: 'action.hover',
+              px: 1,
+              py: 0.5,
+              borderRadius: 0.5,
+              fontSize: '0.9rem',
+              letterSpacing: '0.02em',
+            }}
+          >
+            {conn.id}
+          </Typography>
+          <Tooltip title={copied ? 'Copied!' : 'Copy'} placement="top">
+            <IconButton size="small" aria-label="Copy connection id" onClick={handleCopyId}>
+              <ContentCopyIcon fontSize="inherit" />
+            </IconButton>
+          </Tooltip>
+        </Stack>
       </Box>
 
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
