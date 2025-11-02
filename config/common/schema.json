@@ -12,6 +12,10 @@
       "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h|d)$",
       "description": "A human-readable duration string, e.g., '10s', '20h'."
     },
+    "Cron": {
+      "type": "string",
+      "description": "A cron expression, e.g., '0 0 1 * * *'."
+    },
     "UUID": {
       "type": "string",
       "pattern": "^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$",

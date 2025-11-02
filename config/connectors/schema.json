@@ -21,7 +21,14 @@
       "type": "object"
     },
     "Probe": {
-      "required": ["id", "period"],
+      "oneOf": [
+        {
+          "required": ["id", "http"]
+        },
+        {
+          "required": ["id", "proxy_http"]
+        }
+      ],
       "properties": {
         "id": {
           "type": "string"
@@ -29,11 +36,28 @@
         "period": {
           "$ref": "../common/schema.json#/$defs/HumanDuration"
         },
+        "cron": {
+          "$ref": "../common/schema.json#/$defs/Cron"
+        },
         "proxy_http": {
           "$ref": "#/$defs/ProbeHttp"
         },
         "http": {
           "$ref": "#/$defs/ProbeHttp"
+        }
+      },
+      "dependencies": {
+        "period": {
+          "not": { "required": ["cron"] }
+        },
+        "cron": {
+          "not": { "required": ["period"] }
+        },
+        "proxy_http": {
+          "not": { "required": ["http"] }
+        },
+        "http": {
+          "not": { "required": ["proxy_http"] }
         }
       },
       "additionalProperties": false,

@@ -112,6 +112,56 @@ func TestSchema(t *testing.T) {
 			},
 		},
 		{
+			Name: "Cron",
+			Schema: `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/config/common/test.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["test"],
+  "properties": {
+	"test": {
+		"$ref": "./schema.json#/$defs/Cron"
+    }
+  }
+}`,
+			Tests: []test{
+				// it's really hard to have a pattern that actually checks this. Right now we are just treating
+				// as a string.
+				//{
+				//	Name:  "bad value",
+				//	Valid: false,
+				//	Data:  `{"test": "bad"}`,
+				//},
+				{
+					Name:  "wrong type",
+					Valid: false,
+					Data:  `{"test": 99}`,
+				},
+				{
+					Name:  "every minute",
+					Valid: true,
+					Data:  `{"test": "* * * * *"}`,
+				},
+				{
+					Name:  "every 5 minutes",
+					Valid: true,
+					Data:  `{"test": "*/5 * * * *"}`,
+				},
+				{
+					Name:  "every 10 minutes between 9 AM and 5 PM",
+					Valid: true,
+					Data:  `{"test": "*/10 9-17 * * *"}`,
+				},
+				{
+					Name:  "every two days at midnight",
+					Valid: true,
+					Data:  `{"test": "0 0 */2 * *"}`,
+				},
+			},
+		},
+		{
 			Name: "HumanDuration",
 			Schema: `
 {
