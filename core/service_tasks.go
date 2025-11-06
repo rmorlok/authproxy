@@ -15,10 +15,10 @@ func (s *service) RegisterTasks(mux *asynq.ServeMux) {
 }
 
 func (s *service) GetCronTasks() []*asynq.PeriodicTaskConfig {
-	s.logger.Info("refreshing service periodic tasks")
+	s.logger.Info("refreshing core service periodic tasks")
 	start := time.Now()
 	defer func() {
-		s.logger.Info("refreshing service tasks periodic completed", "duration", time.Since(start))
+		s.logger.Info("refreshing core service tasks periodic completed", "duration", time.Since(start))
 	}()
 
 	periodTasks := []*asynq.PeriodicTaskConfig{}
@@ -53,6 +53,7 @@ func (s *service) GetCronTasks() []*asynq.PeriodicTaskConfig {
 							Task:     t,
 							Cronspec: probe.GetScheduleString(),
 						})
+						logger.Debug("added periodic probe task", "probe", probe.GetId(), "schedule", probe.GetScheduleString())
 					}
 				}
 			}

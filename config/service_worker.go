@@ -3,11 +3,13 @@ package config
 import (
 	"context"
 	"strconv"
+	"time"
 )
 
 type ServiceWorker struct {
-	ServiceCommon  `json:",inline" yaml:",inline"`
-	ConcurrencyVal *StringValue `json:"concurrency" yaml:"concurrency"`
+	ServiceCommon    `json:",inline" yaml:",inline"`
+	ConcurrencyVal   *StringValue   `json:"concurrency" yaml:"concurrency"`
+	CronSyncInterval *HumanDuration `json:"cron_sync_interval,omitempty" yaml:"cron_sync_interval,omitempty"`
 }
 
 func (s *ServiceWorker) HealthCheckPort() uint64 {
@@ -39,6 +41,14 @@ func (s *ServiceWorker) GetConcurrency(ctx context.Context) int {
 	}
 
 	return parsedVal
+}
+
+func (s *ServiceWorker) GetCronSyncInterval() time.Duration {
+	if s == nil || s.CronSyncInterval == nil {
+		return 5 * time.Minute
+	}
+
+	return s.CronSyncInterval.Duration
 }
 
 var _ Service = (*ServicePublic)(nil)

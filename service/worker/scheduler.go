@@ -2,16 +2,17 @@ package worker
 
 import (
 	"context"
-	"github.com/hibiken/asynq"
-	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/aplog"
-	"github.com/rmorlok/authproxy/apredis"
 	"log/slog"
 	"os"
 	"os/signal"
 	"sync"
 	"syscall"
 	"time"
+
+	"github.com/hibiken/asynq"
+	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/aplog"
+	"github.com/rmorlok/authproxy/apredis"
 )
 
 const mutexLockTime = 2 * time.Minute
@@ -30,9 +31,10 @@ type scheduler struct {
 	done            chan struct{}
 	rsMtx           apredis.Mutex
 	logger          *slog.Logger
+	syncInterval    time.Duration
 }
 
-func newScheduler(r apredis.Client, hc func(isScheduler bool, err error), l *slog.Logger) *scheduler {
+func newScheduler(r apredis.Client, hc func(isScheduler bool, err error), l *slog.Logger, syncInterval time.Duration) *scheduler {
 	return &scheduler{
 		r:               r,
 		healthCheckFunc: hc,
@@ -42,6 +44,7 @@ func newScheduler(r apredis.Client, hc func(isScheduler bool, err error), l *slo
 			apredis.MutexOptionLockFor(mutexLockTime),
 			apredis.MutexOptionDetailedLockMetadata(),
 		),
+		syncInterval: syncInterval,
 	}
 }
 
@@ -77,7 +80,7 @@ func (s *scheduler) start(ctx context.Context) error {
 		asynq.PeriodicTaskManagerOpts{
 			RedisUniversalClient:       s.r,
 			PeriodicTaskConfigProvider: s,
-			SyncInterval:               10 * time.Second,
+			SyncInterval:               s.syncInterval,
 			SchedulerOpts: &asynq.SchedulerOpts{
 				Logger:   &asyncLogger{inner: aplog.NewBuilder(s.logger).WithComponent("asynq-scheduler").Build()},
 				LogLevel: asynq.InfoLevel,
@@ -96,7 +99,7 @@ func (s *scheduler) start(ctx context.Context) error {
 		return err
 	}
 	s.healthCheckFunc(true, err)
-	s.logger.Info("Scheduler is running")
+	s.logger.Info("scheduler is running")
 
 	s.wg.Add(1)
 	go func() {
@@ -104,15 +107,15 @@ func (s *scheduler) start(ctx context.Context) error {
 		for {
 			select {
 			case <-s.done:
-				s.logger.Info("Shutting down scheduler")
+				s.logger.Info("shutting down scheduler")
 				s.shutdown()
 				return
 			case <-time.After(mutexLockTime / 2):
-				s.logger.Debug("Extending scheduler ownership lock")
+				s.logger.Debug("extending scheduler ownership lock")
 				err = s.rsMtx.Extend(ctx, mutexLockTime)
 				if err != nil {
 					if s.mgr != nil {
-						s.logger.Info("Shutting down scheduler due to failure to extend the scheduler ownership lock")
+						s.logger.Info("shutting down scheduler due to failure to extend the scheduler ownership lock")
 						s.shutdown()
 					}
 					s.healthCheckFunc(false, nil)
@@ -131,7 +134,7 @@ func (s *scheduler) shutdown() {
 	defer s.mtx.Unlock()
 	if s.mgr != nil {
 		s.mgr.Shutdown()
-		s.logger.Info("Async scheduler shutdown complete")
+		s.logger.Info("async scheduler shutdown complete")
 		s.mgr = nil
 	}
 }
@@ -148,7 +151,7 @@ func (s *scheduler) Run() error {
 		defer s.wg.Done()
 		select {
 		case <-sigChan:
-			s.logger.Info("Received termination signal")
+			s.logger.Info("received termination signal")
 			close(s.done)
 			return
 		case <-s.done:
@@ -161,7 +164,7 @@ func (s *scheduler) Run() error {
 	for {
 		select {
 		case <-s.done:
-			s.logger.Info("Shutting down scheduler watchdog")
+			s.logger.Info("shutting down scheduler watchdog")
 			s.shutdown()
 			return nil
 		default:
@@ -181,7 +184,7 @@ func (s *scheduler) Run() error {
 					s.healthCheckFunc(false, err)
 					if lastErr == nil {
 						s.logger.Error(
-							"Failed to obtain lock for scheduler",
+							"failed to obtain lock for scheduler",
 							"err", err)
 						lastErr = err
 					}

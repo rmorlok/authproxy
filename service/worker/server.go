@@ -148,6 +148,7 @@ func Serve(cfg config.C) {
 		dm.GetRedisClient(),
 		asyncSchedulerHealthChecker,
 		dm.GetLogBuilder().WithComponent("scheduler").Build(),
+		workerConfig.GetCronSyncInterval(),
 	).
 		addRegistrar(oauth2TaskHandler).
 		addRegistrar(dm.GetConnectorsService())
@@ -167,7 +168,7 @@ func Serve(cfg config.C) {
 	go func() {
 		defer wg.Done()
 		httpServer := &http.Server{
-			Addr:    fmt.Sprintf(":%d", cfg.GetRoot().Worker.HealthCheckPort()),
+			Addr:    fmt.Sprintf(":%d", workerConfig.HealthCheckPort()),
 			Handler: router,
 		}
 		if err := api_common.RunServer(httpServer, logger); err != nil {

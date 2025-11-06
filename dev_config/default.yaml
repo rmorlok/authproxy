@@ -24,7 +24,8 @@ admin_api:
 worker:
   health_check_port:
     env_var: HEALTH_CHECK_PORT
-    default: 8083
+    default: "8083"
+  cron_sync_interval: 1m
 
 host_application:
   initiate_session_url: http://127.0.0.1:8888/login-redirect
@@ -152,6 +153,11 @@ connectors:
           url: https://example.com/
       - id: calendar-list
         period: 30s
+        proxy_http:
+          method: GET
+          url: https://www.googleapis.com/calendar/v3/users/me/calendarList
+      - id: calendar-list-2
+        period: 2m
         proxy_http:
           method: GET
           url: https://www.googleapis.com/calendar/v3/users/me/calendarList

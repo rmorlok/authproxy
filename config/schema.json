@@ -282,9 +282,20 @@
     },
     "ServiceWorker": {
       "properties": {
-        "health_check_port": true,
-        "concurrency": true
+        "health_check_port": {
+          "$ref": "./common/schema.json#/$defs/StringValue",
+          "description": "The port on which the worker will listen for health checks."
+        },
+        "concurrency": {
+          "$ref": "./common/schema.json#/$defs/StringValue",
+          "description": "The number of concurrent tasks that a single instance of the worker will run. If not set, the default is 0, which means that the worker will use the number of CPUs to be the maximum number of parallel tasks."
+        },
+        "cron_sync_interval": {
+          "$ref": "./common/schema.json#/$defs/HumanDuration",
+          "description": "The interval at which the the system will sync the list of cron tasks. Cron tasks are both global and connection specific. If not set, the default is every 5 minutes."
+        }
       },
+      "required": ["health_check_port"],
       "additionalProperties": false,
       "type": "object"
     },

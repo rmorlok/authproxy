@@ -576,7 +576,7 @@ func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageRe
 	connectorVersionCountsCTE := `
         SELECT
             id,
-            json_group_array(state) as states,
+            json_group_array(distinct state) as states,
             count(*) as versions
         FROM connector_versions
         GROUP BY id
