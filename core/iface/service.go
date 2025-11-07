@@ -48,6 +48,16 @@ type C interface {
 	ListConnectorsFromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error)
 
 	/*
+	 * List connector versions
+	 */
+
+	// ListConnectorVersionsBuilder returns a builder to allow the caller to list connector versions matching certain criteria.
+	ListConnectorVersionsBuilder() ListConnectorVersionsBuilder
+
+	// ListConnectorVersionsFromCursor continues listing connector versions from a cursor to support pagination.
+	ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error)
+
+	/*
 	 * Connection-specific operations
 	 */
 
