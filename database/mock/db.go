@@ -388,6 +388,35 @@ func (mr *MockDBMockRecorder) ListConnectionsFromCursor(ctx, cursor interface{})
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListConnectionsFromCursor", reflect.TypeOf((*MockDB)(nil).ListConnectionsFromCursor), ctx, cursor)
 }
 
+// ListConnectorVersionsBuilder mocks base method.
+func (m *MockDB) ListConnectorVersionsBuilder() database.ListConnectorVersionsBuilder {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListConnectorVersionsBuilder")
+	ret0, _ := ret[0].(database.ListConnectorVersionsBuilder)
+	return ret0
+}
+
+// ListConnectorVersionsBuilder indicates an expected call of ListConnectorVersionsBuilder.
+func (mr *MockDBMockRecorder) ListConnectorVersionsBuilder() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListConnectorVersionsBuilder", reflect.TypeOf((*MockDB)(nil).ListConnectorVersionsBuilder))
+}
+
+// ListConnectorVersionsFromCursor mocks base method.
+func (m *MockDB) ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (database.ListConnectorVersionsExecutor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListConnectorVersionsFromCursor", ctx, cursor)
+	ret0, _ := ret[0].(database.ListConnectorVersionsExecutor)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListConnectorVersionsFromCursor indicates an expected call of ListConnectorVersionsFromCursor.
+func (mr *MockDBMockRecorder) ListConnectorVersionsFromCursor(ctx, cursor interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListConnectorVersionsFromCursor", reflect.TypeOf((*MockDB)(nil).ListConnectorVersionsFromCursor), ctx, cursor)
+}
+
 // ListConnectorsBuilder mocks base method.
 func (m *MockDB) ListConnectorsBuilder() database.ListConnectorsBuilder {
 	m.ctrl.T.Helper()

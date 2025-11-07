@@ -47,6 +47,8 @@ type DB interface {
 	NewestConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error)
 	NewestPublishedConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error)
 	UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersion) error
+	ListConnectorVersionsBuilder() ListConnectorVersionsBuilder
+	ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error)
 	ListConnectorsBuilder() ListConnectorsBuilder
 	ListConnectorsFromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error)
 
