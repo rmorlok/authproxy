@@ -69,9 +69,17 @@
       ],
       "description": "An image, either as a publicly accessible URL or as a base64 encoded string."
     },
-    "StringValueString": {
+    "StringValueInlineString": {
       "type": "string",
       "description": "A string value used in configuration"
+    },
+    "StringValueInlineNumber": {
+      "type": "number",
+      "description": "A boolean value used in configuration"
+    },
+    "StringValueInlineBool": {
+      "type": "boolean",
+      "description": "A boolean value used in configuration"
     },
     "StringValueDirect": {
       "properties": {
@@ -157,7 +165,9 @@
     },
     "StringValue": {
       "oneOf": [
-        { "$ref": "#/$defs/StringValueString" },
+        { "$ref": "#/$defs/StringValueInlineString" },
+        { "$ref": "#/$defs/StringValueInlineNumber" },
+        { "$ref": "#/$defs/StringValueInlineBool" },
         { "$ref": "#/$defs/StringValueDirect" },
         { "$ref": "#/$defs/StringValueBase64" },
         { "$ref": "#/$defs/StringValueEnvVar" },
@@ -165,6 +175,28 @@
         { "$ref": "#/$defs/StringValueFile" }
       ],
       "description": "A string value used in configuration that can be expressed in on of several ways."
+    },
+    "StringValueNumber": {
+      "oneOf": [
+        { "$ref": "#/$defs/StringValueInlineNumber" },
+        { "$ref": "#/$defs/StringValueDirect" },
+        { "$ref": "#/$defs/StringValueBase64" },
+        { "$ref": "#/$defs/StringValueEnvVar" },
+        { "$ref": "#/$defs/StringValueEnvVarBase64" },
+        { "$ref": "#/$defs/StringValueFile" }
+      ],
+      "description": "A number value used in configuration that can be expressed in on of several ways. When taken from other sources, the string value is parsed as a number."
+    },
+    "StringValueBool": {
+      "oneOf": [
+        { "$ref": "#/$defs/StringValueInlineBool" },
+        { "$ref": "#/$defs/StringValueDirect" },
+        { "$ref": "#/$defs/StringValueBase64" },
+        { "$ref": "#/$defs/StringValueEnvVar" },
+        { "$ref": "#/$defs/StringValueEnvVarBase64" },
+        { "$ref": "#/$defs/StringValueFile" }
+      ],
+      "description": "A boolean value used in configuration that can be expressed in on of several ways. When taken from other sources, the string value is parsed as a bool."
     }
   }
 }

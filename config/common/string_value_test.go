@@ -19,15 +19,15 @@ func TestStringValue(t *testing.T) {
 			{
 				name: "inline direct value",
 				Val: &StringValueDirect{
-					Value:          "https://example.com/some.png",
-					IsDirectString: true,
+					Value:    "https://example.com/some.png",
+					IsDirect: true,
 				},
 			},
 			{
 				name: "inline direct",
 				Val: &StringValueDirect{
-					Value:          "https://example.com/some.png",
-					IsDirectString: false,
+					Value:    "https://example.com/some.png",
+					IsDirect: false,
 				},
 			},
 			{
@@ -106,16 +106,34 @@ func TestStringValue(t *testing.T) {
 				{
 					name: "inline direct value",
 					expected: &StringValueDirect{
-						Value:          "some value",
-						IsDirectString: true,
+						Value:    "some value",
+						IsDirect: true,
 					},
 					data: `some value`,
 				},
 				{
+					name: "inline direct value number",
+					expected: &StringValueDirect{
+						Value:       "8080",
+						IsDirect:    true,
+						IsNonString: true,
+					},
+					data: `8080`,
+				},
+				{
+					name: "inline direct value boolean",
+					expected: &StringValueDirect{
+						Value:       "false",
+						IsDirect:    true,
+						IsNonString: true,
+					},
+					data: `false`,
+				},
+				{
 					name: "direct value",
 					expected: &StringValueDirect{
-						Value:          "some value",
-						IsDirectString: false,
+						Value:    "some value",
+						IsDirect: false,
 					},
 					data: `
 value: some value
@@ -138,7 +156,7 @@ base64: ywAAAAAAQABAAACAUwAOw==
 					err := yaml.Unmarshal([]byte(test.data), &val)
 					require.NoError(t, err)
 					require.Equal(t, test.expected, val.Inner())
-					require.Equal(t, strings.TrimSpace(test.data), strings.TrimSpace(MustMarshalToYamlString(val.Inner())))
+					require.Equal(t, strings.TrimSpace(test.data), strings.TrimSpace(MustMarshalToYamlString(&val)))
 				})
 			}
 		})
@@ -150,8 +168,32 @@ base64: ywAAAAAAQABAAACAUwAOw==
 				err := yaml.Unmarshal([]byte(data), &val)
 				require.NoError(t, err)
 				require.Equal(t, &StringValueDirect{
-					Value:          "some value",
-					IsDirectString: true,
+					Value:    "some value",
+					IsDirect: true,
+				}, val.Inner())
+			})
+			t.Run("inline direct value - coerces number", func(t *testing.T) {
+				data := `99
+`
+				var val StringValue
+				err := yaml.Unmarshal([]byte(data), &val)
+				require.NoError(t, err)
+				require.Equal(t, &StringValueDirect{
+					Value:       "99",
+					IsDirect:    true,
+					IsNonString: true,
+				}, val.Inner())
+			})
+			t.Run("inline direct value - coerces boolean", func(t *testing.T) {
+				data := `true
+`
+				var val StringValue
+				err := yaml.Unmarshal([]byte(data), &val)
+				require.NoError(t, err)
+				require.Equal(t, &StringValueDirect{
+					Value:       "true",
+					IsDirect:    true,
+					IsNonString: true,
 				}, val.Inner())
 			})
 			t.Run("direct value", func(t *testing.T) {
@@ -162,8 +204,32 @@ value: some value
 				err := yaml.Unmarshal([]byte(data), &val)
 				require.NoError(t, err)
 				require.Equal(t, &StringValueDirect{
-					Value:          "some value",
-					IsDirectString: false,
+					Value:    "some value",
+					IsDirect: false,
+				}, val.Inner())
+			})
+			t.Run("direct value - coerces number", func(t *testing.T) {
+				data := `
+value: 99
+`
+				var val StringValue
+				err := yaml.Unmarshal([]byte(data), &val)
+				require.NoError(t, err)
+				require.Equal(t, &StringValueDirect{
+					Value:    "99",
+					IsDirect: false,
+				}, val.Inner())
+			})
+			t.Run("direct value - coerces boolean", func(t *testing.T) {
+				data := `
+value: true
+`
+				var val StringValue
+				err := yaml.Unmarshal([]byte(data), &val)
+				require.NoError(t, err)
+				require.Equal(t, &StringValueDirect{
+					Value:    "true",
+					IsDirect: false,
 				}, val.Inner())
 			})
 			t.Run("base64", func(t *testing.T) {
@@ -181,8 +247,8 @@ base64: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/1J8
 		t.Run("yaml gen", func(t *testing.T) {
 			t.Run("inline value direct", func(t *testing.T) {
 				data := &StringValueDirect{
-					Value:          "https://example.com/some.png",
-					IsDirectString: true,
+					Value:    "https://example.com/some.png",
+					IsDirect: true,
 				}
 				require.Equal(t, "https://example.com/some.png\n", MustMarshalToYamlString(data))
 			})
@@ -211,16 +277,34 @@ base64: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/1J8
 				{
 					name: "inline direct value",
 					expected: &StringValueDirect{
-						Value:          "https://example.com/some.png",
-						IsDirectString: true,
+						Value:    "https://example.com/some.png",
+						IsDirect: true,
 					},
 					data: `"https://example.com/some.png"`,
 				},
 				{
+					name: "inline direct value number",
+					expected: &StringValueDirect{
+						Value:       "67",
+						IsDirect:    true,
+						IsNonString: true,
+					},
+					data: `67`,
+				},
+				{
+					name: "inline direct value bool",
+					expected: &StringValueDirect{
+						Value:       "true",
+						IsDirect:    true,
+						IsNonString: true,
+					},
+					data: `true`,
+				},
+				{
 					name: "direct value",
 					expected: &StringValueDirect{
-						Value:          "https://example.com/some.png",
-						IsDirectString: false,
+						Value:    "https://example.com/some.png",
+						IsDirect: false,
 					},
 					data: `{"value":"https://example.com/some.png"}`,
 				},
@@ -242,6 +326,79 @@ base64: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/1J8
 					require.Equal(t, strings.TrimSpace(test.data), strings.TrimSpace(MustMarshalToJsonString(val.Inner())))
 				})
 			}
+		})
+		t.Run("parse", func(t *testing.T) {
+			t.Run("inline direct value", func(t *testing.T) {
+				data := `"some value"`
+				var val StringValue
+				err := json.Unmarshal([]byte(data), &val)
+				require.NoError(t, err)
+				require.Equal(t, &StringValueDirect{
+					Value:    "some value",
+					IsDirect: true,
+				}, val.Inner())
+			})
+			t.Run("inline direct value - coerces number", func(t *testing.T) {
+				data := `99`
+				var val StringValue
+				err := json.Unmarshal([]byte(data), &val)
+				require.NoError(t, err)
+				require.Equal(t, &StringValueDirect{
+					Value:       "99",
+					IsDirect:    true,
+					IsNonString: true,
+				}, val.Inner())
+			})
+			t.Run("inline direct value - coerces boolean", func(t *testing.T) {
+				data := `true`
+				var val StringValue
+				err := json.Unmarshal([]byte(data), &val)
+				require.NoError(t, err)
+				require.Equal(t, &StringValueDirect{
+					Value:       "true",
+					IsDirect:    true,
+					IsNonString: true,
+				}, val.Inner())
+			})
+			t.Run("direct value", func(t *testing.T) {
+				data := `{"value": "some value"}`
+				var val StringValue
+				err := json.Unmarshal([]byte(data), &val)
+				require.NoError(t, err)
+				require.Equal(t, &StringValueDirect{
+					Value:    "some value",
+					IsDirect: false,
+				}, val.Inner())
+			})
+			t.Run("direct value - coerces number", func(t *testing.T) {
+				data := `{"value": 99}`
+				var val StringValue
+				err := yaml.Unmarshal([]byte(data), &val)
+				require.NoError(t, err)
+				require.Equal(t, &StringValueDirect{
+					Value:    "99",
+					IsDirect: false,
+				}, val.Inner())
+			})
+			t.Run("direct value - coerces boolean", func(t *testing.T) {
+				data := `{"value": true}`
+				var val StringValue
+				err := yaml.Unmarshal([]byte(data), &val)
+				require.NoError(t, err)
+				require.Equal(t, &StringValueDirect{
+					Value:    "true",
+					IsDirect: false,
+				}, val.Inner())
+			})
+			t.Run("base64", func(t *testing.T) {
+				data := `{"base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/1J8qkwAAAAASUVORK5CYII="}`
+				var val StringValue
+				err := yaml.Unmarshal([]byte(data), &val)
+				require.NoError(t, err)
+				require.Equal(t, &StringValueBase64{
+					Base64: "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/1J8qkwAAAAASUVORK5CYII=",
+				}, val.Inner())
+			})
 		})
 	})
 }

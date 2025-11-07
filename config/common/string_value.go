@@ -16,7 +16,7 @@ type StringValueType interface {
 }
 
 type StringValue struct {
-	InnerVal StringValueType
+	InnerVal StringValueType `json:"-" yaml:"-"`
 }
 
 func (sv *StringValue) Inner() StringValueType {

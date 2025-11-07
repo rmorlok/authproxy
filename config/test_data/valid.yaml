@@ -12,6 +12,7 @@ api:
 
 admin_api:
   port: 8082
+  health_check_port: 8085
   ui:
     enabled: true
     base_url: http://localhost:5174
@@ -24,7 +25,7 @@ admin_api:
 worker:
   health_check_port:
     env_var: HEALTH_CHECK_PORT
-    default: 8083
+    default: "8083"
 
 host_application:
   initiate_session_url: http://127.0.0.1:8888/login-redirect

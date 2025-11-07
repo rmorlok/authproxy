@@ -3,6 +3,7 @@ package common
 import (
 	"encoding/json"
 	"fmt"
+	"strconv"
 )
 
 func (sv *StringValue) MarshalJSON() ([]byte, error) {
@@ -15,12 +16,33 @@ func (sv *StringValue) MarshalJSON() ([]byte, error) {
 	return json.Marshal(sv.InnerVal)
 }
 
+func stringValeIsNonString(s string) bool {
+	if s == "true" || s == "false" {
+		return true
+	}
+
+	_, err := strconv.ParseFloat(s, 64)
+	if err == nil {
+		return true
+	}
+
+	_, err = strconv.ParseInt(s, 10, 64)
+	if err == nil {
+		return true
+	}
+
+	return false
+}
+
 // UnmarshalJSON handles unmarshalling from JSON while allowing us to make decisions
 // about how the data is unmarshalled based on the concrete type being represented
 func (sv *StringValue) UnmarshalJSON(data []byte) error {
 	// Check for a direct string value
-	if len(data) >= 2 && data[0] == '"' && data[len(data)-1] == '"' {
-		sv.InnerVal = &StringValueDirect{Value: string(data[1 : len(data)-1]), IsDirectString: true}
+	if stringValeIsNonString(string(data)) {
+		sv.InnerVal = &StringValueDirect{Value: string(data), IsDirect: true, IsNonString: true}
+		return nil
+	} else if len(data) >= 2 && data[0] == '"' && data[len(data)-1] == '"' {
+		sv.InnerVal = &StringValueDirect{Value: string(data[1 : len(data)-1]), IsDirect: true}
 		return nil
 	}
 

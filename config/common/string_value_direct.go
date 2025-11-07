@@ -11,12 +11,18 @@ import (
 type StringValueDirect struct {
 	Value string `json:"value" yaml:"value"`
 
-	// IsDirectString implied how this value was loaded from the config. If true, implies this was loaded
-	// as a string value instead of an object with the `direct` key. This drives how we render to JSON/YAML
-	// to be consistent on the round trip.
+	// IsDirect implies how this value was loaded from the config, without a nested sub-object. If true, implies
+	// this was loaded as a string value instead of an object with the `value` key. This drives how we render
+	// to JSON/YAML to be consistent on the round trip.
 	//
 	// This field is exposed publicly to allow for testing, but should not be manipulated directly.
-	IsDirectString bool `json:"-" yaml:"-"`
+	IsDirect bool `json:"-" yaml:"-"`
+
+	// IsNonString implies that if IsDirect is true, the value was not a string (e.g. number/bool). This is used to
+	// drive re-rendering of the data consistently to omit quotes.
+	//
+	// This field is exposed publicly to allow for testing, but should not be manipulated directly.
+	IsNonString bool `json:"-" yaml:"-"`
 }
 
 func (kb *StringValueDirect) HasValue(ctx context.Context) bool {
@@ -39,7 +45,10 @@ func (kb *StringValueDirect) Clone() StringValueType {
 // MarshalJSON provides custom serialization of the object to account for if this was an inline-string or
 // a nested object.
 func (kb StringValueDirect) MarshalJSON() ([]byte, error) {
-	if kb.IsDirectString {
+	if kb.IsDirect {
+		if kb.IsNonString {
+			return []byte(kb.Value), nil
+		}
 		return []byte(fmt.Sprintf("\"%s\"", kb.Value)), nil
 	}
 
@@ -52,7 +61,7 @@ func (kb StringValueDirect) MarshalJSON() ([]byte, error) {
 // MarshalYAML provides custom serialization of the object to account for if this was an inline-string or
 // a nested object.
 func (kb StringValueDirect) MarshalYAML() (interface{}, error) {
-	if kb.IsDirectString {
+	if kb.IsDirect {
 		return kb.Value, nil
 	}
 
@@ -63,15 +72,15 @@ func (kb StringValueDirect) MarshalYAML() (interface{}, error) {
 
 func NewStringValueDirect(value string) *StringValue {
 	return &StringValue{&StringValueDirect{
-		Value:          value,
-		IsDirectString: false,
+		Value:    value,
+		IsDirect: false,
 	}}
 }
 
 func NewStringValueDirectInline(value string) *StringValue {
 	return &StringValue{&StringValueDirect{
-		Value:          value,
-		IsDirectString: true,
+		Value:    value,
+		IsDirect: true,
 	}}
 }
 

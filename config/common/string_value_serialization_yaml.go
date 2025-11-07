@@ -2,6 +2,7 @@ package common
 
 import (
 	"fmt"
+	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
@@ -12,7 +13,20 @@ func (sv *StringValue) MarshalYAML() (interface{}, error) {
 	}
 
 	// Serialize directly as a string if that's how it was loaded
-	if v, ok := sv.InnerVal.(*StringValueDirect); ok && v.IsDirectString {
+	if v, ok := sv.InnerVal.(*StringValueDirect); ok && v.IsDirect {
+		if v.IsNonString {
+			if v, err := strconv.ParseInt(v.Value, 10, 64); err == nil {
+				return v, nil
+			}
+
+			if v, err := strconv.ParseFloat(v.Value, 64); err == nil {
+				return v, nil
+			}
+
+			if v, err := strconv.ParseBool(v.Value); err == nil {
+				return v, nil
+			}
+		}
 		return v.Value, nil
 	}
 
@@ -23,7 +37,11 @@ func (sv *StringValue) MarshalYAML() (interface{}, error) {
 // about how the data is unmarshalled based on the concrete type being represented
 func (sv *StringValue) UnmarshalYAML(value *yaml.Node) error {
 	if value.Kind == yaml.ScalarNode {
-		sv.InnerVal = &StringValueDirect{Value: value.Value, IsDirectString: true}
+		sv.InnerVal = &StringValueDirect{
+			Value:       value.Value,
+			IsDirect:    true,
+			IsNonString: stringValeIsNonString(value.Value),
+		}
 		return nil
 	}
 

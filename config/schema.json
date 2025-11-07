@@ -283,7 +283,7 @@
     "ServiceWorker": {
       "properties": {
         "health_check_port": {
-          "$ref": "./common/schema.json#/$defs/StringValue",
+          "$ref": "./common/schema.json#/$defs/StringValueNumber",
           "description": "The port on which the worker will listen for health checks."
         },
         "concurrency": {
