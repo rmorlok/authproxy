@@ -1,0 +1,54 @@
+name: JS SDK CI
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'sdks/js/**'
+      - '.github/workflows/js-sdk-ci.yml'
+  pull_request:
+    branches: [ '**' ]
+    paths:
+      - 'sdks/js/**'
+      - '.github/workflows/js-sdk-ci.yml'
+
+jobs:
+  build-and-test:
+    name: Build, typecheck, and test JS SDK
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: sdks/js
+    strategy:
+      matrix:
+        node-version: [18.x, 20.x, 22.x]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'npm'
+          cache-dependency-path: sdks/js/package-lock.json
+
+      - name: Install dependencies
+        run: |
+          if [ -f package-lock.json ]; then
+            npm ci
+          else
+            npm install --no-audit --no-fund
+          fi
+
+      - name: TypeScript typecheck (no emit)
+        run: npm run typecheck
+
+      - name: Build SDK
+        run: npm run build
+
+      - name: Run tests (if present)
+        run: npm test --silent --if-present
+
+      - name: Lint (if present)
+        run: npm run lint --silent --if-present
