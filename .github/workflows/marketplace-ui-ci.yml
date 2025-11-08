@@ -1,0 +1,51 @@
+name: Marketplace UI CI
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'sdks/js/**'
+      - 'ui/marketplace/**'
+      - '.github/workflows/marketplace-ui-ci.yml'
+  pull_request:
+    branches: [ '**' ]
+    paths:
+      - 'sdks/js/**'
+      - 'ui/marketplace/**'
+      - '.github/workflows/marketplace-ui-ci.yml'
+
+jobs:
+  build-and-test:
+    name: Build, typecheck, and test Marketplace UI
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: ui/marketplace/
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'yarn'
+          cache-dependency-path: sdks/js/yarn.lock
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: Build Vite Application
+        run: yarn build
+
+      - name: TypeScript typecheck (no emit)
+        run: yarn typecheck
+
+      - name: Run tests
+        run: yarn test --silent
+
+      - name: Lint
+        run: yarn lint
