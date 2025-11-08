@@ -2,14 +2,20 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import ConnectorCard, { ConnectorCardSkeleton } from '../components/ConnectorCard';
-import { Connector } from '@authproxy/api';
+import { Connector, ConnectorVersionState } from '@authproxy/api';
 
 describe('ConnectorCard', () => {
   const mockConnector: Connector = {
     id: 'google-calendar',
+    version: 1,
+    state: ConnectorVersionState.ACTIVE,
+    type: 'oauth2',
     display_name: 'Google Calendar',
     description: 'Connect to your Google Calendar to manage events and appointments.',
+    highlight: undefined,
     logo: 'https://example.com/google-calendar-logo.png',
+    versions: 1,
+    states: [ConnectorVersionState.ACTIVE],
   };
 
   const mockOnConnect = jest.fn();

@@ -13,4 +13,10 @@ export default defineConfig({
       { find: '@authproxy/api', replacement: resolve(__dirname, '../../sdks/js/src') },
     ],
   },
+  test: {
+    environment: 'jsdom',
+    globals: true,
+    setupFiles: ['./src/tests/setup.ts'],
+    css: true,
+  },
 });
