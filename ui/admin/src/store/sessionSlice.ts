@@ -6,7 +6,7 @@ import {
     ApiSessionInitiateSuccessResponse,
     session,
     isInitiateSessionSuccessResponse
-} from '../api';
+} from '@authproxy/api';
 
 interface AuthState {
     actor_id: string | null;

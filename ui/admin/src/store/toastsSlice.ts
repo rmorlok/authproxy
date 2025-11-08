@@ -1,4 +1,4 @@
-import {createAction, createAsyncThunk, createSlice, PayloadAction} from '@reduxjs/toolkit';
+import {createAction, createSlice, PayloadAction} from '@reduxjs/toolkit';
 import type { RootState } from './store';
 
 export interface Toast {

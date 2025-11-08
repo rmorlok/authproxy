@@ -1,0 +1,30 @@
+{
+  "name": "@authproxy/api",
+  "version": "0.1.0",
+  "description": "AuthProxy JavaScript/TypeScript SDK for interacting with AuthProxy APIs.",
+  "type": "module",
+  "main": "dist/index.js",
+  "module": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "clean": "rimraf dist",
+    "typecheck": "tsc -p tsconfig.json --noEmit"
+  },
+  "keywords": ["authproxy", "sdk", "typescript", "javascript"],
+  "author": "AuthProxy",
+  "license": "MIT",
+  "dependencies": {
+    "axios": "^1.6.8"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.3",
+    "rimraf": "^6.0.1"
+  }
+}

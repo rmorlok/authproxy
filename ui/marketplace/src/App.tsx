@@ -2,7 +2,7 @@ import * as React from 'react';
 import LoadingPage from "./LoadingPage";
 import { BrowserRouter, Route, Routes, Outlet, Navigate } from "react-router-dom";
 import { useSelector, useDispatch } from "react-redux";
-import { selectAuthStatus, initiateSessionAsync } from "./store";
+import { selectAuthStatus } from "./store";
 import Layout from './components/Layout';
 import ConnectorList from './components/ConnectorList';
 import ConnectionList from './components/ConnectionList';

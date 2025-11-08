@@ -2,7 +2,7 @@ import React from 'react';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import ConnectorCard, { ConnectorCardSkeleton } from '../components/ConnectorCard';
-import { Connector } from '../models';
+import { Connector } from '@authproxy/api';
 
 describe('ConnectorCard', () => {
   const mockConnector: Connector = {

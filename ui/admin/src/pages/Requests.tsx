@@ -13,7 +13,7 @@ import MenuItem from '@mui/material/MenuItem';
 import {
     ListResponse, RequestEntryRecord,
     RequestType, ListRequestsParams, listRequests
-} from '../api';
+} from '@authproxy/api';
 import dayjs from 'dayjs';
 import {HttpStatusChip, Duration} from '../util';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'

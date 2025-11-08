@@ -22,7 +22,7 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import dayjs from 'dayjs';
 import Tooltip from '@mui/material/Tooltip';
-import {Connection, connections, ConnectionState, canBeDisconnected} from '../api';
+import {Connection, connections, ConnectionState, canBeDisconnected} from '@authproxy/api';
 import { Link } from "react-router-dom";
 
 function StateChip({state}: { state: ConnectionState }) {

@@ -25,7 +25,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import {Duration, HttpStatusChip} from '../util'
-import {getRequest, RequestEntry} from '../api';
+import {getRequest, RequestEntry} from '@authproxy/api';
 import Chip from "@mui/material/Chip";
 
 function useRequest(id: string | undefined) {

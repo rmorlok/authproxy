@@ -11,7 +11,7 @@ import {
 } from '@mui/material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
-import { Connector } from '../api';
+import { Connector } from '@authproxy/api';
 
 interface ConnectorCardProps {
   connector: Connector;

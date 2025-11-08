@@ -1,4 +1,4 @@
-import {createAsyncThunk, createSlice, PayloadAction} from '@reduxjs/toolkit';
+import {createAsyncThunk, createSlice} from '@reduxjs/toolkit';
 import type {RootState} from './store';
 import {
     ApiSessionInitiateRequest,
@@ -6,7 +6,7 @@ import {
     ApiSessionInitiateSuccessResponse,
     session,
     isInitiateSessionSuccessResponse
-} from '../api';
+} from '@authproxy/api';
 
 interface AuthState {
     actor_id: string | null;

@@ -1,6 +1,6 @@
 import {createAsyncThunk, createSlice} from '@reduxjs/toolkit';
 import type {RootState} from './store';
-import {Connection, connections, ConnectionState, DisconnectResponseJson, ListConnectionsParams} from '../api';
+import {Connection, connections, ConnectionState, DisconnectResponseJson, ListConnectionsParams} from '@authproxy/api';
 
 interface ConnectionsState {
     items: Connection[];

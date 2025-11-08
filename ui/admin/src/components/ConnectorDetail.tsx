@@ -7,7 +7,7 @@ import Stack from '@mui/material/Stack';
 import Chip from '@mui/material/Chip';
 import Avatar from '@mui/material/Avatar';
 import dayjs from 'dayjs';
-import {Connector, ConnectorVersionState, connectors} from '../api';
+import {Connector, ConnectorVersionState, connectors} from '@authproxy/api';
 
 function StateChip({state}: { state: ConnectorVersionState }) {
   const colors: Record<ConnectorVersionState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {

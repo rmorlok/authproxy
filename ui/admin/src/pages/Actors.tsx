@@ -6,7 +6,7 @@ import Typography from '@mui/material/Typography';
 import {DataGrid, GridColDef, GridSortModel} from '@mui/x-data-grid';
 import {
     listActors, Actor, ListResponse, ListActorsParams
-} from '../api';
+} from '@authproxy/api';
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsString} from 'nuqs'
 

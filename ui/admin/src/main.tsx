@@ -5,8 +5,13 @@ import { ThemeProvider, createTheme } from '@mui/material/styles';
 import App from './App';
 import { Provider } from 'react-redux';
 import { store } from './store';
-import { ApiSessionInitiateRequest } from "./api";
 import {initiateSessionAsync} from "./store";
+import { configureClient, ApiSessionInitiateRequest } from '@authproxy/api';
+
+// Configure the shared SDK client for the Admin UI
+configureClient({
+    baseURL: import.meta.env.VITE_ADMIN_BASE_URL,
+});
 
 const theme = createTheme({
     colorSchemes: {

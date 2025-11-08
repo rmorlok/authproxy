@@ -10,7 +10,7 @@ import FormControl from '@mui/material/FormControl';
 import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
-import {Connection, ConnectionState, listConnections, ListConnectionsParams, ListResponse} from '../api';
+import {Connection, ConnectionState, listConnections, ListConnectionsParams, ListResponse} from '@authproxy/api';
 import dayjs from 'dayjs';
 import { useNavigate } from 'react-router-dom';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'

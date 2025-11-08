@@ -6,9 +6,13 @@ import theme from './theme';
 import App from './App';
 import { Provider } from 'react-redux';
 import { store } from './store';
-import { ApiSessionInitiateRequest } from "./api";
-import {initiateSessionAsync, AppDispatch} from "./store";
+import {initiateSessionAsync} from "./store";
+import { configureClient, ApiSessionInitiateRequest } from '@authproxy/api';
 
+// Configure the shared SDK client for the Public UI (marketplace)
+configureClient({
+    baseURL: import.meta.env.VITE_PUBLIC_BASE_URL,
+});
 
 // Construct auth parameters from either window variable or URL query parameter
 const params: ApiSessionInitiateRequest = {

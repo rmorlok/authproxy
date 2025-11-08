@@ -4,7 +4,7 @@ import '@testing-library/jest-dom';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import ConnectionCard, { ConnectionCardSkeleton } from '../components/ConnectionCard';
-import { Connection, ConnectionState } from '../models';
+import { Connection, ConnectionState } from '@authproxy/api';
 import connectorsReducer from '../store/connectorsSlice';
 
 // Create a mock store with connectors
