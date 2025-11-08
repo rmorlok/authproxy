@@ -204,7 +204,7 @@ func DatabaseConnectionToJson(cv connIface.ConnectorVersion, conn database.Conne
 	}
 
 	if cv != nil {
-		connector = ConnectorVersionToJson(cv)
+		connector = ConnectorVersionToConnectorJson(cv)
 	}
 
 	return ConnectionJson{

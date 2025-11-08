@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/api_common"
 	"github.com/rmorlok/authproxy/auth"
 	"github.com/rmorlok/authproxy/config"
+	cfgConnectors "github.com/rmorlok/authproxy/config/connectors"
 	connIface "github.com/rmorlok/authproxy/core/iface"
 	"github.com/rmorlok/authproxy/database"
 	"github.com/rmorlok/authproxy/util"
@@ -33,13 +34,13 @@ type ConnectorJson struct {
 }
 
 func ConnectorToJson(c connIface.Connector) ConnectorJson {
-	result := ConnectorVersionToJson(c)
+	result := ConnectorVersionToConnectorJson(c)
 	result.Versions = c.GetTotalVersions()
 	result.States = c.GetStates()
 	return result
 }
 
-func ConnectorVersionToJson(cv connIface.ConnectorVersion) ConnectorJson {
+func ConnectorVersionToConnectorJson(cv connIface.ConnectorVersion) ConnectorJson {
 	def := cv.GetDefinition()
 	logo := ""
 	if def.Logo != nil {
@@ -71,6 +72,42 @@ type ListConnectorsRequestQueryParams struct {
 type ListConnectorsResponseJson struct {
 	Items  []ConnectorJson `json:"items"`
 	Cursor string          `json:"cursor,omitempty"`
+}
+
+type ConnectorVersionJson struct {
+	Id         uuid.UUID                      `json:"id"`
+	Version    uint64                         `json:"version"`
+	State      database.ConnectorVersionState `json:"state"`
+	Type       string                         `json:"type"`
+	Definition cfgConnectors.Connector        `json:"definition"`
+	CreatedAt  time.Time                      `json:"created_at"`
+	UpdatedAt  time.Time                      `json:"updated_at"`
+}
+
+func ConnectorVersionToJson(cv connIface.ConnectorVersion) ConnectorVersionJson {
+	def := cv.GetDefinition()
+
+	return ConnectorVersionJson{
+		Id:         cv.GetID(),
+		Version:    cv.GetVersion(),
+		State:      cv.GetState(),
+		Type:       cv.GetType(),
+		Definition: *def,
+		CreatedAt:  cv.GetCreatedAt(),
+		UpdatedAt:  cv.GetUpdatedAt(),
+	}
+}
+
+type ListConnectorVersionsRequestQueryParams struct {
+	Cursor     *string                         `form:"cursor"`
+	LimitVal   *int32                          `form:"limit"`
+	StateVal   *database.ConnectorVersionState `form:"state"`
+	OrderByVal *string                         `form:"order_by"`
+}
+
+type ListConnectorVersionsResponseJson struct {
+	Items  []ConnectorVersionJson `json:"items"`
+	Cursor string                 `json:"cursor,omitempty"`
 }
 
 type ConnectorsRoutes struct {
@@ -220,9 +257,117 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 	})
 }
 
+func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
+	var err error
+	var ex connIface.ListConnectorVersionsExecutor
+
+	connectorIdStr := gctx.Param("id")
+
+	if connectorIdStr == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	connectorId, err := uuid.Parse(connectorIdStr)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if connectorId == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+	}
+
+	ctx := gctx.Request.Context()
+	var req ListConnectorVersionsRequestQueryParams
+	if err := gctx.ShouldBindQuery(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg(err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if req.Cursor != nil {
+		ex, err = r.connectors.ListConnectorVersionsFromCursor(ctx, *req.Cursor)
+		if err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusInternalServerError().
+				WithInternalErr(err).
+				WithResponseMsg("failed to list connector versions from cursor").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			return
+		}
+	} else {
+		b := r.connectors.ListConnectorVersionsBuilder().
+			ForId(connectorId)
+
+		if req.LimitVal != nil {
+			b = b.Limit(*req.LimitVal)
+		}
+
+		if req.StateVal != nil {
+			b = b.ForConnectorVersionState(*req.StateVal)
+		}
+
+		if req.OrderByVal != nil {
+			field, order, err := pagination.SplitOrderByParam[database.ConnectorVersionOrderByField](*req.OrderByVal)
+			if err != nil {
+				api_common.NewHttpStatusErrorBuilder().
+					WithStatusBadRequest().
+					WithInternalErr(err).
+					WithResponseMsg(err.Error()).
+					BuildStatusError().
+					WriteGinResponse(r.cfg, gctx)
+				return
+			}
+
+			if !database.IsValidConnectorVersionOrderByField(field) {
+				api_common.NewHttpStatusErrorBuilder().
+					WithStatusBadRequest().
+					WithResponseMsgf("invalid sort field '%s'", field).
+					BuildStatusError().
+					WriteGinResponse(r.cfg, gctx)
+				return
+			}
+
+			b.OrderBy(field, order)
+		}
+
+		ex = b
+	}
+
+	result := ex.FetchPage(ctx)
+
+	if result.Error != nil {
+		gctx.PureJSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+	}
+
+	gctx.PureJSON(http.StatusOK, ListConnectorVersionsResponseJson{
+		Items:  util.Map(result.Results, ConnectorVersionToJson),
+		Cursor: result.Cursor,
+	})
+}
+
 func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 	g.GET("/connectors", r.authService.Required(), r.list)
 	g.GET("/connectors/:id", r.authService.Required(), r.get)
+	g.GET("/connectors/:id/versions", r.authService.Required(), r.listVersions)
 }
 
 func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *ConnectorsRoutes {
