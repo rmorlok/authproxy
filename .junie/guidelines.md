@@ -5,16 +5,17 @@ applications to manage the authentication to other 3rd party systems. It is an e
 
 This project exposes several backend services that can either be run individually or as one from the command line. The `admin-api` is a service 
 intended for running in  a restricted environment of the host application to provide ways to administer and monitor session proxy itself, but not 
-to be consumed by end users  of the host application in any way. The `api` service is the primary way the host application would consume this 
-project, using it to configure  connectors, create connections, and make requests to 3rd party systems where AuthProxy handles adding the 
-necessary authentication to the requests.
+to be consumed by end users  of the host application in any way. The UI for admin is located in the `ui/admin` folder.
 
-The `public` service is intended to handle hosting a public facing web application, which is contained in the `client` folder. This application
+The `api` service is the primary way the host application would consume this  project, using it to configure  connectors, create connections, 
+and make requests to 3rd party systems where AuthProxy handles adding the necessary authentication to the requests.
+
+The `public` service is intended to handle hosting a public facing web application, which is contained in the `ui/marketplace` folder. This application
 provides the portal UI for listing connectors to the user and starting the connection flow for OAuth applications. The public service also contains
 endpoints used as part of the OAuth redirect flow.
 
-The `api` and `admin-api` services use JWT for authentication. `public` uses sessions. To get a session on `public` the `api` returns responses that include
-a JWT with a nonce to transfer the user's session from the JWT to the session. This might or might not be temporary.
+The `api` service uses JWT for authentication. `public` and `admin-api` use sessions. To get a session on `public` or `admin-api` the host service
+has a redirect endpoint that will redirect back to an allowlisted location with a onetime use JWT that can be used to initiate a session.
 
 ## Build and Configuration Instructions
 
@@ -36,12 +37,12 @@ a JWT with a nonce to transfer the user's session from the JWT to the session. T
 
 3. **Start the AuthProxy backend**:
    ```bash
-   go run ./cli/server serve --config=./dev_config/default.yaml all
+   go run ./cmd/server serve --config=./dev_config/default.yaml all
    ```
 
 4. **Run the client to proxy authenticated calls to the backend**:
    ```bash
-   go run ./cli/client raw-proxy --proxyTo=<api|admin-api>
+   go run ./cmd/cli raw-proxy --proxyTo=<api|admin-api>
    ```
 
 5. **Make calls to 3rd party systems**:
@@ -126,7 +127,7 @@ func TestExample(t *testing.T) {
 
 ### Testing Utilities
 
-The project provides testing utilities in the `test_utils` package:
+The project provides testing utilities in the `internal/test_utils` package:
 - `TestDataPath`: Helper for accessing test data files
 - Mock implementations for database, encryption, and other components
 
@@ -134,7 +135,7 @@ The project provides testing utilities in the `test_utils` package:
 
 ### Project Structure
 
-The project is organized into multiple packages:
+The project is organized into multiple packages within `internal`:
 - `api_common`: Common API utilities
 - `apctx`: Context-related utilities
 - `session`: Authentication logic

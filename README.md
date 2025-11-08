@@ -23,20 +23,29 @@ docker run --name redis-server -p 6379:6379 --network authproxy -d redis/redis-s
 Start the AuthProxy backend
 
 ```bash
-go run ./cli/server serve --config=./dev_config/default.yaml all
+go run ./cmd/server serve --config=./dev_config/default.yaml all
 ```
 
 Run the client to proxy authenticated calls to the backend:
 
 ```bash
-go run ./cli/client raw-proxy --enableLoginRedirect=true --proxyTo=api
+go run ./cmd/cli raw-proxy --enableLoginRedirect=true --proxyTo=api
 ```
 
 Run the marketplace UI:
 
 ```bash
 cd ui/marketplace
-nvm use v18.16.0
+nvm use
+yarn
+yarn dev
+```
+
+Run the admin UI:
+
+```bash
+cd ui/admin
+nvm use
 yarn
 yarn dev
 ```

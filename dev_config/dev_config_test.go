@@ -3,7 +3,7 @@ package dev_config
 import (
 	"testing"
 
-	"github.com/rmorlok/authproxy/config"
+	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/stretchr/testify/require"
 )
 
