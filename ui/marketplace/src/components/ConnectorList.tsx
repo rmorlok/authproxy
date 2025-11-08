@@ -59,7 +59,7 @@ const ConnectorList: React.FC = () => {
     content = (
       <Grid container spacing={4}>
         {[1, 2, 3, 4].map((item) => (
-          <Grid item key={item} xs={12} sm={6} md={4} lg={3}>
+          <Grid key={item} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
             <ConnectorCardSkeleton />
           </Grid>
         ))}
@@ -79,7 +79,7 @@ const ConnectorList: React.FC = () => {
     content = (
       <Grid container spacing={4}>
         {connectors.map((connector) => (
-          <Grid item key={connector.id} xs={12} sm={6} md={4} lg={3}>
+          <Grid key={connector.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
             <ConnectorCard 
               connector={connector} 
               onConnect={handleConnect}

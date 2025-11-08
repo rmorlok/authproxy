@@ -47,7 +47,7 @@ const ConnectionList: React.FC = () => {
     content = (
       <Grid container spacing={4}>
         {[1, 2, 3, 4].map((i) => (
-          <Grid item key={`connection-skeleton-${i}`} xs={12} sm={6} md={4} lg={3}>
+          <Grid key={`connection-skeleton-${i}`} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
             <ConnectionCardSkeleton />
           </Grid>
         ))}
@@ -77,7 +77,7 @@ const ConnectionList: React.FC = () => {
     content = (
       <Grid container spacing={4}>
         {connections.map((connection) => (
-          <Grid item key={connection.id} xs={12} sm={6} md={4} lg={3}>
+          <Grid key={connection.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
             <ConnectionCard connection={connection} />
           </Grid>
         ))}
