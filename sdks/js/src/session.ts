@@ -24,7 +24,7 @@ function isInitiateSessionSuccessResponse(
 }
 
 
-type ApiSessionTerminateResponse = {};
+type ApiSessionTerminateResponse = Record<string, never>;
 
 const initiate = (params: ApiSessionInitiateRequest) => {
   const headers: { Authorization?: string } = {};

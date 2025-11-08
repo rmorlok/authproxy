@@ -1,6 +1,6 @@
 # @authproxy/api
 
-A lightweight JavaScript/TypeScript SDK for interacting with AuthProxy APIs. Extracted from the Admin/Public UI code and generalized for reuse across projects.
+A lightweight JavaScript/TypeScript SDK for interacting with AuthProxy APIs.
 
 - Written in TypeScript
 - Axios-based HTTP client with XSRF handling

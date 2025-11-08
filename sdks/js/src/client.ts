@@ -15,12 +15,14 @@ export let client: AxiosInstance = axios.create({
 });
 
 // Function to extract XSRF token from response headers
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const extractXsrfToken = (headers: Record<string, any>): string | null => {
   if (!headers) return null;
   return headers['x-xsrf-token'] || headers['X-XSRF-TOKEN'] || null;
 };
 
 // Function to check if a request should include XSRF token
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const shouldIncludeXsrfToken = (config: any): boolean => {
   const url: string | undefined = config?.url;
   if (!url) return true;
@@ -34,7 +36,8 @@ function attachInterceptors(instance: AxiosInstance) {
   // Response interceptor to extract XSRF tokens
   instance.interceptors.response.use(
     (response) => {
-      const token = extractXsrfToken(response.headers as any);
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const token = extractXsrfToken(response.headers as any);
       if (token) xsrfToken = token;
       return response;
     },
@@ -50,7 +53,8 @@ function attachInterceptors(instance: AxiosInstance) {
   instance.interceptors.request.use(
     (config) => {
       if (shouldIncludeXsrfToken(config) && xsrfToken) {
-        (config.headers as any)['X-XSRF-TOKEN'] = xsrfToken;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          (config.headers as any)['X-XSRF-TOKEN'] = xsrfToken;
       }
       return config;
     },

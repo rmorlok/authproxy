@@ -55,7 +55,7 @@ export const pollForTaskFinalized = async (
 }> => {
   // Merge provided config with defaults
   const fullConfig = { ...defaultBackoffConfig, ...config };
-  let { initialDelay, maxDelay, maxAttempts, backoffFactor } = fullConfig;
+  const { initialDelay, maxDelay, maxAttempts, backoffFactor } = fullConfig;
 
   let attempts = 0;
   let delay = initialDelay;
