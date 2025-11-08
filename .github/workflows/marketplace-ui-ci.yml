@@ -33,16 +33,16 @@ jobs:
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'yarn'
-          cache-dependency-path: sdks/js/yarn.lock
+          cache-dependency-path: ui/marketplace/yarn.lock
 
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Build Vite Application
-        run: yarn build
-
       - name: TypeScript typecheck (no emit)
         run: yarn typecheck
+
+      - name: Build Vite Application
+        run: yarn build
 
       - name: Run tests
         run: yarn test --silent
