@@ -30,25 +30,20 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'npm'
-          cache-dependency-path: sdks/js/package-lock.json
+          cache: 'yarn'
+          cache-dependency-path: sdks/js/yarn.lock
 
       - name: Install dependencies
-        run: |
-          if [ -f package-lock.json ]; then
-            npm ci
-          else
-            npm install --no-audit --no-fund
-          fi
+        run: yarn install --frozen-lockfile
 
       - name: TypeScript typecheck (no emit)
-        run: npm run typecheck
+        run: yarn typecheck
 
       - name: Build SDK
-        run: npm run build
+        run: yarn build
 
-      - name: Run tests (if present)
-        run: npm test --silent --if-present
+      - name: Run tests
+        run: yarn test --silent
 
-      - name: Lint (if present)
-        run: npm run lint --silent --if-present
+      - name: Lint
+        run: yarn lint
