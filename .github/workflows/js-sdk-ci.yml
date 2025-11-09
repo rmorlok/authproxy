@@ -39,13 +39,13 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: TypeScript typecheck (no emit)
-        run: yarn @authproxy/api typecheck
+        run: yarn workspace @authproxy/api typecheck
 
       - name: Build SDK
-        run: yarn @authproxy/api build
+        run: yarn workspace @authproxy/api build
 
       - name: Run tests
-        run: yarn @authproxy/api test --silent
+        run: yarn workspace @authproxy/api test --silent
 
       - name: Lint x
-        run: yarn @authproxy/api lint
+        run: yarn workspace @authproxy/api lint

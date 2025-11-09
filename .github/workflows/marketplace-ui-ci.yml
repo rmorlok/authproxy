@@ -38,13 +38,13 @@ jobs:
         run: yarn install --frozen-lockfile
 
       - name: TypeScript typecheck (no emit)
-        run: yarn @authproxy/marketplace typecheck
+        run: yarn workspace @authproxy/marketplace typecheck
 
       - name: Build Vite Application
-        run: yarn @authproxy/marketplace build
+        run: yarn workspace @authproxy/marketplace build
 
       - name: Run tests
-        run: yarn @authproxy/marketplace test --silent
+        run: yarn workspace @authproxy/marketplace test --silent
 
       - name: Lint
-        run: yarn @authproxy/marketplace lint
+        run: yarn workspace @authproxy/marketplace lint
