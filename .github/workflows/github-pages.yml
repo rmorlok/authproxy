@@ -10,6 +10,8 @@ on:
       - 'ui/marketplace/**'
       - 'package.json'
       - '.github/workflows/github-pages.yml'
+permissions:
+  contents: write
 jobs:
   deploy-pages:
     name: Deploy
@@ -47,5 +49,4 @@ jobs:
         with:
           folder: staging
           branch: github-pages
-          token: ${{ secrets.REPOSITORY_WRITE_TOKEN}}
           clean: true
