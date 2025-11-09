@@ -125,7 +125,7 @@ describe('ConnectionList', () => {
     );
 
     expect(screen.getByText('No connections yet')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /Connect an Application/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Connect an Application/i })).toBeInTheDocument();
   });
 
   test('renders list of connections when present', () => {
@@ -157,6 +157,6 @@ describe('ConnectionList', () => {
     // The ConnectionCard shows connector display name
     expect(screen.getAllByText('Google Calendar').length).toBeGreaterThanOrEqual(1);
     // And the secondary button should appear
-    expect(screen.getByRole('button', { name: /Connect More/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Connect More/i })).toBeInTheDocument();
   });
 });

@@ -40,8 +40,11 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
   const dispatch = useDispatch<AppDispatch>();
   const connector = connection.connector;
 
-  // Use highlight field if available, otherwise use truncated description
-  const displayText = connector.highlight || truncateText(connector.description);
+  // Use highlight field if available, otherwise use truncated description.
+  // Be defensive in case the connector is missing.
+  const displayText = connector?.highlight ?? (
+    connector?.description ? truncateText(connector.description) : ''
+  );
 
   // State for confirmation dialog
   const [openDialog, setOpenDialog] = useState(false);
