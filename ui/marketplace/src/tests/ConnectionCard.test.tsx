@@ -3,7 +3,7 @@ import '@testing-library/jest-dom';
 import { Provider } from 'react-redux';
 import { configureStore } from '@reduxjs/toolkit';
 import ConnectionCard, { ConnectionCardSkeleton } from '../components/ConnectionCard';
-import { Connection, ConnectionState } from '@authproxy/api';
+import { Connection, ConnectionState, Connector, ConnectorVersionState } from '@authproxy/api';
 import authReducer from '../store/sessionSlice';
 import connectorsReducer from '../store/connectorsSlice';
 import connectionsReducer from '../store/connectionsSlice';
@@ -32,16 +32,22 @@ const rootInitialState = () => ({
 });
 
 describe('ConnectionCard', () => {
-  const mockConnector = {
+  const mockConnector: Connector = {
     id: 'google-calendar',
+    version: 1,
+    state: ConnectorVersionState.ACTIVE,
+    type: 'oauth2',
     display_name: 'Google Calendar',
     description: 'Connect to your Google Calendar to manage events and appointments.',
+    highlight: undefined,
     logo: 'https://example.com/google-calendar-logo.png',
+    versions: 1,
+    states: [ConnectorVersionState.ACTIVE],
   };
 
   const baseConnection: Connection = {
     id: '123e4567-e89b-12d3-a456-426614174000',
-    connector: mockConnector as any,
+    connector: mockConnector,
     state: ConnectionState.CONNECTED,
     created_at: '2023-04-01T12:00:00Z',
     updated_at: '2023-04-01T12:00:00Z',
