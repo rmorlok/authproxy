@@ -15,3 +15,5 @@ View components
 yarn workspace @authproxy/marketplace storybook
 open http://localhost:6006
 ```
+
+You can also view a [compiled version of the storybook from the last successful build](https://rmorlok.github.io/authproxy/storybook/marketplace/).
