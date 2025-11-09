@@ -33,7 +33,10 @@ jobs:
           cache-dependency-path: yarn.lock
 
       - name: Install dependencies
-        run: yarn install --frozen-lockfile
+        run: |
+          npm install -g corepack
+          yarn set version 4.11.0 --yes
+          yarn install --frozen-lockfile
 
       - name: TypeScript typecheck (no emit)
         run: yarn typecheck
