@@ -1,7 +1,7 @@
-import React from 'react';
+import * as React from 'react';
 import { Meta, StoryObj } from '@storybook/react';
 import ConnectorCard, { ConnectorCardSkeleton } from '../components/ConnectorCard';
-import { Connector, ConnectorVersionState } from '../models';
+import { Connector, ConnectorVersionState } from '@authproxy/api';
 
 const meta: Meta<typeof ConnectorCard> = {
   title: 'Components/ConnectorCard',

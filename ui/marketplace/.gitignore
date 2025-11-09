@@ -48,6 +48,7 @@ dist-ssr
 *.sw?
 
 *storybook.log
+storybook-static
 
 .yarn/*
 !.yarn/releases
