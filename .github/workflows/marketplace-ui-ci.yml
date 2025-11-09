@@ -1,3 +1,4 @@
+# schema: https://json.schemastore.org/github-workflow.json
 name: Marketplace UI CI
 
 on:
@@ -52,6 +53,7 @@ jobs:
         run: yarn workspace @authproxy/marketplace lint
   deploy-storybook:
     name: Deploy Storybook to GitHub Pages
+    needs: build-and-test
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -60,7 +62,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version-file: '.nvmrc'
-          cache: 'yarn'
+          cache-dependency-path: yarn.lock
 
       - name: Enable corepack
         run: corepack enable
