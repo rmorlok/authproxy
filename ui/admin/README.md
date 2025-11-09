@@ -1,18 +1,18 @@
 # Admin UI
 
-Install it and run:
+From the repo root, run the following to start the app:
 
 ```bash
 nvm use
 yarn
-yarn dev
+yarn workspace @authproxy/admin dev
 open http://127.0.0.1:5174/
 ```
 
 View components
 
 ```bash
-yarn storybook
+yarn workspace @authproxy/admin storybook
 open http://localhost:6007
 ```
 

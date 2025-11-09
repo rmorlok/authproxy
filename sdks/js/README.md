@@ -68,25 +68,14 @@ If you add new exports to the SDK, they will be available immediately in the UIs
 
 ## Build / Publish (optional)
 
-To produce a distributable package (ESM + types):
+To produce a distributable package (ESM + types), run from the repo root:
 
 ```bash
-cd lib/js
-npm install
-npm run build
+yarn
+yarn workspace @authproxy/api build
 ```
 
 This will emit `dist/` with compiled JS and type declarations. You can publish to a registry as needed.
-
-If you want UIs to consume the built package locally without a registry, you can also add a `file:` dependency in the UI `package.json` (not required for in-repo dev with aliases):
-
-```json
-{
-  "dependencies": {
-    "@authproxy/api": "file:../../lib/js"
-  }
-}
-```
 
 ## Notes
 

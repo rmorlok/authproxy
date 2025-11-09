@@ -1,7 +1,7 @@
 {
-  "name": "material-ui-vite-ts",
+  "name": "@authproxy/marketplace",
   "private": true,
-  "version": "5.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -16,12 +16,12 @@
     "lint": "echo 'No lint configuration yet' && exit 0"
   },
   "dependencies": {
+    "@authproxy/api": "^0.1.0",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^7.3.5",
     "@mui/material": "^7.3.5",
     "@reduxjs/toolkit": "^2.2.2",
-    "axios": "^1.6.8",
     "react": "latest",
     "react-dom": "latest",
     "react-markdown": "^10.1.0",
@@ -56,5 +56,5 @@
     "vite": "^5.0.12",
     "vitest": "^2.0.5"
   },
-  "packageManager": "yarn@4.1.1"
+  "packageManager": "yarn@4.11.0"
 }

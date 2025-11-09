@@ -32,22 +32,31 @@ Run the client to proxy authenticated calls to the backend:
 go run ./cmd/cli raw-proxy --enableLoginRedirect=true --proxyTo=api
 ```
 
+# UI
+
+## Setup
+
+Make sure you have [nvm](https://github.com/nvm-sh/nvm) installed. From the repository root:
+
+```bash
+npm install -g corepack
+yarn set version 4.11.0
+yarn
+```
+
+## Marketplace UI
+
 Run the marketplace UI:
 
 ```bash
-cd ui/marketplace
-nvm use
-yarn
-yarn dev
+yarn workspace @authproxy/marketplace dev
 ```
 
+## Admin UI
 Run the admin UI:
 
 ```bash
-cd ui/admin
-nvm use
-yarn
-yarn dev
+yarn workspace @authproxy/admin dev
 ```
 
 ### Viewing Redis Data

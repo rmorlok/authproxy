@@ -19,7 +19,12 @@
     "test": "vitest run --passWithNoTests",
     "lint": "eslint . --ext .ts"
   },
-  "keywords": ["authproxy", "sdk", "typescript", "javascript"],
+  "keywords": [
+    "authproxy",
+    "sdk",
+    "typescript",
+    "javascript"
+  ],
   "author": "AuthProxy",
   "license": "MIT",
   "dependencies": {

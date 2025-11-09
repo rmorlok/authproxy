@@ -29,5 +29,7 @@ go.work
 tmp
 
 .junie
+.yarn
+node_modules
 
 dev_config/keys/tls

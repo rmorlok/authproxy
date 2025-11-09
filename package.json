@@ -1,0 +1,8 @@
+{
+  "private": true,
+  "workspaces": [
+    "ui/*",
+    "sdks/js"
+  ],
+  "packageManager": "yarn@4.11.0"
+}

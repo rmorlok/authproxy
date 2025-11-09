@@ -1,7 +1,7 @@
 {
-  "name": "material-ui-vite-ts",
+  "name": "@authproxy/admin",
   "private": true,
-  "version": "5.0.0",
+  "version": "0.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite --port 5174",
@@ -11,6 +11,7 @@
     "build-storybook": "storybook build"
   },
   "dependencies": {
+    "@authproxy/api": "^0.1.0",
     "@emotion/react": "^11.11.4",
     "@emotion/styled": "^11.11.0",
     "@mui/icons-material": "^5.15.13",
@@ -54,5 +55,5 @@
     "typescript": "latest",
     "vite": "^5.0.12"
   },
-  "packageManager": "yarn@4.1.1"
+  "packageManager": "yarn@4.11.0"
 }
