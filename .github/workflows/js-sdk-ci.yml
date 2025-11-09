@@ -30,9 +30,11 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: ${{ matrix.node-version }}
-          cache: 'yarn'
           cache-dependency-path: yarn.lock
 
+      - name: Enable corepack
+        run: corepack enable
+        
       - name: Install dependencies
         run: |
           npm install -g corepack
@@ -40,13 +42,13 @@ jobs:
           yarn install --frozen-lockfile
 
       - name: TypeScript typecheck (no emit)
-        run: yarn typecheck
+        run: yarn @authproxy/api typecheck
 
       - name: Build SDK
-        run: yarn build
+        run: yarn @authproxy/api build
 
       - name: Run tests
-        run: yarn test --silent
+        run: yarn @authproxy/api test --silent
 
       - name: Lint
-        run: yarn lint
+        run: yarn @authproxy/api lint
