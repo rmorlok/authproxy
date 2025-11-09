@@ -5,11 +5,13 @@ on:
     branches: [ main, master ]
     paths:
       - 'sdks/js/**'
+      - 'package.json'
       - '.github/workflows/js-sdk-ci.yml'
   pull_request:
     branches: [ '**' ]
     paths:
       - 'sdks/js/**'
+      - 'package.json'
       - '.github/workflows/js-sdk-ci.yml'
 
 jobs:

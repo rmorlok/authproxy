@@ -6,12 +6,14 @@ on:
     paths:
       - 'sdks/js/**'
       - 'ui/marketplace/**'
+      - 'package.json'
       - '.github/workflows/marketplace-ui-ci.yml'
   pull_request:
     branches: [ '**' ]
     paths:
       - 'sdks/js/**'
       - 'ui/marketplace/**'
+      - 'package.json'
       - '.github/workflows/marketplace-ui-ci.yml'
 
 jobs:
