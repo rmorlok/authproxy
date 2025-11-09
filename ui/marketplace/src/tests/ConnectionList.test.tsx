@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { Provider } from 'react-redux';
-import { configureStore } from '@reduxjs/toolkit';
+import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import { MemoryRouter } from 'react-router-dom';
 import ConnectionList from '../components/ConnectionList';
 import authReducer from '../store/sessionSlice';
@@ -13,12 +13,12 @@ import { vi, describe, expect, test } from 'vitest';
 
 function createStore(preloadedState?: any) {
   return configureStore({
-    reducer: {
+    reducer: combineReducers({
       auth: authReducer,
       connectors: connectorsReducer,
       connections: connectionsReducer,
       toasts: toastsReducer,
-    },
+    }),
     preloadedState,
   });
 }

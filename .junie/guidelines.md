@@ -162,6 +162,15 @@ The project uses GitHub Actions for CI/CD:
 - Builds are triggered on pushes to the main branch and pull requests
 - The CI pipeline builds the project and runs all tests
 
+## Javascript/Typescript Related Code
+
+This codebase uses a monorepo style with multiple javasript packages contained within it. The `ui/marketplace` folder 
+contains the frontend  code for the public facing application. The `ui/admin` folder contains the frontend code for 
+the admin application. The `sdk/js` folder contains the SDK that is used by the other Javascript codebases.
+
+This project uses nvm to manage node versions. When you start a terminal session, be sure to run `nvm use` to use the 
+correct version of node, or inspect the `.nvmrc` file to see the version that is used and directly invoke it.
+
 ## Additional Resources
 
 - [Go Documentation](https://golang.org/doc/)

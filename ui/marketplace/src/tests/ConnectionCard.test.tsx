@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { Provider } from 'react-redux';
-import { configureStore } from '@reduxjs/toolkit';
+import { configureStore, combineReducers } from '@reduxjs/toolkit';
 import ConnectionCard, { ConnectionCardSkeleton } from '../components/ConnectionCard';
 import { Connection, ConnectionState, Connector, ConnectorVersionState } from '@authproxy/api';
 import authReducer from '../store/sessionSlice';
@@ -13,12 +13,12 @@ import { describe, test, expect } from 'vitest';
 // Create a mock store with required reducers
 const createMockStore = (preloaded?: Partial<ReturnType<typeof rootInitialState>>) => {
   return configureStore({
-    reducer: {
+    reducer: combineReducers({
       auth: authReducer,
       connectors: connectorsReducer,
       connections: connectionsReducer,
       toasts: toastsReducer,
-    },
+    }),
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
     preloadedState: preloaded as any,
   });
