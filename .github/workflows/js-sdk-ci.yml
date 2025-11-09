@@ -36,10 +36,7 @@ jobs:
         run: corepack enable
 
       - name: Install dependencies
-        run: |
-          npm install -g corepack
-          yarn set version 4.11.0 --yes
-          yarn install --frozen-lockfile
+        run: yarn install --frozen-lockfile
 
       - name: TypeScript typecheck (no emit)
         run: yarn @authproxy/api typecheck
