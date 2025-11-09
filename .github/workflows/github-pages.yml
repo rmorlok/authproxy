@@ -1,0 +1,51 @@
+# schema: https://json.schemastore.org/github-workflow.json
+name: Github Pages
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'docs/**'
+      - 'sdks/js/**'
+      - 'ui/marketplace/**'
+      - 'package.json'
+      - '.github/workflows/github-pages.yml'
+jobs:
+  deploy-pages:
+    name: Deploy
+    environment: Github Pages Deploy
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Create staging folder
+        run: mkdir staging && mkdir staging/storybook
+
+      - name: Copy files to staging folder
+        run: cp -r docs/* staging/
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version-file: '.nvmrc'
+          cache-dependency-path: yarn.lock
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --immutable
+
+      - name: Build Storybook
+        run: yarn workspace @authproxy/marketplace build-storybook
+
+      - name: Copy Storybook to staging folder
+        run: mkdir staging/storybook/marketplace && cp -r ui/marketplace/storybook-static/* staging/storybook/marketplace/
+
+      - name: Deploy to GitHub Pages
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          folder: staging
+          branch: github-pages
+          token: ${{ secrets.REPOSITORY_WRITE_TOKEN}}
+          clean: true
