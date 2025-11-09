@@ -1,4 +1,4 @@
-import React from 'react';
+import { describe, test, expect, beforeEach, vi } from 'vitest';
 import { render, screen, fireEvent } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import ConnectorCard, { ConnectorCardSkeleton } from '../components/ConnectorCard';
@@ -18,7 +18,7 @@ describe('ConnectorCard', () => {
     states: [ConnectorVersionState.ACTIVE],
   };
 
-  const mockOnConnect = jest.fn();
+  const mockOnConnect = vi.fn();
 
   beforeEach(() => {
     mockOnConnect.mockClear();

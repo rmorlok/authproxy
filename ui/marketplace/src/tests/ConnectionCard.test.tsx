@@ -1,4 +1,3 @@
-import React from 'react';
 import { render, screen } from '@testing-library/react';
 import '@testing-library/jest-dom';
 import { Provider } from 'react-redux';
@@ -9,6 +8,7 @@ import authReducer from '../store/sessionSlice';
 import connectorsReducer from '../store/connectorsSlice';
 import connectionsReducer from '../store/connectionsSlice';
 import toastsReducer from '../store/toastsSlice';
+import { describe, test, expect } from 'vitest';
 
 // Create a mock store with required reducers
 const createMockStore = (preloaded?: Partial<ReturnType<typeof rootInitialState>>) => {
