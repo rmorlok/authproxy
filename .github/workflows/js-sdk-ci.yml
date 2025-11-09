@@ -34,7 +34,7 @@ jobs:
 
       - name: Enable corepack
         run: corepack enable
-        
+
       - name: Install dependencies
         run: |
           npm install -g corepack
@@ -50,5 +50,5 @@ jobs:
       - name: Run tests
         run: yarn @authproxy/api test --silent
 
-      - name: Lint
+      - name: Lint x
         run: yarn @authproxy/api lint
