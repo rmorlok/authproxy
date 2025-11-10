@@ -4,6 +4,7 @@ From the repo root:
 
 ```bash
 nvm use
+corepack enable
 yarn
 yarn workspace @authproxy/marketplace dev
 open http://127.0.0.1:5173/

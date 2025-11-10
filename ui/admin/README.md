@@ -4,6 +4,7 @@ From the repo root, run the following to start the app:
 
 ```bash
 nvm use
+corepack enable
 yarn
 yarn workspace @authproxy/admin dev
 open http://127.0.0.1:5174/
