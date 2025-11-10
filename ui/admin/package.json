@@ -56,7 +56,8 @@
     "@vitejs/plugin-react": "^4.2.1",
     "storybook": "^8.0.8",
     "typescript": "latest",
-    "vite": "^5.0.12"
+    "vite": "^5.0.12",
+    "vitest": "^2.0.5"
   },
   "packageManager": "yarn@4.11.0"
 }
