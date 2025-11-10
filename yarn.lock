@@ -53,11 +53,19 @@ __metadata:
     "@storybook/react-vite": "npm:^8.0.8"
     "@storybook/test": "npm:^8.0.8"
     "@types/babel__traverse": "npm:^7"
+    "@types/eslint-plugin-jsx-a11y": "npm:^6"
     "@types/react": "npm:latest"
     "@types/react-dom": "npm:latest"
+    "@typescript-eslint/eslint-plugin": "npm:^8.46.3"
+    "@typescript-eslint/parser": "npm:^8.46.3"
     "@vitejs/plugin-react": "npm:^4.2.1"
     axios: "npm:^1.6.8"
     dayjs: "npm:^1.11.18"
+    eslint: "npm:^9.39.1"
+    eslint-plugin-import: "npm:^2.32.0"
+    eslint-plugin-jsx-a11y: "npm:^6.10.2"
+    eslint-plugin-react: "npm:^7.37.5"
+    eslint-plugin-react-hooks: "npm:^7.0.1"
     nuqs: "npm:^2.6.0"
     react: "npm:latest"
     react-dom: "npm:latest"
@@ -70,6 +78,7 @@ __metadata:
     storybook: "npm:^8.0.8"
     typescript: "npm:latest"
     vite: "npm:^5.0.12"
+    vite-plugin-eslint: "npm:^1.8.1"
     vitest: "npm:^2.0.5"
   languageName: unknown
   linkType: soft
@@ -2675,6 +2684,15 @@ __metadata:
   languageName: node
   linkType: hard
 
+"@types/eslint-plugin-jsx-a11y@npm:^6":
+  version: 6.10.1
+  resolution: "@types/eslint-plugin-jsx-a11y@npm:6.10.1"
+  dependencies:
+    eslint: "npm:^9"
+  checksum: 10c0/fe2ce003279f046225fc8ce5ea9b621254f0b6cf6577ea03da4cdd436c6780a7e1565308c2b3406851f5bb6abda0e9e2694f75dc462d8915f031854b10824012
+  languageName: node
+  linkType: hard
+
 "@types/eslint@npm:^8.4.5":
   version: 8.56.12
   resolution: "@types/eslint@npm:8.56.12"
@@ -4947,7 +4965,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"eslint@npm:^9.39.1":
+"eslint@npm:^9, eslint@npm:^9.39.1":
   version: 9.39.1
   resolution: "eslint@npm:9.39.1"
   dependencies:
