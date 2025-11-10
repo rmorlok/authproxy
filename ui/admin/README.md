@@ -16,6 +16,7 @@ View components
 yarn workspace @authproxy/admin storybook
 open http://localhost:6007
 ```
+You can also view a [compiled version of the storybook from the last successful build](https://rmorlok.github.io/authproxy/storybook/admin/).
 
 # Theme / Components
 
