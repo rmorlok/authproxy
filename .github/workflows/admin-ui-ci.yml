@@ -40,9 +40,6 @@ jobs:
       - name: Install dependencies
         run: yarn install --frozen-lockfile
 
-      - name: Build JS SDK
-        run: yarn workspace @authproxy/api build
-
       - name: TypeScript typecheck (no emit)
         run: yarn workspace @authproxy/admin typecheck
 

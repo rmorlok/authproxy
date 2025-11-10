@@ -12,6 +12,9 @@
     "module": "ESNext",
     "moduleResolution": "Node",
     "baseUrl": ".",
+    "paths": {
+      "@authproxy/api": ["../../sdks/js/src"]
+    },
     "resolveJsonModule": true,
     "isolatedModules": true,
     "noEmit": true,
