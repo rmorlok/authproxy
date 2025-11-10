@@ -57,7 +57,7 @@ export const initiateConnectionAsync = createAsyncThunk(
 
 export const disconnectConnectionAsync = createAsyncThunk(
     'connections/disconnectConnection',
-    async (connectionId: string, {dispatch}): Promise<DisconnectResponseJson> => {
+    async (connectionId: string, _): Promise<DisconnectResponseJson> => {
         const response = await connections.disconnect(connectionId);
 
         return response.data;

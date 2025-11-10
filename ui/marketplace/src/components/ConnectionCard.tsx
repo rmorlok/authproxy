@@ -110,7 +110,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
         }
       }
 
-    } catch (error) {
+    } catch (_error) {
       addToast({
         message: 'Failed to disconnect connection',
         type: 'error',

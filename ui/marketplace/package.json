@@ -13,7 +13,7 @@
     "test": "vitest run",
     "test:watch": "vitest",
     "coverage": "vitest run --coverage",
-    "lint": "echo 'No lint configuration yet' && exit 0"
+    "lint": "eslint --ext .ts,.tsx src"
   },
   "dependencies": {
     "@authproxy/api": "^0.1.0",
@@ -47,13 +47,22 @@
     "@testing-library/react": "^16.0.0",
     "@testing-library/user-event": "^14.5.2",
     "@types/babel__traverse": "^7",
+    "@types/eslint-plugin-jsx-a11y": "^6",
     "@types/react": "latest",
     "@types/react-dom": "latest",
+    "@typescript-eslint/eslint-plugin": "^8.46.3",
+    "@typescript-eslint/parser": "^8.46.3",
     "@vitejs/plugin-react": "^4.2.1",
+    "eslint": "^9.39.1",
+    "eslint-plugin-import": "^2.32.0",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.0.1",
     "jsdom": "^24.0.0",
     "storybook": "^8.0.8",
     "typescript": "latest",
     "vite": "^5.0.12",
+    "vite-plugin-eslint": "^1.8.1",
     "vitest": "^2.0.5"
   },
   "packageManager": "yarn@4.11.0"
