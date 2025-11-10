@@ -9,3 +9,4 @@ proxy and stay focussed on the business logic of your product.
 # Resources
 
 * [Marketplace UI Storybook](./storybook/marketplace/)
+* [Admin UI Storybook](./storybook/admin/)
