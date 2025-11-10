@@ -246,12 +246,10 @@ export default function Connectors() {
         // Reset cursors/cache and immediately fetch first page to ensure initial load
         resetPagination();
         fetchPage(1);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pageSize, sort, stateFilter]);
 
     useEffect(() => {
         fetchPage(page);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, pageSize, sort, stateFilter]); // TODO: only page?
 
     return (

@@ -1,4 +1,3 @@
-import CssBaseline from "@mui/material/CssBaseline";
 import Box from "@mui/material/Box";
 import SideMenu from "./components/SideMenu";
 import AppNavbar from "./components/AppNavbar";
@@ -13,7 +12,7 @@ import type {} from '@mui/x-data-grid/themeAugmentation';
 import type {} from '@mui/x-tree-view/themeAugmentation';
 import Copyright from "./components/Copyright";
 
-export default function Layout(props: { disableCustomTheme?: boolean }) {
+export default function Layout(_props: { disableCustomTheme?: boolean }) {
     return (
         <>
             <Box sx={{ display: 'flex' }}>

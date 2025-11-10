@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import Grid from '@mui/material/Grid';
 import Box from '@mui/material/Box';
 import Typography from '@mui/material/Typography';
@@ -173,12 +173,10 @@ export default function Actors() {
         // Reset cursors/cache and immediately fetch first page to ensure initial load
         resetPagination();
         fetchPage(1);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pageSize, sort]);
 
     useEffect(() => {
         fetchPage(page);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, pageSize, sort]); // TODO: only page?
 
     return (

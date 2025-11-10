@@ -1,0 +1,56 @@
+# schema: https://json.schemastore.org/github-workflow.json
+name: Admin UI CI
+
+on:
+  push:
+    branches: [ main, master ]
+    paths:
+      - 'sdks/js/**'
+      - 'ui/admin/**'
+      - 'package.json'
+      - '.github/workflows/admin-ui-ci.yml'
+  pull_request:
+    branches: [ '**' ]
+    paths:
+      - 'sdks/js/**'
+      - 'ui/admin/**'
+      - 'package.json'
+      - '.github/workflows/admin-ui-ci.yml'
+
+jobs:
+  build-and-test:
+    name: Build, typecheck, and test Marketplace UI
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        node-version: [20.x, 22.x]
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Use Node.js ${{ matrix.node-version }}
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache-dependency-path: yarn.lock
+
+      - name: Enable corepack
+        run: corepack enable
+
+      - name: Install dependencies
+        run: yarn install --frozen-lockfile
+
+      - name: TypeScript typecheck (no emit)
+        run: yarn workspace @authproxy/admin typecheck
+
+      - name: Build Vite Application
+        run: yarn workspace @authproxy/admin build
+
+      - name: Run tests
+        run: yarn workspace @authproxy/admin test --silent
+
+      - name: Lint
+        run: yarn workspace @authproxy/admin lint
+
+      - name: Build Storybook
+        run: yarn workspace @authproxy/admin build-storybook

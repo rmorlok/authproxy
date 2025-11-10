@@ -24,7 +24,6 @@ export default function NavbarBreadcrumbs() {
         .map((match) => ({
             title: match.handle.title,
             path: match.pathname,
-            // @ts-ignore params may exist on match
             params: (match as any).params as Record<string, string | undefined>,
         }));
 
@@ -44,14 +43,14 @@ export default function NavbarBreadcrumbs() {
             {finalCrumbs.map((crumb, index) => {
                 if (index === finalCrumbs.length - 1) {
                     return (
-                        <Typography variant="body1" sx={{color: 'text.primary', fontWeight: 600}}>
+                        <Typography key={index} variant="body1" sx={{color: 'text.primary', fontWeight: 600}}>
                             {crumb.title}
                         </Typography>
                     );
                 }
 
                 return (
-                    <Typography variant="body1" component={Link} to={crumb.path} sx={{color: 'text.primary', textDecoration: 'none'}}>
+                    <Typography key={index} variant="body1" component={Link} to={crumb.path} sx={{color: 'text.primary', textDecoration: 'none'}}>
                         {crumb.title}
                     </Typography>
                 );

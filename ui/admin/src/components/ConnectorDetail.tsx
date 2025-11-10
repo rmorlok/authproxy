@@ -95,11 +95,11 @@ export default function ConnectorDetail({connectorId}: { connectorId: string }) 
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Created</Typography>
-          <Typography variant="body1">{dayjs((conn as any).created_at).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(conn.created_at).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Updated</Typography>
-          <Typography variant="body1">{dayjs((conn as any).updated_at).format('MMM DD, YYYY, h:mm A')}</Typography>
+          <Typography variant="body1">{dayjs(conn.updated_at).format('MMM DD, YYYY, h:mm A')}</Typography>
         </Box>
       </Stack>
     </Stack>

@@ -303,12 +303,10 @@ export default function Requests() {
         // Reset cursors/cache and immediately fetch first page to ensure initial load
         resetPagination();
         fetchPage(1);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [pageSize, sort, typeFilter]);
 
     useEffect(() => {
         fetchPage(page);
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [page, pageSize, sort, typeFilter]); // TODO: only page?
 
     useEffect(() => {

@@ -56,7 +56,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
       await navigator.clipboard.writeText(conn?.id || '');
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
-    } catch (e) {
+    } catch (_e: any) {
       // ignore
     }
   };

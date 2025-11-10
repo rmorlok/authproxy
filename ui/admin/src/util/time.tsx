@@ -1,3 +1,4 @@
+import * as React from "react";
 import {Tooltip} from "@mui/material";
 import dayjs from "dayjs";
 import duration from "dayjs/plugin/duration";
@@ -18,6 +19,10 @@ export function formatDuration(ms: number): string {
 
     if (ms < 60 * 1000) {
         // Less than a minute
+        if (ms % 1000 === 0) {
+            return `${duration.asSeconds().toFixed(0)}s`;
+        }
+
         return `${duration.asSeconds().toFixed(1)}s`;
     }
 

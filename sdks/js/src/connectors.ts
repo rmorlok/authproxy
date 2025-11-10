@@ -11,6 +11,8 @@ export interface ConnectorVersion {
   description: string;
   highlight?: string;
   logo: string;
+  created_at: string;
+  updated_at: string;
 }
 
 export interface Connector extends ConnectorVersion {
