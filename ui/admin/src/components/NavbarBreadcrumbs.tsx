@@ -17,31 +17,47 @@ const StyledBreadcrumbs = styled(Breadcrumbs)(({theme}) => ({
     },
 }));
 
-export default function NavbarBreadcrumbs() {
-    const matches = useMatches() as UIMatch<unknown, { title?: string }>[];
-    const crumbs = matches
-        .filter((match) => match.handle && match.handle.title)
-        .map((match) => ({
-            title: match.handle.title,
-            path: match.pathname,
-            params: (match as any).params as Record<string, string | undefined>,
-        }));
+interface RouteHandle {
+    title?: string
+    attr?: string
+}
 
-    // If the last match has an id param, append it as a third-level breadcrumb
-    let finalCrumbs = crumbs as Array<{ title: string; path: string; params?: Record<string, string | undefined> }>;
-    const last = finalCrumbs[finalCrumbs.length - 1];
-    const idParam = last?.params?.id;
-    if (idParam) {
-        finalCrumbs = [...finalCrumbs, { title: idParam, path: `${last.path}` }];
-    }
+export default function NavbarBreadcrumbs() {
+    const matches = useMatches() as UIMatch<unknown, RouteHandle | RouteHandle[]>[];
+    const crumbs = matches
+        .flatMap((match) => {
+            const handles = !match?.handle ? [] : (Array.isArray(match?.handle) ? match.handle : [match.handle]);
+            return handles
+                .filter((match) => match?.title || match?.attr)
+                .map((handle) => {
+                if (handle?.title) {
+                    return {
+                        title: handle?.title,
+                        path: match.pathname,
+                    };
+                }
+
+                if (handle?.attr) {
+                    return {
+                        title: match.params[handle?.attr] || `<UNKNOWN PARAM ${handle?.attr}>`,
+                        path: match.pathname,
+                    }
+                }
+
+                return {
+                    title: '<UNKNOWN>',
+                    path: match.pathname,
+                }
+            });
+        })
 
     return (
         <StyledBreadcrumbs
             aria-label="breadcrumb"
             separator={<NavigateNextRoundedIcon fontSize="small"/>}
         >
-            {finalCrumbs.map((crumb, index) => {
-                if (index === finalCrumbs.length - 1) {
+            {crumbs.map((crumb, index) => {
+                if (index === crumbs.length - 1) {
                     return (
                         <Typography key={index} variant="body1" sx={{color: 'text.primary', fontWeight: 600}}>
                             {crumb.title}
@@ -50,7 +66,8 @@ export default function NavbarBreadcrumbs() {
                 }
 
                 return (
-                    <Typography key={index} variant="body1" component={Link} to={crumb.path} sx={{color: 'text.primary', textDecoration: 'none'}}>
+                    <Typography key={index} variant="body1" component={Link} to={crumb.path}
+                                sx={{color: 'text.primary', textDecoration: 'none'}}>
                         {crumb.title}
                     </Typography>
                 );
