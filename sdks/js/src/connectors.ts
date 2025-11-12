@@ -34,6 +34,13 @@ export interface ListConnectorsParams {
   order_by?: string;
 }
 
+export interface ListConnectorVersionsParams {
+  state?: ConnectorVersionState;
+  cursor?: string;
+  limit?: number;
+  order_by?: string;
+}
+
 /**
  * Get a list of all available connectors
  */
@@ -48,7 +55,21 @@ export const getConnector = (id: string) => {
   return client.get<Connector>(`/api/v1/connectors/${id}`);
 };
 
+/**
+ * Get versions for a specific connector by ID
+ */
+export const listConnectorVersions = (
+  id: string,
+  params: ListConnectorVersionsParams
+) => {
+  return client.get<ListResponse<ConnectorVersion>>(
+    `/api/v1/connectors/${id}/versions`,
+    { params }
+  );
+};
+
 export const connectors = {
   list: listConnectors,
   get: getConnector,
+  listVersions: listConnectorVersions,
 };
