@@ -476,6 +476,7 @@ type ListConnectorVersionsBuilder interface {
 	Limit(int32) ListConnectorVersionsBuilder
 	ForType(string) ListConnectorVersionsBuilder
 	ForId(uuid.UUID) ListConnectorVersionsBuilder
+	ForVersion(version uint64) ListConnectorVersionsBuilder
 	ForConnectorVersionState(ConnectorVersionState) ListConnectorVersionsBuilder
 	OrderBy(ConnectorVersionOrderByField, pagination.OrderBy) ListConnectorVersionsBuilder
 	IncludeDeleted() ListConnectorVersionsBuilder
@@ -488,6 +489,7 @@ type listConnectorVersionsFilters struct {
 	StatesVal         []ConnectorVersionState       `json:"states,omitempty"`
 	TypeVal           []string                      `json:"types,omitempty"`
 	IdsVal            []uuid.UUID                   `json:"ids,omitempty"`
+	VersionsVal       []uint64                      `json:"versions,omitempty"`
 	OrderByFieldVal   *ConnectorVersionOrderByField `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy           `json:"order_by"`
 	IncludeDeletedVal bool                          `json:"include_deleted,omitempty"`
@@ -510,6 +512,11 @@ func (l *listConnectorVersionsFilters) ForType(t string) ListConnectorVersionsBu
 
 func (l *listConnectorVersionsFilters) ForId(id uuid.UUID) ListConnectorVersionsBuilder {
 	l.IdsVal = []uuid.UUID{id}
+	return l
+}
+
+func (l *listConnectorVersionsFilters) ForVersion(version uint64) ListConnectorVersionsBuilder {
+	l.VersionsVal = []uint64{version}
 	return l
 }
 
@@ -562,6 +569,10 @@ cv.deleted_at as deleted_at`).
 
 	if len(l.IdsVal) > 0 {
 		query = query.Where("cv.id IN ?", l.IdsVal)
+	}
+
+	if len(l.VersionsVal) > 0 {
+		query = query.Where("cv.version IN ?", l.VersionsVal)
 	}
 
 	if len(l.StatesVal) > 0 {

@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -257,6 +258,91 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 	})
 }
 
+func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+
+	connectorIdStr := gctx.Param("id")
+
+	if connectorIdStr == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	connectorId, err := uuid.Parse(connectorIdStr)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if connectorId == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+	}
+
+	b := r.connectors.
+		ListConnectorVersionsBuilder().
+		ForId(connectorId).
+		Limit(1)
+
+	versionStr := gctx.Param("version")
+
+	if versionStr == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("version is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	version, err := strconv.ParseUint(versionStr, 10, 64)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("failed to parse version as an integer").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	b = b.ForVersion(version)
+
+	// TODO: support lookup by certain states
+
+	result := b.FetchPage(ctx)
+	if result.Error != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(result.Error).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if len(result.Results) == 0 {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsgf("connector version '%s:%d' not found", connectorId, version).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	cv := result.Results[0]
+	gctx.PureJSON(http.StatusOK, ConnectorVersionToJson(cv))
+}
+
 func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 	var err error
 	var ex connIface.ListConnectorVersionsExecutor
@@ -368,6 +454,7 @@ func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 	g.GET("/connectors", r.authService.Required(), r.list)
 	g.GET("/connectors/:id", r.authService.Required(), r.get)
 	g.GET("/connectors/:id/versions", r.authService.Required(), r.listVersions)
+	g.GET("/connectors/:id/versions/:version", r.authService.Required(), r.getVersion)
 }
 
 func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *ConnectorsRoutes {

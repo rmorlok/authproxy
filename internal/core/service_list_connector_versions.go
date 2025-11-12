@@ -72,6 +72,13 @@ func (l *listConnectorVersionWrapper) ForId(id uuid.UUID) iface.ListConnectorVer
 	}
 }
 
+func (l *listConnectorVersionWrapper) ForVersion(version uint64) iface.ListConnectorVersionsBuilder {
+	return &listConnectorVersionWrapper{
+		l: l.l.ForVersion(version),
+		s: l.s,
+	}
+}
+
 func (l *listConnectorVersionWrapper) ForConnectorVersionState(s database.ConnectorVersionState) iface.ListConnectorVersionsBuilder {
 	return &listConnectorVersionWrapper{
 		l: l.l.ForConnectorVersionState(s),
