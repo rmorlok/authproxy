@@ -16,6 +16,24 @@ import { yaml as yamlMode } from "@codemirror/lang-yaml";
 import { json as jsonMode } from "@codemirror/lang-json";
 import { oneDark } from "@codemirror/theme-one-dark";
 
+function getLogoUrlFromDefinition(cv: ConnectorVersion): string {
+    if (!cv || !cv.definition || !cv.definition.logo) return "";
+
+    if (cv.definition.logo.public_url) {
+        return cv.definition.logo.public_url;
+    }
+
+    if (cv.definition.logo.base64) {
+        if (cv.definition.logo.mime_type === "image/svg+xml") {
+            return `data:${cv.definition.logo.mime_type};base64,${cv.definition.logo.base64}`;
+        } else {
+            return `data:image/png;base64,${cv.definition.logo.base64}`;
+        }
+    }
+
+    return "";
+}
+
 export default function ConnectorVersionDetail(
     { connectorId, version, connectorVersion}: ({ connectorId?: string, version?: number, connectorVersion?: ConnectorVersion})
 ) {
@@ -121,7 +139,7 @@ export default function ConnectorVersionDetail(
         <Stack spacing={2} sx={{p: 2}}>
             <Stack direction="row" spacing={2} alignItems="center">
                 {cv.definition.logo &&
-                    <Avatar alt={cv.definition.display_name} src={cv.definition.logo} sx={{width: 40, height: 40}}/>}
+                    <Avatar alt={cv.definition.display_name} src={getLogoUrlFromDefinition(cv)} sx={{width: 40, height: 40}}/>}
                 <Typography variant="h5">{cv.definition.display_name || cv.type}</Typography>
                 <StateChip state={cv.state}/>
             </Stack>

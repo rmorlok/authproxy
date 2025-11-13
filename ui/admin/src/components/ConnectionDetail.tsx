@@ -212,7 +212,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
           <Box>
             <Typography variant="subtitle2" color="text.secondary">ID</Typography>
               <Typography variant="body1" sx={{wordBreak: 'break-all'}}>
-                  <Link to={`/connectors/${conn.connector.id}`} style={{color: 'inherit', textDecoration: 'none'}}>
+                  <Link to={`/connectors/${conn.connector.id}/versions/${conn.connector.version}`} style={{color: 'inherit', textDecoration: 'none'}}>
                       {conn.connector.id}
               </Link>
             </Typography>
@@ -223,7 +223,11 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">Version</Typography>
-            <Typography variant="body1">{conn.connector.version}</Typography>
+            <Typography variant="body1">
+                <Link to={`/connectors/${conn.connector.id}/versions/${conn.connector.version}`} style={{color: 'inherit', textDecoration: 'none'}}>
+                    {conn.connector.version}
+                </Link>
+            </Typography>
           </Box>
         </Stack>
       </Box>
