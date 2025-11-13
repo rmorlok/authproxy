@@ -8,10 +8,12 @@ import RequestsPage from "./pages/Requests";
 import RequestDetail from "./pages/RequestDetail";
 import ConnectorDetail from "./pages/ConnectorDetail";
 import ConnectionDetail from "./pages/ConnectionDetail";
+import ConnectorVersionDetail from "./pages/ConnectorVersionDetail";
 import ActorsPage from "./pages/Actors";
 import TasksPage from "./pages/Tasks";
 import AboutPage from "./pages/About";
 import * as React from "react";
+
 
 export const router = createBrowserRouter([
     {
@@ -32,16 +34,24 @@ export const router = createBrowserRouter([
                 path: 'connectors',
                 element: (<ListParent><ConnectorsPage /></ListParent>),
                 handle: { title: 'Connectors' },
-                children: [
-                    {
-                        path: ':id',
-                        element: <ConnectorDetail />,
-                    }
-                ]
             },
             {
                 path: 'connectors/:id',
                 element: <ConnectorDetail />,
+                handle: [
+                    { title: 'Connectors' },
+                    { attr: 'id' },
+                ],
+            },
+            {
+                path: 'connectors/:id/versions/:version',
+                element: <ConnectorVersionDetail />,
+                handle: [
+                    { title: 'Connectors' },
+                    { attr: 'id' },
+                    { title: 'Versions' },
+                    { attr: 'version' }
+                ],
             },
             {
                 path: 'connections',

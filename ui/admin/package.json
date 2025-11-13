@@ -38,7 +38,8 @@
     "react-router-dom": "^6.22.3",
     "redux": "^5.0.1",
     "remark-gfm": "^4.0.1",
-    "rxjs": "^7.8.1"
+    "rxjs": "^7.8.1",
+    "yaml": "^2.5.1"
   },
   "devDependencies": {
     "@babel/traverse": "^7.28.0",

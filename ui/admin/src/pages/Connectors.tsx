@@ -11,7 +11,7 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import {
-    listConnectors, ConnectorVersionState, ConnectorVersion, ListResponse, ListConnectorsParams
+    listConnectors, ConnectorVersionState, Connector, ListResponse, ListConnectorsParams
 } from '@authproxy/api';
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
@@ -28,7 +28,7 @@ function renderState(state: ConnectorVersionState) {
     return <Chip label={state} color={colors[state]} size="small" />;
 }
 
-export const columns: GridColDef<ConnectorVersion>[] = [
+export const columns: GridColDef<Connector>[] = [
     {
         field: 'id',
         headerName: 'ID',
@@ -127,7 +127,7 @@ export default function Connectors() {
     const navigate = useNavigate();
     const stateVals = useMemo(() => stateOptions.map(opt => opt.value), [stateOptions]);
 
-    const [rows, setRows] = useState<ConnectorVersion[]>([]);
+    const [rows, setRows] = useState<Connector[]>([]);
     const [rowCount, setRowCount] = useState<number>(-1);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
@@ -140,7 +140,7 @@ export default function Connectors() {
     const [hasNextPage, setHasNextPage] = useState<boolean>(false);
 
     // Simple cache to allow going back without re-fetching
-    const responsesCacheRef = useRef<ListResponse<ConnectorVersion>[]>([]);
+    const responsesCacheRef = useRef<ListResponse<Connector>[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
     // Handle row click with meta/ctrl key checking
