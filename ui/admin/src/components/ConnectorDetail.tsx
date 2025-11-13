@@ -7,13 +7,8 @@ import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import Drawer from '@mui/material/Drawer';
-import IconButton from '@mui/material/IconButton';
-import ToggleButton from '@mui/material/ToggleButton';
-import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import CloseIcon from '@mui/icons-material/Close';
 import dayjs from 'dayjs';
-import {Connector, ConnectorVersionState, connectors, ListResponse, ConnectorVersion} from '@authproxy/api';
-import YAML from 'yaml';
+import {Connector, connectors, ConnectorVersion} from '@authproxy/api';
 import {Link, useNavigate} from 'react-router-dom';
 import {StateChip} from "./StateChip";
 import ConnectorVersionDetail from "./ConnectorVersionDetail";
@@ -28,7 +23,6 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
   const [versionsError, setVersionsError] = useState<string | null>(null);
   const [drawerOpen, setDrawerOpen] = useState<boolean>(false);
   const [selectedVersion, setSelectedVersion] = useState<number | undefined>(initialVersion);
-  const [viewMode, setViewMode] = useState<'json' | 'yaml'>('json');
   const navigate = useNavigate();
 
   useEffect(() => {

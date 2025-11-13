@@ -10,7 +10,6 @@ import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import {connectors, ConnectorVersion} from '@authproxy/api';
 import YAML from 'yaml';
-import {useNavigate} from 'react-router-dom';
 import {StateChip} from "./StateChip";
 import CodeMirror from "@uiw/react-codemirror";
 import { yaml as yamlMode } from "@codemirror/lang-yaml";
@@ -27,7 +26,6 @@ export default function ConnectorVersionDetail(
 
     // versions state
     const [viewMode, setViewMode] = useState<'json' | 'yaml' | 'visual'>('yaml');
-    const navigate = useNavigate();
     const [definitionFormatted, setDefinitionFormatted] = React.useState("");
     const [langMode, setLangMode] = React.useState(yamlMode);
 
