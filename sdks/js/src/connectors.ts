@@ -7,7 +7,7 @@ export interface ConnectorVersion {
     version: number;
     state: ConnectorVersionState;
     type: string;
-    definition: Record<string, any>;
+    definition: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
     created_at: string;
     updated_at: string;
 }
