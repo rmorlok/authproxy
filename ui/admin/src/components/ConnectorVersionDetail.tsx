@@ -1,5 +1,6 @@
 import React, {useEffect, useState} from 'react';
 import Box from '@mui/material/Box';
+import { useTheme } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
@@ -11,10 +12,15 @@ import {connectors, ConnectorVersion} from '@authproxy/api';
 import YAML from 'yaml';
 import {useNavigate} from 'react-router-dom';
 import {StateChip} from "./StateChip";
+import CodeMirror from "@uiw/react-codemirror";
+import { yaml as yamlMode } from "@codemirror/lang-yaml";
+import { json as jsonMode } from "@codemirror/lang-json";
+import { oneDark } from "@codemirror/theme-one-dark";
 
 export default function ConnectorVersionDetail(
     { connectorId, version, connectorVersion}: ({ connectorId?: string, version?: number, connectorVersion?: ConnectorVersion})
 ) {
+    const theme = useTheme();
     const [loading, setLoading] = useState(!connectorVersion);
     const [error, setError] = useState<string | null>(null);
     const [cv, setCv] = useState<ConnectorVersion | null>(connectorVersion || null);
@@ -22,6 +28,21 @@ export default function ConnectorVersionDetail(
     // versions state
     const [viewMode, setViewMode] = useState<'json' | 'yaml' | 'visual'>('yaml');
     const navigate = useNavigate();
+    const [definitionFormatted, setDefinitionFormatted] = React.useState("");
+    const [langMode, setLangMode] = React.useState(yamlMode);
+
+    useEffect(() => {
+        if (!cv?.definition) {
+            setDefinitionFormatted("")
+            setLangMode(yamlMode);
+        } else if (viewMode === 'json') {
+            setDefinitionFormatted(JSON.stringify(cv?.definition, null, 2));
+            setLangMode(jsonMode);
+        } else {
+            setDefinitionFormatted(YAML.stringify(cv.definition as any));
+            setLangMode(yamlMode);
+        }
+    }, [viewMode, cv?.definition]);
 
     useEffect(() => {
         if (cv || !connectorId || !version) return;
@@ -64,11 +85,12 @@ export default function ConnectorVersionDetail(
                 borderRadius: 1,
                 p: 1
             }}>
-            <pre style={{margin: 0, whiteSpace: 'pre-wrap', wordBreak: 'break-word'}}>
-{`
-${viewMode === 'json' ? JSON.stringify(cv.definition, null, 2) : YAML.stringify(cv.definition as any)}
-`}
-            </pre>
+                <CodeMirror
+                    value={definitionFormatted}
+                    theme={theme.palette.mode === 'dark' ? oneDark : undefined}
+                    extensions={[langMode]}
+                    editable={false}
+                />
             </Box>
         );
     }
@@ -121,23 +143,21 @@ ${viewMode === 'json' ? JSON.stringify(cv.definition, null, 2) : YAML.stringify(
                 </Box>
             </Stack>
 
-            <Box sx={{p: 2, height: '100%', display: 'flex', flexDirection: 'column'}}>
-                <Box sx={{mt: 1, mb: 1}}>
-                    <ToggleButtonGroup
-                        size="small"
-                        value={viewMode}
-                        exclusive
-                        onChange={(_, val) => {
-                            if (val) setViewMode(val);
-                        }}
-                    >
-                        <ToggleButton value="yaml">YAML</ToggleButton>
-                        <ToggleButton value="json">JSON</ToggleButton>
-                        <ToggleButton value="visual">Visual</ToggleButton>
-                    </ToggleButtonGroup>
-                </Box>
-                {viewMode === 'visual' ? visualRendering() : preformattedRendering()}
+            <Box sx={{mt: 1, mb: 1}}>
+                <ToggleButtonGroup
+                    size="small"
+                    value={viewMode}
+                    exclusive
+                    onChange={(_, val) => {
+                        if (val) setViewMode(val);
+                    }}
+                >
+                    <ToggleButton value="yaml">YAML</ToggleButton>
+                    <ToggleButton value="json">JSON</ToggleButton>
+                    <ToggleButton value="visual">Visual</ToggleButton>
+                </ToggleButtonGroup>
             </Box>
+            {viewMode === 'visual' ? visualRendering() : preformattedRendering()}
         </Stack>
     );
 }
