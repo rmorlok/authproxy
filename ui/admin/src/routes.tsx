@@ -1,4 +1,4 @@
-import {createBrowserRouter, Navigate} from 'react-router-dom';
+import {createBrowserRouter, Navigate, Params} from 'react-router-dom';
 import Layout from "./Layout";
 import ListParent from "./ListParent";
 import HomePage from "./pages/Home";
@@ -39,18 +39,36 @@ export const router = createBrowserRouter([
                 path: 'connectors/:id',
                 element: <ConnectorDetail />,
                 handle: [
-                    { title: 'Connectors' },
-                    { attr: 'id' },
+                    {
+                        title: 'Connectors',
+                        path: (_params: Params<string>) => `/connectors`,
+                    },
+                    {
+                        attr: 'id',
+                        path: (params: Params<string>) => `/connectors/${params.id}`
+                    },
                 ],
             },
             {
                 path: 'connectors/:id/versions/:version',
                 element: <ConnectorVersionDetail />,
                 handle: [
-                    { title: 'Connectors' },
-                    { attr: 'id' },
-                    { title: 'Versions' },
-                    { attr: 'version' }
+                    {
+                        title: 'Connectors',
+                        path: (_params: Params<string>) => `/connectors`,
+                    },
+                    {
+                        attr: 'id',
+                        path: (params: Params<string>) => `/connectors/${params.id}`,
+                    },
+                    {
+                        title: 'Versions',
+                        path: (params: Params<string>) => `/connectors/${params.id}`,
+                    },
+                    {
+                        attr: 'version',
+                        path: (params: Params<string>) => `/connectors/${params.id}/versions/${params.version}`,
+                    }
                 ],
             },
             {

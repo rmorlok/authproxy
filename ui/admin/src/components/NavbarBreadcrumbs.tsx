@@ -3,7 +3,7 @@ import {styled} from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
 import Breadcrumbs, {breadcrumbsClasses} from '@mui/material/Breadcrumbs';
 import NavigateNextRoundedIcon from '@mui/icons-material/NavigateNextRounded';
-import {Link, UIMatch, useMatches} from 'react-router-dom';
+import {Link, Params, UIMatch, useMatches} from 'react-router-dom';
 
 
 const StyledBreadcrumbs = styled(Breadcrumbs)(({theme}) => ({
@@ -20,6 +20,7 @@ const StyledBreadcrumbs = styled(Breadcrumbs)(({theme}) => ({
 interface RouteHandle {
     title?: string
     attr?: string
+    path?: (params: Params<string>) => string
 }
 
 export default function NavbarBreadcrumbs() {
@@ -30,25 +31,26 @@ export default function NavbarBreadcrumbs() {
             return handles
                 .filter((match) => match?.title || match?.attr)
                 .map((handle) => {
-                if (handle?.title) {
-                    return {
-                        title: handle?.title,
-                        path: match.pathname,
-                    };
-                }
-
-                if (handle?.attr) {
-                    return {
-                        title: match.params[handle?.attr] || `<UNKNOWN PARAM ${handle?.attr}>`,
-                        path: match.pathname,
+                    const path = handle?.path ? handle.path(match.params) : match.pathname;
+                    if (handle?.title) {
+                        return {
+                            title: handle?.title,
+                            path,
+                        };
                     }
-                }
 
-                return {
-                    title: '<UNKNOWN>',
-                    path: match.pathname,
-                }
-            });
+                    if (handle?.attr) {
+                        return {
+                            title: match.params[handle?.attr] || `<UNKNOWN PARAM ${handle?.attr}>`,
+                            path,
+                        }
+                    }
+
+                    return {
+                        title: '<UNKNOWN>',
+                        path,
+                    }
+                });
         })
 
     return (
