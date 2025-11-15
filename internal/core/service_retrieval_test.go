@@ -2,12 +2,13 @@ package core
 
 import (
 	"context"
+	"testing"
+
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	cfg "github.com/rmorlok/authproxy/internal/config/connectors"
 	"github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestGetConnectorVersion(t *testing.T) {
@@ -22,7 +23,7 @@ func TestGetConnectorVersion(t *testing.T) {
 		Version:     version,
 		DisplayName: "Test Connector",
 		Type:        "test",
-		Auth:        &cfg.AuthApiKey{},
+		Auth:        cfg.NewNoAuth(),
 	})
 
 	c, err := s.GetConnectorVersion(context.Background(), id, version)

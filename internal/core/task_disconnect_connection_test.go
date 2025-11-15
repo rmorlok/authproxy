@@ -3,6 +3,8 @@ package core
 import (
 	"context"
 	"errors"
+	"testing"
+
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/apasynq"
@@ -15,7 +17,6 @@ import (
 	mockEncrypt "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestTaskDisconnectConnection(t *testing.T) {
@@ -27,7 +28,7 @@ func TestTaskDisconnectConnection(t *testing.T) {
 		Id:          connectorId,
 		Version:     1,
 		DisplayName: "Test Connector",
-		Auth:        &cfg.AuthApiKey{},
+		Auth:        &cfg.Auth{InnerVal: &cfg.AuthApiKey{Type: cfg.AuthTypeAPIKey}},
 	}
 
 	setupWithMocks := func(t *testing.T) (*service, *mockDb.MockDB, *mockAsynq.MockClient, *mockEncrypt.MockE, *gomock.Controller) {

@@ -40,7 +40,7 @@ func (sv *StringValue) UnmarshalYAML(value *yaml.Node) error {
 		sv.InnerVal = &StringValueDirect{
 			Value:       value.Value,
 			IsDirect:    true,
-			IsNonString: stringValeIsNonString(value.Value),
+			IsNonString: stringValueIsNonString(value.Value),
 		}
 		return nil
 	}

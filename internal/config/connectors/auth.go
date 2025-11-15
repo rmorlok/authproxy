@@ -1,6 +1,7 @@
 package connectors
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"gopkg.in/yaml.v3"
@@ -16,34 +17,53 @@ const (
 	AuthTypeNoAuth = AuthType("no-auth")
 )
 
-type Auth interface {
-	Clone() Auth
+type AuthImpl interface {
+	Clone() AuthImpl
 	GetType() AuthType
 }
 
-func UnmarshallYamlAuthString(data string) (Auth, error) {
-	return UnmarshallYamlAuth([]byte(data))
+type Auth struct {
+	InnerVal AuthImpl `json:"-" yaml:"-"`
 }
 
-func UnmarshallYamlAuth(data []byte) (Auth, error) {
-	var rootNode yaml.Node
+func (a *Auth) Inner() AuthImpl {
+	return a.InnerVal
+}
 
-	if err := yaml.Unmarshal(data, &rootNode); err != nil {
-		return nil, err
+func (a *Auth) CloneValue() *Auth {
+	if a.InnerVal == nil {
+		return nil
 	}
 
-	return authUnmarshalYAML(rootNode.Content[0])
+	return &Auth{InnerVal: a.InnerVal.Clone()}
 }
 
-// authUnmarshalYAML handles unmarshalling from YAML while allowing us to make decisions
+func (a *Auth) Clone() AuthImpl {
+	return a.CloneValue()
+}
+
+func (a *Auth) GetType() AuthType {
+	return a.InnerVal.GetType()
+}
+
+func (a *Auth) MarshalYAML() (interface{}, error) {
+	if a.InnerVal == nil {
+		return nil, nil
+	}
+
+	// Delegate to the concrete type
+	return a.InnerVal, nil
+}
+
+// UnmarshalYAML handles unmarshalling from YAML while allowing us to make decisions
 // about how the data is unmarshalled based on the concrete type being represented
-func authUnmarshalYAML(value *yaml.Node) (Auth, error) {
+func (a *Auth) UnmarshalYAML(value *yaml.Node) error {
 	// Ensure the node is a mapping node
 	if value.Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("auth expected a mapping node, got %s", common.KindToString(value.Kind))
+		return fmt.Errorf("auth expected a mapping node, got %s", common.KindToString(value.Kind))
 	}
 
-	var auth Auth
+	var auth AuthImpl
 
 fieldLoop:
 	for i := 0; i < len(value.Content); i += 2 {
@@ -67,12 +87,67 @@ fieldLoop:
 	}
 
 	if auth == nil {
-		return nil, fmt.Errorf("invalid auth type must be: %s, %s", AuthTypeAPIKey, AuthTypeOAuth2)
+		return fmt.Errorf("invalid auth type must be: %s, %s, %s", AuthTypeAPIKey, AuthTypeOAuth2, AuthTypeNoAuth)
 	}
 
 	if err := value.Decode(auth); err != nil {
-		return nil, err
+		return err
 	}
 
-	return auth, nil
+	a.InnerVal = auth
+
+	return nil
 }
+
+func (a *Auth) MarshalJSON() ([]byte, error) {
+	if a.InnerVal == nil {
+		return json.Marshal(nil)
+	}
+
+	// Direct value serialization is handled in the concrete type
+
+	return json.Marshal(a.InnerVal)
+}
+
+// UnmarshalJSON handles unmarshalling from JSON while allowing us to make decisions
+// about how the data is unmarshalled based on the concrete type being represented
+func (a *Auth) UnmarshalJSON(data []byte) error {
+	var m map[string]interface{}
+	if err := json.Unmarshal(data, &m); err != nil {
+		return fmt.Errorf("failed to unmarshal string value: %v", err)
+	}
+
+	var ai AuthImpl
+
+	switch AuthType(m["type"].(string)) {
+	case AuthTypeOAuth2:
+		ai = &AuthOAuth2{}
+	case AuthTypeAPIKey:
+		ai = &AuthApiKey{}
+	case AuthTypeNoAuth:
+		ai = &AuthNoAuth{}
+	}
+
+	if ai == nil {
+		return fmt.Errorf("invalid auth type '%s', possible types are: %s, %s, %s", m["type"], AuthTypeAPIKey, AuthTypeOAuth2, AuthTypeNoAuth)
+	}
+
+	if err := json.Unmarshal(data, ai); err != nil {
+		return err
+	}
+
+	a.InnerVal = ai
+
+	return nil
+}
+
+// NewNoAuth creates a new no-auth authenticator. Used to simplify testing.
+func NewNoAuth() *Auth {
+	return &Auth{
+		InnerVal: &AuthNoAuth{
+			Type: AuthTypeNoAuth,
+		},
+	}
+}
+
+var _ AuthImpl = (*Auth)(nil)

@@ -37,8 +37,10 @@ func TestConnectorRoundtrip(t *testing.T) {
 					PublicUrl: "https://example.com/logo.png",
 				}),
 				Description: "Test description",
-				Auth: &AuthApiKey{
-					Type: AuthTypeAPIKey,
+				Auth: &Auth{
+					InnerVal: &AuthApiKey{
+						Type: AuthTypeAPIKey,
+					},
 				},
 			},
 		},
@@ -55,44 +57,46 @@ func TestConnectorRoundtrip(t *testing.T) {
 					Base64:   "dGVzdCBiYXNlNjQgZGF0YQ==", // "test base64 data"
 				}),
 				Description: "OAuth2 description",
-				Auth: &AuthOAuth2{
-					Type: AuthTypeOAuth2,
-					ClientId: &common.StringValue{InnerVal: &common.StringValueDirect{
-						Value: "client-id-value",
-					}},
-					ClientSecret: &common.StringValue{InnerVal: &common.StringValueDirect{
-						Value: "client-secret-value",
-					}},
-					Scopes: []Scope{
-						{
-							Id:       "scope1",
-							Required: util.ToPtr(true),
-							Reason:   "Required for basic functionality",
+				Auth: &Auth{
+					InnerVal: &AuthOAuth2{
+						Type: AuthTypeOAuth2,
+						ClientId: &common.StringValue{InnerVal: &common.StringValueDirect{
+							Value: "client-id-value",
+						}},
+						ClientSecret: &common.StringValue{InnerVal: &common.StringValueDirect{
+							Value: "client-secret-value",
+						}},
+						Scopes: []Scope{
+							{
+								Id:       "scope1",
+								Required: util.ToPtr(true),
+								Reason:   "Required for basic functionality",
+							},
+							{
+								Id:       "scope2",
+								Required: util.ToPtr(false),
+								Reason:   "Optional for advanced features",
+							},
 						},
-						{
-							Id:       "scope2",
-							Required: util.ToPtr(false),
-							Reason:   "Optional for advanced features",
+						Authorization: AuthOauth2Authorization{
+							Endpoint: "https://example.com/auth",
+							QueryOverrides: map[string]string{
+								"key1": "value1",
+								"key2": "value2",
+							},
 						},
-					},
-					Authorization: AuthOauth2Authorization{
-						Endpoint: "https://example.com/auth",
-						QueryOverrides: map[string]string{
-							"key1": "value1",
-							"key2": "value2",
+						Token: AuthOauth2Token{
+							Endpoint: "https://example.com/token",
+							QueryOverrides: map[string]string{
+								"token_key": "token_value",
+							},
+							FormOverrides: map[string]string{
+								"form_key": "form_value",
+							},
+							RefreshTimeout:          &refreshDuration,
+							RefreshInBackground:     &refreshInBackground,
+							RefreshTimeBeforeExpiry: &refreshDuration,
 						},
-					},
-					Token: AuthOauth2Token{
-						Endpoint: "https://example.com/token",
-						QueryOverrides: map[string]string{
-							"token_key": "token_value",
-						},
-						FormOverrides: map[string]string{
-							"form_key": "form_value",
-						},
-						RefreshTimeout:          &refreshDuration,
-						RefreshInBackground:     &refreshInBackground,
-						RefreshTimeBeforeExpiry: &refreshDuration,
 					},
 				},
 			},

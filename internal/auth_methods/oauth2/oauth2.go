@@ -44,7 +44,7 @@ func newOAuth2(
 	cv connIface.ConnectorVersion,
 ) *oAuth2Connection {
 	connector := cv.GetDefinition()
-	auth, ok := connector.Auth.(*config.AuthOAuth2)
+	auth, ok := connector.Auth.Inner().(*config.AuthOAuth2)
 	if !ok {
 		panic(fmt.Sprintf("connector id %s is not an oauth2 connector", connector.Id))
 	}

@@ -149,7 +149,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	}
 
 	connector := cv.GetDefinition()
-	if _, ok := connector.Auth.(*config.AuthOAuth2); ok {
+	if _, ok := connector.Auth.Inner().(*config.AuthOAuth2); ok {
 		if req.ReturnToUrl == "" {
 			api_common.NewHttpStatusErrorBuilder().
 				WithStatusBadRequest().

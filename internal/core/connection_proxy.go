@@ -24,14 +24,14 @@ func (c *connection) getProxyImpl() (iface.Proxy, error) {
 		}
 
 		auth := def.Auth
-		if _, ok := auth.(*config.AuthOAuth2); ok {
+		if _, ok := auth.Inner().(*config.AuthOAuth2); ok {
 			o2f := c.s.getOAuth2Factory()
 			c.proxyImpl = o2f.NewOAuth2(c.Connection, c.cv)
 			c.proxyImplErr = nil
 			return
 		}
 
-		if auth, ok := auth.(*config.AuthNoAuth); ok {
+		if auth, ok := auth.Inner().(*config.AuthNoAuth); ok {
 			c.proxyImpl = no_auth.NewNoAuth(c.s.logger, c.s.httpf, auth, c.Connection, c.cv)
 			c.proxyImplErr = nil
 			return

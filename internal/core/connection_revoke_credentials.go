@@ -11,7 +11,7 @@ func (c *connection) getRevokeCredentialsOperations() []operation {
 	def := c.cv.GetDefinition()
 	auth := def.Auth
 
-	if _, ok := auth.(*config.AuthOAuth2); ok {
+	if _, ok := auth.Inner().(*config.AuthOAuth2); ok {
 		o2f := c.s.getOAuth2Factory()
 		o2 := o2f.NewOAuth2(c.Connection, c.cv)
 

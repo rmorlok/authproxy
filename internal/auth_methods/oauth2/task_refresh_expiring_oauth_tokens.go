@@ -2,6 +2,7 @@ package oauth2
 
 import (
 	"context"
+
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/aplog"
@@ -35,7 +36,7 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 	for _, connector := range th.cfg.GetRoot().Connectors.GetConnectors() {
 		connectorIdToConnector[connector.Id] = &connector
 
-		if o2, ok := connector.Auth.(*config.AuthOAuth2); ok {
+		if o2, ok := connector.Auth.Inner().(*config.AuthOAuth2); ok {
 			if o2.Token.GetRefreshInBackgroundOrDefault() &&
 				o2.Token.GetRefreshTimeBeforeExpiryOrDefault(refreshWithin) > refreshWithin {
 				refreshWithin = o2.Token.GetRefreshTimeBeforeExpiryOrDefault(refreshWithin)

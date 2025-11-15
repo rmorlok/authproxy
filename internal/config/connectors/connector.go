@@ -4,12 +4,9 @@ import (
 	"crypto/sha1"
 	"encoding/hex"
 	"encoding/json"
-	"fmt"
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
-	"gopkg.in/yaml.v3"
-
 	"github.com/rmorlok/authproxy/internal/config/common"
 )
 
@@ -50,123 +47,10 @@ type Connector struct {
 
 	// Auth is how this connector authenticates. Possible values are of type OAuth2 or APIKey. See individual
 	// documentation for each struct for more details.
-	Auth Auth `json:"auth" yaml:"auth"`
+	Auth *Auth `json:"auth" yaml:"auth"`
 
 	// Probes are a list of probes to run against connections of this connector type to validation the connection.
 	Probes []Probe `json:"probes,omitempty" yaml:"probes,omitempty"`
-}
-
-func (c *Connector) UnmarshalYAML(value *yaml.Node) error {
-	// Ensure the node is a mapping node
-	if value.Kind != yaml.MappingNode {
-		return fmt.Errorf("connector expected a mapping node, got %s", common.KindToString(value.Kind))
-	}
-
-	var auth Auth
-
-	// Handle custom unmarshalling for some attributes. Iterate through the mapping node's content,
-	// which will be sequences of keys, then values.
-	for i := 0; i < len(value.Content); i += 2 {
-		keyNode := value.Content[i]
-		valueNode := value.Content[i+1]
-
-		var err error
-		matched := false
-
-		switch keyNode.Value {
-		case "auth":
-			if auth, err = authUnmarshalYAML(valueNode); err != nil {
-				return err
-			}
-			matched = true
-		}
-
-		if matched {
-			// Remove the key/value from the raw unmarshalling, and pull back our index
-			// because of the changing slice size to the left of what we are indexing
-			value.Content = append(value.Content[:i], value.Content[i+2:]...)
-			i -= 2
-		}
-	}
-
-	// Let the rest unmarshall normally
-	type RawType Connector
-	raw := (*RawType)(c)
-	if err := value.Decode(raw); err != nil {
-		return err
-	}
-
-	// Set the custom unmarshalled types
-	raw.Auth = auth
-
-	return nil
-}
-
-// UnmarshalJSON implements custom JSON unmarshalling for the Connector struct
-func (c *Connector) UnmarshalJSON(data []byte) error {
-	// Define a temporary struct with the same fields as Connector
-	// but with Logo and Auth as json.RawMessage to capture their raw JSON
-	type TempConnector struct {
-		Id          uuid.UUID       `json:"id"`
-		Type        string          `json:"type"`
-		Version     uint64          `json:"version,omitempty"`
-		State       string          `json:"state,omitempty"`
-		DisplayName string          `json:"display_name"`
-		Logo        *common.Image   `json:"logo"`
-		Highlight   string          `json:"highlight"`
-		Description string          `json:"description"`
-		Auth        json.RawMessage `json:"auth"`
-	}
-
-	var temp TempConnector
-
-	// Unmarshal into the temporary struct
-	if err := json.Unmarshal(data, &temp); err != nil {
-		return err
-	}
-
-	// Copy the simple fields
-	c.Id = temp.Id
-	c.Type = temp.Type
-	c.Version = temp.Version
-	c.State = temp.State
-	c.Highlight = temp.Highlight
-	c.DisplayName = temp.DisplayName
-	c.Logo = temp.Logo
-	c.Description = temp.Description
-
-	// Handle Auth if it's not null
-	if len(temp.Auth) > 0 && string(temp.Auth) != "null" {
-		// Try to determine the type of auth from the JSON
-		var authMap map[string]interface{}
-		if err := json.Unmarshal(temp.Auth, &authMap); err != nil {
-			return err
-		}
-
-		var auth Auth
-		if typeVal, ok := authMap["type"]; ok {
-			switch AuthType(typeVal.(string)) {
-			case AuthTypeOAuth2:
-				// It's an AuthOAuth2
-				var authOAuth2 AuthOAuth2
-				if err := json.Unmarshal(temp.Auth, &authOAuth2); err != nil {
-					return err
-				}
-				auth = &authOAuth2
-			case AuthTypeAPIKey:
-				// It's an AuthApiKey
-				var authApiKey AuthApiKey
-				if err := json.Unmarshal(temp.Auth, &authApiKey); err != nil {
-					return err
-				}
-				auth = &authApiKey
-			}
-		}
-
-		c.Auth = auth
-	}
-
-	return nil
 }
 
 func (c *Connector) Clone() *Connector {
@@ -181,7 +65,7 @@ func (c *Connector) Clone() *Connector {
 	}
 
 	if c.Auth != nil {
-		clone.Auth = c.Auth.Clone()
+		clone.Auth = c.Auth.CloneValue()
 	}
 
 	return &clone

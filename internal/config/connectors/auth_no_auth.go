@@ -8,7 +8,7 @@ func (a *AuthNoAuth) GetType() AuthType {
 	return AuthTypeNoAuth
 }
 
-func (a *AuthNoAuth) Clone() Auth {
+func (a *AuthNoAuth) Clone() AuthImpl {
 	if a == nil {
 		return nil
 	}
@@ -17,4 +17,4 @@ func (a *AuthNoAuth) Clone() Auth {
 	return &clone
 }
 
-var _ Auth = (*AuthNoAuth)(nil)
+var _ AuthImpl = (*AuthNoAuth)(nil)

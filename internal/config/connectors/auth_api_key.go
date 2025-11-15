@@ -8,7 +8,7 @@ func (a *AuthApiKey) GetType() AuthType {
 	return AuthTypeAPIKey
 }
 
-func (a *AuthApiKey) Clone() Auth {
+func (a *AuthApiKey) Clone() AuthImpl {
 	if a == nil {
 		return nil
 	}
@@ -17,4 +17,4 @@ func (a *AuthApiKey) Clone() Auth {
 	return &clone
 }
 
-var _ Auth = (*AuthApiKey)(nil)
+var _ AuthImpl = (*AuthApiKey)(nil)
