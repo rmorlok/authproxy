@@ -1,6 +1,7 @@
 package common
 
 import (
+	"encoding/json"
 	"fmt"
 	"time"
 
@@ -53,4 +54,14 @@ func (d *HumanDuration) UnmarshalYAML(unmarshal func(interface{}) error) error {
 	}
 	d.Duration = parsedDuration
 	return nil
+}
+
+// HumanDurationFor returns a HumanDuration for the given string. Used for testing. Will panic if the string is invalid.
+func HumanDurationFor(h string) *HumanDuration {
+	var d HumanDuration
+	err := json.Unmarshal([]byte(fmt.Sprintf("\"%s\"", h)), &d)
+	if err != nil {
+		panic(err)
+	}
+	return &d
 }

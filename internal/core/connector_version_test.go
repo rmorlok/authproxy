@@ -2,13 +2,15 @@ package core
 
 import (
 	"encoding/json"
+	"testing"
+
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	"github.com/rmorlok/authproxy/internal/config/connectors"
+	cfg "github.com/rmorlok/authproxy/internal/config/connectors"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/encrypt"
 	encryptmock "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestWrapConnectorVersion(t *testing.T) {
@@ -63,7 +65,7 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 	cv := wrapConnectorVersion(dbConnectorVersion, s)
 
 	// Create a connector definition
-	def := &connectors.Connector{
+	def := &cfg.Connector{
 		Type:        "test-connector",
 		DisplayName: "Test Connector",
 		Description: "A test connector",
@@ -111,7 +113,7 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 	cv := wrapConnectorVersion(dbConnectorVersion, s)
 
 	// Create a connector definition
-	def := &connectors.Connector{
+	def := &cfg.Connector{
 		Type:        "test-connector",
 		DisplayName: "Test Connector",
 		Description: "A test connector",
@@ -133,4 +135,40 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 	assert.Equal(t, expectedHash, cv.Hash)
 	assert.Equal(t, "new-encrypted-data", cv.EncryptedDefinition)
 	assert.Equal(t, def, cv.def)
+}
+
+// NewTestConnectorVersion creates a new test connector version using provided connector configuration data.
+func NewTestConnectorVersion(c cfg.Connector) *ConnectorVersion {
+	e := encrypt.NewFakeEncryptService(false)
+	connectorID := uuid.New()
+	if c.Id != uuid.Nil {
+		connectorID = c.Id
+	}
+	version := uint64(1)
+	if c.Version != 0 {
+		version = c.Version
+	}
+	t := "test-connector"
+	if c.Type != "" {
+		t = c.Type
+	}
+	state := database.ConnectorVersionStatePrimary
+	if c.State != "" {
+		state = database.ConnectorVersionState(c.State)
+	}
+	encryptedDefinition, err := json.Marshal(c)
+	if err != nil {
+		panic(err)
+	}
+
+	dbConnectorVersion := database.ConnectorVersion{
+		ID:                  connectorID,
+		Version:             version,
+		Type:                t,
+		State:               state,
+		Hash:                "some-hash",
+		EncryptedDefinition: string(encryptedDefinition),
+	}
+
+	return wrapConnectorVersion(dbConnectorVersion, &service{encrypt: e})
 }

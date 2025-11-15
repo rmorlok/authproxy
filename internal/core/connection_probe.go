@@ -22,7 +22,7 @@ func (c *connection) GetProbe(probeId string) (iface.Probe, error) {
 
 func (c *connection) GetProbes() []iface.Probe {
 	def := c.cv.GetDefinition()
-	probes := make([]iface.Probe, len(def.Probes))
+	probes := make([]iface.Probe, 0, len(def.Probes))
 
 	for _, probe := range def.Probes {
 		probes = append(probes, NewProbe(&probe, c.s, c.cv, c))
