@@ -2,16 +2,17 @@ package database
 
 import (
 	"context"
+	"log"
+	"log/slog"
+	"os"
+	"time"
+
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config"
 	"gorm.io/driver/sqlite"
 	"gorm.io/gorm"
-	"log"
-	"log/slog"
-	"os"
-	"time"
 )
 
 // NewConnectionForRoot creates a new database connection from the specified configuration. The type of the database

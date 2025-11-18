@@ -24,6 +24,17 @@ type DB interface {
 	Ping(ctx context.Context) bool
 
 	/*
+	 *  Namespaces
+	 */
+
+	GetNamespace(ctx context.Context, path string) (*Namespace, error)
+	CreateNamespace(ctx context.Context, ns *Namespace) error
+	DeleteNamespace(ctx context.Context, path string) error
+	SetNamespaceState(ctx context.Context, path string, state NamespaceState) error
+	ListNamespacesBuilder() ListNamespacesBuilder
+	ListNamespacesFromCursor(ctx context.Context, cursor string) (ListNamespacesExecutor, error)
+
+	/*
 	 *  Actors
 	 */
 

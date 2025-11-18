@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+
 	"github.com/pkg/errors"
 )
 
@@ -9,7 +10,12 @@ import (
 const MigrateMutexKeyName = "db-migrate-lock"
 
 func (db *gormDB) Migrate(ctx context.Context) error {
-	err := db.gorm.AutoMigrate(&Actor{})
+	err := db.gorm.AutoMigrate(&Namespace{})
+	if err != nil {
+		return errors.Wrap(err, "failed to auto migrate namespace")
+	}
+
+	err = db.gorm.AutoMigrate(&Actor{})
 	if err != nil {
 		return errors.Wrap(err, "failed to auto migrate actors")
 	}

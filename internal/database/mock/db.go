@@ -81,6 +81,20 @@ func (mr *MockDBMockRecorder) CreateConnection(ctx, c interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateConnection", reflect.TypeOf((*MockDB)(nil).CreateConnection), ctx, c)
 }
 
+// CreateNamespace mocks base method.
+func (m *MockDB) CreateNamespace(ctx context.Context, ns *database.Namespace) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateNamespace", ctx, ns)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateNamespace indicates an expected call of CreateNamespace.
+func (mr *MockDBMockRecorder) CreateNamespace(ctx, ns interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateNamespace", reflect.TypeOf((*MockDB)(nil).CreateNamespace), ctx, ns)
+}
+
 // DeleteActor mocks base method.
 func (m *MockDB) DeleteActor(ctx context.Context, id uuid.UUID) error {
 	m.ctrl.T.Helper()
@@ -121,6 +135,20 @@ func (m *MockDB) DeleteConnection(ctx context.Context, id uuid.UUID) error {
 func (mr *MockDBMockRecorder) DeleteConnection(ctx, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteConnection", reflect.TypeOf((*MockDB)(nil).DeleteConnection), ctx, id)
+}
+
+// DeleteNamespace mocks base method.
+func (m *MockDB) DeleteNamespace(ctx context.Context, path string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteNamespace", ctx, path)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteNamespace indicates an expected call of DeleteNamespace.
+func (mr *MockDBMockRecorder) DeleteNamespace(ctx, path interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNamespace", reflect.TypeOf((*MockDB)(nil).DeleteNamespace), ctx, path)
 }
 
 // DeleteOAuth2Token mocks base method.
@@ -285,6 +313,21 @@ func (mr *MockDBMockRecorder) GetConnectorVersions(ctx, requested interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersions", reflect.TypeOf((*MockDB)(nil).GetConnectorVersions), ctx, requested)
 }
 
+// GetNamespace mocks base method.
+func (m *MockDB) GetNamespace(ctx context.Context, path string) (*database.Namespace, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNamespace", ctx, path)
+	ret0, _ := ret[0].(*database.Namespace)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetNamespace indicates an expected call of GetNamespace.
+func (mr *MockDBMockRecorder) GetNamespace(ctx, path interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespace", reflect.TypeOf((*MockDB)(nil).GetNamespace), ctx, path)
+}
+
 // GetOAuth2Token mocks base method.
 func (m *MockDB) GetOAuth2Token(ctx context.Context, connectionId uuid.UUID) (*database.OAuth2Token, error) {
 	m.ctrl.T.Helper()
@@ -446,6 +489,35 @@ func (mr *MockDBMockRecorder) ListConnectorsFromCursor(ctx, cursor interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListConnectorsFromCursor", reflect.TypeOf((*MockDB)(nil).ListConnectorsFromCursor), ctx, cursor)
 }
 
+// ListNamespacesBuilder mocks base method.
+func (m *MockDB) ListNamespacesBuilder() database.ListNamespacesBuilder {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListNamespacesBuilder")
+	ret0, _ := ret[0].(database.ListNamespacesBuilder)
+	return ret0
+}
+
+// ListNamespacesBuilder indicates an expected call of ListNamespacesBuilder.
+func (mr *MockDBMockRecorder) ListNamespacesBuilder() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNamespacesBuilder", reflect.TypeOf((*MockDB)(nil).ListNamespacesBuilder))
+}
+
+// ListNamespacesFromCursor mocks base method.
+func (m *MockDB) ListNamespacesFromCursor(ctx context.Context, cursor string) (database.ListNamespacesExecutor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListNamespacesFromCursor", ctx, cursor)
+	ret0, _ := ret[0].(database.ListNamespacesExecutor)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListNamespacesFromCursor indicates an expected call of ListNamespacesFromCursor.
+func (mr *MockDBMockRecorder) ListNamespacesFromCursor(ctx, cursor interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNamespacesFromCursor", reflect.TypeOf((*MockDB)(nil).ListNamespacesFromCursor), ctx, cursor)
+}
+
 // Migrate mocks base method.
 func (m *MockDB) Migrate(ctx context.Context) error {
 	m.ctrl.T.Helper()
@@ -516,6 +588,20 @@ func (m *MockDB) SetConnectionState(ctx context.Context, id uuid.UUID, state dat
 func (mr *MockDBMockRecorder) SetConnectionState(ctx, id, state interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectionState", reflect.TypeOf((*MockDB)(nil).SetConnectionState), ctx, id, state)
+}
+
+// SetNamespaceState mocks base method.
+func (m *MockDB) SetNamespaceState(ctx context.Context, path string, state database.NamespaceState) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetNamespaceState", ctx, path, state)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetNamespaceState indicates an expected call of SetNamespaceState.
+func (mr *MockDBMockRecorder) SetNamespaceState(ctx, path, state interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNamespaceState", reflect.TypeOf((*MockDB)(nil).SetNamespaceState), ctx, path, state)
 }
 
 // UpsertActor mocks base method.
