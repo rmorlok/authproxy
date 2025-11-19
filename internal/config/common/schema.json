@@ -9,8 +9,8 @@
     },
     "HumanDuration": {
       "type": "string",
-      "pattern": "^[0-9]+(ns|us|µs|ms|s|m|h|d)$",
-      "description": "A human-readable duration string, e.g., '10s', '20h'."
+      "pattern": "^([0-9]+d)?([0-9]+h)?([0-9]+m)?([0-9]+s)?([0-9]+ms)?$",
+      "description": "A human-readable duration string, e.g., '10s', '20h', '2d3h', etc."
     },
     "Cron": {
       "type": "string",
