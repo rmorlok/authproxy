@@ -26,6 +26,7 @@ type Namespace struct {
 
 var validPathRegex = regexp.MustCompile(`^root(?:/[a-zA-Z0-9_]+[a-zA-Z0-9_\-]*)*$`)
 
+// ValidateNamespacePath checks if the path is valid. It returns an error if it is not with a descriptive message.
 func ValidateNamespacePath(path string) error {
 	if path == "" {
 		return errors.New("path is required")
@@ -42,11 +43,29 @@ func ValidateNamespacePath(path string) error {
 	return nil
 }
 
+// SplitNamespacePathToPrefixes returns all the prefix paths for a given path, including the given path.
+//
+// So if the path is "root/foo/bar", it will return ["root", "root/foo", "root/foo/bar"]. The output will be
+// ordered in increasing path length.
+func SplitNamespacePathToPrefixes(path string) []string {
+	if path == "" {
+		return []string{}
+	}
+
+	parts := strings.Split(path, "/")
+	result := make([]string, len(parts))
+
+	for i := 0; i < len(parts); i++ {
+		result[i] = strings.Join(parts[0:i+1], "/")
+	}
+
+	return result
+}
+
 type NamespaceState string
 
 const (
 	NamespaceStateActive     NamespaceState = "active"
-	NamespaceStateFrozen     NamespaceState = "frozen"
 	NamespaceStateDestroying NamespaceState = "destroying"
 	NamespaceStateDestroyed  NamespaceState = "destroyed"
 )
@@ -72,34 +91,74 @@ func IsValidNamespaceOrderByField[T string | NamespaceOrderByField](field T) boo
 	}
 }
 
+func advanceNamespaceState(cur NamespaceState, next NamespaceState) NamespaceState {
+	switch cur {
+	case NamespaceState(""):
+		return next
+	case NamespaceStateActive:
+		return next
+	case NamespaceStateDestroying:
+		if next == NamespaceStateDestroyed {
+			return next
+		}
+		return cur
+	case NamespaceStateDestroyed:
+		return cur
+	}
+
+	return next
+}
+
 func (db *gormDB) CreateNamespace(ctx context.Context, ns *Namespace) error {
 	err := ValidateNamespacePath(ns.Path)
 	if err != nil {
 		return err
 	}
 
-	if ns.State != NamespaceStateActive && ns.State != NamespaceStateFrozen {
-		return errors.New("state must be active or frozen")
-	}
+	return db.gorm.Transaction(func(tx *gorm.DB) error {
+		prefixes := SplitNamespacePathToPrefixes(ns.Path)
 
-	sess := db.session(ctx)
-	result := sess.Create(&ns)
-	if result.Error != nil {
-		return result.Error
-	}
+		// Start out with the specified state or default to active
+		state := advanceNamespaceState(ns.State, NamespaceStateActive)
 
-	if result.RowsAffected == 0 {
+		for i := 0; i < len(prefixes)-1; i++ {
+			var parent Namespace
+			result := tx.First(&parent, "path = ? ", prefixes[i])
+			if result.Error != nil {
+				if errors.As(result.Error, &gorm.ErrRecordNotFound) {
+					return errors.Errorf("cannot create namespace '%s' because parent namespace '%s' does not exist or is deleted", ns.Path, prefixes[i])
+				}
+				return result.Error
+			}
+
+			state = advanceNamespaceState(state, parent.State)
+		}
+
+		var existing Namespace
+		result := tx.First(&existing, "path = ? ", ns.Path)
+		if result.Error != nil && !errors.As(result.Error, &gorm.ErrRecordNotFound) {
+			return result.Error
+		} else if result.Error == nil {
+			return errors.Errorf("cannot create namespace '%s' because it already exists", ns.Path)
+		}
+
+		// Update the state so that we are always bound by parent namespace state
+		ns.State = state
+
+		result = tx.Create(ns)
+		if result.Error != nil {
+			return result.Error
+		}
+
 		return nil
-	}
-
-	return nil
+	})
 }
 
 func (db *gormDB) GetNamespace(ctx context.Context, path string) (*Namespace, error) {
 	sess := db.session(ctx)
 
 	var ns Namespace
-	result := sess.First(&ns, path)
+	result := sess.First(&ns, "path = ? ", path)
 	if result.Error != nil {
 		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
 			return nil, ErrNotFound
@@ -116,7 +175,7 @@ func (db *gormDB) GetNamespace(ctx context.Context, path string) (*Namespace, er
 
 func (db *gormDB) DeleteNamespace(ctx context.Context, path string) error {
 	sess := db.session(ctx)
-	result := sess.Delete(&Namespace{}, path)
+	result := sess.Delete(&Namespace{}, "path = ?", path)
 	if result.Error != nil {
 		return result.Error
 	}
@@ -248,13 +307,13 @@ n.deleted_at`).
 	}
 
 	if len(l.StatesVal) > 0 {
-		query = query.Where("rr.state IN ?", l.StatesVal)
+		query = query.Where("n.state IN ?", l.StatesVal)
 	}
 
 	if l.IncludeDeletedVal {
 		q = q.Unscoped()
 	} else {
-		query = query.Where("rr.deleted_at IS NULL")
+		query = query.Where("n.deleted_at IS NULL")
 	}
 
 	// Always limit to one more than limit to check if there are more records
