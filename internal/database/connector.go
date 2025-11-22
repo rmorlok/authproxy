@@ -158,7 +158,7 @@ func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageRe
 
 	query := sq.Select(`
 rr.id as id,
-rr.namespace_path as namespace_path,
+rr.namespace as namespace,
 rr.version as version,
 rr.state as state,
 rr.type as type,
@@ -219,7 +219,7 @@ cvc.versions as total_versions
 		// Scan all fields except States
 		err := rows.Scan(
 			&c.ID,
-			&c.NamespacePath,
+			&c.Namespace,
 			&c.Version,
 			&c.State,
 			&c.Type,

@@ -8,14 +8,14 @@ import (
 
 type ConnectorVersion interface {
 	GetID() uuid.UUID
-	GetNamespacePath() string
+	GetNamespace() string
 	GetVersion() uint64
 	GetType() string
 }
 
 type Connection interface {
 	GetID() uuid.UUID
-	GetNamespacePath() string
+	GetNamespace() string
 	GetConnectorId() uuid.UUID
 	GetConnectorVersion() uint64
 }

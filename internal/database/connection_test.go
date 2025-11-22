@@ -21,7 +21,7 @@ func TestConnections(t *testing.T) {
 		u := uuid.New()
 		err := db.CreateConnection(ctx, &Connection{
 			ID:               u,
-			NamespacePath:    "root/some-namespace",
+			Namespace:        "root/some-namespace",
 			ConnectorId:      uuid.New(),
 			ConnectorVersion: 1,
 			State:            ConnectionStateCreated,
@@ -55,7 +55,7 @@ func TestConnections(t *testing.T) {
 		u := uuid.New()
 		err := db.CreateConnection(ctx, &Connection{
 			ID:               u,
-			NamespacePath:    "root/some-namespace",
+			Namespace:        "root/some-namespace",
 			ConnectorId:      uuid.New(),
 			ConnectorVersion: 1,
 			State:            ConnectionStateCreated})
@@ -121,7 +121,7 @@ func TestConnections(t *testing.T) {
 		u := uuid.New()
 		err := db.CreateConnection(ctx, &Connection{
 			ID:               u,
-			NamespacePath:    "root/some-namespace",
+			Namespace:        "root/some-namespace",
 			ConnectorId:      uuid.New(),
 			ConnectorVersion: 1,
 			State:            ConnectionStateCreated,
@@ -194,7 +194,7 @@ func TestConnections(t *testing.T) {
 
 			err := db.CreateConnection(ctx, &Connection{
 				ID:               u,
-				NamespacePath:    "root/some-namespace",
+				Namespace:        "root/some-namespace",
 				ConnectorId:      uuid.New(),
 				ConnectorVersion: 1,
 				State:            state,
@@ -280,7 +280,7 @@ func TestConnections(t *testing.T) {
 
 			err := db.CreateConnection(ctx, &Connection{
 				ID:               u,
-				NamespacePath:    "root/some-namespace",
+				Namespace:        "root/some-namespace",
 				ConnectorId:      uuid.New(),
 				ConnectorVersion: 1,
 				State:            state,
@@ -294,7 +294,7 @@ func TestConnections(t *testing.T) {
 		u := uuid.New()
 		err := db.CreateConnection(ctx, &Connection{
 			ID:               u,
-			NamespacePath:    "root/some-namespace",
+			Namespace:        "root/some-namespace",
 			ConnectorId:      uuid.New(),
 			ConnectorVersion: 1,
 			State:            ConnectionStateDisconnecting,
@@ -307,7 +307,7 @@ func TestConnections(t *testing.T) {
 		u = uuid.New()
 		err = db.CreateConnection(ctx, &Connection{
 			ID:               u,
-			NamespacePath:    "root/some-namespace",
+			Namespace:        "root/some-namespace",
 			ConnectorId:      uuid.New(),
 			ConnectorVersion: 1,
 			State:            ConnectionStateDisconnected,

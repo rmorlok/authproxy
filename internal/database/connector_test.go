@@ -19,7 +19,7 @@ func TestConnectors(t *testing.T) {
 
 		sql := `
 INSERT INTO connector_versions 
-(id,                                     namespace_path, version, state,      type, encrypted_definition, hash, created_at, updated_at, deleted_at) VALUES 
+(id,                                     namespace, version, state,      type, encrypted_definition, hash, created_at, updated_at, deleted_at) VALUES 
 ('6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11', 'root',         1,       'active',   'gmail', 'encrypted-def', 'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
 ('6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11', 'root',         2,       'primary',  'gmail', 'encrypted-def', 'hash2', '2023-10-10 00:00:00', '2023-10-10 00:00:00', null),
 ('8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64', 'root',         1,       'archived', 'gmail', 'encrypted-def', 'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),

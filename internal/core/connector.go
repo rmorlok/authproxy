@@ -21,8 +21,8 @@ func (c *Connector) GetStates() database.ConnectorVersionStates {
 	return c.States
 }
 
-func (c *Connector) GetNamespacePath() string {
-	return c.NamespacePath
+func (c *Connector) GetNamespace() string {
+	return c.Namespace
 }
 
 var _ iface.Connector = (*Connector)(nil)

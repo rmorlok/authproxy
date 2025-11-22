@@ -29,7 +29,7 @@ func (b *connectorVersionBuilder) WithConfig(c *config.Connector) *connectorVers
 			v.Version = c.Version
 			v.Type = c.Type
 			v.ID = c.Id
-			v.NamespacePath = c.GetNamespacePath()
+			v.Namespace = c.GetNamespace()
 		},
 	}, b.versionSetters...)
 

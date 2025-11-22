@@ -48,7 +48,7 @@ func TestService(t *testing.T) {
 
 	connection := database.Connection{
 		ID:               uuid.New(),
-		NamespacePath:    "root/some-namespace",
+		Namespace:        "root/some-namespace",
 		ConnectorId:      uuid.New(),
 		ConnectorVersion: 1,
 		State:            database.ConnectionStateReady,
@@ -58,7 +58,7 @@ func TestService(t *testing.T) {
 	connectorVersion := database.ConnectorVersion{
 		ID:                  uuid.New(),
 		Version:             1,
-		NamespacePath:       "root/some-namespace",
+		Namespace:           "root/some-namespace",
 		State:               database.ConnectorVersionStatePrimary,
 		Type:                "test",
 		Hash:                "test",

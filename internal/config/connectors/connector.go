@@ -163,8 +163,8 @@ func (c *Connector) IsDraft() bool {
 	return c.State == "draft"
 }
 
-// GetNamespacePath returns the namespace path of the connector. Defaults to root if unspecified.
-func (c *Connector) GetNamespacePath() string {
+// GetNamespace returns the namespace of the connector. Defaults to root if unspecified.
+func (c *Connector) GetNamespace() string {
 	if c == nil || c.Namespace == nil {
 		return common.RootNamespace
 	}

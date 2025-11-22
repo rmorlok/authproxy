@@ -81,7 +81,7 @@ func TestConnections(t *testing.T) {
 		u := uuid.New()
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 			ID:               u,
-			NamespacePath:    cfg.RootNamespace,
+			Namespace:        cfg.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
 			State:            database.ConnectionStateCreated,
@@ -128,7 +128,7 @@ func TestConnections(t *testing.T) {
 		u := uuid.New()
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 			ID:               u,
-			NamespacePath:    cfg.RootNamespace,
+			Namespace:        cfg.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
 			State:            database.ConnectionStateCreated,

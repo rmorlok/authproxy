@@ -110,7 +110,7 @@ func IsValidConnectorVersionState[T string | ConnectorVersionState](state T) boo
 type ConnectorVersion struct {
 	ID                  uuid.UUID             `gorm:"column:id;primaryKey"`
 	Version             uint64                `gorm:"column:version;primaryKey"`
-	NamespacePath       string                `gorm:"column:namespace_path"`
+	Namespace           string                `gorm:"column:namespace"`
 	State               ConnectorVersionState `gorm:"column:state"`
 	Type                string                `gorm:"column:type"`
 	Hash                string                `gorm:"column:hash"`
@@ -131,7 +131,7 @@ func (cv *ConnectorVersion) Validate() error {
 		result = multierror.Append(result, errors.New("version is required"))
 	}
 
-	if err := ValidateNamespacePath(cv.NamespacePath); err != nil {
+	if err := ValidateNamespacePath(cv.Namespace); err != nil {
 		result = multierror.Append(result, errors.Wrap(err, "invalid connector namespace path"))
 	}
 
@@ -251,17 +251,17 @@ func (db *gormDB) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 		sqb := sq.StatementBuilder.RunWith(sqlDb)
 
 		existingNamespace, _, err := sqlh.ScanWithDefault(sqb.
-			Select("namespace_path").
+			Select("namespace").
 			From("connector_versions").
 			Where(sq.Eq{"id": cv.ID, "version": cv.Version}).
 			QueryRowContext(ctx),
-			cv.NamespacePath)
+			cv.Namespace)
 
 		if err != nil {
 			return err
 		}
 
-		if existingNamespace != cv.NamespacePath {
+		if existingNamespace != cv.Namespace {
 			return errors.New("cannot modify connector namespace")
 		}
 
@@ -326,7 +326,7 @@ func (db *gormDB) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				Columns(
 					"id",
 					"version",
-					"namespace_path",
+					"namespace",
 					"state",
 					"type",
 					"hash",
@@ -337,7 +337,7 @@ func (db *gormDB) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				Values(
 					cv.ID,
 					cv.Version,
-					cv.NamespacePath,
+					cv.Namespace,
 					cv.State,
 					cv.Type,
 					cv.Hash,

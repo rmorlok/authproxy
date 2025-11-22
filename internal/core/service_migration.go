@@ -229,8 +229,8 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 						return errors.Errorf("connector %s currently has version %d and cannot be incremented to %d", configConnector.Id, newestVersion.Version, configConnector.Version)
 					}
 
-					if newestVersion.NamespacePath != configConnector.GetNamespacePath() {
-						return errors.Errorf("connector %s currently has namespace path '%s' and cannot be changed to '%s'", configConnector.Id, newestVersion.NamespacePath, configConnector.GetNamespacePath())
+					if newestVersion.Namespace != configConnector.GetNamespace() {
+						return errors.Errorf("connector %s currently has namespace path '%s' and cannot be changed to '%s'", configConnector.Id, newestVersion.Namespace, configConnector.GetNamespace())
 					}
 				}
 
@@ -243,8 +243,8 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 					configConnector.State = string(database.ConnectorVersionStatePrimary)
 				}
 
-				if existingVersion.NamespacePath != configConnector.GetNamespacePath() {
-					return errors.Errorf("connector %s currently has namespace path '%s' and cannot be changed to %s", configConnector.Id, existingVersion.NamespacePath, configConnector.GetNamespacePath())
+				if existingVersion.Namespace != configConnector.GetNamespace() {
+					return errors.Errorf("connector %s currently has namespace '%s' and cannot be changed to %s", configConnector.Id, existingVersion.Namespace, configConnector.GetNamespace())
 				}
 
 				if existingVersion.State != database.ConnectorVersionStateDraft && existingVersion.Hash != configConnector.Hash() {
@@ -272,8 +272,8 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 			connectorIds := strings.Join(util.Map(results, func(c database.Connector) string { return c.ID.String() }), ", ")
 			return errors.Errorf("connector type %s is not unique among existing defined connectors: %s", configConnector.Type, connectorIds)
 		} else if len(results) == 1 {
-			if results[0].NamespacePath != configConnector.GetNamespacePath() {
-				return errors.Errorf("connector %s currently has namespace path '%s' and cannot be changed to '%s'", configConnector.Id, results[0].NamespacePath, configConnector.GetNamespacePath())
+			if results[0].Namespace != configConnector.GetNamespace() {
+				return errors.Errorf("connector %s currently has namespace path '%s' and cannot be changed to '%s'", configConnector.Id, results[0].Namespace, configConnector.GetNamespace())
 			}
 		}
 	}

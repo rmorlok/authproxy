@@ -40,7 +40,7 @@ func IsValidConnectionState[T string | ConnectionState](state T) bool {
 
 type Connection struct {
 	ID               uuid.UUID       `gorm:"column:id;primaryKey"`
-	NamespacePath    string          `gorm:"column:namespace_path"`
+	Namespace        string          `gorm:"column:namespace"`
 	State            ConnectionState `gorm:"column:state"`
 	ConnectorId      uuid.UUID       `gorm:"column:connector_id"`
 	ConnectorVersion uint64          `gorm:"column:connector_version"`
@@ -61,8 +61,8 @@ func (c *Connection) GetConnectorVersion() uint64 {
 	return c.ConnectorVersion
 }
 
-func (c *Connection) GetNamespacePath() string {
-	return c.NamespacePath
+func (c *Connection) GetNamespace() string {
+	return c.Namespace
 }
 
 func (c *Connection) Validate() error {
@@ -72,7 +72,7 @@ func (c *Connection) Validate() error {
 		result = multierror.Append(result, errors.New("connection id is required"))
 	}
 
-	if err := ValidateNamespacePath(c.NamespacePath); err != nil {
+	if err := ValidateNamespacePath(c.Namespace); err != nil {
 		result = multierror.Append(result, errors.Wrap(err, "invalid connection namespace path"))
 	}
 
