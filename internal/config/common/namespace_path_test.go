@@ -3,6 +3,8 @@ package common
 import (
 	"reflect"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestNamespaces(t *testing.T) {
@@ -116,6 +118,11 @@ func TestNamespaces(t *testing.T) {
 					}
 				})
 			}
+		})
+		t.Run("NamespacePathFromRoot", func(t *testing.T) {
+			require.Equal(t, NamespacePathFromRoot(), RootNamespace)
+			require.Equal(t, NamespacePathFromRoot("some-namespace"), RootNamespace+"/some-namespace")
+			require.Equal(t, NamespacePathFromRoot("some-namespace", "other-namespace"), RootNamespace+"/some-namespace/other-namespace")
 		})
 	})
 }

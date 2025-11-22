@@ -16,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apredis/mock"
 	auth2 "github.com/rmorlok/authproxy/internal/auth"
 	"github.com/rmorlok/authproxy/internal/config"
+	cfg "github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
@@ -80,7 +81,7 @@ func TestConnections(t *testing.T) {
 		u := uuid.New()
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 			ID:               u,
-			NamespacePath:    "root",
+			NamespacePath:    cfg.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
 			State:            database.ConnectionStateCreated,
@@ -127,7 +128,7 @@ func TestConnections(t *testing.T) {
 		u := uuid.New()
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 			ID:               u,
-			NamespacePath:    "root",
+			NamespacePath:    cfg.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
 			State:            database.ConnectionStateCreated,

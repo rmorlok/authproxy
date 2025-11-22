@@ -13,6 +13,7 @@ const (
 )
 
 type RequestInfo struct {
+	NamespacePath    string
 	Type             RequestType
 	ConnectorType    string
 	ConnectorId      uuid.UUID
@@ -26,6 +27,7 @@ func (r *RequestInfo) setRedisRecordFields(er *EntryRecord) {
 		t = RequestTypeGlobal
 	}
 
+	er.NamespacePath = r.NamespacePath
 	er.Type = t
 	er.ConnectorType = r.ConnectorType
 	er.ConnectorId = r.ConnectorId

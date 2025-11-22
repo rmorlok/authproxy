@@ -3,6 +3,7 @@ package database
 import (
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	cfg "github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/assert"
@@ -169,7 +170,7 @@ INSERT INTO connector_versions
 			cv := &ConnectorVersion{
 				ID:                  connectorID,
 				Version:             1,
-				NamespacePath:       "root",
+				NamespacePath:       cfg.RootNamespace,
 				State:               ConnectorVersionStateDraft,
 				Type:                "test_connector",
 				Hash:                "test_hash",
@@ -204,7 +205,7 @@ INSERT INTO connector_versions
 			cv := &ConnectorVersion{
 				ID:                  connectorID,
 				Version:             1,
-				NamespacePath:       "root",
+				NamespacePath:       cfg.RootNamespace,
 				State:               ConnectorVersionStateDraft,
 				Type:                "test_connector",
 				Hash:                "test_hash",
@@ -218,7 +219,7 @@ INSERT INTO connector_versions
 			// Verify
 			savedCV, err := db.GetConnectorVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
-			assert.Equal(t, "root", savedCV.NamespacePath)
+			assert.Equal(t, cfg.RootNamespace, savedCV.NamespacePath)
 
 			// Try to change namespace
 			cv.NamespacePath = "root/some-other-namespace"
@@ -228,7 +229,7 @@ INSERT INTO connector_versions
 			// Verify unchanged
 			savedCV, err = db.GetConnectorVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
-			assert.Equal(t, "root", savedCV.NamespacePath)
+			assert.Equal(t, cfg.RootNamespace, savedCV.NamespacePath)
 			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_versions"))
 		})
 
@@ -245,7 +246,7 @@ INSERT INTO connector_versions
 			cv1 := &ConnectorVersion{
 				ID:                  connectorID,
 				Version:             1,
-				NamespacePath:       "root",
+				NamespacePath:       cfg.RootNamespace,
 				State:               ConnectorVersionStateDraft,
 				Type:                "test_connector",
 				Hash:                "test_hash_v1",
@@ -259,7 +260,7 @@ INSERT INTO connector_versions
 			cv2 := &ConnectorVersion{
 				ID:                  connectorID,
 				Version:             2,
-				NamespacePath:       "root",
+				NamespacePath:       cfg.RootNamespace,
 				State:               ConnectorVersionStateDraft,
 				Type:                "test_connector",
 				Hash:                "test_hash_v2",
@@ -297,7 +298,7 @@ INSERT INTO connector_versions
 			cv := &ConnectorVersion{
 				ID:                  connectorID,
 				Version:             1,
-				NamespacePath:       "root",
+				NamespacePath:       cfg.RootNamespace,
 				State:               ConnectorVersionStatePrimary,
 				Type:                "test_connector",
 				Hash:                "test_hash",
@@ -329,7 +330,7 @@ INSERT INTO connector_versions
 			cv1 := &ConnectorVersion{
 				ID:                  connectorID,
 				Version:             1,
-				NamespacePath:       "root",
+				NamespacePath:       cfg.RootNamespace,
 				State:               ConnectorVersionStatePrimary,
 				Type:                "test_connector",
 				Hash:                "test_hash_v1",
@@ -349,7 +350,7 @@ INSERT INTO connector_versions
 			cv2 := &ConnectorVersion{
 				ID:                  connectorID,
 				Version:             2,
-				NamespacePath:       "root",
+				NamespacePath:       cfg.RootNamespace,
 				State:               ConnectorVersionStatePrimary,
 				Type:                "test_connector",
 				Hash:                "test_hash_v2",
@@ -386,7 +387,7 @@ INSERT INTO connector_versions
 			cv1 := &ConnectorVersion{
 				ID:                  connectorID,
 				Version:             1,
-				NamespacePath:       "root",
+				NamespacePath:       cfg.RootNamespace,
 				State:               ConnectorVersionStatePrimary,
 				Type:                "test_connector",
 				Hash:                "test_hash_v1",
@@ -406,7 +407,7 @@ INSERT INTO connector_versions
 			cv2 := &ConnectorVersion{
 				ID:                  connectorID,
 				Version:             3,
-				NamespacePath:       "root",
+				NamespacePath:       cfg.RootNamespace,
 				State:               ConnectorVersionStatePrimary,
 				Type:                "test_connector",
 				Hash:                "test_hash_v2",

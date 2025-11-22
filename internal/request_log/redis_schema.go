@@ -11,6 +11,7 @@ import (
 )
 
 const (
+	fieldNamespacePath       = "ns"
 	fieldType                = "t"
 	fieldRequestId           = "id"
 	fieldCorrelationId       = "cid"
@@ -79,6 +80,7 @@ func Migrate(ctx context.Context, rs apredis.Client, l *slog.Logger) error {
 		"PREFIX", "1", "rl:",
 		"NOHL",
 		"SCHEMA",
+		fieldNamespacePath, "TEXT", "SORTABLE",
 		fieldType, "TEXT", "NOSTEM",
 		fieldCorrelationId, "TEXT", "NOSTEM",
 		fieldConnectionId, "TEXT", "NOSTEM",

@@ -34,6 +34,10 @@ func (cv *ConnectorVersion) GetID() uuid.UUID {
 	return cv.ConnectorVersion.ID
 }
 
+func (cv *ConnectorVersion) GetNamespacePath() string {
+	return cv.ConnectorVersion.NamespacePath
+}
+
 func (cv *ConnectorVersion) GetVersion() uint64 {
 	return cv.ConnectorVersion.Version
 }

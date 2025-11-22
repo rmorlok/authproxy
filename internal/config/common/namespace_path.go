@@ -8,13 +8,15 @@ import (
 
 var validPathRegex = regexp.MustCompile(`^root(?:/[a-zA-Z0-9_]+[a-zA-Z0-9_\-]*)*$`)
 
+const RootNamespace = "root"
+
 // ValidateNamespacePath checks if the path is valid. It returns an error if it is not with a descriptive message.
 func ValidateNamespacePath(path string) error {
 	if path == "" {
 		return errors.New("path is required")
 	}
 
-	if path != "root" && !strings.HasPrefix(path, "root/") {
+	if path != RootNamespace && !strings.HasPrefix(path, RootNamespace+"/") {
 		return errors.New("path must be a child of root")
 	}
 
@@ -42,4 +44,10 @@ func SplitNamespacePathToPrefixes(path string) []string {
 	}
 
 	return result
+}
+
+// NamespacePathFromRoot returns a namespace path from the given parts, prefixed with "root/".
+func NamespacePathFromRoot(parts ...string) string {
+	allPaths := append([]string{RootNamespace}, parts...)
+	return strings.Join(allPaths, "/")
 }

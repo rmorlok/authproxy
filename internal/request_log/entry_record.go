@@ -16,6 +16,7 @@ import (
 // JSON tagging on this struct is used so the same data structure can be passed directly to endpoint
 // responses. It is not use for internal storage.
 type EntryRecord struct {
+	NamespacePath       string              `json:"namespace"`
 	Type                RequestType         `json:"type"`
 	RequestId           uuid.UUID           `json:"request_id"`
 	CorrelationId       string              `json:"correlation_id,omitempty"`
@@ -43,6 +44,7 @@ type EntryRecord struct {
 }
 
 func (e *EntryRecord) setRedisRecordFields(vals map[string]string) {
+	vals[fieldNamespacePath] = e.NamespacePath
 	vals[fieldType] = string(e.Type)
 	vals[fieldRequestId] = e.RequestId.String()
 	if e.CorrelationId != "" {
@@ -102,6 +104,7 @@ func EntryRecordFromRedisFields(vals map[string]string) (*EntryRecord, error) {
 
 	var err error
 	er := &EntryRecord{}
+	er.NamespacePath = vals[fieldNamespacePath]
 	er.Type = RequestType(vals[fieldType])
 
 	if er.RequestId, err = uuid.Parse(vals[fieldRequestId]); err != nil {

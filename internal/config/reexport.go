@@ -22,11 +22,19 @@ type (
 
 // Re-export functions from the common sub-package
 var (
-	KindToString               = common.KindToString
-	MarshalToYamlString        = common.MarshalToYamlString
-	MustMarshalToYamlString    = common.MustMarshalToYamlString
-	NewStringValueDirect       = common.NewStringValueDirect
-	NewStringValueDirectInline = common.NewStringValueDirectInline
+	KindToString                 = common.KindToString
+	MarshalToYamlString          = common.MarshalToYamlString
+	MustMarshalToYamlString      = common.MustMarshalToYamlString
+	NewStringValueDirect         = common.NewStringValueDirect
+	NewStringValueDirectInline   = common.NewStringValueDirectInline
+	ValidateNamespacePath        = common.ValidateNamespacePath
+	SplitNamespacePathToPrefixes = common.SplitNamespacePathToPrefixes
+	NamespacePathFromRoot        = common.NamespacePathFromRoot
+)
+
+// Re-export constants from the connectors sub-package
+var (
+	RootNamespace = common.RootNamespace
 )
 
 // Re-export types from the connectors sub-package

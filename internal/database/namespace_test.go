@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apctx"
+	cfg "github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
@@ -65,9 +66,9 @@ INSERT INTO namespaces
 		_, err := rawDb.Exec(sql)
 		require.NoError(t, err)
 
-		ns, err := db.GetNamespace(ctx, "root")
+		ns, err := db.GetNamespace(ctx, cfg.RootNamespace)
 		require.NoError(t, err)
-		require.Equal(t, "root", ns.Path)
+		require.Equal(t, cfg.RootNamespace, ns.Path)
 		require.Equal(t, NamespaceStateActive, ns.State)
 
 		// Namespace doesn't exist
@@ -124,7 +125,7 @@ INSERT INTO namespaces
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			ns := &Namespace{
-				Path:  "root",
+				Path:  cfg.RootNamespace,
 				State: NamespaceStateActive,
 			}
 
@@ -146,7 +147,7 @@ INSERT INTO namespaces
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			ns := &Namespace{
-				Path:  "root",
+				Path:  cfg.RootNamespace,
 				State: NamespaceStateActive,
 			}
 
@@ -175,7 +176,7 @@ INSERT INTO namespaces
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			ns := &Namespace{
-				Path:  "root",
+				Path:  cfg.RootNamespace,
 				State: NamespaceStateActive,
 			}
 
@@ -203,7 +204,7 @@ INSERT INTO namespaces
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			ns := &Namespace{
-				Path:  "root",
+				Path:  cfg.RootNamespace,
 				State: NamespaceStateActive,
 			}
 
@@ -231,7 +232,7 @@ INSERT INTO namespaces
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			ns := &Namespace{
-				Path:  "root",
+				Path:  cfg.RootNamespace,
 				State: NamespaceStateActive,
 			}
 
@@ -259,7 +260,7 @@ INSERT INTO namespaces
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			ns := &Namespace{
-				Path:  "root",
+				Path:  cfg.RootNamespace,
 				State: NamespaceStateActive,
 			}
 
@@ -298,14 +299,14 @@ INSERT INTO namespaces
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		ns := &Namespace{
-			Path:  "root",
+			Path:  cfg.RootNamespace,
 			State: NamespaceStateActive,
 		}
 
 		err := db.CreateNamespace(ctx, ns)
 		require.NoError(t, err)
 
-		retrieved, err := db.GetNamespace(ctx, "root")
+		retrieved, err := db.GetNamespace(ctx, cfg.RootNamespace)
 		require.NoError(t, err)
 		require.Equal(t, ns.Path, retrieved.Path)
 		require.Equal(t, ns.State, retrieved.State)
@@ -317,22 +318,22 @@ INSERT INTO namespaces
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		ns := &Namespace{
-			Path:  "root",
+			Path:  cfg.RootNamespace,
 			State: NamespaceStateActive,
 		}
 
 		err := db.CreateNamespace(ctx, ns)
 		require.NoError(t, err)
 
-		retrieved, err := db.GetNamespace(ctx, "root")
+		retrieved, err := db.GetNamespace(ctx, cfg.RootNamespace)
 		require.NoError(t, err)
 		require.Equal(t, ns.Path, retrieved.Path)
 		require.Equal(t, ns.State, retrieved.State)
 
-		err = db.DeleteNamespace(ctx, "root")
+		err = db.DeleteNamespace(ctx, cfg.RootNamespace)
 		require.NoError(t, err)
 
-		retrieved, err = db.GetNamespace(ctx, "root")
+		retrieved, err = db.GetNamespace(ctx, cfg.RootNamespace)
 		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, retrieved)
 	})
@@ -343,24 +344,24 @@ INSERT INTO namespaces
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		ns := &Namespace{
-			Path:  "root",
+			Path:  cfg.RootNamespace,
 			State: NamespaceStateActive,
 		}
 
 		err := db.CreateNamespace(ctx, ns)
 		require.NoError(t, err)
 
-		retrieved, err := db.GetNamespace(ctx, "root")
+		retrieved, err := db.GetNamespace(ctx, cfg.RootNamespace)
 		require.NoError(t, err)
 		require.Equal(t, ns.Path, retrieved.Path)
 		require.Equal(t, ns.State, retrieved.State)
 
-		err = db.SetNamespaceState(ctx, "root", NamespaceStateDestroying)
+		err = db.SetNamespaceState(ctx, cfg.RootNamespace, NamespaceStateDestroying)
 		require.NoError(t, err)
 
-		retrieved, err = db.GetNamespace(ctx, "root")
+		retrieved, err = db.GetNamespace(ctx, cfg.RootNamespace)
 		require.NoError(t, err)
-		require.Equal(t, ns.Path, "root")
+		require.Equal(t, ns.Path, cfg.RootNamespace)
 		require.Equal(t, NamespaceStateDestroying, retrieved.State)
 	})
 }

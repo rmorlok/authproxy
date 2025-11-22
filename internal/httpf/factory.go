@@ -30,7 +30,8 @@ func CreateFactory(cfg config.C, r apredis.Client, logger *slog.Logger) F {
 		r:      r,
 		logger: logger,
 		requestInfo: request_log.RequestInfo{
-			Type: request_log.RequestTypeGlobal,
+			NamespacePath: config.RootNamespace,
+			Type:          request_log.RequestTypeGlobal,
 		},
 	}
 }
@@ -53,6 +54,7 @@ func (f *clientFactory) ForRequestType(rt request_log.RequestType) F {
 
 func (f *clientFactory) ForConnectorVersion(cv ConnectorVersion) F {
 	ri := f.requestInfo
+	ri.NamespacePath = cv.GetNamespacePath()
 	ri.ConnectorId = cv.GetID()
 	ri.ConnectorVersion = cv.GetVersion()
 	ri.ConnectorType = cv.GetType()
@@ -63,6 +65,7 @@ func (f *clientFactory) ForConnectorVersion(cv ConnectorVersion) F {
 func (f *clientFactory) ForConnection(cv Connection) F {
 	ri := f.requestInfo
 	ri.ConnectionId = cv.GetID()
+	ri.NamespacePath = cv.GetNamespacePath()
 	ri.ConnectorId = cv.GetConnectorId()
 	ri.ConnectorVersion = cv.GetConnectorVersion()
 

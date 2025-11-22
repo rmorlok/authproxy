@@ -61,6 +61,10 @@ func (c *Connection) GetConnectorVersion() uint64 {
 	return c.ConnectorVersion
 }
 
+func (c *Connection) GetNamespacePath() string {
+	return c.NamespacePath
+}
+
 func (c *Connection) Validate() error {
 	result := &multierror.Error{}
 
