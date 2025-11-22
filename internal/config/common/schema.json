@@ -197,6 +197,11 @@
         { "$ref": "#/$defs/StringValueFile" }
       ],
       "description": "A boolean value used in configuration that can be expressed in on of several ways. When taken from other sources, the string value is parsed as a bool."
+    },
+    "NamespacePath": {
+      "type": "string",
+      "pattern": "^root(?:/[a-zA-Z0-9_]+[a-zA-Z0-9_\\-]*)*$",
+      "description": "The fully qualified path to the namespace a resource lives within. For example, 'root/prod/some-feature'. Must begin with 'root'."
     }
   }
 }

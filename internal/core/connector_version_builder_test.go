@@ -21,7 +21,7 @@ func TestNewVersionBuilder(t *testing.T) {
 	}
 
 	// Test
-	builder := newVersionBuilder(s)
+	builder := newConnectorVersionBuilder(s)
 
 	// Verify
 	assert.NotNil(t, builder)
@@ -41,7 +41,7 @@ func TestVersionBuilder_WithConfig(t *testing.T) {
 		encrypt: mockEncrypt,
 	}
 
-	builder := newVersionBuilder(s)
+	builder := newConnectorVersionBuilder(s)
 
 	// Create a test configuration
 	connectorID := uuid.New()
@@ -79,7 +79,7 @@ func TestVersionBuilder_WithId(t *testing.T) {
 		encrypt: mockEncrypt,
 	}
 
-	builder := newVersionBuilder(s)
+	builder := newConnectorVersionBuilder(s)
 
 	// Create a test ID
 	connectorID := uuid.New()
@@ -113,7 +113,7 @@ func TestVersionBuilder_WithType(t *testing.T) {
 		encrypt: mockEncrypt,
 	}
 
-	builder := newVersionBuilder(s)
+	builder := newConnectorVersionBuilder(s)
 
 	// Create a test type
 	connectorType := "test-connector"
@@ -147,7 +147,7 @@ func TestVersionBuilder_WithVersion(t *testing.T) {
 		encrypt: mockEncrypt,
 	}
 
-	builder := newVersionBuilder(s)
+	builder := newConnectorVersionBuilder(s)
 
 	// Create a test version
 	version := uint64(2)
@@ -181,7 +181,7 @@ func TestVersionBuilder_Build_Success(t *testing.T) {
 		encrypt: mockEncrypt,
 	}
 
-	builder := newVersionBuilder(s)
+	builder := newConnectorVersionBuilder(s)
 
 	// Create a test configuration
 	connectorID := uuid.New()
@@ -223,7 +223,7 @@ func TestVersionBuilder_Build_NilConnector(t *testing.T) {
 		encrypt: mockEncrypt,
 	}
 
-	builder := newVersionBuilder(s)
+	builder := newConnectorVersionBuilder(s)
 
 	// Test
 	cv, err := builder.Build()
@@ -244,7 +244,7 @@ func TestVersionBuilder_Build_EncryptError(t *testing.T) {
 		encrypt: mockEncrypt,
 	}
 
-	builder := newVersionBuilder(s)
+	builder := newConnectorVersionBuilder(s)
 
 	// Create a test configuration
 	connectorID := uuid.New()

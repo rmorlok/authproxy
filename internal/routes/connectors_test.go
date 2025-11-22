@@ -61,7 +61,7 @@ func TestConnectors(t *testing.T) {
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(config.ServiceIdApi, cfg, db)
 		rs := mock.NewMockClient(ctrl)
 		h := httpf2.CreateFactory(cfg, rs, aplog.NewNoopLogger())
-		c := core.NewConnectorsService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
+		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		require.NoError(t, c.MigrateConnectors(context.Background()))
 
 		cr := NewConnectorsRoutes(cfg, auth, c)

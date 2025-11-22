@@ -3,11 +3,12 @@ package encrypt
 import (
 	"context"
 	"fmt"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestFakeService(t *testing.T) {
@@ -37,8 +38,11 @@ func TestFakeService(t *testing.T) {
 			s := NewEncryptService(cfg, db)
 
 			connection := database.Connection{
-				ID:    uuid.New(),
-				State: database.ConnectionStateReady,
+				ID:               uuid.New(),
+				NamespacePath:    "root/some-namespace",
+				ConnectorId:      uuid.New(),
+				ConnectorVersion: 1,
+				State:            database.ConnectionStateReady,
 			}
 			require.NoError(t, db.CreateConnection(context.Background(), &connection))
 

@@ -94,6 +94,9 @@
     "id": {
       "$ref": "../common/schema.json#/$defs/UUID"
     },
+    "namespace": {
+      "$ref": "../common/schema.json#/$defs/NamespacePath"
+    },
     "type": {
       "type": "string"
     },

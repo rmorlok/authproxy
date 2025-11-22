@@ -27,8 +27,8 @@ type service struct {
 	o2Factory     oauth2.Factory
 }
 
-// NewConnectorsService creates a new connectors service
-func NewConnectorsService(
+// NewCoreService creates a new core service
+func NewCoreService(
 	cfg config.C,
 	db database.DB,
 	encrypt encrypt.E,

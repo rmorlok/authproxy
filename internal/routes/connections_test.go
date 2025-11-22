@@ -58,7 +58,7 @@ func TestConnections(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		ac := asynqmock.NewMockClient(ctrl)
 		rs := mock.NewMockClient(ctrl)
-		c := core.NewConnectorsService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
+		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		assert.NoError(t, c.MigrateConnectors(context.Background()))
 		cr := NewConnectionsRoutes(cfg, auth, db, rds, c, h, e, test_utils.NewTestLogger())
 		r := gin.Default()
@@ -80,6 +80,7 @@ func TestConnections(t *testing.T) {
 		u := uuid.New()
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 			ID:               u,
+			NamespacePath:    "root",
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
 			State:            database.ConnectionStateCreated,
@@ -126,6 +127,7 @@ func TestConnections(t *testing.T) {
 		u := uuid.New()
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 			ID:               u,
+			NamespacePath:    "root",
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
 			State:            database.ConnectionStateCreated,

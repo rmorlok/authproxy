@@ -2,25 +2,26 @@ package core
 
 import (
 	"errors"
+
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 )
 
-type versionBuilder struct {
+type connectorVersionBuilder struct {
 	s              *service
 	c              *config.Connector
 	configSetters  []func(c *config.Connector)
 	versionSetters []func(v *ConnectorVersion)
 }
 
-func newVersionBuilder(s *service) *versionBuilder {
-	return &versionBuilder{
+func newConnectorVersionBuilder(s *service) *connectorVersionBuilder {
+	return &connectorVersionBuilder{
 		s: s,
 	}
 }
 
-func (b *versionBuilder) WithConfig(c *config.Connector) *versionBuilder {
+func (b *connectorVersionBuilder) WithConfig(c *config.Connector) *connectorVersionBuilder {
 	b.c = c
 
 	b.versionSetters = append([]func(v *ConnectorVersion){
@@ -28,13 +29,14 @@ func (b *versionBuilder) WithConfig(c *config.Connector) *versionBuilder {
 			v.Version = c.Version
 			v.Type = c.Type
 			v.ID = c.Id
+			v.NamespacePath = c.GetNamespacePath()
 		},
 	}, b.versionSetters...)
 
 	return b
 }
 
-func (b *versionBuilder) WithId(id uuid.UUID) *versionBuilder {
+func (b *connectorVersionBuilder) WithId(id uuid.UUID) *connectorVersionBuilder {
 	b.versionSetters = append(b.versionSetters,
 		func(v *ConnectorVersion) {
 			v.ID = id
@@ -49,7 +51,7 @@ func (b *versionBuilder) WithId(id uuid.UUID) *versionBuilder {
 	return b
 }
 
-func (b *versionBuilder) WithType(t string) *versionBuilder {
+func (b *connectorVersionBuilder) WithType(t string) *connectorVersionBuilder {
 	b.versionSetters = append(b.versionSetters,
 		func(v *ConnectorVersion) {
 			v.Type = t
@@ -64,7 +66,7 @@ func (b *versionBuilder) WithType(t string) *versionBuilder {
 	return b
 }
 
-func (b *versionBuilder) WithState(state database.ConnectorVersionState) *versionBuilder {
+func (b *connectorVersionBuilder) WithState(state database.ConnectorVersionState) *connectorVersionBuilder {
 	b.versionSetters = append(b.versionSetters,
 		func(v *ConnectorVersion) {
 			v.State = state
@@ -79,7 +81,7 @@ func (b *versionBuilder) WithState(state database.ConnectorVersionState) *versio
 	return b
 }
 
-func (b *versionBuilder) WithVersion(ver uint64) *versionBuilder {
+func (b *connectorVersionBuilder) WithVersion(ver uint64) *connectorVersionBuilder {
 	b.versionSetters = append(b.versionSetters,
 		func(v *ConnectorVersion) {
 			v.Version = ver
@@ -96,7 +98,7 @@ func (b *versionBuilder) WithVersion(ver uint64) *versionBuilder {
 
 var errNilConnector = errors.New("nil connector")
 
-func (b *versionBuilder) Build() (*ConnectorVersion, error) {
+func (b *connectorVersionBuilder) Build() (*ConnectorVersion, error) {
 	if b.c == nil {
 		return nil, errNilConnector
 	}

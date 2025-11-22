@@ -29,6 +29,12 @@ type Connector struct {
 	// start with 1 (zero implies unspecified).
 	Version uint64 `json:"version,omitempty" yaml:"version,omitempty"`
 
+	// Namespace is the namespace in which this connector lives. The value is a path to this namespace nested within
+	// the parent namespaces. The path must begin with "root". If unspecified, the value is assumed to be "root".
+	//
+	// Example: `root/prod/some-feature`
+	Namespace *string `json:"namespace,omitempty" yaml:"namespace,omitempty"`
+
 	// State is the release state of the connector. Must either be primary or draft if specified. Defaults to primary
 	// if unspecified.
 	State string `json:"state,omitempty" yaml:"state,omitempty"`
@@ -84,6 +90,12 @@ func (c *Connector) Validate(vc *common.ValidationContext) error {
 		}
 	}
 
+	if c.Namespace != nil {
+		if err := common.ValidateNamespacePath(*c.Namespace); err != nil {
+			result = multierror.Append(result, err)
+		}
+	}
+
 	for i, probe := range c.Probes {
 		if err := probe.Validate(vc.PushField("probes").PushIndex(i)); err != nil {
 			result = multierror.Append(result, err)
@@ -133,6 +145,15 @@ func (c *Connector) HasState() bool {
 	return c.State != ""
 }
 
+// HasNamespace returns true if the connector has a namespace set. This implies that the configuration set a namespace explicitly.
+func (c *Connector) HasNamespace() bool {
+	if c == nil {
+		return false
+	}
+
+	return c.Namespace != nil
+}
+
 // IsDraft returns true if the connector has an explicitly defined state and that state is draft.
 func (c *Connector) IsDraft() bool {
 	if c == nil {
@@ -140,4 +161,13 @@ func (c *Connector) IsDraft() bool {
 	}
 
 	return c.State == "draft"
+}
+
+// GetNamespacePath returns the namespace path of the connector. Defaults to root if unspecified.
+func (c *Connector) GetNamespacePath() string {
+	if c == nil || c.Namespace == nil {
+		return "root"
+	}
+
+	return *c.Namespace
 }

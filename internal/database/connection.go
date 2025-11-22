@@ -6,6 +6,7 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -24,8 +25,22 @@ const (
 	ConnectionStateDisconnected  ConnectionState = "disconnected"
 )
 
+func IsValidConnectionState[T string | ConnectionState](state T) bool {
+	switch ConnectionState(state) {
+	case ConnectionStateCreated,
+		ConnectionStateReady,
+		ConnectionStateDisabled,
+		ConnectionStateDisconnecting,
+		ConnectionStateDisconnected:
+		return true
+	default:
+		return false
+	}
+}
+
 type Connection struct {
 	ID               uuid.UUID       `gorm:"column:id;primaryKey"`
+	NamespacePath    string          `gorm:"column:namespace_path"`
 	State            ConnectionState `gorm:"column:state"`
 	ConnectorId      uuid.UUID       `gorm:"column:connector_id"`
 	ConnectorVersion uint64          `gorm:"column:connector_version"`
@@ -46,7 +61,41 @@ func (c *Connection) GetConnectorVersion() uint64 {
 	return c.ConnectorVersion
 }
 
+func (c *Connection) Validate() error {
+	result := &multierror.Error{}
+
+	if c.ID == uuid.Nil {
+		result = multierror.Append(result, errors.New("connection id is required"))
+	}
+
+	if err := ValidateNamespacePath(c.NamespacePath); err != nil {
+		result = multierror.Append(result, errors.Wrap(err, "invalid connection namespace path"))
+	}
+
+	if !IsValidConnectionState(c.State) {
+		result = multierror.Append(result, errors.New("invalid connection state"))
+	}
+
+	if c.ConnectorId == uuid.Nil {
+		result = multierror.Append(result, errors.New("connection connector id is required"))
+	}
+
+	if c.ConnectorVersion == 0 {
+		result = multierror.Append(result, errors.New("connection connector version is required"))
+	}
+
+	return result.ErrorOrNil()
+}
+
 func (db *gormDB) CreateConnection(ctx context.Context, c *Connection) error {
+	if c == nil {
+		return errors.New("connection is required")
+	}
+
+	if err := c.Validate(); err != nil {
+		return err
+	}
+
 	sess := db.session(ctx)
 	result := sess.Create(&c)
 	if result.Error != nil {
@@ -89,6 +138,14 @@ func (db *gormDB) DeleteConnection(ctx context.Context, id uuid.UUID) error {
 }
 
 func (db *gormDB) SetConnectionState(ctx context.Context, id uuid.UUID, state ConnectionState) error {
+	if id == uuid.Nil {
+		return errors.New("connection id is required")
+	}
+
+	if !IsValidConnectionState(state) {
+		return errors.New("invalid connection state")
+	}
+
 	sqlDb, err := db.gorm.DB()
 	if err != nil {
 		return err

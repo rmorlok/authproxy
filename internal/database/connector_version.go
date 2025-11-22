@@ -95,9 +95,22 @@ const (
 	ConnectorVersionStateArchived ConnectorVersionState = "archived"
 )
 
+func IsValidConnectorVersionState[T string | ConnectorVersionState](state T) bool {
+	switch ConnectorVersionState(state) {
+	case ConnectorVersionStateDraft,
+		ConnectorVersionStatePrimary,
+		ConnectorVersionStateActive,
+		ConnectorVersionStateArchived:
+		return true
+	default:
+		return false
+	}
+}
+
 type ConnectorVersion struct {
 	ID                  uuid.UUID             `gorm:"column:id;primaryKey"`
 	Version             uint64                `gorm:"column:version;primaryKey"`
+	NamespacePath       string                `gorm:"column:namespace_path"`
 	State               ConnectorVersionState `gorm:"column:state"`
 	Type                string                `gorm:"column:type"`
 	Hash                string                `gorm:"column:hash"`
@@ -118,13 +131,11 @@ func (cv *ConnectorVersion) Validate() error {
 		result = multierror.Append(result, errors.New("version is required"))
 	}
 
-	switch cv.State {
-	case ConnectorVersionStateDraft,
-		ConnectorVersionStatePrimary,
-		ConnectorVersionStateActive,
-		ConnectorVersionStateArchived:
-		// Valid state
-	default:
+	if err := ValidateNamespacePath(cv.NamespacePath); err != nil {
+		result = multierror.Append(result, errors.Wrap(err, "invalid connector namespace path"))
+	}
+
+	if !IsValidConnectorVersionState(cv.State) {
 		result = multierror.Append(result, errors.New("invalid connector version state"))
 	}
 
@@ -239,11 +250,27 @@ func (db *gormDB) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 
 		sqb := sq.StatementBuilder.RunWith(sqlDb)
 
+		existingNamespace, _, err := sqlh.ScanWithDefault(sqb.
+			Select("namespace_path").
+			From("connector_versions").
+			Where(sq.Eq{"id": cv.ID, "version": cv.Version}).
+			QueryRowContext(ctx),
+			cv.NamespacePath)
+
+		if err != nil {
+			return err
+		}
+
+		if existingNamespace != cv.NamespacePath {
+			return errors.New("cannot modify connector namespace")
+		}
+
 		exitingState, defaultUsed, err := sqlh.ScanWithDefault(sqb.
 			Select("state").
 			From("connector_versions").
 			Where(sq.Eq{"id": cv.ID, "version": cv.Version}).
-			QueryRowContext(ctx), ConnectorVersionStateDraft)
+			QueryRowContext(ctx),
+			ConnectorVersionStateDraft)
 
 		existingRow := !defaultUsed
 		if err != nil {
@@ -299,6 +326,7 @@ func (db *gormDB) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				Columns(
 					"id",
 					"version",
+					"namespace_path",
 					"state",
 					"type",
 					"hash",
@@ -309,6 +337,7 @@ func (db *gormDB) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				Values(
 					cv.ID,
 					cv.Version,
+					cv.NamespacePath,
 					cv.State,
 					cv.Type,
 					cv.Hash,

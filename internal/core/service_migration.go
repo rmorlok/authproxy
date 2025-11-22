@@ -224,8 +224,14 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 					return errors.Wrap(err, "failed to get newest version of connector for precheck")
 				}
 
-				if newestVersion != nil && uint64(newestVersion.Version+1) != configConnector.Version {
-					return errors.Errorf("connector %s currently has version %d and cannot be incremented to %d", configConnector.Id, newestVersion.Version, configConnector.Version)
+				if newestVersion != nil {
+					if newestVersion.Version+1 != configConnector.Version {
+						return errors.Errorf("connector %s currently has version %d and cannot be incremented to %d", configConnector.Id, newestVersion.Version, configConnector.Version)
+					}
+
+					if newestVersion.NamespacePath != configConnector.GetNamespacePath() {
+						return errors.Errorf("connector %s currently has namespace path '%s' and cannot be changed to '%s'", configConnector.Id, newestVersion.NamespacePath, configConnector.GetNamespacePath())
+					}
 				}
 
 				if newestVersion == nil && configConnector.Version != 1 {
@@ -235,6 +241,10 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 				if configConnector.State == "" {
 					// Unless specified, this is trying to be the primary version; important for hash
 					configConnector.State = string(database.ConnectorVersionStatePrimary)
+				}
+
+				if existingVersion.NamespacePath != configConnector.GetNamespacePath() {
+					return errors.Errorf("connector %s currently has namespace path '%s' and cannot be changed to %s", configConnector.Id, existingVersion.NamespacePath, configConnector.GetNamespacePath())
 				}
 
 				if existingVersion.State != database.ConnectorVersionStateDraft && existingVersion.Hash != configConnector.Hash() {
@@ -261,6 +271,10 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 		if len(results) > 1 {
 			connectorIds := strings.Join(util.Map(results, func(c database.Connector) string { return c.ID.String() }), ", ")
 			return errors.Errorf("connector type %s is not unique among existing defined connectors: %s", configConnector.Type, connectorIds)
+		} else if len(results) == 1 {
+			if results[0].NamespacePath != configConnector.GetNamespacePath() {
+				return errors.Errorf("connector %s currently has namespace path '%s' and cannot be changed to '%s'", configConnector.Id, results[0].NamespacePath, configConnector.GetNamespacePath())
+			}
 		}
 	}
 
@@ -269,7 +283,7 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 
 // migrateConnector migrates a single connector from configuration to the database
 func (s *service) migrateConnector(ctx context.Context, configConnector *config.Connector) error {
-	b := newVersionBuilder(s)
+	b := newConnectorVersionBuilder(s)
 
 	id := apctx.GetUuidGenerator(ctx).New()
 	if configConnector.HasId() {

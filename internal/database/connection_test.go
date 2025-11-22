@@ -19,7 +19,13 @@ func TestConnections(t *testing.T) {
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		u := uuid.New()
-		err := db.CreateConnection(ctx, &Connection{ID: u, State: ConnectionStateCreated})
+		err := db.CreateConnection(ctx, &Connection{
+			ID:               u,
+			NamespacePath:    "root/some-namespace",
+			ConnectorId:      uuid.New(),
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+		})
 		assert.NoError(t, err)
 
 		c, err := db.GetConnection(ctx, u)
@@ -47,7 +53,12 @@ func TestConnections(t *testing.T) {
 		`, []connectionResult{})
 
 		u := uuid.New()
-		err := db.CreateConnection(ctx, &Connection{ID: u, State: ConnectionStateCreated})
+		err := db.CreateConnection(ctx, &Connection{
+			ID:               u,
+			NamespacePath:    "root/some-namespace",
+			ConnectorId:      uuid.New(),
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated})
 		assert.NoError(t, err)
 
 		test_utils.AssertSql(t, rawDb, `
@@ -108,7 +119,13 @@ func TestConnections(t *testing.T) {
 		`, []connectionResult{})
 
 		u := uuid.New()
-		err := db.CreateConnection(ctx, &Connection{ID: u, State: ConnectionStateCreated})
+		err := db.CreateConnection(ctx, &Connection{
+			ID:               u,
+			NamespacePath:    "root/some-namespace",
+			ConnectorId:      uuid.New(),
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+		})
 		assert.NoError(t, err)
 
 		test_utils.AssertSql(t, rawDb, `
@@ -175,7 +192,13 @@ func TestConnections(t *testing.T) {
 				state = ConnectionStateReady
 			}
 
-			err := db.CreateConnection(ctx, &Connection{ID: u, State: state})
+			err := db.CreateConnection(ctx, &Connection{
+				ID:               u,
+				NamespacePath:    "root/some-namespace",
+				ConnectorId:      uuid.New(),
+				ConnectorVersion: 1,
+				State:            state,
+			})
 			assert.NoError(t, err)
 		}
 
@@ -255,7 +278,13 @@ func TestConnections(t *testing.T) {
 				state = ConnectionStateReady
 			}
 
-			err := db.CreateConnection(ctx, &Connection{ID: u, State: state})
+			err := db.CreateConnection(ctx, &Connection{
+				ID:               u,
+				NamespacePath:    "root/some-namespace",
+				ConnectorId:      uuid.New(),
+				ConnectorVersion: 1,
+				State:            state,
+			})
 			assert.NoError(t, err)
 		}
 
@@ -263,14 +292,26 @@ func TestConnections(t *testing.T) {
 		now = now.Add(time.Second)
 		c.SetTime(now)
 		u := uuid.New()
-		err := db.CreateConnection(ctx, &Connection{ID: u, State: ConnectionStateDisconnecting})
+		err := db.CreateConnection(ctx, &Connection{
+			ID:               u,
+			NamespacePath:    "root/some-namespace",
+			ConnectorId:      uuid.New(),
+			ConnectorVersion: 1,
+			State:            ConnectionStateDisconnecting,
+		})
 		assert.NoError(t, err)
 
 		// A deleted connection
 		now = now.Add(time.Second)
 		c.SetTime(now)
 		u = uuid.New()
-		err = db.CreateConnection(ctx, &Connection{ID: u, State: ConnectionStateDisconnected})
+		err = db.CreateConnection(ctx, &Connection{
+			ID:               u,
+			NamespacePath:    "root/some-namespace",
+			ConnectorId:      uuid.New(),
+			ConnectorVersion: 1,
+			State:            ConnectionStateDisconnected,
+		})
 		assert.NoError(t, err)
 		now = now.Add(time.Second)
 		c.SetTime(now)

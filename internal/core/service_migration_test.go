@@ -53,7 +53,7 @@ func TestService(t *testing.T) {
 		asynqClient = mock.NewMockClient(ctrl)
 		h = hmock.NewMockF(ctrl)
 
-		service = NewConnectorsService(cfg, db, e, r, h, asynqClient, logger)
+		service = NewCoreService(cfg, db, e, r, h, asynqClient, logger)
 
 		return func() {
 			ctrl.Finish()

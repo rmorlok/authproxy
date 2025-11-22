@@ -2,11 +2,12 @@ package encrypt
 
 import (
 	"context"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestService(t *testing.T) {
@@ -46,14 +47,18 @@ func TestService(t *testing.T) {
 	s := NewEncryptService(cfg, db)
 
 	connection := database.Connection{
-		ID:    uuid.New(),
-		State: database.ConnectionStateReady,
+		ID:               uuid.New(),
+		NamespacePath:    "root/some-namespace",
+		ConnectorId:      uuid.New(),
+		ConnectorVersion: 1,
+		State:            database.ConnectionStateReady,
 	}
 	require.NoError(t, db.CreateConnection(context.Background(), &connection))
 
 	connectorVersion := database.ConnectorVersion{
 		ID:                  uuid.New(),
 		Version:             1,
+		NamespacePath:       "root/some-namespace",
 		State:               database.ConnectorVersionStatePrimary,
 		Type:                "test",
 		Hash:                "test",

@@ -174,7 +174,7 @@ func (dm *DependencyManager) GetAsyncInspector() *asynq.Inspector {
 
 func (dm *DependencyManager) GetConnectorsService() connectorsinterface.C {
 	if dm.c == nil {
-		dm.c = core.NewConnectorsService(
+		dm.c = core.NewCoreService(
 			dm.GetConfig(),
 			dm.GetDatabase(),
 			dm.GetEncryptService(),
