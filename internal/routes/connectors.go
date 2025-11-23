@@ -199,7 +199,7 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 			api_common.NewHttpStatusErrorBuilder().
 				WithStatusInternalServerError().
 				WithInternalErr(err).
-				WithResponseMsg("failed to list connectors from cursor").
+				WithResponseMsg("failed to list core from cursor").
 				BuildStatusError().
 				WriteGinResponse(r.cfg, gctx)
 			return

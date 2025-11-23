@@ -124,5 +124,121 @@ func TestNamespaces(t *testing.T) {
 			require.Equal(t, NamespacePathFromRoot("some-namespace"), RootNamespace+"/some-namespace")
 			require.Equal(t, NamespacePathFromRoot("some-namespace", "other-namespace"), RootNamespace+"/some-namespace/other-namespace")
 		})
+		t.Run("NamespaceIsChild", func(t *testing.T) {
+			tests := []struct {
+				name   string
+				parent string
+				child  string
+				result bool
+			}{
+				{
+					name:   "Empty Child",
+					parent: "root",
+					child:  "",
+					result: false,
+				},
+				{
+					name:   "Empty Parent",
+					parent: "",
+					child:  "root",
+					result: false,
+				},
+				{
+					name:   "Same root",
+					parent: "root",
+					child:  "root",
+					result: false,
+				},
+				{
+					name:   "Same child",
+					parent: "root/child",
+					child:  "root/child",
+					result: false,
+				},
+				{
+					name:   "Child of root",
+					parent: "root",
+					child:  "root/child",
+					result: true,
+				},
+				{
+					name:   "Nested",
+					parent: "root/child",
+					child:  "root/child/grandchild",
+					result: true,
+				},
+				{
+					name:   "Requires separator",
+					parent: "root/child",
+					child:  "root/childgrandchild",
+					result: false,
+				},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					result := NamespaceIsChild(tt.parent, tt.child)
+					require.Equal(t, tt.result, result)
+				})
+			}
+		})
+		t.Run("NamespaceIsSameOrChild", func(t *testing.T) {
+			tests := []struct {
+				name   string
+				parent string
+				child  string
+				result bool
+			}{
+				{
+					name:   "Empty Child",
+					parent: "root",
+					child:  "",
+					result: false,
+				},
+				{
+					name:   "Empty Parent",
+					parent: "",
+					child:  "root",
+					result: false,
+				},
+				{
+					name:   "Same root",
+					parent: "root",
+					child:  "root",
+					result: true,
+				},
+				{
+					name:   "Same child",
+					parent: "root/child",
+					child:  "root/child",
+					result: true,
+				},
+				{
+					name:   "Child of root",
+					parent: "root",
+					child:  "root/child",
+					result: true,
+				},
+				{
+					name:   "Nested",
+					parent: "root/child",
+					child:  "root/child/grandchild",
+					result: true,
+				},
+				{
+					name:   "Requires separator",
+					parent: "root/child",
+					child:  "root/childgrandchild",
+					result: false,
+				},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					result := NamespaceIsSameOrChild(tt.parent, tt.child)
+					require.Equal(t, tt.result, result)
+				})
+			}
+		})
 	})
 }

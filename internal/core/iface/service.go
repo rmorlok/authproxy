@@ -73,6 +73,13 @@ type C interface {
 	GetConnection(ctx context.Context, id uuid.UUID) (Connection, error)
 
 	/*
+	 * Namespace
+	 */
+
+	// EnsureNamespaceAncestorPath ensures that the specified namespace path exists in the database.
+	EnsureNamespaceAncestorPath(ctx context.Context, targetNamespace string) (Namespace, error)
+
+	/*
 	 * Task manager interface functions.
 	 */
 

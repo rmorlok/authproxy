@@ -5,11 +5,13 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/auth"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/config/common"
 	"github.com/rmorlok/authproxy/internal/core"
 	connIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -24,14 +26,14 @@ import (
 )
 
 type ConnectionsRoutes struct {
-	cfg        config.C
-	auth       auth.A
-	connectors connIface.C
-	db         database.DB
-	r          apredis.Client
-	httpf      httpf.F
-	encrypt    encrypt.E
-	oauthf     oauth2.Factory
+	cfg     config.C
+	auth    auth.A
+	core    connIface.C
+	db      database.DB
+	r       apredis.Client
+	httpf   httpf.F
+	encrypt encrypt.E
+	oauthf  oauth2.Factory
 }
 
 type InitiateConnectionRequest struct {
@@ -41,20 +43,36 @@ type InitiateConnectionRequest struct {
 	// Version of the connector to initiate connection for; if not specified defaults to primary version.
 	ConnectorVersion uint64 `json:"connector_version,omitempty"`
 
+	// The namespace to create the connection in. Must be the namespace of connector or a child namespace of that
+	// namespace. Defaults to the connector namespace if not specified.
+	IntoNamespace string `json:"into_namespace,omitempty"`
+
 	// The URL to return to after connection is completed.
 	ReturnToUrl string `json:"return_to_url"`
 }
 
 func (icr *InitiateConnectionRequest) Validate() error {
+	result := &multierror.Error{}
+
 	if icr.ConnectorId == uuid.Nil {
-		return fmt.Errorf("connector_id is required")
+		result = multierror.Append(result, fmt.Errorf("connector_id is required"))
 	}
 
-	return nil
+	if icr.HasIntoNamespace() {
+		if err := common.ValidateNamespacePath(icr.IntoNamespace); err != nil {
+			result = multierror.Append(result, err)
+		}
+	}
+
+	return result.ErrorOrNil()
 }
 
 func (icr *InitiateConnectionRequest) HasVersion() bool {
 	return icr.ConnectorVersion > 0
+}
+
+func (icr *InitiateConnectionRequest) HasIntoNamespace() bool {
+	return icr.IntoNamespace != ""
 }
 
 type InitiateConnectionResponseType string
@@ -109,9 +127,9 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	var err error
 	var cv connIface.ConnectorVersion
 	if req.HasVersion() {
-		cv, err = r.connectors.GetConnectorVersion(ctx, req.ConnectorId, req.ConnectorVersion)
+		cv, err = r.core.GetConnectorVersion(ctx, req.ConnectorId, req.ConnectorVersion)
 	} else {
-		cv, err = r.connectors.GetConnectorVersionForState(ctx, req.ConnectorId, database.ConnectorVersionStatePrimary)
+		cv, err = r.core.GetConnectorVersionForState(ctx, req.ConnectorId, database.ConnectorVersionStatePrimary)
 	}
 
 	if err != nil {
@@ -132,8 +150,43 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 		return
 	}
 
+	targetNamespace := cv.GetNamespace()
+	if req.HasIntoNamespace() {
+		targetNamespace = req.IntoNamespace
+	}
+
+	if err := common.ValidateNamespacePath(targetNamespace); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsgf("invalid namespace '%s'", targetNamespace).
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if !common.NamespaceIsSameOrChild(cv.GetNamespace(), targetNamespace) {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsgf("target namespace '%s' is not a child of the connector's namespace '%s'", targetNamespace, cv.GetNamespace()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	_, err = r.core.EnsureNamespaceAncestorPath(ctx, targetNamespace)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
 	connection := database.Connection{
 		ID:               uuid.New(),
+		Namespace:        targetNamespace,
 		ConnectorId:      cv.GetID(),
 		ConnectorVersion: cv.GetVersion(),
 		State:            database.ConnectionStateCreated,
@@ -305,7 +358,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	connectorVersions, err := r.connectors.GetConnectorVersions(ctx, core.GetConnectorVersionIdsForConnections(result.Results))
+	connectorVersions, err := r.core.GetConnectorVersions(ctx, core.GetConnectorVersionIdsForConnections(result.Results))
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().
@@ -367,7 +420,7 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	cv, err := r.connectors.GetConnectorVersion(ctx, c.ConnectorId, c.ConnectorVersion)
+	cv, err := r.core.GetConnectorVersion(ctx, c.ConnectorId, c.ConnectorVersion)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().
@@ -430,7 +483,7 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 		return
 	}
 
-	cv, err := r.connectors.GetConnectorVersion(ctx, c.ConnectorId, c.ConnectorVersion)
+	cv, err := r.core.GetConnectorVersion(ctx, c.ConnectorId, c.ConnectorVersion)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().
@@ -449,7 +502,7 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 		return
 	}
 
-	ti, err := r.connectors.DisconnectConnection(ctx, id)
+	ti, err := r.core.DisconnectConnection(ctx, id)
 	if err != nil {
 		api_common.HttpStatusErrorBuilderFromError(err).
 			WithStatusInternalServerError().
@@ -559,7 +612,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 		return
 	}
 
-	cv, err := r.connectors.GetConnectorVersion(ctx, c.ConnectorId, c.ConnectorVersion)
+	cv, err := r.core.GetConnectorVersion(ctx, c.ConnectorId, c.ConnectorVersion)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().
@@ -616,13 +669,13 @@ func NewConnectionsRoutes(
 	logger *slog.Logger,
 ) *ConnectionsRoutes {
 	return &ConnectionsRoutes{
-		cfg:        cfg,
-		auth:       authService,
-		connectors: c,
-		db:         db,
-		r:          r,
-		httpf:      httpf,
-		encrypt:    encrypt,
-		oauthf:     oauth2.NewFactory(cfg, db, r, c, httpf, encrypt, logger),
+		cfg:     cfg,
+		auth:    authService,
+		core:    c,
+		db:      db,
+		r:       r,
+		httpf:   httpf,
+		encrypt: encrypt,
+		oauthf:  oauth2.NewFactory(cfg, db, r, c, httpf, encrypt, logger),
 	}
 }

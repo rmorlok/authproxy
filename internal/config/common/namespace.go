@@ -51,3 +51,14 @@ func NamespacePathFromRoot(parts ...string) string {
 	allPaths := append([]string{RootNamespace}, parts...)
 	return strings.Join(allPaths, "/")
 }
+
+// NamespaceIsChild returns true if the child path is a child of the parent path.
+func NamespaceIsChild(parentPath, childPath string) bool {
+	return strings.HasPrefix(childPath, parentPath+"/")
+}
+
+// NamespaceIsSameOrChild returns true if the parent path is the same as the child path,
+// or if the child path is a child of the parent path.
+func NamespaceIsSameOrChild(parentPath, childPath string) bool {
+	return parentPath == childPath || NamespaceIsChild(parentPath, childPath)
+}
