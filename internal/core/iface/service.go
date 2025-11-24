@@ -76,8 +76,17 @@ type C interface {
 	 * Namespace
 	 */
 
+	// GetNamespace returns a namespace by path.
+	GetNamespace(ctx context.Context, path string) (Namespace, error)
+
 	// EnsureNamespaceAncestorPath ensures that the specified namespace path exists in the database.
 	EnsureNamespaceAncestorPath(ctx context.Context, targetNamespace string) (Namespace, error)
+
+	// ListNamespacesBuilder returns a builder to allow the caller to list namespaces matching certain criteria.
+	ListNamespacesBuilder() ListNamespacesBuilder
+
+	// ListNamespacesFromCursor continues listing namespaces from a cursor to support pagination.
+	ListNamespacesFromCursor(ctx context.Context, cursor string) (ListNamespacesExecutor, error)
 
 	/*
 	 * Task manager interface functions.

@@ -95,6 +95,11 @@ func GetGinServer(
 		dm.GetEncryptService(),
 		logger,
 	)
+	routesNamespaces := common_routes.NewNamespacesRoutes(
+		dm.GetConfig(),
+		authService,
+		dm.GetConnectorsService(),
+	)
 	routesRequestLog := common_routes.NewRequestLogRoutes(
 		dm.GetConfig(),
 		authService,
@@ -114,6 +119,7 @@ func GetGinServer(
 
 	routesConnectors.Register(api)
 	routesConnections.Register(api)
+	routesNamespaces.Register(api)
 	routesRequestLog.Register(api)
 	routesActors.Register(api)
 
