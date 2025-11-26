@@ -16,6 +16,7 @@ type Database interface {
 	GetProvider() DatabaseProvider
 	GetAutoMigrate() bool
 	GetAutoMigrationLockDuration() time.Duration
+	GetUri() string
 }
 
 func UnmarshallYamlDatabaseString(data string) (Database, error) {

@@ -1,6 +1,9 @@
 package config
 
-import "time"
+import (
+	"fmt"
+	"time"
+)
 
 type DatabaseSqlite struct {
 	Provider                  DatabaseProvider `json:"provider" yaml:"provider"`
@@ -23,4 +26,8 @@ func (d *DatabaseSqlite) GetAutoMigrationLockDuration() time.Duration {
 	}
 
 	return d.AutoMigrationLockDuration.Duration
+}
+
+func (d *DatabaseSqlite) GetUri() string {
+	return fmt.Sprintf("sqlite3://%s", d.Path)
 }

@@ -64,10 +64,16 @@ func NewSqliteConnection(dbConfig *config.DatabaseSqlite, secretKey config.KeyDa
 		return nil, errors.Wrapf(err, "failed to open sqlite database '%s'", dbConfig.Path)
 	}
 
-	return &gormDB{gorm: db, secretKey: secretKey, logger: l}, nil
+	return &gormDB{
+		cfg:       dbConfig,
+		gorm:      db,
+		secretKey: secretKey,
+		logger:    l,
+	}, nil
 }
 
 type gormDB struct {
+	cfg       config.Database
 	gorm      *gorm.DB       // the gorm instance
 	secretKey config.KeyData // the AES key used to secure cursors
 	logger    *slog.Logger
