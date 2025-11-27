@@ -3,6 +3,7 @@ package routes
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/auth"
@@ -224,6 +225,15 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 
 	a, err := r.db.GetActor(ctx, id)
 	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("actor not found").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			return
+		}
+
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().
 			WithInternalErr(err).
@@ -278,6 +288,15 @@ func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 
 	a, err := r.db.GetActorByExternalId(ctx, externalId)
 	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("actor not found").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			return
+		}
+
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().
 			WithInternalErr(err).
@@ -343,6 +362,12 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 
 	a, err := r.db.GetActor(ctx, id)
 	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			// The actor already doesn't exist
+			gctx.Status(http.StatusNoContent)
+			return
+		}
+
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().
 			WithInternalErr(err).
@@ -407,6 +432,12 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 
 	a, err := r.db.GetActorByExternalId(ctx, externalId)
 	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			// The actor already doesn't exist
+			gctx.Status(http.StatusNoContent)
+			return
+		}
+
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().
 			WithInternalErr(err).

@@ -96,8 +96,10 @@ func (l *listConnectorsFilters) ForId(id uuid.UUID) ListConnectorsBuilder {
 }
 
 func (l *listConnectorsFilters) OrderBy(field ConnectorOrderByField, by pagination.OrderBy) ListConnectorsBuilder {
-	l.OrderByFieldVal = &field
-	l.OrderByVal = &by
+	if IsValidConnectorOrderByField(field) {
+		l.OrderByFieldVal = &field
+		l.OrderByVal = &by
+	}
 	return l
 }
 

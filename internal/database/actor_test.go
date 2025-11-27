@@ -51,7 +51,7 @@ func TestActor(t *testing.T) {
 
 		id := uuid.New()
 		a, err := db.GetActor(ctx, id)
-		require.NoError(t, err)
+		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, a, "actor should not exist")
 
 		actor := &Actor{
@@ -78,7 +78,7 @@ func TestActor(t *testing.T) {
 
 		id := uuid.New()
 		a, err := db.GetActorByExternalId(ctx, id.String())
-		require.NoError(t, err)
+		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, a, "actor should not exist")
 
 		actor := &Actor{
@@ -91,6 +91,13 @@ func TestActor(t *testing.T) {
 		a, err = db.GetActorByExternalId(ctx, actor.ExternalId)
 		require.NoError(t, err)
 		require.Equal(t, actor.Email, a.Email)
+
+		err = db.DeleteActor(ctx, actor.ID)
+		require.NoError(t, err)
+
+		a, err = db.GetActorByExternalId(ctx, actor.ExternalId)
+		require.ErrorIs(t, err, ErrNotFound)
+		require.Nil(t, a, "actor should not exist")
 	})
 	t.Run("CreateActor", func(t *testing.T) {
 		t.Run("valid", func(t *testing.T) {
@@ -331,7 +338,7 @@ func TestActor(t *testing.T) {
 
 		// direct get should return nil (soft-deleted)
 		got, err := db.GetActor(ctx, id)
-		require.NoError(t, err)
+		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, got)
 
 		// default listing should not include deleted
@@ -344,7 +351,7 @@ func TestActor(t *testing.T) {
 		require.NoError(t, page.Error)
 		require.Len(t, page.Results, 1)
 		require.Equal(t, id, page.Results[0].ID)
-		require.False(t, page.Results[0].DeletedAt.Time.IsZero())
+		require.NotNil(t, page.Results[0].DeletedAt)
 	})
 
 	t.Run("GetID and ToJwtActor", func(t *testing.T) {

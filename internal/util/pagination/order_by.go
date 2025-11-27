@@ -18,6 +18,11 @@ func (o *OrderBy) String() string {
 		return "ASC"
 	}
 
+	if !o.IsAsc() && !o.IsDesc() {
+		// Protect against invalid values
+		return "ASC"
+	}
+
 	return string(*o)
 }
 

@@ -2,17 +2,18 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"strings"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/jwt"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
-	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type ActorOrderByField string
@@ -43,16 +44,57 @@ func IsValidActorOrderByField[T string | ActorOrderByField](field T) bool {
 	}
 }
 
+const ActorTable = "actors"
+
 // Actor is some entity taking action within the system.
 type Actor struct {
-	ID         uuid.UUID      `gorm:"column:id;primarykey"`
-	ExternalId string         `gorm:"column:external_id;unique,index"`
-	Email      string         `gorm:"column:email;index"`
-	Admin      bool           `gorm:"column:admin"`
-	SuperAdmin bool           `gorm:"column:super_admin"`
-	CreatedAt  time.Time      `gorm:"column:created_at"`
-	UpdatedAt  time.Time      `gorm:"column:updated_at"`
-	DeletedAt  gorm.DeletedAt `gorm:"column:deleted_at;index"`
+	ID         uuid.UUID  `gorm:"column:id;primarykey"`
+	ExternalId string     `gorm:"column:external_id;unique,index"`
+	Email      string     `gorm:"column:email;index"`
+	Admin      bool       `gorm:"column:admin"`
+	SuperAdmin bool       `gorm:"column:super_admin"`
+	CreatedAt  time.Time  `gorm:"column:created_at"`
+	UpdatedAt  time.Time  `gorm:"column:updated_at"`
+	DeletedAt  *time.Time `gorm:"column:deleted_at;index"`
+}
+
+func (a *Actor) cols() []string {
+	return []string{
+		"id",
+		"external_id",
+		"email",
+		"admin",
+		"super_admin",
+		"created_at",
+		"updated_at",
+		"deleted_at",
+	}
+}
+
+func (a *Actor) fields() []any {
+	return []any{
+		&a.ID,
+		&a.ExternalId,
+		&a.Email,
+		&a.Admin,
+		&a.SuperAdmin,
+		&a.CreatedAt,
+		&a.UpdatedAt,
+		&a.DeletedAt,
+	}
+}
+
+func (a *Actor) values() []any {
+	return []any{
+		a.ID,
+		a.ExternalId,
+		a.Email,
+		a.Admin,
+		a.SuperAdmin,
+		a.CreatedAt,
+		a.UpdatedAt,
+		a.DeletedAt,
+	}
 }
 
 func (a *Actor) setFromJwt(ja *jwt.Actor) {
@@ -139,41 +181,44 @@ func (a *Actor) validate() error {
 }
 
 func (db *gormDB) GetActor(ctx context.Context, id uuid.UUID) (*Actor, error) {
-	sess := db.session(ctx)
-
-	var a Actor
-	result := sess.First(&a, id)
-	if result.Error != nil {
-		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
-			return nil, nil
+	var result Actor
+	err := db.sq.
+		Select(result.cols()...).
+		From(ActorTable).
+		Where(sq.Eq{"id": id, "deleted_at": nil}).
+		RunWith(db.db).
+		QueryRow().
+		Scan(result.fields()...)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
 		}
-		return nil, result.Error
+
+		return nil, err
 	}
 
-	if result.RowsAffected == 0 {
-		return nil, nil
-	}
-
-	return &a, nil
+	return &result, nil
 }
 
 func (db *gormDB) GetActorByExternalId(ctx context.Context, externalId string) (*Actor, error) {
-	q := db.session(ctx)
+	var result Actor
+	err := sq.
+		Select(result.cols()...).
+		From(ActorTable).
+		Where(sq.Eq{"external_id": externalId, "deleted_at": nil}).
+		RunWith(db.db).
+		QueryRow().
+		Scan(result.fields()...)
 
-	var a Actor
-	result := q.Where("external_id = ?", externalId).First(&a)
-	if result.Error != nil {
-		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
-			return nil, nil
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
 		}
-		return nil, result.Error
+
+		return nil, err
 	}
 
-	if result.RowsAffected == 0 {
-		return nil, nil
-	}
-
-	return &a, nil
+	return &result, nil
 }
 
 func (db *gormDB) CreateActor(ctx context.Context, a *Actor) error {
@@ -186,9 +231,18 @@ func (db *gormDB) CreateActor(ctx context.Context, a *Actor) error {
 		return validationErr
 	}
 
-	return db.gorm.Transaction(func(tx *gorm.DB) error {
+	return db.transaction(func(tx *sql.Tx) error {
 		var count int64
-		err := tx.Model(&Actor{}).Where("id = ? OR external_id = ?", a.ID, a.ExternalId).Count(&count).Error
+		err := db.sq.
+			Select("COUNT(*)").
+			From(ActorTable).
+			Where(sq.Or{
+				sq.Eq{"id": a.ID},
+				sq.Eq{"external_id": a.ExternalId},
+			}).
+			RunWith(tx).
+			QueryRow().
+			Scan(&count)
 		if err != nil {
 			return err
 		}
@@ -197,9 +251,28 @@ func (db *gormDB) CreateActor(ctx context.Context, a *Actor) error {
 			return errors.New("actor already exists")
 		}
 
-		result := tx.Create(a)
-		if result.Error != nil {
-			return result.Error
+		cpy := *a
+		now := apctx.GetClock(ctx).Now()
+		cpy.CreatedAt = now
+		cpy.UpdatedAt = now
+
+		result, err := db.sq.
+			Insert(ActorTable).
+			Columns(cpy.cols()...).
+			Values(cpy.values()...).
+			RunWith(tx).
+			Exec()
+		if err != nil {
+			return err
+		}
+
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+
+		if affected == 0 {
+			return errors.New("no rows inserted")
 		}
 
 		return nil
@@ -218,12 +291,18 @@ func (db *gormDB) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 
 	var result *Actor
 
-	err := db.gorm.Transaction(func(tx *gorm.DB) error {
+	err := db.transaction(func(tx *sql.Tx) error {
 		var existingActor Actor
-		err := tx.Where("external_id = ?", actor.ID).First(&existingActor).Error
+		err := db.sq.
+			Select(existingActor.cols()...).
+			From(ActorTable).
+			Where(sq.Eq{"external_id": actor.ID}).
+			RunWith(db.db).
+			QueryRow().
+			Scan(existingActor.fields()...)
 		if err != nil {
-			if err == gorm.ErrRecordNotFound {
-				// Actor does not exist. Create new actor.
+			if errors.Is(err, sql.ErrNoRows) {
+				// Actor does not exist. Create a new actor.
 				now := apctx.GetClock(ctx).Now()
 				newActor := Actor{
 					ID:        uuid.New(),
@@ -236,19 +315,32 @@ func (db *gormDB) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 					return validationErr
 				}
 
-				if createErr := tx.Create(&newActor).Error; createErr != nil {
-					return createErr
+				dbResult, err := db.sq.
+					Insert(ActorTable).
+					Columns(newActor.cols()...).
+					Values(newActor.values()...).
+					RunWith(tx).
+					Exec()
+				if err != nil {
+					return errors.Wrap(err, "failed to create actor on upsert")
+				}
+
+				affected, err := dbResult.RowsAffected()
+				if err != nil {
+					return errors.Wrap(err, "failed to create actor on upsert")
+				}
+
+				if affected == 0 {
+					return errors.New("failed to upsert actor; no rows inserted")
 				}
 
 				result = &newActor
 				return nil
 			}
 
-			// Return the error if it wasn't a "record not found" error
 			return err
 		}
 
-		// Actor exists and was loaded
 		if !existingActor.sameAsJwt(actor) {
 			existingActor.setFromJwt(actor)
 			validationErr := existingActor.validate()
@@ -256,8 +348,24 @@ func (db *gormDB) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 				return validationErr
 			}
 
-			if updateErr := tx.Save(&existingActor).Error; updateErr != nil {
-				return updateErr
+			existingActor.UpdatedAt = apctx.GetClock(ctx).Now()
+
+			dbResult, err := db.sq.
+				Update(ActorTable).
+				SetMap(util.ZipToMap(existingActor.cols(), existingActor.values())).
+				RunWith(tx).
+				Exec()
+			if err != nil {
+				return errors.Wrap(err, "failed to update existing actor")
+			}
+
+			affected, err := dbResult.RowsAffected()
+			if err != nil {
+				return errors.Wrap(err, "failed to update existing actor")
+			}
+
+			if affected == 0 {
+				return errors.New("failed to update actor; no rows updated")
 			}
 		}
 
@@ -274,11 +382,31 @@ func (db *gormDB) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 }
 
 func (db *gormDB) DeleteActor(ctx context.Context, id uuid.UUID) error {
-	sess := db.session(ctx)
-	result := sess.Delete(&Actor{}, id)
-	if result.Error != nil {
-		return result.Error
+	now := apctx.GetClock(ctx).Now()
+	dbResult, err := db.sq.
+		Update(ActorTable).
+		Set("updated_at", now).
+		Set("deleted_at", now).
+		Where(sq.Eq{"id": id}).
+		RunWith(db.db).
+		Exec()
+	if err != nil {
+		return errors.Wrap(err, "failed to soft delete actor")
 	}
+
+	affected, err := dbResult.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "failed to soft delete actor")
+	}
+
+	if affected == 0 {
+		return ErrNotFound
+	}
+
+	if affected > 1 {
+		return errors.New("multiple actors were soft deleted")
+	}
+
 	return nil
 }
 
@@ -300,8 +428,8 @@ type ListActorsBuilder interface {
 
 type listActorsFilters struct {
 	db                *gormDB             `json:"-"`
-	LimitVal          int32               `json:"limit"`
-	Offset            int32               `json:"offset"`
+	LimitVal          uint64              `json:"limit"`
+	Offset            uint64              `json:"offset"`
 	OrderByFieldVal   *ActorOrderByField  `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy `json:"order_by"`
 	IncludeDeletedVal bool                `json:"include_deleted,omitempty"`
@@ -312,13 +440,15 @@ type listActorsFilters struct {
 }
 
 func (l *listActorsFilters) Limit(limit int32) ListActorsBuilder {
-	l.LimitVal = limit
+	l.LimitVal = uint64(limit)
 	return l
 }
 
 func (l *listActorsFilters) OrderBy(field ActorOrderByField, by pagination.OrderBy) ListActorsBuilder {
-	l.OrderByFieldVal = &field
-	l.OrderByVal = &by
+	if IsValidActorOrderByField(field) {
+		l.OrderByFieldVal = &field
+		l.OrderByVal = &by
+	}
 	return l
 }
 
@@ -361,11 +491,13 @@ func (l *listActorsFilters) FromCursor(ctx context.Context, cursor string) (List
 	return l, nil
 }
 
-func (l *listActorsFilters) applyRestrictions(ctx context.Context) *gorm.DB {
-	q := l.db.session(ctx)
+func (l *listActorsFilters) applyRestrictions(ctx context.Context) sq.SelectBuilder {
+	q := l.db.sq.
+		Select(util.ToPtr(Actor{}).cols()...).
+		From(ActorTable)
 
-	if l.IncludeDeletedVal {
-		q = q.Unscoped()
+	if !l.IncludeDeletedVal {
+		q = q.Where(sq.Eq{"deleted_at": nil})
 	}
 
 	if l.LimitVal <= 0 {
@@ -373,10 +505,10 @@ func (l *listActorsFilters) applyRestrictions(ctx context.Context) *gorm.DB {
 	}
 
 	// Always limit to one more than limit to check if there are more records
-	q = q.Limit(int(l.LimitVal + 1)).Offset(int(l.Offset))
+	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)
 
 	if l.OrderByFieldVal != nil {
-		q.Order(clause.OrderByColumn{Column: clause.Column{Name: string(*l.OrderByFieldVal)}, Desc: true})
+		q = q.OrderBy(fmt.Sprintf("%s %s", string(*l.OrderByFieldVal), l.OrderByVal.String()))
 	}
 
 	return q
@@ -384,16 +516,29 @@ func (l *listActorsFilters) applyRestrictions(ctx context.Context) *gorm.DB {
 
 func (l *listActorsFilters) fetchPage(ctx context.Context) pagination.PageResult[Actor] {
 	var err error
+
+	rows, err := l.applyRestrictions(ctx).
+		RunWith(l.db.db).
+		Query()
+	if err != nil {
+		return pagination.PageResult[Actor]{Error: err}
+	}
+	defer rows.Close()
+
 	var actors []Actor
-	result := l.applyRestrictions(ctx).Find(&actors)
-	if result.Error != nil {
-		return pagination.PageResult[Actor]{Error: result.Error}
+	for rows.Next() {
+		var a Actor
+		err := rows.Scan(a.fields()...)
+		if err != nil {
+			return pagination.PageResult[Actor]{Error: err}
+		}
+		actors = append(actors, a)
 	}
 
-	l.Offset = l.Offset + int32(len(actors)) - 1 // we request one more than the page size we return
+	l.Offset = l.Offset + uint64(len(actors)) - 1 // we request one more than the page size we return
 
 	cursor := ""
-	hasMore := int32(len(actors)) > l.LimitVal
+	hasMore := uint64(len(actors)) > l.LimitVal
 	if hasMore {
 		cursor, err = pagination.MakeCursor(ctx, l.db.secretKey, l)
 		if err != nil {
@@ -403,7 +548,7 @@ func (l *listActorsFilters) fetchPage(ctx context.Context) pagination.PageResult
 
 	return pagination.PageResult[Actor]{
 		HasMore: hasMore,
-		Results: actors[:util.MinInt32(l.LimitVal, int32(len(actors)))],
+		Results: actors[:util.MinUint64(l.LimitVal, uint64(len(actors)))],
 		Cursor:  cursor,
 	}
 }

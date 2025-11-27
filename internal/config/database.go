@@ -2,8 +2,10 @@ package config
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"time"
+
+	sq "github.com/Masterminds/squirrel"
+	"gopkg.in/yaml.v3"
 )
 
 type DatabaseProvider string
@@ -17,6 +19,8 @@ type Database interface {
 	GetAutoMigrate() bool
 	GetAutoMigrationLockDuration() time.Duration
 	GetUri() string
+	GetDsn() string
+	GetPlaceholderFormat() sq.PlaceholderFormat
 }
 
 func UnmarshallYamlDatabaseString(data string) (Database, error) {

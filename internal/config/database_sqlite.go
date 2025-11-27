@@ -3,6 +3,8 @@ package config
 import (
 	"fmt"
 	"time"
+
+	sq "github.com/Masterminds/squirrel"
 )
 
 type DatabaseSqlite struct {
@@ -29,5 +31,14 @@ func (d *DatabaseSqlite) GetAutoMigrationLockDuration() time.Duration {
 }
 
 func (d *DatabaseSqlite) GetUri() string {
-	return fmt.Sprintf("sqlite3://%s", d.Path)
+	return fmt.Sprintf("sqlite3://%s?_foreign_keys=on&_journal_mode=WAL", d.Path)
+}
+
+// GetDsn gets the Data Source Name
+func (d *DatabaseSqlite) GetDsn() string {
+	return fmt.Sprintf("file:%s?_foreign_keys=on&_journal_mode=WAL", d.Path)
+}
+
+func (d *DatabaseSqlite) GetPlaceholderFormat() sq.PlaceholderFormat {
+	return sq.Question
 }

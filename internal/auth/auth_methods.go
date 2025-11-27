@@ -3,16 +3,17 @@ package auth
 import (
 	"context"
 	"fmt"
+	"net/http"
+	"net/url"
+	"strings"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	jwt2 "github.com/rmorlok/authproxy/internal/jwt"
-	"net/http"
-	"net/url"
-	"strings"
-	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
@@ -259,14 +260,14 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 			// exist. If the actor does not exist, the claim is invalid. Admins are special cased so that they can
 			// be created dynamically based on information in the system.
 			actor, err = s.db.GetActorByExternalId(ctx, claims.Subject)
-			if err != nil {
+			if err != nil && !errors.Is(err, database.ErrNotFound) {
 				return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
 					WithStatusInternalServerError().
 					WithResponseMsg("database error").
 					WithInternalErr(errors.Wrap(err, "failed to get actor")).
 					Build()
 			}
-			if actor == nil {
+			if errors.Is(err, database.ErrNotFound) || actor == nil {
 				unauthenticatedError := api_common.NewHttpStatusErrorBuilder().
 					WithStatusUnauthorized().
 					WithResponseMsg("actor does not exist").

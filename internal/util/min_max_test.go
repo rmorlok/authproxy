@@ -1,8 +1,9 @@
 package util
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMax(t *testing.T) {
@@ -20,6 +21,11 @@ func TestMax(t *testing.T) {
 	assert.Equal(t, int64(1), MaxInt64(int64(1)))
 	assert.Equal(t, int64(3), MaxInt64(int64(3), int64(2)))
 	assert.Panics(t, func() { MaxInt64() })
+
+	assert.Equal(t, uint64(3), MaxUint64(uint64(1), uint64(2), uint64(3)))
+	assert.Equal(t, uint64(1), MaxUint64(uint64(1)))
+	assert.Equal(t, uint64(3), MaxUint64(uint64(3), uint64(2)))
+	assert.Panics(t, func() { MaxUint64() })
 }
 
 func TestMin(t *testing.T) {
@@ -37,4 +43,9 @@ func TestMin(t *testing.T) {
 	assert.Equal(t, int64(1), MinInt64(int64(1)))
 	assert.Equal(t, int64(2), MinInt64(int64(3), int64(2)))
 	assert.Panics(t, func() { MinInt64() })
+
+	assert.Equal(t, uint64(1), MinUint64(uint64(1), uint64(2), uint64(3)))
+	assert.Equal(t, uint64(1), MinUint64(uint64(1)))
+	assert.Equal(t, uint64(2), MinUint64(uint64(3), uint64(2)))
+	assert.Panics(t, func() { MinUint64() })
 }

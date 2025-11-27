@@ -298,7 +298,7 @@ func TestActorsRoutes(t *testing.T) {
 			require.Equal(t, http.StatusNoContent, w.Code)
 
 			got, err := tu.Db.GetActor(context.Background(), a.ID)
-			require.NoError(t, err)
+			require.ErrorIs(t, err, database.ErrNotFound)
 			require.Nil(t, got)
 		})
 	})
@@ -338,7 +338,7 @@ func TestActorsRoutes(t *testing.T) {
 			require.Equal(t, http.StatusNoContent, w.Code)
 
 			got, err := tu.Db.GetActorByExternalId(context.Background(), a.ExternalId)
-			require.NoError(t, err)
+			require.ErrorIs(t, err, database.ErrNotFound)
 			require.Nil(t, got)
 		})
 	})

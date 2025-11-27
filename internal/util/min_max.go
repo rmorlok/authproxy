@@ -33,6 +33,17 @@ func MaxInt64(vals ...int64) int64 {
 	return max
 }
 
+func MaxUint64(vals ...uint64) uint64 {
+	max := vals[0]
+	for _, i := range vals {
+		if i > max {
+			max = i
+		}
+	}
+
+	return max
+}
+
 func MinInt(vals ...int) int {
 	min := vals[0]
 	for _, i := range vals {
@@ -56,6 +67,17 @@ func MinInt32(vals ...int32) int32 {
 }
 
 func MinInt64(vals ...int64) int64 {
+	min := vals[0]
+	for _, i := range vals {
+		if i < min {
+			min = i
+		}
+	}
+
+	return min
+}
+
+func MinUint64(vals ...uint64) uint64 {
 	min := vals[0]
 	for _, i := range vals {
 		if i < min {

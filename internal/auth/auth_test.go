@@ -14,6 +14,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	apredis2 "github.com/rmorlok/authproxy/internal/apredis"
@@ -254,11 +255,11 @@ type TestSetup struct {
 // regardless of if they have interacted with the system previously.
 func (ts *TestSetup) MustGetValidAdminUser(ctx context.Context) database.Actor {
 	a, err := ts.Db.GetActorByExternalId(ctx, "admin/bobdole")
-	if err != nil {
+	if err != nil && !errors.Is(err, database.ErrNotFound) {
 		panic(err)
 	}
 
-	if a == nil {
+	if errors.Is(err, database.ErrNotFound) {
 		a = &database.Actor{
 			ID:         uuid.New(),
 			ExternalId: "admin/bobdole",
@@ -287,11 +288,11 @@ func (ts *TestSetup) MustGetValidUninitializedAdminUser(ctx context.Context) dat
 // regardless of if they have interacted with the system previously.
 func (ts *TestSetup) MustGetValidUserByExternalId(ctx context.Context, externalId string) database.Actor {
 	a, err := ts.Db.GetActorByExternalId(ctx, externalId)
-	if err != nil {
+	if err != nil && !errors.Is(err, database.ErrNotFound) {
 		panic(err)
 	}
 
-	if a == nil {
+	if errors.Is(err, database.ErrNotFound) {
 		a = &database.Actor{
 			ID:         uuid.New(),
 			ExternalId: externalId,

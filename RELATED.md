@@ -20,3 +20,5 @@ This is a list of related products in the API Integration space and (eventually)
   * Similar style platform for managing auth for MCP
 * [Pica](https://picaos.com)
   * Agent actions framework that as an AuthKit framework with is an authenticating proxy
+* [Nango](https://nango.dev/)
+  * Open Source (Elastic License) unified API product.

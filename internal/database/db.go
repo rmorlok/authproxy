@@ -2,11 +2,14 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"log"
 	"log/slog"
 	"os"
 	"time"
 
+	sq "github.com/Masterminds/squirrel"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
@@ -55,18 +58,29 @@ func NewSqliteConnection(dbConfig *config.DatabaseSqlite, secretKey config.KeyDa
 		defer file.Close()
 	}
 
-	db, err := gorm.Open(sqlite.Open(path), &gorm.Config{
+	db, err := sql.Open("sqlite3", dbConfig.GetDsn())
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to open sqlite database '%s'", dbConfig.GetDsn())
+	}
+
+	if err := db.Ping(); err != nil {
+		return nil, errors.Wrapf(err, "failed to ping sqlite database '%s'", dbConfig.GetDsn())
+	}
+
+	gormDb, err := gorm.Open(sqlite.Open(path), &gorm.Config{
 		Logger: &logger{
 			inner: l,
 		},
 	})
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open sqlite database '%s'", dbConfig.Path)
+		return nil, errors.Wrapf(err, "failed to open sqlite database '%s' with gorm", dbConfig.Path)
 	}
 
 	return &gormDB{
 		cfg:       dbConfig,
-		gorm:      db,
+		sq:        sq.StatementBuilder.PlaceholderFormat(dbConfig.GetPlaceholderFormat()),
+		db:        db,
+		gorm:      gormDb,
 		secretKey: secretKey,
 		logger:    l,
 	}, nil
@@ -74,6 +88,8 @@ func NewSqliteConnection(dbConfig *config.DatabaseSqlite, secretKey config.KeyDa
 
 type gormDB struct {
 	cfg       config.Database
+	sq        sq.StatementBuilderType
+	db        *sql.DB
 	gorm      *gorm.DB       // the gorm instance
 	secretKey config.KeyData // the AES key used to secure cursors
 	logger    *slog.Logger
@@ -88,8 +104,14 @@ func (db *gormDB) session(ctx context.Context) *gorm.DB {
 }
 
 func (db *gormDB) Ping(ctx context.Context) bool {
+	if err := db.db.Ping(); err != nil {
+		db.logger.Error("failed to ping database")
+		return false
+	}
+
 	err := db.session(ctx).Raw("SELECT 1").Error
 	if err != nil {
+		db.logger.Error("failed to ping database with query")
 		log.Println(errors.Wrap(err, "failed to connect to database"))
 		return false
 	}

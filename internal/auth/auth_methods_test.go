@@ -479,7 +479,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			require.NotNil(t, err)
 
 			actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.ID)
-			require.NoError(t, err)
+			require.ErrorIs(t, err, database.ErrNotFound)
 			require.Nil(t, actor)
 		})
 
@@ -493,7 +493,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			require.NotNil(t, err)
 
 			actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.ID)
-			require.NoError(t, err)
+			require.ErrorIs(t, err, database.ErrNotFound)
 			require.Nil(t, actor)
 		})
 	})
