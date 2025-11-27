@@ -427,7 +427,7 @@ type ListActorsBuilder interface {
 }
 
 type listActorsFilters struct {
-	db                *service            `json:"-"`
+	s                 *service            `json:"-"`
 	LimitVal          uint64              `json:"limit"`
 	Offset            uint64              `json:"offset"`
 	OrderByFieldVal   *ActorOrderByField  `json:"order_by_field"`
@@ -478,21 +478,21 @@ func (l *listActorsFilters) ForIsSuperAdmin(isSuperAdmin bool) ListActorsBuilder
 }
 
 func (l *listActorsFilters) FromCursor(ctx context.Context, cursor string) (ListActorsExecutor, error) {
-	db := l.db
-	parsed, err := pagination.ParseCursor[listActorsFilters](ctx, db.secretKey, cursor)
+	s := l.s
+	parsed, err := pagination.ParseCursor[listActorsFilters](ctx, s.secretKey, cursor)
 
 	if err != nil {
 		return nil, err
 	}
 
 	*l = *parsed
-	l.db = db
+	l.s = s
 
 	return l, nil
 }
 
 func (l *listActorsFilters) applyRestrictions(ctx context.Context) sq.SelectBuilder {
-	q := l.db.sq.
+	q := l.s.sq.
 		Select(util.ToPtr(Actor{}).cols()...).
 		From(ActorTable)
 
@@ -518,7 +518,7 @@ func (l *listActorsFilters) fetchPage(ctx context.Context) pagination.PageResult
 	var err error
 
 	rows, err := l.applyRestrictions(ctx).
-		RunWith(l.db.db).
+		RunWith(l.s.db).
 		Query()
 	if err != nil {
 		return pagination.PageResult[Actor]{Error: err}
@@ -540,7 +540,7 @@ func (l *listActorsFilters) fetchPage(ctx context.Context) pagination.PageResult
 	cursor := ""
 	hasMore := uint64(len(actors)) > l.LimitVal
 	if hasMore {
-		cursor, err = pagination.MakeCursor(ctx, l.db.secretKey, l)
+		cursor, err = pagination.MakeCursor(ctx, l.s.secretKey, l)
 		if err != nil {
 			return pagination.PageResult[Actor]{Error: err}
 		}
@@ -577,14 +577,14 @@ func (l *listActorsFilters) Enumerate(ctx context.Context, callback func(paginat
 
 func (s *service) ListActorsBuilder() ListActorsBuilder {
 	return &listActorsFilters{
-		db:       s,
+		s:        s,
 		LimitVal: 100,
 	}
 }
 
 func (s *service) ListActorsFromCursor(ctx context.Context, cursor string) (ListActorsExecutor, error) {
 	b := &listActorsFilters{
-		db:       s,
+		s:        s,
 		LimitVal: 100,
 	}
 

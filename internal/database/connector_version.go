@@ -512,7 +512,7 @@ type ListConnectorVersionsBuilder interface {
 }
 
 type listConnectorVersionsFilters struct {
-	db                *service                      `json:"-"`
+	s                 *service                      `json:"-"`
 	LimitVal          int32                         `json:"limit"`
 	Offset            int32                         `json:"offset"`
 	StatesVal         []ConnectorVersionState       `json:"states,omitempty"`
@@ -561,21 +561,21 @@ func (l *listConnectorVersionsFilters) IncludeDeleted() ListConnectorVersionsBui
 }
 
 func (l *listConnectorVersionsFilters) FromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error) {
-	db := l.db
-	parsed, err := pagination.ParseCursor[listConnectorVersionsFilters](ctx, db.secretKey, cursor)
+	s := l.s
+	parsed, err := pagination.ParseCursor[listConnectorVersionsFilters](ctx, s.secretKey, cursor)
 
 	if err != nil {
 		return nil, err
 	}
 
 	*l = *parsed
-	l.db = db
+	l.s = s
 
 	return l, nil
 }
 
 func (l *listConnectorVersionsFilters) fetchPage(ctx context.Context) pagination.PageResult[ConnectorVersion] {
-	q := l.db.session(ctx)
+	q := l.s.session(ctx)
 
 	if l.LimitVal <= 0 {
 		l.LimitVal = 100
@@ -660,7 +660,7 @@ cv.deleted_at as deleted_at`).
 	cursor := ""
 	hasMore := int32(len(connectorVersions)) > l.LimitVal
 	if hasMore {
-		cursor, err = pagination.MakeCursor(ctx, l.db.secretKey, l)
+		cursor, err = pagination.MakeCursor(ctx, l.s.secretKey, l)
 		if err != nil {
 			return pagination.PageResult[ConnectorVersion]{Error: err}
 		}
@@ -697,14 +697,14 @@ func (l *listConnectorVersionsFilters) Enumerate(ctx context.Context, callback f
 
 func (s *service) ListConnectorVersionsBuilder() ListConnectorVersionsBuilder {
 	return &listConnectorVersionsFilters{
-		db:       s,
+		s:        s,
 		LimitVal: 100,
 	}
 }
 
 func (s *service) ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error) {
 	b := &listConnectorVersionsFilters{
-		db:       s,
+		s:        s,
 		LimitVal: 100,
 	}
 

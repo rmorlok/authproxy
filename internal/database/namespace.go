@@ -201,7 +201,7 @@ type ListNamespacesBuilder interface {
 }
 
 type listNamespacesFilters struct {
-	db                *service               `json:"-"`
+	s                 *service               `json:"-"`
 	LimitVal          int32                  `json:"limit"`
 	Offset            int32                  `json:"offset"`
 	StatesVal         []NamespaceState       `json:"states,omitempty"`
@@ -238,22 +238,22 @@ func (l *listNamespacesFilters) IncludeDeleted() ListNamespacesBuilder {
 }
 
 func (l *listNamespacesFilters) FromCursor(ctx context.Context, cursor string) (ListNamespacesExecutor, error) {
-	db := l.db
-	parsed, err := pagination.ParseCursor[listNamespacesFilters](ctx, db.secretKey, cursor)
+	s := l.s
+	parsed, err := pagination.ParseCursor[listNamespacesFilters](ctx, s.secretKey, cursor)
 
 	if err != nil {
 		return nil, err
 	}
 
 	*l = *parsed
-	l.db = db
+	l.s = s
 
 	return l, nil
 }
 
 func (l *listNamespacesFilters) fetchPage(ctx context.Context) pagination.PageResult[Namespace] {
 
-	q := l.db.session(ctx)
+	q := l.s.session(ctx)
 
 	if l.LimitVal <= 0 {
 		l.LimitVal = 100
@@ -328,7 +328,7 @@ n.deleted_at`).
 	cursor := ""
 	hasMore := int32(len(connectors)) > l.LimitVal
 	if hasMore {
-		cursor, err = pagination.MakeCursor(ctx, l.db.secretKey, l)
+		cursor, err = pagination.MakeCursor(ctx, l.s.secretKey, l)
 		if err != nil {
 			return pagination.PageResult[Namespace]{Error: err}
 		}
@@ -365,14 +365,14 @@ func (l *listNamespacesFilters) Enumerate(ctx context.Context, callback func(pag
 
 func (s *service) ListNamespacesBuilder() ListNamespacesBuilder {
 	return &listNamespacesFilters{
-		db:       s,
+		s:        s,
 		LimitVal: 100,
 	}
 }
 
 func (s *service) ListNamespacesFromCursor(ctx context.Context, cursor string) (ListNamespacesExecutor, error) {
 	b := &listNamespacesFilters{
-		db:       s,
+		s:        s,
 		LimitVal: 100,
 	}
 

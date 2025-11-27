@@ -222,7 +222,7 @@ type ListConnectionsBuilder interface {
 }
 
 type listConnectionsFilters struct {
-	db                *service                `json:"-"`
+	s                 *service                `json:"-"`
 	LimitVal          int32                   `json:"limit"`
 	Offset            int32                   `json:"offset"`
 	StatesVal         []ConnectionState       `json:"states,omitempty"`
@@ -253,21 +253,21 @@ func (l *listConnectionsFilters) IncludeDeleted() ListConnectionsBuilder {
 }
 
 func (l *listConnectionsFilters) FromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error) {
-	db := l.db
-	parsed, err := pagination.ParseCursor[listConnectionsFilters](ctx, db.secretKey, cursor)
+	s := l.s
+	parsed, err := pagination.ParseCursor[listConnectionsFilters](ctx, s.secretKey, cursor)
 
 	if err != nil {
 		return nil, err
 	}
 
 	*l = *parsed
-	l.db = db
+	l.s = s
 
 	return l, nil
 }
 
 func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) *gorm.DB {
-	q := l.db.session(ctx)
+	q := l.s.session(ctx)
 
 	if l.IncludeDeletedVal {
 		q = q.Unscoped()
@@ -304,7 +304,7 @@ func (l *listConnectionsFilters) fetchPage(ctx context.Context) pagination.PageR
 	cursor := ""
 	hasMore := int32(len(connections)) > l.LimitVal
 	if hasMore {
-		cursor, err = pagination.MakeCursor(ctx, l.db.secretKey, l)
+		cursor, err = pagination.MakeCursor(ctx, l.s.secretKey, l)
 		if err != nil {
 			return pagination.PageResult[Connection]{Error: err}
 		}
@@ -341,14 +341,14 @@ func (l *listConnectionsFilters) Enumerate(ctx context.Context, callback func(pa
 
 func (s *service) ListConnectionsBuilder() ListConnectionsBuilder {
 	return &listConnectionsFilters{
-		db:       s,
+		s:        s,
 		LimitVal: 100,
 	}
 }
 
 func (s *service) ListConnectionsFromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error) {
 	b := &listConnectionsFilters{
-		db:       s,
+		s:        s,
 		LimitVal: 100,
 	}
 

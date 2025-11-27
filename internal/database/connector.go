@@ -64,7 +64,7 @@ type ListConnectorsBuilder interface {
 }
 
 type listConnectorsFilters struct {
-	db                *service                `json:"-"`
+	s                 *service                `json:"-"`
 	LimitVal          int32                   `json:"limit"`
 	Offset            int32                   `json:"offset"`
 	StatesVal         []ConnectorVersionState `json:"states,omitempty"`
@@ -109,22 +109,22 @@ func (l *listConnectorsFilters) IncludeDeleted() ListConnectorsBuilder {
 }
 
 func (l *listConnectorsFilters) FromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error) {
-	db := l.db
-	parsed, err := pagination.ParseCursor[listConnectorsFilters](ctx, db.secretKey, cursor)
+	s := l.s
+	parsed, err := pagination.ParseCursor[listConnectorsFilters](ctx, s.secretKey, cursor)
 
 	if err != nil {
 		return nil, err
 	}
 
 	*l = *parsed
-	l.db = db
+	l.s = s
 
 	return l, nil
 }
 
 func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageResult[Connector] {
 
-	q := l.db.session(ctx)
+	q := l.s.session(ctx)
 
 	if l.LimitVal <= 0 {
 		l.LimitVal = 100
@@ -244,7 +244,7 @@ cvc.versions as total_versions
 	cursor := ""
 	hasMore := int32(len(connectors)) > l.LimitVal
 	if hasMore {
-		cursor, err = pagination.MakeCursor(ctx, l.db.secretKey, l)
+		cursor, err = pagination.MakeCursor(ctx, l.s.secretKey, l)
 		if err != nil {
 			return pagination.PageResult[Connector]{Error: err}
 		}
@@ -281,14 +281,14 @@ func (l *listConnectorsFilters) Enumerate(ctx context.Context, callback func(pag
 
 func (s *service) ListConnectorsBuilder() ListConnectorsBuilder {
 	return &listConnectorsFilters{
-		db:       s,
+		s:        s,
 		LimitVal: 100,
 	}
 }
 
 func (s *service) ListConnectorsFromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error) {
 	b := &listConnectorsFilters{
-		db:       s,
+		s:        s,
 		LimitVal: 100,
 	}
 
