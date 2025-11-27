@@ -48,14 +48,14 @@ const ActorTable = "actors"
 
 // Actor is some entity taking action within the system.
 type Actor struct {
-	ID         uuid.UUID  `gorm:"column:id;primarykey"`
-	ExternalId string     `gorm:"column:external_id;unique,index"`
-	Email      string     `gorm:"column:email;index"`
-	Admin      bool       `gorm:"column:admin"`
-	SuperAdmin bool       `gorm:"column:super_admin"`
-	CreatedAt  time.Time  `gorm:"column:created_at"`
-	UpdatedAt  time.Time  `gorm:"column:updated_at"`
-	DeletedAt  *time.Time `gorm:"column:deleted_at;index"`
+	ID         uuid.UUID
+	ExternalId string
+	Email      string
+	Admin      bool
+	SuperAdmin bool
+	CreatedAt  time.Time
+	UpdatedAt  time.Time
+	DeletedAt  *time.Time
 }
 
 func (a *Actor) cols() []string {
