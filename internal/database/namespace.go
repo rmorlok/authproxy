@@ -78,13 +78,13 @@ func advanceNamespaceState(cur NamespaceState, next NamespaceState) NamespaceSta
 	return next
 }
 
-func (db *gormDB) CreateNamespace(ctx context.Context, ns *Namespace) error {
+func (s *service) CreateNamespace(ctx context.Context, ns *Namespace) error {
 	err := ValidateNamespacePath(ns.Path)
 	if err != nil {
 		return err
 	}
 
-	return db.gorm.Transaction(func(tx *gorm.DB) error {
+	return s.gorm.Transaction(func(tx *gorm.DB) error {
 		prefixes := SplitNamespacePathToPrefixes(ns.Path)
 
 		// Start out with the specified state or default to active
@@ -123,8 +123,8 @@ func (db *gormDB) CreateNamespace(ctx context.Context, ns *Namespace) error {
 	})
 }
 
-func (db *gormDB) GetNamespace(ctx context.Context, path string) (*Namespace, error) {
-	sess := db.session(ctx)
+func (s *service) GetNamespace(ctx context.Context, path string) (*Namespace, error) {
+	sess := s.session(ctx)
 
 	var ns Namespace
 	result := sess.First(&ns, "path = ? ", path)
@@ -142,8 +142,8 @@ func (db *gormDB) GetNamespace(ctx context.Context, path string) (*Namespace, er
 	return &ns, nil
 }
 
-func (db *gormDB) DeleteNamespace(ctx context.Context, path string) error {
-	sess := db.session(ctx)
+func (s *service) DeleteNamespace(ctx context.Context, path string) error {
+	sess := s.session(ctx)
 	result := sess.Delete(&Namespace{}, "path = ?", path)
 	if result.Error != nil {
 		return result.Error
@@ -151,8 +151,8 @@ func (db *gormDB) DeleteNamespace(ctx context.Context, path string) error {
 	return nil
 }
 
-func (db *gormDB) SetNamespaceState(ctx context.Context, path string, state NamespaceState) error {
-	sqlDb, err := db.gorm.DB()
+func (s *service) SetNamespaceState(ctx context.Context, path string, state NamespaceState) error {
+	sqlDb, err := s.gorm.DB()
 	if err != nil {
 		return err
 	}
@@ -201,7 +201,7 @@ type ListNamespacesBuilder interface {
 }
 
 type listNamespacesFilters struct {
-	db                *gormDB                `json:"-"`
+	db                *service               `json:"-"`
 	LimitVal          int32                  `json:"limit"`
 	Offset            int32                  `json:"offset"`
 	StatesVal         []NamespaceState       `json:"states,omitempty"`
@@ -363,16 +363,16 @@ func (l *listNamespacesFilters) Enumerate(ctx context.Context, callback func(pag
 	return err
 }
 
-func (db *gormDB) ListNamespacesBuilder() ListNamespacesBuilder {
+func (s *service) ListNamespacesBuilder() ListNamespacesBuilder {
 	return &listNamespacesFilters{
-		db:       db,
+		db:       s,
 		LimitVal: 100,
 	}
 }
 
-func (db *gormDB) ListNamespacesFromCursor(ctx context.Context, cursor string) (ListNamespacesExecutor, error) {
+func (s *service) ListNamespacesFromCursor(ctx context.Context, cursor string) (ListNamespacesExecutor, error) {
 	b := &listNamespacesFilters{
-		db:       db,
+		db:       s,
 		LimitVal: 100,
 	}
 

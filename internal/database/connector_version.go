@@ -154,8 +154,8 @@ func (cv *ConnectorVersion) Validate() error {
 	return result.ErrorOrNil()
 }
 
-func (db *gormDB) GetConnectorVersion(ctx context.Context, id uuid.UUID, version uint64) (*ConnectorVersion, error) {
-	sess := db.session(ctx)
+func (s *service) GetConnectorVersion(ctx context.Context, id uuid.UUID, version uint64) (*ConnectorVersion, error) {
+	sess := s.session(ctx)
 
 	var cv ConnectorVersion
 	result := sess.First(&cv, "id = ? AND version = ?", id, version)
@@ -173,7 +173,7 @@ func (db *gormDB) GetConnectorVersion(ctx context.Context, id uuid.UUID, version
 	return &cv, nil
 }
 
-func (db *gormDB) GetConnectorVersions(
+func (s *service) GetConnectorVersions(
 	ctx context.Context,
 	requested []ConnectorVersionId,
 ) (map[ConnectorVersionId]*ConnectorVersion, error) {
@@ -186,7 +186,7 @@ func (db *gormDB) GetConnectorVersions(
 		ids[id] = struct{}{}
 	}
 
-	sess := db.session(ctx)
+	sess := s.session(ctx)
 
 	query := sess
 	for i, id := range requested {
@@ -223,12 +223,12 @@ type UpsertConnectorVersionResult struct {
 	Version          uint64
 }
 
-func (db *gormDB) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersion) error {
+func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersion) error {
 	if cv == nil {
 		return errors.New("connector version is nil")
 	}
 
-	logger := aplog.NewBuilder(db.logger).
+	logger := aplog.NewBuilder(s.logger).
 		WithCtx(ctx).
 		WithConnectorId(cv.ID).
 		Build()
@@ -242,7 +242,7 @@ func (db *gormDB) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 		return errors.New("can only upsert connector version as draft or primary")
 	}
 
-	return db.gorm.Transaction(func(tx *gorm.DB) error {
+	return s.gorm.Transaction(func(tx *gorm.DB) error {
 		sqlDb, err := tx.DB()
 		if err != nil {
 			return err
@@ -368,15 +368,15 @@ func (db *gormDB) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 			if err != nil {
 				return err
 			}
-			db.logger.Debug("updated connector versions from primary to active", "count", count)
+			s.logger.Debug("updated connector versions from primary to active", "count", count)
 		}
 
 		return nil
 	})
 }
 
-func (db *gormDB) GetConnectorVersionForTypeAndVersion(ctx context.Context, typ string, version uint64) (*ConnectorVersion, error) {
-	sess := db.session(ctx)
+func (s *service) GetConnectorVersionForTypeAndVersion(ctx context.Context, typ string, version uint64) (*ConnectorVersion, error) {
+	sess := s.session(ctx)
 
 	var cv ConnectorVersion
 	result := sess.Order("created_at DESC").First(&cv, "type = ? AND version = ?", typ, version)
@@ -394,8 +394,8 @@ func (db *gormDB) GetConnectorVersionForTypeAndVersion(ctx context.Context, typ 
 	return &cv, nil
 }
 
-func (db *gormDB) GetConnectorVersionForType(ctx context.Context, typ string) (*ConnectorVersion, error) {
-	sess := db.session(ctx)
+func (s *service) GetConnectorVersionForType(ctx context.Context, typ string) (*ConnectorVersion, error) {
+	sess := s.session(ctx)
 
 	var cv ConnectorVersion
 	result := sess.Order("created_at DESC").Order("version DESC").First(&cv, "type = ?", typ)
@@ -413,8 +413,8 @@ func (db *gormDB) GetConnectorVersionForType(ctx context.Context, typ string) (*
 	return &cv, nil
 }
 
-func (db *gormDB) GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state ConnectorVersionState) (*ConnectorVersion, error) {
-	sess := db.session(ctx)
+func (s *service) GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state ConnectorVersionState) (*ConnectorVersion, error) {
+	sess := s.session(ctx)
 
 	var cv ConnectorVersion
 	result := sess.Order("version DESC").First(&cv, "id = ? AND state = ?", id, state)
@@ -432,8 +432,8 @@ func (db *gormDB) GetConnectorVersionForState(ctx context.Context, id uuid.UUID,
 	return &cv, nil
 }
 
-func (db *gormDB) NewestConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error) {
-	sess := db.session(ctx)
+func (s *service) NewestConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error) {
+	sess := s.session(ctx)
 
 	var cv ConnectorVersion
 	result := sess.Order("version DESC").First(&cv, "id = ?", id)
@@ -451,8 +451,8 @@ func (db *gormDB) NewestConnectorVersionForId(ctx context.Context, id uuid.UUID)
 	return &cv, nil
 }
 
-func (db *gormDB) NewestPublishedConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error) {
-	sess := db.session(ctx)
+func (s *service) NewestPublishedConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error) {
+	sess := s.session(ctx)
 
 	var cv ConnectorVersion
 	result := sess.Where(`state in ("primary", "active")`).Order("version DESC").First(&cv, "id = ?", id)
@@ -512,7 +512,7 @@ type ListConnectorVersionsBuilder interface {
 }
 
 type listConnectorVersionsFilters struct {
-	db                *gormDB                       `json:"-"`
+	db                *service                      `json:"-"`
 	LimitVal          int32                         `json:"limit"`
 	Offset            int32                         `json:"offset"`
 	StatesVal         []ConnectorVersionState       `json:"states,omitempty"`
@@ -695,16 +695,16 @@ func (l *listConnectorVersionsFilters) Enumerate(ctx context.Context, callback f
 	return err
 }
 
-func (db *gormDB) ListConnectorVersionsBuilder() ListConnectorVersionsBuilder {
+func (s *service) ListConnectorVersionsBuilder() ListConnectorVersionsBuilder {
 	return &listConnectorVersionsFilters{
-		db:       db,
+		db:       s,
 		LimitVal: 100,
 	}
 }
 
-func (db *gormDB) ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error) {
+func (s *service) ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error) {
 	b := &listConnectorVersionsFilters{
-		db:       db,
+		db:       s,
 		LimitVal: 100,
 	}
 

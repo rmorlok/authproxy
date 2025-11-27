@@ -2,10 +2,11 @@ package database
 
 import (
 	"context"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"gorm.io/gorm"
-	"time"
 )
 
 // UsedNonce represents a onetime use value (UUID) that has already been used in the system and cannot
@@ -18,8 +19,8 @@ type UsedNonce struct {
 	CreatedAt   time.Time `gorm:"column:created_at"`
 }
 
-func (db *gormDB) HasNonceBeenUsed(ctx context.Context, nonce uuid.UUID) (hasBeenUsed bool, err error) {
-	err = db.gorm.Where("id = ?", nonce).First(&UsedNonce{}).Error
+func (s *service) HasNonceBeenUsed(ctx context.Context, nonce uuid.UUID) (hasBeenUsed bool, err error) {
+	err = s.gorm.Where("id = ?", nonce).First(&UsedNonce{}).Error
 	if err != nil {
 		if err == gorm.ErrRecordNotFound {
 			return false, nil // Nonce is not in the database, therefore has not been used
@@ -29,12 +30,12 @@ func (db *gormDB) HasNonceBeenUsed(ctx context.Context, nonce uuid.UUID) (hasBee
 	return true, nil // Nonce is found in the database, so it was used previously
 }
 
-func (db *gormDB) CheckNonceValidAndMarkUsed(
+func (s *service) CheckNonceValidAndMarkUsed(
 	ctx context.Context,
 	nonce uuid.UUID,
 	retainRecordUntil time.Time,
 ) (wasValid bool, err error) {
-	err = db.gorm.Transaction(func(tx *gorm.DB) error {
+	err = s.gorm.Transaction(func(tx *gorm.DB) error {
 		var usedNonce UsedNonce
 		// Check if the nonce exists in the database
 		err := tx.Where("id = ?", nonce).First(&usedNonce).Error

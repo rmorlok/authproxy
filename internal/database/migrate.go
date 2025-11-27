@@ -17,16 +17,16 @@ var migrationsFs embed.FS
 // MigrateMutexKeyName is the key that can be used when locking to perform a migration in redis.
 const MigrateMutexKeyName = "db-migrate-lock"
 
-func (db *gormDB) Migrate(ctx context.Context) error {
-	db.logger.Info("running database migrations", "provider", db.cfg.GetProvider())
-	defer db.logger.Info("database migrations complete")
+func (s *service) Migrate(ctx context.Context) error {
+	s.logger.Info("running database migrations", "provider", s.cfg.GetProvider())
+	defer s.logger.Info("database migrations complete")
 
-	d, err := iofs.New(migrationsFs, fmt.Sprintf("migrations/%s", db.cfg.GetProvider()))
+	d, err := iofs.New(migrationsFs, fmt.Sprintf("migrations/%s", s.cfg.GetProvider()))
 	if err != nil {
-		return errors.Wrapf(err, "failed to load databse migrations for '%s'", db.cfg.GetProvider())
+		return errors.Wrapf(err, "failed to load databse migrations for '%s'", s.cfg.GetProvider())
 	}
 
-	m, err := migrate.NewWithSourceInstance("iofs", d, db.cfg.GetUri())
+	m, err := migrate.NewWithSourceInstance("iofs", d, s.cfg.GetUri())
 	if err != nil {
 		return errors.Wrap(err, "failed setup database migrations")
 	}
@@ -34,7 +34,7 @@ func (db *gormDB) Migrate(ctx context.Context) error {
 	err = m.Up()
 	if err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {
-			db.logger.Info("no migrations required")
+			s.logger.Info("no migrations required")
 			return nil
 		}
 

@@ -64,7 +64,7 @@ type ListConnectorsBuilder interface {
 }
 
 type listConnectorsFilters struct {
-	db                *gormDB                 `json:"-"`
+	db                *service                `json:"-"`
 	LimitVal          int32                   `json:"limit"`
 	Offset            int32                   `json:"offset"`
 	StatesVal         []ConnectorVersionState `json:"states,omitempty"`
@@ -279,16 +279,16 @@ func (l *listConnectorsFilters) Enumerate(ctx context.Context, callback func(pag
 	return err
 }
 
-func (db *gormDB) ListConnectorsBuilder() ListConnectorsBuilder {
+func (s *service) ListConnectorsBuilder() ListConnectorsBuilder {
 	return &listConnectorsFilters{
-		db:       db,
+		db:       s,
 		LimitVal: 100,
 	}
 }
 
-func (db *gormDB) ListConnectorsFromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error) {
+func (s *service) ListConnectorsFromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error) {
 	b := &listConnectorsFilters{
-		db:       db,
+		db:       s,
 		LimitVal: 100,
 	}
 

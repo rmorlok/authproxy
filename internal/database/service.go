@@ -76,7 +76,7 @@ func NewSqliteConnection(dbConfig *config.DatabaseSqlite, secretKey config.KeyDa
 		return nil, errors.Wrapf(err, "failed to open sqlite database '%s' with gorm", dbConfig.Path)
 	}
 
-	return &gormDB{
+	return &service{
 		cfg:       dbConfig,
 		sq:        sq.StatementBuilder.PlaceholderFormat(dbConfig.GetPlaceholderFormat()),
 		db:        db,
@@ -86,7 +86,7 @@ func NewSqliteConnection(dbConfig *config.DatabaseSqlite, secretKey config.KeyDa
 	}, nil
 }
 
-type gormDB struct {
+type service struct {
 	cfg       config.Database
 	sq        sq.StatementBuilderType
 	db        *sql.DB
@@ -95,23 +95,23 @@ type gormDB struct {
 	logger    *slog.Logger
 }
 
-func (db *gormDB) session(ctx context.Context) *gorm.DB {
-	return db.gorm.Session(&gorm.Session{
+func (s *service) session(ctx context.Context) *gorm.DB {
+	return s.gorm.Session(&gorm.Session{
 		NowFunc: func() time.Time {
 			return apctx.GetClock(ctx).Now().UTC()
 		},
 	})
 }
 
-func (db *gormDB) Ping(ctx context.Context) bool {
-	if err := db.db.Ping(); err != nil {
-		db.logger.Error("failed to ping database")
+func (s *service) Ping(ctx context.Context) bool {
+	if err := s.db.Ping(); err != nil {
+		s.logger.Error("failed to ping database")
 		return false
 	}
 
-	err := db.session(ctx).Raw("SELECT 1").Error
+	err := s.session(ctx).Raw("SELECT 1").Error
 	if err != nil {
-		db.logger.Error("failed to ping database with query")
+		s.logger.Error("failed to ping database with query")
 		log.Println(errors.Wrap(err, "failed to connect to database"))
 		return false
 	}
@@ -119,4 +119,4 @@ func (db *gormDB) Ping(ctx context.Context) bool {
 	return true
 }
 
-var _ DB = (*gormDB)(nil)
+var _ DB = (*service)(nil)

@@ -180,13 +180,13 @@ func (a *Actor) validate() error {
 	return nil
 }
 
-func (db *gormDB) GetActor(ctx context.Context, id uuid.UUID) (*Actor, error) {
+func (s *service) GetActor(ctx context.Context, id uuid.UUID) (*Actor, error) {
 	var result Actor
-	err := db.sq.
+	err := s.sq.
 		Select(result.cols()...).
 		From(ActorTable).
 		Where(sq.Eq{"id": id, "deleted_at": nil}).
-		RunWith(db.db).
+		RunWith(s.db).
 		QueryRow().
 		Scan(result.fields()...)
 	if err != nil {
@@ -200,13 +200,13 @@ func (db *gormDB) GetActor(ctx context.Context, id uuid.UUID) (*Actor, error) {
 	return &result, nil
 }
 
-func (db *gormDB) GetActorByExternalId(ctx context.Context, externalId string) (*Actor, error) {
+func (s *service) GetActorByExternalId(ctx context.Context, externalId string) (*Actor, error) {
 	var result Actor
 	err := sq.
 		Select(result.cols()...).
 		From(ActorTable).
 		Where(sq.Eq{"external_id": externalId, "deleted_at": nil}).
-		RunWith(db.db).
+		RunWith(s.db).
 		QueryRow().
 		Scan(result.fields()...)
 
@@ -221,7 +221,7 @@ func (db *gormDB) GetActorByExternalId(ctx context.Context, externalId string) (
 	return &result, nil
 }
 
-func (db *gormDB) CreateActor(ctx context.Context, a *Actor) error {
+func (s *service) CreateActor(ctx context.Context, a *Actor) error {
 	if a == nil {
 		return errors.New("actor is nil")
 	}
@@ -231,9 +231,9 @@ func (db *gormDB) CreateActor(ctx context.Context, a *Actor) error {
 		return validationErr
 	}
 
-	return db.transaction(func(tx *sql.Tx) error {
+	return s.transaction(func(tx *sql.Tx) error {
 		var count int64
-		err := db.sq.
+		err := s.sq.
 			Select("COUNT(*)").
 			From(ActorTable).
 			Where(sq.Or{
@@ -256,7 +256,7 @@ func (db *gormDB) CreateActor(ctx context.Context, a *Actor) error {
 		cpy.CreatedAt = now
 		cpy.UpdatedAt = now
 
-		result, err := db.sq.
+		result, err := s.sq.
 			Insert(ActorTable).
 			Columns(cpy.cols()...).
 			Values(cpy.values()...).
@@ -279,7 +279,7 @@ func (db *gormDB) CreateActor(ctx context.Context, a *Actor) error {
 	})
 }
 
-func (db *gormDB) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, error) {
+func (s *service) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, error) {
 	if actor == nil {
 		return nil, errors.New("actor is nil")
 	}
@@ -291,13 +291,13 @@ func (db *gormDB) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 
 	var result *Actor
 
-	err := db.transaction(func(tx *sql.Tx) error {
+	err := s.transaction(func(tx *sql.Tx) error {
 		var existingActor Actor
-		err := db.sq.
+		err := s.sq.
 			Select(existingActor.cols()...).
 			From(ActorTable).
 			Where(sq.Eq{"external_id": actor.ID}).
-			RunWith(db.db).
+			RunWith(s.db).
 			QueryRow().
 			Scan(existingActor.fields()...)
 		if err != nil {
@@ -315,7 +315,7 @@ func (db *gormDB) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 					return validationErr
 				}
 
-				dbResult, err := db.sq.
+				dbResult, err := s.sq.
 					Insert(ActorTable).
 					Columns(newActor.cols()...).
 					Values(newActor.values()...).
@@ -350,7 +350,7 @@ func (db *gormDB) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 
 			existingActor.UpdatedAt = apctx.GetClock(ctx).Now()
 
-			dbResult, err := db.sq.
+			dbResult, err := s.sq.
 				Update(ActorTable).
 				SetMap(util.ZipToMap(existingActor.cols(), existingActor.values())).
 				RunWith(tx).
@@ -381,14 +381,14 @@ func (db *gormDB) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 	return result, nil
 }
 
-func (db *gormDB) DeleteActor(ctx context.Context, id uuid.UUID) error {
+func (s *service) DeleteActor(ctx context.Context, id uuid.UUID) error {
 	now := apctx.GetClock(ctx).Now()
-	dbResult, err := db.sq.
+	dbResult, err := s.sq.
 		Update(ActorTable).
 		Set("updated_at", now).
 		Set("deleted_at", now).
 		Where(sq.Eq{"id": id}).
-		RunWith(db.db).
+		RunWith(s.db).
 		Exec()
 	if err != nil {
 		return errors.Wrap(err, "failed to soft delete actor")
@@ -427,7 +427,7 @@ type ListActorsBuilder interface {
 }
 
 type listActorsFilters struct {
-	db                *gormDB             `json:"-"`
+	db                *service            `json:"-"`
 	LimitVal          uint64              `json:"limit"`
 	Offset            uint64              `json:"offset"`
 	OrderByFieldVal   *ActorOrderByField  `json:"order_by_field"`
@@ -575,16 +575,16 @@ func (l *listActorsFilters) Enumerate(ctx context.Context, callback func(paginat
 	return err
 }
 
-func (db *gormDB) ListActorsBuilder() ListActorsBuilder {
+func (s *service) ListActorsBuilder() ListActorsBuilder {
 	return &listActorsFilters{
-		db:       db,
+		db:       s,
 		LimitVal: 100,
 	}
 }
 
-func (db *gormDB) ListActorsFromCursor(ctx context.Context, cursor string) (ListActorsExecutor, error) {
+func (s *service) ListActorsFromCursor(ctx context.Context, cursor string) (ListActorsExecutor, error) {
 	b := &listActorsFilters{
-		db:       db,
+		db:       s,
 		LimitVal: 100,
 	}
 

@@ -2,12 +2,13 @@ package database
 
 import (
 	"context"
+	"time"
+
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"gorm.io/gorm"
-	"time"
 )
 
 type OAuth2Token struct {
@@ -34,11 +35,11 @@ func (t *OAuth2Token) IsAccessTokenExpired(ctx context.Context) bool {
 	return t.AccessTokenExpiresAt.Before(apctx.GetClock(ctx).Now())
 }
 
-func (db *gormDB) GetOAuth2Token(
+func (s *service) GetOAuth2Token(
 	ctx context.Context,
 	connectionId uuid.UUID,
 ) (*OAuth2Token, error) {
-	sess := db.session(ctx)
+	sess := s.session(ctx)
 
 	var t OAuth2Token
 
@@ -63,11 +64,11 @@ func (db *gormDB) GetOAuth2Token(
 	return &t, nil
 }
 
-func (db *gormDB) DeleteOAuth2Token(
+func (s *service) DeleteOAuth2Token(
 	ctx context.Context,
 	tokenId uuid.UUID,
 ) error {
-	sess := db.session(ctx)
+	sess := s.session(ctx)
 	result := sess.Delete(&OAuth2Token{}, tokenId)
 	if result.Error != nil {
 		return result.Error
@@ -75,11 +76,11 @@ func (db *gormDB) DeleteOAuth2Token(
 	return nil
 }
 
-func (db *gormDB) DeleteAllOAuth2TokensForConnection(
+func (s *service) DeleteAllOAuth2TokensForConnection(
 	ctx context.Context,
 	connectionId uuid.UUID,
 ) error {
-	sqlDb, err := db.gorm.DB()
+	sqlDb, err := s.gorm.DB()
 	if err != nil {
 		return err
 	}
@@ -99,7 +100,7 @@ func (db *gormDB) DeleteAllOAuth2TokensForConnection(
 	return nil
 }
 
-func (db *gormDB) InsertOAuth2Token(
+func (s *service) InsertOAuth2Token(
 	ctx context.Context,
 	connectionId uuid.UUID,
 	refreshedFrom *uuid.UUID,
@@ -108,7 +109,7 @@ func (db *gormDB) InsertOAuth2Token(
 	accessTokenExpiresAt *time.Time,
 	scopes string,
 ) (*OAuth2Token, error) {
-	sess := db.session(ctx)
+	sess := s.session(ctx)
 
 	var newToken *OAuth2Token
 
@@ -155,7 +156,7 @@ type OAuth2TokenWithConnection struct {
 	Connection Connection `gorm:"embedded"`
 }
 
-func (db *gormDB) EnumerateOAuth2TokensExpiringWithin(
+func (s *service) EnumerateOAuth2TokensExpiringWithin(
 	ctx context.Context,
 	duration time.Duration,
 	callback func(tokens []*OAuth2TokenWithConnection, lastPage bool) (stop bool, err error),
@@ -164,7 +165,7 @@ func (db *gormDB) EnumerateOAuth2TokensExpiringWithin(
 	now := apctx.GetClock(ctx).Now()
 	expirationThreshold := now.Add(duration)
 
-	sess := db.session(ctx)
+	sess := s.session(ctx)
 	offset := 0
 
 	for {

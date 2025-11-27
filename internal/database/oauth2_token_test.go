@@ -520,7 +520,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 				err := db.Migrate(ctx)
 				require.NoError(t, err)
 
-				dbRaw := db.(*gormDB)
+				dbRaw := db.(*service)
 
 				for _, connection := range connections {
 					result := dbRaw.gorm.Create(&connection)

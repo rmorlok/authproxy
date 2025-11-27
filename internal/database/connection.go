@@ -91,7 +91,7 @@ func (c *Connection) Validate() error {
 	return result.ErrorOrNil()
 }
 
-func (db *gormDB) CreateConnection(ctx context.Context, c *Connection) error {
+func (s *service) CreateConnection(ctx context.Context, c *Connection) error {
 	if c == nil {
 		return errors.New("connection is required")
 	}
@@ -100,7 +100,7 @@ func (db *gormDB) CreateConnection(ctx context.Context, c *Connection) error {
 		return err
 	}
 
-	sess := db.session(ctx)
+	sess := s.session(ctx)
 	result := sess.Create(&c)
 	if result.Error != nil {
 		return result.Error
@@ -113,8 +113,8 @@ func (db *gormDB) CreateConnection(ctx context.Context, c *Connection) error {
 	return nil
 }
 
-func (db *gormDB) GetConnection(ctx context.Context, id uuid.UUID) (*Connection, error) {
-	sess := db.session(ctx)
+func (s *service) GetConnection(ctx context.Context, id uuid.UUID) (*Connection, error) {
+	sess := s.session(ctx)
 
 	var c Connection
 	result := sess.First(&c, id)
@@ -132,8 +132,8 @@ func (db *gormDB) GetConnection(ctx context.Context, id uuid.UUID) (*Connection,
 	return &c, nil
 }
 
-func (db *gormDB) DeleteConnection(ctx context.Context, id uuid.UUID) error {
-	sess := db.session(ctx)
+func (s *service) DeleteConnection(ctx context.Context, id uuid.UUID) error {
+	sess := s.session(ctx)
 	result := sess.Delete(&Connection{}, id)
 	if result.Error != nil {
 		return result.Error
@@ -141,7 +141,7 @@ func (db *gormDB) DeleteConnection(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func (db *gormDB) SetConnectionState(ctx context.Context, id uuid.UUID, state ConnectionState) error {
+func (s *service) SetConnectionState(ctx context.Context, id uuid.UUID, state ConnectionState) error {
 	if id == uuid.Nil {
 		return errors.New("connection id is required")
 	}
@@ -150,7 +150,7 @@ func (db *gormDB) SetConnectionState(ctx context.Context, id uuid.UUID, state Co
 		return errors.New("invalid connection state")
 	}
 
-	sqlDb, err := db.gorm.DB()
+	sqlDb, err := s.gorm.DB()
 	if err != nil {
 		return err
 	}
@@ -222,7 +222,7 @@ type ListConnectionsBuilder interface {
 }
 
 type listConnectionsFilters struct {
-	db                *gormDB                 `json:"-"`
+	db                *service                `json:"-"`
 	LimitVal          int32                   `json:"limit"`
 	Offset            int32                   `json:"offset"`
 	StatesVal         []ConnectionState       `json:"states,omitempty"`
@@ -339,23 +339,23 @@ func (l *listConnectionsFilters) Enumerate(ctx context.Context, callback func(pa
 	return err
 }
 
-func (db *gormDB) ListConnectionsBuilder() ListConnectionsBuilder {
+func (s *service) ListConnectionsBuilder() ListConnectionsBuilder {
 	return &listConnectionsFilters{
-		db:       db,
+		db:       s,
 		LimitVal: 100,
 	}
 }
 
-func (db *gormDB) ListConnectionsFromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error) {
+func (s *service) ListConnectionsFromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error) {
 	b := &listConnectionsFilters{
-		db:       db,
+		db:       s,
 		LimitVal: 100,
 	}
 
 	return b.FromCursor(ctx, cursor)
 }
 
-func (db *gormDB) EnumerateConnections(
+func (s *service) EnumerateConnections(
 	ctx context.Context,
 	deletedHandling DeletedHandling,
 	states []ConnectionState,
@@ -363,7 +363,7 @@ func (db *gormDB) EnumerateConnections(
 ) error {
 	const pageSize = 100
 
-	sess := db.session(ctx)
+	sess := s.session(ctx)
 
 	if deletedHandling == DeletedHandlingInclude {
 		sess = sess.Unscoped()
