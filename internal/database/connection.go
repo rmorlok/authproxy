@@ -2,6 +2,8 @@ package database
 
 import (
 	"context"
+	"database/sql"
+	"fmt"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -12,7 +14,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"gorm.io/gorm"
-	"gorm.io/gorm/clause"
 )
 
 type ConnectionState string
@@ -38,15 +39,56 @@ func IsValidConnectionState[T string | ConnectionState](state T) bool {
 	}
 }
 
+const ConnectionsTable = "connections"
+
 type Connection struct {
-	ID               uuid.UUID       `gorm:"column:id;primaryKey"`
-	Namespace        string          `gorm:"column:namespace"`
-	State            ConnectionState `gorm:"column:state"`
-	ConnectorId      uuid.UUID       `gorm:"column:connector_id"`
-	ConnectorVersion uint64          `gorm:"column:connector_version"`
-	CreatedAt        time.Time       `gorm:"column:created_at"`
-	UpdatedAt        time.Time       `gorm:"column:updated_at"`
-	DeletedAt        gorm.DeletedAt  `gorm:"column:deleted_at;index"`
+	ID               uuid.UUID
+	Namespace        string
+	State            ConnectionState
+	ConnectorId      uuid.UUID
+	ConnectorVersion uint64
+	CreatedAt        time.Time
+	UpdatedAt        time.Time
+	DeletedAt        gorm.DeletedAt
+}
+
+func (c *Connection) cols() []string {
+	return []string{
+		"id",
+		"namespace",
+		"state",
+		"connector_id",
+		"connector_version",
+		"created_at",
+		"updated_at",
+		"deleted_at",
+	}
+}
+
+func (c *Connection) fields() []any {
+	return []any{
+		&c.ID,
+		&c.Namespace,
+		&c.State,
+		&c.ConnectorId,
+		&c.ConnectorVersion,
+		&c.CreatedAt,
+		&c.UpdatedAt,
+		&c.DeletedAt,
+	}
+}
+
+func (c *Connection) values() []any {
+	return []any{
+		c.ID,
+		c.Namespace,
+		c.State,
+		c.ConnectorId,
+		c.ConnectorVersion,
+		c.CreatedAt,
+		c.UpdatedAt,
+		c.DeletedAt,
+	}
 }
 
 func (c *Connection) GetID() uuid.UUID {
@@ -100,44 +142,79 @@ func (s *service) CreateConnection(ctx context.Context, c *Connection) error {
 		return err
 	}
 
-	sess := s.session(ctx)
-	result := sess.Create(&c)
-	if result.Error != nil {
-		return result.Error
+	cpy := *c
+	now := apctx.GetClock(ctx).Now()
+	cpy.CreatedAt = now
+	cpy.UpdatedAt = now
+
+	result, err := s.sq.
+		Insert(ConnectionsTable).
+		Columns(cpy.cols()...).
+		Values(cpy.values()...).
+		RunWith(s.db).
+		Exec()
+	if err != nil {
+		return err
 	}
 
-	if result.RowsAffected == 0 {
-		return nil
+	affected, err := result.RowsAffected()
+	if err != nil {
+		return err
+	}
+
+	if affected == 0 {
+		return errors.New("failed to create connection; no rows inserted")
 	}
 
 	return nil
 }
 
 func (s *service) GetConnection(ctx context.Context, id uuid.UUID) (*Connection, error) {
-	sess := s.session(ctx)
-
-	var c Connection
-	result := sess.First(&c, id)
-	if result.Error != nil {
-		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
-			return nil, nil
+	var result Connection
+	err := s.sq.
+		Select(result.cols()...).
+		From(ConnectionsTable).
+		Where(sq.Eq{"id": id, "deleted_at": nil}).
+		RunWith(s.db).
+		QueryRow().
+		Scan(result.fields()...)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
 		}
-		return nil, result.Error
+
+		return nil, err
 	}
 
-	if result.RowsAffected == 0 {
-		return nil, nil
-	}
-
-	return &c, nil
+	return &result, nil
 }
 
 func (s *service) DeleteConnection(ctx context.Context, id uuid.UUID) error {
-	sess := s.session(ctx)
-	result := sess.Delete(&Connection{}, id)
-	if result.Error != nil {
-		return result.Error
+	now := apctx.GetClock(ctx).Now()
+	dbResult, err := s.sq.
+		Update(ConnectionsTable).
+		Set("updated_at", now).
+		Set("deleted_at", now).
+		Where(sq.Eq{"id": id}).
+		RunWith(s.db).
+		Exec()
+	if err != nil {
+		return errors.Wrap(err, "failed to soft delete connection")
 	}
+
+	affected, err := dbResult.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "failed to soft delete connection")
+	}
+
+	if affected == 0 {
+		return ErrNotFound
+	}
+
+	if affected > 1 {
+		return errors.New("multiple connections were soft deleted")
+	}
+
 	return nil
 }
 
@@ -150,35 +227,29 @@ func (s *service) SetConnectionState(ctx context.Context, id uuid.UUID, state Co
 		return errors.New("invalid connection state")
 	}
 
-	sqlDb, err := s.gorm.DB()
-	if err != nil {
-		return err
-	}
-
-	sqb := sq.StatementBuilder.RunWith(sqlDb)
-
-	result, err := sqb.
-		Update("connections").
+	now := apctx.GetClock(ctx).Now()
+	dbResult, err := s.sq.
+		Update(ConnectionsTable).
+		Set("updated_at", now).
 		Set("state", state).
-		Set("updated_at", apctx.GetClock(ctx).Now()).
-		Where("id = ?", id).
-		ExecContext(ctx)
-
+		Where(sq.Eq{"id": id}).
+		RunWith(s.db).
+		Exec()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to soft delete connection")
 	}
 
-	count, err := result.RowsAffected()
+	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to soft delete connection")
 	}
 
-	if count == 0 {
+	if affected == 0 {
 		return ErrNotFound
 	}
 
-	if count > 1 {
-		return ErrViolation
+	if affected > 1 {
+		return errors.Wrap(ErrViolation, "multiple connections had state updated")
 	}
 
 	return nil
@@ -216,15 +287,17 @@ type ListConnectionsExecutor interface {
 type ListConnectionsBuilder interface {
 	ListConnectionsExecutor
 	Limit(int32) ListConnectionsBuilder
-	ForConnectionState(ConnectionState) ListConnectionsBuilder
+	ForState(ConnectionState) ListConnectionsBuilder
+	ForStates([]ConnectionState) ListConnectionsBuilder
 	OrderBy(ConnectionOrderByField, pagination.OrderBy) ListConnectionsBuilder
 	IncludeDeleted() ListConnectionsBuilder
+	WithDeletedHandling(DeletedHandling) ListConnectionsBuilder
 }
 
 type listConnectionsFilters struct {
 	s                 *service                `json:"-"`
-	LimitVal          int32                   `json:"limit"`
-	Offset            int32                   `json:"offset"`
+	LimitVal          uint64                  `json:"limit"`
+	Offset            uint64                  `json:"offset"`
 	StatesVal         []ConnectionState       `json:"states,omitempty"`
 	OrderByFieldVal   *ConnectionOrderByField `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy     `json:"order_by"`
@@ -232,23 +305,38 @@ type listConnectionsFilters struct {
 }
 
 func (l *listConnectionsFilters) Limit(limit int32) ListConnectionsBuilder {
-	l.LimitVal = limit
+	l.LimitVal = uint64(limit)
 	return l
 }
 
-func (l *listConnectionsFilters) ForConnectionState(state ConnectionState) ListConnectionsBuilder {
-	l.StatesVal = []ConnectionState{state}
+func (l *listConnectionsFilters) ForState(state ConnectionState) ListConnectionsBuilder {
+	return l.ForStates([]ConnectionState{state})
+}
+
+func (l *listConnectionsFilters) ForStates(states []ConnectionState) ListConnectionsBuilder {
+	l.StatesVal = states
 	return l
 }
 
 func (l *listConnectionsFilters) OrderBy(field ConnectionOrderByField, by pagination.OrderBy) ListConnectionsBuilder {
-	l.OrderByFieldVal = &field
-	l.OrderByVal = &by
+	if IsValidConnectionOrderByField(field) {
+		l.OrderByFieldVal = &field
+		l.OrderByVal = &by
+	}
 	return l
 }
 
 func (l *listConnectionsFilters) IncludeDeleted() ListConnectionsBuilder {
 	l.IncludeDeletedVal = true
+	return l
+}
+
+func (l *listConnectionsFilters) WithDeletedHandling(h DeletedHandling) ListConnectionsBuilder {
+	if h == DeletedHandlingExclude {
+		l.IncludeDeletedVal = false
+	} else {
+		l.IncludeDeletedVal = true
+	}
 	return l
 }
 
@@ -266,11 +354,13 @@ func (l *listConnectionsFilters) FromCursor(ctx context.Context, cursor string) 
 	return l, nil
 }
 
-func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) *gorm.DB {
-	q := l.s.session(ctx)
+func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) sq.SelectBuilder {
+	q := l.s.sq.
+		Select(util.ToPtr(Connection{}).cols()...).
+		From(ConnectionsTable)
 
-	if l.IncludeDeletedVal {
-		q = q.Unscoped()
+	if !l.IncludeDeletedVal {
+		q = q.Where(sq.Eq{"deleted_at": nil})
 	}
 
 	if l.LimitVal <= 0 {
@@ -278,14 +368,14 @@ func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) *gorm.DB
 	}
 
 	// Always limit to one more than limit to check if there are more records
-	q = q.Limit(int(l.LimitVal + 1)).Offset(int(l.Offset))
+	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)
 
 	if len(l.StatesVal) > 0 {
-		q = q.Where("state IN ?", l.StatesVal)
+		q = q.Where(sq.Eq{"state": l.StatesVal})
 	}
 
 	if l.OrderByFieldVal != nil {
-		q.Order(clause.OrderByColumn{Column: clause.Column{Name: string(*l.OrderByFieldVal)}, Desc: l.OrderByVal.IsDesc()})
+		q = q.OrderBy(fmt.Sprintf("%s %s", string(*l.OrderByFieldVal), l.OrderByVal.String()))
 	}
 
 	return q
@@ -293,16 +383,29 @@ func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) *gorm.DB
 
 func (l *listConnectionsFilters) fetchPage(ctx context.Context) pagination.PageResult[Connection] {
 	var err error
-	var connections []Connection
-	result := l.applyRestrictions(ctx).Find(&connections)
-	if result.Error != nil {
-		return pagination.PageResult[Connection]{Error: result.Error}
+
+	rows, err := l.applyRestrictions(ctx).
+		RunWith(l.s.db).
+		Query()
+	if err != nil {
+		return pagination.PageResult[Connection]{Error: err}
+	}
+	defer rows.Close()
+
+	var results []Connection
+	for rows.Next() {
+		var r Connection
+		err := rows.Scan(r.fields()...)
+		if err != nil {
+			return pagination.PageResult[Connection]{Error: err}
+		}
+		results = append(results, r)
 	}
 
-	l.Offset = l.Offset + int32(len(connections)) - 1 // we request one more than the page size we return
+	l.Offset = l.Offset + uint64(len(results)) - 1 // we request one more than the page size we return
 
 	cursor := ""
-	hasMore := int32(len(connections)) > l.LimitVal
+	hasMore := uint64(len(results)) > l.LimitVal
 	if hasMore {
 		cursor, err = pagination.MakeCursor(ctx, l.s.secretKey, l)
 		if err != nil {
@@ -312,7 +415,7 @@ func (l *listConnectionsFilters) fetchPage(ctx context.Context) pagination.PageR
 
 	return pagination.PageResult[Connection]{
 		HasMore: hasMore,
-		Results: connections[:util.MinInt32(l.LimitVal, int32(len(connections)))],
+		Results: results[:util.MinUint64(l.LimitVal, uint64(len(results)))],
 		Cursor:  cursor,
 	}
 }
@@ -353,65 +456,4 @@ func (s *service) ListConnectionsFromCursor(ctx context.Context, cursor string) 
 	}
 
 	return b.FromCursor(ctx, cursor)
-}
-
-func (s *service) EnumerateConnections(
-	ctx context.Context,
-	deletedHandling DeletedHandling,
-	states []ConnectionState,
-	callback func(conns []*Connection, lastPage bool) (stop bool, err error),
-) error {
-	const pageSize = 100
-
-	sess := s.session(ctx)
-
-	if deletedHandling == DeletedHandlingInclude {
-		sess = sess.Unscoped()
-	}
-
-	offset := 0
-
-	for {
-		var connections []*Connection
-
-		tx := sess.
-			Table("connections c").
-			Select("c.*").
-			Order("c.created_at DESC").
-			Limit(pageSize + 1).
-			Offset(offset)
-
-		if deletedHandling == DeletedHandlingExclude {
-			tx = tx.Where("c.deleted_at IS NULL")
-		}
-
-		if len(states) > 0 {
-			tx = tx.Where("c.state IN ?", states)
-		}
-
-		result := tx.Find(&connections)
-
-		if result.Error != nil {
-			return result.Error
-		}
-
-		lastPage := len(connections) < pageSize+1
-
-		if len(connections) > pageSize {
-			connections = connections[:pageSize]
-		}
-
-		stop, err := callback(connections, lastPage)
-		if err != nil {
-			return err
-		}
-
-		if stop || lastPage {
-			break
-		}
-
-		offset += pageSize
-	}
-
-	return nil
 }

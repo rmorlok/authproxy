@@ -1,15 +1,15 @@
 package database
 
 import (
+	"testing"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/assert"
-	"gorm.io/gorm"
 	clock "k8s.io/utils/clock/testing"
-	"testing"
-	"time"
 )
 
 func TestConnections(t *testing.T) {
@@ -43,13 +43,13 @@ func TestConnections(t *testing.T) {
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		type connectionResult struct {
-			Id    string
-			State string
-			gorm.DeletedAt
+			Id        string
+			State     string
+			DeletedAt *time.Time
 		}
 
 		test_utils.AssertSql(t, rawDb, `
-			SELECT id,state, deleted_at FROM connections;
+			SELECT id, state, deleted_at FROM connections;
 		`, []connectionResult{})
 
 		u := uuid.New()
@@ -62,18 +62,18 @@ func TestConnections(t *testing.T) {
 		assert.NoError(t, err)
 
 		test_utils.AssertSql(t, rawDb, `
-			SELECT id,state, deleted_at FROM connections;
+			SELECT id, state, deleted_at FROM connections;
 		`, []connectionResult{
 			{
 				Id:        u.String(),
 				State:     string(ConnectionStateCreated),
-				DeletedAt: gorm.DeletedAt{},
+				DeletedAt: nil,
 			},
 		})
 
 		// Delete a connection that does not exist
 		err = db.DeleteConnection(ctx, uuid.New())
-		assert.NoError(t, err)
+		assert.ErrorIs(t, err, ErrNotFound)
 
 		// Unchanged
 		test_utils.AssertSql(t, rawDb, `
@@ -82,7 +82,7 @@ func TestConnections(t *testing.T) {
 			{
 				Id:        u.String(),
 				State:     string(ConnectionStateCreated),
-				DeletedAt: gorm.DeletedAt{},
+				DeletedAt: nil,
 			},
 		})
 
@@ -93,12 +93,9 @@ func TestConnections(t *testing.T) {
 			SELECT id,state, deleted_at FROM connections;
 		`, []connectionResult{
 			{
-				Id:    u.String(),
-				State: string(ConnectionStateCreated),
-				DeletedAt: gorm.DeletedAt{
-					Time:  now,
-					Valid: true,
-				},
+				Id:        u.String(),
+				State:     string(ConnectionStateCreated),
+				DeletedAt: &now,
 			},
 		})
 	})
@@ -233,7 +230,7 @@ func TestConnections(t *testing.T) {
 		t.Run("filter by state", func(t *testing.T) {
 			total := 0
 
-			q := db.ListConnectionsBuilder().Limit(10).ForConnectionState(ConnectionStateReady)
+			q := db.ListConnectionsBuilder().Limit(10).ForState(ConnectionStateReady)
 			for {
 				result := q.FetchPage(ctx)
 				assert.NoError(t, result.Error)
@@ -248,7 +245,10 @@ func TestConnections(t *testing.T) {
 
 		t.Run("reverse order", func(t *testing.T) {
 			var allResults []Connection
-			q := db.ListConnectionsBuilder().Limit(7).OrderBy(ConnectionOrderByCreatedAt, pagination.OrderByDesc)
+			q := db.
+				ListConnectionsBuilder().
+				Limit(7).
+				OrderBy(ConnectionOrderByCreatedAt, pagination.OrderByDesc)
 			err := q.Enumerate(ctx, func(result pagination.PageResult[Connection]) (bool, error) {
 				allResults = append(allResults, result.Results...)
 				return true, nil
@@ -320,37 +320,51 @@ func TestConnections(t *testing.T) {
 
 		t.Run("all connections", func(t *testing.T) {
 			total := 0
-			err := db.EnumerateConnections(ctx, DeletedHandlingInclude, nil, func(conns []*Connection, lastPage bool) (stop bool, err error) {
-				total += len(conns)
-				return false, nil
-			})
+			err := db.
+				ListConnectionsBuilder().
+				WithDeletedHandling(DeletedHandlingInclude).
+				Enumerate(ctx, func(pr pagination.PageResult[Connection]) (keepGoing bool, err error) {
+					total += len(pr.Results)
+					return true, nil
+				})
 			assert.NoError(t, err)
 			assert.Equal(t, 203, total)
 		})
 		t.Run("not deleted", func(t *testing.T) {
 			total := 0
-			err := db.EnumerateConnections(ctx, DeletedHandlingExclude, nil, func(conns []*Connection, lastPage bool) (stop bool, err error) {
-				total += len(conns)
-				return false, nil
-			})
+			err := db.
+				ListConnectionsBuilder().
+				WithDeletedHandling(DeletedHandlingExclude).
+				Enumerate(ctx, func(pr pagination.PageResult[Connection]) (keepGoing bool, err error) {
+					total += len(pr.Results)
+					return true, nil
+				})
 			assert.NoError(t, err)
 			assert.Equal(t, 202, total)
 		})
 		t.Run("multiple state filter", func(t *testing.T) {
 			total := 0
-			err := db.EnumerateConnections(ctx, DeletedHandlingExclude, []ConnectionState{ConnectionStateCreated, ConnectionStateReady}, func(conns []*Connection, lastPage bool) (stop bool, err error) {
-				total += len(conns)
-				return false, nil
-			})
+			err := db.
+				ListConnectionsBuilder().
+				ForStates([]ConnectionState{ConnectionStateCreated, ConnectionStateReady}).
+				WithDeletedHandling(DeletedHandlingExclude).
+				Enumerate(ctx, func(pr pagination.PageResult[Connection]) (keepGoing bool, err error) {
+					total += len(pr.Results)
+					return true, nil
+				})
 			assert.NoError(t, err)
 			assert.Equal(t, 201, total)
 		})
-		t.Run("multiple state filter", func(t *testing.T) {
+		t.Run("single state filter", func(t *testing.T) {
 			total := 0
-			err := db.EnumerateConnections(ctx, DeletedHandlingExclude, []ConnectionState{ConnectionStateReady}, func(conns []*Connection, lastPage bool) (stop bool, err error) {
-				total += len(conns)
-				return false, nil
-			})
+			err := db.
+				ListConnectionsBuilder().
+				ForStates([]ConnectionState{ConnectionStateReady}).
+				WithDeletedHandling(DeletedHandlingExclude).
+				Enumerate(ctx, func(pr pagination.PageResult[Connection]) (keepGoing bool, err error) {
+					total += len(pr.Results)
+					return false, nil
+				})
 			assert.NoError(t, err)
 			assert.Equal(t, 100, total)
 		})

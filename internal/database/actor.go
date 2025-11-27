@@ -272,7 +272,7 @@ func (s *service) CreateActor(ctx context.Context, a *Actor) error {
 		}
 
 		if affected == 0 {
-			return errors.New("no rows inserted")
+			return errors.New("failed to create actor; no rows inserted")
 		}
 
 		return nil
@@ -404,7 +404,7 @@ func (s *service) DeleteActor(ctx context.Context, id uuid.UUID) error {
 	}
 
 	if affected > 1 {
-		return errors.New("multiple actors were soft deleted")
+		return errors.Wrap(ErrViolation, "multiple actors were soft deleted")
 	}
 
 	return nil
@@ -525,20 +525,20 @@ func (l *listActorsFilters) fetchPage(ctx context.Context) pagination.PageResult
 	}
 	defer rows.Close()
 
-	var actors []Actor
+	var results []Actor
 	for rows.Next() {
-		var a Actor
-		err := rows.Scan(a.fields()...)
+		var r Actor
+		err := rows.Scan(r.fields()...)
 		if err != nil {
 			return pagination.PageResult[Actor]{Error: err}
 		}
-		actors = append(actors, a)
+		results = append(results, r)
 	}
 
-	l.Offset = l.Offset + uint64(len(actors)) - 1 // we request one more than the page size we return
+	l.Offset = l.Offset + uint64(len(results)) - 1 // we request one more than the page size we return
 
 	cursor := ""
-	hasMore := uint64(len(actors)) > l.LimitVal
+	hasMore := uint64(len(results)) > l.LimitVal
 	if hasMore {
 		cursor, err = pagination.MakeCursor(ctx, l.s.secretKey, l)
 		if err != nil {
@@ -548,7 +548,7 @@ func (l *listActorsFilters) fetchPage(ctx context.Context) pagination.PageResult
 
 	return pagination.PageResult[Actor]{
 		HasMore: hasMore,
-		Results: actors[:util.MinUint64(l.LimitVal, uint64(len(actors)))],
+		Results: results[:util.MinUint64(l.LimitVal, uint64(len(results)))],
 		Cursor:  cursor,
 	}
 }

@@ -6,6 +6,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
+	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/auth"
@@ -13,7 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/config/common"
 	"github.com/rmorlok/authproxy/internal/core"
-	connIface "github.com/rmorlok/authproxy/internal/core/iface"
+	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httpf"
@@ -28,7 +29,7 @@ import (
 type ConnectionsRoutes struct {
 	cfg     config.C
 	auth    auth.A
-	core    connIface.C
+	core    coreIface.C
 	db      database.DB
 	r       apredis.Client
 	httpf   httpf.F
@@ -125,7 +126,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	}
 
 	var err error
-	var cv connIface.ConnectorVersion
+	var cv coreIface.ConnectorVersion
 	if req.HasVersion() {
 		cv, err = r.core.GetConnectorVersion(ctx, req.ConnectorId, req.ConnectorVersion)
 	} else {
@@ -248,7 +249,7 @@ type ConnectionJson struct {
 	UpdatedAt time.Time                `json:"updated_at"`
 }
 
-func DatabaseConnectionToJson(cv connIface.ConnectorVersion, conn database.Connection) ConnectionJson {
+func DatabaseConnectionToJson(cv coreIface.ConnectorVersion, conn database.Connection) ConnectionJson {
 	connector := ConnectorJson{
 		Id:          conn.ConnectorId,
 		DisplayName: "Unknown",
@@ -317,7 +318,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 		}
 
 		if req.StateVal != nil {
-			b = b.ForConnectionState(*req.StateVal)
+			b = b.ForState(*req.StateVal)
 		}
 
 		if req.OrderByVal != nil {
@@ -371,7 +372,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, ListConnectionResponseJson{
 		Items: util.Map(result.Results, func(c database.Connection) ConnectionJson {
 			return DatabaseConnectionToJson(
-				connectorVersions[connIface.ConnectorVersionId{c.ConnectorId, c.ConnectorVersion}],
+				connectorVersions[coreIface.ConnectorVersionId{c.ConnectorId, c.ConnectorVersion}],
 				c,
 			)
 		}),
@@ -403,6 +404,14 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 
 	c, err := r.db.GetConnection(ctx, id)
 	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("connection not found").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			return
+		}
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().
 			WithInternalErr(err).
@@ -595,6 +604,14 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 
 	c, err := r.db.GetConnection(ctx, id)
 	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("connection not found").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			return
+		}
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().
 			WithInternalErr(err).
@@ -663,7 +680,7 @@ func NewConnectionsRoutes(
 	authService auth.A,
 	db database.DB,
 	r apredis.Client,
-	c connIface.C,
+	c coreIface.C,
 	httpf httpf.F,
 	encrypt encrypt.E,
 	logger *slog.Logger,

@@ -73,12 +73,6 @@ type DB interface {
 	SetConnectionState(ctx context.Context, id uuid.UUID, state ConnectionState) error
 	ListConnectionsBuilder() ListConnectionsBuilder
 	ListConnectionsFromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error)
-	EnumerateConnections(
-		ctx context.Context,
-		deletedHandling DeletedHandling,
-		states []ConnectionState,
-		callback func(conns []*Connection, lastPage bool) (stop bool, err error),
-	) error
 
 	/*
 	 * OAuth2 tokens

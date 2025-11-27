@@ -165,20 +165,6 @@ func (mr *MockDBMockRecorder) DeleteOAuth2Token(ctx, tokenId interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteOAuth2Token", reflect.TypeOf((*MockDB)(nil).DeleteOAuth2Token), ctx, tokenId)
 }
 
-// EnumerateConnections mocks base method.
-func (m *MockDB) EnumerateConnections(ctx context.Context, deletedHandling database.DeletedHandling, states []database.ConnectionState, callback func([]*database.Connection, bool) (bool, error)) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnumerateConnections", ctx, deletedHandling, states, callback)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// EnumerateConnections indicates an expected call of EnumerateConnections.
-func (mr *MockDBMockRecorder) EnumerateConnections(ctx, deletedHandling, states, callback interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnumerateConnections", reflect.TypeOf((*MockDB)(nil).EnumerateConnections), ctx, deletedHandling, states, callback)
-}
-
 // EnumerateOAuth2TokensExpiringWithin mocks base method.
 func (m *MockDB) EnumerateOAuth2TokensExpiringWithin(ctx context.Context, duration time.Duration, callback func([]*database.OAuth2TokenWithConnection, bool) (bool, error)) error {
 	m.ctrl.T.Helper()
