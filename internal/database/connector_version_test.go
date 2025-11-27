@@ -61,12 +61,12 @@ INSERT INTO connector_versions
 
 		// Version doesn't exist
 		v, err = db.GetConnectorVersion(ctx, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 99)
-		require.NoError(t, err)
+		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, v)
 
 		// UUID doesn't exist
 		v, err = db.GetConnectorVersion(ctx, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-999999999999"), 1)
-		require.NoError(t, err)
+		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, v)
 
 		v, err = db.GetConnectorVersionForState(ctx, uuid.MustParse("4a9f3c22-a8d5-423e-af53-e459f1d7c8da"), ConnectorVersionStatePrimary)
@@ -75,7 +75,7 @@ INSERT INTO connector_versions
 		require.Equal(t, ConnectorVersionStatePrimary, v.State)
 
 		v, err = db.GetConnectorVersionForState(ctx, uuid.MustParse("4a9f3c22-a8d5-423e-af53-e459f1d7c8da"), ConnectorVersionStateArchived)
-		require.NoError(t, err)
+		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, v)
 
 		pr := db.ListConnectorVersionsBuilder().
@@ -425,7 +425,7 @@ INSERT INTO connector_versions
 
 			// Verify version wasn't created
 			savedCV1, err = db.GetConnectorVersion(ctx, connectorID, 3)
-			require.NoError(t, err)
+			require.ErrorIs(t, err, ErrNotFound)
 			require.Nil(t, savedCV1)
 		})
 	})

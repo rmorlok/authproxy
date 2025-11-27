@@ -2,15 +2,15 @@ package database
 
 import (
 	"fmt"
+	"testing"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
-	"gorm.io/gorm"
 	clock "k8s.io/utils/clock/testing"
-	"testing"
-	"time"
 )
 
 func TestOAuth2Token_IsAccessTokenExpired(t *testing.T) {
@@ -367,10 +367,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 			ConnectorVersion: 1,
 			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 			UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
-			DeletedAt: gorm.DeletedAt{
-				Time:  apctx.GetClock(ctx).Now().Add(-30 * time.Minute),
-				Valid: true,
-			},
+			DeletedAt:        util.ToPtr(apctx.GetClock(ctx).Now().Add(-30 * time.Minute)),
 		}
 
 		manyReadyConnections := make([]Connection, 0)

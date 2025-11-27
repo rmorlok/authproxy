@@ -2,6 +2,7 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
@@ -16,7 +17,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
-	"gorm.io/gorm"
 )
 
 type ConnectorVersionState string
@@ -107,17 +107,64 @@ func IsValidConnectorVersionState[T string | ConnectorVersionState](state T) boo
 	}
 }
 
+const ConnectorVersionsTable = "connector_versions"
+
 type ConnectorVersion struct {
-	ID                  uuid.UUID             `gorm:"column:id;primaryKey"`
-	Version             uint64                `gorm:"column:version;primaryKey"`
-	Namespace           string                `gorm:"column:namespace"`
-	State               ConnectorVersionState `gorm:"column:state"`
-	Type                string                `gorm:"column:type"`
-	Hash                string                `gorm:"column:hash"`
-	EncryptedDefinition string                `gorm:"column:encrypted_definition"`
-	CreatedAt           time.Time             `gorm:"column:created_at"`
-	UpdatedAt           time.Time             `gorm:"column:updated_at"`
-	DeletedAt           gorm.DeletedAt        `gorm:"column:deleted_at;index"`
+	ID                  uuid.UUID
+	Version             uint64
+	Namespace           string
+	State               ConnectorVersionState
+	Type                string
+	Hash                string
+	EncryptedDefinition string
+	CreatedAt           time.Time
+	UpdatedAt           time.Time
+	DeletedAt           *time.Time
+}
+
+func (cv *ConnectorVersion) cols() []string {
+	return []string{
+		"id",
+		"version",
+		"namespace",
+		"state",
+		"type",
+		"hash",
+		"encrypted_definition",
+		"created_at",
+		"updated_at",
+		"deleted_at",
+	}
+}
+
+func (cv *ConnectorVersion) fields() []any {
+	return []any{
+		&cv.ID,
+		&cv.Version,
+		&cv.Namespace,
+		&cv.State,
+		&cv.Type,
+		&cv.Hash,
+		&cv.EncryptedDefinition,
+		&cv.CreatedAt,
+		&cv.UpdatedAt,
+		&cv.DeletedAt,
+	}
+}
+
+func (cv *ConnectorVersion) values() []any {
+	return []any{
+		cv.ID,
+		cv.Version,
+		cv.Namespace,
+		cv.State,
+		cv.Type,
+		cv.Hash,
+		cv.EncryptedDefinition,
+		cv.CreatedAt,
+		cv.UpdatedAt,
+		cv.DeletedAt,
+	}
 }
 
 func (cv *ConnectorVersion) Validate() error {
@@ -155,22 +202,27 @@ func (cv *ConnectorVersion) Validate() error {
 }
 
 func (s *service) GetConnectorVersion(ctx context.Context, id uuid.UUID, version uint64) (*ConnectorVersion, error) {
-	sess := s.session(ctx)
-
-	var cv ConnectorVersion
-	result := sess.First(&cv, "id = ? AND version = ?", id, version)
-	if result.Error != nil {
-		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
-			return nil, nil
+	var result ConnectorVersion
+	err := s.sq.
+		Select(result.cols()...).
+		From(ConnectorVersionsTable).
+		Where(sq.Eq{
+			"id":         id,
+			"version":    version,
+			"deleted_at": nil,
+		}).
+		RunWith(s.db).
+		QueryRow().
+		Scan(result.fields()...)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
 		}
-		return nil, result.Error
+
+		return nil, err
 	}
 
-	if result.RowsAffected == 0 {
-		return nil, nil
-	}
-
-	return &cv, nil
+	return &result, nil
 }
 
 func (s *service) GetConnectorVersions(
@@ -186,21 +238,32 @@ func (s *service) GetConnectorVersions(
 		ids[id] = struct{}{}
 	}
 
-	sess := s.session(ctx)
+	versionConditions := util.Map(requested, func(id ConnectorVersionId) sq.Sqlizer {
+		return sq.Eq{"id": id.Id, "version": id.Version}
+	})
 
-	query := sess
-	for i, id := range requested {
-		if i == 0 {
-			query = query.Where("(id = ? AND version = ?)", id.Id, id.Version)
-		} else {
-			query = query.Or("(id = ? AND version = ?)", id.Id, id.Version)
-		}
+	rows, err := s.sq.
+		Select(util.ToPtr(ConnectorVersion{}).cols()...).
+		From(ConnectorVersionsTable).
+		Where(sq.And{
+			sq.Eq{"deleted_at": nil},
+			sq.Or(versionConditions),
+		}).
+		RunWith(s.db).
+		Query()
+	if err != nil {
+		return nil, err
 	}
+	defer rows.Close()
 
 	var versions []ConnectorVersion
-	result := query.Find(&versions)
-	if result.Error != nil {
-		return nil, result.Error
+	for rows.Next() {
+		var r ConnectorVersion
+		err := rows.Scan(r.fields()...)
+		if err != nil {
+			return nil, err
+		}
+		versions = append(versions, r)
 	}
 
 	versionMap := make(map[ConnectorVersionId]*ConnectorVersion, len(versions))
@@ -242,17 +305,12 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 		return errors.New("can only upsert connector version as draft or primary")
 	}
 
-	return s.gorm.Transaction(func(tx *gorm.DB) error {
-		sqlDb, err := tx.DB()
-		if err != nil {
-			return err
-		}
-
-		sqb := sq.StatementBuilder.RunWith(sqlDb)
+	return s.transaction(func(tx *sql.Tx) error {
+		sqb := sq.StatementBuilder.RunWith(tx)
 
 		existingNamespace, _, err := sqlh.ScanWithDefault(sqb.
 			Select("namespace").
-			From("connector_versions").
+			From(ConnectorVersionsTable).
 			Where(sq.Eq{"id": cv.ID, "version": cv.Version}).
 			QueryRowContext(ctx),
 			cv.Namespace)
@@ -267,7 +325,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 
 		exitingState, defaultUsed, err := sqlh.ScanWithDefault(sqb.
 			Select("state").
-			From("connector_versions").
+			From(ConnectorVersionsTable).
 			Where(sq.Eq{"id": cv.ID, "version": cv.Version}).
 			QueryRowContext(ctx),
 			ConnectorVersionStateDraft)
@@ -283,7 +341,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				return errors.New("cannot modify non-draft connector")
 			}
 
-			result, err := sqb.Update("connector_versions").
+			result, err := sqb.Update(ConnectorVersionsTable).
 				Set("state", cv.State).
 				Set("type", cv.Type).
 				Set("encrypted_definition", cv.EncryptedDefinition).
@@ -309,7 +367,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 			maxVersion := uint64(0)
 			err := sqb.
 				Select("COALESCE(MAX(version), 0)").
-				From("connector_versions").
+				From(ConnectorVersionsTable).
 				Where(sq.Eq{"id": cv.ID}).
 				QueryRowContext(ctx).
 				Scan(&maxVersion)
@@ -322,29 +380,14 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				return errors.New("cannot insert connector version at non-sequential version")
 			}
 
-			_, err = sqb.Insert("connector_versions").
-				Columns(
-					"id",
-					"version",
-					"namespace",
-					"state",
-					"type",
-					"hash",
-					"encrypted_definition",
-					"created_at",
-					"updated_at",
-				).
-				Values(
-					cv.ID,
-					cv.Version,
-					cv.Namespace,
-					cv.State,
-					cv.Type,
-					cv.Hash,
-					cv.EncryptedDefinition,
-					apctx.GetClock(ctx).Now(),
-					apctx.GetClock(ctx).Now(),
-				).
+			cpy := *cv
+			now := apctx.GetClock(ctx).Now()
+			cpy.CreatedAt = now
+			cpy.UpdatedAt = now
+
+			_, err = sqb.Insert(ConnectorVersionsTable).
+				Columns(cpy.cols()...).
+				Values(cpy.values()...).
 				Exec()
 			if err != nil {
 				return err
@@ -353,10 +396,13 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 
 		if cv.State == ConnectorVersionStatePrimary {
 			// New primary version, update any previous primary to active
-			result, err := sqb.Update("connector_versions").
+			result, err := sqb.Update(ConnectorVersionsTable).
 				Set("state", ConnectorVersionStateActive).
 				Where(sq.And{
-					sq.Eq{"id": cv.ID, "state": ConnectorVersionStatePrimary},
+					sq.Eq{
+						"id":    cv.ID,
+						"state": ConnectorVersionStatePrimary,
+					},
 					sq.NotEq{"version": cv.Version},
 				}).
 				Exec()
@@ -376,98 +422,139 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 }
 
 func (s *service) GetConnectorVersionForTypeAndVersion(ctx context.Context, typ string, version uint64) (*ConnectorVersion, error) {
-	sess := s.session(ctx)
+	var result ConnectorVersion
+	err := sq.
+		Select(result.cols()...).
+		From(ConnectorVersionsTable).
+		Where(sq.Eq{
+			"type":       typ,
+			"version":    version,
+			"deleted_at": nil,
+		}).
+		OrderBy("created_at DESC").
+		Limit(1).
+		RunWith(s.db).
+		QueryRow().
+		Scan(result.fields()...)
 
-	var cv ConnectorVersion
-	result := sess.Order("created_at DESC").First(&cv, "type = ? AND version = ?", typ, version)
-	if result.Error != nil {
-		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
-			return nil, nil
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
 		}
-		return nil, result.Error
+
+		return nil, err
 	}
 
-	if result.RowsAffected == 0 {
-		return nil, nil
-	}
-
-	return &cv, nil
+	return &result, nil
 }
 
 func (s *service) GetConnectorVersionForType(ctx context.Context, typ string) (*ConnectorVersion, error) {
-	sess := s.session(ctx)
 
-	var cv ConnectorVersion
-	result := sess.Order("created_at DESC").Order("version DESC").First(&cv, "type = ?", typ)
-	if result.Error != nil {
-		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
-			return nil, nil
+	// This should probably be removed. Not clear when this would be needed.
+
+	var result ConnectorVersion
+	err := sq.
+		Select(result.cols()...).
+		From(ConnectorVersionsTable).
+		Where(sq.Eq{
+			"type":       typ,
+			"deleted_at": nil,
+		}).
+		OrderBy("created_at DESC", "version DESC").
+		Limit(1).
+		RunWith(s.db).
+		QueryRow().
+		Scan(result.fields()...)
+
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
 		}
-		return nil, result.Error
+
+		return nil, err
 	}
 
-	if result.RowsAffected == 0 {
-		return nil, nil
-	}
-
-	return &cv, nil
+	return &result, nil
 }
 
 func (s *service) GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state ConnectorVersionState) (*ConnectorVersion, error) {
-	sess := s.session(ctx)
+	var result ConnectorVersion
+	err := sq.
+		Select(result.cols()...).
+		From(ConnectorVersionsTable).
+		Where(sq.Eq{
+			"id":         id,
+			"state":      state,
+			"deleted_at": nil,
+		}).
+		OrderBy("version DESC").
+		Limit(1).
+		RunWith(s.db).
+		QueryRow().
+		Scan(result.fields()...)
 
-	var cv ConnectorVersion
-	result := sess.Order("version DESC").First(&cv, "id = ? AND state = ?", id, state)
-	if result.Error != nil {
-		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
-			return nil, nil
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
 		}
-		return nil, result.Error
+
+		return nil, err
 	}
 
-	if result.RowsAffected == 0 {
-		return nil, nil
-	}
-
-	return &cv, nil
+	return &result, nil
 }
 
 func (s *service) NewestConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error) {
-	sess := s.session(ctx)
+	var result ConnectorVersion
+	err := sq.
+		Select(result.cols()...).
+		From(ConnectorVersionsTable).
+		Where(sq.Eq{
+			"id":         id,
+			"deleted_at": nil,
+		}).
+		OrderBy("version DESC").
+		Limit(1).
+		RunWith(s.db).
+		QueryRow().
+		Scan(result.fields()...)
 
-	var cv ConnectorVersion
-	result := sess.Order("version DESC").First(&cv, "id = ?", id)
-	if result.Error != nil {
-		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
-			return nil, nil
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
 		}
-		return nil, result.Error
+
+		return nil, err
 	}
 
-	if result.RowsAffected == 0 {
-		return nil, nil
-	}
-
-	return &cv, nil
+	return &result, nil
 }
 
 func (s *service) NewestPublishedConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error) {
-	sess := s.session(ctx)
+	var result ConnectorVersion
+	err := sq.
+		Select(result.cols()...).
+		From(ConnectorVersionsTable).
+		Where(sq.Eq{
+			"id":         id,
+			"state":      []ConnectorVersionState{ConnectorVersionStatePrimary, ConnectorVersionStateActive},
+			"deleted_at": nil,
+		}).
+		OrderBy("version DESC").
+		Limit(1).
+		RunWith(s.db).
+		QueryRow().
+		Scan(result.fields()...)
 
-	var cv ConnectorVersion
-	result := sess.Where(`state in ("primary", "active")`).Order("version DESC").First(&cv, "id = ?", id)
-	if result.Error != nil {
-		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
-			return nil, nil
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
 		}
-		return nil, result.Error
+
+		return nil, err
 	}
 
-	if result.RowsAffected == 0 {
-		return nil, nil
-	}
-
-	return &cv, nil
+	return &result, nil
 }
 
 type ConnectorVersionOrderByField string
@@ -513,8 +600,8 @@ type ListConnectorVersionsBuilder interface {
 
 type listConnectorVersionsFilters struct {
 	s                 *service                      `json:"-"`
-	LimitVal          int32                         `json:"limit"`
-	Offset            int32                         `json:"offset"`
+	LimitVal          uint64                        `json:"limit"`
+	Offset            uint64                        `json:"offset"`
 	StatesVal         []ConnectorVersionState       `json:"states,omitempty"`
 	TypeVal           []string                      `json:"types,omitempty"`
 	IdsVal            []uuid.UUID                   `json:"ids,omitempty"`
@@ -525,7 +612,7 @@ type listConnectorVersionsFilters struct {
 }
 
 func (l *listConnectorVersionsFilters) Limit(limit int32) ListConnectorVersionsBuilder {
-	l.LimitVal = limit
+	l.LimitVal = uint64(limit)
 	return l
 }
 
@@ -550,8 +637,10 @@ func (l *listConnectorVersionsFilters) ForVersion(version uint64) ListConnectorV
 }
 
 func (l *listConnectorVersionsFilters) OrderBy(field ConnectorVersionOrderByField, by pagination.OrderBy) ListConnectorVersionsBuilder {
-	l.OrderByFieldVal = &field
-	l.OrderByVal = &by
+	if IsValidConnectorVersionOrderByField(field) {
+		l.OrderByFieldVal = &field
+		l.OrderByVal = &by
+	}
 	return l
 }
 
@@ -574,91 +663,70 @@ func (l *listConnectorVersionsFilters) FromCursor(ctx context.Context, cursor st
 	return l, nil
 }
 
-func (l *listConnectorVersionsFilters) fetchPage(ctx context.Context) pagination.PageResult[ConnectorVersion] {
-	q := l.s.session(ctx)
+func (l *listConnectorVersionsFilters) applyRestrictions(ctx context.Context) sq.SelectBuilder {
+	q := l.s.sq.
+		Select(util.ToPtr(ConnectorVersion{}).cols()...).
+		From(ConnectorVersionsTable)
 
 	if l.LimitVal <= 0 {
 		l.LimitVal = 100
 	}
 
-	query := sq.Select(`
-cv.id as id,
-cv.version as version,
-cv.state as state,
-cv.type as type,
-cv.encrypted_definition,
-cv.created_at as created_at,
-cv.updated_at as updated_at,
-cv.deleted_at as deleted_at`).
-		From("connector_versions cv")
-
 	if len(l.TypeVal) > 0 {
-		query = query.Where("cv.type IN ?", l.TypeVal)
+		q = q.Where(sq.Eq{"type": l.TypeVal})
 	}
 
 	if len(l.IdsVal) > 0 {
-		query = query.Where("cv.id IN ?", l.IdsVal)
+		q = q.Where(sq.Eq{"id": l.IdsVal})
 	}
 
 	if len(l.VersionsVal) > 0 {
-		query = query.Where("cv.version IN ?", l.VersionsVal)
+		q = q.Where(sq.Eq{"version": l.VersionsVal})
 	}
 
 	if len(l.StatesVal) > 0 {
-		query = query.Where("cv.state IN ?", l.StatesVal)
+		q = q.Where(sq.Eq{"states": l.StatesVal})
 	}
 
-	if l.IncludeDeletedVal {
-		q = q.Unscoped()
-	} else {
-		query = query.Where("cv.deleted_at IS NULL")
+	if !l.IncludeDeletedVal {
+		q = q.Where(sq.Eq{"deleted_at": nil})
 	}
 
 	// Always limit to one more than limit to check if there are more records
-	query = query.Limit(uint64(l.LimitVal + 1)).Offset(uint64(l.Offset))
+	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)
 
 	if l.OrderByFieldVal != nil {
-		query = query.OrderBy(fmt.Sprintf("%s %s", *l.OrderByFieldVal, l.OrderByVal.String()))
+		q = q.OrderBy(fmt.Sprintf("%s %s", *l.OrderByFieldVal, l.OrderByVal.String()))
 	}
 
-	sql, args, err := query.ToSql()
-	if err != nil {
-		// SQL generation should be deterministic
-		panic(errors.Errorf("failed to build query: %s", err))
-	}
+	return q
+}
 
-	rows, err := q.Raw(sql, args...).Rows()
+func (l *listConnectorVersionsFilters) fetchPage(ctx context.Context) pagination.PageResult[ConnectorVersion] {
+	var err error
 
+	rows, err := l.applyRestrictions(ctx).
+		RunWith(l.s.db).
+		Query()
 	if err != nil {
 		return pagination.PageResult[ConnectorVersion]{Error: err}
 	}
+	defer rows.Close()
 
-	var connectorVersions []ConnectorVersion
+	var results []ConnectorVersion
 	for rows.Next() {
-		var cv ConnectorVersion
-
-		// Scan all fields except States
-		err := rows.Scan(
-			&cv.ID,
-			&cv.Version,
-			&cv.State,
-			&cv.Type,
-			&cv.EncryptedDefinition,
-			&cv.CreatedAt,
-			&cv.UpdatedAt,
-			&cv.DeletedAt,
-		)
+		var r ConnectorVersion
+		err := rows.Scan(r.fields()...)
 		if err != nil {
 			return pagination.PageResult[ConnectorVersion]{Error: err}
 		}
-
-		connectorVersions = append(connectorVersions, cv)
+		results = append(results, r)
 	}
 
-	l.Offset = l.Offset + int32(len(connectorVersions)) - 1 // we request one more than the page size we return
+	l.Offset = l.Offset + uint64(len(results)) - 1 // we request one more than the page size we return
 
 	cursor := ""
-	hasMore := int32(len(connectorVersions)) > l.LimitVal
+	hasMore := uint64(len(results)) > l.LimitVal
 	if hasMore {
 		cursor, err = pagination.MakeCursor(ctx, l.s.secretKey, l)
 		if err != nil {
@@ -668,7 +736,7 @@ cv.deleted_at as deleted_at`).
 
 	return pagination.PageResult[ConnectorVersion]{
 		HasMore: hasMore,
-		Results: connectorVersions[:util.MinInt32(l.LimitVal, int32(len(connectorVersions)))],
+		Results: results[:util.MinUint64(l.LimitVal, uint64(len(results)))],
 		Cursor:  cursor,
 	}
 }

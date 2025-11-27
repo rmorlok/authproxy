@@ -1,5 +1,9 @@
 package iface
 
-import "github.com/pkg/errors"
+import (
+	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/database"
+)
 
-var ErrConnectionNotFound = errors.New("connection not found")
+var ErrNotFound = database.ErrNotFound
+var ErrConnectionNotFound = errors.Wrap(ErrNotFound, "connection not found")

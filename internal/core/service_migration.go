@@ -213,14 +213,14 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 	if configConnector.HasId() {
 		if configConnector.HasVersion() {
 			existingVersion, err := s.db.GetConnectorVersion(ctx, configConnector.Id, configConnector.Version)
-			if err != nil {
+			if err != nil && !errors.Is(err, database.ErrNotFound) {
 				return errors.Wrap(err, "failed to check for existing connector for precheck")
 			}
 
-			if existingVersion == nil {
+			if errors.Is(err, database.ErrNotFound) {
 				// Check for other versions that might exist
 				newestVersion, err := s.db.NewestConnectorVersionForId(ctx, configConnector.Id)
-				if err != nil {
+				if err != nil && !errors.Is(err, database.ErrNotFound) {
 					return errors.Wrap(err, "failed to get newest version of connector for precheck")
 				}
 
@@ -305,7 +305,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnector *config.
 
 	if configConnector.HasId() && configConnector.HasVersion() {
 		existingVersion, err = s.db.GetConnectorVersion(ctx, configConnector.Id, configConnector.Version)
-		if err != nil {
+		if err != nil && !errors.Is(err, database.ErrNotFound) {
 			return errors.Wrap(err, "failed to get connector version")
 		}
 
@@ -324,7 +324,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnector *config.
 		}
 	} else if configConnector.HasId() {
 		existingVersion, err = s.db.NewestConnectorVersionForId(ctx, configConnector.Id)
-		if err != nil {
+		if err != nil && !errors.Is(err, database.ErrNotFound) {
 			return errors.Wrap(err, "failed to get newest version of connector")
 		}
 
@@ -366,7 +366,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnector *config.
 		}
 	} else {
 		existingVersion, err := s.db.GetConnectorVersionForType(ctx, configConnector.Type)
-		if err != nil {
+		if err != nil && !errors.Is(err, database.ErrNotFound) {
 			return errors.Wrap(err, "failed to get connector version for type")
 		}
 

@@ -13,7 +13,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
-	"gorm.io/gorm"
 )
 
 type ConnectionState string
@@ -49,7 +48,7 @@ type Connection struct {
 	ConnectorVersion uint64
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
-	DeletedAt        gorm.DeletedAt
+	DeletedAt        *time.Time
 }
 
 func (c *Connection) cols() []string {

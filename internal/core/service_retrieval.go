@@ -17,11 +17,10 @@ func (s *service) GetConnectorVersion(ctx context.Context, id uuid.UUID, version
 func (s *service) getConnectorVersion(ctx context.Context, id uuid.UUID, version uint64) (*ConnectorVersion, error) {
 	cv, err := s.db.GetConnectorVersion(ctx, id, version)
 	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNotFound
+		}
 		return nil, err
-	}
-
-	if cv == nil {
-		return nil, nil
 	}
 
 	wrapped := wrapConnectorVersion(*cv, s)
@@ -90,8 +89,13 @@ func (s *service) getConnectionForDb(ctx context.Context, dbConn *database.Conne
 	logger.Debug("getting connector for connection")
 	cv, err := s.getConnectorVersion(ctx, dbConn.ConnectorId, dbConn.ConnectorVersion)
 	if err != nil {
+		if errors.Is(err, ErrNotFound) {
+			logger.Error("connector is missing for connector version", "error", err)
+			return nil, errors.Wrap(err, "connector is missing for connector version")
+		}
+
 		logger.Error("failed to get connector for connection", "error", err)
-		return nil, err
+		return nil, errors.Wrap(err, "failed to get connector for connection")
 	}
 
 	return newConnection(dbConn, s, cv), nil

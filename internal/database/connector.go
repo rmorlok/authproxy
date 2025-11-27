@@ -6,7 +6,6 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -65,8 +64,8 @@ type ListConnectorsBuilder interface {
 
 type listConnectorsFilters struct {
 	s                 *service                `json:"-"`
-	LimitVal          int32                   `json:"limit"`
-	Offset            int32                   `json:"offset"`
+	LimitVal          uint64                  `json:"limit"`
+	Offset            uint64                  `json:"offset"`
 	StatesVal         []ConnectorVersionState `json:"states,omitempty"`
 	TypeVal           []string                `json:"types,omitempty"`
 	IdsVal            []uuid.UUID             `json:"ids,omitempty"`
@@ -76,7 +75,7 @@ type listConnectorsFilters struct {
 }
 
 func (l *listConnectorsFilters) Limit(limit int32) ListConnectorsBuilder {
-	l.LimitVal = limit
+	l.LimitVal = uint64(limit)
 	return l
 }
 
@@ -123,15 +122,12 @@ func (l *listConnectorsFilters) FromCursor(ctx context.Context, cursor string) (
 }
 
 func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageResult[Connector] {
-
-	q := l.s.session(ctx)
-
 	if l.LimitVal <= 0 {
 		l.LimitVal = 100
 	}
 
 	// Picks out the row that will be returned as primary based on a ranked priority of the states
-	rankedRowsCTE := `
+	rankedRowsCTE := fmt.Sprintf(`
         SELECT
             *,
             ROW_NUMBER() OVER (
@@ -145,20 +141,20 @@ func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageRe
                         ELSE 5
                     END
             ) AS row_num
-        FROM connector_versions
-    `
+        FROM %s
+    `, ConnectorVersionsTable)
 
-	// Compute aggregate state for the connector across all versions
-	connectorVersionCountsCTE := `
+	// Compute the aggregate state for the connector across all versions
+	connectorVersionCountsCTE := fmt.Sprintf(`
         SELECT
             id,
             json_group_array(distinct state) as states,
             count(*) as versions
-        FROM connector_versions
+        FROM %s
         GROUP BY id
-    `
+    `, ConnectorVersionsTable)
 
-	query := sq.Select(`
+	q := l.s.sq.Select(`
 rr.id as id,
 rr.namespace as namespace,
 rr.version as version,
@@ -178,37 +174,29 @@ cvc.versions as total_versions
 		Where("rr.row_num = ?", 1)
 
 	if len(l.TypeVal) > 0 {
-		query = query.Where("rr.type IN ?", l.TypeVal)
+		q = q.Where(sq.Eq{"rr.type": l.TypeVal})
 	}
 
 	if len(l.IdsVal) > 0 {
-		query = query.Where("rr.id IN ?", l.IdsVal)
+		q = q.Where(sq.Eq{"rr.id": l.IdsVal})
 	}
 
 	if len(l.StatesVal) > 0 {
-		query = query.Where("rr.state IN ?", l.StatesVal)
+		q = q.Where(sq.Eq{"rr.state": l.StatesVal})
 	}
 
-	if l.IncludeDeletedVal {
-		q = q.Unscoped()
-	} else {
-		query = query.Where("rr.deleted_at IS NULL")
+	if !l.IncludeDeletedVal {
+		q = q.Where(sq.Eq{"rr.deleted_at": nil})
 	}
 
 	// Always limit to one more than limit to check if there are more records
-	query = query.Limit(uint64(l.LimitVal + 1)).Offset(uint64(l.Offset))
+	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)
 
 	if l.OrderByFieldVal != nil {
-		query = query.OrderBy(fmt.Sprintf("%s %s", *l.OrderByFieldVal, l.OrderByVal.String()))
+		q = q.OrderBy(fmt.Sprintf("%s %s", *l.OrderByFieldVal, l.OrderByVal.String()))
 	}
 
-	sql, args, err := query.ToSql()
-	if err != nil {
-		// SQL generation should be deterministic
-		panic(errors.Errorf("failed to build query: %s", err))
-	}
-
-	rows, err := q.Raw(sql, args...).Rows()
+	rows, err := q.RunWith(l.s.db).Query()
 
 	if err != nil {
 		return pagination.PageResult[Connector]{Error: err}
@@ -239,10 +227,10 @@ cvc.versions as total_versions
 		connectors = append(connectors, c)
 	}
 
-	l.Offset = l.Offset + int32(len(connectors)) - 1 // we request one more than the page size we return
+	l.Offset = l.Offset + uint64(len(connectors)) - 1 // we request one more than the page size we return
 
 	cursor := ""
-	hasMore := int32(len(connectors)) > l.LimitVal
+	hasMore := uint64(len(connectors)) > l.LimitVal
 	if hasMore {
 		cursor, err = pagination.MakeCursor(ctx, l.s.secretKey, l)
 		if err != nil {
@@ -252,7 +240,7 @@ cvc.versions as total_versions
 
 	return pagination.PageResult[Connector]{
 		HasMore: hasMore,
-		Results: connectors[:util.MinInt32(l.LimitVal, int32(len(connectors)))],
+		Results: connectors[:util.MinUint64(l.LimitVal, uint64(len(connectors)))],
 		Cursor:  cursor,
 	}
 }

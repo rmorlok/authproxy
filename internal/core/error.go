@@ -1,5 +1,8 @@
 package core
 
-import "github.com/rmorlok/authproxy/internal/database"
+import (
+	"github.com/rmorlok/authproxy/internal/core/iface"
+)
 
-var ErrNotFound = database.ErrNotFound
+var ErrNotFound = iface.ErrNotFound
+var ErrConnectionNotFound = iface.ErrConnectionNotFound
