@@ -24,6 +24,7 @@ export interface ListNamespaceParams {
   cursor?: string;
   limit?: number;
   order_by?: string;
+  children_of?: string;
 }
 
 /**

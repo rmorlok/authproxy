@@ -114,6 +114,20 @@ func (l *listNamespaceWrapper) ForPathPrefix(prefix string) iface.ListNamespaces
 	}
 }
 
+func (l *listNamespaceWrapper) ForDepth(depth uint64) iface.ListNamespacesBuilder {
+	return &listNamespaceWrapper{
+		l: l.l.ForDepth(depth),
+		s: l.s,
+	}
+}
+
+func (l *listNamespaceWrapper) ForChildrenOf(prefix string) iface.ListNamespacesBuilder {
+	return &listNamespaceWrapper{
+		l: l.l.ForChildrenOf(prefix),
+		s: l.s,
+	}
+}
+
 func (l *listNamespaceWrapper) ForState(s database.NamespaceState) iface.ListNamespacesBuilder {
 	return &listNamespaceWrapper{
 		l: l.l.ForState(s),

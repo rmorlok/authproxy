@@ -101,7 +101,7 @@ INSERT INTO namespaces
 		require.Equal(t, pr.Results[3].Path, "root/prod/12345")
 
 		pr = db.ListNamespacesBuilder().
-			ForDirectDescendents("root/prod").
+			ForChildrenOf("root/prod").
 			OrderBy(NamespaceOrderByCreatedAt, pagination.OrderByDesc).
 			FetchPage(ctx)
 		require.NoError(t, pr.Error)

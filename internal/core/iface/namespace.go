@@ -28,6 +28,8 @@ type ListNamespacesBuilder interface {
 	ListNamespacesExecutor
 	Limit(int32) ListNamespacesBuilder
 	ForPathPrefix(string) ListNamespacesBuilder
+	ForDepth(depth uint64) ListNamespacesBuilder
+	ForChildrenOf(path string) ListNamespacesBuilder
 	ForState(database.NamespaceState) ListNamespacesBuilder
 	OrderBy(database.NamespaceOrderByField, pagination.OrderBy) ListNamespacesBuilder
 	IncludeDeleted() ListNamespacesBuilder

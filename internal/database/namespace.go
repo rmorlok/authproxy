@@ -295,7 +295,7 @@ type ListNamespacesBuilder interface {
 	Limit(int32) ListNamespacesBuilder
 	ForPathPrefix(path string) ListNamespacesBuilder
 	ForDepth(depth uint64) ListNamespacesBuilder
-	ForDirectDescendents(path string) ListNamespacesBuilder
+	ForChildrenOf(path string) ListNamespacesBuilder
 	ForState(NamespaceState) ListNamespacesBuilder
 	OrderBy(NamespaceOrderByField, pagination.OrderBy) ListNamespacesBuilder
 	IncludeDeleted() ListNamespacesBuilder
@@ -333,7 +333,7 @@ func (l *listNamespacesFilters) ForDepth(depth uint64) ListNamespacesBuilder {
 	return l
 }
 
-func (l *listNamespacesFilters) ForDirectDescendents(path string) ListNamespacesBuilder {
+func (l *listNamespacesFilters) ForChildrenOf(path string) ListNamespacesBuilder {
 	currDepth := DepthOfNamespacePath(path)
 	return l.
 		ForDepth(currDepth + 1).

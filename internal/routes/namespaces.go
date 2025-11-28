@@ -37,6 +37,7 @@ type ListNamespacesRequestQueryParams struct {
 	Cursor     *string                  `form:"cursor"`
 	LimitVal   *int32                   `form:"limit"`
 	StateVal   *database.NamespaceState `form:"state"`
+	ChildrenOf *string                  `form:"children_of"`
 	OrderByVal *string                  `form:"order_by"`
 }
 
@@ -124,6 +125,10 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 
 		if req.StateVal != nil {
 			b = b.ForState(*req.StateVal)
+		}
+
+		if req.ChildrenOf != nil {
+			b = b.ForChildrenOf(*req.ChildrenOf)
 		}
 
 		if req.OrderByVal != nil {
