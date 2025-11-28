@@ -2,11 +2,13 @@ package util
 
 import (
 	"fmt"
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestMust(t *testing.T) {
+	t.Parallel()
 	assert.True(t, Must(true, nil))
 	assert.Panics(t, func() {
 		Must(false, fmt.Errorf("I panic"))
@@ -14,6 +16,7 @@ func TestMust(t *testing.T) {
 }
 
 func TestMustNotError(t *testing.T) {
+	t.Parallel()
 	assert.NotPanics(t, func() {
 		MustNotError(nil)
 	})

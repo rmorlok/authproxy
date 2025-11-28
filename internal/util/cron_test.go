@@ -6,6 +6,7 @@ import (
 )
 
 func TestDurationToCronSpec(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name      string
 		duration  time.Duration

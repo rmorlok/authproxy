@@ -1,11 +1,14 @@
 package util
 
 import (
-	"github.com/stretchr/testify/assert"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestSecureDecryptedJsonValue(t *testing.T) {
+	t.Parallel()
+
 	type Foo struct {
 		Val string
 	}

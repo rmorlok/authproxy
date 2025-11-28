@@ -7,6 +7,7 @@ import (
 )
 
 func TestDeindent(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		Name     string
 		AllEqual []string

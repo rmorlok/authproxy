@@ -1,15 +1,17 @@
 package auth
 
 import (
+	"net/http"
+	"testing"
+
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/assert"
-	"net/http"
-	"testing"
 )
 
 func TestActorOnRequest(t *testing.T) {
+	t.Parallel()
 	assert.False(t, GetAuthFromRequest(util.Must(http.NewRequest("GET", "https://example.com", nil))).IsAuthenticated())
 
 	a := database.Actor{

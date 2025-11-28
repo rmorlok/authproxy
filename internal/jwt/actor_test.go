@@ -9,6 +9,7 @@ import (
 )
 
 func TestActor_HashID(t *testing.T) {
+	t.Parallel()
 	tbl := []struct {
 		id   string
 		hash string
@@ -34,6 +35,7 @@ func (m *mockBadHasher) Size() int                         { return 0 }
 func (m *mockBadHasher) BlockSize() int                    { return 0 }
 
 func TestActor(t *testing.T) {
+	t.Parallel()
 	t.Run("HashIDWithCRC", func(t *testing.T) {
 		tbl := []struct {
 			id   string

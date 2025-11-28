@@ -24,6 +24,7 @@ import (
 )
 
 func TestAuth_Token(t *testing.T) {
+	t.Parallel()
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 
@@ -36,6 +37,7 @@ func TestAuth_Token(t *testing.T) {
 }
 
 func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
+	t.Parallel()
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 
@@ -94,6 +96,7 @@ func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 }
 
 func TestAuth_RoundtripPublicPrivate(t *testing.T) {
+	t.Parallel()
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 
@@ -130,6 +133,7 @@ func TestAuth_RoundtripPublicPrivate(t *testing.T) {
 }
 
 func TestAuth_SecretKey(t *testing.T) {
+	t.Parallel()
 	cfg := config.FromRoot(&testConfigSecretKey)
 	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 
@@ -171,6 +175,7 @@ func TestAuth_SecretKey(t *testing.T) {
 }
 
 func TestAuth_Parse(t *testing.T) {
+	t.Parallel()
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
 	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 	t.Run("valid", func(t *testing.T) {

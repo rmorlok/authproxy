@@ -2,12 +2,14 @@ package jwt
 
 import (
 	"context"
+	"testing"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/require"
-	"testing"
 )
 
 func TestJwtTokenParserBuilder(t *testing.T) {
+	t.Parallel()
 	t.Run("getSigningKeyDataAndMethod", func(t *testing.T) {
 		t.Run("RSA SSH", func(t *testing.T) {
 			tb := NewJwtTokenParserBuilder().

@@ -5,6 +5,7 @@ import (
 )
 
 func TestStringsJoin(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		strs     []string

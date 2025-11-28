@@ -2,14 +2,16 @@ package jwt
 
 import (
 	"context"
+	"testing"
+	"time"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"testing"
-	"time"
 )
 
 func TestJwtTokenClaims(t *testing.T) {
+	t.Parallel()
 	t.Run("String", func(t *testing.T) {
 		assert.NotPanics(t, func() {
 			var tc *AuthProxyClaims

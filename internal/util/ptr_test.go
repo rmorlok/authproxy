@@ -1,11 +1,13 @@
 package util
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestToPtr(t *testing.T) {
+	t.Parallel()
 	x := "foo"
 	require.Equal(t, &x, ToPtr(x))
 }

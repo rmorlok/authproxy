@@ -8,6 +8,7 @@ import (
 )
 
 func TestJwtTokenBuilder(t *testing.T) {
+	t.Parallel()
 	t.Run("getSigningKeyDataAndMethod", func(t *testing.T) {
 		t.Run("RSA SSH", func(t *testing.T) {
 			tb := NewJwtTokenBuilder().

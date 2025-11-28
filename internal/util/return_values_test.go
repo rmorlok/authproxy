@@ -7,6 +7,7 @@ import (
 )
 
 func TestFirst2(t *testing.T) {
+	t.Parallel()
 	f := func() (string, int) {
 		return "foo", 1
 	}
@@ -15,6 +16,7 @@ func TestFirst2(t *testing.T) {
 }
 
 func TestFirst3(t *testing.T) {
+	t.Parallel()
 	f := func() (string, int, bool) {
 		return "foo", 1, true
 	}
@@ -23,6 +25,7 @@ func TestFirst3(t *testing.T) {
 }
 
 func TestSecond2(t *testing.T) {
+	t.Parallel()
 	f := func() (string, int) {
 		return "foo", 1
 	}
@@ -31,6 +34,7 @@ func TestSecond2(t *testing.T) {
 }
 
 func TestSecond3(t *testing.T) {
+	t.Parallel()
 	f := func() (string, int, bool) {
 		return "foo", 1, true
 	}
@@ -39,6 +43,7 @@ func TestSecond3(t *testing.T) {
 }
 
 func TestThird3(t *testing.T) {
+	t.Parallel()
 	f := func() (string, int, bool) {
 		return "foo", 1, true
 	}

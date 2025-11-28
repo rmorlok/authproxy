@@ -13,6 +13,7 @@ type FakeCursor struct {
 }
 
 func TestCursorRoundTrip(t *testing.T) {
+	t.Parallel()
 	key := config.KeyDataValue{
 		Value: "0123456789abcdef0123456789abcdef",
 	}

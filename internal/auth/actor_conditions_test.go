@@ -9,6 +9,7 @@ import (
 )
 
 func TestActorValidatorIsAdmin(t *testing.T) {
+	t.Parallel()
 	notAdmin := database.Actor{}
 	valid, reason := ActorValidatorIsAdmin(&notAdmin)
 	require.False(t, valid)
@@ -21,6 +22,7 @@ func TestActorValidatorIsAdmin(t *testing.T) {
 }
 
 func TestValidateAllActorValidators(t *testing.T) {
+	t.Parallel()
 	multiple := []ActorValidator{
 		ActorValidatorIsAdmin,
 		func(a *database.Actor) (bool, string) {
@@ -40,6 +42,7 @@ func TestValidateAllActorValidators(t *testing.T) {
 }
 
 func TestCombineActorValidators(t *testing.T) {
+	t.Parallel()
 	adminRestrictions := []ActorValidator{ActorValidatorIsAdmin}
 	externalIdRestrictions := []ActorValidator{
 		func(a *database.Actor) (bool, string) {

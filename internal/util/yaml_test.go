@@ -9,6 +9,7 @@ import (
 )
 
 func TestYamlBytesToJSON(t *testing.T) {
+	t.Parallel()
 	type TestData struct {
 		Foo string `json:"foo" yaml:"foo"`
 		Bar struct {

@@ -7,6 +7,7 @@ import (
 )
 
 func TestTabs2Spaces(t *testing.T) {
+	t.Parallel()
 	assert := require.New(t)
 
 	tests := []struct {

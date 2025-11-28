@@ -6,6 +6,7 @@ import (
 )
 
 func TestPrependAll(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name   string
 		prefix string

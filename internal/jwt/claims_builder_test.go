@@ -1,15 +1,17 @@
 package jwt
 
 import (
+	"testing"
+	"time"
+
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
-	"testing"
-	"time"
 )
 
 func TestClaimsBuilder(t *testing.T) {
+	t.Parallel()
 	t.Run("valid no actor", func(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()

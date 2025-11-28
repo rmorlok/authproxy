@@ -8,6 +8,7 @@ import (
 )
 
 func TestSplitOrderByParam(t *testing.T) {
+	t.Parallel()
 	t.Run("it works for a single field value with no order", func(t *testing.T) {
 		field, order, err := SplitOrderByParam[string]("foo")
 		require.NoError(t, err)

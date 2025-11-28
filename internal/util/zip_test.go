@@ -7,6 +7,7 @@ import (
 )
 
 func TestZipToMap(t *testing.T) {
+	t.Parallel()
 	tests := []struct {
 		name     string
 		l1       []string

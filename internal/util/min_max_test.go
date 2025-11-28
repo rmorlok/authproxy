@@ -7,6 +7,7 @@ import (
 )
 
 func TestMax(t *testing.T) {
+	t.Parallel()
 	assert.Equal(t, 3, MaxInt(1, 2, 3))
 	assert.Equal(t, 1, MaxInt(1))
 	assert.Equal(t, 3, MaxInt(3, 2))
@@ -29,6 +30,7 @@ func TestMax(t *testing.T) {
 }
 
 func TestMin(t *testing.T) {
+	t.Parallel()
 	assert.Equal(t, 1, MinInt(1, 2, 3))
 	assert.Equal(t, 1, MinInt(1))
 	assert.Equal(t, 2, MinInt(3, 2))
