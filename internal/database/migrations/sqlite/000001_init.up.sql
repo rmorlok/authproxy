@@ -52,6 +52,7 @@ create index idx_connector_versions_deleted_at
 create table namespaces
 (
     path       text primary key,
+    depth      integer,
     state      text,
     created_at datetime,
     updated_at datetime,

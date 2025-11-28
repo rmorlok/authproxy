@@ -7,6 +7,7 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config/common"
@@ -19,6 +20,7 @@ const NamespacesTable = "namespaces"
 // Namespace is the grouping of resources within AuthProxy.
 type Namespace struct {
 	Path      string
+	depth     uint64
 	State     NamespaceState
 	CreatedAt time.Time
 	UpdatedAt time.Time
@@ -28,6 +30,7 @@ type Namespace struct {
 func (ns *Namespace) cols() []string {
 	return []string{
 		"path",
+		"depth",
 		"state",
 		"created_at",
 		"updated_at",
@@ -38,6 +41,7 @@ func (ns *Namespace) cols() []string {
 func (ns *Namespace) fields() []any {
 	return []any{
 		&ns.Path,
+		&ns.depth,
 		&ns.State,
 		&ns.CreatedAt,
 		&ns.UpdatedAt,
@@ -48,6 +52,7 @@ func (ns *Namespace) fields() []any {
 func (ns *Namespace) values() []any {
 	return []any{
 		ns.Path,
+		ns.depth,
 		ns.State,
 		ns.CreatedAt,
 		ns.UpdatedAt,
@@ -55,9 +60,32 @@ func (ns *Namespace) values() []any {
 	}
 }
 
+func (ns *Namespace) normalize() {
+	if ns.State == "" {
+		ns.State = NamespaceStateActive
+	}
+
+	ns.depth = DepthOfNamespacePath(ns.Path)
+}
+
+func (ns *Namespace) Validate() error {
+	result := &multierror.Error{}
+
+	if err := ValidateNamespacePath(ns.Path); err != nil {
+		result = multierror.Append(result, errors.Wrap(err, "invalid namespace path"))
+	}
+
+	if !IsValidNamespaceState(ns.State) {
+		result = multierror.Append(result, errors.New("invalid namespace state"))
+	}
+
+	return result.ErrorOrNil()
+}
+
 var (
 	ValidateNamespacePath        = common.ValidateNamespacePath
 	SplitNamespacePathToPrefixes = common.SplitNamespacePathToPrefixes
+	DepthOfNamespacePath         = common.DepthOfNamespacePath
 )
 
 type NamespaceState string
@@ -67,6 +95,15 @@ const (
 	NamespaceStateDestroying NamespaceState = "destroying"
 	NamespaceStateDestroyed  NamespaceState = "destroyed"
 )
+
+func IsValidNamespaceState[T string | NamespaceState](state T) bool {
+	switch NamespaceState(state) {
+	case NamespaceStateActive, NamespaceStateDestroying, NamespaceStateDestroyed:
+		return true
+	default:
+		return false
+	}
+}
 
 type NamespaceOrderByField string
 
@@ -129,16 +166,14 @@ func (s *service) getNamespaceByPath(ctx context.Context, tx sq.BaseRunner, path
 }
 
 func (s *service) CreateNamespace(ctx context.Context, ns *Namespace) error {
-	err := ValidateNamespacePath(ns.Path)
-	if err != nil {
+	ns.normalize()
+	if err := ns.Validate(); err != nil {
 		return err
 	}
 
-	err = s.transaction(func(tx *sql.Tx) error {
+	err := s.transaction(func(tx *sql.Tx) error {
 		prefixes := SplitNamespacePathToPrefixes(ns.Path)
-
-		// Start out with the specified state or default to active
-		state := advanceNamespaceState(ns.State, NamespaceStateActive)
+		state := ns.State
 
 		for i := 0; i < len(prefixes)-1; i++ {
 			parent, err := s.getNamespaceByPath(ctx, tx, prefixes[i])
@@ -259,6 +294,8 @@ type ListNamespacesBuilder interface {
 	ListNamespacesExecutor
 	Limit(int32) ListNamespacesBuilder
 	ForPathPrefix(path string) ListNamespacesBuilder
+	ForDepth(depth uint64) ListNamespacesBuilder
+	ForDirectDescendents(path string) ListNamespacesBuilder
 	ForState(NamespaceState) ListNamespacesBuilder
 	OrderBy(NamespaceOrderByField, pagination.OrderBy) ListNamespacesBuilder
 	IncludeDeleted() ListNamespacesBuilder
@@ -269,7 +306,8 @@ type listNamespacesFilters struct {
 	LimitVal          uint64                 `json:"limit"`
 	Offset            uint64                 `json:"offset"`
 	StatesVal         []NamespaceState       `json:"states,omitempty"`
-	PathPrefix        string                 `json:"path_prefix,omitempty"`
+	PathPrefixVal     string                 `json:"path_prefix,omitempty"`
+	DepthVal          *uint64                `json:"depth,omitempty"`
 	OrderByFieldVal   *NamespaceOrderByField `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy    `json:"order_by"`
 	IncludeDeletedVal bool                   `json:"include_deleted,omitempty"`
@@ -286,8 +324,20 @@ func (l *listNamespacesFilters) ForState(state NamespaceState) ListNamespacesBui
 }
 
 func (l *listNamespacesFilters) ForPathPrefix(prefix string) ListNamespacesBuilder {
-	l.PathPrefix = prefix
+	l.PathPrefixVal = prefix
 	return l
+}
+
+func (l *listNamespacesFilters) ForDepth(depth uint64) ListNamespacesBuilder {
+	l.DepthVal = &depth
+	return l
+}
+
+func (l *listNamespacesFilters) ForDirectDescendents(path string) ListNamespacesBuilder {
+	currDepth := DepthOfNamespacePath(path)
+	return l.
+		ForDepth(currDepth + 1).
+		ForPathPrefix(path)
 }
 
 func (l *listNamespacesFilters) OrderBy(field NamespaceOrderByField, by pagination.OrderBy) ListNamespacesBuilder {
@@ -324,12 +374,16 @@ func (l *listNamespacesFilters) applyRestrictions(ctx context.Context) sq.Select
 		l.LimitVal = 100
 	}
 
-	if l.PathPrefix != "" {
-		if len(l.PathPrefix) >= 2 && l.PathPrefix[len(l.PathPrefix)-1] == '/' {
-			q = q.Where("(path = ? OR path LIKE ?)", l.PathPrefix[:len(l.PathPrefix)-2], l.PathPrefix+"%")
+	if l.PathPrefixVal != "" {
+		if len(l.PathPrefixVal) >= 2 && l.PathPrefixVal[len(l.PathPrefixVal)-1] == '/' {
+			q = q.Where("(path = ? OR path LIKE ?)", l.PathPrefixVal[:len(l.PathPrefixVal)-2], l.PathPrefixVal+"%")
 		} else {
-			q = q.Where("(path = ? OR path LIKE ?)", l.PathPrefix, l.PathPrefix+"/%")
+			q = q.Where("(path = ? OR path LIKE ?)", l.PathPrefixVal, l.PathPrefixVal+"/%")
 		}
+	}
+
+	if l.DepthVal != nil {
+		q = q.Where(sq.Eq{"depth": *l.DepthVal})
 	}
 
 	if len(l.StatesVal) > 0 {

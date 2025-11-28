@@ -241,4 +241,48 @@ func TestNamespaces(t *testing.T) {
 			}
 		})
 	})
+	t.Run("DepthOfNamespacePath", func(t *testing.T) {
+		tests := []struct {
+			name  string
+			path  string
+			depth uint64
+		}{
+			{
+				name:  "root",
+				path:  "root",
+				depth: 0,
+			},
+			{
+				name:  "root with slash",
+				path:  "root/",
+				depth: 0,
+			},
+			{
+				name:  "single child",
+				path:  "root/child",
+				depth: 1,
+			},
+			{
+				name:  "single child with slash",
+				path:  "root/child/",
+				depth: 1,
+			},
+			{
+				name:  "grandchild",
+				path:  "root/child/grandchild",
+				depth: 2,
+			},
+			{
+				name:  "empty path",
+				path:  "",
+				depth: 0,
+			},
+		}
+
+		for _, tt := range tests {
+			t.Run(tt.name, func(t *testing.T) {
+				require.Equal(t, tt.depth, DepthOfNamespacePath(tt.path))
+			})
+		}
+	})
 }

@@ -4,6 +4,8 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 var validPathRegex = regexp.MustCompile(`^root(?:/[a-zA-Z0-9_]+[a-zA-Z0-9_\-]*)*$`)
@@ -25,6 +27,12 @@ func ValidateNamespacePath(path string) error {
 	}
 
 	return nil
+}
+
+// DepthOfNamespacePath returns the number of path segments in the given path. This is a measure of how deep from
+// root this path is. So root has depth 0, root/foo has depth 1, root/foo/bar has depth 2, etc.
+func DepthOfNamespacePath(path string) uint64 {
+	return uint64(util.MaxInt(len(util.Filter(strings.Split(path, "/"), func(s string) bool { return s != "" }))-1, 0))
 }
 
 // SplitNamespacePathToPrefixes returns all the prefix paths for a given path, including the given path.
