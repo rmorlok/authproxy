@@ -520,8 +520,13 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 				dbRaw := db.(*service)
 
 				for _, connection := range connections {
-					result := dbRaw.gorm.Create(&connection)
-					require.NoError(t, result.Error)
+					_, err := dbRaw.sq.
+						Insert(ConnectionsTable).
+						Columns(connection.cols()...).
+						Values(connection.values()...).
+						RunWith(dbRaw.db).
+						Exec()
+					require.NoError(t, err)
 				}
 
 				for _, token := range tc.tokens {

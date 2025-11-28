@@ -11,7 +11,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/util"
-	"gorm.io/gorm"
 )
 
 const OAuth2TokensTable = "oauth2_tokens"
@@ -25,7 +24,7 @@ type OAuth2Token struct {
 	AccessTokenExpiresAt  *time.Time
 	Scopes                string
 	CreatedAt             time.Time
-	DeletedAt             gorm.DeletedAt
+	DeletedAt             *time.Time
 }
 
 func (t *OAuth2Token) cols() []string {

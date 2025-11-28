@@ -10,7 +10,6 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/config"
-	"github.com/rmorlok/authproxy/internal/util"
 )
 
 // MustApplyBlankTestDbConfig applies a test database configuration to the specified config root. The database
@@ -90,5 +89,5 @@ func MustApplyBlankTestDbConfigRaw(testName string, cfg config.C) (config.C, DB,
 		panic(err)
 	}
 
-	return cfg, db, util.Must(db.(*service).gorm.DB())
+	return cfg, db, db.(*service).db
 }

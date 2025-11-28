@@ -175,5 +175,4 @@ correct version of node, or inspect the `.nvmrc` file to see the version that is
 
 - [Go Documentation](https://golang.org/doc/)
 - [Testify Documentation](https://github.com/stretchr/testify)
-- [GORM Documentation](https://gorm.io/docs/)
 - [OAuth 2.0 Specification](https://oauth.net/2/)

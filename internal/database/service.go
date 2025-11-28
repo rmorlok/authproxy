@@ -6,16 +6,12 @@ import (
 	"log"
 	"log/slog"
 	"os"
-	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config"
-	"gorm.io/driver/sqlite"
-	"gorm.io/gorm"
 )
 
 // NewConnectionForRoot creates a new database connection from the specified configuration. The type of the database
@@ -67,20 +63,10 @@ func NewSqliteConnection(dbConfig *config.DatabaseSqlite, secretKey config.KeyDa
 		return nil, errors.Wrapf(err, "failed to ping sqlite database '%s'", dbConfig.GetDsn())
 	}
 
-	gormDb, err := gorm.Open(sqlite.Open(path), &gorm.Config{
-		Logger: &logger{
-			inner: l,
-		},
-	})
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to open sqlite database '%s' with gorm", dbConfig.Path)
-	}
-
 	return &service{
 		cfg:       dbConfig,
 		sq:        sq.StatementBuilder.PlaceholderFormat(dbConfig.GetPlaceholderFormat()),
 		db:        db,
-		gorm:      gormDb,
 		secretKey: secretKey,
 		logger:    l,
 	}, nil
@@ -90,17 +76,8 @@ type service struct {
 	cfg       config.Database
 	sq        sq.StatementBuilderType
 	db        *sql.DB
-	gorm      *gorm.DB       // the gorm instance
 	secretKey config.KeyData // the AES key used to secure cursors
 	logger    *slog.Logger
-}
-
-func (s *service) session(ctx context.Context) *gorm.DB {
-	return s.gorm.Session(&gorm.Session{
-		NowFunc: func() time.Time {
-			return apctx.GetClock(ctx).Now().UTC()
-		},
-	})
 }
 
 func (s *service) Ping(ctx context.Context) bool {
@@ -109,7 +86,7 @@ func (s *service) Ping(ctx context.Context) bool {
 		return false
 	}
 
-	err := s.session(ctx).Raw("SELECT 1").Error
+	_, err := s.db.Exec("SELECT 1")
 	if err != nil {
 		s.logger.Error("failed to ping database with query")
 		log.Println(errors.Wrap(err, "failed to connect to database"))
