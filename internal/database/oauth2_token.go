@@ -2,29 +2,72 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/aplog"
+	"github.com/rmorlok/authproxy/internal/util"
 	"gorm.io/gorm"
 )
 
+const OAuth2TokensTable = "oauth2_tokens"
+
 type OAuth2Token struct {
-	ID                    uuid.UUID      `gorm:"column:id;primarykey"`
-	ConnectionID          uuid.UUID      `gorm:"column:connection_id;not null"` // Foreign key to Connection
-	RefreshedFromID       *uuid.UUID     `gorm:"column:refreshed_from_id"`
-	EncryptedRefreshToken string         `gorm:"column:encrypted_refresh_token"`
-	EncryptedAccessToken  string         `gorm:"column:encrypted_access_token"`
-	AccessTokenExpiresAt  *time.Time     `gorm:"column:access_token_expires_at"`
-	Scopes                string         `gorm:"column:scopes"`
-	CreatedAt             time.Time      `gorm:"column:created_at"`
-	DeletedAt             gorm.DeletedAt `gorm:"column:deleted_at;index"`
+	ID                    uuid.UUID
+	ConnectionID          uuid.UUID // Foreign key to Connection; not enforced by database
+	RefreshedFromID       *uuid.UUID
+	EncryptedRefreshToken string
+	EncryptedAccessToken  string
+	AccessTokenExpiresAt  *time.Time
+	Scopes                string
+	CreatedAt             time.Time
+	DeletedAt             gorm.DeletedAt
 }
 
-func (*OAuth2Token) TableName() string {
-	return "oauth2_tokens"
+func (t *OAuth2Token) cols() []string {
+	return []string{
+		"id",
+		"connection_id",
+		"refreshed_from_id",
+		"encrypted_refresh_token",
+		"encrypted_access_token",
+		"access_token_expires_at",
+		"scopes",
+		"created_at",
+		"deleted_at",
+	}
+}
+
+func (t *OAuth2Token) fields() []any {
+	return []any{
+		&t.ID,
+		&t.ConnectionID,
+		&t.RefreshedFromID,
+		&t.EncryptedRefreshToken,
+		&t.EncryptedAccessToken,
+		&t.AccessTokenExpiresAt,
+		&t.Scopes,
+		&t.CreatedAt,
+		&t.DeletedAt,
+	}
+}
+
+func (t *OAuth2Token) values() []any {
+	return []any{
+		t.ID,
+		t.ConnectionID,
+		t.RefreshedFromID,
+		t.EncryptedRefreshToken,
+		t.EncryptedAccessToken,
+		t.AccessTokenExpiresAt,
+		t.Scopes,
+		t.CreatedAt,
+		t.DeletedAt,
+	}
 }
 
 func (t *OAuth2Token) IsAccessTokenExpired(ctx context.Context) bool {
@@ -39,40 +82,58 @@ func (s *service) GetOAuth2Token(
 	ctx context.Context,
 	connectionId uuid.UUID,
 ) (*OAuth2Token, error) {
-	sess := s.session(ctx)
-
-	var t OAuth2Token
-
-	// Query the database for the newest token matching the specified connection ID
-	result := sess.
-		Where("connection_id = ?", connectionId).
-		Where("deleted_at IS NULL").
-		Order("created_at DESC").
-		First(&t)
-
-	if result.Error != nil {
-		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
+	var result OAuth2Token
+	err := s.sq.
+		Select(result.cols()...).
+		From(OAuth2TokensTable).
+		Where(sq.Eq{
+			"connection_id": connectionId,
+			"deleted_at":    nil,
+		}).
+		OrderBy("created_at DESC").
+		Limit(1).
+		RunWith(s.db).
+		QueryRow().
+		Scan(result.fields()...)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, errors.Wrap(ErrNotFound, "no OAuth2 token found for connection ID")
 		}
-		return nil, result.Error
+
+		return nil, err
 	}
 
-	if result.RowsAffected == 0 {
-		return nil, ErrNotFound
-	}
-
-	return &t, nil
+	return &result, nil
 }
 
 func (s *service) DeleteOAuth2Token(
 	ctx context.Context,
 	tokenId uuid.UUID,
 ) error {
-	sess := s.session(ctx)
-	result := sess.Delete(&OAuth2Token{}, tokenId)
-	if result.Error != nil {
-		return result.Error
+	now := apctx.GetClock(ctx).Now()
+	dbResult, err := s.sq.
+		Update(OAuth2TokensTable).
+		Set("deleted_at", now).
+		Where(sq.Eq{"id": tokenId}).
+		RunWith(s.db).
+		Exec()
+	if err != nil {
+		return errors.Wrap(err, "failed to soft delete oauth token")
 	}
+
+	affected, err := dbResult.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "failed to soft delete oauth token")
+	}
+
+	if affected == 0 {
+		return ErrNotFound
+	}
+
+	if affected > 1 {
+		return errors.Wrap(ErrViolation, "multiple oauth tokens were soft deleted")
+	}
+
 	return nil
 }
 
@@ -80,23 +141,30 @@ func (s *service) DeleteAllOAuth2TokensForConnection(
 	ctx context.Context,
 	connectionId uuid.UUID,
 ) error {
-	sqlDb, err := s.gorm.DB()
-	if err != nil {
-		return err
-	}
+	logger := aplog.NewBuilder(s.logger).
+		WithCtx(ctx).
+		WithConnectionId(connectionId).
+		Build()
+	logger.Debug("deleting all oauth tokens for connection")
 
-	sqb := sq.StatementBuilder.RunWith(sqlDb)
 	now := apctx.GetClock(ctx).Now()
-
-	_, err = sqb.
-		Update("oauth2_tokens").
+	dbResult, err := s.sq.
+		Update(OAuth2TokensTable).
 		Set("deleted_at", now).
-		Where("connection_id = ?", connectionId).
-		ExecContext(ctx)
-
+		Where(sq.Eq{"connection_id": connectionId}).
+		RunWith(s.db).
+		Exec()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to soft delete oauth tokens for connection")
 	}
+
+	affected, err := dbResult.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "failed to soft delete oauth tokens for connection")
+	}
+
+	logger.Info("deleted oauth tokens for connection", "affected", affected)
+
 	return nil
 }
 
@@ -109,21 +177,35 @@ func (s *service) InsertOAuth2Token(
 	accessTokenExpiresAt *time.Time,
 	scopes string,
 ) (*OAuth2Token, error) {
-	sess := s.session(ctx)
+	logger := aplog.NewBuilder(s.logger).
+		WithCtx(ctx).
+		WithConnectionId(connectionId).
+		Build()
+	logger.Debug("inserting new oauth token")
 
+	now := apctx.GetClock(ctx).Now()
 	var newToken *OAuth2Token
 
-	err := sess.Transaction(func(tx *gorm.DB) error {
+	err := s.transaction(func(tx *sql.Tx) error {
 		// Check if a token exists for refreshedFrom
-		result := tx.
-			Model(&OAuth2Token{}).
-			Where("connection_id = ?", connectionId).
-			Where("deleted_at IS NULL").
-			Update("deleted_at", apctx.GetClock(ctx).Now())
-
-		if result.Error != nil {
-			return result.Error
+		dbResult, err := s.sq.Update(OAuth2TokensTable).
+			Set("deleted_at", now).
+			Where(sq.Eq{
+				"connection_id": connectionId,
+				"deleted_at":    nil,
+			}).
+			RunWith(tx).
+			Exec()
+		if err != nil {
+			return errors.Wrap(err, "failed to soft delete old oauth tokens as part of inserting new token")
 		}
+
+		affected, err := dbResult.RowsAffected()
+		if err != nil {
+			return errors.Wrap(err, "failed to soft delete old oauth tokens as part of inserting new token")
+		}
+
+		logger.Info("deleted previous oauth tokens for connection as part of inserting new", "affected", affected)
 
 		// Create a new token
 		newToken = &OAuth2Token{
@@ -134,11 +216,26 @@ func (s *service) InsertOAuth2Token(
 			EncryptedAccessToken:  encryptedAccessToken,
 			AccessTokenExpiresAt:  accessTokenExpiresAt,
 			Scopes:                scopes,
-			CreatedAt:             apctx.GetClock(ctx).Now(),
+			CreatedAt:             now,
 		}
 
-		if err := tx.Create(newToken).Error; err != nil {
-			return err
+		result, err := s.sq.
+			Insert(OAuth2TokensTable).
+			Columns(newToken.cols()...).
+			Values(newToken.values()...).
+			RunWith(tx).
+			Exec()
+		if err != nil {
+			return errors.Wrap(err, "failed to create oauth token")
+		}
+
+		affected, err = result.RowsAffected()
+		if err != nil {
+			return errors.Wrap(err, "failed to create oauth token")
+		}
+
+		if affected == 0 {
+			return errors.New("failed to create oauth token; no rows inserted")
 		}
 
 		return nil
@@ -152,8 +249,8 @@ func (s *service) InsertOAuth2Token(
 }
 
 type OAuth2TokenWithConnection struct {
-	OAuth2Token
-	Connection Connection `gorm:"embedded"`
+	Token      OAuth2Token
+	Connection Connection
 }
 
 func (s *service) EnumerateOAuth2TokensExpiringWithin(
@@ -165,37 +262,50 @@ func (s *service) EnumerateOAuth2TokensExpiringWithin(
 	now := apctx.GetClock(ctx).Now()
 	expirationThreshold := now.Add(duration)
 
-	sess := s.session(ctx)
-	offset := 0
+	offset := uint64(0)
 
 	for {
-		var tokensWithConnections []*OAuth2TokenWithConnection
-
-		// Fetch tokens that are expiring within the given duration or already expired
-		result := sess.
-			Table("oauth2_tokens t").
-			Select("t.*, c.*").
-			Joins("INNER JOIN connections c ON c.id = t.connection_id").
+		rows, err := s.sq.
+			Select(
+				append(
+					util.PrependAll("t.", util.ToPtr(OAuth2Token{}).cols()),
+					util.PrependAll("c.", util.ToPtr(Connection{}).cols())...,
+				)...,
+			).
+			From(OAuth2TokensTable+" AS t").
+			InnerJoin(ConnectionsTable+" AS c ON c.id = t.connection_id").
+			Where(sq.Eq{
+				"t.deleted_at": nil,
+				"c.deleted_at": nil,
+				"c.state":      ConnectionStateReady,
+			}).
 			Where("t.access_token_expires_at <= ?", expirationThreshold).
-			Where("t.deleted_at IS NULL").
-			Where("c.deleted_at IS NULL").
-			Where("c.state = ?", ConnectionStateReady).
-			Order("t.created_at DESC").
+			OrderBy("t.created_at DESC").
 			Limit(pageSize + 1).
 			Offset(offset).
-			Find(&tokensWithConnections)
-
-		if result.Error != nil {
-			return result.Error
+			RunWith(s.db).
+			Query()
+		if err != nil {
+			return err
 		}
 
-		lastPage := len(tokensWithConnections) < pageSize+1
-
-		if len(tokensWithConnections) > pageSize {
-			tokensWithConnections = tokensWithConnections[:pageSize]
+		var results []*OAuth2TokenWithConnection
+		for rows.Next() {
+			var r OAuth2TokenWithConnection
+			err := rows.Scan(append(r.Token.fields(), r.Connection.fields()...)...)
+			if err != nil {
+				return err
+			}
+			results = append(results, &r)
 		}
 
-		stop, err := callback(tokensWithConnections, lastPage)
+		lastPage := len(results) < pageSize+1
+
+		if len(results) > pageSize {
+			results = results[:pageSize]
+		}
+
+		stop, err := callback(results, lastPage)
 		if err != nil {
 			return err
 		}
