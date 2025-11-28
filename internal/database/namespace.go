@@ -2,8 +2,8 @@ package database
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
-	"regexp"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -12,19 +12,48 @@ import (
 	"github.com/rmorlok/authproxy/internal/config/common"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
-	"gorm.io/gorm"
 )
+
+const NamespacesTable = "namespaces"
 
 // Namespace is the grouping of resources within AuthProxy.
 type Namespace struct {
-	Path      string         `gorm:"column:path;primarykey"`
-	State     NamespaceState `gorm:"column:state"`
-	CreatedAt time.Time      `gorm:"column:created_at"`
-	UpdatedAt time.Time      `gorm:"column:updated_at"`
-	DeletedAt gorm.DeletedAt `gorm:"column:deleted_at;index"`
+	Path      string
+	State     NamespaceState
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	DeletedAt *time.Time
 }
 
-var validPathRegex = regexp.MustCompile(`^root(?:/[a-zA-Z0-9_]+[a-zA-Z0-9_\-]*)*$`)
+func (ns *Namespace) cols() []string {
+	return []string{
+		"path",
+		"state",
+		"created_at",
+		"updated_at",
+		"deleted_at",
+	}
+}
+
+func (ns *Namespace) fields() []any {
+	return []any{
+		&ns.Path,
+		&ns.State,
+		&ns.CreatedAt,
+		&ns.UpdatedAt,
+		&ns.DeletedAt,
+	}
+}
+
+func (ns *Namespace) values() []any {
+	return []any{
+		ns.Path,
+		ns.State,
+		ns.CreatedAt,
+		ns.UpdatedAt,
+		ns.DeletedAt,
+	}
+}
 
 var (
 	ValidateNamespacePath        = common.ValidateNamespacePath
@@ -78,109 +107,144 @@ func advanceNamespaceState(cur NamespaceState, next NamespaceState) NamespaceSta
 	return next
 }
 
+func (s *service) getNamespaceByPath(ctx context.Context, tx sq.BaseRunner, path string) (*Namespace, error) {
+	var result Namespace
+	err := s.sq.
+		Select(result.cols()...).
+		From(NamespacesTable).
+		Where(sq.Eq{
+			"path":       path,
+			"deleted_at": nil,
+		}).
+		RunWith(tx).QueryRow().
+		Scan(result.fields()...)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	return &result, nil
+}
+
 func (s *service) CreateNamespace(ctx context.Context, ns *Namespace) error {
 	err := ValidateNamespacePath(ns.Path)
 	if err != nil {
 		return err
 	}
 
-	return s.gorm.Transaction(func(tx *gorm.DB) error {
+	err = s.transaction(func(tx *sql.Tx) error {
 		prefixes := SplitNamespacePathToPrefixes(ns.Path)
 
 		// Start out with the specified state or default to active
 		state := advanceNamespaceState(ns.State, NamespaceStateActive)
 
 		for i := 0; i < len(prefixes)-1; i++ {
-			var parent Namespace
-			result := tx.First(&parent, "path = ? ", prefixes[i])
-			if result.Error != nil {
-				if errors.As(result.Error, &gorm.ErrRecordNotFound) {
+			parent, err := s.getNamespaceByPath(ctx, tx, prefixes[i])
+			if err != nil {
+				if errors.Is(err, ErrNotFound) {
 					return errors.Errorf("cannot create namespace '%s' because parent namespace '%s' does not exist or is deleted", ns.Path, prefixes[i])
 				}
-				return result.Error
+				return err
 			}
 
 			state = advanceNamespaceState(state, parent.State)
 		}
 
-		var existing Namespace
-		result := tx.First(&existing, "path = ? ", ns.Path)
-		if result.Error != nil && !errors.As(result.Error, &gorm.ErrRecordNotFound) {
-			return result.Error
-		} else if result.Error == nil {
+		// Check if the namespace already exists
+		_, err := s.getNamespaceByPath(ctx, tx, ns.Path)
+		if err != nil && !errors.Is(err, ErrNotFound) {
+			return err
+		} else if err == nil {
 			return errors.Errorf("cannot create namespace '%s' because it already exists", ns.Path)
 		}
 
-		// Update the state so that we are always bound by parent namespace state
+		// Update the state so that we are always bound by the parent namespace state
 		ns.State = state
 
-		result = tx.Create(ns)
-		if result.Error != nil {
-			return result.Error
+		dbResult, err := s.sq.
+			Insert(NamespacesTable).
+			Columns(ns.cols()...).
+			Values(ns.values()...).
+			RunWith(tx).
+			Exec()
+		if err != nil {
+			return errors.Wrap(err, "failed to create namespace")
+		}
+
+		affected, err := dbResult.RowsAffected()
+		if err != nil {
+			return errors.Wrap(err, "failed to create namespace")
+		}
+
+		if affected == 0 {
+			return errors.New("failed to create namespace; no rows inserted")
 		}
 
 		return nil
 	})
+
+	return err
 }
 
 func (s *service) GetNamespace(ctx context.Context, path string) (*Namespace, error) {
-	sess := s.session(ctx)
-
-	var ns Namespace
-	result := sess.First(&ns, "path = ? ", path)
-	if result.Error != nil {
-		if errors.As(result.Error, &gorm.ErrRecordNotFound) {
-			return nil, ErrNotFound
-		}
-		return nil, result.Error
-	}
-
-	if result.RowsAffected == 0 {
-		return nil, ErrNotFound
-	}
-
-	return &ns, nil
+	return s.getNamespaceByPath(ctx, s.db, path)
 }
 
 func (s *service) DeleteNamespace(ctx context.Context, path string) error {
-	sess := s.session(ctx)
-	result := sess.Delete(&Namespace{}, "path = ?", path)
-	if result.Error != nil {
-		return result.Error
+	now := apctx.GetClock(ctx).Now()
+	dbResult, err := s.sq.
+		Update(NamespacesTable).
+		Set("updated_at", now).
+		Set("deleted_at", now).
+		Where(sq.Eq{"path": path}).
+		RunWith(s.db).
+		Exec()
+	if err != nil {
+		return errors.Wrap(err, "failed to soft delete namespace")
 	}
+
+	affected, err := dbResult.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "failed to soft delete namespace")
+	}
+
+	if affected == 0 {
+		return ErrNotFound
+	}
+
+	if affected > 1 {
+		return errors.Wrap(ErrViolation, "multiple namespaces were soft deleted")
+	}
+
 	return nil
 }
 
 func (s *service) SetNamespaceState(ctx context.Context, path string, state NamespaceState) error {
-	sqlDb, err := s.gorm.DB()
-	if err != nil {
-		return err
-	}
-
-	sqb := sq.StatementBuilder.RunWith(sqlDb)
-
-	result, err := sqb.
-		Update("namespaces").
+	now := apctx.GetClock(ctx).Now()
+	dbResult, err := s.sq.
+		Update(NamespacesTable).
+		Set("updated_at", now).
 		Set("state", state).
-		Set("updated_at", apctx.GetClock(ctx).Now()).
-		Where("path = ?", path).
-		ExecContext(ctx)
-
+		Where(sq.Eq{"path": path}).
+		RunWith(s.db).
+		Exec()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to soft delete namespace")
 	}
 
-	count, err := result.RowsAffected()
+	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to soft delete namespace")
 	}
 
-	if count == 0 {
-		return ErrNotFound
+	if affected == 0 {
+		return errors.Wrap(ErrNotFound, "failed to set namespace state")
 	}
 
-	if count > 1 {
-		return ErrViolation
+	if affected > 1 {
+		return errors.Wrap(ErrViolation, "multiple namespaces were soft deleted")
 	}
 
 	return nil
@@ -202,8 +266,8 @@ type ListNamespacesBuilder interface {
 
 type listNamespacesFilters struct {
 	s                 *service               `json:"-"`
-	LimitVal          int32                  `json:"limit"`
-	Offset            int32                  `json:"offset"`
+	LimitVal          uint64                 `json:"limit"`
+	Offset            uint64                 `json:"offset"`
 	StatesVal         []NamespaceState       `json:"states,omitempty"`
 	PathPrefix        string                 `json:"path_prefix,omitempty"`
 	OrderByFieldVal   *NamespaceOrderByField `json:"order_by_field"`
@@ -212,7 +276,7 @@ type listNamespacesFilters struct {
 }
 
 func (l *listNamespacesFilters) Limit(limit int32) ListNamespacesBuilder {
-	l.LimitVal = limit
+	l.LimitVal = uint64(limit)
 	return l
 }
 
@@ -251,82 +315,66 @@ func (l *listNamespacesFilters) FromCursor(ctx context.Context, cursor string) (
 	return l, nil
 }
 
-func (l *listNamespacesFilters) fetchPage(ctx context.Context) pagination.PageResult[Namespace] {
-
-	q := l.s.session(ctx)
+func (l *listNamespacesFilters) applyRestrictions(ctx context.Context) sq.SelectBuilder {
+	q := l.s.sq.
+		Select(util.ToPtr(Namespace{}).cols()...).
+		From(NamespacesTable)
 
 	if l.LimitVal <= 0 {
 		l.LimitVal = 100
 	}
 
-	query := sq.Select(`
-n.path,
-n.state,
-n.created_at,
-n.updated_at,
-n.deleted_at`).
-		From("namespaces n")
-
 	if l.PathPrefix != "" {
 		if len(l.PathPrefix) >= 2 && l.PathPrefix[len(l.PathPrefix)-1] == '/' {
-			query = query.Where("(n.path = ? OR n.path LIKE ?)", l.PathPrefix[:len(l.PathPrefix)-2], l.PathPrefix+"%")
+			q = q.Where("(path = ? OR path LIKE ?)", l.PathPrefix[:len(l.PathPrefix)-2], l.PathPrefix+"%")
 		} else {
-			query = query.Where("(n.path = ? OR n.path LIKE ?)", l.PathPrefix, l.PathPrefix+"/%")
+			q = q.Where("(path = ? OR path LIKE ?)", l.PathPrefix, l.PathPrefix+"/%")
 		}
 	}
 
 	if len(l.StatesVal) > 0 {
-		query = query.Where("n.state IN ?", l.StatesVal)
+		q = q.Where(sq.Eq{"state": l.StatesVal})
 	}
 
-	if l.IncludeDeletedVal {
-		q = q.Unscoped()
-	} else {
-		query = query.Where("n.deleted_at IS NULL")
+	if !l.IncludeDeletedVal {
+		q = q.Where(sq.Eq{"deleted_at": nil})
 	}
 
 	// Always limit to one more than limit to check if there are more records
-	query = query.Limit(uint64(l.LimitVal + 1)).Offset(uint64(l.Offset))
+	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)
 
 	if l.OrderByFieldVal != nil {
-		query = query.OrderBy(fmt.Sprintf("%s %s", *l.OrderByFieldVal, l.OrderByVal.String()))
+		q = q.OrderBy(fmt.Sprintf("%s %s", *l.OrderByFieldVal, l.OrderByVal.String()))
 	}
 
-	sql, args, err := query.ToSql()
-	if err != nil {
-		// SQL generation should be deterministic
-		panic(errors.Errorf("failed to build query: %s", err))
-	}
+	return q
+}
 
-	rows, err := q.Raw(sql, args...).Rows()
+func (l *listNamespacesFilters) fetchPage(ctx context.Context) pagination.PageResult[Namespace] {
+	var err error
 
+	rows, err := l.applyRestrictions(ctx).
+		RunWith(l.s.db).
+		Query()
 	if err != nil {
 		return pagination.PageResult[Namespace]{Error: err}
 	}
+	defer rows.Close()
 
-	var connectors []Namespace
+	var results []Namespace
 	for rows.Next() {
-		var c Namespace
-
-		// Scan all fields except States
-		err := rows.Scan(
-			&c.Path,
-			&c.State,
-			&c.CreatedAt,
-			&c.UpdatedAt,
-			&c.DeletedAt,
-		)
+		var r Namespace
+		err := rows.Scan(r.fields()...)
 		if err != nil {
 			return pagination.PageResult[Namespace]{Error: err}
 		}
-
-		connectors = append(connectors, c)
+		results = append(results, r)
 	}
 
-	l.Offset = l.Offset + int32(len(connectors)) - 1 // we request one more than the page size we return
+	l.Offset = l.Offset + uint64(len(results)) - 1 // we request one more than the page size we return
 
 	cursor := ""
-	hasMore := int32(len(connectors)) > l.LimitVal
+	hasMore := uint64(len(results)) > l.LimitVal
 	if hasMore {
 		cursor, err = pagination.MakeCursor(ctx, l.s.secretKey, l)
 		if err != nil {
@@ -336,7 +384,7 @@ n.deleted_at`).
 
 	return pagination.PageResult[Namespace]{
 		HasMore: hasMore,
-		Results: connectors[:util.MinInt32(l.LimitVal, int32(len(connectors)))],
+		Results: results[:util.MinUint64(l.LimitVal, uint64(len(results)))],
 		Cursor:  cursor,
 	}
 }
