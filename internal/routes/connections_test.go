@@ -60,7 +60,7 @@ func TestConnections(t *testing.T) {
 		ac := asynqmock.NewMockClient(ctrl)
 		rs := mock.NewMockClient(ctrl)
 		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
-		assert.NoError(t, c.MigrateConnectors(context.Background()))
+		assert.NoError(t, c.Migrate(context.Background()))
 		cr := NewConnectionsRoutes(cfg, auth, db, rds, c, h, e, test_utils.NewTestLogger())
 		r := gin.Default()
 		cr.Register(r)

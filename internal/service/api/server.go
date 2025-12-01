@@ -86,14 +86,14 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 	routesConnectors := common_routes.NewConnectorsRoutes(
 		dm.GetConfig(),
 		authService,
-		dm.GetConnectorsService(),
+		dm.GetCoreService(),
 	)
 	routesConnections := common_routes.NewConnectionsRoutes(
 		dm.GetConfig(),
 		authService,
 		dm.GetDatabase(),
 		dm.GetRedisClient(),
-		dm.GetConnectorsService(),
+		dm.GetCoreService(),
 		dm.GetHttpf(),
 		dm.GetEncryptService(),
 		logger,
@@ -101,14 +101,14 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 	routesNamespaces := common_routes.NewNamespacesRoutes(
 		dm.GetConfig(),
 		authService,
-		dm.GetConnectorsService(),
+		dm.GetCoreService(),
 	)
 	routesProxy := common_routes.NewConnectionsProxyRoutes(
 		dm.GetConfig(),
 		authService,
 		dm.GetDatabase(),
 		dm.GetRedisClient(),
-		dm.GetConnectorsService(),
+		dm.GetCoreService(),
 		dm.GetHttpf(),
 		dm.GetEncryptService(),
 		logger,

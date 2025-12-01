@@ -62,7 +62,7 @@ func TestConnectors(t *testing.T) {
 		rs := mock.NewMockClient(ctrl)
 		h := httpf2.CreateFactory(cfg, rs, aplog.NewNoopLogger())
 		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
-		require.NoError(t, c.MigrateConnectors(context.Background()))
+		require.NoError(t, c.Migrate(context.Background()))
 
 		cr := NewConnectorsRoutes(cfg, auth, c)
 

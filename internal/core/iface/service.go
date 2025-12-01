@@ -17,6 +17,10 @@ type C interface {
 	 * Migrating connectors from config to db
 	 */
 
+	// Migrate migrates all resources defined in config file into the databases within the system, invoking appropriate
+	// events, lifecycle hooks, etc.
+	Migrate(ctx context.Context) error
+
 	// MigrateConnectors migrates connectors from configuration to the database
 	// It checks if the connector already exists in the database:
 	// - If it doesn't exist, it creates a new one

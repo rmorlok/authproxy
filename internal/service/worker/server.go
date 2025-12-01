@@ -122,14 +122,14 @@ func Serve(cfg config.C) {
 		cfg,
 		dm.GetDatabase(),
 		dm.GetRedisClient(),
-		dm.GetConnectorsService(),
+		dm.GetCoreService(),
 		dm.GetAsyncClient(),
 		dm.GetHttpf(),
 		dm.GetEncryptService(),
 		logger,
 	)
 	oauth2TaskHandler.RegisterTasks(mux)
-	dm.GetConnectorsService().RegisterTasks(mux)
+	dm.GetCoreService().RegisterTasks(mux)
 
 	var wg sync.WaitGroup
 
@@ -151,7 +151,7 @@ func Serve(cfg config.C) {
 		workerConfig.GetCronSyncInterval(),
 	).
 		addRegistrar(oauth2TaskHandler).
-		addRegistrar(dm.GetConnectorsService())
+		addRegistrar(dm.GetCoreService())
 
 	wg.Add(1)
 	go func() {

@@ -11,7 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
-	connectorsinterface "github.com/rmorlok/authproxy/internal/core/iface"
+	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httpf"
@@ -30,7 +30,7 @@ type DependencyManager struct {
 	e              encrypt.E
 	asynqClient    *asynq.Client
 	asynqInspector *asynq.Inspector
-	c              connectorsinterface.C
+	c              coreIface.C
 }
 
 func NewDependencyManager(serviceId string, cfg config.C) *DependencyManager {
@@ -172,7 +172,7 @@ func (dm *DependencyManager) GetAsyncInspector() *asynq.Inspector {
 	return dm.asynqInspector
 }
 
-func (dm *DependencyManager) GetConnectorsService() connectorsinterface.C {
+func (dm *DependencyManager) GetCoreService() coreIface.C {
 	if dm.c == nil {
 		dm.c = core.NewCoreService(
 			dm.GetConfig(),
@@ -188,7 +188,8 @@ func (dm *DependencyManager) GetConnectorsService() connectorsinterface.C {
 	return dm.c
 }
 
-func (dm *DependencyManager) AutoMigrateConnectors() {
+// TODO: this automigrate should not be specific to the connectors config
+func (dm *DependencyManager) AutoMigrateCore() {
 	if dm.GetConfigRoot().Connectors.GetAutoMigrate() {
 		func() {
 			m := apredis.NewMutex(
@@ -205,7 +206,7 @@ func (dm *DependencyManager) AutoMigrateConnectors() {
 			}
 			defer m.Unlock(context.Background())
 
-			if err := dm.GetConnectorsService().MigrateConnectors(context.Background()); err != nil {
+			if err := dm.GetCoreService().Migrate(context.Background()); err != nil {
 				panic(err)
 			}
 		}()
@@ -215,5 +216,5 @@ func (dm *DependencyManager) AutoMigrateConnectors() {
 func (dm *DependencyManager) AutoMigrateAll() {
 	dm.AutoMigrateDatabase()
 	dm.AutoMigrateLogRetriever()
-	dm.AutoMigrateConnectors()
+	dm.AutoMigrateCore()
 }
