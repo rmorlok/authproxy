@@ -3,6 +3,7 @@ package common
 import (
 	"errors"
 	"regexp"
+	"slices"
 	"strings"
 
 	"github.com/rmorlok/authproxy/internal/util"
@@ -50,6 +51,48 @@ func SplitNamespacePathToPrefixes(path string) []string {
 	for i := 0; i < len(parts); i++ {
 		result[i] = strings.Join(parts[0:i+1], "/")
 	}
+
+	return result
+}
+
+// SplitNamespacePathsToPrefixes returns all the prefix paths for a given set of paths. The prefixes will be the set
+// of paths that are common to all the given paths, once for each prefix. The output includes the paths themselves.
+// Output is returning in ascending order of path depth with a deterministic sub-ordering.
+//
+// So if paths is ["root/foo/bar", "roo/baz"], it will return ["root", "root/baz", "root/foo", "root/foo/bar"].
+func SplitNamespacePathsToPrefixes(paths []string) []string {
+	if len(paths) == 0 {
+		return []string{}
+	}
+
+	prefixSet := make(map[string]struct{})
+
+	for _, path := range paths {
+		for _, prefix := range SplitNamespacePathToPrefixes(path) {
+			prefixSet[prefix] = struct{}{}
+		}
+	}
+
+	result := util.GetKeys(prefixSet)
+
+	slices.SortFunc(result, func(i, j string) int {
+		iDepth := DepthOfNamespacePath(i)
+		jDepth := DepthOfNamespacePath(j)
+
+		if iDepth != jDepth {
+			return int(iDepth - jDepth)
+		}
+
+		if i < j {
+			return -1
+		}
+
+		if i > j {
+			return 1
+		}
+
+		return 0
+	})
 
 	return result
 }

@@ -119,6 +119,68 @@ func TestNamespaces(t *testing.T) {
 				})
 			}
 		})
+		t.Run("split multiple", func(t *testing.T) {
+			tests := []struct {
+				name     string
+				paths    []string
+				prefixes []string
+			}{
+				{
+					name:     "single root",
+					paths:    []string{"root"},
+					prefixes: []string{"root"},
+				},
+				{
+					name:     "single child",
+					paths:    []string{"root/child"},
+					prefixes: []string{"root", "root/child"},
+				},
+				{
+					name:     "single grandchild",
+					paths:    []string{"root/child/grandchild"},
+					prefixes: []string{"root", "root/child", "root/child/grandchild"},
+				},
+				{
+					name:     "empty",
+					paths:    []string{""},
+					prefixes: []string{},
+				},
+				{
+					name:     "nil",
+					paths:    nil,
+					prefixes: []string{},
+				},
+				{
+					name:     "duplicate grandchild",
+					paths:    []string{"root/child/grandchild", "root/child/grandchild"},
+					prefixes: []string{"root", "root/child", "root/child/grandchild"},
+				},
+				{
+					name:     "different parents",
+					paths:    []string{"root/child1/grandchild", "root/child2/grandchild"},
+					prefixes: []string{"root", "root/child1", "root/child2", "root/child1/grandchild", "root/child2/grandchild"},
+				},
+				{
+					name:     "multiple levels",
+					paths:    []string{"root/child1/grandchild", "root/child1", "root/child3", "root/child2/grandchild"},
+					prefixes: []string{"root", "root/child1", "root/child2", "root/child3", "root/child1/grandchild", "root/child2/grandchild"},
+				},
+				{
+					name:     "favors depth before alphabetical order",
+					paths:    []string{"root/aaaaaa/grandchild/greatgrandchild", "root/b", "root/b/grandchild", "root/aaaaaa/grandchild"},
+					prefixes: []string{"root", "root/aaaaaa", "root/b", "root/aaaaaa/grandchild", "root/b/grandchild", "root/aaaaaa/grandchild/greatgrandchild"},
+				},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					prefixes := SplitNamespacePathsToPrefixes(tt.paths)
+					if !reflect.DeepEqual(prefixes, tt.prefixes) {
+						t.Errorf("expected prefixes %v, got %v", tt.prefixes, prefixes)
+					}
+				})
+			}
+		})
 		t.Run("NamespacePathFromRoot", func(t *testing.T) {
 			require.Equal(t, NamespacePathFromRoot(), RootNamespace)
 			require.Equal(t, NamespacePathFromRoot("some-namespace"), RootNamespace+"/some-namespace")

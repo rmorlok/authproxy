@@ -9,6 +9,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/config/common"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -21,10 +22,76 @@ const MigrateMutexKeyName = "connectors-migrate-lock"
 
 // Migrate all resources from the config file into the system, triggering appropriate event hooks, etc.
 func (s *service) Migrate(ctx context.Context) error {
-	err := s.MigrateConnectors(ctx)
+	err := s.MigrateNamespaces(ctx)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to migrate namespaces")
 	}
+
+	err = s.MigrateConnectors(ctx)
+	if err != nil {
+		return errors.Wrap(err, "failed to migrate connectors")
+	}
+
+	return nil
+}
+
+func (s *service) MigrateNamespaces(ctx context.Context) error {
+	namespaces := []string{common.RootNamespace}
+
+	cfgRoot := s.cfg.GetRoot()
+	if cfgRoot == nil {
+		return errors.New("invalid config")
+	}
+
+	for _, configConnector := range cfgRoot.Connectors.GetConnectors() {
+		namespaces = append(namespaces, configConnector.GetNamespace())
+	}
+
+	prefixOrderedList := common.SplitNamespacePathsToPrefixes(namespaces)
+
+	// Because prefixOrderedList is in the appropriate order, this list will also be in the appropriate order
+	toCreatePaths := make([]string, 0)
+
+	// Precheck to make sure there aren't going to be errors in migration
+	for _, nsPath := range prefixOrderedList {
+		ns, err := s.db.GetNamespace(ctx, nsPath)
+		if err != nil {
+			if errors.Is(err, database.ErrNotFound) {
+				toCreatePaths = append(toCreatePaths, nsPath)
+				continue
+			} else {
+				return errors.Wrap(err, "failed to get namespace")
+			}
+		}
+
+		if ns.State != database.NamespaceStateActive {
+			return errors.Errorf("namespace %s is not active", nsPath)
+		}
+	}
+
+	if len(toCreatePaths) == 0 {
+		s.logger.Info("no namespaces to migrate")
+		return nil
+	}
+
+	s.logger.Info(
+		"precheck passed, migrating namespaces",
+		"namespace_count", len(prefixOrderedList),
+		"to_migrate", len(toCreatePaths),
+	)
+
+	for _, nsPath := range toCreatePaths {
+		s.logger.Info("migrating namespace", "namespace", nsPath)
+		err := s.db.CreateNamespace(context.Background(), &database.Namespace{
+			Path:  nsPath,
+			State: database.NamespaceStateActive,
+		})
+		if err != nil {
+			return errors.Wrapf(err, "failed to create namespace %s", nsPath)
+		}
+	}
+
+	s.logger.Info("finished migrating namespaces", "migrated_count", len(prefixOrderedList))
 
 	return nil
 }
@@ -32,18 +99,21 @@ func (s *service) Migrate(ctx context.Context) error {
 // MigrateConnectors migrates connectors from configuration to the database. It should generally not be called
 // directly, but call the Migrate(...) method instead to migrate everything.
 func (s *service) MigrateConnectors(ctx context.Context) error {
-	root := s.cfg.GetRoot()
-	if root == nil || len(root.Connectors.GetConnectors()) == 0 {
-		s.logger.Info("No connectors to migrate")
+	cfgRoot := s.cfg.GetRoot()
+	if cfgRoot == nil {
+		return errors.New("invalid config")
+	}
+	if len(cfgRoot.Connectors.GetConnectors()) == 0 {
+		s.logger.Info("no connectors to migrate")
 		return nil
 	}
 
-	if err := s.precheckConnectorsForMigration(ctx, root.Connectors); err != nil {
+	if err := s.precheckConnectorsForMigration(ctx, cfgRoot.Connectors); err != nil {
 		return err
 	}
-	s.logger.Info("Precheck passed, migrating connectors", "connector_count", len(root.Connectors.GetConnectors()))
+	s.logger.Info("precheck passed, migrating connectors", "connector_count", len(cfgRoot.Connectors.GetConnectors()))
 
-	for _, configConnector := range root.Connectors.GetConnectors() {
+	for _, configConnector := range cfgRoot.Connectors.GetConnectors() {
 		if err := s.migrateConnector(ctx, &configConnector); err != nil {
 			return err
 		}

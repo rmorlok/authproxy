@@ -198,6 +198,10 @@ func (s *service) CreateNamespace(ctx context.Context, ns *Namespace) error {
 		// Update the state so that we are always bound by the parent namespace state
 		ns.State = state
 
+		now := apctx.GetClock(ctx).Now()
+		ns.CreatedAt = now
+		ns.UpdatedAt = now
+
 		dbResult, err := s.sq.
 			Insert(NamespacesTable).
 			Columns(ns.cols()...).

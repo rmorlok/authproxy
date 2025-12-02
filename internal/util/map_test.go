@@ -24,3 +24,10 @@ func TestGetKeys(t *testing.T) {
 	var m map[string]int
 	assert.Equal(t, []string{}, GetKeys(m))
 }
+
+func TestFlatMap(t *testing.T) {
+	t.Parallel()
+	assert.Equal(t, []int{1, 2, 3}, FlatMap([][]int{{1, 2}, {3}}, func(i []int) []int { return i }))
+	assert.Equal(t, []int{}, FlatMap([][]int{}, func(i []int) []int { return i }))
+	assert.Equal(t, []int{}, FlatMap(nil, func(i []int) []int { return i }))
+}
