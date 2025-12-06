@@ -1,11 +1,13 @@
 import {configureStore, ThunkAction, Action} from '@reduxjs/toolkit';
 import authReducer from './sessionSlice';
 import toastsReducer from './toastsSlice';
+import namespaceReducer from './namespacesSlice';
 
 export const store = configureStore({
     reducer: {
         auth: authReducer,
         toasts: toastsReducer,
+        namespaces: namespaceReducer
     },
 });
 

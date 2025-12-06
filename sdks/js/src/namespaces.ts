@@ -3,6 +3,9 @@ import { ListResponse } from './common';
 
 // Namespace models
 
+// The predefined root namespace path
+export const ROOT_NAMESPACE_PATH = 'root';
+
 export enum NamespaceState {
     ACTIVE = 'active',
     DISCONNECTING = 'disconnecting',
@@ -39,7 +42,7 @@ export const listNamespaces = (params: ListNamespaceParams) => {
  * Get a specific namespace by path
  */
 export const getNamespaceByPath = (path: string) => {
-  return client.get<Namespace>(`/api/v1/namespace/${path}`);
+  return client.get<Namespace>(`/api/v1/namespaces/${path}`);
 };
 
 export const namespaces = {

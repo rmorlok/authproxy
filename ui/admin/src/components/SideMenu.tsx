@@ -6,7 +6,7 @@ import Box from '@mui/material/Box';
 import Divider from '@mui/material/Divider';
 import Stack from '@mui/material/Stack';
 import Typography from '@mui/material/Typography';
-import SelectContent from './SelectContent';
+import NamespaceSelector from './NamespaceSelector';
 import MenuContent from './MenuContent';
 import OptionsMenu from './OptionsMenu';
 import { useSelector } from 'react-redux';
@@ -45,7 +45,7 @@ export default function SideMenu() {
                     p: 1.5,
                 }}
             >
-                <SelectContent/>
+                <NamespaceSelector/>
             </Box>
             <Divider/>
             <Box

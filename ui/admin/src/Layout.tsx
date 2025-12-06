@@ -11,8 +11,61 @@ import type {} from '@mui/x-charts/themeAugmentation';
 import type {} from '@mui/x-data-grid/themeAugmentation';
 import type {} from '@mui/x-tree-view/themeAugmentation';
 import Copyright from "./components/Copyright";
+import {ROOT_NAMESPACE_PATH} from "@authproxy/api";
+import {useDispatch, useSelector} from "react-redux";
+import {AppDispatch} from "./store";
+import {parseAsString, useQueryState} from "nuqs";
+import {
+    selectCurrentNamespace,
+    selectCurrentNamespacePath, selectHasInitializedNamespace,
+    selectNamespaceStatus,
+    setCurrentNamespace
+} from "./store/namespacesSlice";
+import {useEffect} from "react";
+import CircularProgress from "@mui/material/CircularProgress";
+
+const NS_LOCALSTORAGE_KEY = 'ns';
+const DEFAULT_NAMESPACE_PATH_QUERY_SENTINEL = ROOT_NAMESPACE_PATH;
 
 export default function Layout(_props: { disableCustomTheme?: boolean }) {
+    const dispatch = useDispatch<AppDispatch>();
+    const [queryNs, setQueryNs] = useQueryState<string>('ns', parseAsString.withDefault(DEFAULT_NAMESPACE_PATH_QUERY_SENTINEL));
+
+    const nsPath = useSelector(selectCurrentNamespacePath);
+    const hasInitializedNs = useSelector(selectHasInitializedNamespace);
+
+    useEffect(() => {
+        if(!hasInitializedNs) {
+            let targetPath = ROOT_NAMESPACE_PATH;
+
+            if (queryNs !== DEFAULT_NAMESPACE_PATH_QUERY_SENTINEL) {
+                targetPath = queryNs;
+            } else if (typeof window !== 'undefined') {
+                // Attempt to get the namespace from local storage
+                targetPath = localStorage.getItem(NS_LOCALSTORAGE_KEY) || ROOT_NAMESPACE_PATH;
+            }
+
+            // Start loading the information for the namespace
+            dispatch(setCurrentNamespace(targetPath))
+        } else {
+            if(nsPath === ROOT_NAMESPACE_PATH) {
+                void setQueryNs(DEFAULT_NAMESPACE_PATH_QUERY_SENTINEL);
+            } else {
+                void setQueryNs(nsPath);
+            }
+
+            localStorage.setItem(NS_LOCALSTORAGE_KEY, nsPath);
+        }
+    }, [nsPath, queryNs, dispatch, setQueryNs])
+
+    if(!hasInitializedNs) {
+        return (
+            <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+                <CircularProgress />
+            </Box>
+        );
+    }
+
     return (
         <>
             <Box sx={{ display: 'flex' }}>
