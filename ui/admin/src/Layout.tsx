@@ -16,9 +16,7 @@ import {useDispatch, useSelector} from "react-redux";
 import {AppDispatch} from "./store";
 import {parseAsString, useQueryState} from "nuqs";
 import {
-    selectCurrentNamespace,
     selectCurrentNamespacePath, selectHasInitializedNamespace,
-    selectNamespaceStatus,
     setCurrentNamespace
 } from "./store/namespacesSlice";
 import {useEffect} from "react";

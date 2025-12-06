@@ -13,7 +13,6 @@ import RefreshIcon from '@mui/icons-material/Refresh';
 import ErrorIcon from '@mui/icons-material/Error';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import FolderIcon from '@mui/icons-material/Folder';
-import ConstructionRoundedIcon from '@mui/icons-material/ConstructionRounded';
 import {useDispatch, useSelector} from "react-redux";
 import {
     selectCurrentNamespace,
@@ -79,7 +78,7 @@ export default function NamespaceSelector() {
         }
     }
 
-    var currentNamespaceItem = (
+    let currentNamespaceItem = (
         <MenuItem value="///action/loading-ns">
             <ListItemIcon>
                 <RefreshIcon />
@@ -112,8 +111,8 @@ export default function NamespaceSelector() {
         );
     }
 
-    var childNamespaceItems = [(
-        <MenuItem value="///action/children">
+    let childNamespaceItems = [(
+        <MenuItem key="///action/children" value="///action/children">
             <ListItemIcon>
                 <RefreshIcon />
             </ListItemIcon>
@@ -123,8 +122,8 @@ export default function NamespaceSelector() {
 
     if(childLoadingStatus === 'succeeded') {
         childNamespaceItems = children.flatMap((child, idx) => {
-            var items = [
-                <MenuItem value={child?.path}>
+            const items = [
+                <MenuItem key={child?.path} value={child?.path}>
                     <ListItemAvatar>
                         <Avatar alt={child?.path}>
                             <FolderIcon sx={{fontSize: '1rem'}}/>
@@ -142,7 +141,7 @@ export default function NamespaceSelector() {
         });
     } else if(childLoadingStatus === 'failed') {
         childNamespaceItems = [(
-                <MenuItem value="" disabled={true}>
+            <MenuItem key="child-error" value="" disabled={true}>
                 <ListItemAvatar>
                     <Avatar alt="error">
                         <ErrorIcon sx={{fontSize: '1rem'}}/>
@@ -182,7 +181,7 @@ export default function NamespaceSelector() {
             {childNamespaceItems.length == 0 ?
                 null :
                 ([
-                    <ListSubheader>Children</ListSubheader>,
+                    <ListSubheader key="children-header">Children</ListSubheader>,
                     ...childNamespaceItems
                 ])
             }
