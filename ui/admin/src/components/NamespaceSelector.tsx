@@ -223,8 +223,8 @@ export default function NamespaceSelector() {
 
             {depth(ns?.path) > 0 ?
                 ([
-                    <ListSubheader sx={{pt: 0}}>Navigate</ListSubheader>,
-                    <MenuItem value="...action.navigate-parent">
+                    <ListSubheader key="navigate-header" sx={{pt: 0}}>Navigate</ListSubheader>,
+                    <MenuItem key="...action.navigate-parent" value="...action.navigate-parent">
                         <ListItemIcon>
                             <ArrowBackIcon />
                         </ListItemIcon>
