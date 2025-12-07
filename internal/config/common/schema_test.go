@@ -781,9 +781,9 @@ func TestSchema(t *testing.T) {
 					Data:  `{"test": "other/namespace"}`,
 				},
 				{
-					Name:  "trailing slash",
+					Name:  "trailing dot",
 					Valid: false,
-					Data:  `{"test": "root/"}`,
+					Data:  `{"test": "root."}`,
 				},
 				{
 					Name:  "case sensitive",
@@ -791,14 +791,14 @@ func TestSchema(t *testing.T) {
 					Data:  `{"test": "ROOT"}`,
 				},
 				{
-					Name:  "nested trailing slash",
+					Name:  "nested trailing dot",
 					Valid: false,
-					Data:  `{"test": "root/other/"}`,
+					Data:  `{"test": "root.other."}`,
 				},
 				{
 					Name:  "cannot start with dash",
 					Valid: false,
-					Data:  `{"test": "root/-other"}`,
+					Data:  `{"test": "root.-other"}`,
 				},
 				{
 					Name:  "root",
@@ -808,37 +808,37 @@ func TestSchema(t *testing.T) {
 				{
 					Name:  "nested",
 					Valid: true,
-					Data:  `{"test": "root/other"}`,
+					Data:  `{"test": "root.other"}`,
 				},
 				{
 					Name:  "deeply nested",
 					Valid: true,
-					Data:  `{"test": "root/foo/bar/baz"}`,
+					Data:  `{"test": "root.foo.bar.baz"}`,
 				},
 				{
 					Name:  "allows underscores",
 					Valid: true,
-					Data:  `{"test": "root/foo_bar"}`,
+					Data:  `{"test": "root.foo_bar"}`,
 				},
 				{
 					Name:  "can start with underscore",
 					Valid: true,
-					Data:  `{"test": "root/_foo"}`,
+					Data:  `{"test": "root._foo"}`,
 				},
 				{
 					Name:  "allows dashes",
 					Valid: true,
-					Data:  `{"test": "root/foo-bar"}`,
+					Data:  `{"test": "root.foo-bar"}`,
 				},
 				{
 					Name:  "allows just numbers",
 					Valid: true,
-					Data:  `{"test": "root/1234"}`,
+					Data:  `{"test": "root.1234"}`,
 				},
 				{
 					Name:  "allows mixed",
 					Valid: true,
-					Data:  `{"test": "root/foo-1234_bar"}`,
+					Data:  `{"test": "root.foo-1234_bar"}`,
 				},
 			},
 		},
