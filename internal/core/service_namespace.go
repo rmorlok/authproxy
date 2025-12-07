@@ -58,6 +58,20 @@ func (s *service) GetNamespace(ctx context.Context, path string) (iface.Namespac
 	return wrapNamespace(*ns, s), nil
 }
 
+func (s *service) CreateNamespace(ctx context.Context, path string) (iface.Namespace, error) {
+	ns := &database.Namespace{
+		Path:  path,
+		State: database.NamespaceStateActive,
+	}
+
+	err := s.db.CreateNamespace(ctx, ns)
+	if err != nil {
+		return nil, err
+	}
+
+	return wrapNamespace(*ns, s), nil
+}
+
 type listNamespaceWrapper struct {
 	l database.ListNamespacesBuilder
 	e database.ListNamespacesExecutor

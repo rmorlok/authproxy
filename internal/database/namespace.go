@@ -10,6 +10,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/config/common"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -179,7 +180,10 @@ func (s *service) CreateNamespace(ctx context.Context, ns *Namespace) error {
 			parent, err := s.getNamespaceByPath(ctx, tx, prefixes[i])
 			if err != nil {
 				if errors.Is(err, ErrNotFound) {
-					return errors.Errorf("cannot create namespace '%s' because parent namespace '%s' does not exist or is deleted", ns.Path, prefixes[i])
+					return api_common.NewHttpStatusErrorBuilder().
+						WithStatusBadRequest().
+						WithPublicErrf("cannot create namespace '%s' because parent namespace '%s' does not exist or is deleted", ns.Path, prefixes[i]).
+						Build()
 				}
 				return err
 			}

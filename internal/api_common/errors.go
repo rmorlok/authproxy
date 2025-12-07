@@ -138,12 +138,15 @@ type HttpStatusErrorBuilder interface {
 	DefaultStatusBadRequest() HttpStatusErrorBuilder
 	DefaultStatusUnauthorized() HttpStatusErrorBuilder
 	DefaultStatusForbidden() HttpStatusErrorBuilder
+	DefaultStatusInternalServerError() HttpStatusErrorBuilder
 
 	WithResponseMsg(msg string) HttpStatusErrorBuilder
 	WithResponseMsgf(format string, args ...interface{}) HttpStatusErrorBuilder
 	DefaultResponseMsg(msg string) HttpStatusErrorBuilder
 	DefaultResponseMsgf(format string, args ...interface{}) HttpStatusErrorBuilder
 	WithInternalErr(err error) HttpStatusErrorBuilder
+	WithPublicErr(err error) HttpStatusErrorBuilder
+	WithPublicErrf(format string, args ...interface{}) HttpStatusErrorBuilder
 	WithWrappedInternalErr(err error, msg string) HttpStatusErrorBuilder
 	WithWrappedInternalErrf(err error, msg string, args ...interface{}) HttpStatusErrorBuilder
 	BuildStatusError() *HttpStatusError
@@ -225,6 +228,10 @@ func (b *httpStatusErrorBuilder) DefaultStatusForbidden() HttpStatusErrorBuilder
 	return b.DefaultStatus(http.StatusForbidden)
 }
 
+func (b *httpStatusErrorBuilder) DefaultStatusInternalServerError() HttpStatusErrorBuilder {
+	return b.DefaultStatus(http.StatusInternalServerError)
+}
+
 func (b *httpStatusErrorBuilder) WithResponseMsg(msg string) HttpStatusErrorBuilder {
 	b.err.ResponseMsg = msg
 	return b
@@ -261,6 +268,16 @@ func (b *httpStatusErrorBuilder) WithInternalErr(err error) HttpStatusErrorBuild
 	}
 
 	return b
+}
+
+func (b *httpStatusErrorBuilder) WithPublicErr(err error) HttpStatusErrorBuilder {
+	return b.WithResponseMsg(err.Error()).
+		WithInternalErr(err)
+
+}
+
+func (b *httpStatusErrorBuilder) WithPublicErrf(format string, args ...interface{}) HttpStatusErrorBuilder {
+	return b.WithPublicErr(fmt.Errorf(format, args...))
 }
 
 func (b *httpStatusErrorBuilder) WithWrappedInternalErr(err error, msg string) HttpStatusErrorBuilder {

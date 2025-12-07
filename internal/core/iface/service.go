@@ -83,6 +83,9 @@ type C interface {
 	// GetNamespace returns a namespace by path.
 	GetNamespace(ctx context.Context, path string) (Namespace, error)
 
+	// CreateNamespace creates a new namespace.
+	CreateNamespace(ctx context.Context, path string) (Namespace, error)
+
 	// EnsureNamespaceAncestorPath ensures that the specified namespace path exists in the database.
 	EnsureNamespaceAncestorPath(ctx context.Context, targetNamespace string) (Namespace, error)
 

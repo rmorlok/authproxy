@@ -24,6 +24,10 @@ type NamespaceJson struct {
 	UpdatedAt time.Time               `json:"updated_at"`
 }
 
+type CreateNamespaceRequestJson struct {
+	Path string `json:"path"`
+}
+
 func NamespaceToJson(ns coreIface.Namespace) NamespaceJson {
 	return NamespaceJson{
 		Path:      ns.GetPath(),
@@ -86,6 +90,61 @@ func (r *NamespacesRoutes) get(gctx *gin.Context) {
 		return
 	}
 
+	gctx.PureJSON(http.StatusOK, NamespaceToJson(ns))
+}
+
+func (r *NamespacesRoutes) create(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+
+	var req CreateNamespaceRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if err := database.ValidateNamespacePath(req.Path); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid namespace path '%s': %s", req.Path, err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	ns, err := r.core.GetNamespace(ctx, req.Path)
+	if err == nil {
+		// This means the namespace already exists
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatus(http.StatusConflict).
+			WithResponseMsgf("namespace '%s' already exists", req.Path).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if !errors.Is(err, core.ErrNotFound) {
+		api_common.NewHttpStatusErrorBuilder().
+			DefaultStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	ns, err = r.core.CreateNamespace(ctx, req.Path)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			DefaultStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
 	gctx.PureJSON(http.StatusOK, NamespaceToJson(ns))
 }
 
@@ -172,6 +231,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 
 func (r *NamespacesRoutes) Register(g gin.IRouter) {
 	g.GET("/namespaces", r.authService.Required(), r.list)
+	g.POST("/namespaces", r.authService.Required(), r.create)
 	g.GET("/namespaces/:path", r.authService.Required(), r.get)
 }
 
