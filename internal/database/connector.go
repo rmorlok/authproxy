@@ -27,6 +27,7 @@ type ConnectorOrderByField string
 const (
 	ConnectorOrderById        ConnectorOrderByField = "id"
 	ConnectorOrderByVersion   ConnectorOrderByField = "version"
+	ConnectorOrderByNamespace ConnectorOrderByField = "namespace"
 	ConnectorOrderByState     ConnectorOrderByField = "state"
 	ConnectorOrderByCreatedAt ConnectorOrderByField = "created_at"
 	ConnectorOrderByUpdatedAt ConnectorOrderByField = "updated_at"
@@ -37,6 +38,7 @@ func IsValidConnectorOrderByField[T string | ConnectorOrderByField](field T) boo
 	switch ConnectorOrderByField(field) {
 	case ConnectorOrderById,
 		ConnectorOrderByVersion,
+		ConnectorOrderByNamespace,
 		ConnectorOrderByState,
 		ConnectorOrderByCreatedAt,
 		ConnectorOrderByUpdatedAt,

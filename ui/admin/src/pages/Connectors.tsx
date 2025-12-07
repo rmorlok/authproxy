@@ -40,7 +40,14 @@ export const columns: GridColDef<Connector>[] = [
         field: 'version',
         headerName: 'Version',
         flex: 0.4,
-        minWidth: 80,
+        minWidth: 70,
+        sortable: true,
+    },
+    {
+        field: 'namespace',
+        headerName: 'Namespace',
+        flex: 0.4,
+        minWidth: 90,
         sortable: true,
     },
     {

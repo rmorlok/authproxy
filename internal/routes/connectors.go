@@ -21,6 +21,7 @@ import (
 type ConnectorJson struct {
 	Id          uuid.UUID                      `json:"id"`
 	Version     uint64                         `json:"version"`
+	Namespace   string                         `json:"namespace"`
 	State       database.ConnectorVersionState `json:"state"`
 	Type        string                         `json:"type"`
 	DisplayName string                         `json:"display_name"`
@@ -51,6 +52,7 @@ func ConnectorVersionToConnectorJson(cv connIface.ConnectorVersion) ConnectorJso
 	return ConnectorJson{
 		Id:          cv.GetID(),
 		Version:     cv.GetVersion(),
+		Namespace:   cv.GetNamespace(),
 		State:       cv.GetState(),
 		Type:        cv.GetType(),
 		Highlight:   def.Highlight,
