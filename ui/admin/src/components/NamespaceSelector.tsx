@@ -10,6 +10,7 @@ import Divider from '@mui/material/Divider';
 import {styled} from '@mui/material/styles';
 import AddRoundedIcon from '@mui/icons-material/AddRounded';
 import RefreshIcon from '@mui/icons-material/Refresh';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import ErrorIcon from '@mui/icons-material/Error';
 import AccountTreeIcon from '@mui/icons-material/AccountTree';
 import FolderIcon from '@mui/icons-material/Folder';
@@ -23,6 +24,7 @@ import {
 import CircularProgress from "@mui/material/CircularProgress";
 import {AppDispatch} from "../store";
 import {useEffect} from "react";
+import {NAMESPACE_PATH_SEPARATOR, ROOT_NAMESPACE_PATH} from "@authproxy/api";
 
 const Avatar = styled(MuiAvatar)(({theme}) => ({
     width: 28,
@@ -37,14 +39,35 @@ const ListItemAvatar = styled(MuiListItemAvatar)({
     marginRight: 12,
 });
 
+function depth(path: string | null | undefined): number {
+    if (!path) {
+        return 0;
+    }
+
+    return path.split(NAMESPACE_PATH_SEPARATOR).length - 1;
+}
+
+function parentNamespace(path: string | null | undefined): string {
+    if (!path) {
+        return ROOT_NAMESPACE_PATH;
+    }
+
+    const parts = path.split(NAMESPACE_PATH_SEPARATOR);
+    if (parts.length > 1) {
+        return parts.slice(0, -1).join(NAMESPACE_PATH_SEPARATOR);
+    } else {
+        return ROOT_NAMESPACE_PATH;
+    }
+}
+
 function leafNamespace(path: string | null | undefined): string {
     if (!path) {
         return "";
     }
 
-    const parts = path.split('/');
+    const parts = path.split(NAMESPACE_PATH_SEPARATOR);
     if (parts.length > 1) {
-        return parts[length-1];
+        return parts[parts.length-1];
     } else {
         return "";
     }
@@ -63,8 +86,17 @@ export default function NamespaceSelector() {
     }, [ns]);
 
     const handleChange = (event: SelectChangeEvent) => {
-        const path = event.target.value as string;
-        if (path.startsWith("///action/")) {
+        let path = event.target.value as string;
+
+        if (path === "...action.navigate-root") {
+            path = ROOT_NAMESPACE_PATH;
+        }
+
+        if (path === "...action.navigate-parent") {
+            path = parentNamespace(ns?.path);
+        }
+
+        if (path.startsWith("...action.")) {
             return;
         }
 
@@ -79,7 +111,7 @@ export default function NamespaceSelector() {
     }
 
     let currentNamespaceItem = (
-        <MenuItem value="///action/loading-ns">
+        <MenuItem value="...action.loading-ns">
             <ListItemIcon>
                 <RefreshIcon />
             </ListItemIcon>
@@ -92,7 +124,10 @@ export default function NamespaceSelector() {
             <MenuItem value={ns?.path}>
                 <ListItemAvatar>
                     <Avatar alt={ns?.path}>
-                        <AccountTreeIcon sx={{fontSize: '1rem'}}/>
+                        {ns?.path == ROOT_NAMESPACE_PATH ?
+                            <AccountTreeIcon sx={{fontSize: '1rem'}}/> :
+                            <FolderIcon sx={{fontSize: '1rem'}}/>
+                        }
                     </Avatar>
                 </ListItemAvatar>
                 <ListItemText primary={leafNamespace(ns?.path)} secondary={ns?.path}/>
@@ -112,7 +147,7 @@ export default function NamespaceSelector() {
     }
 
     let childNamespaceItems = [(
-        <MenuItem key="///action/children" value="///action/children">
+        <MenuItem key="...action.children" value="...action.children">
             <ListItemIcon>
                 <RefreshIcon />
             </ListItemIcon>
@@ -186,14 +221,37 @@ export default function NamespaceSelector() {
                 ])
             }
 
+            {depth(ns?.path) > 0 ?
+                ([
+                    <ListSubheader sx={{pt: 0}}>Navigate</ListSubheader>,
+                    <MenuItem value="...action.navigate-parent">
+                        <ListItemIcon>
+                            <ArrowBackIcon />
+                        </ListItemIcon>
+                        <ListItemText primary="Go to parent" secondary={`Return to ${parentNamespace(ns?.path)}`} />
+                    </MenuItem>
+                ]) : []
+            }
+
+            {depth(ns?.path) > 1 ?
+                (
+                    <MenuItem value="...action.navigate-root">
+                        <ListItemIcon>
+                            <AccountTreeIcon sx={{fontSize: '1rem'}}/>
+                        </ListItemIcon>
+                        <ListItemText primary={`Go to ${ROOT_NAMESPACE_PATH}`} />
+                    </MenuItem>
+                ) : null
+            }
+
+            <ListSubheader sx={{pt: 0}}>Actions</ListSubheader>
             <MenuItem value="///action/refresh" onClick={refreshList}>
                 <ListItemIcon>
                     <RefreshIcon />
                 </ListItemIcon>
                 <ListItemText primary="Refresh" secondary="Refresh namespace list" />
             </MenuItem>
-
-            <MenuItem value="///action/add">
+            <MenuItem value="...action.add">
                 <ListItemIcon>
                     <AddRoundedIcon />
                 </ListItemIcon>
