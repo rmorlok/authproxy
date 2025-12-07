@@ -5,6 +5,7 @@ import { ListResponse } from './common';
 
 // The predefined root namespace path
 export const ROOT_NAMESPACE_PATH = 'root';
+export const NAMESPACE_PATH_SEPARATOR = '.';
 
 export enum NamespaceState {
     ACTIVE = 'active',

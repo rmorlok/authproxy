@@ -39,7 +39,7 @@ func TestFakeService(t *testing.T) {
 
 			connection := database.Connection{
 				ID:               uuid.New(),
-				Namespace:        "root/some-namespace",
+				Namespace:        "root.some-namespace",
 				ConnectorId:      uuid.New(),
 				ConnectorVersion: 1,
 				State:            database.ConnectionStateReady,

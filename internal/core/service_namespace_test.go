@@ -38,7 +38,7 @@ func TestEnsureNamespaceAncestorPath(t *testing.T) {
 	}{
 		{
 			name:     "Valid namespace path with no existing namespaces",
-			targetNS: "root/child/grandchild",
+			targetNS: "root.child.grandchild",
 			setupMocks: func() {
 				// Simulate the first query not finding the namespace
 				mockDB.
@@ -53,29 +53,29 @@ func TestEnsureNamespaceAncestorPath(t *testing.T) {
 				// Same for child
 				mockDB.
 					EXPECT().
-					GetNamespace(ctx, "root/child").
+					GetNamespace(ctx, "root.child").
 					Return(nil, database.ErrNotFound)
 				mockDB.
 					EXPECT().
-					CreateNamespace(ctx, dbMock.NamespaceMatcher{ExpectedPath: "root/child"}).
+					CreateNamespace(ctx, dbMock.NamespaceMatcher{ExpectedPath: "root.child"}).
 					Return(nil)
 
 				// Same for grandchild
 				mockDB.
 					EXPECT().
-					GetNamespace(ctx, "root/child/grandchild").
+					GetNamespace(ctx, "root.child.grandchild").
 					Return(nil, database.ErrNotFound)
 				mockDB.
 					EXPECT().
-					CreateNamespace(ctx, dbMock.NamespaceMatcher{ExpectedPath: "root/child/grandchild"}).
+					CreateNamespace(ctx, dbMock.NamespaceMatcher{ExpectedPath: "root.child.grandchild"}).
 					Return(nil)
 			},
 			expectedError: nil,
-			expectedPath:  "root/child/grandchild",
+			expectedPath:  "root.child.grandchild",
 		},
 		{
 			name:     "Valid namespace path with partially existing namespaces",
-			targetNS: "root/child/grandchild",
+			targetNS: "root.child.grandchild",
 			setupMocks: func() {
 				// Find the root
 				mockDB.
@@ -86,21 +86,21 @@ func TestEnsureNamespaceAncestorPath(t *testing.T) {
 				// Same for child
 				mockDB.
 					EXPECT().
-					GetNamespace(ctx, "root/child").
-					Return(&database.Namespace{Path: "root/child"}, nil)
+					GetNamespace(ctx, "root.child").
+					Return(&database.Namespace{Path: "root.child"}, nil)
 
 				// Grandchild not found
 				mockDB.
 					EXPECT().
-					GetNamespace(ctx, "root/child/grandchild").
+					GetNamespace(ctx, "root.child.grandchild").
 					Return(nil, database.ErrNotFound)
 				mockDB.
 					EXPECT().
-					CreateNamespace(ctx, dbMock.NamespaceMatcher{ExpectedPath: "root/child/grandchild"}).
+					CreateNamespace(ctx, dbMock.NamespaceMatcher{ExpectedPath: "root.child.grandchild"}).
 					Return(nil)
 			},
 			expectedError: nil,
-			expectedPath:  "root/child/grandchild",
+			expectedPath:  "root.child.grandchild",
 		},
 		{
 			name:     "Invalid namespace path",
@@ -112,7 +112,7 @@ func TestEnsureNamespaceAncestorPath(t *testing.T) {
 		},
 		{
 			name:     "Database error on GetNamespace",
-			targetNS: "root/child",
+			targetNS: "root.child",
 			setupMocks: func() {
 				mockDB.
 					EXPECT().
@@ -123,7 +123,7 @@ func TestEnsureNamespaceAncestorPath(t *testing.T) {
 		},
 		{
 			name:     "Database error on CreateNamespace",
-			targetNS: "root/child",
+			targetNS: "root.child",
 			setupMocks: func() {
 				mockDB.
 					EXPECT().

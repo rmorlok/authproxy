@@ -56,14 +56,14 @@ func TestNamespaces(t *testing.T) {
 INSERT INTO namespaces 
 (path,                   depth, state,       created_at,            updated_at,            deleted_at) VALUES 
 ('root',                 0,     'active',    '2023-10-01 00:00:00', '2023-11-01 00:00:00', null),
-('root/prod',            1,     'active',    '2023-10-02 00:00:00', '2023-11-02 00:00:00', null),
-('root/prod/12345',      2,     'active',    '2023-10-04 00:00:00', '2023-11-03 00:00:00', null),
-('root/prod/54321',      2,     'active',    '2023-10-03 00:00:00', '2023-11-04 00:00:00', null),
-('root/prod/99999',      2,     'destroyed', '2023-10-03 03:00:00', '2023-11-04 01:00:00', null),
-('root/prod-like',       1,     'active',    '2023-10-02 00:00:00', '2023-11-02 00:00:00', null),
-('root/prod-like/77777', 2,     'destroyed', '2023-10-03 03:00:00', '2023-11-04 02:00:00', null),
-('root/prod/88888',      2,     'destroyed', '2023-10-03 04:00:00', '2023-11-04 04:00:00', '2023-11-04 05:00:00'),
-('root/dev',             1,     'active',    '2023-10-02 01:00:00', '2023-11-05 00:00:00', null)
+('root.prod',            1,     'active',    '2023-10-02 00:00:00', '2023-11-02 00:00:00', null),
+('root.prod.12345',      2,     'active',    '2023-10-04 00:00:00', '2023-11-03 00:00:00', null),
+('root.prod.54321',      2,     'active',    '2023-10-03 00:00:00', '2023-11-04 00:00:00', null),
+('root.prod.99999',      2,     'destroyed', '2023-10-03 03:00:00', '2023-11-04 01:00:00', null),
+('root.prod-like',       1,     'active',    '2023-10-02 00:00:00', '2023-11-02 00:00:00', null),
+('root.prod-like.77777', 2,     'destroyed', '2023-10-03 03:00:00', '2023-11-04 02:00:00', null),
+('root.prod.88888',      2,     'destroyed', '2023-10-03 04:00:00', '2023-11-04 04:00:00', '2023-11-04 05:00:00'),
+('root.dev',             1,     'active',    '2023-10-02 01:00:00', '2023-11-05 00:00:00', null)
 `
 		_, err := rawDb.Exec(sql)
 		require.NoError(t, err)
@@ -79,15 +79,15 @@ INSERT INTO namespaces
 		require.Nil(t, ns)
 
 		pr := db.ListNamespacesBuilder().
-			ForPathPrefix("root/prod").
+			ForPathPrefix("root.prod").
 			OrderBy(NamespaceOrderByCreatedAt, pagination.OrderByDesc).
 			FetchPage(ctx)
 		require.NoError(t, pr.Error)
 		require.Len(t, pr.Results, 4)
-		require.Equal(t, pr.Results[0].Path, "root/prod/12345")
-		require.Equal(t, pr.Results[1].Path, "root/prod/99999")
-		require.Equal(t, pr.Results[2].Path, "root/prod/54321")
-		require.Equal(t, pr.Results[3].Path, "root/prod")
+		require.Equal(t, pr.Results[0].Path, "root.prod.12345")
+		require.Equal(t, pr.Results[1].Path, "root.prod.99999")
+		require.Equal(t, pr.Results[2].Path, "root.prod.54321")
+		require.Equal(t, pr.Results[3].Path, "root.prod")
 
 		pr = db.ListNamespacesBuilder().
 			ForDepth(2).
@@ -95,40 +95,40 @@ INSERT INTO namespaces
 			FetchPage(ctx)
 		require.NoError(t, pr.Error)
 		require.Len(t, pr.Results, 4)
-		require.Equal(t, pr.Results[0].Path, "root/prod-like/77777")
-		require.Equal(t, pr.Results[1].Path, "root/prod/99999")
-		require.Equal(t, pr.Results[2].Path, "root/prod/54321")
-		require.Equal(t, pr.Results[3].Path, "root/prod/12345")
+		require.Equal(t, pr.Results[0].Path, "root.prod-like.77777")
+		require.Equal(t, pr.Results[1].Path, "root.prod.99999")
+		require.Equal(t, pr.Results[2].Path, "root.prod.54321")
+		require.Equal(t, pr.Results[3].Path, "root.prod.12345")
 
 		pr = db.ListNamespacesBuilder().
-			ForChildrenOf("root/prod").
+			ForChildrenOf("root.prod").
 			OrderBy(NamespaceOrderByCreatedAt, pagination.OrderByDesc).
 			FetchPage(ctx)
 		require.NoError(t, pr.Error)
 		require.Len(t, pr.Results, 3)
-		require.Equal(t, pr.Results[0].Path, "root/prod/12345")
-		require.Equal(t, pr.Results[1].Path, "root/prod/99999")
-		require.Equal(t, pr.Results[2].Path, "root/prod/54321")
+		require.Equal(t, pr.Results[0].Path, "root.prod.12345")
+		require.Equal(t, pr.Results[1].Path, "root.prod.99999")
+		require.Equal(t, pr.Results[2].Path, "root.prod.54321")
 
 		pr = db.ListNamespacesBuilder().
-			ForPathPrefix("root/prod").
+			ForPathPrefix("root.prod").
 			ForState(NamespaceStateDestroyed).
 			OrderBy(NamespaceOrderByCreatedAt, pagination.OrderByDesc).
 			FetchPage(ctx)
 		require.NoError(t, pr.Error)
 		require.Len(t, pr.Results, 1)
-		require.Equal(t, pr.Results[0].Path, "root/prod/99999")
+		require.Equal(t, pr.Results[0].Path, "root.prod.99999")
 
 		pr = db.ListNamespacesBuilder().
-			ForPathPrefix("root/prod").
+			ForPathPrefix("root.prod").
 			ForState(NamespaceStateDestroyed).
 			IncludeDeleted().
 			OrderBy(NamespaceOrderByCreatedAt, pagination.OrderByDesc).
 			FetchPage(ctx)
 		require.NoError(t, pr.Error)
 		require.Len(t, pr.Results, 2)
-		require.Equal(t, pr.Results[0].Path, "root/prod/88888")
-		require.Equal(t, pr.Results[1].Path, "root/prod/99999")
+		require.Equal(t, pr.Results[0].Path, "root.prod.88888")
+		require.Equal(t, pr.Results[1].Path, "root.prod.99999")
 
 		count := 0
 		err = db.
@@ -178,7 +178,7 @@ INSERT INTO namespaces
 			require.NoError(t, err)
 
 			ns = &Namespace{
-				Path:  "root/child",
+				Path:  "root.child",
 				State: NamespaceStateActive,
 			}
 
@@ -207,7 +207,7 @@ INSERT INTO namespaces
 			require.NoError(t, err)
 
 			ns = &Namespace{
-				Path:  "root/#invalid#",
+				Path:  "root.#invalid#",
 				State: NamespaceStateActive,
 			}
 
@@ -263,7 +263,7 @@ INSERT INTO namespaces
 			require.NoError(t, err)
 
 			ns = &Namespace{
-				Path:  "root/does-not-exist/child",
+				Path:  "root.does-not-exist.child",
 				State: NamespaceStateActive,
 			}
 
@@ -291,7 +291,7 @@ INSERT INTO namespaces
 			require.NoError(t, err)
 
 			ns = &Namespace{
-				Path:  "root/parent",
+				Path:  "root.parent",
 				State: NamespaceStateActive,
 			}
 
@@ -302,7 +302,7 @@ INSERT INTO namespaces
 			require.NoError(t, err)
 
 			ns = &Namespace{
-				Path:  "root/does-not-exist/child",
+				Path:  "root.does-not-exist.child",
 				State: NamespaceStateActive,
 			}
 
@@ -389,12 +389,12 @@ INSERT INTO namespaces
 	})
 	t.Run("normalize", func(t *testing.T) {
 		val := Namespace{
-			Path:  "root/prod/12345",
+			Path:  "root.prod.12345",
 			State: NamespaceStateDestroying,
 		}
 
 		val.normalize()
-		require.Equal(t, "root/prod/12345", val.Path)
+		require.Equal(t, "root.prod.12345", val.Path)
 		require.Equal(t, uint64(2), val.depth)
 		require.Equal(t, NamespaceStateDestroying, val.State)
 
@@ -409,7 +409,7 @@ INSERT INTO namespaces
 	})
 	t.Run("Validate", func(t *testing.T) {
 		val := Namespace{
-			Path:  "root/prod/12345",
+			Path:  "root.prod.12345",
 			State: NamespaceStateDestroying,
 		}
 

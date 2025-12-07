@@ -22,12 +22,12 @@ func TestNamespaces(t *testing.T) {
 				},
 				{
 					name:      "ValidChildPath",
-					path:      "root/child",
+					path:      "root.child",
 					expectErr: false,
 				},
 				{
 					name:      "ValidNestedChildPath",
-					path:      "root/child/grandchild",
+					path:      "root.child.grandchild",
 					expectErr: false,
 				},
 				{
@@ -37,32 +37,37 @@ func TestNamespaces(t *testing.T) {
 				},
 				{
 					name:      "PathNotStartingWithRoot",
-					path:      "notroot/child",
+					path:      "notroot.child",
 					expectErr: true,
 				},
 				{
 					name:      "PathWithInvalidCharacter",
-					path:      "root/child@123",
+					path:      "root.child@123",
 					expectErr: true,
 				},
 				{
 					name:      "PathWithUppercaseLetter",
-					path:      "root/Child",
+					path:      "root.Child",
 					expectErr: false,
 				},
 				{
 					name:      "PathContainingSpace",
-					path:      "root/child with space",
+					path:      "root.child with space",
 					expectErr: true,
 				},
 				{
-					name:      "PathWithTrailingSlash",
-					path:      "root/child/",
+					name:      "PathWithTrailingDot",
+					path:      "root.child.",
+					expectErr: true,
+				},
+				{
+					name:      "PathWithDoubleDot",
+					path:      "root.child..grandchild",
 					expectErr: true,
 				},
 				{
 					name:      "PathWithSpecialCharacters",
-					path:      "root/child!@#",
+					path:      "root.child!@#",
 					expectErr: true,
 				},
 			}
@@ -95,13 +100,13 @@ func TestNamespaces(t *testing.T) {
 				},
 				{
 					name:     "single child",
-					path:     "root/child",
-					prefixes: []string{"root", "root/child"},
+					path:     "root.child",
+					prefixes: []string{"root", "root.child"},
 				},
 				{
 					name:     "grandchild",
-					path:     "root/child/grandchild",
-					prefixes: []string{"root", "root/child", "root/child/grandchild"},
+					path:     "root.child.grandchild",
+					prefixes: []string{"root", "root.child", "root.child.grandchild"},
 				},
 				{
 					name:     "empty path",
@@ -132,13 +137,13 @@ func TestNamespaces(t *testing.T) {
 				},
 				{
 					name:     "single child",
-					paths:    []string{"root/child"},
-					prefixes: []string{"root", "root/child"},
+					paths:    []string{"root.child"},
+					prefixes: []string{"root", "root.child"},
 				},
 				{
 					name:     "single grandchild",
-					paths:    []string{"root/child/grandchild"},
-					prefixes: []string{"root", "root/child", "root/child/grandchild"},
+					paths:    []string{"root.child.grandchild"},
+					prefixes: []string{"root", "root.child", "root.child.grandchild"},
 				},
 				{
 					name:     "empty",
@@ -152,23 +157,23 @@ func TestNamespaces(t *testing.T) {
 				},
 				{
 					name:     "duplicate grandchild",
-					paths:    []string{"root/child/grandchild", "root/child/grandchild"},
-					prefixes: []string{"root", "root/child", "root/child/grandchild"},
+					paths:    []string{"root.child.grandchild", "root.child.grandchild"},
+					prefixes: []string{"root", "root.child", "root.child.grandchild"},
 				},
 				{
 					name:     "different parents",
-					paths:    []string{"root/child1/grandchild", "root/child2/grandchild"},
-					prefixes: []string{"root", "root/child1", "root/child2", "root/child1/grandchild", "root/child2/grandchild"},
+					paths:    []string{"root.child1.grandchild", "root.child2.grandchild"},
+					prefixes: []string{"root", "root.child1", "root.child2", "root.child1.grandchild", "root.child2.grandchild"},
 				},
 				{
 					name:     "multiple levels",
-					paths:    []string{"root/child1/grandchild", "root/child1", "root/child3", "root/child2/grandchild"},
-					prefixes: []string{"root", "root/child1", "root/child2", "root/child3", "root/child1/grandchild", "root/child2/grandchild"},
+					paths:    []string{"root.child1.grandchild", "root.child1", "root.child3", "root.child2.grandchild"},
+					prefixes: []string{"root", "root.child1", "root.child2", "root.child3", "root.child1.grandchild", "root.child2.grandchild"},
 				},
 				{
 					name:     "favors depth before alphabetical order",
-					paths:    []string{"root/aaaaaa/grandchild/greatgrandchild", "root/b", "root/b/grandchild", "root/aaaaaa/grandchild"},
-					prefixes: []string{"root", "root/aaaaaa", "root/b", "root/aaaaaa/grandchild", "root/b/grandchild", "root/aaaaaa/grandchild/greatgrandchild"},
+					paths:    []string{"root.aaaaaa.grandchild.greatgrandchild", "root.b", "root.b.grandchild", "root.aaaaaa.grandchild"},
+					prefixes: []string{"root", "root.aaaaaa", "root.b", "root.aaaaaa.grandchild", "root.b.grandchild", "root.aaaaaa.grandchild.greatgrandchild"},
 				},
 			}
 
@@ -183,8 +188,8 @@ func TestNamespaces(t *testing.T) {
 		})
 		t.Run("NamespacePathFromRoot", func(t *testing.T) {
 			require.Equal(t, NamespacePathFromRoot(), RootNamespace)
-			require.Equal(t, NamespacePathFromRoot("some-namespace"), RootNamespace+"/some-namespace")
-			require.Equal(t, NamespacePathFromRoot("some-namespace", "other-namespace"), RootNamespace+"/some-namespace/other-namespace")
+			require.Equal(t, NamespacePathFromRoot("some-namespace"), RootNamespace+".some-namespace")
+			require.Equal(t, NamespacePathFromRoot("some-namespace", "other-namespace"), RootNamespace+".some-namespace.other-namespace")
 		})
 		t.Run("NamespaceIsChild", func(t *testing.T) {
 			tests := []struct {
@@ -213,26 +218,26 @@ func TestNamespaces(t *testing.T) {
 				},
 				{
 					name:   "Same child",
-					parent: "root/child",
-					child:  "root/child",
+					parent: "root.child",
+					child:  "root.child",
 					result: false,
 				},
 				{
 					name:   "Child of root",
 					parent: "root",
-					child:  "root/child",
+					child:  "root.child",
 					result: true,
 				},
 				{
 					name:   "Nested",
-					parent: "root/child",
-					child:  "root/child/grandchild",
+					parent: "root.child",
+					child:  "root.child.grandchild",
 					result: true,
 				},
 				{
 					name:   "Requires separator",
-					parent: "root/child",
-					child:  "root/childgrandchild",
+					parent: "root.child",
+					child:  "root.childgrandchild",
 					result: false,
 				},
 			}
@@ -271,26 +276,26 @@ func TestNamespaces(t *testing.T) {
 				},
 				{
 					name:   "Same child",
-					parent: "root/child",
-					child:  "root/child",
+					parent: "root.child",
+					child:  "root.child",
 					result: true,
 				},
 				{
 					name:   "Child of root",
 					parent: "root",
-					child:  "root/child",
+					child:  "root.child",
 					result: true,
 				},
 				{
 					name:   "Nested",
-					parent: "root/child",
-					child:  "root/child/grandchild",
+					parent: "root.child",
+					child:  "root.child.grandchild",
 					result: true,
 				},
 				{
 					name:   "Requires separator",
-					parent: "root/child",
-					child:  "root/childgrandchild",
+					parent: "root.child",
+					child:  "root.childgrandchild",
 					result: false,
 				},
 			}
@@ -316,22 +321,22 @@ func TestNamespaces(t *testing.T) {
 			},
 			{
 				name:  "root with slash",
-				path:  "root/",
+				path:  "root.",
 				depth: 0,
 			},
 			{
 				name:  "single child",
-				path:  "root/child",
+				path:  "root.child",
 				depth: 1,
 			},
 			{
 				name:  "single child with slash",
-				path:  "root/child/",
+				path:  "root.child.",
 				depth: 1,
 			},
 			{
 				name:  "grandchild",
-				path:  "root/child/grandchild",
+				path:  "root.child.grandchild",
 				depth: 2,
 			},
 			{

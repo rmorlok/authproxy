@@ -383,10 +383,10 @@ func (l *listNamespacesFilters) applyRestrictions(ctx context.Context) sq.Select
 	}
 
 	if l.PathPrefixVal != "" {
-		if len(l.PathPrefixVal) >= 2 && l.PathPrefixVal[len(l.PathPrefixVal)-1] == '/' {
+		if len(l.PathPrefixVal) >= 2 && string(l.PathPrefixVal[len(l.PathPrefixVal)-1]) == common.NamespacePathSeparator {
 			q = q.Where("(path = ? OR path LIKE ?)", l.PathPrefixVal[:len(l.PathPrefixVal)-2], l.PathPrefixVal+"%")
 		} else {
-			q = q.Where("(path = ? OR path LIKE ?)", l.PathPrefixVal, l.PathPrefixVal+"/%")
+			q = q.Where("(path = ? OR path LIKE ?)", l.PathPrefixVal, l.PathPrefixVal+common.NamespacePathSeparator+"%")
 		}
 	}
 

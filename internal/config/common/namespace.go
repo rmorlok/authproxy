@@ -9,9 +9,10 @@ import (
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
-var validPathRegex = regexp.MustCompile(`^root(?:/[a-zA-Z0-9_]+[a-zA-Z0-9_\-]*)*$`)
+var validPathRegex = regexp.MustCompile(`^root(?:\.[a-zA-Z0-9_]+[a-zA-Z0-9_\-]*)*$`)
 
 const RootNamespace = "root"
+const NamespacePathSeparator = "."
 
 // ValidateNamespacePath checks if the path is valid. It returns an error if it is not with a descriptive message.
 func ValidateNamespacePath(path string) error {
@@ -19,7 +20,7 @@ func ValidateNamespacePath(path string) error {
 		return errors.New("path is required")
 	}
 
-	if path != RootNamespace && !strings.HasPrefix(path, RootNamespace+"/") {
+	if path != RootNamespace && !strings.HasPrefix(path, RootNamespace+NamespacePathSeparator) {
 		return errors.New("path must be a child of root")
 	}
 
@@ -33,7 +34,7 @@ func ValidateNamespacePath(path string) error {
 // DepthOfNamespacePath returns the number of path segments in the given path. This is a measure of how deep from
 // root this path is. So root has depth 0, root/foo has depth 1, root/foo/bar has depth 2, etc.
 func DepthOfNamespacePath(path string) uint64 {
-	return uint64(util.MaxInt(len(util.Filter(strings.Split(path, "/"), func(s string) bool { return s != "" }))-1, 0))
+	return uint64(util.MaxInt(len(util.Filter(strings.Split(path, NamespacePathSeparator), func(s string) bool { return s != "" }))-1, 0))
 }
 
 // SplitNamespacePathToPrefixes returns all the prefix paths for a given path, including the given path.
@@ -45,11 +46,11 @@ func SplitNamespacePathToPrefixes(path string) []string {
 		return []string{}
 	}
 
-	parts := strings.Split(path, "/")
+	parts := strings.Split(path, NamespacePathSeparator)
 	result := make([]string, len(parts))
 
 	for i := 0; i < len(parts); i++ {
-		result[i] = strings.Join(parts[0:i+1], "/")
+		result[i] = strings.Join(parts[0:i+1], NamespacePathSeparator)
 	}
 
 	return result
@@ -59,7 +60,7 @@ func SplitNamespacePathToPrefixes(path string) []string {
 // of paths that are common to all the given paths, once for each prefix. The output includes the paths themselves.
 // Output is returning in ascending order of path depth with a deterministic sub-ordering.
 //
-// So if paths is ["root/foo/bar", "roo/baz"], it will return ["root", "root/baz", "root/foo", "root/foo/bar"].
+// So if paths is ["root.foo.bar", "roo.baz"], it will return ["root", "root.baz", "root.foo", "root.foo.bar"].
 func SplitNamespacePathsToPrefixes(paths []string) []string {
 	if len(paths) == 0 {
 		return []string{}
@@ -100,12 +101,12 @@ func SplitNamespacePathsToPrefixes(paths []string) []string {
 // NamespacePathFromRoot returns a namespace path from the given parts, prefixed with "root/".
 func NamespacePathFromRoot(parts ...string) string {
 	allPaths := append([]string{RootNamespace}, parts...)
-	return strings.Join(allPaths, "/")
+	return strings.Join(allPaths, NamespacePathSeparator)
 }
 
 // NamespaceIsChild returns true if the child path is a child of the parent path.
 func NamespaceIsChild(parentPath, childPath string) bool {
-	return strings.HasPrefix(childPath, parentPath+"/")
+	return strings.HasPrefix(childPath, parentPath+NamespacePathSeparator)
 }
 
 // NamespaceIsSameOrChild returns true if the parent path is the same as the child path,
