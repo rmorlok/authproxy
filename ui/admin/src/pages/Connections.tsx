@@ -34,6 +34,12 @@ export const columns: GridColDef<Connection>[] = [
         minWidth: 110,
         sortable: true,
     },
+    { field: 'namespace',
+        headerName: 'Namespace',
+        flex: 0.4,
+        minWidth: 90,
+        sortable: true,
+    },
     {
         field: 'state',
         headerName: 'State',

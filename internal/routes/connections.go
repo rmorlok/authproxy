@@ -243,6 +243,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 
 type ConnectionJson struct {
 	ID        uuid.UUID                `json:"id"`
+	Namespace string                   `json:"namespace"`
 	State     database.ConnectionState `json:"state"`
 	Connector ConnectorJson            `json:"connector"`
 	CreatedAt time.Time                `json:"created_at"`
@@ -263,6 +264,7 @@ func DatabaseConnectionToJson(cv coreIface.ConnectorVersion, conn database.Conne
 
 	return ConnectionJson{
 		ID:        conn.ID,
+		Namespace: conn.Namespace,
 		State:     conn.State,
 		Connector: connector,
 		CreatedAt: conn.CreatedAt,

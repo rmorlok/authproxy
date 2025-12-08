@@ -5,6 +5,7 @@ import {ListResponse} from './common';
 export interface ConnectorVersion {
     id: string;
     version: number;
+    namespace: string;
     state: ConnectorVersionState;
     type: string;
     definition: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
@@ -15,6 +16,7 @@ export interface ConnectorVersion {
 export interface Connector {
     id: string;
     version: number;
+    namespace: string;
     state: ConnectorVersionState;
     type: string;
     display_name: string;

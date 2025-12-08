@@ -258,6 +258,7 @@ type ConnectionOrderByField string
 
 const (
 	ConnectionOrderById        ConnectionOrderByField = "id"
+	ConnectionOrderByNamespace ConnectionOrderByField = "namespace"
 	ConnectionOrderByState     ConnectionOrderByField = "state"
 	ConnectionOrderByCreatedAt ConnectionOrderByField = "created_at"
 	ConnectionOrderByUpdatedAt ConnectionOrderByField = "updated_at"
@@ -265,13 +266,11 @@ const (
 
 func IsValidConnectionOrderByField[T string | ConnectionOrderByField](field T) bool {
 	switch ConnectionOrderByField(field) {
-	case ConnectionOrderById:
-		return true
-	case ConnectionOrderByState:
-		return true
-	case ConnectionOrderByCreatedAt:
-		return true
-	case ConnectionOrderByUpdatedAt:
+	case ConnectionOrderById,
+		ConnectionOrderByNamespace,
+		ConnectionOrderByState,
+		ConnectionOrderByCreatedAt,
+		ConnectionOrderByUpdatedAt:
 		return true
 	default:
 		return false
