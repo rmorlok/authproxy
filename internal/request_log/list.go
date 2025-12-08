@@ -31,6 +31,7 @@ const (
 	RequestOrderByPath               RequestOrderByField = "path"
 	RequestOrderByResponseStatusCode RequestOrderByField = "response_status_code"
 	RequestOrderByConnectorVersion   RequestOrderByField = "connector_version"
+	RequestOrderByNamespace          RequestOrderByField = "namespace"
 )
 
 var orderByToRedisSearchField = map[RequestOrderByField]string{
@@ -44,6 +45,12 @@ var orderByToRedisSearchField = map[RequestOrderByField]string{
 	RequestOrderByPath:               fieldPath,
 	RequestOrderByResponseStatusCode: fieldResponseStatusCode,
 	RequestOrderByConnectorVersion:   fieldConnectorVersion,
+	RequestOrderByNamespace:          fieldNamespace,
+}
+
+func IsValidOrderByField(field RequestOrderByField) bool {
+	_, ok := orderByToRedisSearchField[field]
+	return ok
 }
 
 type ListRequestExecutor interface {

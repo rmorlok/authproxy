@@ -236,6 +236,16 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 					WriteGinResponse(r.cfg, gctx)
 				return
 			}
+
+			if !request_log.IsValidOrderByField(field) {
+				api_common.NewHttpStatusErrorBuilder().
+					WithStatusBadRequest().
+					WithResponseMsg("invalid order by field").
+					BuildStatusError().
+					WriteGinResponse(r.cfg, gctx)
+				return
+			}
+
 			b = b.OrderBy(field, ob)
 		}
 
