@@ -60,6 +60,11 @@ export const columns: (GridColDef<RequestEntryRecord> & {hideInitial?: boolean})
         hideInitial: true,
     },
     {
+        field: 'namespace',
+        headerName: 'Namespace',
+        sortable: true,
+    },
+    {
         field: 'duration',
         headerName: 'Duration',
         sortable: true,
