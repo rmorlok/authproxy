@@ -31,6 +31,24 @@ func ValidateNamespacePath(path string) error {
 	return nil
 }
 
+// ValidateNamespaceMatcher checks if the matcher is valid. A matcher is valid if it is a valid path or is is a
+// valid path appended by ".**". This method assumes the matcher must be present.
+func ValidateNamespaceMatcher(matcher string) error {
+	if matcher == "" {
+		return errors.New("namespace matcher is required")
+	}
+
+	if matcher != RootNamespace && !strings.HasPrefix(matcher, RootNamespace+NamespacePathSeparator) {
+		return errors.New("matcher must start with root")
+	}
+
+	if strings.HasSuffix(matcher, ".**") {
+		return ValidateNamespacePath(matcher[:len(matcher)-3])
+	} else {
+		return ValidateNamespacePath(matcher)
+	}
+}
+
 // DepthOfNamespacePath returns the number of path segments in the given path. This is a measure of how deep from
 // root this path is. So root has depth 0, root/foo has depth 1, root/foo/bar has depth 2, etc.
 func DepthOfNamespacePath(path string) uint64 {

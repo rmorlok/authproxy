@@ -46,6 +46,36 @@ func TestNamespaces(t *testing.T) {
 					expectErr: true,
 				},
 				{
+					name:      "PathOnlyAsterisk",
+					path:      "root.*",
+					expectErr: true,
+				},
+				{
+					name:      "PathOnlyDoubleAsterisk",
+					path:      "root.**",
+					expectErr: true,
+				},
+				{
+					name:      "PathStartingWithAsterisk",
+					path:      "root.*child",
+					expectErr: true,
+				},
+				{
+					name:      "PathStartingWithDoubleAsterisk",
+					path:      "root.**child",
+					expectErr: true,
+				},
+				{
+					name:      "PathWithAsterisk",
+					path:      "root.child*namespace",
+					expectErr: true,
+				},
+				{
+					name:      "PathWithDoubleAsterisk",
+					path:      "root.child**namespace",
+					expectErr: true,
+				},
+				{
 					name:      "PathWithUppercaseLetter",
 					path:      "root.Child",
 					expectErr: false,
@@ -75,6 +105,114 @@ func TestNamespaces(t *testing.T) {
 			for _, tt := range tests {
 				t.Run(tt.name, func(t *testing.T) {
 					err := ValidateNamespacePath(tt.path)
+					if tt.expectErr {
+						if err == nil {
+							t.Errorf("expected error but got nil")
+						}
+					} else {
+						if err != nil {
+							t.Errorf("did not expect error but got: %v", err)
+						}
+					}
+				})
+			}
+		})
+		t.Run("matcher", func(t *testing.T) {
+			tests := []struct {
+				name      string
+				matcher   string
+				expectErr bool
+			}{
+				{
+					name:      "ValidRootPath",
+					matcher:   "root",
+					expectErr: false,
+				},
+				{
+					name:      "ValidChildPath",
+					matcher:   "root.child",
+					expectErr: false,
+				},
+				{
+					name:      "ValidNestedChildPath",
+					matcher:   "root.child.grandchild",
+					expectErr: false,
+				},
+				{
+					name:      "EmptyPath",
+					matcher:   "",
+					expectErr: true,
+				},
+				{
+					name:      "PathNotStartingWithRoot",
+					matcher:   "notroot.child",
+					expectErr: true,
+				},
+				{
+					name:      "PathWithInvalidCharacter",
+					matcher:   "root.child@123",
+					expectErr: true,
+				},
+				{
+					name:      "PathAsterisk",
+					matcher:   "root.*",
+					expectErr: true,
+				},
+				{
+					name:      "PathDoubleAsterisk",
+					matcher:   "root.**",
+					expectErr: false,
+				},
+				{
+					name:      "PathStartingWithAsterisk",
+					matcher:   "root.*child",
+					expectErr: true,
+				},
+				{
+					name:      "PathStartingWithDoubleAsterisk",
+					matcher:   "root.**child",
+					expectErr: true,
+				},
+				{
+					name:      "PathWithAsterisk",
+					matcher:   "root.child*namespace",
+					expectErr: true,
+				},
+				{
+					name:      "PathWithDoubleAsterisk",
+					matcher:   "root.child**namespace",
+					expectErr: true,
+				},
+				{
+					name:      "PathWithUppercaseLetter",
+					matcher:   "root.Child",
+					expectErr: false,
+				},
+				{
+					name:      "PathContainingSpace",
+					matcher:   "root.child with space",
+					expectErr: true,
+				},
+				{
+					name:      "PathWithTrailingDot",
+					matcher:   "root.child.",
+					expectErr: true,
+				},
+				{
+					name:      "PathWithDoubleDot",
+					matcher:   "root.child..grandchild",
+					expectErr: true,
+				},
+				{
+					name:      "PathWithSpecialCharacters",
+					matcher:   "root.child!@#",
+					expectErr: true,
+				},
+			}
+
+			for _, tt := range tests {
+				t.Run(tt.name, func(t *testing.T) {
+					err := ValidateNamespaceMatcher(tt.matcher)
 					if tt.expectErr {
 						if err == nil {
 							t.Errorf("expected error but got nil")

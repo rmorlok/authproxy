@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"strings"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -85,9 +86,23 @@ func (ns *Namespace) Validate() error {
 
 var (
 	ValidateNamespacePath        = common.ValidateNamespacePath
+	ValidateNamespaceMatcher     = common.ValidateNamespaceMatcher
 	SplitNamespacePathToPrefixes = common.SplitNamespacePathToPrefixes
 	DepthOfNamespacePath         = common.DepthOfNamespacePath
 )
+
+// restrictToNamespaceMatcher applies a restriction where the query must match the namespace matcher.
+func restrictToNamespaceMatcher(q sq.SelectBuilder, field string, matcher string) sq.SelectBuilder {
+	if strings.HasSuffix(matcher, ".**") {
+		statedNamespace := matcher[:len(matcher)-3]
+		return q.Where(sq.Or{
+			sq.Eq{field: statedNamespace},
+			sq.Like{field: statedNamespace + ".%"},
+		})
+	} else {
+		return q.Where(sq.Eq{field: matcher})
+	}
+}
 
 type NamespaceState string
 
@@ -304,6 +319,7 @@ type ListNamespacesBuilder interface {
 	ForPathPrefix(path string) ListNamespacesBuilder
 	ForDepth(depth uint64) ListNamespacesBuilder
 	ForChildrenOf(path string) ListNamespacesBuilder
+	ForNamespaceMatcher(path string) ListNamespacesBuilder
 	ForState(NamespaceState) ListNamespacesBuilder
 	OrderBy(NamespaceOrderByField, pagination.OrderBy) ListNamespacesBuilder
 	IncludeDeleted() ListNamespacesBuilder
@@ -316,9 +332,16 @@ type listNamespacesFilters struct {
 	StatesVal         []NamespaceState       `json:"states,omitempty"`
 	PathPrefixVal     string                 `json:"path_prefix,omitempty"`
 	DepthVal          *uint64                `json:"depth,omitempty"`
+	NamespaceMatcher  *string                `json:"namespace_matcher,omitempty"`
 	OrderByFieldVal   *NamespaceOrderByField `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy    `json:"order_by"`
+	Errors            *multierror.Error      `json:"-"`
 	IncludeDeletedVal bool                   `json:"include_deleted,omitempty"`
+}
+
+func (l *listNamespacesFilters) addError(e error) ListNamespacesBuilder {
+	l.Errors = multierror.Append(l.Errors, e)
+	return l
 }
 
 func (l *listNamespacesFilters) Limit(limit int32) ListNamespacesBuilder {
@@ -342,10 +365,24 @@ func (l *listNamespacesFilters) ForDepth(depth uint64) ListNamespacesBuilder {
 }
 
 func (l *listNamespacesFilters) ForChildrenOf(path string) ListNamespacesBuilder {
-	currDepth := DepthOfNamespacePath(path)
-	return l.
-		ForDepth(currDepth + 1).
-		ForPathPrefix(path)
+	if err := ValidateNamespacePath(path); err != nil {
+		return l.addError(err)
+	} else {
+		currDepth := DepthOfNamespacePath(path)
+		return l.
+			ForDepth(currDepth + 1).
+			ForPathPrefix(path)
+	}
+}
+
+func (l *listNamespacesFilters) ForNamespaceMatcher(matcher string) ListNamespacesBuilder {
+	if err := ValidateNamespaceMatcher(matcher); err != nil {
+		return l.addError(err)
+	} else {
+		l.NamespaceMatcher = &matcher
+	}
+
+	return l
 }
 
 func (l *listNamespacesFilters) OrderBy(field NamespaceOrderByField, by pagination.OrderBy) ListNamespacesBuilder {
@@ -402,6 +439,10 @@ func (l *listNamespacesFilters) applyRestrictions(ctx context.Context) sq.Select
 		q = q.Where(sq.Eq{"deleted_at": nil})
 	}
 
+	if l.NamespaceMatcher != nil {
+		q = restrictToNamespaceMatcher(q, "path", *l.NamespaceMatcher)
+	}
+
 	// Always limit to one more than limit to check if there are more records
 	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)
 
@@ -414,6 +455,10 @@ func (l *listNamespacesFilters) applyRestrictions(ctx context.Context) sq.Select
 
 func (l *listNamespacesFilters) fetchPage(ctx context.Context) pagination.PageResult[Namespace] {
 	var err error
+
+	if err = l.Errors.ErrorOrNil(); err != nil {
+		return pagination.PageResult[Namespace]{Error: err}
+	}
 
 	rows, err := l.applyRestrictions(ctx).
 		RunWith(l.s.db).

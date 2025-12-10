@@ -111,6 +111,32 @@ INSERT INTO namespaces
 		require.Equal(t, pr.Results[2].Path, "root.prod.54321")
 
 		pr = db.ListNamespacesBuilder().
+			ForNamespaceMatcher("root.prod").
+			OrderBy(NamespaceOrderByCreatedAt, pagination.OrderByDesc).
+			FetchPage(ctx)
+		require.NoError(t, pr.Error)
+		require.Len(t, pr.Results, 1)
+		require.Equal(t, pr.Results[0].Path, "root.prod")
+
+		pr = db.ListNamespacesBuilder().
+			ForNamespaceMatcher("root.prod.**").
+			OrderBy(NamespaceOrderByCreatedAt, pagination.OrderByDesc).
+			FetchPage(ctx)
+		require.NoError(t, pr.Error)
+		require.Len(t, pr.Results, 4)
+		require.Equal(t, pr.Results[0].Path, "root.prod.12345")
+		require.Equal(t, pr.Results[1].Path, "root.prod.99999")
+		require.Equal(t, pr.Results[2].Path, "root.prod.54321")
+		require.Equal(t, pr.Results[3].Path, "root.prod")
+
+		// Invalid matcher
+		pr = db.ListNamespacesBuilder().
+			ForNamespaceMatcher("root.prod**").
+			OrderBy(NamespaceOrderByCreatedAt, pagination.OrderByDesc).
+			FetchPage(ctx)
+		require.Error(t, pr.Error)
+
+		pr = db.ListNamespacesBuilder().
 			ForPathPrefix("root.prod").
 			ForState(NamespaceStateDestroyed).
 			OrderBy(NamespaceOrderByCreatedAt, pagination.OrderByDesc).

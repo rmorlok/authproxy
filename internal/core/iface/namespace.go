@@ -30,6 +30,7 @@ type ListNamespacesBuilder interface {
 	ForPathPrefix(string) ListNamespacesBuilder
 	ForDepth(depth uint64) ListNamespacesBuilder
 	ForChildrenOf(path string) ListNamespacesBuilder
+	ForNamespaceMatcher(matcher string) ListNamespacesBuilder
 	ForState(database.NamespaceState) ListNamespacesBuilder
 	OrderBy(database.NamespaceOrderByField, pagination.OrderBy) ListNamespacesBuilder
 	IncludeDeleted() ListNamespacesBuilder
