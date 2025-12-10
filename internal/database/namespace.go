@@ -319,7 +319,7 @@ type ListNamespacesBuilder interface {
 	ForPathPrefix(path string) ListNamespacesBuilder
 	ForDepth(depth uint64) ListNamespacesBuilder
 	ForChildrenOf(path string) ListNamespacesBuilder
-	ForNamespaceMatcher(path string) ListNamespacesBuilder
+	ForNamespaceMatcher(matcher string) ListNamespacesBuilder
 	ForState(NamespaceState) ListNamespacesBuilder
 	OrderBy(NamespaceOrderByField, pagination.OrderBy) ListNamespacesBuilder
 	IncludeDeleted() ListNamespacesBuilder
@@ -335,8 +335,8 @@ type listNamespacesFilters struct {
 	NamespaceMatcher  *string                `json:"namespace_matcher,omitempty"`
 	OrderByFieldVal   *NamespaceOrderByField `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy    `json:"order_by"`
-	Errors            *multierror.Error      `json:"-"`
 	IncludeDeletedVal bool                   `json:"include_deleted,omitempty"`
+	Errors            *multierror.Error      `json:"-"`
 }
 
 func (l *listNamespacesFilters) addError(e error) ListNamespacesBuilder {

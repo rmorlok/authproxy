@@ -273,10 +273,11 @@ func DatabaseConnectionToJson(cv coreIface.ConnectorVersion, conn database.Conne
 }
 
 type ListConnectionRequestQuery struct {
-	Cursor     *string                   `form:"cursor"`
-	LimitVal   *int32                    `form:"limit"`
-	StateVal   *database.ConnectionState `form:"state"`
-	OrderByVal *string                   `form:"order_by"`
+	Cursor       *string                   `form:"cursor"`
+	LimitVal     *int32                    `form:"limit"`
+	StateVal     *database.ConnectionState `form:"state"`
+	NamespaceVal *string                   `form:"namespace"`
+	OrderByVal   *string                   `form:"order_by"`
 }
 
 type ListConnectionResponseJson struct {
@@ -323,6 +324,10 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 			b = b.ForState(*req.StateVal)
 		}
 
+		if req.NamespaceVal != nil {
+			b = b.ForNamespaceMatcher(*req.NamespaceVal)
+		}
+
 		if req.OrderByVal != nil {
 			field, order, err := pagination.SplitOrderByParam[database.ConnectionOrderByField](*req.OrderByVal)
 			if err != nil {
@@ -344,7 +349,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 				return
 			}
 
-			b.OrderBy(database.ConnectionOrderByField(field), order)
+			b.OrderBy(field, order)
 		}
 
 		ex = b

@@ -287,6 +287,7 @@ type ListConnectionsBuilder interface {
 	Limit(int32) ListConnectionsBuilder
 	ForState(ConnectionState) ListConnectionsBuilder
 	ForStates([]ConnectionState) ListConnectionsBuilder
+	ForNamespaceMatcher(matcher string) ListConnectionsBuilder
 	OrderBy(ConnectionOrderByField, pagination.OrderBy) ListConnectionsBuilder
 	IncludeDeleted() ListConnectionsBuilder
 	WithDeletedHandling(DeletedHandling) ListConnectionsBuilder
@@ -297,9 +298,16 @@ type listConnectionsFilters struct {
 	LimitVal          uint64                  `json:"limit"`
 	Offset            uint64                  `json:"offset"`
 	StatesVal         []ConnectionState       `json:"states,omitempty"`
+	NamespaceMatcher  *string                 `json:"namespace_matcher,omitempty"`
 	OrderByFieldVal   *ConnectionOrderByField `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy     `json:"order_by"`
 	IncludeDeletedVal bool                    `json:"include_deleted,omitempty"`
+	Errors            *multierror.Error       `json:"-"`
+}
+
+func (l *listConnectionsFilters) addError(e error) ListConnectionsBuilder {
+	l.Errors = multierror.Append(l.Errors, e)
+	return l
 }
 
 func (l *listConnectionsFilters) Limit(limit int32) ListConnectionsBuilder {
@@ -311,6 +319,16 @@ func (l *listConnectionsFilters) ForState(state ConnectionState) ListConnections
 	return l.ForStates([]ConnectionState{state})
 }
 
+func (l *listConnectionsFilters) ForNamespaceMatcher(matcher string) ListConnectionsBuilder {
+	if err := ValidateNamespaceMatcher(matcher); err != nil {
+		return l.addError(err)
+	} else {
+		l.NamespaceMatcher = &matcher
+	}
+
+	return l
+}
+
 func (l *listConnectionsFilters) ForStates(states []ConnectionState) ListConnectionsBuilder {
 	l.StatesVal = states
 	return l
@@ -320,6 +338,8 @@ func (l *listConnectionsFilters) OrderBy(field ConnectionOrderByField, by pagina
 	if IsValidConnectionOrderByField(field) {
 		l.OrderByFieldVal = &field
 		l.OrderByVal = &by
+	} else {
+		return l.addError(fmt.Errorf("invalid order by field: %v", field))
 	}
 	return l
 }
@@ -372,6 +392,10 @@ func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) sq.Selec
 		q = q.Where(sq.Eq{"state": l.StatesVal})
 	}
 
+	if l.NamespaceMatcher != nil {
+		q = restrictToNamespaceMatcher(q, "namespace", *l.NamespaceMatcher)
+	}
+
 	if l.OrderByFieldVal != nil {
 		q = q.OrderBy(fmt.Sprintf("%s %s", string(*l.OrderByFieldVal), l.OrderByVal.String()))
 	}
@@ -381,6 +405,10 @@ func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) sq.Selec
 
 func (l *listConnectionsFilters) fetchPage(ctx context.Context) pagination.PageResult[Connection] {
 	var err error
+
+	if err = l.Errors.ErrorOrNil(); err != nil {
+		return pagination.PageResult[Connection]{Error: err}
+	}
 
 	rows, err := l.applyRestrictions(ctx).
 		RunWith(l.s.db).

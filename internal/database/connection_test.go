@@ -1,6 +1,7 @@
 package database
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
@@ -191,7 +192,7 @@ func TestConnections(t *testing.T) {
 
 			err := db.CreateConnection(ctx, &Connection{
 				ID:               u,
-				Namespace:        "root.some-namespace",
+				Namespace:        fmt.Sprintf("root.some-namespace.%d", i%10),
 				ConnectorId:      uuid.New(),
 				ConnectorVersion: 1,
 				State:            state,
@@ -225,6 +226,30 @@ func TestConnections(t *testing.T) {
 
 			assert.Equal(t, 50, total)
 			assert.Equal(t, lastUuid, last.ID)
+		})
+
+		t.Run("filter by namespace", func(t *testing.T) {
+			result := db.ListConnectionsBuilder().
+				ForNamespaceMatcher("root.some-namespace.0").
+				OrderBy(ConnectionOrderByCreatedAt, pagination.OrderByAsc).
+				Limit(51).
+				FetchPage(ctx)
+			assert.NoError(t, result.Error)
+			assert.Len(t, result.Results, 5)
+			assert.Equal(t, result.Results[0].ID, firstUuid)
+			assert.False(t, result.HasMore)
+			assert.Empty(t, result.Cursor)
+
+			result = db.ListConnectionsBuilder().
+				ForNamespaceMatcher("root.some-namespace.2").
+				OrderBy(ConnectionOrderByCreatedAt, pagination.OrderByAsc).
+				Limit(51).
+				FetchPage(ctx)
+			assert.NoError(t, result.Error)
+			assert.Len(t, result.Results, 5)
+			assert.NotEqual(t, result.Results[0].ID, firstUuid)
+			assert.False(t, result.HasMore)
+			assert.Empty(t, result.Cursor)
 		})
 
 		t.Run("filter by state", func(t *testing.T) {
