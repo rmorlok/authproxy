@@ -23,7 +23,9 @@ type ListConnectorVersionsBuilder interface {
 	ForType(string) ListConnectorVersionsBuilder
 	ForId(uuid.UUID) ListConnectorVersionsBuilder
 	ForVersion(version uint64) ListConnectorVersionsBuilder
-	ForConnectorVersionState(database.ConnectorVersionState) ListConnectorVersionsBuilder
+	ForState(database.ConnectorVersionState) ListConnectorVersionsBuilder
+	ForStates([]database.ConnectorVersionState) ListConnectorVersionsBuilder
+	ForNamespaceMatcher(string) ListConnectorVersionsBuilder
 	OrderBy(database.ConnectorVersionOrderByField, pagination.OrderBy) ListConnectorVersionsBuilder
 	IncludeDeleted() ListConnectorVersionsBuilder
 }

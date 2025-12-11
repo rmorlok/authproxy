@@ -22,7 +22,9 @@ type ListConnectorsBuilder interface {
 	Limit(int32) ListConnectorsBuilder
 	ForType(string) ListConnectorsBuilder
 	ForId(uuid.UUID) ListConnectorsBuilder
-	ForConnectorVersionState(database.ConnectorVersionState) ListConnectorsBuilder
+	ForState(database.ConnectorVersionState) ListConnectorsBuilder
+	ForStates([]database.ConnectorVersionState) ListConnectorsBuilder
+	ForNamespaceMatcher(string) ListConnectorsBuilder
 	OrderBy(database.ConnectorOrderByField, pagination.OrderBy) ListConnectorsBuilder
 	IncludeDeleted() ListConnectorsBuilder
 }

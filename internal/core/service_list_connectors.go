@@ -80,9 +80,23 @@ func (l *listWrapper) ForId(id uuid.UUID) iface.ListConnectorsBuilder {
 	}
 }
 
-func (l *listWrapper) ForConnectorVersionState(s database.ConnectorVersionState) iface.ListConnectorsBuilder {
+func (l *listWrapper) ForState(s database.ConnectorVersionState) iface.ListConnectorsBuilder {
 	return &listWrapper{
-		l: l.l.ForConnectorVersionState(s),
+		l: l.l.ForState(s),
+		s: l.s,
+	}
+}
+
+func (l *listWrapper) ForStates(states []database.ConnectorVersionState) iface.ListConnectorsBuilder {
+	return &listWrapper{
+		l: l.l.ForStates(states),
+		s: l.s,
+	}
+}
+
+func (l *listWrapper) ForNamespaceMatcher(m string) iface.ListConnectorsBuilder {
+	return &listWrapper{
+		l: l.l.ForNamespaceMatcher(m),
 		s: l.s,
 	}
 }

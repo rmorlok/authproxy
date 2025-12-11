@@ -6,6 +6,7 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
+	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -59,7 +60,9 @@ type ListConnectorsBuilder interface {
 	Limit(int32) ListConnectorsBuilder
 	ForType(string) ListConnectorsBuilder
 	ForId(uuid.UUID) ListConnectorsBuilder
-	ForConnectorVersionState(ConnectorVersionState) ListConnectorsBuilder
+	ForNamespaceMatcher(string) ListConnectorsBuilder
+	ForState(ConnectorVersionState) ListConnectorsBuilder
+	ForStates([]ConnectorVersionState) ListConnectorsBuilder
 	OrderBy(ConnectorOrderByField, pagination.OrderBy) ListConnectorsBuilder
 	IncludeDeleted() ListConnectorsBuilder
 }
@@ -69,11 +72,18 @@ type listConnectorsFilters struct {
 	LimitVal          uint64                  `json:"limit"`
 	Offset            uint64                  `json:"offset"`
 	StatesVal         []ConnectorVersionState `json:"states,omitempty"`
+	NamespaceMatcher  *string                 `json:"namespace_matcher,omitempty"`
 	TypeVal           []string                `json:"types,omitempty"`
 	IdsVal            []uuid.UUID             `json:"ids,omitempty"`
 	OrderByFieldVal   *ConnectorOrderByField  `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy     `json:"order_by"`
 	IncludeDeletedVal bool                    `json:"include_deleted,omitempty"`
+	Errors            *multierror.Error       `json:"-"`
+}
+
+func (l *listConnectorsFilters) addError(e error) ListConnectorsBuilder {
+	l.Errors = multierror.Append(l.Errors, e)
+	return l
 }
 
 func (l *listConnectorsFilters) Limit(limit int32) ListConnectorsBuilder {
@@ -81,8 +91,23 @@ func (l *listConnectorsFilters) Limit(limit int32) ListConnectorsBuilder {
 	return l
 }
 
-func (l *listConnectorsFilters) ForConnectorVersionState(state ConnectorVersionState) ListConnectorsBuilder {
+func (l *listConnectorsFilters) ForState(state ConnectorVersionState) ListConnectorsBuilder {
 	l.StatesVal = []ConnectorVersionState{state}
+	return l
+}
+
+func (l *listConnectorsFilters) ForStates(states []ConnectorVersionState) ListConnectorsBuilder {
+	l.StatesVal = states
+	return l
+}
+
+func (l *listConnectorsFilters) ForNamespaceMatcher(matcher string) ListConnectorsBuilder {
+	if err := ValidateNamespaceMatcher(matcher); err != nil {
+		return l.addError(err)
+	} else {
+		l.NamespaceMatcher = &matcher
+	}
+
 	return l
 }
 
@@ -126,6 +151,10 @@ func (l *listConnectorsFilters) FromCursor(ctx context.Context, cursor string) (
 func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageResult[Connector] {
 	if l.LimitVal <= 0 {
 		l.LimitVal = 100
+	}
+
+	if err := l.Errors.ErrorOrNil(); err != nil {
+		return pagination.PageResult[Connector]{Error: err}
 	}
 
 	// Picks out the row that will be returned as primary based on a ranked priority of the states
@@ -185,6 +214,10 @@ cvc.versions as total_versions
 
 	if len(l.StatesVal) > 0 {
 		q = q.Where(sq.Eq{"rr.state": l.StatesVal})
+	}
+
+	if l.NamespaceMatcher != nil {
+		q = restrictToNamespaceMatcher(q, "rr.namespace", *l.NamespaceMatcher)
 	}
 
 	if !l.IncludeDeletedVal {

@@ -592,8 +592,10 @@ type ListConnectorVersionsBuilder interface {
 	Limit(int32) ListConnectorVersionsBuilder
 	ForType(string) ListConnectorVersionsBuilder
 	ForId(uuid.UUID) ListConnectorVersionsBuilder
-	ForVersion(version uint64) ListConnectorVersionsBuilder
-	ForConnectorVersionState(ConnectorVersionState) ListConnectorVersionsBuilder
+	ForVersion(uint64) ListConnectorVersionsBuilder
+	ForState(ConnectorVersionState) ListConnectorVersionsBuilder
+	ForStates([]ConnectorVersionState) ListConnectorVersionsBuilder
+	ForNamespaceMatcher(string) ListConnectorVersionsBuilder
 	OrderBy(ConnectorVersionOrderByField, pagination.OrderBy) ListConnectorVersionsBuilder
 	IncludeDeleted() ListConnectorVersionsBuilder
 }
@@ -603,12 +605,19 @@ type listConnectorVersionsFilters struct {
 	LimitVal          uint64                        `json:"limit"`
 	Offset            uint64                        `json:"offset"`
 	StatesVal         []ConnectorVersionState       `json:"states,omitempty"`
+	NamespaceMatcher  *string                       `json:"namespace_matcher,omitempty"`
 	TypeVal           []string                      `json:"types,omitempty"`
 	IdsVal            []uuid.UUID                   `json:"ids,omitempty"`
 	VersionsVal       []uint64                      `json:"versions,omitempty"`
 	OrderByFieldVal   *ConnectorVersionOrderByField `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy           `json:"order_by"`
 	IncludeDeletedVal bool                          `json:"include_deleted,omitempty"`
+	Errors            *multierror.Error             `json:"-"`
+}
+
+func (l *listConnectorVersionsFilters) addError(e error) ListConnectorVersionsBuilder {
+	l.Errors = multierror.Append(l.Errors, e)
+	return l
 }
 
 func (l *listConnectorVersionsFilters) Limit(limit int32) ListConnectorVersionsBuilder {
@@ -616,8 +625,23 @@ func (l *listConnectorVersionsFilters) Limit(limit int32) ListConnectorVersionsB
 	return l
 }
 
-func (l *listConnectorVersionsFilters) ForConnectorVersionState(state ConnectorVersionState) ListConnectorVersionsBuilder {
+func (l *listConnectorVersionsFilters) ForState(state ConnectorVersionState) ListConnectorVersionsBuilder {
 	l.StatesVal = []ConnectorVersionState{state}
+	return l
+}
+
+func (l *listConnectorVersionsFilters) ForStates(states []ConnectorVersionState) ListConnectorVersionsBuilder {
+	l.StatesVal = states
+	return l
+}
+
+func (l *listConnectorVersionsFilters) ForNamespaceMatcher(matcher string) ListConnectorVersionsBuilder {
+	if err := ValidateNamespaceMatcher(matcher); err != nil {
+		return l.addError(err)
+	} else {
+		l.NamespaceMatcher = &matcher
+	}
+
 	return l
 }
 
@@ -688,6 +712,10 @@ func (l *listConnectorVersionsFilters) applyRestrictions(ctx context.Context) sq
 		q = q.Where(sq.Eq{"states": l.StatesVal})
 	}
 
+	if l.NamespaceMatcher != nil {
+		q = restrictToNamespaceMatcher(q, "namespace", *l.NamespaceMatcher)
+	}
+
 	if !l.IncludeDeletedVal {
 		q = q.Where(sq.Eq{"deleted_at": nil})
 	}
@@ -704,6 +732,10 @@ func (l *listConnectorVersionsFilters) applyRestrictions(ctx context.Context) sq
 
 func (l *listConnectorVersionsFilters) fetchPage(ctx context.Context) pagination.PageResult[ConnectorVersion] {
 	var err error
+
+	if err = l.Errors.ErrorOrNil(); err != nil {
+		return pagination.PageResult[ConnectorVersion]{Error: err}
+	}
 
 	rows, err := l.applyRestrictions(ctx).
 		RunWith(l.s.db).

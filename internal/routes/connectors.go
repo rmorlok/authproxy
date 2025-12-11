@@ -65,11 +65,12 @@ func ConnectorVersionToConnectorJson(cv connIface.ConnectorVersion) ConnectorJso
 }
 
 type ListConnectorsRequestQueryParams struct {
-	Cursor     *string                         `form:"cursor"`
-	LimitVal   *int32                          `form:"limit"`
-	StateVal   *database.ConnectorVersionState `form:"state"`
-	TypeVal    *string                         `form:"type"`
-	OrderByVal *string                         `form:"order_by"`
+	Cursor       *string                         `form:"cursor"`
+	LimitVal     *int32                          `form:"limit"`
+	StateVal     *database.ConnectorVersionState `form:"state"`
+	NamespaceVal *string                         `form:"namespace"`
+	TypeVal      *string                         `form:"type"`
+	OrderByVal   *string                         `form:"order_by"`
 }
 
 type ListConnectorsResponseJson struct {
@@ -102,10 +103,11 @@ func ConnectorVersionToJson(cv connIface.ConnectorVersion) ConnectorVersionJson 
 }
 
 type ListConnectorVersionsRequestQueryParams struct {
-	Cursor     *string                         `form:"cursor"`
-	LimitVal   *int32                          `form:"limit"`
-	StateVal   *database.ConnectorVersionState `form:"state"`
-	OrderByVal *string                         `form:"order_by"`
+	Cursor       *string                         `form:"cursor"`
+	LimitVal     *int32                          `form:"limit"`
+	StateVal     *database.ConnectorVersionState `form:"state"`
+	NamespaceVal *string                         `form:"namespace"`
+	OrderByVal   *string                         `form:"order_by"`
 }
 
 type ListConnectorVersionsResponseJson struct {
@@ -218,7 +220,11 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 		}
 
 		if req.StateVal != nil {
-			b = b.ForConnectorVersionState(*req.StateVal)
+			b = b.ForState(*req.StateVal)
+		}
+
+		if req.NamespaceVal != nil {
+			b = b.ForNamespaceMatcher(*req.NamespaceVal)
 		}
 
 		if req.OrderByVal != nil {
@@ -410,7 +416,11 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 		}
 
 		if req.StateVal != nil {
-			b = b.ForConnectorVersionState(*req.StateVal)
+			b = b.ForState(*req.StateVal)
+		}
+
+		if req.NamespaceVal != nil {
+			b = b.ForNamespaceMatcher(*req.NamespaceVal)
 		}
 
 		if req.OrderByVal != nil {

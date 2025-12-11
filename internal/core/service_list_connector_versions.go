@@ -79,9 +79,23 @@ func (l *listConnectorVersionWrapper) ForVersion(version uint64) iface.ListConne
 	}
 }
 
-func (l *listConnectorVersionWrapper) ForConnectorVersionState(s database.ConnectorVersionState) iface.ListConnectorVersionsBuilder {
+func (l *listConnectorVersionWrapper) ForState(s database.ConnectorVersionState) iface.ListConnectorVersionsBuilder {
 	return &listConnectorVersionWrapper{
-		l: l.l.ForConnectorVersionState(s),
+		l: l.l.ForState(s),
+		s: l.s,
+	}
+}
+
+func (l *listConnectorVersionWrapper) ForStates(states []database.ConnectorVersionState) iface.ListConnectorVersionsBuilder {
+	return &listConnectorVersionWrapper{
+		l: l.l.ForStates(states),
+		s: l.s,
+	}
+}
+
+func (l *listConnectorVersionWrapper) ForNamespaceMatcher(m string) iface.ListConnectorVersionsBuilder {
+	return &listConnectorVersionWrapper{
+		l: l.l.ForNamespaceMatcher(m),
 		s: l.s,
 	}
 }

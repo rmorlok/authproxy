@@ -20,6 +20,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/test_utils"
+	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -48,8 +49,15 @@ func TestConnectors(t *testing.T) {
 			root.Connectors.LoadFromList = []config.Connector{
 				{
 					Id:          uuid.MustParse("10000000-0000-0000-0000-000000000001"),
+					Namespace:   util.ToPtr("root"),
 					Type:        "test-connector",
 					DisplayName: "Test ConnectorJson",
+				},
+				{
+					Id:          uuid.MustParse("20000000-0000-0000-0000-000000000002"),
+					Namespace:   util.ToPtr("root.child"),
+					Type:        "test-connector-2",
+					DisplayName: "Test ConnectorJson 2",
 				},
 			}
 		}
@@ -76,78 +84,197 @@ func TestConnectors(t *testing.T) {
 		}
 	}
 
-	t.Run("get connector", func(t *testing.T) {
-		tu := setup(t, nil)
+	t.Run("connectors", func(t *testing.T) {
+		t.Run("get", func(t *testing.T) {
+			tu := setup(t, nil)
 
-		t.Run("unauthorized", func(t *testing.T) {
-			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodGet, "/connectors/test-connector", nil)
-			require.NoError(t, err)
+			t.Run("unauthorized", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := http.NewRequest(http.MethodGet, "/connectors/test-connector", nil)
+				require.NoError(t, err)
 
-			tu.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusUnauthorized, w.Code)
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusUnauthorized, w.Code)
+			})
+
+			t.Run("malformed id", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors/bad-connector", nil, "some-actor")
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusBadRequest, w.Code)
+			})
+
+			t.Run("invalid id", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001", nil, "some-actor")
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNotFound, w.Code)
+			})
+
+			t.Run("valid", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors/10000000-0000-0000-0000-000000000001", nil, "some-actor")
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp ConnectorJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Equal(t, uuid.MustParse("10000000-0000-0000-0000-000000000001"), resp.Id)
+				require.Equal(t, "Test ConnectorJson", resp.DisplayName)
+			})
 		})
 
-		t.Run("malformed id", func(t *testing.T) {
-			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors/bad-connector", nil, "some-actor")
-			require.NoError(t, err)
+		t.Run("list", func(t *testing.T) {
+			tu := setup(t, nil)
 
-			tu.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusBadRequest, w.Code)
-		})
+			t.Run("unauthorized", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := http.NewRequest(http.MethodGet, "/connectors", nil)
+				require.NoError(t, err)
 
-		t.Run("invalid id", func(t *testing.T) {
-			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001", nil, "some-actor")
-			require.NoError(t, err)
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusUnauthorized, w.Code)
+			})
 
-			tu.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusNotFound, w.Code)
-		})
+			t.Run("valid", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors?order=id%20asc", nil, "some-actor")
+				require.NoError(t, err)
 
-		t.Run("valid", func(t *testing.T) {
-			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors/10000000-0000-0000-0000-000000000001", nil, "some-actor")
-			require.NoError(t, err)
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
 
-			tu.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusOK, w.Code)
+				var resp ListConnectorsResponseJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Len(t, resp.Items, 2)
+				require.Equal(t, uuid.MustParse("10000000-0000-0000-0000-000000000001"), resp.Items[0].Id)
+				require.Equal(t, "Test ConnectorJson", resp.Items[0].DisplayName)
+				require.Equal(t, uuid.MustParse("20000000-0000-0000-0000-000000000002"), resp.Items[1].Id)
+				require.Equal(t, "Test ConnectorJson 2", resp.Items[1].DisplayName)
+			})
 
-			var resp ConnectorJson
-			err = json.Unmarshal(w.Body.Bytes(), &resp)
-			require.NoError(t, err)
-			require.Equal(t, uuid.MustParse("10000000-0000-0000-0000-000000000001"), resp.Id)
-			require.Equal(t, "Test ConnectorJson", resp.DisplayName)
+			t.Run("namespace filter", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors?order=id%20asc&namespace=root.child", nil, "some-actor")
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp ListConnectorsResponseJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Len(t, resp.Items, 1)
+				require.Equal(t, uuid.MustParse("20000000-0000-0000-0000-000000000002"), resp.Items[0].Id)
+				require.Equal(t, "Test ConnectorJson 2", resp.Items[0].DisplayName)
+			})
 		})
 	})
 
-	t.Run("list connectors", func(t *testing.T) {
-		tu := setup(t, nil)
+	t.Run("versions", func(t *testing.T) {
+		t.Run("get", func(t *testing.T) {
+			tu := setup(t, nil)
 
-		t.Run("unauthorized", func(t *testing.T) {
-			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodGet, "/connectors", nil)
-			require.NoError(t, err)
+			t.Run("unauthorized", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := http.NewRequest(http.MethodGet, "/connectors/test-connector/versions/1", nil)
+				require.NoError(t, err)
 
-			tu.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusUnauthorized, w.Code)
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusUnauthorized, w.Code)
+			})
+
+			t.Run("malformed id", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors/bad-connector/versions/1", nil, "some-actor")
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusBadRequest, w.Code)
+			})
+
+			t.Run("invalid id", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001/versions/1", nil, "some-actor")
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNotFound, w.Code)
+			})
+
+			t.Run("invalid version", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001/versions/999", nil, "some-actor")
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNotFound, w.Code)
+			})
+
+			t.Run("valid", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors/10000000-0000-0000-0000-000000000001/versions/1", nil, "some-actor")
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp ConnectorVersionJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Equal(t, uuid.MustParse("10000000-0000-0000-0000-000000000001"), resp.Id)
+			})
 		})
 
-		t.Run("valid", func(t *testing.T) {
-			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors", nil, "some-actor")
-			require.NoError(t, err)
+		t.Run("list", func(t *testing.T) {
+			tu := setup(t, nil)
 
-			tu.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusOK, w.Code)
+			t.Run("unauthorized", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := http.NewRequest(http.MethodGet, "/connectors/10000000-0000-0000-0000-000000000001/versions", nil)
+				require.NoError(t, err)
 
-			var resp ListConnectorsResponseJson
-			err = json.Unmarshal(w.Body.Bytes(), &resp)
-			require.NoError(t, err)
-			require.Len(t, resp.Items, 1)
-			require.Equal(t, uuid.MustParse("10000000-0000-0000-0000-000000000001"), resp.Items[0].Id)
-			require.Equal(t, "Test ConnectorJson", resp.Items[0].DisplayName)
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusUnauthorized, w.Code)
+			})
+
+			t.Run("valid", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors/10000000-0000-0000-0000-000000000001/versions?order=id%20asc", nil, "some-actor")
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp ListConnectorVersionsResponseJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Len(t, resp.Items, 1)
+				require.Equal(t, uuid.MustParse("10000000-0000-0000-0000-000000000001"), resp.Items[0].Id)
+			})
+
+			t.Run("namespace filter", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				// Namespace filter doesn't actually make sense here because versions can't change namespaces
+				req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connectors/10000000-0000-0000-0000-000000000001/versions?order=id%20asc&namespace=root.child", nil, "some-actor")
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp ListConnectorsResponseJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Len(t, resp.Items, 0)
+			})
 		})
 	})
 }
