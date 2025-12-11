@@ -38,6 +38,7 @@ export enum ConnectorVersionState {
 
 export interface ListConnectorsParams {
     state?: ConnectorVersionState;
+    namespace?: string;
     cursor?: string;
     limit?: number;
     order_by?: string;
@@ -45,6 +46,7 @@ export interface ListConnectorsParams {
 
 export interface ListConnectorVersionsParams {
     state?: ConnectorVersionState;
+    namespace?: string;
     cursor?: string;
     limit?: number;
     order_by?: string;

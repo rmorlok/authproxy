@@ -32,6 +32,22 @@ export interface ListNamespaceParams {
 }
 
 /**
+ * Returns a matcher that will match for the specified namespace path and all its children. This value can be used
+ * in the namespace filter param for listing resources. If no path is specified, the matcher will match for all namespaces.
+ */
+export const namespaceAndChildren = (path: string | null | undefined): string => {
+    if( !path ) {
+        return ROOT_NAMESPACE_PATH + NAMESPACE_PATH_SEPARATOR +  "**";
+    }
+
+    if (path.endsWith("**")) {
+        return path;
+    } else {
+        return path + NAMESPACE_PATH_SEPARATOR + "**";
+    }
+}
+
+/**
  * Get a list of all namespaces
  * @param params The parameters for filtering and pagination
  */

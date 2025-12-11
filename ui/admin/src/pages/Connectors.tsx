@@ -11,11 +11,13 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import {
-    listConnectors, ConnectorVersionState, Connector, ListResponse, ListConnectorsParams
+    listConnectors, ConnectorVersionState, Connector, ListResponse, ListConnectorsParams, namespaceAndChildren
 } from '@authproxy/api';
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
 import {useNavigate} from "react-router-dom";
+import {useSelector} from "react-redux";
+import {selectCurrentNamespacePath} from "../store/namespacesSlice";
 
 function renderState(state: ConnectorVersionState) {
     const colors: Record<ConnectorVersionState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -133,6 +135,7 @@ export default function Connectors() {
     ], []);
     const navigate = useNavigate();
     const stateVals = useMemo(() => stateOptions.map(opt => opt.value), [stateOptions]);
+    const ns = useSelector(selectCurrentNamespacePath);
 
     const [rows, setRows] = useState<Connector[]>([]);
     const [rowCount, setRowCount] = useState<number>(-1);
@@ -218,6 +221,7 @@ export default function Connectors() {
 
                 const params: ListConnectorsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
                     state: (stateFilter as ConnectorVersionState) || undefined,
+                    namespace: namespaceAndChildren(ns),
                     order_by: sort || undefined,
                     limit: pageSize,
                 };
@@ -253,11 +257,11 @@ export default function Connectors() {
         // Reset cursors/cache and immediately fetch first page to ensure initial load
         resetPagination();
         fetchPage(1);
-    }, [pageSize, sort, stateFilter]);
+    }, [ns, pageSize, sort, stateFilter]);
 
     useEffect(() => {
         fetchPage(page);
-    }, [page, pageSize, sort, stateFilter]); // TODO: only page?
+    }, [page]);
 
     return (
         <Box sx={{width: '100%', maxWidth: {sm: '100%', md: '1700px'}}}>

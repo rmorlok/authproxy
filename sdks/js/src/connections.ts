@@ -64,6 +64,7 @@ export interface ForceConnectionStateResponse extends Connection {
  */
 export interface ListConnectionsParams {
     state?: ConnectionState;
+    namespace?: string;
     cursor?: string;
     limit?: number;
     order_by?: string;
