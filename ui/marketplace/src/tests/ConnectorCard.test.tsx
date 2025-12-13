@@ -8,6 +8,7 @@ import {Connector, ConnectorVersionState} from '@authproxy/api';
 describe('ConnectorCard', () => {
     const mockConnector: Connector = {
         id: 'google-calendar',
+        namespace: 'root',
         version: 1,
         state: ConnectorVersionState.ACTIVE,
         type: 'oauth2',

@@ -26,6 +26,7 @@ function createStore(preloadedState?: any) {
 
 const connector: Connector = {
     id: 'google-calendar',
+    namespace: 'root',
     version: 1,
     state: ConnectorVersionState.ACTIVE,
     type: 'oauth2',
@@ -41,6 +42,7 @@ const connector: Connector = {
 
 const makeConnection = (overrides: Partial<Connection> = {}): Connection => ({
     id: 'c-1',
+    namespace: 'root',
     connector: connector,
     state: ConnectionState.CONNECTED,
     created_at: '2024-01-01T00:00:00Z',

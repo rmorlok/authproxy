@@ -43,6 +43,7 @@ const rootInitialState = () => ({
 describe('ConnectionCard', () => {
     const mockConnector: Connector = {
         id: 'google-calendar',
+        namespace: 'root',
         version: 1,
         state: ConnectorVersionState.ACTIVE,
         type: 'oauth2',
@@ -58,6 +59,7 @@ describe('ConnectionCard', () => {
 
     const baseConnection: Connection = {
         id: '123e4567-e89b-12d3-a456-426614174000',
+        namespace: 'root',
         connector: mockConnector,
         state: ConnectionState.CONNECTED,
         created_at: '2023-04-01T12:00:00Z',
