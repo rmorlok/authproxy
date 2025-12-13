@@ -27,6 +27,7 @@ type ListRequestsQuery struct {
 	/*
 	 * Filters
 	 */
+	Namespace                *string    `form:"namespace"`
 	RequestType              *string    `form:"request_type"`
 	CorrelationId            *string    `form:"correlation_id"`
 	ConnectionId             *uuid.UUID `form:"connection_id"`
@@ -44,6 +45,10 @@ type ListRequestsQuery struct {
 func (q *ListRequestsQuery) ApplyToBuilder(
 	b request_log.ListRequestBuilder,
 ) (_ request_log.ListRequestBuilder, err error) {
+	if q.Namespace != nil {
+		b = b.WithNamespaceMatcher(*q.Namespace)
+	}
+
 	if q.RequestType != nil {
 		b = b.WithRequestType(request_log.RequestType(*q.RequestType))
 	}

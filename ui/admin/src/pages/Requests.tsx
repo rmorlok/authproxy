@@ -18,6 +18,8 @@ import dayjs from 'dayjs';
 import {HttpStatusChip, Duration} from '../util';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
 import RequestDetail from "../components/RequestDetail";
+import {useSelector} from "react-redux";
+import {selectCurrentNamespacePath} from "../store/namespacesSlice";
 
 export const columns: (GridColDef<RequestEntryRecord> & {hideInitial?: boolean})[] = [
     {
@@ -186,6 +188,7 @@ export default function Requests() {
         { label: 'Public', value: RequestType.PUBLIC },
     ], []);
     const stateVals = useMemo(() => stateOptions.map(opt => opt.value), [stateOptions]);
+    const ns = useSelector(selectCurrentNamespacePath);
 
     const [rows, setRows] = useState<RequestEntryRecord[]>([]);
     const [rowCount, setRowCount] = useState<number>(-1);
@@ -272,6 +275,7 @@ export default function Requests() {
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
                 const params: ListRequestsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
+                    namespace: ns + ".**",
                     request_type: (typeFilter as RequestType) || undefined,
                     order_by: sort || undefined,
                     limit: pageSize,
@@ -308,11 +312,11 @@ export default function Requests() {
         // Reset cursors/cache and immediately fetch first page to ensure initial load
         resetPagination();
         fetchPage(1);
-    }, [pageSize, sort, typeFilter]);
+    }, [ns, pageSize, sort, typeFilter]);
 
     useEffect(() => {
         fetchPage(page);
-    }, [page, pageSize, sort, typeFilter]); // TODO: only page?
+    }, [page]); // TODO: only page?
 
     useEffect(() => {
         setDrawerOpen(requestId !== '');

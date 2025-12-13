@@ -12,6 +12,7 @@ import (
 func TestEntryRecord(t *testing.T) {
 	val := EntryRecord{
 		Type:                RequestTypeOAuth,
+		Namespace:           "root.child",
 		RequestId:           uuid.New(),
 		CorrelationId:       "some-correlation-id",
 		Timestamp:           time.Date(1970, time.January, 1, 0, 20, 34, 567000000, time.UTC), // This only has millisecond precision

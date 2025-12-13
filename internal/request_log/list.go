@@ -10,10 +10,12 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/hashicorp/go-multierror"
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/config/common"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -67,6 +69,7 @@ type ListRequestBuilder interface {
 	 * Filters
 	 */
 
+	WithNamespaceMatcher(matcher string) ListRequestBuilder
 	WithRequestType(requestType RequestType) ListRequestBuilder
 	WithCorrelationId(correlationId string) ListRequestBuilder
 	WithConnectionId(u uuid.UUID) ListRequestBuilder
@@ -91,21 +94,38 @@ type listRequestsFilters struct {
 	OrderByFieldVal *RequestOrderByField `json:"order_by_field"`
 	OrderByVal      *pagination.OrderBy  `json:"order_by"`
 
-	RequestType              *string     `json:"request_type,omitempty"`
-	CorrelationId            *string     `json:"correlation_id,omitempty"`
-	ConnectionId             *uuid.UUID  `json:"connection_id,omitempty"`
-	ConnectorType            *string     `json:"connector_type,omitempty"`
-	ConnectorId              *uuid.UUID  `json:"connector_id,omitempty"`
-	ConnectorVersion         *uint64     `json:"connector_version,omitempty"`
-	Method                   *string     `json:"method,omitempty"`
-	StatusCodeRangeInclusive []int       `json:"status_code_range,omitempty"`
-	TimestampRange           []time.Time `json:"timestamp_range,omitempty"`
-	Path                     *string     `json:"path,omitempty"`
-	PathRegex                *string     `json:"path_regex,omitempty"`
+	RequestType              *string           `json:"request_type,omitempty"`
+	CorrelationId            *string           `json:"correlation_id,omitempty"`
+	ConnectionId             *uuid.UUID        `json:"connection_id,omitempty"`
+	ConnectorType            *string           `json:"connector_type,omitempty"`
+	ConnectorId              *uuid.UUID        `json:"connector_id,omitempty"`
+	ConnectorVersion         *uint64           `json:"connector_version,omitempty"`
+	Method                   *string           `json:"method,omitempty"`
+	StatusCodeRangeInclusive []int             `json:"status_code_range,omitempty"`
+	TimestampRange           []time.Time       `json:"timestamp_range,omitempty"`
+	Path                     *string           `json:"path,omitempty"`
+	PathRegex                *string           `json:"path_regex,omitempty"`
+	NamespaceMatcher         *string           `json:"namespace_matcher,omitempty"`
+	Errors                   *multierror.Error `json:"-"`
+}
+
+func (l *listRequestsFilters) addError(e error) ListRequestBuilder {
+	l.Errors = multierror.Append(l.Errors, e)
+	return l
 }
 
 func (l *listRequestsFilters) Limit(limit int32) ListRequestBuilder {
 	l.LimitVal = limit
+	return l
+}
+
+func (l *listRequestsFilters) WithNamespaceMatcher(matcher string) ListRequestBuilder {
+	if err := common.ValidateNamespaceMatcher(matcher); err != nil {
+		return l.addError(err)
+	} else {
+		l.NamespaceMatcher = &matcher
+	}
+
 	return l
 }
 
@@ -336,6 +356,19 @@ func (l *listRequestsFilters) FromCursor(ctx context.Context, cursor string) (Li
 	return l, nil
 }
 
+func namespaceMatcherRestriction(nsMatcher string) string {
+	if strings.HasSuffix(nsMatcher, ".**") {
+		coreNamespace := nsMatcher[:len(nsMatcher)-3]
+		descendantRegex := regexp.QuoteMeta(coreNamespace) + "\\.*"
+		return fmt.Sprintf(
+			"(@%s:{%s|%s})",
+			fieldNamespace, apredis.EscapeRedisSearchString(coreNamespace), descendantRegex,
+		)
+	} else {
+		return fmt.Sprintf("@%s:{%s}", fieldNamespace, apredis.EscapeRedisSearchString(nsMatcher))
+	}
+}
+
 func (l *listRequestsFilters) apply() (query string, options *goredis.FTSearchOptions) {
 	clauses := []string{}
 	options = &goredis.FTSearchOptions{}
@@ -364,23 +397,23 @@ func (l *listRequestsFilters) apply() (query string, options *goredis.FTSearchOp
 	options.SortBy = []goredis.FTSearchSortBy{sortBy}
 
 	if l.RequestType != nil {
-		clauses = append(clauses, fmt.Sprintf("@%s:(%s)", fieldType, apredis.EscapeRedisSearchString(*l.RequestType)))
+		clauses = append(clauses, fmt.Sprintf("@%s:{%s}", fieldType, apredis.EscapeRedisSearchString(*l.RequestType)))
 	}
 
 	if l.CorrelationId != nil {
-		clauses = append(clauses, fmt.Sprintf("@%s:(%s)", fieldCorrelationId, apredis.EscapeRedisSearchStringAllowWildcards(*l.RequestType)))
+		clauses = append(clauses, fmt.Sprintf("@%s:{%s}", fieldCorrelationId, apredis.EscapeRedisSearchStringAllowWildcards(*l.RequestType)))
 	}
 
 	if l.ConnectionId != nil {
-		clauses = append(clauses, fmt.Sprintf("@%s:(%s)", fieldConnectionId, apredis.EscapeRedisSearchString(l.ConnectionId.String())))
+		clauses = append(clauses, fmt.Sprintf("@%s:{%s}", fieldConnectionId, apredis.EscapeRedisSearchString(l.ConnectionId.String())))
 	}
 
 	if l.ConnectorType != nil {
-		clauses = append(clauses, fmt.Sprintf("@%s:(%s)", fieldConnectorType, apredis.EscapeRedisSearchStringAllowWildcards(*l.ConnectorType)))
+		clauses = append(clauses, fmt.Sprintf("@%s:{%s}", fieldConnectorType, apredis.EscapeRedisSearchStringAllowWildcards(*l.ConnectorType)))
 	}
 
 	if l.ConnectorId != nil {
-		clauses = append(clauses, fmt.Sprintf("@%s:(%s)", fieldConnectorId, apredis.EscapeRedisSearchString(l.ConnectorId.String())))
+		clauses = append(clauses, fmt.Sprintf("@%s:{%s}", fieldConnectorId, apredis.EscapeRedisSearchString(l.ConnectorId.String())))
 	}
 
 	if l.ConnectorVersion != nil {
@@ -388,7 +421,7 @@ func (l *listRequestsFilters) apply() (query string, options *goredis.FTSearchOp
 	}
 
 	if l.Method != nil {
-		clauses = append(clauses, fmt.Sprintf("@%s:(%s)", fieldMethod, apredis.EscapeRedisSearchString(*l.Method)))
+		clauses = append(clauses, fmt.Sprintf("@%s:{%s}", fieldMethod, apredis.EscapeRedisSearchString(*l.Method)))
 	}
 
 	if len(l.StatusCodeRangeInclusive) == 2 {
@@ -400,10 +433,15 @@ func (l *listRequestsFilters) apply() (query string, options *goredis.FTSearchOp
 	}
 
 	if l.Path != nil {
-		clauses = append(clauses, fmt.Sprintf("@%s:(%s)", fieldPath, apredis.EscapeRedisSearchStringAllowWildcards(*l.RequestType)))
+		clauses = append(clauses, fmt.Sprintf("@%s:{%s}", fieldPath, apredis.EscapeRedisSearchStringAllowWildcards(*l.RequestType)))
+	}
+
+	if l.NamespaceMatcher != nil {
+		clauses = append(clauses, namespaceMatcherRestriction(*l.NamespaceMatcher))
 	}
 
 	if l.PathRegex != nil {
+		// TODO: This likely doesn't work
 		clauses = append(clauses, fmt.Sprintf("@%s:/%s/", fieldPath, *l.PathRegex))
 	}
 
@@ -433,6 +471,10 @@ func (l *listRequestsFilters) validate() error {
 func (l *listRequestsFilters) fetchPage(ctx context.Context) pagination.PageResult[EntryRecord] {
 	var err error
 	entries := make([]EntryRecord, 0)
+
+	if err = l.Errors.ErrorOrNil(); err != nil {
+		return pagination.PageResult[EntryRecord]{Error: err}
+	}
 
 	if err = l.validate(); err != nil {
 		return pagination.PageResult[EntryRecord]{Error: err}

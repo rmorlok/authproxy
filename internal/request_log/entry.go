@@ -68,6 +68,7 @@ func (e *EntryResponse) setRedisRecordFields(er *EntryRecord) {
 
 type Entry struct {
 	ID                  uuid.UUID           `json:"id"`
+	Namespace           string              `json:"ns"`
 	CorrelationID       string              `json:"cid"`
 	Timestamp           time.Time           `json:"ts"`
 	MillisecondDuration MillisecondDuration `json:"dur"`
@@ -84,6 +85,7 @@ func (e *Entry) setRedisRecordFields(er *EntryRecord) {
 	}
 
 	er.RequestId = e.ID
+	er.Namespace = e.Namespace
 	er.Timestamp = e.Timestamp
 	er.MillisecondDuration = e.MillisecondDuration
 	er.CorrelationId = e.CorrelationID
@@ -100,6 +102,7 @@ func NewEntryFromRecord(er *EntryRecord) *Entry {
 
 	entry := &Entry{
 		ID:                  er.RequestId,
+		Namespace:           er.Namespace,
 		CorrelationID:       er.CorrelationId,
 		Timestamp:           er.Timestamp,
 		MillisecondDuration: er.MillisecondDuration,

@@ -60,15 +60,15 @@ func Migrate(ctx context.Context, rs apredis.Client, l *slog.Logger) error {
 		apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 2*time.Second),
 		apredis.MutexOptionDetailedLockMetadata(),
 	)
-	err := m.Lock(context.Background())
+	err := m.Lock(ctx)
 	if err != nil {
 		panic(err)
 	}
-	defer m.Unlock(context.Background())
+	defer m.Unlock(ctx)
 
 	l.Info("checking if request log redis index exists")
 	client := rs
-	_, err = client.Info(context.Background(), RequestLogRedisIndexName).Result()
+	_, err = client.Do(ctx, "FT.INFO", RequestLogRedisIndexName).Result()
 	if err == nil {
 		l.Info("request log redis index already exists")
 		return nil
@@ -80,14 +80,14 @@ func Migrate(ctx context.Context, rs apredis.Client, l *slog.Logger) error {
 		"PREFIX", "1", "rl:",
 		"NOHL",
 		"SCHEMA",
-		fieldNamespace, "TEXT", "SORTABLE",
-		fieldType, "TEXT", "NOSTEM",
-		fieldCorrelationId, "TEXT", "NOSTEM",
-		fieldConnectionId, "TEXT", "NOSTEM",
-		fieldConnectorType, "TEXT", "NOSTEM",
-		fieldConnectorId, "TEXT", "NOSTEM",
-		fieldMethod, "TEXT", "NOSTEM",
-		fieldPath, "TEXT", "NOSTEM",
+		fieldNamespace, "TAG", "SORTABLE",
+		fieldType, "TAG",
+		fieldCorrelationId, "TAG",
+		fieldConnectionId, "TAG",
+		fieldConnectorType, "TAG",
+		fieldConnectorId, "TAG",
+		fieldMethod, "TAG",
+		fieldPath, "TAG",
 		fieldResponseStatusCode, "NUMERIC",
 		fieldConnectorVersion, "NUMERIC",
 		fieldTimestamp, "NUMERIC", "SORTABLE",

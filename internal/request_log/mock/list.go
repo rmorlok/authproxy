@@ -19,6 +19,7 @@ type MockListRequestBuilderExecutor struct {
 	OrderByFieldVal *request_log.RequestOrderByField
 	OrderByVal      *pagination.OrderBy
 
+	Namespace                *string     `json:"namespace,omitempty"`
 	RequestType              *string     `json:"request_type,omitempty"`
 	CorrelationId            *string     `json:"correlation_id,omitempty"`
 	ConnectionId             *uuid.UUID  `json:"connection_id,omitempty"`
@@ -30,6 +31,11 @@ type MockListRequestBuilderExecutor struct {
 	TimestampRange           []time.Time `json:"timestamp_range,omitempty"`
 	Path                     *string     `json:"path,omitempty"`
 	PathRegex                *string     `json:"path_regex,omitempty"`
+}
+
+func (l *MockListRequestBuilderExecutor) WithNamespaceMatcher(matcher string) request_log.ListRequestBuilder {
+	l.RequestType = util.ToPtr(matcher)
+	return l
 }
 
 func (l *MockListRequestBuilderExecutor) WithRequestType(requestType request_log.RequestType) request_log.ListRequestBuilder {
