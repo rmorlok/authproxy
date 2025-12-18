@@ -19,14 +19,14 @@ import (
 )
 
 type ConnectionsProxyRoutes struct {
-	cfg        config.C
-	auth       auth.A
-	connectors iface.C
-	db         database.DB
-	r          apredis.Client
-	httpf      httpf.F
-	encrypt    encrypt.E
-	logger     *slog.Logger
+	cfg     config.C
+	auth    auth.A
+	core    iface.C
+	db      database.DB
+	r       apredis.Client
+	httpf   httpf.F
+	encrypt encrypt.E
+	logger  *slog.Logger
 }
 
 func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
@@ -64,7 +64,7 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 
 	// TODO: add security checking for ownership
 
-	conn, err := r.connectors.GetConnection(ctx, connectionUuid)
+	conn, err := r.core.GetConnection(ctx, connectionUuid)
 	if err != nil {
 		if errors.Is(err, iface.ErrConnectionNotFound) {
 			api_common.NewHttpStatusErrorBuilder().
@@ -130,13 +130,13 @@ func NewConnectionsProxyRoutes(
 	logger *slog.Logger,
 ) *ConnectionsProxyRoutes {
 	return &ConnectionsProxyRoutes{
-		cfg:        cfg,
-		auth:       authService,
-		connectors: c,
-		db:         db,
-		r:          r,
-		httpf:      httpf,
-		encrypt:    encrypt,
-		logger:     logger,
+		cfg:     cfg,
+		auth:    authService,
+		core:    c,
+		db:      db,
+		r:       r,
+		httpf:   httpf,
+		encrypt: encrypt,
+		logger:  logger,
 	}
 }
