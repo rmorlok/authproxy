@@ -2,6 +2,9 @@ package oauth2
 
 import (
 	"context"
+	"net/url"
+	"strings"
+
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/auth"
@@ -9,8 +12,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/jwt"
 	"github.com/rmorlok/authproxy/internal/util"
-	"net/url"
-	"strings"
 )
 
 func (o *oAuth2Connection) getPublicRedirectUrl(ctx context.Context, stateId uuid.UUID, actor database.Actor) (string, error) {
@@ -54,17 +55,19 @@ func (o *oAuth2Connection) getPublicRedirectUrl(ctx context.Context, stateId uui
 }
 
 func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor database.Actor) (string, error) {
+	cv := o.connection.GetConnectorVersionEntity()
+
 	if !o.auth.ClientId.HasValue(ctx) {
-		return "", errors.Errorf("client id does not have value for connector %s", o.cv.GetID())
+		return "", errors.Errorf("client id does not have value for connector %s", cv.GetID())
 	}
 
 	clientId, err := o.auth.ClientId.GetValue(ctx)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to get client id for connector %s", o.cv.GetID())
+		return "", errors.Wrapf(err, "failed to get client id for connector %s", cv.GetID())
 	}
 
 	if o.auth.Authorization.Endpoint == "" {
-		return "", errors.Errorf("no authorization endpoint for connector %s", o.cv.GetID())
+		return "", errors.Errorf("no authorization endpoint for connector %s", cv.GetID())
 	}
 
 	if o.state == nil {
@@ -82,7 +85,7 @@ func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor database.A
 
 	authUrl3p, err := url.Parse(o.auth.Authorization.Endpoint)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to parse authorization endpoint for connector %s", o.cv.GetID())
+		return "", errors.Wrapf(err, "failed to parse authorization endpoint for connector %s", cv.GetID())
 	}
 
 	query := authUrl3p.Query()

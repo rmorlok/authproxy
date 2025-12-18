@@ -62,14 +62,21 @@ func (f *clientFactory) ForConnectorVersion(cv ConnectorVersion) F {
 	return f.ForRequestInfo(ri)
 }
 
-func (f *clientFactory) ForConnection(cv Connection) F {
-	ri := f.requestInfo
-	ri.ConnectionId = cv.GetID()
-	ri.Namespace = cv.GetNamespace()
-	ri.ConnectorId = cv.GetConnectorId()
-	ri.ConnectorVersion = cv.GetConnectorVersion()
+func (f *clientFactory) ForConnection(c Connection) F {
+	var fp F = f
 
-	return f.ForRequestInfo(ri)
+	if cg, ok := c.(GettableConnectorVersion); ok {
+		cv := cg.GetConnectorVersionEntity()
+		fp = fp.ForConnectorVersion(cv)
+	}
+
+	ri := f.requestInfo
+	ri.ConnectionId = c.GetID()
+	ri.Namespace = c.GetNamespace()
+	ri.ConnectorId = c.GetConnectorId()
+	ri.ConnectorVersion = c.GetConnectorVersion()
+
+	return fp.ForRequestInfo(ri)
 }
 
 func (f *clientFactory) New() *gentleman.Client {

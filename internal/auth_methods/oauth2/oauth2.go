@@ -9,7 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
-	connIface "github.com/rmorlok/authproxy/internal/core/iface"
+	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httpf"
@@ -19,14 +19,13 @@ type oAuth2Connection struct {
 	cfg        config.C
 	db         database.DB
 	r          apredis.Client
-	connectors connIface.C
+	connectors coreIface.C
 	encrypt    encrypt.E
 	logger     *slog.Logger
 	auth       *config.AuthOAuth2
 	httpf      httpf.F
 
-	connection database.Connection
-	cv         connIface.ConnectorVersion
+	connection coreIface.Connection
 	state      *state
 }
 
@@ -36,13 +35,13 @@ func newOAuth2(
 	cfg config.C,
 	db database.DB,
 	r apredis.Client,
-	c connIface.C,
+	c coreIface.C,
 	encrypt encrypt.E,
 	logger *slog.Logger,
 	httpf httpf.F,
-	connection database.Connection,
-	cv connIface.ConnectorVersion,
+	connection coreIface.Connection,
 ) *oAuth2Connection {
+	cv := connection.GetConnectorVersionEntity()
 	connector := cv.GetDefinition()
 	auth, ok := connector.Auth.Inner().(*config.AuthOAuth2)
 	if !ok {
@@ -60,7 +59,6 @@ func newOAuth2(
 
 		connection: connection,
 		httpf:      httpf,
-		cv:         cv,
 	}
 }
 
@@ -74,7 +72,7 @@ func (o *oAuth2Connection) RecordCancelSessionAfterAuth(ctx context.Context, sho
 
 	result := o.r.Set(ctx, getStateRedisKey(o.state.Id), o.state, ttl)
 	if result.Err() != nil {
-		return errors.Wrapf(result.Err(), "failed to set state in redis for session status for connector %s", o.cv.GetID())
+		return errors.Wrapf(result.Err(), "failed to set state in redis for session status for connection %s", o.connection.GetID())
 	}
 
 	return nil

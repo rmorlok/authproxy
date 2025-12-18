@@ -3,10 +3,11 @@ package oauth2
 import (
 	"context"
 	"fmt"
+	"net/url"
+
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/request_log"
-	"net/url"
 )
 
 func (o *oAuth2Connection) SupportsRevokeTokens() bool {
@@ -18,7 +19,7 @@ func (o *oAuth2Connection) RevokeTokens(ctx context.Context) error {
 		return nil
 	}
 
-	token, err := o.db.GetOAuth2Token(ctx, o.connection.ID)
+	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetID())
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			return nil
@@ -66,8 +67,7 @@ func (o *oAuth2Connection) revokeRefreshToken(ctx context.Context, token *databa
 
 	c := o.httpf.
 		ForRequestType(request_log.RequestTypeOAuth).
-		ForConnection(&o.connection).
-		ForConnectorVersion(o.cv).
+		ForConnection(o.connection).
 		New().
 		UseContext(ctx)
 
@@ -113,7 +113,7 @@ func (o *oAuth2Connection) revokeAccessToken(ctx context.Context, token *databas
 	}
 
 	// Get the latest token to make sure we still need to refresh
-	token, err := o.db.GetOAuth2Token(ctx, o.connection.ID)
+	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetID())
 	if err != nil {
 		return err
 	}
@@ -129,8 +129,7 @@ func (o *oAuth2Connection) revokeAccessToken(ctx context.Context, token *databas
 
 	c := o.httpf.
 		ForRequestType(request_log.RequestTypeOAuth).
-		ForConnectorVersion(o.cv).
-		ForConnection(&o.connection).
+		ForConnection(o.connection).
 		New().
 		UseContext(ctx)
 

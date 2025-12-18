@@ -26,7 +26,7 @@ func (c *connection) getProxyImpl() (iface.Proxy, error) {
 		auth := def.Auth
 		if _, ok := auth.Inner().(*config.AuthOAuth2); ok {
 			o2f := c.s.getOAuth2Factory()
-			c.proxyImpl = o2f.NewOAuth2(c.Connection, c.cv)
+			c.proxyImpl = o2f.NewOAuth2(c)
 			c.proxyImplErr = nil
 			return
 		}

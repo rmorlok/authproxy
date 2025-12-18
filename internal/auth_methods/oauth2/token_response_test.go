@@ -3,15 +3,18 @@ package oauth2
 import (
 	"context"
 	"errors"
+	"strings"
+	"testing"
+
 	"github.com/golang/mock/gomock"
+	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/config"
+	mockCore "github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
 	database_mock "github.com/rmorlok/authproxy/internal/database/mock"
 	encrypt_mock "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"gopkg.in/h2non/gock.v1"
-	"strings"
-	"testing"
 )
 
 func TestCreateDbTokenFromResponse(t *testing.T) {
@@ -91,6 +94,9 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 				auth: &config.AuthOAuth2{
 					Scopes: []config.Scope{{Id: "read"}, {Id: "write"}},
 				},
+				connection: &mockCore.Connection{
+					ID: uuid.MustParse("12345678-1234-1234-1234-123456789abc"),
+				},
 			}
 
 			responseStatus := tt.responseStatus
@@ -109,7 +115,7 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 				}
 			})
 
-			ctx := context.TODO()
+			ctx := context.Background()
 
 			_, err := oauth.createDbTokenFromResponse(ctx, resp, nil)
 			if tt.wantErr == "" && err != nil {

@@ -6,7 +6,9 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/aplog"
 	cfg "github.com/rmorlok/authproxy/internal/config/connectors"
+	coreMock "github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	encryptmock "github.com/rmorlok/authproxy/internal/encrypt/mock"
@@ -21,6 +23,7 @@ func TestWrapConnectorVersion(t *testing.T) {
 	mockEncrypt := encryptmock.NewMockE(ctrl)
 	s := &service{
 		encrypt: mockEncrypt,
+		logger:  aplog.NewNoopLogger(),
 	}
 
 	connectorID := uuid.New()
@@ -50,6 +53,7 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 	mockEncrypt := encryptmock.NewMockE(ctrl)
 	s := &service{
 		encrypt: mockEncrypt,
+		logger:  aplog.NewNoopLogger(),
 	}
 
 	connectorID := uuid.New()
@@ -74,7 +78,7 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 
 	// Set up expectations for the encrypt service
 	mockEncrypt.EXPECT().
-		DecryptStringForConnector(gomock.Any(), cv.ConnectorVersion, "encrypted-data").
+		DecryptStringForConnector(gomock.Any(), cv, "encrypted-data").
 		Return(string(defJSON), nil)
 
 	// Test
@@ -98,6 +102,7 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 	mockEncrypt := encryptmock.NewMockE(ctrl)
 	s := &service{
 		encrypt: mockEncrypt,
+		logger:  aplog.NewNoopLogger(),
 	}
 
 	connectorID := uuid.New()
@@ -124,7 +129,13 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 
 	// Set up expectations for the encrypt service
 	mockEncrypt.EXPECT().
-		EncryptStringForConnector(gomock.Any(), cv.ConnectorVersion, gomock.Any()).
+		EncryptStringForConnector(
+			gomock.Any(),
+			coreMock.ConnectorVersionMatcher{
+				ExpectedId:      cv.ConnectorVersion.ID,
+				ExpectedVersion: cv.ConnectorVersion.Version,
+			},
+			gomock.Any()).
 		Return("new-encrypted-data", nil)
 
 	// Test
@@ -170,5 +181,5 @@ func NewTestConnectorVersion(c cfg.Connector) *ConnectorVersion {
 		EncryptedDefinition: string(encryptedDefinition),
 	}
 
-	return wrapConnectorVersion(dbConnectorVersion, &service{encrypt: e})
+	return wrapConnectorVersion(dbConnectorVersion, &service{encrypt: e, logger: aplog.NewNoopLogger()})
 }

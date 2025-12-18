@@ -2,6 +2,9 @@ package oauth2
 
 import (
 	"context"
+	"strings"
+	"time"
+
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
@@ -9,8 +12,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/h2non/gentleman.v2"
-	"strings"
-	"time"
 )
 
 // tokenResponse is the OAuth response from the authorization token request and the refresh request
@@ -69,7 +70,7 @@ func (o *oAuth2Connection) createDbTokenFromResponse(ctx context.Context, resp *
 
 	token, err := o.db.InsertOAuth2Token(
 		ctx,
-		o.connection.ID,
+		o.connection.GetID(),
 		refreshFromId,
 		encryptedRefreshToken,
 		encryptedAccessToken,

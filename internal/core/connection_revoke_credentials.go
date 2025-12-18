@@ -13,7 +13,7 @@ func (c *connection) getRevokeCredentialsOperations() []operation {
 
 	if _, ok := auth.Inner().(*config.AuthOAuth2); ok {
 		o2f := c.s.getOAuth2Factory()
-		o2 := o2f.NewOAuth2(c.Connection, c.cv)
+		o2 := o2f.NewOAuth2(c)
 
 		if o2.SupportsRevokeTokens() {
 			return []operation{o2.RevokeTokens}

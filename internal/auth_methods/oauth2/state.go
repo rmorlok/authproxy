@@ -13,7 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
-	connIface "github.com/rmorlok/authproxy/internal/core/iface"
+	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httpf"
@@ -58,15 +58,15 @@ func (o *oAuth2Connection) saveStateToRedis(ctx context.Context, actor database.
 	s := &state{
 		Id:               stateId,
 		ActorId:          actor.ID,
-		ConnectorId:      o.cv.GetID(),
-		ConnectorVersion: o.cv.GetVersion(),
-		ConnectionId:     o.connection.ID,
+		ConnectorId:      o.connection.GetConnectorVersionEntity().GetID(),
+		ConnectorVersion: o.connection.GetConnectorVersionEntity().GetVersion(),
+		ConnectionId:     o.connection.GetID(),
 		ExpiresAt:        time.Now().Add(ttl),
 		ReturnToUrl:      returnToUrl,
 	}
 	result := o.r.Set(ctx, getStateRedisKey(stateId), s, ttl)
 	if result.Err() != nil {
-		return errors.Wrapf(result.Err(), "failed to set state in redis for connector %s", o.cv.GetID())
+		return errors.Wrapf(result.Err(), "failed to set state in redis for connection %s", o.connection.GetID())
 	}
 
 	o.state = s
@@ -79,7 +79,7 @@ func getOAuth2State(
 	cfg config.C,
 	db database.DB,
 	r apredis.Client,
-	c connIface.C,
+	core coreIface.C,
 	httpf httpf.F,
 	encrypt encrypt.E,
 	logger *slog.Logger,
@@ -114,34 +114,24 @@ func getOAuth2State(
 		return nil, errors.Errorf("actor id %s does not match state actor id %s", actor.ID, s.ActorId)
 	}
 
-	cv, err := c.GetConnectorVersion(ctx, s.ConnectorId, s.ConnectorVersion)
+	connection, err := core.GetConnection(ctx, s.ConnectionId)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to load connector version")
+		if errors.Is(err, coreIface.ErrNotFound) {
+			return nil, errors.Errorf("connection %s not found for state %s", s.ConnectionId.String(), stateId.String())
+		}
+
+		return nil, errors.Wrapf(err, "failed to get connection %s for state %s", s.ConnectionId.String(), stateId.String())
 	}
 
-	if cv == nil {
-		return nil, errors.Errorf("connector %s version %d not found from state %s", s.ConnectorId, s.ConnectorVersion, stateId.String())
-	}
-
+	cv := connection.GetConnectorVersionEntity()
 	connector := cv.GetDefinition()
 	if connector.Auth.GetType() != config.AuthTypeOAuth2 {
 		return nil, errors.Errorf("connector %s is not an oauth2 connector", s.ConnectorId)
 	}
 
-	connection, err := db.GetConnection(ctx, s.ConnectionId)
-	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get connection %s for state %s", s.ConnectionId.String(), stateId.String())
-	}
-
-	if connection == nil {
-		return nil, errors.Errorf("connection %s not found for state %s", s.ConnectionId.String(), stateId.String())
-	}
-
 	// TODO: add actor auth validation once connections get ownership
 
-	// TODO: add connector validation to make sure the connection is of the specified connector type once connections get mapped to connectors
-
-	o := newOAuth2(cfg, db, r, c, encrypt, logger, httpf, *connection, cv)
+	o := newOAuth2(cfg, db, r, core, encrypt, logger, httpf, connection)
 	o.state = &s
 
 	deleteResult := r.Del(ctx, getStateRedisKey(stateId))

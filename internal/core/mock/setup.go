@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/apctx"
@@ -68,7 +69,7 @@ func MockConnectorRetrival(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.
 		EXPECT().
 		DecryptStringForConnector(
 			gomock.Any(),
-			mockDb.ConnectorVersionMatcher{
+			ConnectorVersionMatcher{
 				ExpectedId:      c.Id,
 				ExpectedVersion: c.Version,
 			},

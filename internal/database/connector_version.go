@@ -167,6 +167,22 @@ func (cv *ConnectorVersion) values() []any {
 	}
 }
 
+func (cv *ConnectorVersion) GetID() uuid.UUID {
+	return cv.ID
+}
+
+func (cv *ConnectorVersion) GetNamespace() string {
+	return cv.Namespace
+}
+
+func (cv *ConnectorVersion) GetVersion() uint64 {
+	return cv.Version
+}
+
+func (cv *ConnectorVersion) GetType() string {
+	return cv.Type
+}
+
 func (cv *ConnectorVersion) Validate() error {
 	result := &multierror.Error{}
 

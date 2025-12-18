@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	mockLog "github.com/rmorlok/authproxy/internal/aplog/mock"
 	cfg "github.com/rmorlok/authproxy/internal/config/connectors"
+	mockCore "github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
 	mockEncrypt "github.com/rmorlok/authproxy/internal/encrypt/mock"
@@ -54,7 +55,7 @@ func TestRevokeRefreshToken(t *testing.T) {
 			connectors: nil,
 			encrypt:    encrypt,
 			logger:     logger,
-			connection: database.Connection{
+			connection: &mockCore.Connection{
 				ID: connectionId,
 			},
 			auth: &cfg.AuthOAuth2{

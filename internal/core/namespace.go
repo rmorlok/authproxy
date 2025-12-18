@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 )
@@ -20,7 +21,9 @@ func wrapNamespace(ns database.Namespace, s *service) *Namespace {
 	return &Namespace{
 		Namespace: ns,
 		s:         s,
-		logger:    s.logger,
+		logger: aplog.NewBuilder(s.logger).
+			WithNamespace(ns.Path).
+			Build(),
 	}
 }
 
@@ -40,4 +43,9 @@ func (ns *Namespace) GetUpdatedAt() time.Time {
 	return ns.UpdatedAt
 }
 
+func (ns *Namespace) Logger() *slog.Logger {
+	return ns.logger
+}
+
 var _ iface.Namespace = (*Namespace)(nil)
+var _ aplog.HasLogger = (*Namespace)(nil)

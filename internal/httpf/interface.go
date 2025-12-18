@@ -13,6 +13,10 @@ type ConnectorVersion interface {
 	GetType() string
 }
 
+type GettableConnectorVersion interface {
+	GetConnectorVersionEntity() ConnectorVersion
+}
+
 type Connection interface {
 	GetID() uuid.UUID
 	GetNamespace() string

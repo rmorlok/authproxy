@@ -4,6 +4,7 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/config"
 	encryptmock "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	"github.com/stretchr/testify/assert"
@@ -18,6 +19,7 @@ func TestNewVersionBuilder(t *testing.T) {
 	mockEncrypt := encryptmock.NewMockE(ctrl)
 	s := &service{
 		encrypt: mockEncrypt,
+		logger:  aplog.NewNoopLogger(),
 	}
 
 	// Test
@@ -39,6 +41,7 @@ func TestVersionBuilder_WithConfig(t *testing.T) {
 	mockEncrypt := encryptmock.NewMockE(ctrl)
 	s := &service{
 		encrypt: mockEncrypt,
+		logger:  aplog.NewNoopLogger(),
 	}
 
 	builder := newConnectorVersionBuilder(s)
@@ -77,6 +80,7 @@ func TestVersionBuilder_WithId(t *testing.T) {
 	mockEncrypt := encryptmock.NewMockE(ctrl)
 	s := &service{
 		encrypt: mockEncrypt,
+		logger:  aplog.NewNoopLogger(),
 	}
 
 	builder := newConnectorVersionBuilder(s)
@@ -111,6 +115,7 @@ func TestVersionBuilder_WithType(t *testing.T) {
 	mockEncrypt := encryptmock.NewMockE(ctrl)
 	s := &service{
 		encrypt: mockEncrypt,
+		logger:  aplog.NewNoopLogger(),
 	}
 
 	builder := newConnectorVersionBuilder(s)
@@ -145,6 +150,7 @@ func TestVersionBuilder_WithVersion(t *testing.T) {
 	mockEncrypt := encryptmock.NewMockE(ctrl)
 	s := &service{
 		encrypt: mockEncrypt,
+		logger:  aplog.NewNoopLogger(),
 	}
 
 	builder := newConnectorVersionBuilder(s)
@@ -179,6 +185,7 @@ func TestVersionBuilder_Build_Success(t *testing.T) {
 	mockEncrypt := encryptmock.NewMockE(ctrl)
 	s := &service{
 		encrypt: mockEncrypt,
+		logger:  aplog.NewNoopLogger(),
 	}
 
 	builder := newConnectorVersionBuilder(s)
@@ -221,6 +228,7 @@ func TestVersionBuilder_Build_NilConnector(t *testing.T) {
 	mockEncrypt := encryptmock.NewMockE(ctrl)
 	s := &service{
 		encrypt: mockEncrypt,
+		logger:  aplog.NewNoopLogger(),
 	}
 
 	builder := newConnectorVersionBuilder(s)
@@ -242,6 +250,7 @@ func TestVersionBuilder_Build_EncryptError(t *testing.T) {
 	mockEncrypt := encryptmock.NewMockE(ctrl)
 	s := &service{
 		encrypt: mockEncrypt,
+		logger:  aplog.NewNoopLogger(),
 	}
 
 	builder := newConnectorVersionBuilder(s)

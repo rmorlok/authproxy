@@ -2,10 +2,11 @@ package oauth2
 
 import (
 	"context"
+	"net/url"
+
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/request_log"
-	"net/url"
 )
 
 func (o *oAuth2Connection) getPublicCallbackUrl() (string, error) {
@@ -45,8 +46,7 @@ func (o *oAuth2Connection) CallbackFrom3rdParty(ctx context.Context, query url.V
 
 	c := o.httpf.
 		ForRequestType(request_log.RequestTypeOAuth).
-		ForConnection(&o.connection).
-		ForConnectorVersion(o.cv).
+		ForConnection(o.connection).
 		New().
 		UseContext(ctx)
 

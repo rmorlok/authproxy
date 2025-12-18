@@ -3,8 +3,10 @@ package oauth2
 import (
 	"context"
 	"fmt"
+
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	mockCore "github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
 	mockE "github.com/rmorlok/authproxy/internal/encrypt/mock"
@@ -37,7 +39,7 @@ func MockOAuthTokenForConnection(ctx context.Context, dbMock *mockDb.MockDB, e *
 		EXPECT().
 		DecryptStringForConnection(
 			gomock.Any(),
-			mockDb.ConnectionMatcher{
+			mockCore.ConnectionMatcher{
 				ExpectedId: token.ConnectionID,
 			},
 			encryptedRefreshToken).
@@ -48,7 +50,7 @@ func MockOAuthTokenForConnection(ctx context.Context, dbMock *mockDb.MockDB, e *
 		EXPECT().
 		DecryptStringForConnection(
 			gomock.Any(),
-			mockDb.ConnectionMatcher{
+			mockCore.ConnectionMatcher{
 				ExpectedId: token.ConnectionID,
 			},
 			encryptedAccessToken).

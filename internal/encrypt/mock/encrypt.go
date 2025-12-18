@@ -9,8 +9,167 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	database "github.com/rmorlok/authproxy/internal/database"
+	uuid "github.com/google/uuid"
+	encrypt "github.com/rmorlok/authproxy/internal/encrypt"
 )
+
+// MockConnectorVersion is a mock of ConnectorVersion interface.
+type MockConnectorVersion struct {
+	ctrl     *gomock.Controller
+	recorder *MockConnectorVersionMockRecorder
+}
+
+// MockConnectorVersionMockRecorder is the mock recorder for MockConnectorVersion.
+type MockConnectorVersionMockRecorder struct {
+	mock *MockConnectorVersion
+}
+
+// NewMockConnectorVersion creates a new mock instance.
+func NewMockConnectorVersion(ctrl *gomock.Controller) *MockConnectorVersion {
+	mock := &MockConnectorVersion{ctrl: ctrl}
+	mock.recorder = &MockConnectorVersionMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockConnectorVersion) EXPECT() *MockConnectorVersionMockRecorder {
+	return m.recorder
+}
+
+// GetID mocks base method.
+func (m *MockConnectorVersion) GetID() uuid.UUID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetID")
+	ret0, _ := ret[0].(uuid.UUID)
+	return ret0
+}
+
+// GetID indicates an expected call of GetID.
+func (mr *MockConnectorVersionMockRecorder) GetID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetID", reflect.TypeOf((*MockConnectorVersion)(nil).GetID))
+}
+
+// GetNamespace mocks base method.
+func (m *MockConnectorVersion) GetNamespace() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNamespace")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetNamespace indicates an expected call of GetNamespace.
+func (mr *MockConnectorVersionMockRecorder) GetNamespace() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespace", reflect.TypeOf((*MockConnectorVersion)(nil).GetNamespace))
+}
+
+// GetType mocks base method.
+func (m *MockConnectorVersion) GetType() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetType")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetType indicates an expected call of GetType.
+func (mr *MockConnectorVersionMockRecorder) GetType() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetType", reflect.TypeOf((*MockConnectorVersion)(nil).GetType))
+}
+
+// GetVersion mocks base method.
+func (m *MockConnectorVersion) GetVersion() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetVersion")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetVersion indicates an expected call of GetVersion.
+func (mr *MockConnectorVersionMockRecorder) GetVersion() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetVersion", reflect.TypeOf((*MockConnectorVersion)(nil).GetVersion))
+}
+
+// MockConnection is a mock of Connection interface.
+type MockConnection struct {
+	ctrl     *gomock.Controller
+	recorder *MockConnectionMockRecorder
+}
+
+// MockConnectionMockRecorder is the mock recorder for MockConnection.
+type MockConnectionMockRecorder struct {
+	mock *MockConnection
+}
+
+// NewMockConnection creates a new mock instance.
+func NewMockConnection(ctrl *gomock.Controller) *MockConnection {
+	mock := &MockConnection{ctrl: ctrl}
+	mock.recorder = &MockConnectionMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockConnection) EXPECT() *MockConnectionMockRecorder {
+	return m.recorder
+}
+
+// GetConnectorId mocks base method.
+func (m *MockConnection) GetConnectorId() uuid.UUID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetConnectorId")
+	ret0, _ := ret[0].(uuid.UUID)
+	return ret0
+}
+
+// GetConnectorId indicates an expected call of GetConnectorId.
+func (mr *MockConnectionMockRecorder) GetConnectorId() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorId", reflect.TypeOf((*MockConnection)(nil).GetConnectorId))
+}
+
+// GetConnectorVersion mocks base method.
+func (m *MockConnection) GetConnectorVersion() uint64 {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetConnectorVersion")
+	ret0, _ := ret[0].(uint64)
+	return ret0
+}
+
+// GetConnectorVersion indicates an expected call of GetConnectorVersion.
+func (mr *MockConnectionMockRecorder) GetConnectorVersion() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersion", reflect.TypeOf((*MockConnection)(nil).GetConnectorVersion))
+}
+
+// GetID mocks base method.
+func (m *MockConnection) GetID() uuid.UUID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetID")
+	ret0, _ := ret[0].(uuid.UUID)
+	return ret0
+}
+
+// GetID indicates an expected call of GetID.
+func (mr *MockConnectionMockRecorder) GetID() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetID", reflect.TypeOf((*MockConnection)(nil).GetID))
+}
+
+// GetNamespace mocks base method.
+func (m *MockConnection) GetNamespace() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNamespace")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetNamespace indicates an expected call of GetNamespace.
+func (mr *MockConnectionMockRecorder) GetNamespace() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespace", reflect.TypeOf((*MockConnection)(nil).GetNamespace))
+}
 
 // MockE is a mock of E interface.
 type MockE struct {
@@ -36,7 +195,7 @@ func (m *MockE) EXPECT() *MockEMockRecorder {
 }
 
 // DecryptForConnection mocks base method.
-func (m *MockE) DecryptForConnection(ctx context.Context, connection database.Connection, data []byte) ([]byte, error) {
+func (m *MockE) DecryptForConnection(ctx context.Context, connection encrypt.Connection, data []byte) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DecryptForConnection", ctx, connection, data)
 	ret0, _ := ret[0].([]byte)
@@ -51,7 +210,7 @@ func (mr *MockEMockRecorder) DecryptForConnection(ctx, connection, data interfac
 }
 
 // DecryptForConnector mocks base method.
-func (m *MockE) DecryptForConnector(ctx context.Context, connection database.ConnectorVersion, data []byte) ([]byte, error) {
+func (m *MockE) DecryptForConnector(ctx context.Context, connection encrypt.ConnectorVersion, data []byte) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DecryptForConnector", ctx, connection, data)
 	ret0, _ := ret[0].([]byte)
@@ -81,7 +240,7 @@ func (mr *MockEMockRecorder) DecryptGlobal(ctx, data interface{}) *gomock.Call {
 }
 
 // DecryptStringForConnection mocks base method.
-func (m *MockE) DecryptStringForConnection(ctx context.Context, connection database.Connection, base64 string) (string, error) {
+func (m *MockE) DecryptStringForConnection(ctx context.Context, connection encrypt.Connection, base64 string) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DecryptStringForConnection", ctx, connection, base64)
 	ret0, _ := ret[0].(string)
@@ -96,7 +255,7 @@ func (mr *MockEMockRecorder) DecryptStringForConnection(ctx, connection, base64 
 }
 
 // DecryptStringForConnector mocks base method.
-func (m *MockE) DecryptStringForConnector(ctx context.Context, connection database.ConnectorVersion, base64 string) (string, error) {
+func (m *MockE) DecryptStringForConnector(ctx context.Context, connection encrypt.ConnectorVersion, base64 string) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DecryptStringForConnector", ctx, connection, base64)
 	ret0, _ := ret[0].(string)
@@ -126,7 +285,7 @@ func (mr *MockEMockRecorder) DecryptStringGlobal(ctx, base64 interface{}) *gomoc
 }
 
 // EncryptForConnection mocks base method.
-func (m *MockE) EncryptForConnection(ctx context.Context, connection database.Connection, data []byte) ([]byte, error) {
+func (m *MockE) EncryptForConnection(ctx context.Context, connection encrypt.Connection, data []byte) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EncryptForConnection", ctx, connection, data)
 	ret0, _ := ret[0].([]byte)
@@ -141,7 +300,7 @@ func (mr *MockEMockRecorder) EncryptForConnection(ctx, connection, data interfac
 }
 
 // EncryptForConnector mocks base method.
-func (m *MockE) EncryptForConnector(ctx context.Context, connection database.ConnectorVersion, data []byte) ([]byte, error) {
+func (m *MockE) EncryptForConnector(ctx context.Context, connection encrypt.ConnectorVersion, data []byte) ([]byte, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EncryptForConnector", ctx, connection, data)
 	ret0, _ := ret[0].([]byte)
@@ -171,7 +330,7 @@ func (mr *MockEMockRecorder) EncryptGlobal(ctx, data interface{}) *gomock.Call {
 }
 
 // EncryptStringForConnection mocks base method.
-func (m *MockE) EncryptStringForConnection(ctx context.Context, connection database.Connection, data string) (string, error) {
+func (m *MockE) EncryptStringForConnection(ctx context.Context, connection encrypt.Connection, data string) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EncryptStringForConnection", ctx, connection, data)
 	ret0, _ := ret[0].(string)
@@ -186,7 +345,7 @@ func (mr *MockEMockRecorder) EncryptStringForConnection(ctx, connection, data in
 }
 
 // EncryptStringForConnector mocks base method.
-func (m *MockE) EncryptStringForConnector(ctx context.Context, connection database.ConnectorVersion, data string) (string, error) {
+func (m *MockE) EncryptStringForConnector(ctx context.Context, connection encrypt.ConnectorVersion, data string) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EncryptStringForConnector", ctx, connection, data)
 	ret0, _ := ret[0].(string)

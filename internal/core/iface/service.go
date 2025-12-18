@@ -11,10 +11,12 @@ import (
 
 type ConnectorVersionId = database.ConnectorVersionId
 
-// C is the interface for the connectors service
+// C is the interface for the core service that implements primary business logic and binds the system together.
 type C interface {
 	/*
-	 * Migrating connectors from config to db
+	 *
+	 * Migration
+	 *
 	 */
 
 	// Migrate migrates all resources defined in config file into the databases within the system, invoking appropriate
@@ -29,7 +31,9 @@ type C interface {
 	MigrateConnectors(ctx context.Context) error
 
 	/*
-	 * Get connector version
+	 *
+	 * Connectors
+	 *
 	 */
 
 	// GetConnectorVersion returns the specified version of a connector.
@@ -41,19 +45,11 @@ type C interface {
 	// GetConnectorVersionForState returns the most recent version of the connector for the specified state.
 	GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state database.ConnectorVersionState) (ConnectorVersion, error)
 
-	/*
-	 * List connectors
-	 */
-
 	// ListConnectorsBuilder returns a builder to allow the caller to list connectors matching certain criteria.
 	ListConnectorsBuilder() ListConnectorsBuilder
 
 	// ListConnectorsFromCursor continues listing connectors from a cursor to support pagination.
 	ListConnectorsFromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error)
-
-	/*
-	 * List connector versions
-	 */
 
 	// ListConnectorVersionsBuilder returns a builder to allow the caller to list connector versions matching certain criteria.
 	ListConnectorVersionsBuilder() ListConnectorVersionsBuilder
@@ -62,22 +58,31 @@ type C interface {
 	ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error)
 
 	/*
-	 * Connection-specific operations
+	 *
+	 * Connections
+	 *
 	 */
 
 	// DisconnectConnection disconnects a connection. This is a state transition that queues work to do any cleanup
 	// with the 3rd party.
 	DisconnectConnection(ctx context.Context, id uuid.UUID) (taskInfo *tasks.TaskInfo, err error)
 
-	/*
-	 * Get connection
-	 */
-
 	// GetConnection returns a connection by ID. This connection has the full connection version details in it.
 	GetConnection(ctx context.Context, id uuid.UUID) (Connection, error)
 
+	// CreateConnection creates a new connection.
+	CreateConnection(ctx context.Context, namespace string, cv ConnectorVersion) (Connection, error)
+	
+	// ListConnectionsBuilder returns a builder to allow the caller to list connections matching certain criteria.
+	ListConnectionsBuilder() ListConnectionsBuilder
+
+	// ListConnectionsFromCursor continues listing connections from a cursor to support pagination.
+	ListConnectionsFromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error)
+
 	/*
-	 * Namespace
+	 *
+	 * Namespaces
+	 *
 	 */
 
 	// GetNamespace returns a namespace by path.
@@ -96,7 +101,9 @@ type C interface {
 	ListNamespacesFromCursor(ctx context.Context, cursor string) (ListNamespacesExecutor, error)
 
 	/*
-	 * Task manager interface functions.
+	 *
+	 * Tasks
+	 *
 	 */
 
 	RegisterTasks(mux *asynq.ServeMux)

@@ -7,7 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
-	connIface "github.com/rmorlok/authproxy/internal/core/iface"
+	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httpf"
@@ -17,13 +17,13 @@ type factory struct {
 	cfg        config.C
 	db         database.DB
 	redis      apredis.Client
-	connectors connIface.C
+	connectors coreIface.C
 	httpf      httpf.F
 	encrypt    encrypt.E
 	logger     *slog.Logger
 }
 
-func NewFactory(cfg config.C, db database.DB, r apredis.Client, c connIface.C, httpf httpf.F, encrypt encrypt.E, logger *slog.Logger) Factory {
+func NewFactory(cfg config.C, db database.DB, r apredis.Client, c coreIface.C, httpf httpf.F, encrypt encrypt.E, logger *slog.Logger) Factory {
 	return &factory{
 		cfg:        cfg,
 		db:         db,
@@ -35,7 +35,7 @@ func NewFactory(cfg config.C, db database.DB, r apredis.Client, c connIface.C, h
 	}
 }
 
-func (f *factory) NewOAuth2(connection database.Connection, connector connIface.ConnectorVersion) OAuth2Connection {
+func (f *factory) NewOAuth2(connection coreIface.Connection) OAuth2Connection {
 	return newOAuth2(
 		f.cfg,
 		f.db,
@@ -45,7 +45,6 @@ func (f *factory) NewOAuth2(connection database.Connection, connector connIface.
 		f.logger,
 		f.httpf,
 		connection,
-		connector,
 	)
 }
 

@@ -3,10 +3,12 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/aplog"
 	cfg "github.com/rmorlok/authproxy/internal/config/connectors"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -21,12 +23,18 @@ type ConnectorVersion struct {
 	s     *service
 	defMu sync.RWMutex
 	def   *cfg.Connector
+	l     *slog.Logger
 }
 
 func wrapConnectorVersion(cv database.ConnectorVersion, s *service) *ConnectorVersion {
 	return &ConnectorVersion{
 		ConnectorVersion: cv,
 		s:                s,
+		l: aplog.NewBuilder(s.logger).
+			WithNamespace(cv.Namespace).
+			WithConnectorId(cv.ID).
+			WithConnectorVersion(cv.Version).
+			Build(),
 	}
 }
 
@@ -70,7 +78,7 @@ func (cv *ConnectorVersion) getDefinition() (*cfg.Connector, error) {
 	cv.defMu.RLock()
 	defer cv.defMu.RUnlock()
 	if cv.def == nil {
-		decrypted, err := cv.s.encrypt.DecryptStringForConnector(context.Background(), cv.ConnectorVersion, cv.EncryptedDefinition)
+		decrypted, err := cv.s.encrypt.DecryptStringForConnector(context.Background(), cv, cv.EncryptedDefinition)
 		if err != nil {
 			return nil, err
 		}
@@ -95,7 +103,7 @@ func (cv *ConnectorVersion) setDefinition(def *cfg.Connector) error {
 		return err
 	}
 
-	encrypted, err := cv.s.encrypt.EncryptStringForConnector(context.Background(), cv.ConnectorVersion, string(jsonBytes))
+	encrypted, err := cv.s.encrypt.EncryptStringForConnector(context.Background(), cv, string(jsonBytes))
 	if err != nil {
 		return err
 	}
@@ -106,4 +114,9 @@ func (cv *ConnectorVersion) setDefinition(def *cfg.Connector) error {
 	return nil
 }
 
+func (cv *ConnectorVersion) Logger() *slog.Logger {
+	return cv.l
+}
+
 var _ iface.ConnectorVersion = (*ConnectorVersion)(nil)
+var _ aplog.HasLogger = (*ConnectorVersion)(nil)

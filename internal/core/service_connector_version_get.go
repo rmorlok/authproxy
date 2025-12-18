@@ -34,7 +34,7 @@ func (s *service) getConnectorVersion(ctx context.Context, id uuid.UUID, version
 	return wrapped, nil
 }
 
-func (s *service) GetConnectorVersions(ctx context.Context, requested []iface.ConnectorVersionId) (map[iface.ConnectorVersionId]iface.ConnectorVersion, error) {
+func (s *service) getConnectorVersions(ctx context.Context, requested []iface.ConnectorVersionId) (map[iface.ConnectorVersionId]*ConnectorVersion, error) {
 	results, err := s.db.GetConnectorVersions(ctx, requested)
 	if err != nil {
 		return nil, err
@@ -44,7 +44,7 @@ func (s *service) GetConnectorVersions(ctx context.Context, requested []iface.Co
 		return nil, nil
 	}
 
-	wrappedResults := make(map[iface.ConnectorVersionId]iface.ConnectorVersion, len(results))
+	wrappedResults := make(map[iface.ConnectorVersionId]*ConnectorVersion, len(results))
 	for id, cv := range results {
 		tmp := wrapConnectorVersion(*cv, s)
 
@@ -55,6 +55,20 @@ func (s *service) GetConnectorVersions(ctx context.Context, requested []iface.Co
 		}
 
 		wrappedResults[id] = tmp
+	}
+
+	return wrappedResults, nil
+}
+
+func (s *service) GetConnectorVersions(ctx context.Context, requested []iface.ConnectorVersionId) (map[iface.ConnectorVersionId]iface.ConnectorVersion, error) {
+	results, err := s.getConnectorVersions(ctx, requested)
+	if err != nil {
+		return nil, err
+	}
+
+	wrappedResults := make(map[iface.ConnectorVersionId]iface.ConnectorVersion, len(results))
+	for k, v := range results {
+		wrappedResults[k] = v
 	}
 
 	return wrappedResults, nil
@@ -98,28 +112,5 @@ func (s *service) getConnectionForDb(ctx context.Context, dbConn *database.Conne
 		return nil, errors.Wrap(err, "failed to get connector for connection")
 	}
 
-	return newConnection(dbConn, s, cv), nil
-}
-func (s *service) getConnection(ctx context.Context, id uuid.UUID) (*connection, error) {
-	logger := aplog.NewBuilder(s.logger).
-		WithConnectionId(id).
-		Build()
-
-	logger.Debug("getting connection")
-	dbConn, err := s.db.GetConnection(ctx, id)
-	if err != nil {
-		if errors.Is(database.ErrNotFound, err) {
-			logger.Info("connection not found", "error", err)
-			return nil, iface.ErrConnectionNotFound
-		}
-
-		logger.Error("failed to get connection", "error", err)
-		return nil, err
-	}
-
-	return s.getConnectionForDb(ctx, dbConn)
-}
-
-func (s *service) GetConnection(ctx context.Context, id uuid.UUID) (iface.Connection, error) {
-	return s.getConnection(ctx, id)
+	return wrapConnection(dbConn, cv, s), nil
 }

@@ -16,9 +16,8 @@ import (
 
 func (o *oAuth2Connection) newHttpClient(rt request_log.RequestType) *gentleman.Client {
 	return o.httpf.
-		ForRequestType(request_log.RequestType(rt)).
-		ForConnection(&o.connection).
-		ForConnectorVersion(o.cv).
+		ForRequestType(rt).
+		ForConnection(o.connection).
 		New()
 }
 
@@ -38,7 +37,7 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 	defer m.Unlock(ctx)
 
 	// Get the latest token to make sure we still need to refresh
-	token, err = o.db.GetOAuth2Token(ctx, o.connection.ID)
+	token, err = o.db.GetOAuth2Token(ctx, o.connection.GetID())
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +98,7 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 }
 
 func (o *oAuth2Connection) getValidToken(ctx context.Context) (*database.OAuth2Token, error) {
-	token, err := o.db.GetOAuth2Token(ctx, o.connection.ID)
+	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetID())
 	if err != nil {
 		if errors.Is(database.ErrNotFound, err) {
 			return nil, api_common.

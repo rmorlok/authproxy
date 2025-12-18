@@ -6,11 +6,12 @@ import (
 	"crypto/cipher"
 	"crypto/rand"
 	"encoding/base64"
+	"io"
+	"sync"
+
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
-	"io"
-	"sync"
 )
 
 type service struct {
@@ -95,11 +96,11 @@ func (s *service) EncryptGlobal(ctx context.Context, data []byte) ([]byte, error
 	return encryptedData, nil
 }
 
-func (s *service) EncryptForConnection(ctx context.Context, connection database.Connection, data []byte) ([]byte, error) {
+func (s *service) EncryptForConnection(ctx context.Context, connection Connection, data []byte) ([]byte, error) {
 	return s.EncryptGlobal(ctx, data)
 }
 
-func (s *service) EncryptForConnector(ctx context.Context, connection database.ConnectorVersion, data []byte) ([]byte, error) {
+func (s *service) EncryptForConnector(ctx context.Context, connection ConnectorVersion, data []byte) ([]byte, error) {
 	return s.EncryptGlobal(ctx, data)
 }
 
@@ -133,11 +134,11 @@ func (s *service) DecryptGlobal(ctx context.Context, data []byte) ([]byte, error
 	return decryptedData, nil
 }
 
-func (s *service) DecryptForConnection(ctx context.Context, connection database.Connection, data []byte) ([]byte, error) {
+func (s *service) DecryptForConnection(ctx context.Context, connection Connection, data []byte) ([]byte, error) {
 	return s.DecryptGlobal(ctx, data)
 }
 
-func (s *service) DecryptForConnector(ctx context.Context, cv database.ConnectorVersion, data []byte) ([]byte, error) {
+func (s *service) DecryptForConnector(ctx context.Context, cv ConnectorVersion, data []byte) ([]byte, error) {
 	return s.DecryptGlobal(ctx, data)
 }
 
@@ -151,7 +152,7 @@ func (s *service) EncryptStringGlobal(ctx context.Context, data string) (string,
 	return encodedData, nil
 }
 
-func (s *service) EncryptStringForConnection(ctx context.Context, connection database.Connection, data string) (string, error) {
+func (s *service) EncryptStringForConnection(ctx context.Context, connection Connection, data string) (string, error) {
 	encryptedData, err := s.EncryptForConnection(ctx, connection, []byte(data))
 	if err != nil {
 		return "", err
@@ -161,7 +162,7 @@ func (s *service) EncryptStringForConnection(ctx context.Context, connection dat
 	return encodedData, nil
 }
 
-func (s *service) EncryptStringForConnector(ctx context.Context, cv database.ConnectorVersion, data string) (string, error) {
+func (s *service) EncryptStringForConnector(ctx context.Context, cv ConnectorVersion, data string) (string, error) {
 	encryptedData, err := s.EncryptForConnector(ctx, cv, []byte(data))
 	if err != nil {
 		return "", err
@@ -185,7 +186,7 @@ func (s *service) DecryptStringGlobal(ctx context.Context, base64Data string) (s
 	return string(decryptedData), nil
 }
 
-func (s *service) DecryptStringForConnection(ctx context.Context, connection database.Connection, base64Data string) (string, error) {
+func (s *service) DecryptStringForConnection(ctx context.Context, connection Connection, base64Data string) (string, error) {
 	decodedData, err := base64.StdEncoding.DecodeString(base64Data)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to decode base64 string")
@@ -199,7 +200,7 @@ func (s *service) DecryptStringForConnection(ctx context.Context, connection dat
 	return string(decryptedData), nil
 }
 
-func (s *service) DecryptStringForConnector(ctx context.Context, cv database.ConnectorVersion, base64Data string) (string, error) {
+func (s *service) DecryptStringForConnector(ctx context.Context, cv ConnectorVersion, base64Data string) (string, error) {
 	decodedData, err := base64.StdEncoding.DecodeString(base64Data)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to decode base64 string")

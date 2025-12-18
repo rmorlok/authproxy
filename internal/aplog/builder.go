@@ -15,6 +15,8 @@ type Builder interface {
 	WithCtx(ctx context.Context) Builder
 	WithConnectionId(connectionId uuid.UUID) Builder
 	WithConnectorId(connectionId uuid.UUID) Builder
+	WithConnectorVersion(version uint64) Builder
+	WithNamespace(path string) Builder
 	With(args ...any) Builder
 	Build() *slog.Logger
 }
@@ -60,6 +62,14 @@ func (b *builder) WithConnectionId(connectionId uuid.UUID) Builder {
 
 func (b *builder) WithConnectorId(connectorId uuid.UUID) Builder {
 	return &builder{l: b.l.With("connector_id", connectorId.String())}
+}
+
+func (b *builder) WithNamespace(path string) Builder {
+	return &builder{l: b.l.With("namespace", path)}
+}
+
+func (b *builder) WithConnectorVersion(version uint64) Builder {
+	return &builder{l: b.l.With("connector_version", version)}
 }
 
 func (b *builder) Build() *slog.Logger {

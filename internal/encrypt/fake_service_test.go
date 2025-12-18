@@ -58,22 +58,22 @@ func TestFakeService(t *testing.T) {
 					require.Equal(t, someString, decrypted)
 				})
 				t.Run("roundtrip connection", func(t *testing.T) {
-					encryptedBase64, err := s.EncryptStringForConnection(context.Background(), connection, someString)
+					encryptedBase64, err := s.EncryptStringForConnection(context.Background(), &connection, someString)
 					require.NoError(t, err)
 					require.NotEmpty(t, encryptedBase64)
 					require.NotEqual(t, someString, encryptedBase64)
 
-					decrypted, err := s.DecryptStringForConnection(context.Background(), connection, encryptedBase64)
+					decrypted, err := s.DecryptStringForConnection(context.Background(), &connection, encryptedBase64)
 					require.NoError(t, err)
 					require.Equal(t, someString, decrypted)
 				})
 				t.Run("roundtrip connector", func(t *testing.T) {
-					encryptedBase64, err := s.EncryptStringForConnector(context.Background(), connectorVersion, someString)
+					encryptedBase64, err := s.EncryptStringForConnector(context.Background(), &connectorVersion, someString)
 					require.NoError(t, err)
 					require.NotEmpty(t, encryptedBase64)
 					require.NotEqual(t, someString, encryptedBase64)
 
-					decrypted, err := s.DecryptStringForConnector(context.Background(), connectorVersion, encryptedBase64)
+					decrypted, err := s.DecryptStringForConnector(context.Background(), &connectorVersion, encryptedBase64)
 					require.NoError(t, err)
 					require.Equal(t, someString, decrypted)
 				})
@@ -91,22 +91,22 @@ func TestFakeService(t *testing.T) {
 					require.Equal(t, someBytes, decrypted)
 				})
 				t.Run("roundtrip connection", func(t *testing.T) {
-					encryptedBytes, err := s.EncryptForConnection(context.Background(), connection, someBytes)
+					encryptedBytes, err := s.EncryptForConnection(context.Background(), &connection, someBytes)
 					require.NoError(t, err)
 					require.NotEmpty(t, encryptedBytes)
 					require.NotEqual(t, someBytes, encryptedBytes)
 
-					decrypted, err := s.DecryptForConnection(context.Background(), connection, encryptedBytes)
+					decrypted, err := s.DecryptForConnection(context.Background(), &connection, encryptedBytes)
 					require.NoError(t, err)
 					require.Equal(t, someBytes, decrypted)
 				})
 				t.Run("roundtrip connector", func(t *testing.T) {
-					encryptedBytes, err := s.EncryptForConnector(context.Background(), connectorVersion, someBytes)
+					encryptedBytes, err := s.EncryptForConnector(context.Background(), &connectorVersion, someBytes)
 					require.NoError(t, err)
 					require.NotEmpty(t, encryptedBytes)
 					require.NotEqual(t, someBytes, encryptedBytes)
 
-					decrypted, err := s.DecryptForConnector(context.Background(), connectorVersion, encryptedBytes)
+					decrypted, err := s.DecryptForConnector(context.Background(), &connectorVersion, encryptedBytes)
 					require.NoError(t, err)
 					require.Equal(t, someBytes, decrypted)
 				})

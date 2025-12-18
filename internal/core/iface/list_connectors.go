@@ -8,10 +8,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-/*
- * These interfaces wrap the database equivalents so this service can provide decryption and potentially caching.
- */
-
 type ListConnectorsExecutor interface {
 	FetchPage(context.Context) pagination.PageResult[Connector]
 	Enumerate(context.Context, func(pagination.PageResult[Connector]) (keepGoing bool, err error)) error

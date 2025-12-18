@@ -3,7 +3,9 @@ package core
 import (
 	"log/slog"
 	"sync"
+	"time"
 
+	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -23,14 +25,59 @@ type connection struct {
 	proxyImplErr  error
 }
 
-func newConnection(c *database.Connection, s *service, cv *ConnectorVersion) *connection {
+func wrapConnection(c *database.Connection, cv *ConnectorVersion, s *service) *connection {
 	return &connection{
 		Connection: *c,
 		s:          s,
 		cv:         cv,
 		logger: aplog.NewBuilder(s.logger).
+			WithNamespace(c.Namespace).
 			WithConnectionId(c.ID).
 			WithConnectorId(cv.ID).
+			WithConnectorVersion(cv.Version).
 			Build(),
 	}
 }
+
+func (c *connection) GetID() uuid.UUID {
+	return c.ID
+}
+
+func (c *connection) GetNamespace() string {
+	return c.Namespace
+}
+
+func (c *connection) GetState() database.ConnectionState {
+	return c.State
+}
+
+func (c *connection) GetConnectorId() uuid.UUID {
+	return c.ConnectorId
+}
+
+func (c *connection) GetConnectorVersion() uint64 {
+	return c.ConnectorVersion
+}
+
+func (c *connection) GetCreatedAt() time.Time {
+	return c.CreatedAt
+}
+
+func (c *connection) GetUpdatedAt() time.Time {
+	return c.UpdatedAt
+}
+
+func (c *connection) GetDeletedAt() *time.Time {
+	return c.DeletedAt
+}
+
+func (c *connection) GetConnectorVersionEntity() iface.ConnectorVersion {
+	return c.cv
+}
+
+func (c *connection) Logger() *slog.Logger {
+	return c.logger
+}
+
+var _ iface.Connection = (*connection)(nil)
+var _ aplog.HasLogger = (*connection)(nil)

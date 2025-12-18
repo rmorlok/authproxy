@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/aplog"
 	cfg "github.com/rmorlok/authproxy/internal/config/connectors"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 )
@@ -29,6 +30,10 @@ func (p *probeBase) IsPeriodic() bool {
 
 func (p *probeBase) GetId() string {
 	return p.cfg.Id
+}
+
+func (p *probeBase) Logger() *slog.Logger {
+	return p.logger
 }
 
 func (p *probeBase) GetScheduleString() string {
@@ -69,11 +74,17 @@ func (p *probeBase) recordInvokeOutcome(
 
 func NewProbe(cfg *cfg.Probe, s *service, cv *ConnectorVersion, c *connection) iface.Probe {
 	base := probeBase{
-		cfg:    cfg,
-		s:      s,
-		cv:     cv,
-		c:      c,
-		logger: c.logger.With("probe_id", cfg.Id),
+		cfg: cfg,
+		s:   s,
+		cv:  cv,
+		c:   c,
+		logger: aplog.NewBuilder(s.logger).
+			With("probe_id", cfg.Id).
+			WithNamespace(c.Namespace).
+			WithConnectionId(c.ID).
+			WithConnectorId(cv.ID).
+			WithConnectorVersion(cv.Version).
+			Build(),
 	}
 
 	if cfg.Http != nil || cfg.ProxyHttp != nil {
@@ -84,3 +95,5 @@ func NewProbe(cfg *cfg.Probe, s *service, cv *ConnectorVersion, c *connection) i
 		return &probeNoOp{base}
 	}
 }
+
+var _ aplog.HasLogger = (*probeBase)(nil)
