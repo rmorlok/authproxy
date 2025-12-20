@@ -1,10 +1,8 @@
 package jwt
 
 import (
-	"context"
 	"encoding/hex"
 	"fmt"
-	"github.com/rmorlok/authproxy/internal/apctx"
 	"hash"
 	"hash/crc64"
 	"io"
@@ -13,17 +11,6 @@ import (
 
 var reValidSha = regexp.MustCompile("^[a-fA-F0-9]{40}$")
 var reValidCrc64 = regexp.MustCompile("^[a-fA-F0-9]{16}$")
-
-const (
-	adminAttr      = "admin"       // predefined attribute key for bool isAdmin status
-	superAdminAttr = "super_admin" // predefined attribute key for bool isAdmin status
-)
-
-type contextKey string
-
-const (
-	actorContextKey contextKey = "actor"
-)
 
 // Actor is the information that identifies who is making a request. This can be a actor in the calling
 // system, an admin from the calling system, a devops admin from the cli, etc.
@@ -126,35 +113,6 @@ func (a *Actor) SetRole(role string) {
 // GetRole gets actor role
 func (a *Actor) GetRole() string {
 	return a.Role
-}
-
-// ContextWith sets actor in the context
-func (a *Actor) ContextWith(ctx context.Context) context.Context {
-	return context.WithValue(ctx, actorContextKey, a)
-}
-
-// MustGetActorFromContext always returns an actor, or panics if an actor is not present on the context.
-func MustGetActorFromContext(ctx context.Context) Actor {
-	a := GetActorFromContext(ctx)
-	if a == nil {
-		panic("actor not present on context")
-	}
-
-	return *a
-}
-
-// SetActorInContext sets the actor on the context. This is just an alias for the context.With method.
-func SetActorInContext(ctx context.Context, actor *Actor) context.Context {
-	return apctx.NewBuilder(ctx).With(actor).Build()
-}
-
-// GetActorFromContext gets an actor from the context, or returns nil if one is not present
-func GetActorFromContext(ctx context.Context) *Actor {
-	if a, ok := ctx.Value(actorContextKey).(*Actor); ok {
-		return a
-	}
-
-	return nil
 }
 
 // HashID tries to hash val with hash.Hash and fallback to crc if needed
