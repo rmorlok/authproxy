@@ -72,12 +72,14 @@ type C interface {
 
 	// CreateConnection creates a new connection.
 	CreateConnection(ctx context.Context, namespace string, cv ConnectorVersion) (Connection, error)
-	
+
 	// ListConnectionsBuilder returns a builder to allow the caller to list connections matching certain criteria.
 	ListConnectionsBuilder() ListConnectionsBuilder
 
 	// ListConnectionsFromCursor continues listing connections from a cursor to support pagination.
 	ListConnectionsFromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error)
+
+	InitiateConnection(ctx context.Context, req InitiateConnectionRequest) (InitiateConnectionResponse, error)
 
 	/*
 	 *

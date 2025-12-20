@@ -1,18 +1,14 @@
 package routes
 
 import (
-	"fmt"
-
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
-	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/auth"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/config"
-	"github.com/rmorlok/authproxy/internal/config/common"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
@@ -36,62 +32,6 @@ type ConnectionsRoutes struct {
 	oauthf  oauth2.Factory
 }
 
-type InitiateConnectionRequest struct {
-	// Id of the connector to initiate the connector for
-	ConnectorId uuid.UUID `json:"connector_id"`
-
-	// Version of the connector to initiate connection for; if not specified defaults to primary version.
-	ConnectorVersion uint64 `json:"connector_version,omitempty"`
-
-	// The namespace to create the connection in. Must be the namespace of connector or a child namespace of that
-	// namespace. Defaults to the connector namespace if not specified.
-	IntoNamespace string `json:"into_namespace,omitempty"`
-
-	// The URL to return to after connection is completed.
-	ReturnToUrl string `json:"return_to_url"`
-}
-
-func (icr *InitiateConnectionRequest) Validate() error {
-	result := &multierror.Error{}
-
-	if icr.ConnectorId == uuid.Nil {
-		result = multierror.Append(result, fmt.Errorf("connector_id is required"))
-	}
-
-	if icr.HasIntoNamespace() {
-		if err := common.ValidateNamespacePath(icr.IntoNamespace); err != nil {
-			result = multierror.Append(result, err)
-		}
-	}
-
-	return result.ErrorOrNil()
-}
-
-func (icr *InitiateConnectionRequest) HasVersion() bool {
-	return icr.ConnectorVersion > 0
-}
-
-func (icr *InitiateConnectionRequest) HasIntoNamespace() bool {
-	return icr.IntoNamespace != ""
-}
-
-type InitiateConnectionResponseType string
-
-const (
-	PreconnectionResponseTypeRedirect InitiateConnectionResponseType = "redirect"
-)
-
-type InitiateConnectionResponse struct {
-	Id   uuid.UUID                      `json:"id"`
-	Type InitiateConnectionResponseType `json:"type"`
-}
-
-type InitiateConnectionRedirect struct {
-	// Type must be PreconnectionResponseTypeRedirect
-	InitiateConnectionResponse
-	RedirectUrl string `json:"redirect_url"`
-}
-
 func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 
@@ -105,7 +45,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 		return
 	}
 
-	var req InitiateConnectionRequest
+	var req coreIface.InitiateConnectionRequest
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
@@ -115,25 +55,9 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 		return
 	}
 
-	if err := req.Validate(); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
-		return
-	}
-
-	var err error
-	var cv coreIface.ConnectorVersion
-	if req.HasVersion() {
-		cv, err = r.core.GetConnectorVersion(ctx, req.ConnectorId, req.ConnectorVersion)
-	} else {
-		cv, err = r.core.GetConnectorVersionForState(ctx, req.ConnectorId, database.ConnectorVersionStatePrimary)
-	}
-
+	resp, err := r.core.InitiateConnection(ctx, req)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
+		api_common.HttpStatusErrorBuilderFromError(err).
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
@@ -141,95 +65,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 		return
 	}
 
-	if cv == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsgf("connector '%s' not found", req.ConnectorId).
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
-		return
-	}
-
-	targetNamespace := cv.GetNamespace()
-	if req.HasIntoNamespace() {
-		targetNamespace = req.IntoNamespace
-	}
-
-	if err := common.ValidateNamespacePath(targetNamespace); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsgf("invalid namespace '%s'", targetNamespace).
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
-		return
-	}
-
-	if !common.NamespaceIsSameOrChild(cv.GetNamespace(), targetNamespace) {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsgf("target namespace '%s' is not a child of the connector's namespace '%s'", targetNamespace, cv.GetNamespace()).
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
-		return
-	}
-
-	_, err = r.core.EnsureNamespaceAncestorPath(ctx, targetNamespace)
-	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
-		return
-	}
-
-	connection, err := r.core.CreateConnection(ctx, targetNamespace, cv)
-	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
-	}
-
-	connector := cv.GetDefinition()
-	if _, ok := connector.Auth.Inner().(*config.AuthOAuth2); ok {
-		if req.ReturnToUrl == "" {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithResponseMsg("must specify return_to_url").
-				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
-			return
-		}
-
-		o2 := r.oauthf.NewOAuth2(connection)
-		url, err := o2.SetStateAndGeneratePublicUrl(ctx, ra.MustGetActor(), req.ReturnToUrl)
-		if err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
-			return
-		}
-
-		gctx.PureJSON(http.StatusOK, InitiateConnectionRedirect{
-			InitiateConnectionResponse: InitiateConnectionResponse{
-				Id:   connection.GetID(),
-				Type: PreconnectionResponseTypeRedirect,
-			},
-			RedirectUrl: url,
-		})
-		return
-	}
-
-	api_common.NewHttpStatusErrorBuilder().
-		WithStatusInternalServerError().
-		WithResponseMsg("unsupported connector auth type").
-		BuildStatusError().
-		WriteGinResponse(r.cfg, gctx)
+	gctx.PureJSON(http.StatusOK, resp)
 }
 
 type ConnectionJson struct {
