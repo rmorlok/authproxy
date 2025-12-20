@@ -17,15 +17,22 @@ func GetAuthFromGinContext(c *gin.Context) RequestAuth {
 		return nil
 	}
 
-	if a, ok := c.Get(authContextKey); ok {
-		return a.(RequestAuth)
-	}
-
 	if c.Request == nil {
 		return NewUnauthenticatedRequestAuth()
 	}
 
 	return GetAuthFromContext(c.Request.Context())
+}
+
+// ApplyAuthToGinContext applies the auth info to the request context.
+func ApplyAuthToGinContext(c *gin.Context, ra RequestAuth) {
+	if c == nil || c.Request == nil {
+		return
+	}
+
+	ctx := c.Request.Context()
+	ctx = ra.ContextWith(ctx)
+	c.Request = c.Request.WithContext(ctx)
 }
 
 // MustGetAuthFromGinContext returns an authenticated request info. If the request is not authenticated, this
@@ -55,7 +62,7 @@ func (j *service) Required(validators ...ActorValidator) gin.HandlerFunc {
 				return
 			}
 
-			c.Set(authContextKey, a)
+			ApplyAuthToGinContext(c, a)
 			c.Next()
 		})
 		j.Auth(_next, c.Abort, validators...).ServeHTTP(c.Writer, c.Request)
@@ -69,7 +76,7 @@ func (j *service) Optional(validators ...ActorValidator) gin.HandlerFunc {
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			a := GetAuthFromRequest(r)
 			if a.IsAuthenticated() {
-				c.Set(authContextKey, a)
+				ApplyAuthToGinContext(c, a)
 			}
 
 			c.Next()
@@ -86,7 +93,7 @@ func (j *service) OptionalXsrfNotRequired(validators ...ActorValidator) gin.Hand
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			a := GetAuthFromRequest(r)
 			if a.IsAuthenticated() {
-				c.Set(authContextKey, a)
+				ApplyAuthToGinContext(c, a)
 			}
 
 			c.Next()

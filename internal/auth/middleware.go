@@ -23,7 +23,6 @@ func MustGetAuthFromRequest(r *http.Request) RequestAuth {
 // GetAuthFromRequest returns auth info for the request. If the request is unauthenticated, it will return
 // a value indicating not authenticated.
 func GetAuthFromRequest(r *http.Request) RequestAuth {
-
 	ctx := r.Context()
 	if ctx == nil {
 		return NewUnauthenticatedRequestAuth()
