@@ -19,45 +19,7 @@ type Actor struct {
 	ID         string `json:"id"`
 	Admin      bool   `json:"admin,omitempty"`
 	SuperAdmin bool   `json:"super_admin,omitempty"`
-	// set by client
-	IP         string                 `json:"ip,omitempty"`
-	Email      string                 `json:"email,omitempty"`
-	Attributes map[string]interface{} `json:"attrs,omitempty"`
-	Role       string                 `json:"role,omitempty"`
-}
-
-// SetBoolAttr sets boolean attribute
-func (a *Actor) SetBoolAttr(key string, val bool) {
-	if a.Attributes == nil {
-		a.Attributes = map[string]interface{}{}
-	}
-	a.Attributes[key] = val
-}
-
-// SetStrAttr sets string attribute
-func (a *Actor) SetStrAttr(key, val string) {
-	if a.Attributes == nil {
-		a.Attributes = map[string]interface{}{}
-	}
-	a.Attributes[key] = val
-}
-
-// BoolAttr gets boolean attribute
-func (a *Actor) BoolAttr(key string) bool {
-	r, ok := a.Attributes[key].(bool)
-	if !ok {
-		return false
-	}
-	return r
-}
-
-// StrAttr gets string attribute
-func (a *Actor) StrAttr(key string) string {
-	r, ok := a.Attributes[key].(string)
-	if !ok {
-		return ""
-	}
-	return r
+	Email      string `json:"email,omitempty"`
 }
 
 // IsAdmin is a helper to wrap the Admin attribute
@@ -86,33 +48,6 @@ func (a *Actor) IsNormalActor() bool {
 	}
 
 	return !a.IsSuperAdmin() && !a.IsAdmin()
-}
-
-// SliceAttr gets slice attribute
-func (a *Actor) SliceAttr(key string) []string {
-	r, ok := a.Attributes[key].([]string)
-	if !ok {
-		return []string{}
-	}
-	return r
-}
-
-// SetSliceAttr sets slice attribute for given key
-func (a *Actor) SetSliceAttr(key string, val []string) {
-	if a.Attributes == nil {
-		a.Attributes = map[string]interface{}{}
-	}
-	a.Attributes[key] = val
-}
-
-// SetRole sets actor role for RBAC
-func (a *Actor) SetRole(role string) {
-	a.Role = role
-}
-
-// GetRole gets actor role
-func (a *Actor) GetRole() string {
-	return a.Role
 }
 
 // HashID tries to hash val with hash.Hash and fallback to crc if needed

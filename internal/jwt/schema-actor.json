@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/jwt/schema-actor.json",
+  "properties": {
+    "id": {
+      "type": "string",
+      "description": "Unique identifier for the actor. Required. This value should generally be the ID of the actor in the host system (e.g. user ID in a database)."
+    },
+    "admin": {
+      "type": "boolean",
+      "description": "Whether the actor is an admin. Optional. Defaults to false."
+    },
+    "super_admin": {
+      "type": "boolean",
+      "description": "Whether the actor is a super admin. Optional. Defaults to false."
+    },
+    "email": {
+      "type": "string",
+      "description": "The email address of the actor. Optional."
+    },
+    "permissions": {
+      "type": "array",
+      "description": "A list of permissions that the actor has. Required."
+    }
+  },
+  "additionalProperties": false,
+  "type": "object"
+}

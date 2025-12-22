@@ -53,7 +53,6 @@ func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 
 		Actor: &jwt2.Actor{
 			ID:    "id1",
-			IP:    "127.0.0.1",
 			Email: "me@example.com",
 		},
 	}
@@ -112,7 +111,6 @@ func TestAuth_RoundtripPublicPrivate(t *testing.T) {
 
 		Actor: &jwt2.Actor{
 			ID:    "id1",
-			IP:    "127.0.0.1",
 			Email: "me@example.com",
 		},
 	}
@@ -149,7 +147,6 @@ func TestAuth_SecretKey(t *testing.T) {
 
 		Actor: &jwt2.Actor{
 			ID:    "id7",
-			IP:    "127.0.0.1",
 			Email: "me@example.com",
 		},
 	}
@@ -201,7 +198,6 @@ func TestAuth_Parse(t *testing.T) {
 
 			Actor: &jwt2.Actor{
 				ID:    "id1",
-				IP:    "127.0.0.1",
 				Email: "me@example.com",
 			},
 		}
@@ -231,7 +227,6 @@ func TestAuth_Parse(t *testing.T) {
 
 			Actor: &jwt2.Actor{
 				ID:    "id1",
-				IP:    "127.0.0.1",
 				Email: "me@example.com",
 			},
 		}
@@ -683,7 +678,6 @@ func testClaims() *jwt2.AuthProxyClaims {
 
 		Actor: &jwt2.Actor{
 			ID:    "id1",
-			IP:    "127.0.0.1",
 			Email: "me@example.com",
 		},
 	}

@@ -52,36 +52,8 @@ func TestActor(t *testing.T) {
 			assert.Equal(t, tt.hash, HashID(hh, tt.id), "case #%d", i)
 		}
 	})
-	t.Run("Attrs", func(t *testing.T) {
-		u := Actor{IP: "127.0.0.1"}
-
-		u.SetBoolAttr("k1", true)
-		v := u.BoolAttr("k1")
-		assert.True(t, v)
-
-		u.SetBoolAttr("k1", false)
-		v = u.BoolAttr("k1")
-		assert.False(t, v)
-		err := u.StrAttr("k1")
-		assert.NotNil(t, err)
-
-		u.SetStrAttr("k2", "v2")
-		vs := u.StrAttr("k2")
-		assert.Equal(t, "v2", vs)
-
-		u.SetStrAttr("k2", "v22")
-		vs = u.StrAttr("k2")
-		assert.Equal(t, "v22", vs)
-
-		vb := u.BoolAttr("k2")
-		assert.False(t, vb)
-
-		u.SetSliceAttr("ks", []string{"ss1", "ss2", "blah"})
-		assert.Equal(t, []string{"ss1", "ss2", "blah"}, u.SliceAttr("ks"))
-		assert.Equal(t, []string{}, u.SliceAttr("k2"), "not a slice")
-	})
 	t.Run("IsAdmin", func(t *testing.T) {
-		u := Actor{IP: "127.0.0.1"}
+		u := Actor{}
 		assert.False(t, u.IsAdmin())
 		u.Admin = true
 		assert.True(t, u.IsAdmin())
@@ -92,7 +64,7 @@ func TestActor(t *testing.T) {
 		assert.False(t, nila.IsAdmin())
 	})
 	t.Run("IsSuperAdmin", func(t *testing.T) {
-		u := Actor{IP: "127.0.0.1"}
+		u := Actor{}
 		assert.False(t, u.IsSuperAdmin())
 		u.SuperAdmin = true
 		assert.True(t, u.IsSuperAdmin())
@@ -103,7 +75,7 @@ func TestActor(t *testing.T) {
 		assert.False(t, nila.IsSuperAdmin())
 	})
 	t.Run("IsNormalActor", func(t *testing.T) {
-		u := Actor{IP: "127.0.0.1"}
+		u := Actor{}
 		assert.True(t, u.IsNormalActor())
 		u.SuperAdmin = true
 		assert.False(t, u.IsNormalActor())

@@ -1,0 +1,19 @@
+{
+  "iss": "host-system",
+  "sub": "user/12345",
+  "aud": [
+    "api",
+    "admin-api"
+  ],
+  "exp": 1735689600,
+  "nbf": 1735603200,
+  "iat": 1735603200,
+  "jti": "550e8400-e29b-41d4-a716-446655440000",
+  "actor": {
+    "id": "user/12345",
+    "permissions": [
+      "root.prod.actor-1234#/connections/_initiate",
+      "root.prod.**#/connections/_list"
+    ]
+  }
+}

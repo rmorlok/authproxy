@@ -1,6 +1,11 @@
 package auth
 
 import (
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/rmorlok/authproxy/internal/apctx"
@@ -8,10 +13,6 @@ import (
 	jwt2 "github.com/rmorlok/authproxy/internal/jwt"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-	"time"
 )
 
 func TestAuth_Gin(t *testing.T) {
@@ -32,7 +33,6 @@ func TestAuth_Gin(t *testing.T) {
 
 			Actor: &jwt2.Actor{
 				ID:    "id1",
-				IP:    "127.0.0.1",
 				Email: "me@example.com",
 			},
 		}
@@ -52,7 +52,6 @@ func TestAuth_Gin(t *testing.T) {
 
 			Actor: &jwt2.Actor{
 				ID:    "admin/aid1",
-				IP:    "127.0.0.1",
 				Email: "me@example.com",
 				Admin: true,
 			},

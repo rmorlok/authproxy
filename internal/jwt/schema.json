@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/jwt/schema.json",
+  "title": "Auth Proxy JWT Payload Schema",
+  "type": "object",
+  "properties": {
+    "iss": {
+      "type": "string",
+      "description": "Issuer of the token. Required. The system that is generating/signing the JWT"
+    },
+    "sub": {
+      "type": "string",
+      "description": "Subject of the token. Required. This value is the id of the actor taking the action. If actor is specified in this JWT, this value must match the actor's id."
+    },
+    "aud": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      ],
+      "description": "Audience of the token. Required. Can be a single string or an array of strings. Must be the name of the auth proxy service or services this token is valid for. Possible values: api, admin-api, public"
+    },
+    "exp": {
+      "type": "integer",
+      "description": "Unix timestamp of when the token expires. Required if nonce is present."
+    },
+    "nbf": {
+      "type": "integer",
+      "description": "Not before timestamp. Optional."
+    },
+    "iat": {
+      "type": "integer",
+      "description": "Issued at timestamp. Optional."
+    },
+    "jti": {
+      "type": "string",
+      "description": "JWT ID. Optional. Not used by Auth Proxy."
+    },
+    "actor": { "$ref": "schema-actor.json" }
+  },
+  "additionalProperties": true
+}
