@@ -38,6 +38,16 @@ func TestActor(t *testing.T) {
 		}).validate())
 		require.Error(t, util.ToPtr(Actor{}).validate())
 	})
+	t.Run("Normalize", func(t *testing.T) {
+		// It sorts permissions
+		a := &Actor{
+			ID:          uuid.New(),
+			ExternalId:  "1234567890",
+			Permissions: Permissions{"c", "a", "b"},
+		}
+		a.normalize()
+		require.Equal(t, Permissions{"a", "b", "c"}, a.Permissions)
+	})
 	t.Run("GetActor", func(t *testing.T) {
 		setup(t)
 
@@ -105,15 +115,17 @@ func TestActor(t *testing.T) {
 
 			id := uuid.New()
 			actor := &Actor{
-				ID:         id,
-				ExternalId: id.String(),
-				Email:      "bobdole@example.com",
+				ID:          id,
+				ExternalId:  id.String(),
+				Email:       "bobdole@example.com",
+				Permissions: []string{"read", "write"},
 			}
 			require.NoError(t, db.CreateActor(ctx, actor))
 
 			a, err := db.GetActor(ctx, id)
 			require.NoError(t, err)
 			require.Equal(t, actor.Email, a.Email)
+			require.Equal(t, actor.Permissions, a.Permissions)
 		})
 		t.Run("validates", func(t *testing.T) {
 			setup(t)
@@ -181,35 +193,88 @@ func TestActor(t *testing.T) {
 		})
 
 		t.Run("updates existing", func(t *testing.T) {
-			setup(t)
+			t.Run("email", func(t *testing.T) {
+				setup(t)
 
-			id := uuid.New()
-			externalId := "bobdole"
-			err := db.CreateActor(ctx, &Actor{
-				ID:         id,
-				ExternalId: externalId,
-				Email:      "bobdole@example.com",
+				id := uuid.New()
+				externalId := "bobdole"
+				err := db.CreateActor(ctx, &Actor{
+					ID:         id,
+					ExternalId: externalId,
+					Email:      "bobdole@example.com",
+				})
+				require.NoError(t, err)
+
+				retrieved, err := db.GetActorByExternalId(ctx, externalId)
+				require.NoError(t, err)
+				require.Equal(t, id, retrieved.ID)
+				require.Equal(t, "bobdole@example.com", retrieved.Email)
+
+				actor, err := db.UpsertActor(ctx, &jwt.Actor{
+					ID:    externalId,
+					Email: "thomasjefferson@example.com",
+				})
+				require.NoError(t, err)
+				require.Equal(t, externalId, actor.ExternalId)
+				require.Equal(t, id, actor.ID)
+				require.Equal(t, "thomasjefferson@example.com", actor.Email)
+
+				retrieved, err = db.GetActorByExternalId(ctx, externalId)
+				require.NoError(t, err)
+				require.Equal(t, id, retrieved.ID)
+				require.Equal(t, "thomasjefferson@example.com", retrieved.Email)
 			})
-			require.NoError(t, err)
+			t.Run("permissions", func(t *testing.T) {
+				setup(t)
 
-			retrieved, err := db.GetActorByExternalId(ctx, externalId)
-			require.NoError(t, err)
-			require.Equal(t, id, retrieved.ID)
-			require.Equal(t, "bobdole@example.com", retrieved.Email)
+				id := uuid.New()
+				externalId := "bobdole"
+				err := db.CreateActor(ctx, &Actor{
+					ID:         id,
+					ExternalId: externalId,
+					Email:      "bobdole@example.com",
+					Permissions: Permissions{
+						"read",
+						"write",
+					},
+				})
+				require.NoError(t, err)
 
-			actor, err := db.UpsertActor(ctx, &jwt.Actor{
-				ID:    externalId,
-				Email: "thomasjefferson@example.com",
+				retrieved, err := db.GetActorByExternalId(ctx, externalId)
+				require.NoError(t, err)
+				require.Equal(t, id, retrieved.ID)
+				require.Equal(t, Permissions{
+					"read",
+					"write",
+				}, retrieved.Permissions)
+
+				actor, err := db.UpsertActor(ctx, &jwt.Actor{
+					ID:    externalId,
+					Email: "bobdole@example.com",
+					Permissions: []string{
+						"execute",
+						"read",
+						"write",
+					},
+				})
+				require.NoError(t, err)
+				require.Equal(t, externalId, actor.ExternalId)
+				require.Equal(t, id, actor.ID)
+				require.Equal(t, Permissions{
+					"execute",
+					"read",
+					"write",
+				}, actor.Permissions)
+
+				retrieved, err = db.GetActorByExternalId(ctx, externalId)
+				require.NoError(t, err)
+				require.Equal(t, id, retrieved.ID)
+				require.Equal(t, Permissions{
+					"execute",
+					"read",
+					"write",
+				}, retrieved.Permissions)
 			})
-			require.NoError(t, err)
-			require.Equal(t, externalId, actor.ExternalId)
-			require.Equal(t, id, actor.ID)
-			require.Equal(t, "thomasjefferson@example.com", actor.Email)
-
-			retrieved, err = db.GetActorByExternalId(ctx, externalId)
-			require.NoError(t, err)
-			require.Equal(t, id, retrieved.ID)
-			require.Equal(t, "thomasjefferson@example.com", retrieved.Email)
 		})
 	})
 	t.Run("List", func(t *testing.T) {

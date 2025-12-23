@@ -15,11 +15,11 @@ var reValidCrc64 = regexp.MustCompile("^[a-fA-F0-9]{16}$")
 // Actor is the information that identifies who is making a request. This can be a actor in the calling
 // system, an admin from the calling system, a devops admin from the cli, etc.
 type Actor struct {
-	// set by service
-	ID         string `json:"id"`
-	Admin      bool   `json:"admin,omitempty"`
-	SuperAdmin bool   `json:"super_admin,omitempty"`
-	Email      string `json:"email,omitempty"`
+	ID          string   `json:"id"`
+	Permissions []string `json:"permissions"`
+	Admin       bool     `json:"admin,omitempty"`
+	SuperAdmin  bool     `json:"super_admin,omitempty"`
+	Email       string   `json:"email,omitempty"`
 }
 
 // IsAdmin is a helper to wrap the Admin attribute

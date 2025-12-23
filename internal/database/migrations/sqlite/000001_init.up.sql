@@ -5,6 +5,7 @@ create table actors
     email       text,
     admin       numeric,
     super_admin numeric,
+    permissions text,
     created_at  datetime,
     updated_at  datetime,
     deleted_at  datetime

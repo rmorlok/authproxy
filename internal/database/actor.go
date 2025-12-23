@@ -3,7 +3,10 @@ package database
 import (
 	"context"
 	"database/sql"
+	"database/sql/driver"
+	"encoding/json"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -28,6 +31,35 @@ const (
 	ActorOrderByDeletedAt  ActorOrderByField = "deleted_at"
 )
 
+// Permissions is a custom type for a slice of permissions
+type Permissions []string
+
+// Value implements the driver.Valuer interface for Permissions
+func (p Permissions) Value() (driver.Value, error) {
+	if len(p) == 0 {
+		return nil, nil
+	}
+
+	return json.Marshal(p)
+}
+
+// Scan implements the sql.Scanner interface for Permissions
+func (p *Permissions) Scan(value interface{}) error {
+	if value == nil {
+		*p = nil
+		return nil
+	}
+
+	switch v := value.(type) {
+	case string:
+		return json.Unmarshal([]byte(v), p)
+	case []byte:
+		return json.Unmarshal(v, p)
+	default:
+		return fmt.Errorf("cannot convert %T to Permissions", value)
+	}
+}
+
 // IsValidActorOrderByField checks if the given value is a valid ActorOrderByField.
 func IsValidActorOrderByField[T string | ActorOrderByField](field T) bool {
 	switch ActorOrderByField(field) {
@@ -48,14 +80,15 @@ const ActorTable = "actors"
 
 // Actor is some entity taking action within the system.
 type Actor struct {
-	ID         uuid.UUID
-	ExternalId string
-	Email      string
-	Admin      bool
-	SuperAdmin bool
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
-	DeletedAt  *time.Time
+	ID          uuid.UUID
+	ExternalId  string
+	Email       string
+	Permissions Permissions
+	Admin       bool
+	SuperAdmin  bool
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
+	DeletedAt   *time.Time
 }
 
 func (a *Actor) cols() []string {
@@ -63,6 +96,7 @@ func (a *Actor) cols() []string {
 		"id",
 		"external_id",
 		"email",
+		"permissions",
 		"admin",
 		"super_admin",
 		"created_at",
@@ -76,6 +110,7 @@ func (a *Actor) fields() []any {
 		&a.ID,
 		&a.ExternalId,
 		&a.Email,
+		&a.Permissions,
 		&a.Admin,
 		&a.SuperAdmin,
 		&a.CreatedAt,
@@ -89,6 +124,7 @@ func (a *Actor) values() []any {
 		a.ID,
 		a.ExternalId,
 		a.Email,
+		a.Permissions,
 		a.Admin,
 		a.SuperAdmin,
 		a.CreatedAt,
@@ -100,23 +136,28 @@ func (a *Actor) values() []any {
 func (a *Actor) setFromJwt(ja *jwt.Actor) {
 	a.ExternalId = ja.ID
 	a.Email = ja.Email
+	a.Permissions = ja.Permissions
 	a.Admin = ja.IsAdmin()
 	a.SuperAdmin = ja.IsSuperAdmin()
 }
 
 func (a *Actor) sameAsJwt(ja *jwt.Actor) bool {
+	slices.Sort(a.Permissions)
+
 	return a.ExternalId == ja.ID &&
 		a.Email == ja.Email &&
+		slices.Equal(a.Permissions, ja.Permissions) &&
 		a.Admin == ja.IsAdmin() &&
 		a.SuperAdmin == ja.IsSuperAdmin()
 }
 
 func (a *Actor) ToJwtActor() jwt.Actor {
 	return jwt.Actor{
-		ID:         a.ExternalId,
-		Email:      a.Email,
-		Admin:      a.Admin,
-		SuperAdmin: a.SuperAdmin,
+		ID:          a.ExternalId,
+		Email:       a.Email,
+		Permissions: a.Permissions,
+		Admin:       a.Admin,
+		SuperAdmin:  a.SuperAdmin,
 	}
 }
 
@@ -150,6 +191,11 @@ func (a *Actor) IsNormalActor() bool {
 	}
 
 	return !a.IsSuperAdmin() && !a.IsAdmin()
+}
+
+func (a *Actor) normalize() {
+	// Permissions are stores sorted so that we don't have to sort on load
+	slices.Sort(a.Permissions)
 }
 
 func (a *Actor) validate() error {
@@ -225,6 +271,8 @@ func (s *service) CreateActor(ctx context.Context, a *Actor) error {
 	if a == nil {
 		return errors.New("actor is nil")
 	}
+
+	a.normalize()
 
 	validationErr := a.validate()
 	if validationErr != nil {
@@ -310,6 +358,7 @@ func (s *service) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 					UpdatedAt: now,
 				}
 				newActor.setFromJwt(actor)
+				newActor.normalize()
 				validationErr := newActor.validate()
 				if validationErr != nil {
 					return validationErr
@@ -343,6 +392,7 @@ func (s *service) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 
 		if !existingActor.sameAsJwt(actor) {
 			existingActor.setFromJwt(actor)
+			existingActor.normalize()
 			validationErr := existingActor.validate()
 			if validationErr != nil {
 				return validationErr
