@@ -36,8 +36,10 @@ func TestSystemAuth(t *testing.T) {
 						},
 					},
 				},
-				AdminUsers: &AdminUsersExternalSource{
-					KeysPath: "./dev_config/keys/admin",
+				AdminUsers: &AdminUsers{
+					InnerVal: &AdminUsersExternalSource{
+						KeysPath: "./dev_config/keys/admin",
+					},
 				},
 			}
 
