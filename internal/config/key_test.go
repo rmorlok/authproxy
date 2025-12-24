@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestKey(t *testing.T) {
@@ -15,12 +16,15 @@ func TestKey(t *testing.T) {
 shared_key:
   value: some-key-value
 `
-			key, err := UnmarshallYamlKeyString(data)
+			var key Key
+			err := yaml.Unmarshal([]byte(data), &key)
 			assert.NoError(err)
-			assert.Equal(&KeyShared{
-				SharedKey: &KeyData{
-					InnerVal: &KeyDataValue{
-						Value: "some-key-value",
+			assert.Equal(Key{
+				InnerVal: &KeyShared{
+					SharedKey: &KeyData{
+						InnerVal: &KeyDataValue{
+							Value: "some-key-value",
+						},
 					},
 				},
 			}, key)
@@ -30,12 +34,15 @@ shared_key:
 public_key:
   value: some-key-value
 `
-			key, err := UnmarshallYamlKeyString(data)
+			var key Key
+			err := yaml.Unmarshal([]byte(data), &key)
 			assert.NoError(err)
-			assert.Equal(&KeyPublicPrivate{
-				PublicKey: &KeyData{
-					InnerVal: &KeyDataValue{
-						Value: "some-key-value",
+			assert.Equal(Key{
+				InnerVal: &KeyPublicPrivate{
+					PublicKey: &KeyData{
+						InnerVal: &KeyDataValue{
+							Value: "some-key-value",
+						},
 					},
 				},
 			}, key)
@@ -45,12 +52,15 @@ public_key:
 private_key:
   value: some-key-value
 `
-			key, err := UnmarshallYamlKeyString(data)
+			var key Key
+			err := yaml.Unmarshal([]byte(data), &key)
 			assert.NoError(err)
-			assert.Equal(&KeyPublicPrivate{
-				PrivateKey: &KeyData{
-					InnerVal: &KeyDataValue{
-						Value: "some-key-value",
+			assert.Equal(Key{
+				InnerVal: &KeyPublicPrivate{
+					PrivateKey: &KeyData{
+						InnerVal: &KeyDataValue{
+							Value: "some-key-value",
+						},
 					},
 				},
 			}, key)
@@ -62,17 +72,20 @@ public_key:
 private_key:
   value: some-key-value-2
 `
-			key, err := UnmarshallYamlKeyString(data)
+			var key Key
+			err := yaml.Unmarshal([]byte(data), &key)
 			assert.NoError(err)
-			assert.Equal(&KeyPublicPrivate{
-				PublicKey: &KeyData{
-					InnerVal: &KeyDataValue{
-						Value: "some-key-value-1",
+			assert.Equal(Key{
+				InnerVal: &KeyPublicPrivate{
+					PublicKey: &KeyData{
+						InnerVal: &KeyDataValue{
+							Value: "some-key-value-1",
+						},
 					},
-				},
-				PrivateKey: &KeyData{
-					InnerVal: &KeyDataValue{
-						Value: "some-key-value-2",
+					PrivateKey: &KeyData{
+						InnerVal: &KeyDataValue{
+							Value: "some-key-value-2",
+						},
 					},
 				},
 			}, key)

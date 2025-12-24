@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestAdminUser(t *testing.T) {
@@ -17,14 +18,17 @@ key:
   public_key:
     value: some-key-value
 `
-			au, err := UnmarshallYamlAdminUserString(data)
+			var au AdminUser
+			err := yaml.Unmarshal([]byte(data), &au)
 			assert.NoError(err)
-			assert.Equal(&AdminUser{
+			assert.Equal(AdminUser{
 				Username: "bobdole",
-				Key: &KeyPublicPrivate{
-					PublicKey: &KeyData{
-						InnerVal: &KeyDataValue{
-							Value: "some-key-value",
+				Key: &Key{
+					InnerVal: &KeyPublicPrivate{
+						PublicKey: &KeyData{
+							InnerVal: &KeyDataValue{
+								Value: "some-key-value",
+							},
 						},
 					},
 				},
@@ -43,9 +47,10 @@ key:
   public_key:
     value: some-key-value
 `
-			au, err := UnmarshallYamlAdminUserString(data)
+			var au AdminUser
+			err := yaml.Unmarshal([]byte(data), &au)
 			assert.NoError(err)
-			assert.Equal(&AdminUser{
+			assert.Equal(AdminUser{
 				Username: "bobdole",
 				Email:    "bob@example.com",
 				Permissions: []string{
@@ -53,10 +58,12 @@ key:
 					"admin:write",
 					"connectors:manage",
 				},
-				Key: &KeyPublicPrivate{
-					PublicKey: &KeyData{
-						InnerVal: &KeyDataValue{
-							Value: "some-key-value",
+				Key: &Key{
+					InnerVal: &KeyPublicPrivate{
+						PublicKey: &KeyData{
+							InnerVal: &KeyDataValue{
+								Value: "some-key-value",
+							},
 						},
 					},
 				},

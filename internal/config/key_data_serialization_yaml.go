@@ -6,12 +6,12 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-func (sv *KeyData) MarshalYAML() (interface{}, error) {
-	if sv.InnerVal == nil {
+func (kd *KeyData) MarshalYAML() (interface{}, error) {
+	if kd.InnerVal == nil {
 		return nil, nil
 	}
 
-	return sv.InnerVal, nil
+	return kd.InnerVal, nil
 }
 
 // UnmarshalYAML handles unmarshalling from YAML while allowing us to make decisions

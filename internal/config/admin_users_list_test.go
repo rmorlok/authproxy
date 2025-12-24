@@ -32,10 +32,12 @@ func TestAdminUsersList(t *testing.T) {
 		adminUsers := AdminUsersList{
 			&AdminUser{
 				Username: "bobdole",
-				Key: &KeyPublicPrivate{
-					PublicKey: &KeyData{
-						InnerVal: &KeyDataFile{
-							Path: "../../test_data/admin_user_keys/bobdole.pub",
+				Key: &Key{
+					InnerVal: &KeyPublicPrivate{
+						PublicKey: &KeyData{
+							InnerVal: &KeyDataFile{
+								Path: "../../test_data/admin_user_keys/bobdole.pub",
+							},
 						},
 					},
 				},
@@ -55,10 +57,12 @@ func TestAdminUsersList(t *testing.T) {
 		adminUsers := AdminUsersList{
 			&AdminUser{
 				Username: "bobdole",
-				Key: &KeyPublicPrivate{
-					PublicKey: &KeyData{
-						InnerVal: &KeyDataFile{
-							Path: "../../test_data/admin_user_keys/bobdole.pub",
+				Key: &Key{
+					InnerVal: &KeyPublicPrivate{
+						PublicKey: &KeyData{
+							InnerVal: &KeyDataFile{
+								Path: "../../test_data/admin_user_keys/bobdole.pub",
+							},
 						},
 					},
 				},

@@ -21,7 +21,7 @@ import (
 
 // keyForToken loads an appropriate key to sign or verify a given token. This accounts for the
 // fact that admin users will verify with different keys to sign/verify tokens.
-func (s *service) keyForToken(claims *jwt2.AuthProxyClaims) (config.Key, error) {
+func (s *service) keyForToken(claims *jwt2.AuthProxyClaims) (*config.Key, error) {
 	if claims.IsAdmin() {
 		adminUsername, err := claims.AdminUsername()
 		if err != nil {
@@ -82,11 +82,11 @@ func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProx
 				return nil, false, errors.Wrap(err, "failed to get key")
 			}
 
-			if pk, ok := key.(*config.KeyPublicPrivate); ok {
+			if pk, ok := key.InnerVal.(*config.KeyPublicPrivate); ok {
 				return pk.PublicKey, false, nil
 			}
 
-			if sk, ok := key.(*config.KeyShared); ok {
+			if sk, ok := key.InnerVal.(*config.KeyShared); ok {
 				return sk.SharedKey, true, nil
 			}
 

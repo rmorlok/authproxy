@@ -264,15 +264,17 @@ func TestAuth_Parse(t *testing.T) {
 			SystemAuth: config.SystemAuth{
 				JwtTokenDurationVal: 12 * time.Hour,
 				JwtIssuerVal:        "example",
-				JwtSigningKey: &config.KeyPublicPrivate{
-					PublicKey: &config.KeyData{
-						InnerVal: &config.KeyDataFile{
-							Path: "../../test_data/system_keys/other-system.pub",
+				JwtSigningKey: &config.Key{
+					InnerVal: &config.KeyPublicPrivate{
+						PublicKey: &config.KeyData{
+							InnerVal: &config.KeyDataFile{
+								Path: "../../test_data/system_keys/other-system.pub",
+							},
 						},
-					},
-					PrivateKey: &config.KeyData{
-						InnerVal: &config.KeyDataFile{
-							Path: "../../test_data/system_keys/other-system",
+						PrivateKey: &config.KeyData{
+							InnerVal: &config.KeyDataFile{
+								Path: "../../test_data/system_keys/other-system",
+							},
 						},
 					},
 				},
@@ -310,10 +312,12 @@ func TestAuth_Parse(t *testing.T) {
 				AdminUsers: &config.AdminUsersList{
 					&config.AdminUser{
 						Username: "bobdole",
-						Key: &config.KeyPublicPrivate{
-							PublicKey: &config.KeyData{
-								InnerVal: &config.KeyDataFile{
-									Path: "../../test_data/admin_user_keys/bobdole.pub",
+						Key: &config.Key{
+							InnerVal: &config.KeyPublicPrivate{
+								PublicKey: &config.KeyData{
+									InnerVal: &config.KeyDataFile{
+										Path: "../../test_data/admin_user_keys/bobdole.pub",
+									},
 								},
 							},
 						},
@@ -321,15 +325,17 @@ func TestAuth_Parse(t *testing.T) {
 				},
 				JwtTokenDurationVal: 12 * time.Hour,
 				JwtIssuerVal:        "example",
-				JwtSigningKey: &config.KeyPublicPrivate{
-					PublicKey: &config.KeyData{
-						InnerVal: &config.KeyDataFile{
-							Path: "../../test_data/system_keys/other-system.pub",
+				JwtSigningKey: &config.Key{
+					&config.KeyPublicPrivate{
+						PublicKey: &config.KeyData{
+							InnerVal: &config.KeyDataFile{
+								Path: "../../test_data/system_keys/other-system.pub",
+							},
 						},
-					},
-					PrivateKey: &config.KeyData{
-						InnerVal: &config.KeyDataFile{
-							Path: "../../test_data/system_keys/other-system",
+						PrivateKey: &config.KeyData{
+							InnerVal: &config.KeyDataFile{
+								Path: "../../test_data/system_keys/other-system",
+							},
 						},
 					},
 				},
@@ -697,30 +703,34 @@ var testConfigPublicPrivateKey = config.Root{
 	SystemAuth: config.SystemAuth{
 		JwtTokenDurationVal: 12 * time.Hour,
 		JwtIssuerVal:        "example",
-		JwtSigningKey: &config.KeyPublicPrivate{
-			PublicKey: &config.KeyData{
-				InnerVal: &config.KeyDataFile{
-					Path: "../../test_data/system_keys/system.pub",
+		JwtSigningKey: &config.Key{
+			InnerVal: &config.KeyPublicPrivate{
+				PublicKey: &config.KeyData{
+					InnerVal: &config.KeyDataFile{
+						Path: "../../test_data/system_keys/system.pub",
+					},
 				},
-			},
-			PrivateKey: &config.KeyData{
-				InnerVal: &config.KeyDataFile{
-					Path: "../../test_data/system_keys/system",
+				PrivateKey: &config.KeyData{
+					InnerVal: &config.KeyDataFile{
+						Path: "../../test_data/system_keys/system",
+					},
 				},
 			},
 		},
 		AdminUsers: config.AdminUsersList{
 			&config.AdminUser{
 				Username: "aid1",
-				Key: &config.KeyPublicPrivate{
-					PublicKey: &config.KeyData{
-						InnerVal: &config.KeyDataFile{
-							Path: "../../test_data/system_keys/system.pub",
+				Key: &config.Key{
+					InnerVal: &config.KeyPublicPrivate{
+						PublicKey: &config.KeyData{
+							InnerVal: &config.KeyDataFile{
+								Path: "../../test_data/system_keys/system.pub",
+							},
 						},
-					},
-					PrivateKey: &config.KeyData{
-						InnerVal: &config.KeyDataFile{
-							Path: "../../test_data/system_keys/system",
+						PrivateKey: &config.KeyData{
+							InnerVal: &config.KeyDataFile{
+								Path: "../../test_data/system_keys/system",
+							},
 						},
 					},
 				},
@@ -743,10 +753,12 @@ var testConfigSecretKey = config.Root{
 	SystemAuth: config.SystemAuth{
 		JwtTokenDurationVal: 12 * time.Hour,
 		JwtIssuerVal:        "example",
-		JwtSigningKey: &config.KeyShared{
-			SharedKey: &config.KeyData{
-				InnerVal: &config.KeyDataBase64Val{
-					Base64: "+xKbTv+pdvWK+4ucIsUcAHqzEhelLWuud80+fy1pQzc=",
+		JwtSigningKey: &config.Key{
+			InnerVal: &config.KeyShared{
+				SharedKey: &config.KeyData{
+					InnerVal: &config.KeyDataBase64Val{
+						Base64: "+xKbTv+pdvWK+4ucIsUcAHqzEhelLWuud80+fy1pQzc=",
+					},
 				},
 			},
 		},

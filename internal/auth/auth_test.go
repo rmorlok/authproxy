@@ -167,21 +167,27 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 				XsrfRequestQueueDepthVal: util.ToPtr(5),
 			},
 			SystemAuth: config.SystemAuth{
-				JwtSigningKey: &config.KeyShared{
-					SharedKey: config.NewKeyDataRandomBytes(),
+				JwtSigningKey: &config.Key{
+					InnerVal: &config.KeyShared{
+						SharedKey: config.NewKeyDataRandomBytes(),
+					},
 				},
 				GlobalAESKey: config.NewKeyDataRandomBytes(),
 				AdminUsers: config.AdminUsersList{
 					&config.AdminUser{
 						Username: "bobdole",
-						Key: &config.KeyShared{
-							SharedKey: adminSigningKey,
+						Key: &config.Key{
+							InnerVal: &config.KeyShared{
+								SharedKey: adminSigningKey,
+							},
 						},
 					},
 					&config.AdminUser{
 						Username: "ronaldreagan",
-						Key: &config.KeyShared{
-							SharedKey: adminSigningKey,
+						Key: &config.Key{
+							InnerVal: &config.KeyShared{
+								SharedKey: adminSigningKey,
+							},
 						},
 					},
 				},
@@ -314,11 +320,11 @@ func (ts *TestSetup) GetPingCount() int {
 	return *ts.pingCounter
 }
 
-func (ts *TestSetup) MustGetValidSigningTokenForUser() config.Key {
+func (ts *TestSetup) MustGetValidSigningTokenForUser() *config.Key {
 	return ts.Cfg.GetRoot().SystemAuth.JwtSigningKey
 }
 
-func (ts *TestSetup) MustGetValidSigningTokenForAdmin() config.Key {
+func (ts *TestSetup) MustGetValidSigningTokenForAdmin() *config.Key {
 	return ts.Cfg.GetRoot().SystemAuth.AdminUsers.All()[0].Key
 }
 

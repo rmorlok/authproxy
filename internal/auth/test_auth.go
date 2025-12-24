@@ -51,8 +51,10 @@ func TestAuthServiceWithDb(serviceId config.ServiceId, cfg config.C, db database
 		root.SystemAuth.GlobalAESKey = config.NewKeyDataRandomBytes()
 	}
 	if root.SystemAuth.JwtSigningKey == nil {
-		root.SystemAuth.JwtSigningKey = &config.KeyShared{
-			SharedKey: config.NewKeyDataRandomBytes(),
+		root.SystemAuth.JwtSigningKey = &config.Key{
+			InnerVal: &config.KeyShared{
+				SharedKey: config.NewKeyDataRandomBytes(),
+			},
 		}
 	}
 

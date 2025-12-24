@@ -38,7 +38,7 @@ type ParserBuilder interface {
 	WithKeySelector(KeySelector) ParserBuilder
 
 	// WithConfigKey specifies the key to be used for parsing as a config value. Key can be either secret or public.
-	WithConfigKey(ctx context.Context, cfgKey config.Key) ParserBuilder
+	WithConfigKey(ctx context.Context, cfgKey *config.Key) ParserBuilder
 
 	// WithPublicKeyPath specifies the public key as a file path.
 	WithPublicKeyPath(string) ParserBuilder
@@ -66,7 +66,7 @@ type ParserBuilder interface {
 
 type parserBuilder struct {
 	keySelector   KeySelector
-	key           config.Key
+	key           *config.Key
 	publicKeyPath *string
 	publicKeyData []byte
 	secretKeyPath *string
@@ -90,11 +90,11 @@ func (pb *parserBuilder) defaultKeySelector(
 	)
 
 	if pb.key != nil {
-		if pk, ok := pb.key.(*config.KeyPublicPrivate); ok {
+		if pk, ok := pb.key.InnerVal.(*config.KeyPublicPrivate); ok {
 			return pk.PublicKey, isPublicKey, nil
 		}
 
-		if sk, ok := pb.key.(*config.KeyShared); ok {
+		if sk, ok := pb.key.InnerVal.(*config.KeyShared); ok {
 			return sk.SharedKey, isSharedKey, nil
 		}
 		return nil, isSharedKey, errors.New("invalid key type")
@@ -132,7 +132,7 @@ func (pb *parserBuilder) defaultKeySelector(
 	return nil, isSharedKey, errors.New("no key specified")
 }
 
-func (pb *parserBuilder) WithConfigKey(ctx context.Context, cfgKey config.Key) ParserBuilder {
+func (pb *parserBuilder) WithConfigKey(ctx context.Context, cfgKey *config.Key) ParserBuilder {
 	pb.key = cfgKey
 	return pb
 }

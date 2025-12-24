@@ -22,15 +22,17 @@ func TestSystemAuth(t *testing.T) {
     keys_path: ./dev_config/keys/admin
 `
 			expected := &SystemAuth{
-				JwtSigningKey: &KeyPublicPrivate{
-					PublicKey: &KeyData{
-						InnerVal: &KeyDataFile{
-							Path: "./dev_config/keys/system.pub",
+				JwtSigningKey: &Key{
+					InnerVal: &KeyPublicPrivate{
+						PublicKey: &KeyData{
+							InnerVal: &KeyDataFile{
+								Path: "./dev_config/keys/system.pub",
+							},
 						},
-					},
-					PrivateKey: &KeyData{
-						InnerVal: &KeyDataFile{
-							Path: "./dev_config/keys/system",
+						PrivateKey: &KeyData{
+							InnerVal: &KeyDataFile{
+								Path: "./dev_config/keys/system",
+							},
 						},
 					},
 				},
@@ -58,25 +60,29 @@ admin_users:
         path: ./dev_config/keys/admin/bobdole.pub
 `
 			expected := &SystemAuth{
-				JwtSigningKey: &KeyPublicPrivate{
-					PublicKey: &KeyData{
-						InnerVal: &KeyDataFile{
-							Path: "./dev_config/keys/system.pub",
+				JwtSigningKey: &Key{
+					InnerVal: &KeyPublicPrivate{
+						PublicKey: &KeyData{
+							InnerVal: &KeyDataFile{
+								Path: "./dev_config/keys/system.pub",
+							},
 						},
-					},
-					PrivateKey: &KeyData{
-						InnerVal: &KeyDataFile{
-							Path: "./dev_config/keys/system",
+						PrivateKey: &KeyData{
+							InnerVal: &KeyDataFile{
+								Path: "./dev_config/keys/system",
+							},
 						},
 					},
 				},
 				AdminUsers: AdminUsersList{
 					&AdminUser{
 						Username: "bobdole",
-						Key: &KeyPublicPrivate{
-							PublicKey: &KeyData{
-								InnerVal: &KeyDataFile{
-									Path: "./dev_config/keys/admin/bobdole.pub",
+						Key: &Key{
+							InnerVal: &KeyPublicPrivate{
+								PublicKey: &KeyData{
+									InnerVal: &KeyDataFile{
+										Path: "./dev_config/keys/admin/bobdole.pub",
+									},
 								},
 							},
 						},

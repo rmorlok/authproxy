@@ -30,10 +30,12 @@ func (s *AdminUsersExternalSource) All() []*AdminUser {
 			username := strings.TrimSuffix(entry.Name(), ".pub")
 			adminUsers = append(adminUsers, &AdminUser{
 				Username: username,
-				Key: &KeyPublicPrivate{
-					PublicKey: &KeyData{
-						InnerVal: &KeyDataFile{
-							Path: filepath.Join(s.KeysPath, entry.Name()),
+				Key: &Key{
+					InnerVal: &KeyPublicPrivate{
+						PublicKey: &KeyData{
+							InnerVal: &KeyDataFile{
+								Path: filepath.Join(s.KeysPath, entry.Name()),
+							},
 						},
 					},
 				},

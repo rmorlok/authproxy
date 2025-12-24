@@ -8,7 +8,7 @@ import (
 )
 
 type SystemAuth struct {
-	JwtSigningKey       Key           `json:"jwt_signing_key" yaml:"jwt_signing_key"`
+	JwtSigningKey       *Key          `json:"jwt_signing_key" yaml:"jwt_signing_key"`
 	JwtIssuerVal        string        `json:"jwt_issuer" yaml:"jwt_issuer"`
 	JwtTokenDurationVal time.Duration `json:"jwt_token_duration" yaml:"jwt_token_duration"`
 	DisableXSRF         bool          `json:"disable_xsrf" yaml:"disable_xsrf"`
@@ -39,7 +39,6 @@ func (sa *SystemAuth) UnmarshalYAML(value *yaml.Node) error {
 		return fmt.Errorf("system auth expected a mapping node, got %s", KindToString(value.Kind))
 	}
 
-	var jwtSigngingKey Key
 	var adminUsers AdminUsers
 
 	// Handle custom unmarshalling for some attributes. Iterate through the mapping node's content,
@@ -52,11 +51,6 @@ func (sa *SystemAuth) UnmarshalYAML(value *yaml.Node) error {
 		matched := false
 
 		switch keyNode.Value {
-		case "jwt_signing_key":
-			if jwtSigngingKey, err = keyUnmarshalYAML(valueNode); err != nil {
-				return err
-			}
-			matched = true
 		case "admin_users":
 			if adminUsers, err = adminUsersUnmarshalYAML(valueNode); err != nil {
 				return err
@@ -80,7 +74,6 @@ func (sa *SystemAuth) UnmarshalYAML(value *yaml.Node) error {
 	}
 
 	// Set the custom unmarshalled types
-	raw.JwtSigningKey = jwtSigngingKey
 	raw.AdminUsers = adminUsers
 
 	return nil

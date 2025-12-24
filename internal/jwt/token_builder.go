@@ -43,8 +43,8 @@ type TokenBuilder interface {
 	WithActor(actor *Actor) TokenBuilder
 	WithNonce() TokenBuilder
 
-	WithConfigKey(ctx context.Context, cfgKey config.Key) (TokenBuilder, error)
-	MustWithConfigKey(ctx context.Context, cfgKey config.Key) TokenBuilder
+	WithConfigKey(ctx context.Context, cfgKey *config.Key) (TokenBuilder, error)
+	MustWithConfigKey(ctx context.Context, cfgKey *config.Key) TokenBuilder
 	WithSecretConfigKeyData(ctx context.Context, cfgKeyData config.KeyDataType) (TokenBuilder, error)
 	WithPrivateKeyPath(string) TokenBuilder
 	WithPrivateKeyString(string) TokenBuilder
@@ -148,10 +148,10 @@ func (tb *tokenBuilder) WithNonce() TokenBuilder {
 	return tb
 }
 
-func (tb *tokenBuilder) WithConfigKey(ctx context.Context, cfgKey config.Key) (TokenBuilder, error) {
+func (tb *tokenBuilder) WithConfigKey(ctx context.Context, cfgKey *config.Key) (TokenBuilder, error) {
 	var us TokenBuilder = tb
 
-	if pp, ok := cfgKey.(*config.KeyPublicPrivate); ok {
+	if pp, ok := cfgKey.InnerVal.(*config.KeyPublicPrivate); ok {
 		if pp.PrivateKey != nil {
 			if pp.PrivateKey.HasData(ctx) {
 				data, err := pp.PrivateKey.GetData(ctx)
@@ -163,7 +163,7 @@ func (tb *tokenBuilder) WithConfigKey(ctx context.Context, cfgKey config.Key) (T
 		}
 	}
 
-	if ks, ok := cfgKey.(*config.KeyShared); ok {
+	if ks, ok := cfgKey.InnerVal.(*config.KeyShared); ok {
 		if ks.SharedKey != nil {
 			if ks.SharedKey.HasData(ctx) {
 				data, err := ks.SharedKey.GetData(ctx)
@@ -178,7 +178,7 @@ func (tb *tokenBuilder) WithConfigKey(ctx context.Context, cfgKey config.Key) (T
 	return us, nil
 }
 
-func (tb *tokenBuilder) MustWithConfigKey(ctx context.Context, cfgKey config.Key) TokenBuilder {
+func (tb *tokenBuilder) MustWithConfigKey(ctx context.Context, cfgKey *config.Key) TokenBuilder {
 	return util.Must(tb.WithConfigKey(ctx, cfgKey))
 }
 
