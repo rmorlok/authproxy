@@ -287,10 +287,11 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 						}
 
 						adminActor := database.Actor{
-							ID:         uuid.New(),
-							ExternalId: claims.Subject,
-							Email:      email,
-							Admin:      true,
+							ID:          uuid.New(),
+							ExternalId:  claims.Subject,
+							Email:       email,
+							Admin:       true,
+							Permissions: database.Permissions(cfgAdmin.Permissions),
 						}
 
 						err = s.db.CreateActor(ctx, &adminActor)

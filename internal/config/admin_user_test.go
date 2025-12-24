@@ -27,5 +27,35 @@ key:
 				},
 			}, au)
 		})
+
+		t.Run("with permissions", func(t *testing.T) {
+			data := `
+username: bobdole
+email: bob@example.com
+permissions:
+  - admin:read
+  - admin:write
+  - connectors:manage
+key:
+  public_key:
+    value: some-key-value
+`
+			au, err := UnmarshallYamlAdminUserString(data)
+			assert.NoError(err)
+			assert.Equal(&AdminUser{
+				Username: "bobdole",
+				Email:    "bob@example.com",
+				Permissions: []string{
+					"admin:read",
+					"admin:write",
+					"connectors:manage",
+				},
+				Key: &KeyPublicPrivate{
+					PublicKey: &KeyDataValue{
+						Value: "some-key-value",
+					},
+				},
+			}, au)
+		})
 	})
 }
