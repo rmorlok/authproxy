@@ -8,14 +8,15 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"os"
+	"time"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/util"
 	"golang.org/x/crypto/ssh"
-	"os"
-	"time"
 )
 
 // TokenBuilder extends from ClaimsBuilder to provide options to sign tokens
@@ -44,7 +45,7 @@ type TokenBuilder interface {
 
 	WithConfigKey(ctx context.Context, cfgKey config.Key) (TokenBuilder, error)
 	MustWithConfigKey(ctx context.Context, cfgKey config.Key) TokenBuilder
-	WithSecretConfigKeyData(ctx context.Context, cfgKeyData config.KeyData) (TokenBuilder, error)
+	WithSecretConfigKeyData(ctx context.Context, cfgKeyData config.KeyDataType) (TokenBuilder, error)
 	WithPrivateKeyPath(string) TokenBuilder
 	WithPrivateKeyString(string) TokenBuilder
 	WithPrivateKey([]byte) TokenBuilder
@@ -181,7 +182,7 @@ func (tb *tokenBuilder) MustWithConfigKey(ctx context.Context, cfgKey config.Key
 	return util.Must(tb.WithConfigKey(ctx, cfgKey))
 }
 
-func (tb *tokenBuilder) WithSecretConfigKeyData(ctx context.Context, cfgKeyData config.KeyData) (TokenBuilder, error) {
+func (tb *tokenBuilder) WithSecretConfigKeyData(ctx context.Context, cfgKeyData config.KeyDataType) (TokenBuilder, error) {
 	var us TokenBuilder = tb
 
 	if cfgKeyData.HasData(ctx) {

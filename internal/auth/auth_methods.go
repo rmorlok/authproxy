@@ -72,7 +72,7 @@ func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (stri
 // Parse token string and verify.
 func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProxyClaims, error) {
 	claims, err := jwt2.NewJwtTokenParserBuilder().
-		WithKeySelector(func(ctx context.Context, unverified *jwt2.AuthProxyClaims) (kd config.KeyData, isShared bool, err error) {
+		WithKeySelector(func(ctx context.Context, unverified *jwt2.AuthProxyClaims) (kd config.KeyDataType, isShared bool, err error) {
 			if unverified.SelfSigned {
 				return s.config.GetRoot().SystemAuth.GlobalAESKey, true, nil
 			}

@@ -33,7 +33,7 @@ func NewConnectionForRoot(root *config.Root, logger *slog.Logger) (DB, error) {
 // Parameters:
 // - dbConfig: the configuration for the SQLite database
 // - secretKey: the AES key used to secure cursors
-func NewSqliteConnection(dbConfig *config.DatabaseSqlite, secretKey config.KeyData, l *slog.Logger) (DB, error) {
+func NewSqliteConnection(dbConfig *config.DatabaseSqlite, secretKey config.KeyDataType, l *slog.Logger) (DB, error) {
 	path := dbConfig.Path
 	_, err := os.Stat(path)
 	if err != nil {
@@ -76,7 +76,7 @@ type service struct {
 	cfg       config.Database
 	sq        sq.StatementBuilderType
 	db        *sql.DB
-	secretKey config.KeyData // the AES key used to secure cursors
+	secretKey config.KeyDataType // the AES key used to secure cursors
 	logger    *slog.Logger
 }
 

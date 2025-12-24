@@ -2,9 +2,10 @@ package config
 
 import (
 	"context"
+	"os"
+
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
-	"os"
 )
 
 type KeyDataFile struct {
@@ -45,3 +46,5 @@ func (kf *KeyDataFile) GetData(ctx context.Context) ([]byte, error) {
 	// Read the file contents
 	return os.ReadFile(path)
 }
+
+var _ KeyDataType = (*KeyDataFile)(nil)

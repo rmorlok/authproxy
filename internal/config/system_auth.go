@@ -2,8 +2,9 @@ package config
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 type SystemAuth struct {
@@ -13,7 +14,7 @@ type SystemAuth struct {
 	DisableXSRF         bool          `json:"disable_xsrf" yaml:"disable_xsrf"`
 	AdminUsers          AdminUsers    `json:"admin_users" yaml:"admin_users"`
 	AdminEmailDomain    string        `json:"admin_email_domain,omitempty" yaml:"admin_email_domain,omitempty"`
-	GlobalAESKey        KeyData       `json:"global_aes_key" yaml:"global_aes_key"`
+	GlobalAESKey        *KeyData      `json:"global_aes_key" yaml:"global_aes_key"`
 }
 
 func (sa *SystemAuth) JwtIssuer() string {
@@ -40,7 +41,6 @@ func (sa *SystemAuth) UnmarshalYAML(value *yaml.Node) error {
 
 	var jwtSigngingKey Key
 	var adminUsers AdminUsers
-	var globalAESKey KeyData
 
 	// Handle custom unmarshalling for some attributes. Iterate through the mapping node's content,
 	// which will be sequences of keys, then values.
@@ -59,11 +59,6 @@ func (sa *SystemAuth) UnmarshalYAML(value *yaml.Node) error {
 			matched = true
 		case "admin_users":
 			if adminUsers, err = adminUsersUnmarshalYAML(valueNode); err != nil {
-				return err
-			}
-			matched = true
-		case "global_aes_key":
-			if globalAESKey, err = keyDataUnmarshalYAML(valueNode); err != nil {
 				return err
 			}
 			matched = true
@@ -87,7 +82,6 @@ func (sa *SystemAuth) UnmarshalYAML(value *yaml.Node) error {
 	// Set the custom unmarshalled types
 	raw.JwtSigningKey = jwtSigngingKey
 	raw.AdminUsers = adminUsers
-	raw.GlobalAESKey = globalAESKey
 
 	return nil
 }

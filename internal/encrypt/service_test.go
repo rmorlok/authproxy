@@ -27,8 +27,10 @@ func TestService(t *testing.T) {
 
 		cfg = config.FromRoot(&config.Root{
 			SystemAuth: config.SystemAuth{
-				GlobalAESKey: &config.KeyDataEnvVar{
-					EnvVar: "DOES_NOT_EXIST",
+				GlobalAESKey: &config.KeyData{
+					InnerVal: &config.KeyDataEnvVar{
+						EnvVar: "DOES_NOT_EXIST",
+					},
 				},
 			},
 		})
@@ -40,7 +42,7 @@ func TestService(t *testing.T) {
 
 	cfg := config.FromRoot(&config.Root{
 		SystemAuth: config.SystemAuth{
-			GlobalAESKey: &config.KeyDataRandomBytes{},
+			GlobalAESKey: config.NewKeyDataRandomBytes(),
 		},
 	})
 	cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)

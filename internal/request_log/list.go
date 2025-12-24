@@ -88,7 +88,7 @@ type ListRequestBuilder interface {
 
 type listRequestsFilters struct {
 	r               apredis.Client       `json:"-"`
-	cursorKey       config.KeyData       `json:"-"`
+	cursorKey       config.KeyDataType   `json:"-"`
 	LimitVal        int32                `json:"limit"`
 	Offset          int32                `json:"offset"`
 	OrderByFieldVal *RequestOrderByField `json:"order_by_field"`

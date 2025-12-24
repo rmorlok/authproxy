@@ -1,8 +1,9 @@
 package config
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestSystemAuth(t *testing.T) {
@@ -22,11 +23,15 @@ func TestSystemAuth(t *testing.T) {
 `
 			expected := &SystemAuth{
 				JwtSigningKey: &KeyPublicPrivate{
-					PublicKey: &KeyDataFile{
-						Path: "./dev_config/keys/system.pub",
+					PublicKey: &KeyData{
+						InnerVal: &KeyDataFile{
+							Path: "./dev_config/keys/system.pub",
+						},
 					},
-					PrivateKey: &KeyDataFile{
-						Path: "./dev_config/keys/system",
+					PrivateKey: &KeyData{
+						InnerVal: &KeyDataFile{
+							Path: "./dev_config/keys/system",
+						},
 					},
 				},
 				AdminUsers: &AdminUsersExternalSource{
@@ -54,19 +59,25 @@ admin_users:
 `
 			expected := &SystemAuth{
 				JwtSigningKey: &KeyPublicPrivate{
-					PublicKey: &KeyDataFile{
-						Path: "./dev_config/keys/system.pub",
+					PublicKey: &KeyData{
+						InnerVal: &KeyDataFile{
+							Path: "./dev_config/keys/system.pub",
+						},
 					},
-					PrivateKey: &KeyDataFile{
-						Path: "./dev_config/keys/system",
+					PrivateKey: &KeyData{
+						InnerVal: &KeyDataFile{
+							Path: "./dev_config/keys/system",
+						},
 					},
 				},
 				AdminUsers: AdminUsersList{
 					&AdminUser{
 						Username: "bobdole",
 						Key: &KeyPublicPrivate{
-							PublicKey: &KeyDataFile{
-								Path: "./dev_config/keys/admin/bobdole.pub",
+							PublicKey: &KeyData{
+								InnerVal: &KeyDataFile{
+									Path: "./dev_config/keys/admin/bobdole.pub",
+								},
 							},
 						},
 					},

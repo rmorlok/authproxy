@@ -17,3 +17,5 @@ func (kb *KeyDataRawVal) HasData(ctx context.Context) bool {
 func (kb *KeyDataRawVal) GetData(ctx context.Context) ([]byte, error) {
 	return kb.Raw, nil
 }
+
+var _ KeyDataType = (*KeyDataRawVal)(nil)

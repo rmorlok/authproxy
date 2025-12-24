@@ -35,7 +35,7 @@ type C interface {
 
 	// GetGlobalKey returns the global key for the application. This is used for symmetric encryption of data in things
 	// like cursors, JWTs, etc.
-	GetGlobalKey() KeyData
+	GetGlobalKey() KeyDataType
 }
 
 type config struct {
@@ -79,7 +79,7 @@ func (c *config) GetErrorPageUrl(ep ErrorPage) string {
 	return c.root.ErrorPages.urlForError(ep, c.root.Public.GetBaseUrl())
 }
 
-func (c *config) GetGlobalKey() KeyData {
+func (c *config) GetGlobalKey() KeyDataType {
 	if c == nil {
 		return nil
 	}

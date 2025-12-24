@@ -76,7 +76,7 @@ func MustApplyBlankTestDbConfigRaw(testName string, cfg config.C) (config.C, DB,
 		Path: tempFilePath,
 	}
 	if root.SystemAuth.GlobalAESKey == nil {
-		root.SystemAuth.GlobalAESKey = &config.KeyDataRandomBytes{}
+		root.SystemAuth.GlobalAESKey = &config.KeyData{InnerVal: &config.KeyDataRandomBytes{}}
 	}
 
 	db, err := NewConnectionForRoot(root, root.GetRootLogger())

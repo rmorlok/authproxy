@@ -8,12 +8,13 @@ import (
 	"crypto/x509"
 	"encoding/pem"
 	"fmt"
+	"time"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config"
 	"golang.org/x/crypto/ssh"
-	"time"
 )
 
 // KeySelector is a function that takes a claims object and loads a key dynamically used to verify the JWT. This
@@ -27,7 +28,7 @@ import (
 // * kd: the key data to use
 // * isShared: if the key data is a shared (aka secret) key. If false, will assume public key.
 // * err: An error from loading key data. If specified, other return values are ignored.
-type KeySelector func(ctx context.Context, unverified *AuthProxyClaims) (kd config.KeyData, isShared bool, err error)
+type KeySelector func(ctx context.Context, unverified *AuthProxyClaims) (kd config.KeyDataType, isShared bool, err error)
 
 // ParserBuilder is a builder that can parse a JWT
 type ParserBuilder interface {
@@ -82,7 +83,7 @@ func (pb *parserBuilder) WithKeySelector(
 func (pb *parserBuilder) defaultKeySelector(
 	ctx context.Context,
 	unverified *AuthProxyClaims,
-) (config.KeyData, bool, error) {
+) (config.KeyDataType, bool, error) {
 	const (
 		isPublicKey = false
 		isSharedKey = true

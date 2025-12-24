@@ -151,7 +151,7 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 	}
 
 	if b.cfg == nil {
-		adminSigningKey := &config.KeyDataRandomBytes{}
+		adminSigningKey := config.NewKeyDataRandomBytes()
 		b.cfg = config.FromRoot(&config.Root{
 			Public: config.ServicePublic{
 				ServiceHttp: config.ServiceHttp{
@@ -168,9 +168,9 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 			},
 			SystemAuth: config.SystemAuth{
 				JwtSigningKey: &config.KeyShared{
-					SharedKey: &config.KeyDataRandomBytes{},
+					SharedKey: config.NewKeyDataRandomBytes(),
 				},
-				GlobalAESKey: &config.KeyDataRandomBytes{},
+				GlobalAESKey: config.NewKeyDataRandomBytes(),
 				AdminUsers: config.AdminUsersList{
 					&config.AdminUser{
 						Username: "bobdole",

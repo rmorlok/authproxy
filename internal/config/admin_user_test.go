@@ -1,8 +1,9 @@
 package config
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestAdminUser(t *testing.T) {
@@ -21,8 +22,10 @@ key:
 			assert.Equal(&AdminUser{
 				Username: "bobdole",
 				Key: &KeyPublicPrivate{
-					PublicKey: &KeyDataValue{
-						Value: "some-key-value",
+					PublicKey: &KeyData{
+						InnerVal: &KeyDataValue{
+							Value: "some-key-value",
+						},
 					},
 				},
 			}, au)
@@ -51,8 +54,10 @@ key:
 					"connectors:manage",
 				},
 				Key: &KeyPublicPrivate{
-					PublicKey: &KeyDataValue{
-						Value: "some-key-value",
+					PublicKey: &KeyData{
+						InnerVal: &KeyDataValue{
+							Value: "some-key-value",
+						},
 					},
 				},
 			}, au)

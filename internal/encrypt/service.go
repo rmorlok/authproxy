@@ -32,7 +32,7 @@ func NewTestEncryptService(
 	}
 
 	if cfg.GetRoot().SystemAuth.GlobalAESKey == nil {
-		cfg.GetRoot().SystemAuth.GlobalAESKey = &config.KeyDataRandomBytes{}
+		cfg.GetRoot().SystemAuth.GlobalAESKey = &config.KeyData{InnerVal: &config.KeyDataRandomBytes{}}
 	}
 
 	return cfg, NewEncryptService(cfg, db)

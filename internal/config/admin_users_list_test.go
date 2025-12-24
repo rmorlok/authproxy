@@ -1,8 +1,9 @@
 package config
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestAdminUsersList(t *testing.T) {
@@ -32,8 +33,10 @@ func TestAdminUsersList(t *testing.T) {
 			&AdminUser{
 				Username: "bobdole",
 				Key: &KeyPublicPrivate{
-					PublicKey: &KeyDataFile{
-						Path: "../../test_data/admin_user_keys/bobdole.pub",
+					PublicKey: &KeyData{
+						InnerVal: &KeyDataFile{
+							Path: "../../test_data/admin_user_keys/bobdole.pub",
+						},
 					},
 				},
 			},
@@ -53,8 +56,10 @@ func TestAdminUsersList(t *testing.T) {
 			&AdminUser{
 				Username: "bobdole",
 				Key: &KeyPublicPrivate{
-					PublicKey: &KeyDataFile{
-						Path: "../../test_data/admin_user_keys/bobdole.pub",
+					PublicKey: &KeyData{
+						InnerVal: &KeyDataFile{
+							Path: "../../test_data/admin_user_keys/bobdole.pub",
+						},
 					},
 				},
 			},

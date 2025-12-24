@@ -2,8 +2,9 @@ package config
 
 import (
 	"context"
-	"github.com/rmorlok/authproxy/internal/util"
 	"sync"
+
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 type KeyDataRandomBytes struct {
@@ -28,3 +29,9 @@ func (kf *KeyDataRandomBytes) GetData(ctx context.Context) ([]byte, error) {
 
 	return kf.bytes, nil
 }
+
+func NewKeyDataRandomBytes() *KeyData {
+	return &KeyData{InnerVal: &KeyDataRandomBytes{}}
+}
+
+var _ KeyDataType = (*KeyDataRandomBytes)(nil)

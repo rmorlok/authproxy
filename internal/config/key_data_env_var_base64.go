@@ -3,8 +3,9 @@ package config
 import (
 	"context"
 	"encoding/base64"
-	"github.com/pkg/errors"
 	"os"
+
+	"github.com/pkg/errors"
 )
 
 type KeyDataEnvBase64Var struct {
@@ -29,3 +30,5 @@ func (kev *KeyDataEnvBase64Var) GetData(ctx context.Context) ([]byte, error) {
 
 	return decodedBytes, nil
 }
+
+var _ KeyDataType = (*KeyDataEnvBase64Var)(nil)

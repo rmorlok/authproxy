@@ -1,10 +1,11 @@
 package config
 
 import (
-	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
 	"strings"
+
+	"gopkg.in/yaml.v3"
 )
 
 type AdminUsersExternalSource struct {
@@ -30,8 +31,10 @@ func (s *AdminUsersExternalSource) All() []*AdminUser {
 			adminUsers = append(adminUsers, &AdminUser{
 				Username: username,
 				Key: &KeyPublicPrivate{
-					PublicKey: &KeyDataFile{
-						Path: filepath.Join(s.KeysPath, entry.Name()),
+					PublicKey: &KeyData{
+						InnerVal: &KeyDataFile{
+							Path: filepath.Join(s.KeysPath, entry.Name()),
+						},
 					},
 				},
 			})

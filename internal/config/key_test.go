@@ -1,8 +1,9 @@
 package config
 
 import (
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestKey(t *testing.T) {
@@ -17,8 +18,10 @@ shared_key:
 			key, err := UnmarshallYamlKeyString(data)
 			assert.NoError(err)
 			assert.Equal(&KeyShared{
-				SharedKey: &KeyDataValue{
-					Value: "some-key-value",
+				SharedKey: &KeyData{
+					InnerVal: &KeyDataValue{
+						Value: "some-key-value",
+					},
 				},
 			}, key)
 		})
@@ -30,8 +33,10 @@ public_key:
 			key, err := UnmarshallYamlKeyString(data)
 			assert.NoError(err)
 			assert.Equal(&KeyPublicPrivate{
-				PublicKey: &KeyDataValue{
-					Value: "some-key-value",
+				PublicKey: &KeyData{
+					InnerVal: &KeyDataValue{
+						Value: "some-key-value",
+					},
 				},
 			}, key)
 		})
@@ -43,8 +48,10 @@ private_key:
 			key, err := UnmarshallYamlKeyString(data)
 			assert.NoError(err)
 			assert.Equal(&KeyPublicPrivate{
-				PrivateKey: &KeyDataValue{
-					Value: "some-key-value",
+				PrivateKey: &KeyData{
+					InnerVal: &KeyDataValue{
+						Value: "some-key-value",
+					},
 				},
 			}, key)
 		})
@@ -58,11 +65,15 @@ private_key:
 			key, err := UnmarshallYamlKeyString(data)
 			assert.NoError(err)
 			assert.Equal(&KeyPublicPrivate{
-				PublicKey: &KeyDataValue{
-					Value: "some-key-value-1",
+				PublicKey: &KeyData{
+					InnerVal: &KeyDataValue{
+						Value: "some-key-value-1",
+					},
 				},
-				PrivateKey: &KeyDataValue{
-					Value: "some-key-value-2",
+				PrivateKey: &KeyData{
+					InnerVal: &KeyDataValue{
+						Value: "some-key-value-2",
+					},
 				},
 			}, key)
 		})

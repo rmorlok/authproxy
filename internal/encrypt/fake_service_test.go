@@ -27,7 +27,7 @@ func TestFakeService(t *testing.T) {
 
 			cfg := config.FromRoot(&config.Root{
 				SystemAuth: config.SystemAuth{
-					GlobalAESKey: &config.KeyDataRandomBytes{},
+					GlobalAESKey: config.NewKeyDataRandomBytes(),
 				},
 				DevSettings: &config.DevSettings{
 					FakeEncryption:           true,

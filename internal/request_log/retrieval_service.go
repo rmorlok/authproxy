@@ -12,8 +12,8 @@ import (
 )
 
 type redisLogRetriever struct {
-	r         apredis.Client `json:"-"`
-	cursorKey config.KeyData `json:"-"`
+	r         apredis.Client     `json:"-"`
+	cursorKey config.KeyDataType `json:"-"`
 }
 
 func (r *redisLogRetriever) GetFullLog(ctx context.Context, id uuid.UUID) (*Entry, error) {
@@ -80,7 +80,7 @@ func (r *redisLogRetriever) ListRequestsFromCursor(ctx context.Context, cursor s
 	return b.FromCursor(ctx, cursor)
 }
 
-func NewRetrievalService(r apredis.Client, cursorKey config.KeyData) LogRetriever {
+func NewRetrievalService(r apredis.Client, cursorKey config.KeyDataType) LogRetriever {
 	return &redisLogRetriever{
 		r:         r,
 		cursorKey: cursorKey,

@@ -21,3 +21,5 @@ func (kb *KeyDataBase64Val) GetData(ctx context.Context) ([]byte, error) {
 
 	return decodedBytes, nil
 }
+
+var _ KeyDataType = (*KeyDataBase64Val)(nil)

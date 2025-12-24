@@ -2,8 +2,9 @@ package config
 
 import (
 	"context"
-	"github.com/pkg/errors"
 	"os"
+
+	"github.com/pkg/errors"
 )
 
 type KeyDataEnvVar struct {
@@ -22,3 +23,5 @@ func (kev *KeyDataEnvVar) GetData(ctx context.Context) ([]byte, error) {
 	}
 	return []byte(val), nil
 }
+
+var _ KeyDataType = (*KeyDataEnvVar)(nil)

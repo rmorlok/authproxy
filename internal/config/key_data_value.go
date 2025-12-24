@@ -13,3 +13,5 @@ func (kv *KeyDataValue) HasData(ctx context.Context) bool {
 func (kv *KeyDataValue) GetData(ctx context.Context) ([]byte, error) {
 	return []byte(kv.Value), nil
 }
+
+var _ KeyDataType = (*KeyDataValue)(nil)
