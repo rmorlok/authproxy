@@ -74,7 +74,7 @@ keys_path: %s
 		})
 		t.Run("external source", func(t *testing.T) {
 			data := fmt.Sprintf(`{
-"keys_path": %s
+"keys_path": "%s"
 }`, tu.TestDataPath("admin_user_keys"))
 			var adminUsers AdminUsers
 			err := json.Unmarshal([]byte(data), &adminUsers)

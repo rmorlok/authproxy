@@ -173,20 +173,22 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 					},
 				},
 				GlobalAESKey: config.NewKeyDataRandomBytes(),
-				AdminUsers: config.AdminUsersList{
-					&config.AdminUser{
-						Username: "bobdole",
-						Key: &config.Key{
-							InnerVal: &config.KeyShared{
-								SharedKey: adminSigningKey,
+				AdminUsers: &config.AdminUsers{
+					InnerVal: config.AdminUsersList{
+						&config.AdminUser{
+							Username: "bobdole",
+							Key: &config.Key{
+								InnerVal: &config.KeyShared{
+									SharedKey: adminSigningKey,
+								},
 							},
 						},
-					},
-					&config.AdminUser{
-						Username: "ronaldreagan",
-						Key: &config.Key{
-							InnerVal: &config.KeyShared{
-								SharedKey: adminSigningKey,
+						&config.AdminUser{
+							Username: "ronaldreagan",
+							Key: &config.Key{
+								InnerVal: &config.KeyShared{
+									SharedKey: adminSigningKey,
+								},
 							},
 						},
 					},
