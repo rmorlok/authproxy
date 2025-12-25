@@ -3,11 +3,13 @@ package config
 import (
 	"os"
 	"path/filepath"
+	"slices"
 	"strings"
 )
 
 type AdminUsersExternalSource struct {
-	KeysPath string `json:"keys_path" yaml:"keys_path"`
+	KeysPath    string   `json:"keys_path" yaml:"keys_path"`
+	Permissions []string `json:"permissions,omitempty" yaml:"permissions,omitempty"`
 }
 
 func (s *AdminUsersExternalSource) All() []*AdminUser {
@@ -37,6 +39,7 @@ func (s *AdminUsersExternalSource) All() []*AdminUser {
 						},
 					},
 				},
+				Permissions: slices.Clone(s.Permissions),
 			})
 		}
 	}

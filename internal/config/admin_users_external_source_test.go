@@ -24,7 +24,8 @@ keys_path: some/path/to/keys
 	})
 	t.Run("loads users from path", func(t *testing.T) {
 		aues := AdminUsersExternalSource{
-			KeysPath: tu.TestDataPath("admin_user_keys"),
+			KeysPath:    tu.TestDataPath("admin_user_keys"),
+			Permissions: []string{"read", "write"},
 		}
 
 		// Check the test_data/admin_user_keys folder to see what this count should be
@@ -34,16 +35,19 @@ keys_path: some/path/to/keys
 		assert.True(found)
 		assert.NotNil(u)
 		assert.True(u.Key.CanVerifySignature())
+		assert.Equal([]string{"read", "write"}, u.Permissions)
 
 		u, found = aues.GetByUsername("bobdole")
 		assert.True(found)
 		assert.NotNil(u)
 		assert.True(u.Key.CanVerifySignature())
+		assert.Equal([]string{"read", "write"}, u.Permissions)
 
 		u, found = aues.GetByUsername("bobdole")
 		assert.True(found)
 		assert.NotNil(u)
 		assert.True(u.Key.CanVerifySignature())
+		assert.Equal([]string{"read", "write"}, u.Permissions)
 	})
 	t.Run("get by jwt subject", func(t *testing.T) {
 		aues := AdminUsersExternalSource{
