@@ -3,6 +3,8 @@ package config
 import (
 	tu "github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
+
 	"testing"
 )
 
@@ -14,7 +16,8 @@ func TestAdminUsersExternalSource(t *testing.T) {
 			data := `
 keys_path: some/path/to/keys
 `
-			adminUsersExternalSource, err := UnmarshallYamlAdminUsersExternalSourceString(data)
+			var adminUsersExternalSource AdminUsersExternalSource
+			err := yaml.Unmarshal([]byte(data), &adminUsersExternalSource)
 			assert.NoError(err)
 			assert.Equal("some/path/to/keys", adminUsersExternalSource.KeysPath)
 		})

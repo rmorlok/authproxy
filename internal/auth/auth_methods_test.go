@@ -309,14 +309,16 @@ func TestAuth_Parse(t *testing.T) {
 	t.Run("admin", func(t *testing.T) {
 		cfg := config.FromRoot(&config.Root{
 			SystemAuth: config.SystemAuth{
-				AdminUsers: &config.AdminUsersList{
-					&config.AdminUser{
-						Username: "bobdole",
-						Key: &config.Key{
-							InnerVal: &config.KeyPublicPrivate{
-								PublicKey: &config.KeyData{
-									InnerVal: &config.KeyDataFile{
-										Path: "../../test_data/admin_user_keys/bobdole.pub",
+				AdminUsers: &config.AdminUsers{
+					InnerVal: &config.AdminUsersList{
+						&config.AdminUser{
+							Username: "bobdole",
+							Key: &config.Key{
+								InnerVal: &config.KeyPublicPrivate{
+									PublicKey: &config.KeyData{
+										InnerVal: &config.KeyDataFile{
+											Path: "../../test_data/admin_user_keys/bobdole.pub",
+										},
 									},
 								},
 							},
@@ -717,19 +719,21 @@ var testConfigPublicPrivateKey = config.Root{
 				},
 			},
 		},
-		AdminUsers: config.AdminUsersList{
-			&config.AdminUser{
-				Username: "aid1",
-				Key: &config.Key{
-					InnerVal: &config.KeyPublicPrivate{
-						PublicKey: &config.KeyData{
-							InnerVal: &config.KeyDataFile{
-								Path: "../../test_data/system_keys/system.pub",
+		AdminUsers: &config.AdminUsers{
+			InnerVal: config.AdminUsersList{
+				&config.AdminUser{
+					Username: "aid1",
+					Key: &config.Key{
+						InnerVal: &config.KeyPublicPrivate{
+							PublicKey: &config.KeyData{
+								InnerVal: &config.KeyDataFile{
+									Path: "../../test_data/system_keys/system.pub",
+								},
 							},
-						},
-						PrivateKey: &config.KeyData{
-							InnerVal: &config.KeyDataFile{
-								Path: "../../test_data/system_keys/system",
+							PrivateKey: &config.KeyData{
+								InnerVal: &config.KeyDataFile{
+									Path: "../../test_data/system_keys/system",
+								},
 							},
 						},
 					},

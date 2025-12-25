@@ -4,8 +4,6 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
-
-	"gopkg.in/yaml.v3"
 )
 
 type AdminUsersExternalSource struct {
@@ -65,15 +63,4 @@ func (s *AdminUsersExternalSource) GetByJwtSubject(subject string) (*AdminUser, 
 	return s.GetByUsername(username)
 }
 
-func UnmarshallYamlAdminUsersExternalSourceString(data string) (*AdminUsersExternalSource, error) {
-	return UnmarshallYamlAdminUsersExternalSource([]byte(data))
-}
-
-func UnmarshallYamlAdminUsersExternalSource(data []byte) (*AdminUsersExternalSource, error) {
-	var aues AdminUsersExternalSource
-	if err := yaml.Unmarshal(data, &aues); err != nil {
-		return nil, err
-	}
-
-	return &aues, nil
-}
+var _ AdminUsersType = (*AdminUsersExternalSource)(nil)

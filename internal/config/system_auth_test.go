@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestSystemAuth(t *testing.T) {
@@ -21,7 +22,7 @@ func TestSystemAuth(t *testing.T) {
   admin_users:
     keys_path: ./dev_config/keys/admin
 `
-			expected := &SystemAuth{
+			expected := SystemAuth{
 				JwtSigningKey: &Key{
 					InnerVal: &KeyPublicPrivate{
 						PublicKey: &KeyData{
@@ -36,12 +37,15 @@ func TestSystemAuth(t *testing.T) {
 						},
 					},
 				},
-				AdminUsers: &AdminUsersExternalSource{
-					KeysPath: "./dev_config/keys/admin",
+				AdminUsers: &AdminUsers{
+					InnerVal: &AdminUsersExternalSource{
+						KeysPath: "./dev_config/keys/admin",
+					},
 				},
 			}
 
-			sa, err := UnmarshallYamlSystemAuthString(data)
+			var sa SystemAuth
+			err := yaml.Unmarshal([]byte(data), &sa)
 			assert.NoError(err)
 			assert.Equal(expected, sa)
 		})
@@ -59,7 +63,7 @@ admin_users:
       public_key:
         path: ./dev_config/keys/admin/bobdole.pub
 `
-			expected := &SystemAuth{
+			expected := SystemAuth{
 				JwtSigningKey: &Key{
 					InnerVal: &KeyPublicPrivate{
 						PublicKey: &KeyData{
@@ -74,14 +78,16 @@ admin_users:
 						},
 					},
 				},
-				AdminUsers: AdminUsersList{
-					&AdminUser{
-						Username: "bobdole",
-						Key: &Key{
-							InnerVal: &KeyPublicPrivate{
-								PublicKey: &KeyData{
-									InnerVal: &KeyDataFile{
-										Path: "./dev_config/keys/admin/bobdole.pub",
+				AdminUsers: &AdminUsers{
+					InnerVal: AdminUsersList{
+						&AdminUser{
+							Username: "bobdole",
+							Key: &Key{
+								InnerVal: &KeyPublicPrivate{
+									PublicKey: &KeyData{
+										InnerVal: &KeyDataFile{
+											Path: "./dev_config/keys/admin/bobdole.pub",
+										},
 									},
 								},
 							},
@@ -90,7 +96,8 @@ admin_users:
 				},
 			}
 
-			sa, err := UnmarshallYamlSystemAuthString(data)
+			var sa SystemAuth
+			err := yaml.Unmarshal([]byte(data), &sa)
 			assert.NoError(err)
 			assert.Equal(expected, sa)
 		})
