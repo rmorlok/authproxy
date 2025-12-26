@@ -98,9 +98,15 @@ func fromSessionCookieId(val string, e Encrypt) (sessionId, error) {
 }
 
 // establishAuthFromSession loads auth from an existing session. It is used as part of the process of attempting
-// to establish auth for a request. It takes an optional claims which would have come from any JWT present on
+// to establish auth for a request. It takes an optional RequestAuth which would have come from any JWT present on
 // the request previously.
-func (s *service) establishAuthFromSession(ctx context.Context, requireSessionXsrf bool, r *http.Request, w http.ResponseWriter, fromJwt RequestAuth) (RequestAuth, error) {
+func (s *service) establishAuthFromSession(
+	ctx context.Context,
+	requireSessionXsrf bool,
+	r *http.Request,
+	w http.ResponseWriter,
+	fromJwt RequestAuth,
+) (RequestAuth, error) {
 	if !s.service.SupportsSession() {
 		// This service doesn't support sessions, so do nothing
 		return fromJwt, nil
@@ -110,7 +116,7 @@ func (s *service) establishAuthFromSession(ctx context.Context, requireSessionXs
 	sessionCookie, err := r.Cookie(sessionCookieName)
 	if err != nil {
 		// If the session cookie is not found, return the original JWT auth
-		if err == http.ErrNoCookie {
+		if errors.Is(err, http.ErrNoCookie) {
 			return fromJwt, nil
 		}
 		// If there is another error, return it
@@ -139,7 +145,7 @@ func (s *service) establishAuthFromSession(ctx context.Context, requireSessionXs
 	}
 
 	// Sanity check to avoid session hijacking in redis
-	if sess.Id != sessionCookieId.Id || sess.ActorId != sessionCookieId.ActorId {
+	if sess.ActorId != sessionCookieId.ActorId {
 		return NewUnauthenticatedRequestAuth(), errors.Errorf("session actor mismatch: %s != %s", sess.ActorId.String(), sessionCookieId.ActorId.String())
 	}
 
@@ -167,7 +173,8 @@ func (s *service) establishAuthFromSession(ctx context.Context, requireSessionXs
 		if requireSessionXsrf && r.Method != http.MethodGet {
 			xsrfTokenHeader := r.Header.Get(xsrfHeaderKey)
 			if xsrfTokenHeader == "" {
-				return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+				return NewUnauthenticatedRequestAuth(), api_common.
+					NewHttpStatusErrorBuilder().
 					WithStatusForbidden().
 					WithResponseMsg("missing XSRF token").
 					Build()
