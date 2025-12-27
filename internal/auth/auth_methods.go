@@ -188,7 +188,7 @@ func getJwtTokenFromHeader(r *http.Request) (token string, hasValue bool, err er
 //
 // When establishing auth, a JWT always takes precedence over a session. If the session and JWT differ, the session will
 // be terminated and the caller must decide to start a new session explicitly.
-func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXsrf bool, r *http.Request, w http.ResponseWriter) (RequestAuth, error) {
+func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXsrf bool, r *http.Request, w http.ResponseWriter) (*RequestAuth, error) {
 	var err error
 	var claims *jwt2.AuthProxyClaims
 	var ra = NewUnauthenticatedRequestAuth()
@@ -327,7 +327,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 			}
 		}
 
-		ra = &requestAuth{
+		ra = &RequestAuth{
 			actor: actor,
 		}
 	}

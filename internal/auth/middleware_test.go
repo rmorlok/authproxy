@@ -20,6 +20,6 @@ func TestActorOnRequest(t *testing.T) {
 	}
 
 	r := util.Must(http.NewRequest("GET", "https://example.com", nil))
-	r = SetAuthOnRequestContext(r, &requestAuth{actor: &a})
+	r = SetAuthOnRequestContext(r, &RequestAuth{actor: &a})
 	assert.Equal(t, &a, GetAuthFromRequest(r).GetActor())
 }

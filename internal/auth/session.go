@@ -105,8 +105,8 @@ func (s *service) establishAuthFromSession(
 	requireSessionXsrf bool,
 	r *http.Request,
 	w http.ResponseWriter,
-	fromJwt RequestAuth,
-) (RequestAuth, error) {
+	fromJwt *RequestAuth,
+) (*RequestAuth, error) {
 	if !s.service.SupportsSession() {
 		// This service doesn't support sessions, so do nothing
 		return fromJwt, nil
@@ -209,7 +209,7 @@ func (s *service) establishAuthFromSession(
 		return NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to extend session")
 	}
 
-	return &requestAuth{
+	return &RequestAuth{
 		actor:     actor,
 		sessionId: &sess.Id,
 	}, nil
@@ -218,7 +218,7 @@ func (s *service) establishAuthFromSession(
 // EstablishSession is used to start a new session explicitly from a service that is using auth. Generally this
 // will be used to session a user after that request has already been authenticated using a JWT. This method does
 // check for existing sessions and either extends them or cancels them if the auth is inconsistent.
-func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, ra RequestAuth) error {
+func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, ra *RequestAuth) error {
 	if !ra.IsAuthenticated() {
 		return errors.New("request is not authenticated")
 	}
@@ -329,7 +329,7 @@ func (s *service) setSessionCookie(ctx context.Context, w http.ResponseWriter, s
 
 // EndSession terminates a session that is in progress by clearing the session information from redis and clearing
 // session id cookies on the response.
-func (s *service) EndSession(ctx context.Context, w http.ResponseWriter, ra RequestAuth) error {
+func (s *service) EndSession(ctx context.Context, w http.ResponseWriter, ra *RequestAuth) error {
 	if ra.IsSession() {
 		err := s.deleteSessionFromRedis(ctx, *ra.getSessionId())
 		if err != nil {

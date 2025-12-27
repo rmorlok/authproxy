@@ -11,13 +11,13 @@ import (
 
 // service is the implementation of the core auth service.
 type service struct {
-	config                 config.C
-	service                config.HttpService
-	db                     database.DB
-	r                      apredis.Client
-	encrypt                encrypt.E
-	logger                 *slog.Logger
-	defaultActorValidators []ActorValidator
+	config                config.C
+	service               config.HttpService
+	db                    database.DB
+	r                     apredis.Client
+	encrypt               encrypt.E
+	logger                *slog.Logger
+	defaultAuthValidators []AuthValidator
 }
 
 // NewService makes an auth service
@@ -40,8 +40,8 @@ func NewService(cfg config.C, svc config.HttpService, db database.DB, r apredis.
 	}
 }
 
-func (s *service) WithDefaultActorValidators(validators ...ActorValidator) A {
+func (s *service) WithDefaultAuthValidators(validators ...AuthValidator) A {
 	s2 := *s
-	s2.defaultActorValidators = validators
+	s2.defaultAuthValidators = validators
 	return &s2
 }

@@ -18,25 +18,25 @@ type A interface {
 	 * Gin middlewares for establishing auth
 	 */
 
-	Required(validators ...ActorValidator) gin.HandlerFunc
-	Optional(validators ...ActorValidator) gin.HandlerFunc
-	OptionalXsrfNotRequired(validators ...ActorValidator) gin.HandlerFunc
-	AdminOnly(validators ...ActorValidator) gin.HandlerFunc
+	Required(validators ...AuthValidator) gin.HandlerFunc
+	Optional(validators ...AuthValidator) gin.HandlerFunc
+	OptionalXsrfNotRequired(validators ...AuthValidator) gin.HandlerFunc
+	AdminOnly(validators ...AuthValidator) gin.HandlerFunc
 
 	/*
 	 * Middleware not specific to a framework
 	 */
 
 	// Auth middleware adds auth from session and populates actor info
-	Auth(next http.Handler, abort func(), validators ...ActorValidator) http.Handler
+	Auth(next http.Handler, abort func(), validators ...AuthValidator) http.Handler
 
 	// Trace middleware doesn't require a valid actor but if an actor is present it populates the actor info. If present
 	// the actor is validated against the supplied validators.
-	Trace(next http.Handler, abort func(), validators ...ActorValidator) http.Handler
+	Trace(next http.Handler, abort func(), validators ...AuthValidator) http.Handler
 
 	// TraceXsrfNotRequired is the same as the Trace middleware except that it doesn't require a valid Xsrf token if session
 	// auth is being used.
-	TraceXsrfNotRequired(next http.Handler, abort func(), validators ...ActorValidator) http.Handler
+	TraceXsrfNotRequired(next http.Handler, abort func(), validators ...AuthValidator) http.Handler
 
 	/*
 	 * Other helpers to set and get authentication.
@@ -54,27 +54,27 @@ type A interface {
 	// EstablishSession is used to start a new session explicitly from a service that is using auth. Generally this
 	// will be used to session a user after that request has already been authenticated using a JWT. This method does
 	// check for existing sessions and either extends them or cancels them if the auth is inconsistent.
-	EstablishSession(ctx context.Context, w http.ResponseWriter, ra RequestAuth) error
+	EstablishSession(ctx context.Context, w http.ResponseWriter, ra *RequestAuth) error
 
 	// EstablishGinSession is used to start a new session explicitly from a service that is using auth. Generally this
 	// will be used to session a user after that request has already been authenticated using a JWT. This method does
 	// check for existing sessions and either extends them or cancels them if the auth is inconsistent. This method
 	// provides a gin wrapper for the more generalized version of a similar name.
-	EstablishGinSession(gctx *gin.Context, ra RequestAuth) error
+	EstablishGinSession(gctx *gin.Context, ra *RequestAuth) error
 
 	// EndSession terminates a session that is in progress by clearing the session information from redis and clearing
 	// session id cookies on the response.
-	EndSession(ctx context.Context, w http.ResponseWriter, ra RequestAuth) error
+	EndSession(ctx context.Context, w http.ResponseWriter, ra *RequestAuth) error
 
 	// EndGinSession terminates a session that is in progress by clearing the session information from redis and clearing
 	// session id cookies on the response. This method provides a gin wrapper for the more generalized version of a
 	// similar name.
-	EndGinSession(gctx *gin.Context, ra RequestAuth) error
+	EndGinSession(gctx *gin.Context, ra *RequestAuth) error
 
-	// WithDefaultActorValidators returns a new service with the given actor validators added to the list of validators
+	// WithDefaultAuthValidators returns a new service with the given actor validators added to the list of validators
 	// that are used to validate actors. The original service will not be modified. The validators are applied to all
 	// requests that are authenticated. Unauthenticated requests will not be affected.
-	WithDefaultActorValidators(validators ...ActorValidator) A
+	WithDefaultAuthValidators(validators ...AuthValidator) A
 }
 
 var _ A = &service{}

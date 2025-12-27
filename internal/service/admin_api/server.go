@@ -49,7 +49,7 @@ func GetGinServer(
 		dm.GetRedisClient(),
 		dm.GetEncryptService(),
 		logger,
-	).WithDefaultActorValidators(auth.ActorValidatorIsAdmin)
+	).WithDefaultAuthValidators(auth.AuthValidatorActorIsAdmin)
 
 	server := api_common.GinForService(service)
 

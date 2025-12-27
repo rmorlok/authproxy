@@ -12,7 +12,7 @@ import (
 
 // MustGetAuthFromRequest gets an authenticated info for the request. If the request is not authenticated, it
 // panics.
-func MustGetAuthFromRequest(r *http.Request) RequestAuth {
+func MustGetAuthFromRequest(r *http.Request) *RequestAuth {
 	a := GetAuthFromRequest(r)
 	if a == nil || !a.IsAuthenticated() {
 		panic("request is not authenticated")
@@ -22,7 +22,7 @@ func MustGetAuthFromRequest(r *http.Request) RequestAuth {
 
 // GetAuthFromRequest returns auth info for the request. If the request is unauthenticated, it will return
 // a value indicating not authenticated.
-func GetAuthFromRequest(r *http.Request) RequestAuth {
+func GetAuthFromRequest(r *http.Request) *RequestAuth {
 	ctx := r.Context()
 	if ctx == nil {
 		return NewUnauthenticatedRequestAuth()
@@ -33,31 +33,31 @@ func GetAuthFromRequest(r *http.Request) RequestAuth {
 
 // SetAuthOnRequestContext sets the auth information into the context for the request so that later handlers
 // can retrieve the auth information.
-func SetAuthOnRequestContext(r *http.Request, auth RequestAuth) *http.Request {
+func SetAuthOnRequestContext(r *http.Request, auth *RequestAuth) *http.Request {
 	ctx := r.Context()
 	ctx = auth.ContextWith(ctx)
 	return r.WithContext(ctx)
 }
 
 // Auth middleware adds auth from session and populates actor info
-func (j *service) Auth(next http.Handler, abort func(), validators ...ActorValidator) http.Handler {
+func (j *service) Auth(next http.Handler, abort func(), validators ...AuthValidator) http.Handler {
 	return j.auth(true, true, abort, validators)(next)
 }
 
 // Trace middleware doesn't require a valid actor but if an actor is present it populates the actor info. If present
 // the actor is validated against the supplied validators.
-func (j *service) Trace(next http.Handler, abort func(), validators ...ActorValidator) http.Handler {
+func (j *service) Trace(next http.Handler, abort func(), validators ...AuthValidator) http.Handler {
 	return j.auth(false, true, abort, validators)(next)
 }
 
 // TraceXsrfNotRequired is the same as the Trace middleware except that it doesn't require a valid Xsrf token if session
 // auth is being used.
-func (j *service) TraceXsrfNotRequired(next http.Handler, abort func(), validators ...ActorValidator) http.Handler {
+func (j *service) TraceXsrfNotRequired(next http.Handler, abort func(), validators ...AuthValidator) http.Handler {
 	return j.auth(false, false, abort, validators)(next)
 }
 
 // auth implements all logic for authentication (reqAuth=true) and tracing (reqAuth=false)
-func (j *service) auth(requireAuth bool, requireSessionXsrf bool, abort func(), validators []ActorValidator) func(http.Handler) http.Handler {
+func (j *service) auth(requireAuth bool, requireSessionXsrf bool, abort func(), validators []AuthValidator) func(http.Handler) http.Handler {
 	f := func(h http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -82,8 +82,8 @@ func (j *service) auth(requireAuth bool, requireSessionXsrf bool, abort func(), 
 			}
 
 			if requestAuth.IsAuthenticated() {
-				combinedValidators := combineActorValidators(j.defaultActorValidators, validators)
-				valid, reason := validateAllActorValidators(combinedValidators, requestAuth.GetActor())
+				combinedValidators := combineAuthValidators(j.defaultAuthValidators, validators)
+				valid, reason := validateAllAuthValidators(combinedValidators, requestAuth)
 				if !valid {
 					api_common.NewHttpStatusErrorBuilder().
 						WithStatusForbidden().

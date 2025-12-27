@@ -12,7 +12,7 @@ import (
 )
 
 // GetAuthFromGinContext returns auth info from a request. This auth info can be authenticated or unauthenticated.
-func GetAuthFromGinContext(c *gin.Context) RequestAuth {
+func GetAuthFromGinContext(c *gin.Context) *RequestAuth {
 	if c == nil {
 		return nil
 	}
@@ -25,7 +25,7 @@ func GetAuthFromGinContext(c *gin.Context) RequestAuth {
 }
 
 // ApplyAuthToGinContext applies the auth info to the request context.
-func ApplyAuthToGinContext(c *gin.Context, ra RequestAuth) {
+func ApplyAuthToGinContext(c *gin.Context, ra *RequestAuth) {
 	if c == nil || c.Request == nil {
 		return
 	}
@@ -37,7 +37,7 @@ func ApplyAuthToGinContext(c *gin.Context, ra RequestAuth) {
 
 // MustGetAuthFromGinContext returns an authenticated request info. If the request is not authenticated, this
 // method panics.
-func MustGetAuthFromGinContext(c *gin.Context) RequestAuth {
+func MustGetAuthFromGinContext(c *gin.Context) *RequestAuth {
 	ra := GetAuthFromGinContext(c)
 	if ra == nil || !ra.IsAuthenticated() {
 		panic("request is not authenticated")
@@ -47,7 +47,7 @@ func MustGetAuthFromGinContext(c *gin.Context) RequestAuth {
 
 // Required middleware requires authentication and validates the actor. There must be an authenticated actor, and
 // the actor must pass the validators passed here and defaulted in the service.
-func (j *service) Required(validators ...ActorValidator) gin.HandlerFunc {
+func (j *service) Required(validators ...AuthValidator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			a := GetAuthFromRequest(r)
@@ -71,7 +71,7 @@ func (j *service) Required(validators ...ActorValidator) gin.HandlerFunc {
 
 // Optional middleware allows access for unauthenticated users. If the user is authenticated, it validates the
 // actor with the supplied validators and the defaults for the service.
-func (j *service) Optional(validators ...ActorValidator) gin.HandlerFunc {
+func (j *service) Optional(validators ...AuthValidator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			a := GetAuthFromRequest(r)
@@ -88,7 +88,7 @@ func (j *service) Optional(validators ...ActorValidator) gin.HandlerFunc {
 // OptionalXsrfNotRequired middleware allows access for unauthenticated users and requests in session that do not have
 // Xsrf. If the user is authenticated, it validates the actor with the supplied validators and the defaults for the
 // service.
-func (j *service) OptionalXsrfNotRequired(validators ...ActorValidator) gin.HandlerFunc {
+func (j *service) OptionalXsrfNotRequired(validators ...AuthValidator) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			a := GetAuthFromRequest(r)
@@ -104,15 +104,15 @@ func (j *service) OptionalXsrfNotRequired(validators ...ActorValidator) gin.Hand
 
 // AdminOnly middleware requires and authenticates an admin actor. It applies the validators passed in addition to the
 // admin validator and the default validators for the service.
-func (j *service) AdminOnly(validators ...ActorValidator) gin.HandlerFunc {
-	combined := combineActorValidators(validators, []ActorValidator{ActorValidatorIsAdmin})
+func (j *service) AdminOnly(validators ...AuthValidator) gin.HandlerFunc {
+	combined := combineAuthValidators(validators, []AuthValidator{AuthValidatorActorIsAdmin})
 	return j.Required(combined...)
 }
 
-func (j *service) EstablishGinSession(c *gin.Context, ra RequestAuth) error {
+func (j *service) EstablishGinSession(c *gin.Context, ra *RequestAuth) error {
 	return j.EstablishSession(c.Request.Context(), c.Writer, ra)
 }
 
-func (j *service) EndGinSession(c *gin.Context, ra RequestAuth) error {
+func (j *service) EndGinSession(c *gin.Context, ra *RequestAuth) error {
 	return j.EndSession(c.Request.Context(), c.Writer, ra)
 }

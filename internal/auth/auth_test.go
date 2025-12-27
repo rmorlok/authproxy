@@ -35,7 +35,7 @@ type route struct {
 	method     string
 	path       string
 	handler    HandlerFunc
-	validators []ActorValidator
+	validators []AuthValidator
 }
 
 type TestGinServerBuilder struct {
@@ -51,14 +51,14 @@ type TestGinServerBuilder struct {
 	optionalXsrfNotRequiredAuthRoutes []route
 	requiredAuthRoutes                []route
 	adminAuthRoutes                   []route
-	defaultValidators                 []ActorValidator
+	defaultValidators                 []AuthValidator
 }
 
 func NewTestGinServerBuilder(testName string) *TestGinServerBuilder {
 	return &TestGinServerBuilder{testName: testName}
 }
 
-func (b *TestGinServerBuilder) WithDefaultValidator(v ActorValidator) *TestGinServerBuilder {
+func (b *TestGinServerBuilder) WithDefaultValidator(v AuthValidator) *TestGinServerBuilder {
 	b.defaultValidators = append(b.defaultValidators, v)
 	return b
 }
@@ -90,55 +90,55 @@ func (b *TestGinServerBuilder) WithGetPingOpenRoute(path string) *TestGinServerB
 	})
 }
 
-func (b *TestGinServerBuilder) WithOptionalAuthRoute(method, path string, handler HandlerFunc, validators ...ActorValidator) *TestGinServerBuilder {
+func (b *TestGinServerBuilder) WithOptionalAuthRoute(method, path string, handler HandlerFunc, validators ...AuthValidator) *TestGinServerBuilder {
 	b.optionalAuthRoutes = append(b.optionalAuthRoutes, route{path: path, handler: handler, method: method, validators: validators})
 	return b
 }
 
-func (b *TestGinServerBuilder) WithGetPingOptionalAuthRoute(path string, validators ...ActorValidator) *TestGinServerBuilder {
+func (b *TestGinServerBuilder) WithGetPingOptionalAuthRoute(path string, validators ...AuthValidator) *TestGinServerBuilder {
 	return b.WithOptionalAuthRoute(http.MethodGet, path, func(c *gin.Context, a A) {
 		b.pingCounter++
 		c.PureJSON(200, gin.H{"ok": true})
 	}, validators...)
 }
 
-func (b *TestGinServerBuilder) WithOptionalXsrfNotRequiredAuthRoute(method, path string, handler HandlerFunc, validators ...ActorValidator) *TestGinServerBuilder {
+func (b *TestGinServerBuilder) WithOptionalXsrfNotRequiredAuthRoute(method, path string, handler HandlerFunc, validators ...AuthValidator) *TestGinServerBuilder {
 	b.optionalXsrfNotRequiredAuthRoutes = append(b.optionalXsrfNotRequiredAuthRoutes, route{path: path, handler: handler, method: method, validators: validators})
 	return b
 }
 
-func (b *TestGinServerBuilder) WithGetPingOptionalXsrfNotRequiredAuthRoute(path string, validators ...ActorValidator) *TestGinServerBuilder {
+func (b *TestGinServerBuilder) WithGetPingOptionalXsrfNotRequiredAuthRoute(path string, validators ...AuthValidator) *TestGinServerBuilder {
 	return b.WithOptionalXsrfNotRequiredAuthRoute(http.MethodGet, path, func(c *gin.Context, a A) {
 		b.pingCounter++
 		c.PureJSON(200, gin.H{"ok": true})
 	}, validators...)
 }
 
-func (b *TestGinServerBuilder) WithRequiredAuthRoute(method, path string, handler HandlerFunc, validators ...ActorValidator) *TestGinServerBuilder {
+func (b *TestGinServerBuilder) WithRequiredAuthRoute(method, path string, handler HandlerFunc, validators ...AuthValidator) *TestGinServerBuilder {
 	b.requiredAuthRoutes = append(b.requiredAuthRoutes, route{path: path, handler: handler, method: method, validators: validators})
 	return b
 }
 
-func (b *TestGinServerBuilder) WithGetPingRequiredAuthRoute(path string, validators ...ActorValidator) *TestGinServerBuilder {
+func (b *TestGinServerBuilder) WithGetPingRequiredAuthRoute(path string, validators ...AuthValidator) *TestGinServerBuilder {
 	return b.WithRequiredAuthRoute(http.MethodGet, path, func(c *gin.Context, a A) {
 		b.pingCounter++
 		c.PureJSON(200, gin.H{"ok": true})
 	}, validators...)
 }
 
-func (b *TestGinServerBuilder) WithPostPingRequiredAuthRoute(path string, validators ...ActorValidator) *TestGinServerBuilder {
+func (b *TestGinServerBuilder) WithPostPingRequiredAuthRoute(path string, validators ...AuthValidator) *TestGinServerBuilder {
 	return b.WithRequiredAuthRoute(http.MethodPost, path, func(c *gin.Context, a A) {
 		b.pingCounter++
 		c.PureJSON(200, gin.H{"ok": true})
 	}, validators...)
 }
 
-func (b *TestGinServerBuilder) WithAdminAuthRoute(method, path string, handler HandlerFunc, validators ...ActorValidator) *TestGinServerBuilder {
+func (b *TestGinServerBuilder) WithAdminAuthRoute(method, path string, handler HandlerFunc, validators ...AuthValidator) *TestGinServerBuilder {
 	b.adminAuthRoutes = append(b.adminAuthRoutes, route{path: path, handler: handler, method: method, validators: validators})
 	return b
 }
 
-func (b *TestGinServerBuilder) WithGetPingAdminAuthRoute(path string, validators ...ActorValidator) *TestGinServerBuilder {
+func (b *TestGinServerBuilder) WithGetPingAdminAuthRoute(path string, validators ...AuthValidator) *TestGinServerBuilder {
 	return b.WithAdminAuthRoute(http.MethodGet, path, func(c *gin.Context, a A) {
 		b.pingCounter++
 		c.PureJSON(200, gin.H{"ok": true})
@@ -213,7 +213,7 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 	auth := NewService(b.cfg, b.cfg.MustGetService(b.service).(config.HttpService), b.db, b.r, e, test_utils.NewTestLogger())
 
 	if len(b.defaultValidators) > 0 {
-		auth = auth.WithDefaultActorValidators(b.defaultValidators...)
+		auth = auth.WithDefaultAuthValidators(b.defaultValidators...)
 	}
 	b.ginEngine = gin.New()
 
@@ -428,8 +428,8 @@ func (ts *TestSetup) MustGetInvalidAdminUser(ctx context.Context) database.Actor
 	}
 }
 
-func actorIsBobDole(actor *database.Actor) (bool, string) {
-	if actor.ExternalId == "bobdole" {
+func actorIsBobDole(ra *RequestAuth) (bool, string) {
+	if ra.GetActor().ExternalId == "bobdole" {
 		return true, ""
 	}
 
