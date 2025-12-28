@@ -56,7 +56,7 @@ func TestRevokeRefreshToken(t *testing.T) {
 			encrypt:    encrypt,
 			logger:     logger,
 			connection: &mockCore.Connection{
-				ID: connectionId,
+				Id: connectionId,
 			},
 			auth: &cfg.AuthOAuth2{
 				Type: cfg.AuthTypeOAuth2,
@@ -72,8 +72,8 @@ func TestRevokeRefreshToken(t *testing.T) {
 		defer ctrl.Finish()
 
 		MockOAuthTokenForConnection(context.Background(), db, encrypt, database.OAuth2Token{
-			ID:                    tokenId,
-			ConnectionID:          connectionId,
+			Id:                    tokenId,
+			ConnectionId:          connectionId,
 			EncryptedAccessToken:  "some-access-token",
 			EncryptedRefreshToken: "some-refresh-token",
 		})

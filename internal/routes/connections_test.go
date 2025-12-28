@@ -83,7 +83,7 @@ func TestConnections(t *testing.T) {
 		defer done()
 		u := uuid.New()
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
-			ID:               u,
+			Id:               u,
 			Namespace:        cfg.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
@@ -120,7 +120,7 @@ func TestConnections(t *testing.T) {
 			var resp ConnectionJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, u, resp.ID)
+			require.Equal(t, u, resp.Id)
 			require.Equal(t, database.ConnectionStateCreated, resp.State)
 		})
 	})
@@ -135,7 +135,7 @@ func TestConnections(t *testing.T) {
 
 		u := uuid.New()
 		err := tu.Db.CreateConnection(ctx, &database.Connection{
-			ID:               u,
+			Id:               u,
 			Namespace:        "root",
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
@@ -146,7 +146,7 @@ func TestConnections(t *testing.T) {
 		now = now.Add(time.Second)
 		c.SetTime(now)
 		err = tu.Db.CreateConnection(context.Background(), &database.Connection{
-			ID:               uuid.New(),
+			Id:               uuid.New(),
 			Namespace:        "root.child",
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
@@ -157,7 +157,7 @@ func TestConnections(t *testing.T) {
 		now = now.Add(time.Second)
 		c.SetTime(now)
 		err = tu.Db.CreateConnection(context.Background(), &database.Connection{
-			ID:               uuid.New(),
+			Id:               uuid.New(),
 			Namespace:        "root.child",
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
@@ -168,7 +168,7 @@ func TestConnections(t *testing.T) {
 		now = now.Add(time.Second)
 		c.SetTime(now)
 		err = tu.Db.CreateConnection(context.Background(), &database.Connection{
-			ID:               uuid.New(),
+			Id:               uuid.New(),
 			Namespace:        "root.child.grandchild",
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
@@ -211,7 +211,7 @@ func TestConnections(t *testing.T) {
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 1)
-			require.Equal(t, resp.Items[0].ID, u)
+			require.Equal(t, resp.Items[0].Id, u)
 		})
 
 		t.Run("filter to namespace matcher", func(t *testing.T) {
@@ -234,7 +234,7 @@ func TestConnections(t *testing.T) {
 		defer done()
 		u := uuid.New()
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
-			ID:               u,
+			Id:               u,
 			Namespace:        cfg.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
@@ -271,7 +271,7 @@ func TestConnections(t *testing.T) {
 			var resp ConnectionJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, u, resp.ID)
+			require.Equal(t, u, resp.Id)
 			require.Equal(t, database.ConnectionStateDisconnected, resp.State)
 		})
 	})

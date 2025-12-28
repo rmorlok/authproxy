@@ -49,7 +49,7 @@ func TestService(t *testing.T) {
 	s := NewEncryptService(cfg, db)
 
 	connection := database.Connection{
-		ID:               uuid.New(),
+		Id:               uuid.New(),
 		Namespace:        "root.some-namespace",
 		ConnectorId:      uuid.New(),
 		ConnectorVersion: 1,
@@ -58,7 +58,7 @@ func TestService(t *testing.T) {
 	require.NoError(t, db.CreateConnection(context.Background(), &connection))
 
 	connectorVersion := database.ConnectorVersion{
-		ID:                  uuid.New(),
+		Id:                  uuid.New(),
 		Version:             1,
 		Namespace:           "root.some-namespace",
 		State:               database.ConnectorVersionStatePrimary,

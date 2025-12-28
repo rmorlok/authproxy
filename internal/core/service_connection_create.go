@@ -20,7 +20,7 @@ func (s *service) CreateConnection(
 	logger := aplog.LoggerOrDefault(cv, s)
 	logger.Info("creating new connection",
 		"namespace", namespace,
-		"connector_id", cv.GetID(),
+		"connector_id", cv.GetId(),
 		"connector_version", cv.GetVersion(),
 	)
 
@@ -36,9 +36,9 @@ func (s *service) CreateConnection(
 	now := apctx.GetClock(ctx).Now()
 
 	dbConn := database.Connection{
-		ID:               id,
+		Id:               id,
 		Namespace:        namespace,
-		ConnectorId:      cv.GetID(),
+		ConnectorId:      cv.GetId(),
 		ConnectorVersion: cv.GetVersion(),
 		CreatedAt:        now,
 		UpdatedAt:        now,
@@ -55,7 +55,7 @@ func (s *service) CreateConnection(
 
 	logger.Info("created new connection",
 		"namespace", namespace,
-		"connector_id", cv.GetID(),
+		"connector_id", cv.GetId(),
 		"connector_version", cv.GetVersion(),
 		"connection_id", id)
 

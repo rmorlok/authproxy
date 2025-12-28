@@ -49,7 +49,7 @@ func (l *listConnectionsWrapper) convertPageResult(ctx context.Context, result p
 			l.cc = make(map[iface.ConnectorVersionId]*ConnectorVersion)
 		}
 
-		l.cc[iface.ConnectorVersionId{Id: v.GetID(), Version: v.GetVersion()}] = v
+		l.cc[iface.ConnectorVersionId{Id: v.GetId(), Version: v.GetVersion()}] = v
 	}
 
 	connections := make([]iface.Connection, 0, len(result.Results))

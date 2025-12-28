@@ -208,7 +208,7 @@ func TestDirectStore_WritesKeys(t *testing.T) {
 	rl := ll.(*redisLogger)
 
 	entry := &Entry{
-		ID:        uuid.New(),
+		Id:        uuid.New(),
 		Timestamp: time.Now(),
 		Request: EntryRequest{
 			URL:         "http://x/y",
@@ -235,7 +235,7 @@ func TestDirectStore_WritesKeys(t *testing.T) {
 	err := rl.storeEntryInRedis(entry)
 	require.NoError(t, err)
 
-	key := redisLogKey(entry.ID)
+	key := redisLogKey(entry.Id)
 	m, err := r.HGetAll(context.Background(), key).Result()
 
 	require.NoError(t, err)

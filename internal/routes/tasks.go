@@ -158,7 +158,7 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	if ti.ActorId != uuid.Nil && ti.ActorId != ra.MustGetActor().ID {
+	if ti.ActorId != uuid.Nil && ti.ActorId != ra.MustGetActor().Id {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusForbidden().
 			WithResponseMsg("not authorized to view task").

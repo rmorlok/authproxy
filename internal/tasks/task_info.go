@@ -24,11 +24,11 @@ type TaskInfo struct {
 }
 
 type Actor interface {
-	GetID() uuid.UUID
+	GetId() uuid.UUID
 }
 
 func (ti *TaskInfo) BindToActor(actor Actor) *TaskInfo {
-	ti.ActorId = actor.GetID()
+	ti.ActorId = actor.GetId()
 	return ti
 }
 

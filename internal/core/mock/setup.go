@@ -22,7 +22,7 @@ func MockConnectionRetrieval(ctx context.Context, dbMock *mockDb.MockDB, e *mock
 		EXPECT().
 		GetConnection(gomock.Any(), connUuuid).
 		Return(&database.Connection{
-			ID:               connUuuid,
+			Id:               connUuuid,
 			State:            database.ConnectionStateReady,
 			ConnectorId:      c.Id,
 			ConnectorVersion: c.Version,
@@ -49,7 +49,7 @@ func MockConnectorRetrival(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.
 		EXPECT().
 		GetConnectorVersion(gomock.Any(), c.Id, c.Version).
 		Return(&database.ConnectorVersion{
-			ID:                  c.Id,
+			Id:                  c.Id,
 			Version:             c.Version,
 			State:               state,
 			Type:                c.Type,

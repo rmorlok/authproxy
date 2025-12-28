@@ -42,13 +42,13 @@ func (th *taskHandler) refreshOauth2Token(ctx context.Context, t *asynq.Task) er
 		return fmt.Errorf("connection not found: %w", asynq.SkipRetry)
 	}
 
-	token, err := th.db.GetOAuth2Token(ctx, connection.GetID())
+	token, err := th.db.GetOAuth2Token(ctx, connection.GetId())
 	if err != nil {
 		return fmt.Errorf("failed to load oauth token: %v", err)
 	}
 
 	if token == nil {
-		return fmt.Errorf("oauth token not found for connection %v: %w", connection.GetID(), asynq.SkipRetry)
+		return fmt.Errorf("oauth token not found for connection %v: %w", connection.GetId(), asynq.SkipRetry)
 	}
 
 	o2 := th.factory.NewOAuth2(connection).(*oAuth2Connection)

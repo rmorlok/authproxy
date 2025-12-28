@@ -32,15 +32,15 @@ func wrapConnection(c *database.Connection, cv *ConnectorVersion, s *service) *c
 		cv:         cv,
 		logger: aplog.NewBuilder(s.logger).
 			WithNamespace(c.Namespace).
-			WithConnectionId(c.ID).
-			WithConnectorId(cv.ID).
+			WithConnectionId(c.Id).
+			WithConnectorId(cv.Id).
 			WithConnectorVersion(cv.Version).
 			Build(),
 	}
 }
 
-func (c *connection) GetID() uuid.UUID {
-	return c.ID
+func (c *connection) GetId() uuid.UUID {
+	return c.Id
 }
 
 func (c *connection) GetNamespace() string {

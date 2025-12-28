@@ -95,7 +95,7 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 					Scopes: []config.Scope{{Id: "read"}, {Id: "write"}},
 				},
 				connection: &mockCore.Connection{
-					ID: uuid.MustParse("12345678-1234-1234-1234-123456789abc"),
+					Id: uuid.MustParse("12345678-1234-1234-1234-123456789abc"),
 				},
 			}
 

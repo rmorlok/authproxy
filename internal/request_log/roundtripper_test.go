@@ -65,7 +65,7 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 				ContentLength: int64(len([]byte(`{"other": "json"}`))),
 			},
 			expectedEntry: &Entry{
-				ID:            uuid.New(),
+				Id:            uuid.New(),
 				CorrelationID: "some-value",
 				Timestamp:     time.Now(),
 				Full:          true,
@@ -124,7 +124,7 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 				ContentLength: int64(len([]byte(`{"other": "json"}`))),
 			},
 			expectedEntry: &Entry{
-				ID:            uuid.New(),
+				Id:            uuid.New(),
 				CorrelationID: "some-value",
 				Timestamp:     time.Now(),
 				Full:          true,
@@ -183,7 +183,7 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 				ContentLength: int64(len([]byte(`{"other": "json"}`))),
 			},
 			expectedEntry: &Entry{
-				ID:            uuid.New(),
+				Id:            uuid.New(),
 				CorrelationID: "some-value",
 				Timestamp:     time.Now(),
 				Full:          false,
@@ -230,7 +230,7 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 			},
 			roundTripErr: errors.New("network issue"),
 			expectedEntry: &Entry{
-				ID:            uuid.New(),
+				Id:            uuid.New(),
 				CorrelationID: "some-value",
 				Timestamp:     time.Now(),
 				Full:          true,
@@ -281,7 +281,7 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 
 			ctx := apctx.
 				NewBuilderBackground().
-				WithFixedUuidGenerator(test.expectedEntry.ID).
+				WithFixedUuidGenerator(test.expectedEntry.Id).
 				WithCorrelationID(test.expectedEntry.CorrelationID).
 				WithFixedClock(test.expectedEntry.Timestamp).
 				Build()
@@ -348,7 +348,7 @@ func TestRedisLogger_RoundTrip_TimesOutAtConfiguredValue(t *testing.T) {
 		ContentLength: 0, // Unset directly, must be inferred from the response size
 	}
 	expectedEntry := &Entry{
-		ID:               uuid.New(),
+		Id:               uuid.New(),
 		CorrelationID:    "some-value",
 		Timestamp:        time.Now(),
 		InternalTimeout:  true,
@@ -402,7 +402,7 @@ func TestRedisLogger_RoundTrip_TimesOutAtConfiguredValue(t *testing.T) {
 
 	ctx := apctx.
 		NewBuilderBackground().
-		WithFixedUuidGenerator(expectedEntry.ID).
+		WithFixedUuidGenerator(expectedEntry.Id).
 		WithCorrelationID(expectedEntry.CorrelationID).
 		WithFixedClock(expectedEntry.Timestamp).
 		Build()
@@ -462,7 +462,7 @@ func TestRedisLogger_RoundTrip_TimesOutAtAtContextCancel(t *testing.T) {
 		ContentLength: 0, // Unset directly, must be inferred from the response size
 	}
 	expectedEntry := &Entry{
-		ID:               uuid.New(),
+		Id:               uuid.New(),
 		CorrelationID:    "some-value",
 		Timestamp:        time.Now(),
 		InternalTimeout:  false,
@@ -516,7 +516,7 @@ func TestRedisLogger_RoundTrip_TimesOutAtAtContextCancel(t *testing.T) {
 
 	ctx := apctx.
 		NewBuilderBackground().
-		WithFixedUuidGenerator(expectedEntry.ID).
+		WithFixedUuidGenerator(expectedEntry.Id).
 		WithCorrelationID(expectedEntry.CorrelationID).
 		WithFixedClock(expectedEntry.Timestamp).
 		Build()

@@ -243,7 +243,7 @@ cvc.versions as total_versions
 
 		// Scan all fields except States
 		err := rows.Scan(
-			&c.ID,
+			&c.Id,
 			&c.Namespace,
 			&c.Version,
 			&c.State,

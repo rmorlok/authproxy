@@ -21,7 +21,7 @@ func TestConnections(t *testing.T) {
 
 		u := uuid.New()
 		err := db.CreateConnection(ctx, &Connection{
-			ID:               u,
+			Id:               u,
 			Namespace:        "root.some-namespace",
 			ConnectorId:      uuid.New(),
 			ConnectorVersion: 1,
@@ -32,7 +32,7 @@ func TestConnections(t *testing.T) {
 		c, err := db.GetConnection(ctx, u)
 		assert.NoError(t, err)
 		assert.NotNil(t, c)
-		assert.Equal(t, c.ID, u)
+		assert.Equal(t, c.Id, u)
 		assert.Equal(t, c.State, ConnectionStateCreated)
 		assert.Equal(t, now, c.CreatedAt)
 		assert.Equal(t, now, c.UpdatedAt)
@@ -55,7 +55,7 @@ func TestConnections(t *testing.T) {
 
 		u := uuid.New()
 		err := db.CreateConnection(ctx, &Connection{
-			ID:               u,
+			Id:               u,
 			Namespace:        "root.some-namespace",
 			ConnectorId:      uuid.New(),
 			ConnectorVersion: 1,
@@ -118,7 +118,7 @@ func TestConnections(t *testing.T) {
 
 		u := uuid.New()
 		err := db.CreateConnection(ctx, &Connection{
-			ID:               u,
+			Id:               u,
 			Namespace:        "root.some-namespace",
 			ConnectorId:      uuid.New(),
 			ConnectorVersion: 1,
@@ -191,7 +191,7 @@ func TestConnections(t *testing.T) {
 			}
 
 			err := db.CreateConnection(ctx, &Connection{
-				ID:               u,
+				Id:               u,
 				Namespace:        fmt.Sprintf("root.some-namespace.%d", i%10),
 				ConnectorId:      uuid.New(),
 				ConnectorVersion: 1,
@@ -204,7 +204,7 @@ func TestConnections(t *testing.T) {
 			result := db.ListConnectionsBuilder().Limit(10).FetchPage(ctx)
 			assert.NoError(t, result.Error)
 			assert.Len(t, result.Results, 10)
-			assert.Equal(t, result.Results[0].ID, firstUuid)
+			assert.Equal(t, result.Results[0].Id, firstUuid)
 			assert.True(t, result.HasMore)
 			assert.NotEmpty(t, result.Cursor)
 
@@ -225,7 +225,7 @@ func TestConnections(t *testing.T) {
 			}
 
 			assert.Equal(t, 50, total)
-			assert.Equal(t, lastUuid, last.ID)
+			assert.Equal(t, lastUuid, last.Id)
 		})
 
 		t.Run("filter by namespace", func(t *testing.T) {
@@ -236,7 +236,7 @@ func TestConnections(t *testing.T) {
 				FetchPage(ctx)
 			assert.NoError(t, result.Error)
 			assert.Len(t, result.Results, 5)
-			assert.Equal(t, result.Results[0].ID, firstUuid)
+			assert.Equal(t, result.Results[0].Id, firstUuid)
 			assert.False(t, result.HasMore)
 			assert.Empty(t, result.Cursor)
 
@@ -247,7 +247,7 @@ func TestConnections(t *testing.T) {
 				FetchPage(ctx)
 			assert.NoError(t, result.Error)
 			assert.Len(t, result.Results, 5)
-			assert.NotEqual(t, result.Results[0].ID, firstUuid)
+			assert.NotEqual(t, result.Results[0].Id, firstUuid)
 			assert.False(t, result.HasMore)
 			assert.Empty(t, result.Cursor)
 		})
@@ -281,8 +281,8 @@ func TestConnections(t *testing.T) {
 
 			assert.NoError(t, err)
 			assert.Len(t, allResults, 50)
-			assert.Equal(t, lastUuid, allResults[0].ID)
-			assert.Equal(t, firstUuid, allResults[49].ID)
+			assert.Equal(t, lastUuid, allResults[0].Id)
+			assert.Equal(t, firstUuid, allResults[49].Id)
 		})
 	})
 
@@ -304,7 +304,7 @@ func TestConnections(t *testing.T) {
 			}
 
 			err := db.CreateConnection(ctx, &Connection{
-				ID:               u,
+				Id:               u,
 				Namespace:        "root.some-namespace",
 				ConnectorId:      uuid.New(),
 				ConnectorVersion: 1,
@@ -318,7 +318,7 @@ func TestConnections(t *testing.T) {
 		c.SetTime(now)
 		u := uuid.New()
 		err := db.CreateConnection(ctx, &Connection{
-			ID:               u,
+			Id:               u,
 			Namespace:        "root.some-namespace",
 			ConnectorId:      uuid.New(),
 			ConnectorVersion: 1,
@@ -331,7 +331,7 @@ func TestConnections(t *testing.T) {
 		c.SetTime(now)
 		u = uuid.New()
 		err = db.CreateConnection(ctx, &Connection{
-			ID:               u,
+			Id:               u,
 			Namespace:        "root.some-namespace",
 			ConnectorId:      uuid.New(),
 			ConnectorVersion: 1,

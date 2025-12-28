@@ -17,7 +17,7 @@ func TestFakeService(t *testing.T) {
 	for _, doBase64 := range []bool{true, false} {
 		t.Run(fmt.Sprintf("doBase64=%v", doBase64), func(t *testing.T) {
 			connectorVersion := database.ConnectorVersion{
-				ID:                  uuid.New(),
+				Id:                  uuid.New(),
 				Version:             1,
 				State:               database.ConnectorVersionStatePrimary,
 				Type:                "test",
@@ -38,7 +38,7 @@ func TestFakeService(t *testing.T) {
 			s := NewEncryptService(cfg, db)
 
 			connection := database.Connection{
-				ID:               uuid.New(),
+				Id:               uuid.New(),
 				Namespace:        "root.some-namespace",
 				ConnectorId:      uuid.New(),
 				ConnectorVersion: 1,

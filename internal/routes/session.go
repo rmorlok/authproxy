@@ -106,7 +106,7 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 	a := ra.MustGetActor()
 
 	gctx.PureJSON(http.StatusOK, InitiateSuccessResponse{
-		ActorId: a.ID,
+		ActorId: a.Id,
 	})
 }
 

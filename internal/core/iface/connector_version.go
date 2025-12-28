@@ -9,7 +9,7 @@ import (
 )
 
 type ConnectorVersion interface {
-	GetID() uuid.UUID
+	GetId() uuid.UUID
 	GetNamespace() string
 	GetVersion() uint64
 	GetState() database.ConnectorVersionState

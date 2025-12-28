@@ -81,8 +81,8 @@ func NewProbe(cfg *cfg.Probe, s *service, cv *ConnectorVersion, c *connection) i
 		logger: aplog.NewBuilder(s.logger).
 			With("probe_id", cfg.Id).
 			WithNamespace(c.Namespace).
-			WithConnectionId(c.ID).
-			WithConnectorId(cv.ID).
+			WithConnectionId(c.Id).
+			WithConnectorId(cv.Id).
 			WithConnectorVersion(cv.Version).
 			Build(),
 	}

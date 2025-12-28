@@ -21,8 +21,8 @@ func MockOAuthTokenForConnection(ctx context.Context, dbMock *mockDb.MockDB, e *
 	unencryptedRefreshToken := token.EncryptedRefreshToken
 	unencryptedAccessToken := token.EncryptedAccessToken
 
-	encryptedRefreshToken := fmt.Sprintf("%s-encrypted-refresh-token", token.ConnectionID.String())
-	encryptedAccessToken := fmt.Sprintf("%s-encrypted-access-token", token.ConnectionID.String())
+	encryptedRefreshToken := fmt.Sprintf("%s-encrypted-refresh-token", token.ConnectionId.String())
+	encryptedAccessToken := fmt.Sprintf("%s-encrypted-access-token", token.ConnectionId.String())
 	token.EncryptedRefreshToken = encryptedRefreshToken
 	token.EncryptedAccessToken = encryptedAccessToken
 	if token.CreatedAt.IsZero() {
@@ -31,7 +31,7 @@ func MockOAuthTokenForConnection(ctx context.Context, dbMock *mockDb.MockDB, e *
 
 	dbMock.
 		EXPECT().
-		GetOAuth2Token(gomock.Any(), token.ConnectionID).
+		GetOAuth2Token(gomock.Any(), token.ConnectionId).
 		Return(&token, nil).
 		AnyTimes()
 
@@ -40,7 +40,7 @@ func MockOAuthTokenForConnection(ctx context.Context, dbMock *mockDb.MockDB, e *
 		DecryptStringForConnection(
 			gomock.Any(),
 			mockCore.ConnectionMatcher{
-				ExpectedId: token.ConnectionID,
+				ExpectedId: token.ConnectionId,
 			},
 			encryptedRefreshToken).
 		Return(unencryptedRefreshToken, nil).
@@ -51,7 +51,7 @@ func MockOAuthTokenForConnection(ctx context.Context, dbMock *mockDb.MockDB, e *
 		DecryptStringForConnection(
 			gomock.Any(),
 			mockCore.ConnectionMatcher{
-				ExpectedId: token.ConnectionID,
+				ExpectedId: token.ConnectionId,
 			},
 			encryptedAccessToken).
 		Return(unencryptedAccessToken, nil).

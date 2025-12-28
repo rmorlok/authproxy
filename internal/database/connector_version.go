@@ -110,7 +110,7 @@ func IsValidConnectorVersionState[T string | ConnectorVersionState](state T) boo
 const ConnectorVersionsTable = "connector_versions"
 
 type ConnectorVersion struct {
-	ID                  uuid.UUID
+	Id                  uuid.UUID
 	Version             uint64
 	Namespace           string
 	State               ConnectorVersionState
@@ -139,7 +139,7 @@ func (cv *ConnectorVersion) cols() []string {
 
 func (cv *ConnectorVersion) fields() []any {
 	return []any{
-		&cv.ID,
+		&cv.Id,
 		&cv.Version,
 		&cv.Namespace,
 		&cv.State,
@@ -154,7 +154,7 @@ func (cv *ConnectorVersion) fields() []any {
 
 func (cv *ConnectorVersion) values() []any {
 	return []any{
-		cv.ID,
+		cv.Id,
 		cv.Version,
 		cv.Namespace,
 		cv.State,
@@ -167,8 +167,8 @@ func (cv *ConnectorVersion) values() []any {
 	}
 }
 
-func (cv *ConnectorVersion) GetID() uuid.UUID {
-	return cv.ID
+func (cv *ConnectorVersion) GetId() uuid.UUID {
+	return cv.Id
 }
 
 func (cv *ConnectorVersion) GetNamespace() string {
@@ -186,7 +186,7 @@ func (cv *ConnectorVersion) GetType() string {
 func (cv *ConnectorVersion) Validate() error {
 	result := &multierror.Error{}
 
-	if cv.ID == uuid.Nil {
+	if cv.Id == uuid.Nil {
 		result = multierror.Append(result, errors.New("id is required"))
 	}
 
@@ -285,7 +285,7 @@ func (s *service) GetConnectorVersions(
 	versionMap := make(map[ConnectorVersionId]*ConnectorVersion, len(versions))
 	for i := range versions {
 		id := ConnectorVersionId{
-			Id:      versions[i].ID,
+			Id:      versions[i].Id,
 			Version: versions[i].Version,
 		}
 		if _, exists := ids[id]; exists {
@@ -309,7 +309,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 
 	logger := aplog.NewBuilder(s.logger).
 		WithCtx(ctx).
-		WithConnectorId(cv.ID).
+		WithConnectorId(cv.Id).
 		Build()
 	logger.Debug("upserting connector version")
 
@@ -327,7 +327,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 		existingNamespace, _, err := sqlh.ScanWithDefault(sqb.
 			Select("namespace").
 			From(ConnectorVersionsTable).
-			Where(sq.Eq{"id": cv.ID, "version": cv.Version}).
+			Where(sq.Eq{"id": cv.Id, "version": cv.Version}).
 			QueryRowContext(ctx),
 			cv.Namespace)
 
@@ -342,7 +342,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 		exitingState, defaultUsed, err := sqlh.ScanWithDefault(sqb.
 			Select("state").
 			From(ConnectorVersionsTable).
-			Where(sq.Eq{"id": cv.ID, "version": cv.Version}).
+			Where(sq.Eq{"id": cv.Id, "version": cv.Version}).
 			QueryRowContext(ctx),
 			ConnectorVersionStateDraft)
 
@@ -362,7 +362,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				Set("type", cv.Type).
 				Set("encrypted_definition", cv.EncryptedDefinition).
 				Set("updated_at", apctx.GetClock(ctx).Now()).
-				Where(sq.Eq{"id": cv.ID, "version": cv.Version}).
+				Where(sq.Eq{"id": cv.Id, "version": cv.Version}).
 				Exec()
 			if err != nil {
 				return err
@@ -384,7 +384,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 			err := sqb.
 				Select("COALESCE(MAX(version), 0)").
 				From(ConnectorVersionsTable).
-				Where(sq.Eq{"id": cv.ID}).
+				Where(sq.Eq{"id": cv.Id}).
 				QueryRowContext(ctx).
 				Scan(&maxVersion)
 
@@ -416,7 +416,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				Set("state", ConnectorVersionStateActive).
 				Where(sq.And{
 					sq.Eq{
-						"id":    cv.ID,
+						"id":    cv.Id,
 						"state": ConnectorVersionStatePrimary,
 					},
 					sq.NotEq{"version": cv.Version},

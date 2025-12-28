@@ -37,18 +37,18 @@ func (m *MockConnectorVersion) EXPECT() *MockConnectorVersionMockRecorder {
 	return m.recorder
 }
 
-// GetID mocks base method.
-func (m *MockConnectorVersion) GetID() uuid.UUID {
+// GetId mocks base method.
+func (m *MockConnectorVersion) GetId() uuid.UUID {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetID")
+	ret := m.ctrl.Call(m, "GetId")
 	ret0, _ := ret[0].(uuid.UUID)
 	return ret0
 }
 
-// GetID indicates an expected call of GetID.
-func (mr *MockConnectorVersionMockRecorder) GetID() *gomock.Call {
+// GetId indicates an expected call of GetId.
+func (mr *MockConnectorVersionMockRecorder) GetId() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetID", reflect.TypeOf((*MockConnectorVersion)(nil).GetID))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetId", reflect.TypeOf((*MockConnectorVersion)(nil).GetId))
 }
 
 // GetType mocks base method.
@@ -130,18 +130,18 @@ func (mr *MockConnectionMockRecorder) GetConnectorVersion() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersion", reflect.TypeOf((*MockConnection)(nil).GetConnectorVersion))
 }
 
-// GetID mocks base method.
-func (m *MockConnection) GetID() uuid.UUID {
+// GetId mocks base method.
+func (m *MockConnection) GetId() uuid.UUID {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetID")
+	ret := m.ctrl.Call(m, "GetId")
 	ret0, _ := ret[0].(uuid.UUID)
 	return ret0
 }
 
-// GetID indicates an expected call of GetID.
-func (mr *MockConnectionMockRecorder) GetID() *gomock.Call {
+// GetId indicates an expected call of GetId.
+func (mr *MockConnectionMockRecorder) GetId() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetID", reflect.TypeOf((*MockConnection)(nil).GetID))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetId", reflect.TypeOf((*MockConnection)(nil).GetId))
 }
 
 // MockF is a mock of F interface.

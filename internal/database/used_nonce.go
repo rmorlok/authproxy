@@ -18,7 +18,7 @@ const UsedNoncesTable = "used_nonces"
 // when they are used there is a known time that they must be retained until so that the list of used nonces doesn't
 // grow infinitely.
 type UsedNonce struct {
-	ID          uuid.UUID
+	Id          uuid.UUID
 	RetainUntil time.Time
 	CreatedAt   time.Time
 }
@@ -33,7 +33,7 @@ func (n *UsedNonce) cols() []string {
 
 func (n *UsedNonce) fields() []any {
 	return []any{
-		&n.ID,
+		&n.Id,
 		&n.RetainUntil,
 		&n.CreatedAt,
 	}
@@ -41,7 +41,7 @@ func (n *UsedNonce) fields() []any {
 
 func (n *UsedNonce) values() []any {
 	return []any{
-		n.ID,
+		n.Id,
 		n.RetainUntil,
 		n.CreatedAt,
 	}
@@ -88,7 +88,7 @@ func (s *service) CheckNonceValidAndMarkUsed(
 		}
 
 		newUsedNonce := UsedNonce{
-			ID:          nonce,
+			Id:          nonce,
 			RetainUntil: retainRecordUntil,
 			CreatedAt:   apctx.GetClock(ctx).Now(),
 		}

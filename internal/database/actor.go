@@ -80,7 +80,7 @@ const ActorTable = "actors"
 
 // Actor is some entity taking action within the system.
 type Actor struct {
-	ID          uuid.UUID
+	Id          uuid.UUID
 	ExternalId  string
 	Email       string
 	Permissions Permissions
@@ -107,7 +107,7 @@ func (a *Actor) cols() []string {
 
 func (a *Actor) fields() []any {
 	return []any{
-		&a.ID,
+		&a.Id,
 		&a.ExternalId,
 		&a.Email,
 		&a.Permissions,
@@ -121,7 +121,7 @@ func (a *Actor) fields() []any {
 
 func (a *Actor) values() []any {
 	return []any{
-		a.ID,
+		a.Id,
 		a.ExternalId,
 		a.Email,
 		a.Permissions,
@@ -134,7 +134,7 @@ func (a *Actor) values() []any {
 }
 
 func (a *Actor) setFromJwt(ja *jwt.Actor) {
-	a.ExternalId = ja.ID
+	a.ExternalId = ja.Id
 	a.Email = ja.Email
 	a.Permissions = ja.Permissions
 	a.Admin = ja.IsAdmin()
@@ -144,7 +144,7 @@ func (a *Actor) setFromJwt(ja *jwt.Actor) {
 func (a *Actor) sameAsJwt(ja *jwt.Actor) bool {
 	slices.Sort(a.Permissions)
 
-	return a.ExternalId == ja.ID &&
+	return a.ExternalId == ja.Id &&
 		a.Email == ja.Email &&
 		slices.Equal(a.Permissions, ja.Permissions) &&
 		a.Admin == ja.IsAdmin() &&
@@ -153,7 +153,7 @@ func (a *Actor) sameAsJwt(ja *jwt.Actor) bool {
 
 func (a *Actor) ToJwtActor() jwt.Actor {
 	return jwt.Actor{
-		ID:          a.ExternalId,
+		Id:          a.ExternalId,
 		Email:       a.Email,
 		Permissions: a.Permissions,
 		Admin:       a.Admin,
@@ -161,8 +161,8 @@ func (a *Actor) ToJwtActor() jwt.Actor {
 	}
 }
 
-func (a *Actor) GetID() uuid.UUID {
-	return a.ID
+func (a *Actor) GetId() uuid.UUID {
+	return a.Id
 }
 
 // IsAdmin is a helper to wrap the Admin attribute
@@ -199,7 +199,7 @@ func (a *Actor) normalize() {
 }
 
 func (a *Actor) validate() error {
-	if a.ID == uuid.Nil {
+	if a.Id == uuid.Nil {
 		return errors.New("actor id is empty")
 	}
 
@@ -212,15 +212,15 @@ func (a *Actor) validate() error {
 	}
 
 	if strings.HasPrefix(a.ExternalId, "admin/") && !a.Admin {
-		return errors.New("normal actor cannot have admin/ ID prefix")
+		return errors.New("normal actor cannot have admin/ Id prefix")
 	}
 
 	if a.SuperAdmin && !strings.HasPrefix(a.ExternalId, "superadmin/") {
-		return errors.New("super admin ID is not correctly formatted")
+		return errors.New("super admin Id is not correctly formatted")
 	}
 
 	if strings.HasPrefix(a.ExternalId, "superadmin/") && !a.SuperAdmin {
-		return errors.New("normal actor cannot have superadmin/ ID prefix")
+		return errors.New("normal actor cannot have superadmin/ Id prefix")
 	}
 
 	return nil
@@ -285,7 +285,7 @@ func (s *service) CreateActor(ctx context.Context, a *Actor) error {
 			Select("COUNT(*)").
 			From(ActorTable).
 			Where(sq.Or{
-				sq.Eq{"id": a.ID},
+				sq.Eq{"id": a.Id},
 				sq.Eq{"external_id": a.ExternalId},
 			}).
 			RunWith(tx).
@@ -333,7 +333,7 @@ func (s *service) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 	}
 
 	// This is covered in validation, but cover here to prevent any sort of lookup against an invalid id
-	if actor.ID == "" {
+	if actor.Id == "" {
 		return nil, errors.New("actor id is empty")
 	}
 
@@ -344,7 +344,7 @@ func (s *service) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 		err := s.sq.
 			Select(existingActor.cols()...).
 			From(ActorTable).
-			Where(sq.Eq{"external_id": actor.ID}).
+			Where(sq.Eq{"external_id": actor.Id}).
 			RunWith(s.db).
 			QueryRow().
 			Scan(existingActor.fields()...)
@@ -353,7 +353,7 @@ func (s *service) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 				// Actor does not exist. Create a new actor.
 				now := apctx.GetClock(ctx).Now()
 				newActor := Actor{
-					ID:        uuid.New(),
+					Id:        uuid.New(),
 					CreatedAt: now,
 					UpdatedAt: now,
 				}

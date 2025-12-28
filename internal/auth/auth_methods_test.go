@@ -33,7 +33,7 @@ func TestAuth_Token(t *testing.T) {
 
 	claims, err := j.Parse(testContext, res)
 	require.NoError(t, err)
-	require.NotNil(t, testClaims().Actor.ID, claims.Actor.ID)
+	require.NotNil(t, testClaims().Actor.Id, claims.Actor.Id)
 }
 
 func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
@@ -52,7 +52,7 @@ func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 		},
 
 		Actor: &jwt2.Actor{
-			ID:    "id1",
+			Id:    "id1",
 			Email: "me@example.com",
 		},
 	}
@@ -62,7 +62,7 @@ func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 		require.NoError(t, err)
 		rtClaims, err := j.Parse(testContext, tok)
 		require.NoError(t, err)
-		require.Equal(t, claims.Actor.ID, rtClaims.Actor.ID)
+		require.Equal(t, claims.Actor.Id, rtClaims.Actor.Id)
 
 		tokRunes := []rune(tok)
 		if len(tokRunes) >= 10 {
@@ -82,7 +82,7 @@ func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 		require.NoError(t, err)
 		rtClaims, err := j.Parse(testContext, tok)
 		require.NoError(t, err)
-		require.Equal(t, claims.Actor.ID, rtClaims.Actor.ID)
+		require.Equal(t, claims.Actor.Id, rtClaims.Actor.Id)
 
 		tokRunes := []rune(tok)
 		if len(tokRunes) >= 10 {
@@ -110,7 +110,7 @@ func TestAuth_RoundtripPublicPrivate(t *testing.T) {
 		},
 
 		Actor: &jwt2.Actor{
-			ID:    "id1",
+			Id:    "id1",
 			Email: "me@example.com",
 		},
 	}
@@ -119,7 +119,7 @@ func TestAuth_RoundtripPublicPrivate(t *testing.T) {
 	require.NoError(t, err)
 	rtClaims, err := j.Parse(testContext, tok)
 	require.NoError(t, err)
-	require.Equal(t, claims.Actor.ID, rtClaims.Actor.ID)
+	require.Equal(t, claims.Actor.Id, rtClaims.Actor.Id)
 
 	tokRunes := []rune(tok)
 	if len(tokRunes) >= 10 {
@@ -146,7 +146,7 @@ func TestAuth_SecretKey(t *testing.T) {
 		},
 
 		Actor: &jwt2.Actor{
-			ID:    "id7",
+			Id:    "id7",
 			Email: "me@example.com",
 		},
 	}
@@ -159,7 +159,7 @@ func TestAuth_SecretKey(t *testing.T) {
 
 	rtClaims, err := j.Parse(testContext, tok)
 	require.NoError(t, err)
-	require.Equal(t, claims.Actor.ID, rtClaims.Actor.ID)
+	require.Equal(t, claims.Actor.Id, rtClaims.Actor.Id)
 
 	tokRunes := []rune(tok)
 	if len(tokRunes) >= 10 {
@@ -197,7 +197,7 @@ func TestAuth_Parse(t *testing.T) {
 			},
 
 			Actor: &jwt2.Actor{
-				ID:    "id1",
+				Id:    "id1",
 				Email: "me@example.com",
 			},
 		}
@@ -226,7 +226,7 @@ func TestAuth_Parse(t *testing.T) {
 			},
 
 			Actor: &jwt2.Actor{
-				ID:    "id1",
+				Id:    "id1",
 				Email: "me@example.com",
 			},
 		}
@@ -420,11 +420,11 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
 				require.NoError(t, err)
 				require.True(t, ra.IsAuthenticated())
-				require.Equal(t, testClaims().Actor.ID, ra.MustGetActor().ExternalId)
+				require.Equal(t, testClaims().Actor.Id, ra.MustGetActor().ExternalId)
 
-				actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.ID)
+				actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.Id)
 				require.NoError(t, err)
-				require.Equal(t, testClaims().Actor.ID, actor.ExternalId)
+				require.Equal(t, testClaims().Actor.Id, actor.ExternalId)
 			})
 
 			t.Run("actor loaded from database", func(t *testing.T) {
@@ -432,8 +432,8 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 
 				dbActorId := uuid.New()
 				dbActor := &database.Actor{
-					ID:         dbActorId,
-					ExternalId: testClaims().Actor.ID,
+					Id:         dbActorId,
+					ExternalId: testClaims().Actor.Id,
 					Email:      testClaims().Actor.Email,
 				}
 				require.NoError(t, db.CreateActor(testContext, dbActor))
@@ -450,7 +450,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
 				require.NoError(t, err)
 				require.True(t, ra.IsAuthenticated())
-				require.Equal(t, testClaims().Actor.ID, ra.MustGetActor().ExternalId)
+				require.Equal(t, testClaims().Actor.Id, ra.MustGetActor().ExternalId)
 			})
 
 			t.Run("actor updated in database", func(t *testing.T) {
@@ -458,8 +458,8 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 
 				dbActorId := uuid.New()
 				dbActor := &database.Actor{
-					ID:         dbActorId,
-					ExternalId: testClaims().Actor.ID,
+					Id:         dbActorId,
+					ExternalId: testClaims().Actor.Id,
 					Email:      "old-" + testClaims().Actor.Email,
 				}
 				require.NoError(t, db.CreateActor(testContext, dbActor))
@@ -473,7 +473,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
 				require.NoError(t, err)
 				require.True(t, ra.IsAuthenticated())
-				require.Equal(t, testClaims().Actor.ID, ra.MustGetActor().ExternalId)
+				require.Equal(t, testClaims().Actor.Id, ra.MustGetActor().ExternalId)
 				require.Equal(t, testClaims().Actor.Email, ra.MustGetActor().Email)
 			})
 		})
@@ -496,7 +496,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			_, err = raw.establishAuthFromRequest(futureCtx, true, req, w)
 			require.NotNil(t, err)
 
-			actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.ID)
+			actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.Id)
 			require.ErrorIs(t, err, database.ErrNotFound)
 			require.Nil(t, actor)
 		})
@@ -510,7 +510,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			_, err := raw.establishAuthFromRequest(testContext, true, req, w)
 			require.NotNil(t, err)
 
-			actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.ID)
+			actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.Id)
 			require.ErrorIs(t, err, database.ErrNotFound)
 			require.Nil(t, actor)
 		})
@@ -528,7 +528,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			require.NoError(t, err)
 			require.True(t, ra.IsAuthenticated())
 
-			require.Equal(t, ra.MustGetActor().ID, ra.MustGetActor().ID)
+			require.Equal(t, ra.MustGetActor().Id, ra.MustGetActor().Id)
 		})
 		t.Run("expired", func(t *testing.T) {
 			setup(t)
@@ -597,7 +597,7 @@ func TestAuth_Nonce(t *testing.T) {
 		req := httptest.NewRequest("GET", "/?auth_token="+tok, nil).WithContext(ctx)
 		ts.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code)
-		require.Equal(t, c.Actor.ID, w.Body.String())
+		require.Equal(t, c.Actor.Id, w.Body.String())
 	})
 
 	t.Run("expired", func(t *testing.T) {
@@ -631,7 +631,7 @@ func TestAuth_Nonce(t *testing.T) {
 		req := httptest.NewRequest("GET", "/?auth_token="+tok, nil).WithContext(ctx)
 		ts.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code)
-		require.Equal(t, c.Actor.ID, w.Body.String())
+		require.Equal(t, c.Actor.Id, w.Body.String())
 
 		// Second request fail
 		w = httptest.NewRecorder()
@@ -695,7 +695,7 @@ func testClaims() *jwt2.AuthProxyClaims {
 		},
 
 		Actor: &jwt2.Actor{
-			ID:    "id1",
+			Id:    "id1",
 			Email: "me@example.com",
 		},
 	}

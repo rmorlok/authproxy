@@ -21,7 +21,7 @@ type MockActor struct {
 	id uuid.UUID
 }
 
-func (m *MockActor) GetID() uuid.UUID {
+func (m *MockActor) GetId() uuid.UUID {
 	return m.id
 }
 

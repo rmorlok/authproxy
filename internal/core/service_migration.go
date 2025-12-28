@@ -134,7 +134,7 @@ func (s *service) configConnectorToVersion(configConnector *config.Connector) (*
 	}
 
 	return &database.ConnectorVersion{
-		ID:                  configConnector.Id,
+		Id:                  configConnector.Id,
 		Version:             configConnector.Version,
 		Type:                configConnector.Type,
 		Hash:                configConnector.Hash(),
@@ -350,7 +350,7 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 		}
 
 		if len(results) > 1 {
-			connectorIds := strings.Join(util.Map(results, func(c database.Connector) string { return c.ID.String() }), ", ")
+			connectorIds := strings.Join(util.Map(results, func(c database.Connector) string { return c.Id.String() }), ", ")
 			return errors.Errorf("connector type %s is not unique among existing defined connectors: %s", configConnector.Type, connectorIds)
 		} else if len(results) == 1 {
 			if results[0].Namespace != configConnector.GetNamespace() {
@@ -432,7 +432,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnector *config.
 
 		if existingVersion != nil {
 			cv, err := b.
-				WithId(existingVersion.ID).
+				WithId(existingVersion.Id).
 				WithVersion(version).
 				WithConfig(configConnector).
 				WithState(state).
@@ -443,7 +443,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnector *config.
 				return nil
 			}
 
-			id = existingVersion.ID
+			id = existingVersion.Id
 		}
 	} else {
 		existingVersion, err := s.db.GetConnectorVersionForType(ctx, configConnector.Type)
@@ -453,7 +453,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnector *config.
 
 		if existingVersion != nil {
 			cv, err := b.
-				WithId(existingVersion.ID).
+				WithId(existingVersion.Id).
 				WithVersion(existingVersion.Version).
 				WithConfig(configConnector).
 				WithState(state).
@@ -464,7 +464,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnector *config.
 				return nil
 			}
 
-			id = existingVersion.ID
+			id = existingVersion.Id
 			version = existingVersion.Version + 1
 		}
 	}

@@ -58,16 +58,16 @@ func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor database.A
 	cv := o.connection.GetConnectorVersionEntity()
 
 	if !o.auth.ClientId.HasValue(ctx) {
-		return "", errors.Errorf("client id does not have value for connector %s", cv.GetID())
+		return "", errors.Errorf("client id does not have value for connector %s", cv.GetId())
 	}
 
 	clientId, err := o.auth.ClientId.GetValue(ctx)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to get client id for connector %s", cv.GetID())
+		return "", errors.Wrapf(err, "failed to get client id for connector %s", cv.GetId())
 	}
 
 	if o.auth.Authorization.Endpoint == "" {
-		return "", errors.Errorf("no authorization endpoint for connector %s", cv.GetID())
+		return "", errors.Errorf("no authorization endpoint for connector %s", cv.GetId())
 	}
 
 	if o.state == nil {
@@ -85,7 +85,7 @@ func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor database.A
 
 	authUrl3p, err := url.Parse(o.auth.Authorization.Endpoint)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to parse authorization endpoint for connector %s", cv.GetID())
+		return "", errors.Wrapf(err, "failed to parse authorization endpoint for connector %s", cv.GetId())
 	}
 
 	query := authUrl3p.Query()

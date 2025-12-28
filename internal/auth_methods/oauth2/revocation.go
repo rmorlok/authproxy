@@ -19,7 +19,7 @@ func (o *oAuth2Connection) RevokeTokens(ctx context.Context) error {
 		return nil
 	}
 
-	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetID())
+	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetId())
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			return nil
@@ -41,7 +41,7 @@ func (o *oAuth2Connection) RevokeTokens(ctx context.Context) error {
 		}
 	}
 
-	err = o.db.DeleteOAuth2Token(ctx, token.ID)
+	err = o.db.DeleteOAuth2Token(ctx, token.Id)
 	return err
 }
 
@@ -113,7 +113,7 @@ func (o *oAuth2Connection) revokeAccessToken(ctx context.Context, token *databas
 	}
 
 	// Get the latest token to make sure we still need to refresh
-	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetID())
+	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetId())
 	if err != nil {
 		return err
 	}

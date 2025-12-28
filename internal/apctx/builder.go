@@ -56,8 +56,8 @@ func (b *builder) WithFixedUuidGenerator(u uuid.UUID) Builder {
 }
 
 // WithCorrelationID sets a correlation ID on the context.
-func (b *builder) WithCorrelationID(correlationID string) Builder {
-	return &builder{WithCorrelationID(b.ctx, correlationID)}
+func (b *builder) WithCorrelationID(correlationId string) Builder {
+	return &builder{WithCorrelationID(b.ctx, correlationId)}
 }
 
 // Build returns the context.

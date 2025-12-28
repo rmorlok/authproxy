@@ -15,7 +15,7 @@ func TestActorOnRequest(t *testing.T) {
 	assert.False(t, GetAuthFromRequest(util.Must(http.NewRequest("GET", "https://example.com", nil))).IsAuthenticated())
 
 	a := database.Actor{
-		ID:         uuid.New(),
+		Id:         uuid.New(),
 		ExternalId: "bobdole",
 	}
 

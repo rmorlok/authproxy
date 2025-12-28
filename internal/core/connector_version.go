@@ -32,14 +32,14 @@ func wrapConnectorVersion(cv database.ConnectorVersion, s *service) *ConnectorVe
 		s:                s,
 		l: aplog.NewBuilder(s.logger).
 			WithNamespace(cv.Namespace).
-			WithConnectorId(cv.ID).
+			WithConnectorId(cv.Id).
 			WithConnectorVersion(cv.Version).
 			Build(),
 	}
 }
 
-func (cv *ConnectorVersion) GetID() uuid.UUID {
-	return cv.ConnectorVersion.ID
+func (cv *ConnectorVersion) GetId() uuid.UUID {
+	return cv.ConnectorVersion.Id
 }
 
 func (cv *ConnectorVersion) GetNamespace() string {

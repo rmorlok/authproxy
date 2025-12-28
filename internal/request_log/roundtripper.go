@@ -67,7 +67,7 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	// Create a log entry
 	entry := &Entry{
-		ID:            id,
+		Id:            id,
 		CorrelationID: apctx.CorrelationID(ctx),
 		Timestamp:     startTime,
 		Full:          t.recordFullRequest,
@@ -92,7 +92,7 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 				if requestBodyBuf != nil {
 					requestData, err := io.ReadAll(requestBodyBuf)
 					if err != nil {
-						t.logger.Error("error reading full request body", "error", err, "entry_id", entry.ID.String())
+						t.logger.Error("error reading full request body", "error", err, "entry_id", entry.Id.String())
 						entry.Request.Body = []byte(err.Error())
 					} else {
 						entry.Request.Body = requestData
@@ -104,7 +104,7 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 
 			err := t.persistEntry(entry)
 			if err != nil {
-				t.logger.Error("error storing HTTP log entry in Redis", "error", err, "entry_id", entry.ID.String(), "correlation_id", entry.CorrelationID)
+				t.logger.Error("error storing HTTP log entry in Redis", "error", err, "entry_id", entry.Id.String(), "correlation_id", entry.CorrelationID)
 			}
 		}()
 
@@ -151,7 +151,7 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 			if requestBodyBuf != nil {
 				requestData, err := io.ReadAll(requestBodyBuf)
 				if err != nil {
-					t.logger.Error("error reading full request body", "error", err, "entry_id", entry.ID.String())
+					t.logger.Error("error reading full request body", "error", err, "entry_id", entry.Id.String())
 					entry.Request.Body = []byte(err.Error())
 				} else {
 					entry.Request.Body = requestData
@@ -161,7 +161,7 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 			if responseBodyReader != nil {
 				responseData, err := io.ReadAll(responseBodyReader)
 				if err != nil {
-					t.logger.Error("error reading full request body", "error", err, "entry_id", entry.ID.String())
+					t.logger.Error("error reading full request body", "error", err, "entry_id", entry.Id.String())
 					entry.Response.Body = []byte(err.Error())
 				} else {
 					entry.Response.Body = responseData
@@ -181,12 +181,12 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 			}
 		case <-time.After(t.maxResponseWait):
 			entry.InternalTimeout = true
-			t.logger.Error("timed out waiting for response body to be read; entry will not have accurate size", "entry_id", entry.ID.String(), "correlation_id", entry.CorrelationID, "max_wait", t.maxResponseWait.String())
+			t.logger.Error("timed out waiting for response body to be read; entry will not have accurate size", "entry_id", entry.Id.String(), "correlation_id", entry.CorrelationID, "max_wait", t.maxResponseWait.String())
 		}
 
 		err := t.persistEntry(entry)
 		if err != nil {
-			t.logger.Error("error storing HTTP log entry in Redis", "error", err, "entry_id", entry.ID.String(), "correlation_id", entry.CorrelationID)
+			t.logger.Error("error storing HTTP log entry in Redis", "error", err, "entry_id", entry.Id.String(), "correlation_id", entry.CorrelationID)
 		}
 	}()
 

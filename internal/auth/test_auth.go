@@ -77,7 +77,7 @@ func (atu *AuthTestUtil) NewSignedRequestForActorId(method, url string, body io.
 		context.Background(),
 		req,
 		jwt2.Actor{
-			ID: actorId,
+			Id: actorId,
 		},
 	)
 	if err != nil {
@@ -91,7 +91,7 @@ func (atu *AuthTestUtil) claimsForActor(a jwt2.Actor) *jwt2.AuthProxyClaims {
 	claims := &jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:   "test",
-			Subject:  a.ID,
+			Subject:  a.Id,
 			Audience: []string{string(atu.serviceId)},
 			ID:       uuid.UUID{}.String(),
 		},

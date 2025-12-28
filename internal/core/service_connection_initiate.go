@@ -103,7 +103,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 		}
 
 		return &iface.InitiateConnectionRedirect{
-			Id:          connection.GetID(),
+			Id:          connection.GetId(),
 			Type:        iface.PreconnectionResponseTypeRedirect,
 			RedirectUrl: url,
 		}, nil

@@ -35,7 +35,7 @@ func (s *service) GetCronTasks() []*asynq.PeriodicTaskConfig {
 			func(pr pagination.PageResult[database.Connection]) (keepGoing bool, err error) {
 				for _, dbConn := range pr.Results {
 					logger := aplog.NewBuilder(s.logger).
-						WithConnectionId(dbConn.ID).
+						WithConnectionId(dbConn.Id).
 						Build()
 					c, err := s.getConnectionForDb(context.Background(), &dbConn)
 					if err != nil {
@@ -46,7 +46,7 @@ func (s *service) GetCronTasks() []*asynq.PeriodicTaskConfig {
 					for _, probe := range c.GetProbes() {
 						if probe.IsPeriodic() {
 							logger.Debug("adding periodic probe task", "probe_id", probe.GetId())
-							t, err := newProbeTask(c.ID, probe.GetId())
+							t, err := newProbeTask(c.Id, probe.GetId())
 							if err != nil {
 								logger.Error("failed to create probe task", "error", err, "probe_id", probe.GetId())
 								continue

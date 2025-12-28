@@ -27,21 +27,21 @@ func TestActor(t *testing.T) {
 
 	t.Run("Validation", func(t *testing.T) {
 		require.NoError(t, util.ToPtr(Actor{
-			ID:         uuid.New(),
+			Id:         uuid.New(),
 			ExternalId: "1234567890",
 		}).validate())
 		require.Error(t, util.ToPtr(Actor{
 			ExternalId: "1234567890",
 		}).validate())
 		require.Error(t, util.ToPtr(Actor{
-			ID: uuid.New(),
+			Id: uuid.New(),
 		}).validate())
 		require.Error(t, util.ToPtr(Actor{}).validate())
 	})
 	t.Run("Normalize", func(t *testing.T) {
 		// It sorts permissions
 		a := &Actor{
-			ID:          uuid.New(),
+			Id:          uuid.New(),
 			ExternalId:  "1234567890",
 			Permissions: Permissions{"c", "a", "b"},
 		}
@@ -53,7 +53,7 @@ func TestActor(t *testing.T) {
 
 		otherId := uuid.New()
 		otherActor := &Actor{
-			ID:         otherId,
+			Id:         otherId,
 			ExternalId: otherId.String(),
 			Email:      "billclinton@example.com",
 		}
@@ -65,7 +65,7 @@ func TestActor(t *testing.T) {
 		require.Nil(t, a, "actor should not exist")
 
 		actor := &Actor{
-			ID:         id,
+			Id:         id,
 			ExternalId: id.String(),
 			Email:      "bobdole@example.com",
 		}
@@ -80,7 +80,7 @@ func TestActor(t *testing.T) {
 
 		otherId := uuid.New()
 		otherActor := &Actor{
-			ID:         otherId,
+			Id:         otherId,
 			ExternalId: otherId.String(),
 			Email:      "billclinton@example.com",
 		}
@@ -92,7 +92,7 @@ func TestActor(t *testing.T) {
 		require.Nil(t, a, "actor should not exist")
 
 		actor := &Actor{
-			ID:         id,
+			Id:         id,
 			ExternalId: id.String(),
 			Email:      "bobdole@example.com",
 		}
@@ -102,7 +102,7 @@ func TestActor(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, actor.Email, a.Email)
 
-		err = db.DeleteActor(ctx, actor.ID)
+		err = db.DeleteActor(ctx, actor.Id)
 		require.NoError(t, err)
 
 		a, err = db.GetActorByExternalId(ctx, actor.ExternalId)
@@ -115,7 +115,7 @@ func TestActor(t *testing.T) {
 
 			id := uuid.New()
 			actor := &Actor{
-				ID:          id,
+				Id:          id,
 				ExternalId:  id.String(),
 				Email:       "bobdole@example.com",
 				Permissions: []string{"read", "write"},
@@ -132,7 +132,7 @@ func TestActor(t *testing.T) {
 
 			id := uuid.New()
 			actor := &Actor{
-				ID: id,
+				Id: id,
 				// ExternalId omitted
 				Email: "bobdole@example.com",
 			}
@@ -142,14 +142,14 @@ func TestActor(t *testing.T) {
 			setup(t)
 
 			actor1 := &Actor{
-				ID:         uuid.New(),
+				Id:         uuid.New(),
 				ExternalId: "duplicate",
 				Email:      "bobdole@example.com",
 			}
 			require.NoError(t, db.CreateActor(ctx, actor1))
 
 			actor2 := &Actor{
-				ID:         uuid.New(),
+				Id:         uuid.New(),
 				ExternalId: "duplicate",
 				Email:      "billclinton@example.com",
 			}
@@ -160,14 +160,14 @@ func TestActor(t *testing.T) {
 
 			id := uuid.New()
 			actor1 := &Actor{
-				ID:         id,
+				Id:         id,
 				ExternalId: uuid.New().String(),
 				Email:      "bobdole@example.com",
 			}
 			require.NoError(t, db.CreateActor(ctx, actor1))
 
 			actor2 := &Actor{
-				ID:         id,
+				Id:         id,
 				ExternalId: uuid.New().String(),
 				Email:      "billclinton@example.com",
 			}
@@ -180,7 +180,7 @@ func TestActor(t *testing.T) {
 
 			externalId := "bobdole"
 			actor, err := db.UpsertActor(ctx, &jwt.Actor{
-				ID:    externalId,
+				Id:    externalId,
 				Email: "bobdole@example.com",
 			})
 			require.NoError(t, err)
@@ -188,7 +188,7 @@ func TestActor(t *testing.T) {
 
 			retrieved, err := db.GetActorByExternalId(ctx, externalId)
 			require.NoError(t, err)
-			require.Equal(t, actor.ID, retrieved.ID)
+			require.Equal(t, actor.Id, retrieved.Id)
 			require.Equal(t, actor.Email, retrieved.Email)
 		})
 
@@ -199,7 +199,7 @@ func TestActor(t *testing.T) {
 				id := uuid.New()
 				externalId := "bobdole"
 				err := db.CreateActor(ctx, &Actor{
-					ID:         id,
+					Id:         id,
 					ExternalId: externalId,
 					Email:      "bobdole@example.com",
 				})
@@ -207,21 +207,21 @@ func TestActor(t *testing.T) {
 
 				retrieved, err := db.GetActorByExternalId(ctx, externalId)
 				require.NoError(t, err)
-				require.Equal(t, id, retrieved.ID)
+				require.Equal(t, id, retrieved.Id)
 				require.Equal(t, "bobdole@example.com", retrieved.Email)
 
 				actor, err := db.UpsertActor(ctx, &jwt.Actor{
-					ID:    externalId,
+					Id:    externalId,
 					Email: "thomasjefferson@example.com",
 				})
 				require.NoError(t, err)
 				require.Equal(t, externalId, actor.ExternalId)
-				require.Equal(t, id, actor.ID)
+				require.Equal(t, id, actor.Id)
 				require.Equal(t, "thomasjefferson@example.com", actor.Email)
 
 				retrieved, err = db.GetActorByExternalId(ctx, externalId)
 				require.NoError(t, err)
-				require.Equal(t, id, retrieved.ID)
+				require.Equal(t, id, retrieved.Id)
 				require.Equal(t, "thomasjefferson@example.com", retrieved.Email)
 			})
 			t.Run("permissions", func(t *testing.T) {
@@ -230,7 +230,7 @@ func TestActor(t *testing.T) {
 				id := uuid.New()
 				externalId := "bobdole"
 				err := db.CreateActor(ctx, &Actor{
-					ID:         id,
+					Id:         id,
 					ExternalId: externalId,
 					Email:      "bobdole@example.com",
 					Permissions: Permissions{
@@ -242,14 +242,14 @@ func TestActor(t *testing.T) {
 
 				retrieved, err := db.GetActorByExternalId(ctx, externalId)
 				require.NoError(t, err)
-				require.Equal(t, id, retrieved.ID)
+				require.Equal(t, id, retrieved.Id)
 				require.Equal(t, Permissions{
 					"read",
 					"write",
 				}, retrieved.Permissions)
 
 				actor, err := db.UpsertActor(ctx, &jwt.Actor{
-					ID:    externalId,
+					Id:    externalId,
 					Email: "bobdole@example.com",
 					Permissions: []string{
 						"execute",
@@ -259,7 +259,7 @@ func TestActor(t *testing.T) {
 				})
 				require.NoError(t, err)
 				require.Equal(t, externalId, actor.ExternalId)
-				require.Equal(t, id, actor.ID)
+				require.Equal(t, id, actor.Id)
 				require.Equal(t, Permissions{
 					"execute",
 					"read",
@@ -268,7 +268,7 @@ func TestActor(t *testing.T) {
 
 				retrieved, err = db.GetActorByExternalId(ctx, externalId)
 				require.NoError(t, err)
-				require.Equal(t, id, retrieved.ID)
+				require.Equal(t, id, retrieved.Id)
 				require.Equal(t, Permissions{
 					"execute",
 					"read",
@@ -307,7 +307,7 @@ func TestActor(t *testing.T) {
 				externalID = "superadmin/" + externalID
 			}
 
-			err := db.CreateActor(ctx, &Actor{ID: u, ExternalId: externalID, Email: u.String() + "@example.com", Admin: isAdmin, SuperAdmin: isSuperAdmin})
+			err := db.CreateActor(ctx, &Actor{Id: u, ExternalId: externalID, Email: u.String() + "@example.com", Admin: isAdmin, SuperAdmin: isSuperAdmin})
 			require.NoError(t, err)
 		}
 
@@ -315,7 +315,7 @@ func TestActor(t *testing.T) {
 			result := db.ListActorsBuilder().Limit(10).FetchPage(ctx)
 			require.NoError(t, result.Error)
 			require.Len(t, result.Results, 10)
-			require.Equal(t, result.Results[0].ID, firstUuid)
+			require.Equal(t, result.Results[0].Id, firstUuid)
 			require.True(t, result.HasMore)
 			require.NotEmpty(t, result.Cursor)
 
@@ -336,7 +336,7 @@ func TestActor(t *testing.T) {
 			}
 
 			require.Equal(t, 50, total)
-			require.Equal(t, lastUuid, last.ID)
+			require.Equal(t, lastUuid, last.Id)
 		})
 
 		t.Run("reverse order", func(t *testing.T) {
@@ -349,8 +349,8 @@ func TestActor(t *testing.T) {
 
 			require.NoError(t, err)
 			require.Len(t, allResults, 50)
-			require.Equal(t, lastUuid, allResults[0].ID)
-			require.Equal(t, firstUuid, allResults[49].ID)
+			require.Equal(t, lastUuid, allResults[0].Id)
+			require.Equal(t, firstUuid, allResults[49].Id)
 		})
 	})
 	t.Run("IsAdmin", func(t *testing.T) {
@@ -395,7 +395,7 @@ func TestActor(t *testing.T) {
 
 		// create a single actor
 		id := uuid.New()
-		a := &Actor{ID: id, ExternalId: id.String(), Email: "delete-me@example.com"}
+		a := &Actor{Id: id, ExternalId: id.String(), Email: "delete-me@example.com"}
 		require.NoError(t, db.CreateActor(ctx, a))
 
 		// delete it
@@ -415,19 +415,19 @@ func TestActor(t *testing.T) {
 		page = db.ListActorsBuilder().IncludeDeleted().FetchPage(ctx)
 		require.NoError(t, page.Error)
 		require.Len(t, page.Results, 1)
-		require.Equal(t, id, page.Results[0].ID)
+		require.Equal(t, id, page.Results[0].Id)
 		require.NotNil(t, page.Results[0].DeletedAt)
 	})
 
-	t.Run("GetID and ToJwtActor", func(t *testing.T) {
+	t.Run("GetId and ToJwtActor", func(t *testing.T) {
 		setup(t)
 
 		id := uuid.New()
-		a := &Actor{ID: id, ExternalId: "user/" + id.String(), Email: "id@example.com", Admin: false, SuperAdmin: false}
-		require.Equal(t, id, a.GetID())
+		a := &Actor{Id: id, ExternalId: "user/" + id.String(), Email: "id@example.com", Admin: false, SuperAdmin: false}
+		require.Equal(t, id, a.GetId())
 
 		ja := a.ToJwtActor()
-		require.Equal(t, a.ExternalId, ja.ID)
+		require.Equal(t, a.ExternalId, ja.Id)
 		require.Equal(t, a.Email, ja.Email)
 		require.Equal(t, a.Admin, ja.Admin)
 		require.Equal(t, a.SuperAdmin, ja.SuperAdmin)

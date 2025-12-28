@@ -18,7 +18,7 @@ func (m ConnectorVersionMatcher) Matches(x interface{}) bool {
 		return false
 	}
 
-	return cv.GetID() == m.ExpectedId && cv.GetVersion() == m.ExpectedVersion
+	return cv.GetId() == m.ExpectedId && cv.GetVersion() == m.ExpectedVersion
 }
 
 func (m ConnectorVersionMatcher) String() string {

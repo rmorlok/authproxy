@@ -15,7 +15,7 @@ type Connection interface {
 	 * Core fields
 	 */
 
-	GetID() uuid.UUID
+	GetId() uuid.UUID
 	GetNamespace() string
 	GetState() database.ConnectionState
 	GetConnectorId() uuid.UUID

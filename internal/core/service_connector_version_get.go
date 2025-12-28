@@ -97,7 +97,7 @@ func (s *service) GetConnectorVersionForState(ctx context.Context, id uuid.UUID,
 
 func (s *service) getConnectionForDb(ctx context.Context, dbConn *database.Connection) (*connection, error) {
 	logger := aplog.NewBuilder(s.logger).
-		WithConnectionId(dbConn.ID).
+		WithConnectionId(dbConn.Id).
 		Build()
 
 	logger.Debug("getting connector for connection")

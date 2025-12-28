@@ -26,9 +26,9 @@ func TestWrapConnectorVersion(t *testing.T) {
 		logger:  aplog.NewNoopLogger(),
 	}
 
-	connectorID := uuid.New()
+	connectorId := uuid.New()
 	dbConnectorVersion := database.ConnectorVersion{
-		ID:                  connectorID,
+		Id:                  connectorId,
 		Version:             1,
 		Type:                "test-connector",
 		State:               database.ConnectorVersionStateDraft,
@@ -56,9 +56,9 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 		logger:  aplog.NewNoopLogger(),
 	}
 
-	connectorID := uuid.New()
+	connectorId := uuid.New()
 	dbConnectorVersion := database.ConnectorVersion{
-		ID:                  connectorID,
+		Id:                  connectorId,
 		Version:             1,
 		Type:                "test-connector",
 		State:               database.ConnectorVersionStateDraft,
@@ -105,9 +105,9 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 		logger:  aplog.NewNoopLogger(),
 	}
 
-	connectorID := uuid.New()
+	connectorId := uuid.New()
 	dbConnectorVersion := database.ConnectorVersion{
-		ID:                  connectorID,
+		Id:                  connectorId,
 		Version:             1,
 		Type:                "test-connector",
 		State:               database.ConnectorVersionStateDraft,
@@ -132,7 +132,7 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 		EncryptStringForConnector(
 			gomock.Any(),
 			coreMock.ConnectorVersionMatcher{
-				ExpectedId:      cv.ConnectorVersion.ID,
+				ExpectedId:      cv.ConnectorVersion.Id,
 				ExpectedVersion: cv.ConnectorVersion.Version,
 			},
 			gomock.Any()).
@@ -151,9 +151,9 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 // NewTestConnectorVersion creates a new test connector version using provided connector configuration data.
 func NewTestConnectorVersion(c cfg.Connector) *ConnectorVersion {
 	e := encrypt.NewFakeEncryptService(false)
-	connectorID := uuid.New()
+	connectorId := uuid.New()
 	if c.Id != uuid.Nil {
-		connectorID = c.Id
+		connectorId = c.Id
 	}
 	version := uint64(1)
 	if c.Version != 0 {
@@ -173,7 +173,7 @@ func NewTestConnectorVersion(c cfg.Connector) *ConnectorVersion {
 	}
 
 	dbConnectorVersion := database.ConnectorVersion{
-		ID:                  connectorID,
+		Id:                  connectorId,
 		Version:             version,
 		Type:                t,
 		State:               state,

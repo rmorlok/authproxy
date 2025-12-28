@@ -84,13 +84,13 @@ INSERT INTO connector_versions
 			FetchPage(ctx)
 		require.NoError(t, pr.Error)
 		require.Len(t, pr.Results, 4)
-		require.Equal(t, pr.Results[0].ID, uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"))
+		require.Equal(t, pr.Results[0].Id, uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"))
 		require.Equal(t, uint64(2), pr.Results[0].Version)
-		require.Equal(t, pr.Results[1].ID, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"))
+		require.Equal(t, pr.Results[1].Id, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"))
 		require.Equal(t, uint64(2), pr.Results[1].Version)
-		require.Equal(t, pr.Results[2].ID, uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"))
+		require.Equal(t, pr.Results[2].Id, uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"))
 		require.Equal(t, uint64(1), pr.Results[2].Version)
-		require.Equal(t, pr.Results[3].ID, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"))
+		require.Equal(t, pr.Results[3].Id, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"))
 		require.Equal(t, uint64(1), pr.Results[3].Version)
 
 		pr = db.ListConnectorVersionsBuilder().
@@ -99,15 +99,15 @@ INSERT INTO connector_versions
 			FetchPage(ctx)
 		require.NoError(t, pr.Error)
 		require.Len(t, pr.Results, 5)
-		require.Equal(t, uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), pr.Results[0].ID)
+		require.Equal(t, uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), pr.Results[0].Id)
 		require.Equal(t, uint64(1), pr.Results[0].Version)
-		require.Equal(t, uuid.MustParse("c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa"), pr.Results[1].ID)
+		require.Equal(t, uuid.MustParse("c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa"), pr.Results[1].Id)
 		require.Equal(t, uint64(1), pr.Results[1].Version)
-		require.Equal(t, uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), pr.Results[2].ID)
+		require.Equal(t, uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), pr.Results[2].Id)
 		require.Equal(t, uint64(2), pr.Results[2].Version)
-		require.Equal(t, uuid.MustParse("c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa"), pr.Results[3].ID)
+		require.Equal(t, uuid.MustParse("c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa"), pr.Results[3].Id)
 		require.Equal(t, uint64(2), pr.Results[3].Version)
-		require.Equal(t, uuid.MustParse("c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa"), pr.Results[4].ID)
+		require.Equal(t, uuid.MustParse("c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa"), pr.Results[4].Id)
 		require.Equal(t, uint64(3), pr.Results[4].Version)
 	})
 	t.Run("UpsertConnectorVersion", func(t *testing.T) {
@@ -120,7 +120,7 @@ INSERT INTO connector_versions
 			// Create a new connector version
 			connectorID := uuid.New()
 			cv := &ConnectorVersion{
-				ID:                  connectorID,
+				Id:                  connectorID,
 				Version:             1,
 				Namespace:           "root.some-namespace",
 				State:               ConnectorVersionStateDraft,
@@ -137,7 +137,7 @@ INSERT INTO connector_versions
 			savedCV, err := db.GetConnectorVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
 			require.NotNil(t, savedCV)
-			assert.Equal(t, connectorID, savedCV.ID)
+			assert.Equal(t, connectorID, savedCV.Id)
 			assert.Equal(t, uint64(1), savedCV.Version)
 			assert.Equal(t, ConnectorVersionStateDraft, savedCV.State)
 			assert.Equal(t, "test_connector", savedCV.Type)
@@ -156,7 +156,7 @@ INSERT INTO connector_versions
 			// Create a new connector version
 			connectorID := uuid.New()
 			cv := &ConnectorVersion{
-				ID:                  connectorID,
+				Id:                  connectorID,
 				Version:             1,
 				Namespace:           "root.some-namespace",
 				State:               ConnectorVersionStateActive,
@@ -185,7 +185,7 @@ INSERT INTO connector_versions
 			// Create a new connector version
 			connectorID := uuid.New()
 			cv := &ConnectorVersion{
-				ID:                  connectorID,
+				Id:                  connectorID,
 				Version:             1,
 				Namespace:           cfg.RootNamespace,
 				State:               ConnectorVersionStateDraft,
@@ -202,7 +202,7 @@ INSERT INTO connector_versions
 			savedCV, err := db.GetConnectorVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
 			require.NotNil(t, savedCV)
-			assert.Equal(t, connectorID, savedCV.ID)
+			assert.Equal(t, connectorID, savedCV.Id)
 			assert.Equal(t, uint64(1), savedCV.Version)
 			assert.Equal(t, ConnectorVersionStateDraft, savedCV.State)
 			assert.Equal(t, "test_connector", savedCV.Type)
@@ -220,7 +220,7 @@ INSERT INTO connector_versions
 			// Create a new connector version
 			connectorID := uuid.New()
 			cv := &ConnectorVersion{
-				ID:                  connectorID,
+				Id:                  connectorID,
 				Version:             1,
 				Namespace:           cfg.RootNamespace,
 				State:               ConnectorVersionStateDraft,
@@ -256,12 +256,12 @@ INSERT INTO connector_versions
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-			// Create connector ID
+			// Create connector Id
 			connectorID := uuid.New()
 
 			// Create version 1
 			cv1 := &ConnectorVersion{
-				ID:                  connectorID,
+				Id:                  connectorID,
 				Version:             1,
 				Namespace:           cfg.RootNamespace,
 				State:               ConnectorVersionStateDraft,
@@ -275,7 +275,7 @@ INSERT INTO connector_versions
 
 			// Create version 2
 			cv2 := &ConnectorVersion{
-				ID:                  connectorID,
+				Id:                  connectorID,
 				Version:             2,
 				Namespace:           cfg.RootNamespace,
 				State:               ConnectorVersionStateDraft,
@@ -308,12 +308,12 @@ INSERT INTO connector_versions
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-			// Create connector ID
+			// Create connector Id
 			connectorID := uuid.New()
 
 			// Create a primary connector version
 			cv := &ConnectorVersion{
-				ID:                  connectorID,
+				Id:                  connectorID,
 				Version:             1,
 				Namespace:           cfg.RootNamespace,
 				State:               ConnectorVersionStatePrimary,
@@ -340,12 +340,12 @@ INSERT INTO connector_versions
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-			// Create connector ID
+			// Create connector Id
 			connectorID := uuid.New()
 
 			// Create version 1 as primary
 			cv1 := &ConnectorVersion{
-				ID:                  connectorID,
+				Id:                  connectorID,
 				Version:             1,
 				Namespace:           cfg.RootNamespace,
 				State:               ConnectorVersionStatePrimary,
@@ -365,7 +365,7 @@ INSERT INTO connector_versions
 
 			// Create version 2 as primary
 			cv2 := &ConnectorVersion{
-				ID:                  connectorID,
+				Id:                  connectorID,
 				Version:             2,
 				Namespace:           cfg.RootNamespace,
 				State:               ConnectorVersionStatePrimary,
@@ -397,12 +397,12 @@ INSERT INTO connector_versions
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-			// Create connector ID
+			// Create connector Id
 			connectorID := uuid.New()
 
 			// Create version 1 as primary
 			cv1 := &ConnectorVersion{
-				ID:                  connectorID,
+				Id:                  connectorID,
 				Version:             1,
 				Namespace:           cfg.RootNamespace,
 				State:               ConnectorVersionStatePrimary,
@@ -422,7 +422,7 @@ INSERT INTO connector_versions
 
 			// Create version 2 as primary
 			cv2 := &ConnectorVersion{
-				ID:                  connectorID,
+				Id:                  connectorID,
 				Version:             3,
 				Namespace:           cfg.RootNamespace,
 				State:               ConnectorVersionStatePrimary,

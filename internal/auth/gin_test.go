@@ -32,7 +32,7 @@ func TestAuth_Gin(t *testing.T) {
 			},
 
 			Actor: &jwt2.Actor{
-				ID:    "id1",
+				Id:    "id1",
 				Email: "me@example.com",
 			},
 		}
@@ -51,7 +51,7 @@ func TestAuth_Gin(t *testing.T) {
 			},
 
 			Actor: &jwt2.Actor{
-				ID:    "admin/aid1",
+				Id:    "admin/aid1",
 				Email: "me@example.com",
 				Admin: true,
 			},
@@ -98,7 +98,7 @@ func TestAuth_Gin(t *testing.T) {
 			SetJwtRequestHeader(req, tok)
 			ts.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
-			require.Equal(t, c.Actor.ID, w.Body.String())
+			require.Equal(t, c.Actor.Id, w.Body.String())
 		})
 
 		t.Run("valid with admin", func(t *testing.T) {
@@ -113,7 +113,7 @@ func TestAuth_Gin(t *testing.T) {
 			SetJwtRequestHeader(req, tok)
 			ts.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
-			require.Equal(t, c.Actor.ID, w.Body.String())
+			require.Equal(t, c.Actor.Id, w.Body.String())
 		})
 
 		t.Run("expired", func(t *testing.T) {
@@ -180,7 +180,7 @@ func TestAuth_Gin(t *testing.T) {
 			SetJwtRequestHeader(req, tok)
 			ts.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
-			require.Equal(t, c.Actor.ID, w.Body.String())
+			require.Equal(t, c.Actor.Id, w.Body.String())
 		})
 
 		t.Run("valid with admin", func(t *testing.T) {
@@ -195,7 +195,7 @@ func TestAuth_Gin(t *testing.T) {
 			SetJwtRequestHeader(req, tok)
 			ts.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
-			require.Equal(t, c.Actor.ID, w.Body.String())
+			require.Equal(t, c.Actor.Id, w.Body.String())
 		})
 
 		t.Run("valid without auth", func(t *testing.T) {
@@ -263,13 +263,13 @@ func TestAuth_Gin(t *testing.T) {
 			SetJwtRequestHeader(req, tok)
 			ts.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
-			require.Equal(t, c.Actor.ID, w.Body.String())
+			require.Equal(t, c.Actor.Id, w.Body.String())
 		})
 
 		t.Run("not valid admin", func(t *testing.T) {
 			ts := setup(t, authFunc)
 			c := testAdminClaims()
-			c.Actor.ID = "admin/unknown"
+			c.Actor.Id = "admin/unknown"
 			c.RegisteredClaims.Subject = "admin/unknown"
 
 			tok, err := jwt2.NewJwtTokenBuilder().

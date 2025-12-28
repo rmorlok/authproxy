@@ -1,6 +1,8 @@
 package core
 
 import (
+	"testing"
+
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
@@ -8,7 +10,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	encryptmock "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	"github.com/stretchr/testify/assert"
-	"testing"
 )
 
 func TestNewVersionBuilder(t *testing.T) {
@@ -69,7 +70,7 @@ func TestVersionBuilder_WithConfig(t *testing.T) {
 	builder.versionSetters[0](cv)
 	assert.Equal(t, uint64(1), cv.Version)
 	assert.Equal(t, "test-connector", cv.Type)
-	assert.Equal(t, connectorID, cv.ID)
+	assert.Equal(t, connectorID, cv.Id)
 }
 
 func TestVersionBuilder_WithId(t *testing.T) {
@@ -99,7 +100,7 @@ func TestVersionBuilder_WithId(t *testing.T) {
 	// Test the version setter function
 	cv := &ConnectorVersion{}
 	builder.versionSetters[0](cv)
-	assert.Equal(t, connectorID, cv.ID)
+	assert.Equal(t, connectorID, cv.Id)
 
 	// Test the config setter function
 	c := &config.Connector{}
@@ -213,7 +214,7 @@ func TestVersionBuilder_Build_Success(t *testing.T) {
 	// Verify
 	assert.NoError(t, err)
 	assert.NotNil(t, cv)
-	assert.Equal(t, connectorID, cv.ID)
+	assert.Equal(t, connectorID, cv.Id)
 	assert.Equal(t, uint64(1), cv.Version)
 	assert.Equal(t, "test-connector", cv.Type)
 	assert.Equal(t, c.Hash(), cv.Hash)

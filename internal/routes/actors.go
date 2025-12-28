@@ -30,7 +30,7 @@ type ActorsRoutes struct {
 }
 
 type ActorJson struct {
-	ID         uuid.UUID `json:"id"`
+	Id         uuid.UUID `json:"id"`
 	ExternalId string    `json:"external_id"`
 	Email      string    `json:"email"`
 	Admin      bool      `json:"admin"`
@@ -41,7 +41,7 @@ type ActorJson struct {
 
 func DatabaseActorToJson(a database.Actor) ActorJson {
 	return ActorJson{
-		ID:         a.ID,
+		Id:         a.Id,
 		ExternalId: a.ExternalId,
 		Email:      a.Email,
 		Admin:      a.Admin,
@@ -382,7 +382,7 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 		return
 	}
 
-	r.logger.Info("deleting actor ", "id", a.ID.String(), "external_id", a.ExternalId)
+	r.logger.Info("deleting actor ", "id", a.Id.String(), "external_id", a.ExternalId)
 
 	err = r.db.DeleteActor(ctx, id)
 	if err != nil {
@@ -452,9 +452,9 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 		return
 	}
 
-	r.logger.Info("deleting actor ", "id", a.ID.String(), "external_id", a.ExternalId)
+	r.logger.Info("deleting actor ", "id", a.Id.String(), "external_id", a.ExternalId)
 
-	err = r.db.DeleteActor(ctx, a.ID)
+	err = r.db.DeleteActor(ctx, a.Id)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().

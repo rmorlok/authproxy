@@ -27,7 +27,7 @@ func TestJwtTokenClaims(t *testing.T) {
 				Subject: "admin/bobdole",
 			},
 			Actor: &Actor{
-				ID:    "admin/bobdole",
+				Id:    "admin/bobdole",
 				Admin: true,
 			},
 		}
@@ -47,7 +47,7 @@ func TestJwtTokenClaims(t *testing.T) {
 				Subject: "admin/bobdole",
 			},
 			Actor: &Actor{
-				ID:    "admin/bobdole",
+				Id:    "admin/bobdole",
 				Admin: false,
 			},
 		}
@@ -72,7 +72,7 @@ func TestJwtTokenClaims(t *testing.T) {
 				Subject: "admin/bobdole",
 			},
 			Actor: &Actor{
-				ID:    "admin/bobdole",
+				Id:    "admin/bobdole",
 				Admin: true,
 			},
 		}
@@ -106,7 +106,7 @@ func TestJwtTokenClaims(t *testing.T) {
 		j = AuthProxyClaims{
 			RegisteredClaims: jwt.RegisteredClaims{},
 			Actor: &Actor{
-				ID:    "admin/bobdole",
+				Id:    "admin/bobdole",
 				Admin: true,
 			},
 		}
@@ -119,7 +119,7 @@ func TestJwtTokenClaims(t *testing.T) {
 				Subject: "admin/bobsmith",
 			},
 			Actor: &Actor{
-				ID:    "admin/bobdole",
+				Id:    "admin/bobdole",
 				Admin: true,
 			},
 		}
@@ -132,7 +132,7 @@ func TestJwtTokenClaims(t *testing.T) {
 				Subject: "bobdole",
 			},
 			Actor: &Actor{
-				ID:    "bobdole",
+				Id:    "bobdole",
 				Admin: true,
 			},
 		}
@@ -145,7 +145,7 @@ func TestJwtTokenClaims(t *testing.T) {
 				Subject: "admin/bobdole",
 			},
 			Actor: &Actor{
-				ID:    "admin/bobdole",
+				Id:    "admin/bobdole",
 				Admin: false,
 			},
 		}

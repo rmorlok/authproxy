@@ -287,7 +287,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 						}
 
 						adminActor := database.Actor{
-							ID:          uuid.New(),
+							Id:          uuid.New(),
 							ExternalId:  claims.Subject,
 							Email:       email,
 							Admin:       true,

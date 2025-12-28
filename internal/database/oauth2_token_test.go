@@ -72,8 +72,8 @@ func TestOAuth2Tokens(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, tok)
-		require.Equal(t, connectionId, tok.ConnectionID)
-		require.Nil(t, tok.RefreshedFromID)
+		require.Equal(t, connectionId, tok.ConnectionId)
+		require.Nil(t, tok.RefreshedFromId)
 		require.Equal(t, "encryptedRefreshToken", tok.EncryptedRefreshToken)
 		require.Equal(t, "encryptedAccessToken", tok.EncryptedAccessToken)
 		require.Equal(t, now, tok.CreatedAt)
@@ -81,8 +81,8 @@ func TestOAuth2Tokens(t *testing.T) {
 		tok2, err := db.GetOAuth2Token(ctx, connectionId)
 		require.NoError(t, err)
 		require.NotNil(t, tok2)
-		require.Equal(t, connectionId, tok2.ConnectionID)
-		require.Nil(t, tok2.RefreshedFromID)
+		require.Equal(t, connectionId, tok2.ConnectionId)
+		require.Nil(t, tok2.RefreshedFromId)
 		require.Equal(t, "encryptedRefreshToken", tok2.EncryptedRefreshToken)
 		require.Equal(t, "encryptedAccessToken", tok2.EncryptedAccessToken)
 	})
@@ -127,8 +127,8 @@ func TestOAuth2Tokens(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, tok1)
-		require.Equal(t, connectionId, tok1.ConnectionID)
-		require.Nil(t, tok1.RefreshedFromID)
+		require.Equal(t, connectionId, tok1.ConnectionId)
+		require.Nil(t, tok1.RefreshedFromId)
 		require.Equal(t, "encryptedRefreshToken", tok1.EncryptedRefreshToken)
 		require.Equal(t, "encryptedAccessToken", tok1.EncryptedAccessToken)
 		require.Equal(t, now, tok1.CreatedAt)
@@ -136,7 +136,7 @@ func TestOAuth2Tokens(t *testing.T) {
 		tok2, err := db.InsertOAuth2Token(
 			ctx,
 			connectionId,
-			&tok1.ID,
+			&tok1.Id,
 			"encryptedRefreshToken2",
 			"encryptedAccessToken2",
 			nil,
@@ -144,8 +144,8 @@ func TestOAuth2Tokens(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, tok2)
-		require.Equal(t, connectionId, tok2.ConnectionID)
-		require.Equal(t, &tok1.ID, tok2.RefreshedFromID)
+		require.Equal(t, connectionId, tok2.ConnectionId)
+		require.Equal(t, &tok1.Id, tok2.RefreshedFromId)
 		require.Equal(t, "encryptedRefreshToken2", tok2.EncryptedRefreshToken)
 		require.Equal(t, "encryptedAccessToken2", tok2.EncryptedAccessToken)
 		require.Equal(t, now, tok2.CreatedAt)
@@ -153,8 +153,8 @@ func TestOAuth2Tokens(t *testing.T) {
 		tok3, err := db.GetOAuth2Token(ctx, connectionId)
 		require.NoError(t, err)
 		require.NotNil(t, tok2)
-		require.Equal(t, connectionId, tok3.ConnectionID)
-		require.Equal(t, &tok1.ID, tok2.RefreshedFromID)
+		require.Equal(t, connectionId, tok3.ConnectionId)
+		require.Equal(t, &tok1.Id, tok2.RefreshedFromId)
 		require.Equal(t, "encryptedRefreshToken2", tok2.EncryptedRefreshToken)
 		require.Equal(t, "encryptedAccessToken2", tok2.EncryptedAccessToken)
 	})
@@ -176,8 +176,8 @@ func TestOAuth2Tokens(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, tok1)
-		require.Equal(t, connectionId, tok1.ConnectionID)
-		require.Nil(t, tok1.RefreshedFromID)
+		require.Equal(t, connectionId, tok1.ConnectionId)
+		require.Nil(t, tok1.RefreshedFromId)
 		require.Equal(t, "encryptedRefreshToken", tok1.EncryptedRefreshToken)
 		require.Equal(t, "encryptedAccessToken", tok1.EncryptedAccessToken)
 		require.Equal(t, now, tok1.CreatedAt)
@@ -193,8 +193,8 @@ func TestOAuth2Tokens(t *testing.T) {
 		)
 		require.NoError(t, err)
 		require.NotNil(t, tok2)
-		require.Equal(t, connectionId, tok2.ConnectionID)
-		require.Nil(t, tok2.RefreshedFromID)
+		require.Equal(t, connectionId, tok2.ConnectionId)
+		require.Nil(t, tok2.RefreshedFromId)
 		require.Equal(t, "encryptedRefreshToken2", tok2.EncryptedRefreshToken)
 		require.Equal(t, "encryptedAccessToken2", tok2.EncryptedAccessToken)
 		require.Equal(t, now, tok2.CreatedAt)
@@ -202,8 +202,8 @@ func TestOAuth2Tokens(t *testing.T) {
 		tok3, err := db.GetOAuth2Token(ctx, connectionId)
 		require.NoError(t, err)
 		require.NotNil(t, tok2)
-		require.Equal(t, connectionId, tok3.ConnectionID)
-		require.Nil(t, tok2.RefreshedFromID)
+		require.Equal(t, connectionId, tok3.ConnectionId)
+		require.Nil(t, tok2.RefreshedFromId)
 		require.Equal(t, "encryptedRefreshToken2", tok2.EncryptedRefreshToken)
 		require.Equal(t, "encryptedAccessToken2", tok2.EncryptedAccessToken)
 	})
@@ -243,7 +243,7 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, tok2)
 
-		err = db.DeleteOAuth2Token(ctx, tok.ID)
+		err = db.DeleteOAuth2Token(ctx, tok.Id)
 		require.NoError(t, err)
 
 		tok3, err := db.GetOAuth2Token(ctx, connectionId)
@@ -277,7 +277,7 @@ func TestOAuth2Tokens(t *testing.T) {
 		tok2, err := db.InsertOAuth2Token(
 			ctx,
 			connectionId,
-			&tok.ID,
+			&tok.Id,
 			"encryptedRefreshToken2",
 			"encryptedAccessToken2",
 			nil,
@@ -302,7 +302,7 @@ func TestOAuth2Tokens(t *testing.T) {
 		tok3, err := db.GetOAuth2Token(ctx, connectionId)
 		require.NoError(t, err)
 		require.NotNil(t, tok3)
-		require.Equal(t, tok2.ID, tok3.ID)
+		require.Equal(t, tok2.Id, tok3.Id)
 
 		err = db.DeleteAllOAuth2TokensForConnection(ctx, connectionId)
 		require.NoError(t, err)
@@ -325,7 +325,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		createdConnection := Connection{
-			ID:               uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+			Id:               uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 			State:            ConnectionStateCreated,
 			ConnectorId:      uuid.MustParse("10000000-0000-0000-0000-000000000001"),
 			ConnectorVersion: 1,
@@ -334,7 +334,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 		}
 
 		readyConnection1 := Connection{
-			ID:               uuid.MustParse("00000000-0000-0000-0000-000000000002"),
+			Id:               uuid.MustParse("00000000-0000-0000-0000-000000000002"),
 			State:            ConnectionStateReady,
 			ConnectorId:      uuid.MustParse("10000000-0000-0000-0000-000000000001"),
 			ConnectorVersion: 1,
@@ -343,7 +343,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 		}
 
 		readyConnection2 := Connection{
-			ID:               uuid.MustParse("00000000-0000-0000-0000-000000000003"),
+			Id:               uuid.MustParse("00000000-0000-0000-0000-000000000003"),
 			State:            ConnectionStateReady,
 			ConnectorId:      uuid.MustParse("10000000-0000-0000-0000-000000000001"),
 			ConnectorVersion: 1,
@@ -352,7 +352,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 		}
 
 		disabledConnection := Connection{
-			ID:               uuid.MustParse("00000000-0000-0000-0000-000000000004"),
+			Id:               uuid.MustParse("00000000-0000-0000-0000-000000000004"),
 			State:            ConnectionStateDisabled,
 			ConnectorId:      uuid.MustParse("10000000-0000-0000-0000-000000000001"),
 			ConnectorVersion: 1,
@@ -361,7 +361,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 		}
 
 		deletedConnection := Connection{
-			ID:               uuid.MustParse("00000000-0000-0000-0000-000000000005"),
+			Id:               uuid.MustParse("00000000-0000-0000-0000-000000000005"),
 			State:            ConnectionStateReady,
 			ConnectorId:      uuid.MustParse("10000000-0000-0000-0000-000000000001"),
 			ConnectorVersion: 1,
@@ -373,7 +373,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 		manyReadyConnections := make([]Connection, 0)
 		for i := 0; i < 200; i++ {
 			manyReadyConnections = append(manyReadyConnections, Connection{
-				ID:               uuid.New(),
+				Id:               uuid.New(),
 				State:            ConnectionStateReady,
 				ConnectorId:      uuid.MustParse("10000000-0000-0000-0000-000000000001"),
 				ConnectorVersion: 1,
@@ -385,7 +385,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 		tokens150AllExpiring := make([]*OAuth2Token, 0)
 		for i := 0; i < 150; i++ {
 			tokens150AllExpiring = append(tokens150AllExpiring, &OAuth2Token{
-				ConnectionID:         manyReadyConnections[i].ID,
+				ConnectionId:         manyReadyConnections[i].Id,
 				AccessTokenExpiresAt: util.ToPtr(now.Add(15 * time.Minute)),
 			})
 		}
@@ -418,7 +418,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 				name: "one token expiring within duration",
 				tokens: []*OAuth2Token{
 					{
-						ConnectionID:         readyConnection1.ID,
+						ConnectionId:         readyConnection1.Id,
 						AccessTokenExpiresAt: util.ToPtr(now.Add(30 * time.Minute)),
 					},
 				},
@@ -430,7 +430,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 				name: "one token already expired",
 				tokens: []*OAuth2Token{
 					{
-						ConnectionID:         readyConnection1.ID,
+						ConnectionId:         readyConnection1.Id,
 						AccessTokenExpiresAt: util.ToPtr(now.Add(-30 * time.Minute)),
 					},
 				},
@@ -442,11 +442,11 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 				name: "multiple tokens expiring within duration",
 				tokens: []*OAuth2Token{
 					{
-						ConnectionID:         readyConnection1.ID,
+						ConnectionId:         readyConnection1.Id,
 						AccessTokenExpiresAt: util.ToPtr(now.Add(15 * time.Minute)),
 					},
 					{
-						ConnectionID:         readyConnection2.ID,
+						ConnectionId:         readyConnection2.Id,
 						AccessTokenExpiresAt: util.ToPtr(now.Add(45 * time.Minute)),
 					},
 				},
@@ -458,7 +458,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 				name: "tokens expiring beyond provided duration",
 				tokens: []*OAuth2Token{
 					{
-						ConnectionID:         readyConnection1.ID,
+						ConnectionId:         readyConnection1.Id,
 						AccessTokenExpiresAt: util.ToPtr(now.Add(2 * time.Hour)),
 					},
 				},
@@ -470,7 +470,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 				name: "ignores tokens for disabled connections",
 				tokens: []*OAuth2Token{
 					{
-						ConnectionID:         disabledConnection.ID,
+						ConnectionId:         disabledConnection.Id,
 						AccessTokenExpiresAt: util.ToPtr(now.Add(30 * time.Minute)),
 					},
 				},
@@ -482,7 +482,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 				name: "ignores tokens for deleted connections",
 				tokens: []*OAuth2Token{
 					{
-						ConnectionID:         deletedConnection.ID,
+						ConnectionId:         deletedConnection.Id,
 						AccessTokenExpiresAt: util.ToPtr(now.Add(30 * time.Minute)),
 					},
 				},
@@ -501,7 +501,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 				name: "callback returns error",
 				tokens: []*OAuth2Token{
 					{
-						ConnectionID:         readyConnection1.ID,
+						ConnectionId:         readyConnection1.Id,
 						AccessTokenExpiresAt: util.ToPtr(now.Add(15 * time.Minute)),
 					},
 				},
@@ -532,7 +532,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 				for _, token := range tc.tokens {
 					_, err := db.InsertOAuth2Token(
 						ctx,
-						token.ConnectionID,
+						token.ConnectionId,
 						nil,
 						"refreshToken",
 						"accessToken",

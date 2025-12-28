@@ -151,7 +151,7 @@ func (s *service) establishAuthFromSession(
 
 	if fromJwt.IsAuthenticated() {
 		// Sanity check that this session is for the same actor
-		if sess.ActorId != fromJwt.GetActor().ID {
+		if sess.ActorId != fromJwt.GetActor().Id {
 			// The two do not agree. Cancel the previous session as this is a new user. Service will need to
 			// re-establish session if it wants it.
 			err = s.deleteSessionFromRedis(ctx, sessionCookieId.Id)
@@ -244,7 +244,7 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 
 		if sess != nil {
 			// Sanity check that this session is for the same actor
-			if sess.ActorId != ra.GetActor().ID {
+			if sess.ActorId != ra.GetActor().Id {
 				err = s.deleteSessionFromRedis(ctx, sessionId)
 				if err != nil {
 					return errors.Wrap(err, "failed to delete session from redis")
@@ -257,7 +257,7 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 	if sess == nil {
 		sess = &session{
 			Id:        uuid.New(),
-			ActorId:   ra.GetActor().ID,
+			ActorId:   ra.GetActor().Id,
 			ExpiresAt: apctx.GetClock(ctx).Now().Add(sessionService.SessionTimeout()),
 		}
 	}

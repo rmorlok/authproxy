@@ -13,7 +13,7 @@ import (
 )
 
 type Connection struct {
-	ID               uuid.UUID
+	Id               uuid.UUID
 	Namespace        string
 	State            database.ConnectionState
 	ConnectorId      uuid.UUID
@@ -23,8 +23,8 @@ type Connection struct {
 	DeletedAt        *time.Time
 }
 
-func (m *Connection) GetID() uuid.UUID {
-	return m.ID
+func (m *Connection) GetId() uuid.UUID {
+	return m.Id
 }
 
 func (m *Connection) GetNamespace() string {
@@ -101,7 +101,7 @@ func (m ConnectionMatcher) Matches(x interface{}) bool {
 		return false
 	}
 
-	return c.GetID() == m.ExpectedId
+	return c.GetId() == m.ExpectedId
 }
 
 func (m ConnectionMatcher) String() string {

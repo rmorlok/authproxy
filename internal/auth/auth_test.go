@@ -269,7 +269,7 @@ func (ts *TestSetup) MustGetValidAdminUser(ctx context.Context) database.Actor {
 
 	if errors.Is(err, database.ErrNotFound) {
 		a = &database.Actor{
-			ID:         uuid.New(),
+			Id:         uuid.New(),
 			ExternalId: "admin/bobdole",
 			Email:      "bobdole@example.com",
 			Admin:      true,
@@ -285,7 +285,7 @@ func (ts *TestSetup) MustGetValidAdminUser(ctx context.Context) database.Actor {
 // MustGetValidUninitializedAdminUser give a valid admin, but does not create a user in the database ahead of time.
 func (ts *TestSetup) MustGetValidUninitializedAdminUser(ctx context.Context) database.Actor {
 	return database.Actor{
-		ID:         uuid.New(),
+		Id:         uuid.New(),
 		ExternalId: "admin/ronaldreagan",
 		Email:      "ronaldreagan@example.com",
 		Admin:      true,
@@ -302,7 +302,7 @@ func (ts *TestSetup) MustGetValidUserByExternalId(ctx context.Context, externalI
 
 	if errors.Is(err, database.ErrNotFound) {
 		a = &database.Actor{
-			ID:         uuid.New(),
+			Id:         uuid.New(),
 			ExternalId: externalId,
 			Email:      "jimmycarter@example.com",
 		}
@@ -421,7 +421,7 @@ func (ts *TestSetup) PostWithSigner(ctx context.Context, path string, body gin.H
 // the information.
 func (ts *TestSetup) MustGetInvalidAdminUser(ctx context.Context) database.Actor {
 	return database.Actor{
-		ID:         uuid.New(),
+		Id:         uuid.New(),
 		ExternalId: "admin/billclinton",
 		Email:      "billclinton@example.com",
 		Admin:      true,

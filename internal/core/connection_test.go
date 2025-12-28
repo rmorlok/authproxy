@@ -15,9 +15,9 @@ func newTestConnectionWithDetails(u uuid.UUID, s database.ConnectionState, c cfg
 	cv := NewTestConnectorVersion(c)
 	return &connection{
 		Connection: database.Connection{
-			ID:               u,
+			Id:               u,
 			State:            s,
-			ConnectorId:      cv.GetID(),
+			ConnectorId:      cv.GetId(),
 			ConnectorVersion: cv.GetVersion(),
 		},
 		s:      cv.s,

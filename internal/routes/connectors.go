@@ -50,7 +50,7 @@ func ConnectorVersionToConnectorJson(cv connIface.ConnectorVersion) ConnectorJso
 	}
 
 	return ConnectorJson{
-		Id:          cv.GetID(),
+		Id:          cv.GetId(),
 		Version:     cv.GetVersion(),
 		Namespace:   cv.GetNamespace(),
 		State:       cv.GetState(),
@@ -92,7 +92,7 @@ func ConnectorVersionToJson(cv connIface.ConnectorVersion) ConnectorVersionJson 
 	def := cv.GetDefinition()
 
 	return ConnectorVersionJson{
-		Id:         cv.GetID(),
+		Id:         cv.GetId(),
 		Version:    cv.GetVersion(),
 		State:      cv.GetState(),
 		Type:       cv.GetType(),

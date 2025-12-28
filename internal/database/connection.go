@@ -41,7 +41,7 @@ func IsValidConnectionState[T string | ConnectionState](state T) bool {
 const ConnectionsTable = "connections"
 
 type Connection struct {
-	ID               uuid.UUID
+	Id               uuid.UUID
 	Namespace        string
 	State            ConnectionState
 	ConnectorId      uuid.UUID
@@ -66,7 +66,7 @@ func (c *Connection) cols() []string {
 
 func (c *Connection) fields() []any {
 	return []any{
-		&c.ID,
+		&c.Id,
 		&c.Namespace,
 		&c.State,
 		&c.ConnectorId,
@@ -79,7 +79,7 @@ func (c *Connection) fields() []any {
 
 func (c *Connection) values() []any {
 	return []any{
-		c.ID,
+		c.Id,
 		c.Namespace,
 		c.State,
 		c.ConnectorId,
@@ -90,8 +90,8 @@ func (c *Connection) values() []any {
 	}
 }
 
-func (c *Connection) GetID() uuid.UUID {
-	return c.ID
+func (c *Connection) GetId() uuid.UUID {
+	return c.Id
 }
 
 func (c *Connection) GetConnectorId() uuid.UUID {
@@ -109,7 +109,7 @@ func (c *Connection) GetNamespace() string {
 func (c *Connection) Validate() error {
 	result := &multierror.Error{}
 
-	if c.ID == uuid.Nil {
+	if c.Id == uuid.Nil {
 		result = multierror.Append(result, errors.New("connection id is required"))
 	}
 

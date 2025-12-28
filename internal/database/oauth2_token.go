@@ -16,9 +16,9 @@ import (
 const OAuth2TokensTable = "oauth2_tokens"
 
 type OAuth2Token struct {
-	ID                    uuid.UUID
-	ConnectionID          uuid.UUID // Foreign key to Connection; not enforced by database
-	RefreshedFromID       *uuid.UUID
+	Id                    uuid.UUID
+	ConnectionId          uuid.UUID // Foreign key to Connection; not enforced by database
+	RefreshedFromId       *uuid.UUID
 	EncryptedRefreshToken string
 	EncryptedAccessToken  string
 	AccessTokenExpiresAt  *time.Time
@@ -43,9 +43,9 @@ func (t *OAuth2Token) cols() []string {
 
 func (t *OAuth2Token) fields() []any {
 	return []any{
-		&t.ID,
-		&t.ConnectionID,
-		&t.RefreshedFromID,
+		&t.Id,
+		&t.ConnectionId,
+		&t.RefreshedFromId,
 		&t.EncryptedRefreshToken,
 		&t.EncryptedAccessToken,
 		&t.AccessTokenExpiresAt,
@@ -57,9 +57,9 @@ func (t *OAuth2Token) fields() []any {
 
 func (t *OAuth2Token) values() []any {
 	return []any{
-		t.ID,
-		t.ConnectionID,
-		t.RefreshedFromID,
+		t.Id,
+		t.ConnectionId,
+		t.RefreshedFromId,
 		t.EncryptedRefreshToken,
 		t.EncryptedAccessToken,
 		t.AccessTokenExpiresAt,
@@ -96,7 +96,7 @@ func (s *service) GetOAuth2Token(
 		Scan(result.fields()...)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, errors.Wrap(ErrNotFound, "no OAuth2 token found for connection ID")
+			return nil, errors.Wrap(ErrNotFound, "no OAuth2 token found for connection Id")
 		}
 
 		return nil, err
@@ -208,9 +208,9 @@ func (s *service) InsertOAuth2Token(
 
 		// Create a new token
 		newToken = &OAuth2Token{
-			ID:                    apctx.GetUuidGenerator(ctx).New(),
-			ConnectionID:          connectionId,
-			RefreshedFromID:       refreshedFrom,
+			Id:                    apctx.GetUuidGenerator(ctx).New(),
+			ConnectionId:          connectionId,
+			RefreshedFromId:       refreshedFrom,
 			EncryptedRefreshToken: encryptedRefreshToken,
 			EncryptedAccessToken:  encryptedAccessToken,
 			AccessTokenExpiresAt:  accessTokenExpiresAt,

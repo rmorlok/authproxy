@@ -55,7 +55,7 @@ func (f *clientFactory) ForRequestType(rt request_log.RequestType) F {
 func (f *clientFactory) ForConnectorVersion(cv ConnectorVersion) F {
 	ri := f.requestInfo
 	ri.Namespace = cv.GetNamespace()
-	ri.ConnectorId = cv.GetID()
+	ri.ConnectorId = cv.GetId()
 	ri.ConnectorVersion = cv.GetVersion()
 	ri.ConnectorType = cv.GetType()
 
@@ -71,7 +71,7 @@ func (f *clientFactory) ForConnection(c Connection) F {
 	}
 
 	ri := f.requestInfo
-	ri.ConnectionId = c.GetID()
+	ri.ConnectionId = c.GetId()
 	ri.Namespace = c.GetNamespace()
 	ri.ConnectorId = c.GetConnectorId()
 	ri.ConnectorVersion = c.GetConnectorVersion()

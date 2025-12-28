@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strings"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
-	"strings"
 )
 
 // AuthProxyClaims is the struct that defines a JWT for the auth service. It contains information about the actor
@@ -51,7 +52,7 @@ func (tc *AuthProxyClaims) AdminUsername() (string, error) {
 		return "", errors.New("not admin")
 	}
 
-	if tc.Actor != nil && tc.Subject != tc.Actor.ID {
+	if tc.Actor != nil && tc.Subject != tc.Actor.Id {
 		return "", errors.New("token subject and actor id do not match")
 	}
 

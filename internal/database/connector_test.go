@@ -39,8 +39,8 @@ INSERT INTO connector_versions
 			FetchPage(ctx)
 		require.NoError(t, pr.Error)
 		require.Len(t, pr.Results, 2)
-		require.Equal(t, uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), pr.Results[0].ID)
-		require.Equal(t, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), pr.Results[1].ID)
+		require.Equal(t, uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), pr.Results[0].Id)
+		require.Equal(t, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), pr.Results[1].Id)
 
 		pr = db.ListConnectorsBuilder().
 			ForNamespaceMatcher("root.child.**").
@@ -48,7 +48,7 @@ INSERT INTO connector_versions
 			FetchPage(ctx)
 		require.NoError(t, pr.Error)
 		require.Len(t, pr.Results, 2)
-		require.Equal(t, uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), pr.Results[0].ID)
-		require.Equal(t, uuid.MustParse("c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa"), pr.Results[1].ID)
+		require.Equal(t, uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), pr.Results[0].Id)
+		require.Equal(t, uuid.MustParse("c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa"), pr.Results[1].Id)
 	})
 }

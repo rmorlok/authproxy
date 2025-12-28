@@ -67,7 +67,7 @@ func TestActorsRoutes(t *testing.T) {
 	// Helper to create an actor in DB
 	createActor := func(t *testing.T, db database.DB, externalId, email string, admin, superAdmin bool) *database.Actor {
 		a := &database.Actor{
-			ID:         uuid.New(),
+			Id:         uuid.New(),
 			ExternalId: externalId,
 			Email:      email,
 			Admin:      admin,
@@ -82,7 +82,7 @@ func TestActorsRoutes(t *testing.T) {
 	// Build an admin-authenticated request from a base request
 	adminize := func(t *testing.T, tu *TestSetup, req *http.Request) *http.Request {
 		var err error
-		req, err = tu.AuthUtil.SignRequestHeaderAs(context.Background(), req, jwt2.Actor{ID: "admin/test", Admin: true})
+		req, err = tu.AuthUtil.SignRequestHeaderAs(context.Background(), req, jwt2.Actor{Id: "admin/test", Admin: true})
 		require.NoError(t, err)
 		return req
 	}
@@ -169,7 +169,7 @@ func TestActorsRoutes(t *testing.T) {
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodGet, "/actors/"+a.ID.String(), nil)
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+a.Id.String(), nil)
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -198,7 +198,7 @@ func TestActorsRoutes(t *testing.T) {
 
 		t.Run("success", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodGet, "/actors/"+a.ID.String(), nil)
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+a.Id.String(), nil)
 			require.NoError(t, err)
 			req = adminize(t, tu, req)
 
@@ -207,7 +207,7 @@ func TestActorsRoutes(t *testing.T) {
 
 			var resp ActorJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			require.Equal(t, a.ID, resp.ID)
+			require.Equal(t, a.Id, resp.Id)
 			require.Equal(t, a.ExternalId, resp.ExternalId)
 		})
 	})
@@ -248,7 +248,7 @@ func TestActorsRoutes(t *testing.T) {
 
 			var resp ActorJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			require.Equal(t, a.ID, resp.ID)
+			require.Equal(t, a.Id, resp.Id)
 			require.Equal(t, a.ExternalId, resp.ExternalId)
 		})
 	})
@@ -261,7 +261,7 @@ func TestActorsRoutes(t *testing.T) {
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodDelete, "/actors/"+a.ID.String(), nil)
+			req, err := http.NewRequest(http.MethodDelete, "/actors/"+a.Id.String(), nil)
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -290,14 +290,14 @@ func TestActorsRoutes(t *testing.T) {
 
 		t.Run("success", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodDelete, "/actors/"+a.ID.String(), nil)
+			req, err := http.NewRequest(http.MethodDelete, "/actors/"+a.Id.String(), nil)
 			require.NoError(t, err)
 			req = adminize(t, tu, req)
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusNoContent, w.Code)
 
-			got, err := tu.Db.GetActor(context.Background(), a.ID)
+			got, err := tu.Db.GetActor(context.Background(), a.Id)
 			require.ErrorIs(t, err, database.ErrNotFound)
 			require.Nil(t, got)
 		})

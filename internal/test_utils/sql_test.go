@@ -129,7 +129,7 @@ func (m *MockRowsIterator) Close() error {
 // TestPerson is a test struct used for testing the scanStruct function.
 // It has fields with both direct name matching and db tag matching.
 type TestPerson struct {
-	ID        int    `db:"id"`
+	Id        int    `db:"id"`
 	FirstName string `db:"first_name"`
 	LastName  string `db:"last_name"`
 	Age       int
@@ -143,7 +143,7 @@ func TestScanStruct(t *testing.T) {
 		// Setup mock
 		mockScanner := &MockRowScanner{
 			ColumnsFunc: func() ([]string, error) {
-				return []string{"ID", "FirstName", "LastName", "Age"}, nil
+				return []string{"Id", "FirstName", "LastName", "Age"}, nil
 			},
 			ScanFunc: func(dest ...interface{}) error {
 				// Set values to the destination pointers
@@ -161,7 +161,7 @@ func TestScanStruct(t *testing.T) {
 
 		// Verify
 		require.NoError(t, err)
-		assert.Equal(t, 1, person.ID)
+		assert.Equal(t, 1, person.Id)
 		assert.Equal(t, "John", person.FirstName)
 		assert.Equal(t, "Doe", person.LastName)
 		assert.Equal(t, 30, person.Age)
@@ -190,7 +190,7 @@ func TestScanStruct(t *testing.T) {
 
 		// Verify
 		require.NoError(t, err)
-		assert.Equal(t, 1, person.ID)
+		assert.Equal(t, 1, person.Id)
 		assert.Equal(t, "John", person.FirstName)
 		assert.Equal(t, "Doe", person.LastName)
 		assert.Equal(t, 30, person.Age)
@@ -219,7 +219,7 @@ func TestScanStruct(t *testing.T) {
 		// Setup mock
 		mockScanner := &MockRowScanner{
 			ColumnsFunc: func() ([]string, error) {
-				return []string{"ID"}, nil
+				return []string{"Id"}, nil
 			},
 		}
 
@@ -237,7 +237,7 @@ func TestScanStruct(t *testing.T) {
 		// Setup mock
 		mockScanner := &MockRowScanner{
 			ColumnsFunc: func() ([]string, error) {
-				return []string{"ID"}, nil
+				return []string{"Id"}, nil
 			},
 		}
 
@@ -273,7 +273,7 @@ func TestScanStruct(t *testing.T) {
 		// Setup mock
 		mockScanner := &MockRowScanner{
 			ColumnsFunc: func() ([]string, error) {
-				return []string{"ID"}, nil
+				return []string{"Id"}, nil
 			},
 			ScanFunc: func(dest ...interface{}) error {
 				return errors.New("scan error")
@@ -300,7 +300,7 @@ func TestFetchAllRows(t *testing.T) {
 		mockRows := &MockRowsIterator{
 			MockRowScanner: MockRowScanner{
 				ColumnsFunc: func() ([]string, error) {
-					return []string{"ID", "FirstName", "LastName", "Age"}, nil
+					return []string{"Id", "FirstName", "LastName", "Age"}, nil
 				},
 				ScanFunc: func(dest ...interface{}) error {
 					// Set values based on row count
@@ -330,9 +330,9 @@ func TestFetchAllRows(t *testing.T) {
 		// Verify
 		require.NoError(t, err)
 		assert.Len(t, results, 3)
-		assert.Equal(t, 1, results[0].ID)
-		assert.Equal(t, 2, results[1].ID)
-		assert.Equal(t, 3, results[2].ID)
+		assert.Equal(t, 1, results[0].Id)
+		assert.Equal(t, 2, results[1].Id)
+		assert.Equal(t, 3, results[2].Id)
 		assert.Equal(t, 20, results[0].Age)
 		assert.Equal(t, 21, results[1].Age)
 		assert.Equal(t, 22, results[2].Age)
@@ -344,7 +344,7 @@ func TestFetchAllRows(t *testing.T) {
 		mockRows := &MockRowsIterator{
 			MockRowScanner: MockRowScanner{
 				ColumnsFunc: func() ([]string, error) {
-					return []string{"ID"}, nil
+					return []string{"Id"}, nil
 				},
 				ScanFunc: func(dest ...interface{}) error {
 					return errors.New("scan error")
@@ -369,7 +369,7 @@ func TestFetchAllRows(t *testing.T) {
 		mockRows := &MockRowsIterator{
 			MockRowScanner: MockRowScanner{
 				ColumnsFunc: func() ([]string, error) {
-					return []string{"ID"}, nil
+					return []string{"Id"}, nil
 				},
 				ScanFunc: func(dest ...interface{}) error {
 					return nil
@@ -401,12 +401,12 @@ func TestAssertSqlComponents(t *testing.T) {
 	t.Run("comparison logic works correctly", func(t *testing.T) {
 		// Test case: equal rows - should not report any errors
 		expected := []TestPerson{
-			{ID: 1, FirstName: "John", LastName: "Doe", Age: 30},
-			{ID: 2, FirstName: "Jane", LastName: "Smith", Age: 25},
+			{Id: 1, FirstName: "John", LastName: "Doe", Age: 30},
+			{Id: 2, FirstName: "Jane", LastName: "Smith", Age: 25},
 		}
 		actual := []TestPerson{
-			{ID: 1, FirstName: "John", LastName: "Doe", Age: 30},
-			{ID: 2, FirstName: "Jane", LastName: "Smith", Age: 25},
+			{Id: 1, FirstName: "John", LastName: "Doe", Age: 30},
+			{Id: 2, FirstName: "Jane", LastName: "Smith", Age: 25},
 		}
 
 		// Create a mock testing.T to capture errors
@@ -429,11 +429,11 @@ func TestAssertSqlComponents(t *testing.T) {
 
 		// Test case: different row count - should detect the mismatch
 		expected = []TestPerson{
-			{ID: 1, FirstName: "John", LastName: "Doe", Age: 30},
-			{ID: 2, FirstName: "Jane", LastName: "Smith", Age: 25},
+			{Id: 1, FirstName: "John", LastName: "Doe", Age: 30},
+			{Id: 2, FirstName: "Jane", LastName: "Smith", Age: 25},
 		}
 		actual = []TestPerson{
-			{ID: 1, FirstName: "John", LastName: "Doe", Age: 30},
+			{Id: 1, FirstName: "John", LastName: "Doe", Age: 30},
 		}
 
 		// Compare the rows directly
@@ -444,10 +444,10 @@ func TestAssertSqlComponents(t *testing.T) {
 
 		// Test case: different row content - should detect the mismatch
 		expected = []TestPerson{
-			{ID: 1, FirstName: "John", LastName: "Doe", Age: 30},
+			{Id: 1, FirstName: "John", LastName: "Doe", Age: 30},
 		}
 		actual = []TestPerson{
-			{ID: 1, FirstName: "Different", LastName: "Person", Age: 40},
+			{Id: 1, FirstName: "Different", LastName: "Person", Age: 40},
 		}
 
 		// Compare the rows directly
@@ -531,8 +531,8 @@ func TestAssertSqlIntegration(t *testing.T) {
 
 	// Define expected results that should match the data we inserted
 	expected := []TestPerson{
-		{ID: 1, FirstName: "John", LastName: "Doe", Age: 30},
-		{ID: 2, FirstName: "Jane", LastName: "Smith", Age: 25},
+		{Id: 1, FirstName: "John", LastName: "Doe", Age: 30},
+		{Id: 2, FirstName: "Jane", LastName: "Smith", Age: 25},
 	}
 
 	// Test AssertSql with the real database

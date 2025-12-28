@@ -65,12 +65,12 @@ func (o *oAuth2Connection) createDbTokenFromResponse(ctx context.Context, resp *
 
 	var refreshFromId *uuid.UUID
 	if refreshFrom != nil {
-		refreshFromId = &refreshFrom.ID
+		refreshFromId = &refreshFrom.Id
 	}
 
 	token, err := o.db.InsertOAuth2Token(
 		ctx,
-		o.connection.GetID(),
+		o.connection.GetId(),
 		refreshFromId,
 		encryptedRefreshToken,
 		encryptedAccessToken,

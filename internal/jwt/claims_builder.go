@@ -3,14 +3,15 @@ package jwt
 import (
 	"context"
 	"fmt"
+	"strings"
+	"time"
+
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/util"
-	"strings"
-	"time"
 )
 
 // ClaimsBuilder is an object to build Jwts to properly construct claims as expected
@@ -138,8 +139,8 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 	}
 
 	if b.actor != nil {
-		if b.actor.ID != "" {
-			b.id = util.ToPtr(b.actor.ID)
+		if b.actor.Id != "" {
+			b.id = util.ToPtr(b.actor.Id)
 		}
 	}
 
@@ -150,7 +151,7 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 	if util.CoerceBool(b.admin) && !strings.HasPrefix(*b.id, "admin/") {
 		b.id = util.ToPtr(fmt.Sprintf("admin/%s", *b.id))
 		if b.actor != nil {
-			b.actor.ID = *b.id
+			b.actor.Id = *b.id
 		}
 	}
 

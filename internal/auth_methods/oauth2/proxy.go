@@ -37,7 +37,7 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 	defer m.Unlock(ctx)
 
 	// Get the latest token to make sure we still need to refresh
-	token, err = o.db.GetOAuth2Token(ctx, o.connection.GetID())
+	token, err = o.db.GetOAuth2Token(ctx, o.connection.GetId())
 	if err != nil {
 		return nil, err
 	}
@@ -98,7 +98,7 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 }
 
 func (o *oAuth2Connection) getValidToken(ctx context.Context) (*database.OAuth2Token, error) {
-	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetID())
+	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetId())
 	if err != nil {
 		if errors.Is(database.ErrNotFound, err) {
 			return nil, api_common.

@@ -28,7 +28,7 @@ func (b *connectorVersionBuilder) WithConfig(c *config.Connector) *connectorVers
 		func(v *ConnectorVersion) {
 			v.Version = c.Version
 			v.Type = c.Type
-			v.ID = c.Id
+			v.Id = c.Id
 			v.Namespace = c.GetNamespace()
 		},
 	}, b.versionSetters...)
@@ -39,7 +39,7 @@ func (b *connectorVersionBuilder) WithConfig(c *config.Connector) *connectorVers
 func (b *connectorVersionBuilder) WithId(id uuid.UUID) *connectorVersionBuilder {
 	b.versionSetters = append(b.versionSetters,
 		func(v *ConnectorVersion) {
-			v.ID = id
+			v.Id = id
 		},
 	)
 
