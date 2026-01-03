@@ -18,6 +18,7 @@ type A interface {
 	 * Gin middlewares for establishing auth
 	 */
 
+	NewRequiredBuilder() *PermissionValidatorBuilder
 	Required(validators ...AuthValidator) gin.HandlerFunc
 	Optional(validators ...AuthValidator) gin.HandlerFunc
 	OptionalXsrfNotRequired(validators ...AuthValidator) gin.HandlerFunc

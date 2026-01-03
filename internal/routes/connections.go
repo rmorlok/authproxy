@@ -421,11 +421,49 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 }
 
 func (r *ConnectionsRoutes) Register(g gin.IRouter) {
-	g.POST("/connections/_initiate", r.auth.Required(), r.initiate)
-	g.GET("/connections", r.auth.Required(), r.list)
-	g.GET("/connections/:id", r.auth.Required(), r.get)
-	g.POST("/connections/:id/_disconnect", r.auth.Required(), r.disconnect)
-	g.PUT("/connections/:id/_force_state", r.auth.Required(), r.forceState)
+	g.POST(
+		"/connections/_initiate",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("create").
+			Build(),
+		r.initiate,
+	)
+	g.GET(
+		"/connections",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("list").
+			Build(),
+		r.list,
+	)
+	g.GET(
+		"/connections/:id",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("get").
+			ForIdField("id").
+			Build(),
+		r.get,
+	)
+	g.POST(
+		"/connections/:id/_disconnect",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("disconnect").
+			ForIdField("id").
+			Build(),
+		r.disconnect,
+	)
+	g.PUT(
+		"/connections/:id/_force_state",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("force_state").
+			ForIdField("id").
+			Build(),
+		r.forceState,
+	)
 }
 
 func NewConnectionsRoutes(

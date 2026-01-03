@@ -45,3 +45,7 @@ func (s *service) WithDefaultAuthValidators(validators ...AuthValidator) A {
 	s2.defaultAuthValidators = validators
 	return &s2
 }
+
+func (s *service) NewRequiredBuilder() *PermissionValidatorBuilder {
+	return &PermissionValidatorBuilder{s: s}
+}
