@@ -1,4 +1,4 @@
-package auth
+package service
 
 import (
 	"net/http"
@@ -8,9 +8,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	jwt2 "github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config"
-	jwt2 "github.com/rmorlok/authproxy/internal/jwt"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
 )
@@ -274,7 +274,7 @@ func TestAuth_Gin(t *testing.T) {
 
 			tok, err := jwt2.NewJwtTokenBuilder().
 				WithClaims(c).
-				WithPrivateKeyPath("../../test_data/system_keys/system").
+				WithPrivateKeyPath(pathToTestData("system_keys/system")).
 				TokenCtx(testContext)
 			require.NoError(t, err)
 

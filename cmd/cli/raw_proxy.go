@@ -13,8 +13,8 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/cmd/cli/config"
+	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	server_config "github.com/rmorlok/authproxy/internal/config"
-	"github.com/rmorlok/authproxy/internal/jwt"
 	"github.com/spf13/cobra"
 )
 

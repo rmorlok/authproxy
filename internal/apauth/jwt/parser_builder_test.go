@@ -13,7 +13,7 @@ func TestJwtTokenParserBuilder(t *testing.T) {
 	t.Run("getSigningKeyDataAndMethod", func(t *testing.T) {
 		t.Run("RSA SSH", func(t *testing.T) {
 			tb := NewJwtTokenParserBuilder().
-				WithPublicKeyPath("../../test_data/admin_user_keys/ronaldreagan-ssh-rsa.pub")
+				WithPublicKeyPath(pathToTestData("admin_user_keys/ronaldreagan-ssh-rsa.pub"))
 			x := tb.(*parserBuilder)
 			_, signingMethod, err := x.getVerifyingKeyData(context.Background(), nil)
 			require.NoError(t, err)
@@ -21,7 +21,7 @@ func TestJwtTokenParserBuilder(t *testing.T) {
 		})
 		t.Run("RSA PEM", func(t *testing.T) {
 			tb := NewJwtTokenParserBuilder().
-				WithPublicKeyPath("../../test_data/admin_user_keys/ronaldreagan-pem-rsa-pub.pem")
+				WithPublicKeyPath(pathToTestData("admin_user_keys/ronaldreagan-pem-rsa-pub.pem"))
 			x := tb.(*parserBuilder)
 			_, signingMethod, err := x.getVerifyingKeyData(context.Background(), nil)
 			require.NoError(t, err)
@@ -29,7 +29,7 @@ func TestJwtTokenParserBuilder(t *testing.T) {
 		})
 		t.Run("ed SSH", func(t *testing.T) {
 			tb := NewJwtTokenParserBuilder().
-				WithPublicKeyPath("../../test_data/admin_user_keys/georgebush-ssh-ed.pub")
+				WithPublicKeyPath(pathToTestData("admin_user_keys/georgebush-ssh-ed.pub"))
 			x := tb.(*parserBuilder)
 			_, signingMethod, err := x.getVerifyingKeyData(context.Background(), nil)
 			require.NoError(t, err)
@@ -37,7 +37,7 @@ func TestJwtTokenParserBuilder(t *testing.T) {
 		})
 		t.Run("ed PEM", func(t *testing.T) {
 			tb := NewJwtTokenParserBuilder().
-				WithPublicKeyPath("../../test_data/admin_user_keys/georgebush-pem-ed-pub.pem")
+				WithPublicKeyPath(pathToTestData("admin_user_keys/georgebush-pem-ed-pub.pem"))
 			x := tb.(*parserBuilder)
 			_, signingMethod, err := x.getVerifyingKeyData(context.Background(), nil)
 			require.NoError(t, err)
@@ -45,7 +45,7 @@ func TestJwtTokenParserBuilder(t *testing.T) {
 		})
 		t.Run("ec SSH", func(t *testing.T) {
 			tb := NewJwtTokenParserBuilder().
-				WithPublicKeyPath("../../test_data/admin_user_keys/jimmycarter-ssh-ec.pub")
+				WithPublicKeyPath(pathToTestData("admin_user_keys/jimmycarter-ssh-ec.pub"))
 			x := tb.(*parserBuilder)
 			_, signingMethod, err := x.getVerifyingKeyData(context.Background(), nil)
 			require.NoError(t, err)
@@ -54,7 +54,7 @@ func TestJwtTokenParserBuilder(t *testing.T) {
 		})
 		t.Run("ec PEM", func(t *testing.T) {
 			tb := NewJwtTokenParserBuilder().
-				WithPublicKeyPath("../../test_data/admin_user_keys/jimmycarter-pem-ec-pub.pem")
+				WithPublicKeyPath(pathToTestData("admin_user_keys/jimmycarter-pem-ec-pub.pem"))
 			x := tb.(*parserBuilder)
 			_, signingMethod, err := x.getVerifyingKeyData(context.Background(), nil)
 			require.NoError(t, err)

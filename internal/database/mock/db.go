@@ -12,7 +12,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
 	database "github.com/rmorlok/authproxy/internal/database"
-	jwt "github.com/rmorlok/authproxy/internal/jwt"
+	jwt "github.com/rmorlok/authproxy/internal/apauth/jwt"
 )
 
 // MockDB is a mock of DB interface.

@@ -1,4 +1,4 @@
-package auth
+package service
 
 // AuthValidator is a function that validates the auth for a request. It returns true if the auth is valid,
 // false otherwise. If an actor is not valid for a request, a forbidden response should be returned.

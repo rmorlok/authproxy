@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/cmd/cli/config"
-	"github.com/rmorlok/authproxy/internal/jwt"
+	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/spf13/cobra"
 )
 

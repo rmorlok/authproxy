@@ -1,4 +1,4 @@
-package auth
+package service
 
 import (
 	"fmt"
@@ -12,16 +12,20 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/mohae/deepcopy"
+	jwt2 "github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
-	jwt2 "github.com/rmorlok/authproxy/internal/jwt"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
 	test_clock "k8s.io/utils/clock/testing"
 )
+
+func pathToTestData(path string) string {
+	return "../../../test_data/" + path
+}
 
 func TestAuth_Token(t *testing.T) {
 	t.Parallel()
@@ -268,12 +272,12 @@ func TestAuth_Parse(t *testing.T) {
 					InnerVal: &config.KeyPublicPrivate{
 						PublicKey: &config.KeyData{
 							InnerVal: &config.KeyDataFile{
-								Path: "../../test_data/system_keys/other-system.pub",
+								Path: pathToTestData("system_keys/other-system.pub"),
 							},
 						},
 						PrivateKey: &config.KeyData{
 							InnerVal: &config.KeyDataFile{
-								Path: "../../test_data/system_keys/other-system",
+								Path: pathToTestData("system_keys/other-system"),
 							},
 						},
 					},
@@ -317,7 +321,7 @@ func TestAuth_Parse(t *testing.T) {
 								InnerVal: &config.KeyPublicPrivate{
 									PublicKey: &config.KeyData{
 										InnerVal: &config.KeyDataFile{
-											Path: "../../test_data/admin_user_keys/bobdole.pub",
+											Path: pathToTestData("admin_user_keys/bobdole.pub"),
 										},
 									},
 								},
@@ -331,12 +335,12 @@ func TestAuth_Parse(t *testing.T) {
 					&config.KeyPublicPrivate{
 						PublicKey: &config.KeyData{
 							InnerVal: &config.KeyDataFile{
-								Path: "../../test_data/system_keys/other-system.pub",
+								Path: pathToTestData("system_keys/other-system.pub"),
 							},
 						},
 						PrivateKey: &config.KeyData{
 							InnerVal: &config.KeyDataFile{
-								Path: "../../test_data/system_keys/other-system",
+								Path: pathToTestData("system_keys/other-system"),
 							},
 						},
 					},
@@ -354,7 +358,7 @@ func TestAuth_Parse(t *testing.T) {
 			token, err := jwt2.NewJwtTokenBuilder().
 				WithActorId("bobdole").
 				WithActorEmail("bobdole@example.com").
-				WithPrivateKeyPath("../../test_data/admin_user_keys/bobdole").
+				WithPrivateKeyPath(pathToTestData("admin_user_keys/bobdole")).
 				WithAdmin().
 				WithAudience(string(config.ServiceIdAdminApi)).
 				TokenCtx(testContext)
@@ -370,7 +374,7 @@ func TestAuth_Parse(t *testing.T) {
 			token, err := jwt2.NewJwtTokenBuilder().
 				WithActorId("billclinton").
 				WithActorEmail("billclinton@example.com").
-				WithPrivateKeyPath("../../test_data/admin_user_keys/billclinton").
+				WithPrivateKeyPath(pathToTestData("admin_user_keys/billclinton")).
 				WithAdmin().
 				TokenCtx(testContext)
 			require.NoError(t, err)
@@ -383,7 +387,7 @@ func TestAuth_Parse(t *testing.T) {
 			token, err := jwt2.NewJwtTokenBuilder().
 				WithActorId("bobdole").
 				WithActorEmail("bobdole@example.com").
-				WithPrivateKeyPath("../../test_data/admin_user_keys/billclinton").
+				WithPrivateKeyPath(pathToTestData("admin_user_keys/billclinton")).
 				WithAdmin().
 				TokenCtx(testContext)
 			require.NoError(t, err)
@@ -709,12 +713,12 @@ var testConfigPublicPrivateKey = config.Root{
 			InnerVal: &config.KeyPublicPrivate{
 				PublicKey: &config.KeyData{
 					InnerVal: &config.KeyDataFile{
-						Path: "../../test_data/system_keys/system.pub",
+						Path: pathToTestData("system_keys/system.pub"),
 					},
 				},
 				PrivateKey: &config.KeyData{
 					InnerVal: &config.KeyDataFile{
-						Path: "../../test_data/system_keys/system",
+						Path: pathToTestData("system_keys/system"),
 					},
 				},
 			},
@@ -727,12 +731,12 @@ var testConfigPublicPrivateKey = config.Root{
 						InnerVal: &config.KeyPublicPrivate{
 							PublicKey: &config.KeyData{
 								InnerVal: &config.KeyDataFile{
-									Path: "../../test_data/system_keys/system.pub",
+									Path: pathToTestData("system_keys/system.pub"),
 								},
 							},
 							PrivateKey: &config.KeyData{
 								InnerVal: &config.KeyDataFile{
-									Path: "../../test_data/system_keys/system",
+									Path: pathToTestData("system_keys/system"),
 								},
 							},
 						},

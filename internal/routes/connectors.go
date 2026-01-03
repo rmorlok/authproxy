@@ -6,8 +6,8 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
-	"github.com/rmorlok/authproxy/internal/auth"
 	"github.com/rmorlok/authproxy/internal/config"
 	cfgConnectors "github.com/rmorlok/authproxy/internal/config/connectors"
 	connIface "github.com/rmorlok/authproxy/internal/core/iface"

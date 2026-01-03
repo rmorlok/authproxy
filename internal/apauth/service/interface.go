@@ -1,11 +1,11 @@
-package auth
+package service
 
 import (
 	"context"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	jwt2 "github.com/rmorlok/authproxy/internal/jwt"
+	jwt2 "github.com/rmorlok/authproxy/internal/apauth/jwt"
 )
 
 const (

@@ -1,4 +1,4 @@
-package auth
+package service
 
 import (
 	"context"
@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	jwt2 "github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
-	jwt2 "github.com/rmorlok/authproxy/internal/jwt"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"

@@ -7,10 +7,10 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/internal/auth"
+	"github.com/rmorlok/authproxy/internal/apauth/jwt"
+	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
-	"github.com/rmorlok/authproxy/internal/jwt"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 

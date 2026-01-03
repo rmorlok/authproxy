@@ -4,8 +4,8 @@ import (
 	"context"
 	"errors"
 
+	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
-	"github.com/rmorlok/authproxy/internal/auth"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/config/common"
 	"github.com/rmorlok/authproxy/internal/core/iface"

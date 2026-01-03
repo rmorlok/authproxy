@@ -7,12 +7,16 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func pathToTestData(path string) string {
+	return "../../../test_data/" + path
+}
+
 func TestJwtTokenBuilder(t *testing.T) {
 	t.Parallel()
 	t.Run("getSigningKeyDataAndMethod", func(t *testing.T) {
 		t.Run("RSA SSH", func(t *testing.T) {
 			tb := NewJwtTokenBuilder().
-				WithPrivateKeyPath("../../test_data/admin_user_keys/ronaldreagan-ssh-rsa")
+				WithPrivateKeyPath(pathToTestData("admin_user_keys/ronaldreagan-ssh-rsa"))
 			x := tb.(*tokenBuilder)
 			_, signingMethod, err := x.getSigningKeyDataAndMethod()
 			require.NoError(t, err)
@@ -20,7 +24,7 @@ func TestJwtTokenBuilder(t *testing.T) {
 		})
 		t.Run("RSA PEM", func(t *testing.T) {
 			tb := NewJwtTokenBuilder().
-				WithPrivateKeyPath("../../test_data/admin_user_keys/ronaldreagan-pem-rsa.pem")
+				WithPrivateKeyPath(pathToTestData("admin_user_keys/ronaldreagan-pem-rsa.pem"))
 			x := tb.(*tokenBuilder)
 			_, signingMethod, err := x.getSigningKeyDataAndMethod()
 			require.NoError(t, err)
@@ -28,7 +32,7 @@ func TestJwtTokenBuilder(t *testing.T) {
 		})
 		t.Run("ed SSH", func(t *testing.T) {
 			tb := NewJwtTokenBuilder().
-				WithPrivateKeyPath("../../test_data/admin_user_keys/georgebush-ssh-ed")
+				WithPrivateKeyPath(pathToTestData("admin_user_keys/georgebush-ssh-ed"))
 			x := tb.(*tokenBuilder)
 			_, signingMethod, err := x.getSigningKeyDataAndMethod()
 			require.NoError(t, err)
@@ -36,7 +40,7 @@ func TestJwtTokenBuilder(t *testing.T) {
 		})
 		t.Run("ed PEM", func(t *testing.T) {
 			tb := NewJwtTokenBuilder().
-				WithPrivateKeyPath("../../test_data/admin_user_keys/georgebush-pem-ed.pem")
+				WithPrivateKeyPath(pathToTestData("admin_user_keys/georgebush-pem-ed.pem"))
 			x := tb.(*tokenBuilder)
 			_, signingMethod, err := x.getSigningKeyDataAndMethod()
 			require.NoError(t, err)
@@ -44,7 +48,7 @@ func TestJwtTokenBuilder(t *testing.T) {
 		})
 		t.Run("ec SSH", func(t *testing.T) {
 			tb := NewJwtTokenBuilder().
-				WithPrivateKeyPath("../../test_data/admin_user_keys/jimmycarter-ssh-ec")
+				WithPrivateKeyPath(pathToTestData("admin_user_keys/jimmycarter-ssh-ec"))
 			x := tb.(*tokenBuilder)
 			_, signingMethod, err := x.getSigningKeyDataAndMethod()
 			require.NoError(t, err)
@@ -53,7 +57,7 @@ func TestJwtTokenBuilder(t *testing.T) {
 		})
 		t.Run("ec PEM", func(t *testing.T) {
 			tb := NewJwtTokenBuilder().
-				WithPrivateKeyPath("../../test_data/admin_user_keys/jimmycarter-pem-ec.pem")
+				WithPrivateKeyPath(pathToTestData("admin_user_keys/jimmycarter-pem-ec.pem"))
 			x := tb.(*tokenBuilder)
 			_, signingMethod, err := x.getSigningKeyDataAndMethod()
 			require.NoError(t, err)
@@ -61,7 +65,7 @@ func TestJwtTokenBuilder(t *testing.T) {
 			require.True(t, ok)
 
 			tb = NewJwtTokenBuilder().
-				WithPrivateKeyPath("../../test_data/admin_user_keys/jimmycarter-pem-ec-old.pem")
+				WithPrivateKeyPath(pathToTestData("admin_user_keys/jimmycarter-pem-ec-old.pem"))
 			x = tb.(*tokenBuilder)
 			_, signingMethod, err = x.getSigningKeyDataAndMethod()
 			require.NoError(t, err)

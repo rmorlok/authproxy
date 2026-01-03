@@ -2,7 +2,7 @@ package main
 
 import (
 	"fmt"
-	"github.com/rmorlok/authproxy/internal/jwt"
+	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/spf13/cobra"
 	"os"

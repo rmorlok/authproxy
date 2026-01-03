@@ -8,8 +8,8 @@ import (
 
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/config"
-	"github.com/rmorlok/authproxy/internal/jwt"
 	"github.com/spf13/cobra"
 )
 

@@ -1,4 +1,4 @@
-package auth
+package service
 
 /*
  This file implements middleware specific to the gin framework on top of what's provided in the middlewares.go file.
