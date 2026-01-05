@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/rmorlok/authproxy/internal/apauth/jwt"
+	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -179,9 +179,9 @@ func TestActor(t *testing.T) {
 			setup(t)
 
 			externalId := "bobdole"
-			actor, err := db.UpsertActor(ctx, &jwt.Actor{
-				Id:    externalId,
-				Email: "bobdole@example.com",
+			actor, err := db.UpsertActor(ctx, &core.Actor{
+				ExternalId: externalId,
+				Email:      "bobdole@example.com",
 			})
 			require.NoError(t, err)
 			require.Equal(t, externalId, actor.ExternalId)
@@ -210,9 +210,9 @@ func TestActor(t *testing.T) {
 				require.Equal(t, id, retrieved.Id)
 				require.Equal(t, "bobdole@example.com", retrieved.Email)
 
-				actor, err := db.UpsertActor(ctx, &jwt.Actor{
-					Id:    externalId,
-					Email: "thomasjefferson@example.com",
+				actor, err := db.UpsertActor(ctx, &core.Actor{
+					ExternalId: externalId,
+					Email:      "thomasjefferson@example.com",
 				})
 				require.NoError(t, err)
 				require.Equal(t, externalId, actor.ExternalId)
@@ -248,9 +248,9 @@ func TestActor(t *testing.T) {
 					"write",
 				}, retrieved.Permissions)
 
-				actor, err := db.UpsertActor(ctx, &jwt.Actor{
-					Id:    externalId,
-					Email: "bobdole@example.com",
+				actor, err := db.UpsertActor(ctx, &core.Actor{
+					ExternalId: externalId,
+					Email:      "bobdole@example.com",
 					Permissions: []string{
 						"execute",
 						"read",
@@ -417,20 +417,6 @@ func TestActor(t *testing.T) {
 		require.Len(t, page.Results, 1)
 		require.Equal(t, id, page.Results[0].Id)
 		require.NotNil(t, page.Results[0].DeletedAt)
-	})
-
-	t.Run("GetId and ToJwtActor", func(t *testing.T) {
-		setup(t)
-
-		id := uuid.New()
-		a := &Actor{Id: id, ExternalId: "user/" + id.String(), Email: "id@example.com", Admin: false, SuperAdmin: false}
-		require.Equal(t, id, a.GetId())
-
-		ja := a.ToJwtActor()
-		require.Equal(t, a.ExternalId, ja.Id)
-		require.Equal(t, a.Email, ja.Email)
-		require.Equal(t, a.Admin, ja.Admin)
-		require.Equal(t, a.SuperAdmin, ja.SuperAdmin)
 	})
 
 	t.Run("IsValidActorOrderByField", func(t *testing.T) {

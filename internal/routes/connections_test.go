@@ -102,7 +102,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("invalid uuid", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connections/"+uuid.New().String(), nil, "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections/"+uuid.New().String(), nil, "some-actor")
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -111,7 +111,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("valid", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connections/"+u.String(), nil, "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections/"+u.String(), nil, "some-actor")
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -187,7 +187,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("valid", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connections?limit=50&order=created_at%20asc", nil, "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections?limit=50&order=created_at%20asc", nil, "some-actor")
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -201,7 +201,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("filter to namespace", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connections?limit=50&order=created_at%20asc&namespace=root", nil, "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections?limit=50&order=created_at%20asc&namespace=root", nil, "some-actor")
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -216,7 +216,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("filter to namespace matcher", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodGet, "/connections?limit=50&order=created_at%20asc&namespace=root.child.**", nil, "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections?limit=50&order=created_at%20asc&namespace=root.child.**", nil, "some-actor")
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -253,7 +253,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("invalid uuid", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodPut, "/connections/"+uuid.New().String()+"/_force_state", util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}), "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodPut, "/connections/"+uuid.New().String()+"/_force_state", util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}), "some-actor")
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -262,7 +262,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("valid", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorId(http.MethodPut, "/connections/"+u.String()+"/_force_state", util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}), "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodPut, "/connections/"+u.String()+"/_force_state", util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}), "some-actor")
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)

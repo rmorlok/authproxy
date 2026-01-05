@@ -1,17 +1,15 @@
-package service
+package core
 
 import (
 	"context"
-	context2 "context"
 
 	"github.com/google/uuid"
-	"github.com/rmorlok/authproxy/internal/database"
 )
 
 const authContextKey = "auth"
 
 // GetAuthFromContext gets the auth from context. If no auth is in context, it returns an unauthenticated auth.
-func GetAuthFromContext(ctx context2.Context) *RequestAuth {
+func GetAuthFromContext(ctx context.Context) *RequestAuth {
 	if a, ok := ctx.Value(authContextKey).(*RequestAuth); ok {
 		return a
 	}
@@ -21,7 +19,7 @@ func GetAuthFromContext(ctx context2.Context) *RequestAuth {
 
 type RequestAuth struct {
 	sessionId *uuid.UUID
-	actor     *database.Actor
+	actor     *Actor
 }
 
 func (ra *RequestAuth) IsAuthenticated() bool {
@@ -32,24 +30,24 @@ func (ra *RequestAuth) IsSession() bool {
 	return ra.IsAuthenticated() && ra.sessionId != nil
 }
 
-func (ra *RequestAuth) getSessionId() *uuid.UUID {
+func (ra *RequestAuth) GetSessionId() *uuid.UUID {
 	return ra.sessionId
 }
 
-func (ra *RequestAuth) setSessionId(sessionId *uuid.UUID) {
+func (ra *RequestAuth) SetSessionId(sessionId *uuid.UUID) {
 	ra.sessionId = sessionId
 }
 
-func (ra *RequestAuth) GetActor() *database.Actor {
+func (ra *RequestAuth) GetActor() *Actor {
 	return ra.actor
 }
 
-func (ra *RequestAuth) MustGetActor() database.Actor {
+func (ra *RequestAuth) MustGetActor() *Actor {
 	if ra.actor == nil {
-		panic("request was expected to be authenticated, but was not")
+		panic("expected request to be authenticated")
 	}
 
-	return *ra.actor
+	return ra.actor
 }
 
 func (a *RequestAuth) ContextWith(ctx context.Context) context.Context {
@@ -60,15 +58,15 @@ func NewUnauthenticatedRequestAuth() *RequestAuth {
 	return &RequestAuth{}
 }
 
-func NewAuthenticatedRequestAuth(a *database.Actor) *RequestAuth {
+func NewAuthenticatedRequestAuth(a IActorData) *RequestAuth {
 	return &RequestAuth{
-		actor: a,
+		actor: CreateActor(a),
 	}
 }
 
-func NewAuthenticatedRequestAuthWithSession(a *database.Actor, sess *uuid.UUID) *RequestAuth {
+func NewAuthenticatedRequestAuthWithSession(a IActorData, sess *uuid.UUID) *RequestAuth {
 	return &RequestAuth{
-		actor:     a,
+		actor:     CreateActor(a),
 		sessionId: sess,
 	}
 }

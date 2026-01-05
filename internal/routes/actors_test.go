@@ -12,14 +12,14 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	jwt2 "github.com/rmorlok/authproxy/internal/apauth/jwt"
-	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
+	coreAuth "github.com/rmorlok/authproxy/internal/apauth/core"
+	authService "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/apredis/mock"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
-	httpf2 "github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/stretchr/testify/require"
 )
@@ -28,7 +28,7 @@ func TestActorsRoutes(t *testing.T) {
 	type TestSetup struct {
 		Gin      *gin.Engine
 		Cfg      config.C
-		AuthUtil *auth2.AuthTestUtil
+		AuthUtil *authService.AuthTestUtil
 		Db       database.DB
 	}
 
@@ -42,10 +42,10 @@ func TestActorsRoutes(t *testing.T) {
 		// Real redis config (in-memory test) for httpf factory
 		cfg, rds := apredis.MustApplyTestConfig(cfg)
 		// Auth service bound to this DB
-		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(config.ServiceIdApi, cfg, db)
+		cfg, auth, authUtil := authService.TestAuthServiceWithDb(config.ServiceIdApi, cfg, db)
 		// Test encrypt service and http factory
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
-		h := httpf2.CreateFactory(cfg, rds, test_utils.NewTestLogger())
+		h := httpf.CreateFactory(cfg, rds, test_utils.NewTestLogger())
 
 		// Build routes
 		ar := NewActorsRoutes(cfg, auth, db, rds, h, e, test_utils.NewTestLogger())
@@ -82,7 +82,7 @@ func TestActorsRoutes(t *testing.T) {
 	// Build an admin-authenticated request from a base request
 	adminize := func(t *testing.T, tu *TestSetup, req *http.Request) *http.Request {
 		var err error
-		req, err = tu.AuthUtil.SignRequestHeaderAs(context.Background(), req, jwt2.Actor{Id: "admin/test", Admin: true})
+		req, err = tu.AuthUtil.SignRequestHeaderAs(context.Background(), req, coreAuth.Actor{ExternalId: "admin/test", Admin: true})
 		require.NoError(t, err)
 		return req
 	}

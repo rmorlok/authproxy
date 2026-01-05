@@ -10,11 +10,10 @@ import (
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/config"
-	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
-func (o *oAuth2Connection) getPublicRedirectUrl(ctx context.Context, stateId uuid.UUID, actor database.Actor) (string, error) {
+func (o *oAuth2Connection) getPublicRedirectUrl(ctx context.Context, stateId uuid.UUID, actor IActorData) (string, error) {
 	if o.cfg == nil {
 		return "", errors.New("config is nil")
 	}
@@ -24,7 +23,7 @@ func (o *oAuth2Connection) getPublicRedirectUrl(ctx context.Context, stateId uui
 	}
 
 	tb, err := jwt.NewJwtTokenBuilder().
-		WithActor(util.ToPtr(actor.ToJwtActor())).
+		WithActor(actor).
 		WithExpiresInCtx(ctx, o.cfg.GetRoot().Oauth.GetInitiateToRedirectTtlOrDefault()).
 		WithServiceId(config.ServiceIdPublic).
 		WithSelfSigned().
@@ -54,7 +53,7 @@ func (o *oAuth2Connection) getPublicRedirectUrl(ctx context.Context, stateId uui
 	return u.String(), nil
 }
 
-func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor database.Actor) (string, error) {
+func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor IActorData) (string, error) {
 	cv := o.connection.GetConnectorVersionEntity()
 
 	if !o.auth.ClientId.HasValue(ctx) {
@@ -111,7 +110,7 @@ func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor database.A
 // This redirect will read from state, validate everything, then cookie the user and redirect to the 3rd party.
 func (o *oAuth2Connection) SetStateAndGeneratePublicUrl(
 	ctx context.Context,
-	actor database.Actor,
+	actor IActorData,
 	returnToUrl string,
 ) (string, error) {
 	stateId := uuid.New()

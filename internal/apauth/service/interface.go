@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rmorlok/authproxy/internal/apauth/core"
 	jwt2 "github.com/rmorlok/authproxy/internal/apauth/jwt"
 )
 
@@ -55,22 +56,22 @@ type A interface {
 	// EstablishSession is used to start a new session explicitly from a service that is using auth. Generally this
 	// will be used to session a user after that request has already been authenticated using a JWT. This method does
 	// check for existing sessions and either extends them or cancels them if the auth is inconsistent.
-	EstablishSession(ctx context.Context, w http.ResponseWriter, ra *RequestAuth) error
+	EstablishSession(ctx context.Context, w http.ResponseWriter, ra *core.RequestAuth) error
 
 	// EstablishGinSession is used to start a new session explicitly from a service that is using auth. Generally this
 	// will be used to session a user after that request has already been authenticated using a JWT. This method does
 	// check for existing sessions and either extends them or cancels them if the auth is inconsistent. This method
 	// provides a gin wrapper for the more generalized version of a similar name.
-	EstablishGinSession(gctx *gin.Context, ra *RequestAuth) error
+	EstablishGinSession(gctx *gin.Context, ra *core.RequestAuth) error
 
 	// EndSession terminates a session that is in progress by clearing the session information from redis and clearing
 	// session id cookies on the response.
-	EndSession(ctx context.Context, w http.ResponseWriter, ra *RequestAuth) error
+	EndSession(ctx context.Context, w http.ResponseWriter, ra *core.RequestAuth) error
 
 	// EndGinSession terminates a session that is in progress by clearing the session information from redis and clearing
 	// session id cookies on the response. This method provides a gin wrapper for the more generalized version of a
 	// similar name.
-	EndGinSession(gctx *gin.Context, ra *RequestAuth) error
+	EndGinSession(gctx *gin.Context, ra *core.RequestAuth) error
 
 	// WithDefaultAuthValidators returns a new service with the given actor validators added to the list of validators
 	// that are used to validate actors. The original service will not be modified. The validators are applied to all

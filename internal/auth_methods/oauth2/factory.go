@@ -48,7 +48,7 @@ func (f *factory) NewOAuth2(connection coreIface.Connection) OAuth2Connection {
 	)
 }
 
-func (f *factory) GetOAuth2State(ctx context.Context, actor database.Actor, stateId uuid.UUID) (OAuth2Connection, error) {
+func (f *factory) GetOAuth2State(ctx context.Context, actor IActorData, stateId uuid.UUID) (OAuth2Connection, error) {
 	return getOAuth2State(
 		ctx,
 		f.cfg,

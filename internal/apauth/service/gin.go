@@ -8,24 +8,25 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/api_common"
 )
 
 // GetAuthFromGinContext returns auth info from a request. This auth info can be authenticated or unauthenticated.
-func GetAuthFromGinContext(c *gin.Context) *RequestAuth {
+func GetAuthFromGinContext(c *gin.Context) *core.RequestAuth {
 	if c == nil {
 		return nil
 	}
 
 	if c.Request == nil {
-		return NewUnauthenticatedRequestAuth()
+		return core.NewUnauthenticatedRequestAuth()
 	}
 
-	return GetAuthFromContext(c.Request.Context())
+	return core.GetAuthFromContext(c.Request.Context())
 }
 
 // ApplyAuthToGinContext applies the auth info to the request context.
-func ApplyAuthToGinContext(c *gin.Context, ra *RequestAuth) {
+func ApplyAuthToGinContext(c *gin.Context, ra *core.RequestAuth) {
 	if c == nil || c.Request == nil {
 		return
 	}
@@ -37,7 +38,7 @@ func ApplyAuthToGinContext(c *gin.Context, ra *RequestAuth) {
 
 // MustGetAuthFromGinContext returns an authenticated request info. If the request is not authenticated, this
 // method panics.
-func MustGetAuthFromGinContext(c *gin.Context) *RequestAuth {
+func MustGetAuthFromGinContext(c *gin.Context) *core.RequestAuth {
 	ra := GetAuthFromGinContext(c)
 	if ra == nil || !ra.IsAuthenticated() {
 		panic("request is not authenticated")
@@ -109,10 +110,10 @@ func (j *service) AdminOnly(validators ...AuthValidator) gin.HandlerFunc {
 	return j.Required(combined...)
 }
 
-func (j *service) EstablishGinSession(c *gin.Context, ra *RequestAuth) error {
+func (j *service) EstablishGinSession(c *gin.Context, ra *core.RequestAuth) error {
 	return j.EstablishSession(c.Request.Context(), c.Writer, ra)
 }
 
-func (j *service) EndGinSession(c *gin.Context, ra *RequestAuth) error {
+func (j *service) EndGinSession(c *gin.Context, ra *core.RequestAuth) error {
 	return j.EndSession(c.Request.Context(), c.Writer, ra)
 }

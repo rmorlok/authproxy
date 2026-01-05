@@ -3,6 +3,7 @@ package service
 import (
 	"net/http"
 
+	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/api_common"
 )
 
@@ -12,7 +13,7 @@ import (
 
 // MustGetAuthFromRequest gets an authenticated info for the request. If the request is not authenticated, it
 // panics.
-func MustGetAuthFromRequest(r *http.Request) *RequestAuth {
+func MustGetAuthFromRequest(r *http.Request) *core.RequestAuth {
 	a := GetAuthFromRequest(r)
 	if a == nil || !a.IsAuthenticated() {
 		panic("request is not authenticated")
@@ -22,18 +23,18 @@ func MustGetAuthFromRequest(r *http.Request) *RequestAuth {
 
 // GetAuthFromRequest returns auth info for the request. If the request is unauthenticated, it will return
 // a value indicating not authenticated.
-func GetAuthFromRequest(r *http.Request) *RequestAuth {
+func GetAuthFromRequest(r *http.Request) *core.RequestAuth {
 	ctx := r.Context()
 	if ctx == nil {
-		return NewUnauthenticatedRequestAuth()
+		return core.NewUnauthenticatedRequestAuth()
 	}
 
-	return GetAuthFromContext(ctx)
+	return core.GetAuthFromContext(ctx)
 }
 
 // SetAuthOnRequestContext sets the auth information into the context for the request so that later handlers
 // can retrieve the auth information.
-func SetAuthOnRequestContext(r *http.Request, auth *RequestAuth) *http.Request {
+func SetAuthOnRequestContext(r *http.Request, auth *core.RequestAuth) *http.Request {
 	ctx := r.Context()
 	ctx = auth.ContextWith(ctx)
 	return r.WithContext(ctx)

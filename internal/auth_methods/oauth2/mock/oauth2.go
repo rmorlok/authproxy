@@ -18,6 +18,43 @@ import (
 	request_log "github.com/rmorlok/authproxy/internal/request_log"
 )
 
+// MockActor is a mock of IActorData interface.
+type MockActor struct {
+	ctrl     *gomock.Controller
+	recorder *MockActorMockRecorder
+}
+
+// MockActorMockRecorder is the mock recorder for MockActor.
+type MockActorMockRecorder struct {
+	mock *MockActor
+}
+
+// NewMockActor creates a new mock instance.
+func NewMockActor(ctrl *gomock.Controller) *MockActor {
+	mock := &MockActor{ctrl: ctrl}
+	mock.recorder = &MockActorMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockActor) EXPECT() *MockActorMockRecorder {
+	return m.recorder
+}
+
+// GetId mocks base method.
+func (m *MockActor) GetId() uuid.UUID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetId")
+	ret0, _ := ret[0].(uuid.UUID)
+	return ret0
+}
+
+// GetId indicates an expected call of GetId.
+func (mr *MockActorMockRecorder) GetId() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetId", reflect.TypeOf((*MockActor)(nil).GetId))
+}
+
 // MockFactory is a mock of Factory interface.
 type MockFactory struct {
 	ctrl     *gomock.Controller
@@ -42,7 +79,7 @@ func (m *MockFactory) EXPECT() *MockFactoryMockRecorder {
 }
 
 // GetOAuth2State mocks base method.
-func (m *MockFactory) GetOAuth2State(ctx context.Context, actor database.Actor, stateId uuid.UUID) (oauth2.OAuth2Connection, error) {
+func (m *MockFactory) GetOAuth2State(ctx context.Context, actor oauth2.IActorData, stateId uuid.UUID) (oauth2.OAuth2Connection, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetOAuth2State", ctx, actor, stateId)
 	ret0, _ := ret[0].(oauth2.OAuth2Connection)
@@ -57,17 +94,17 @@ func (mr *MockFactoryMockRecorder) GetOAuth2State(ctx, actor, stateId interface{
 }
 
 // NewOAuth2 mocks base method.
-func (m *MockFactory) NewOAuth2(connection database.Connection, connector iface.ConnectorVersion) oauth2.OAuth2Connection {
+func (m *MockFactory) NewOAuth2(connection iface.Connection) oauth2.OAuth2Connection {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "NewOAuth2", connection, connector)
+	ret := m.ctrl.Call(m, "NewOAuth2", connection)
 	ret0, _ := ret[0].(oauth2.OAuth2Connection)
 	return ret0
 }
 
 // NewOAuth2 indicates an expected call of NewOAuth2.
-func (mr *MockFactoryMockRecorder) NewOAuth2(connection, connector interface{}) *gomock.Call {
+func (mr *MockFactoryMockRecorder) NewOAuth2(connection interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewOAuth2", reflect.TypeOf((*MockFactory)(nil).NewOAuth2), connection, connector)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewOAuth2", reflect.TypeOf((*MockFactory)(nil).NewOAuth2), connection)
 }
 
 // MockOAuth2Connection is a mock of OAuth2Connection interface.
@@ -123,7 +160,7 @@ func (mr *MockOAuth2ConnectionMockRecorder) CancelSessionAfterAuth() *gomock.Cal
 }
 
 // GenerateAuthUrl mocks base method.
-func (m *MockOAuth2Connection) GenerateAuthUrl(ctx context.Context, actor database.Actor) (string, error) {
+func (m *MockOAuth2Connection) GenerateAuthUrl(ctx context.Context, actor oauth2.IActorData) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GenerateAuthUrl", ctx, actor)
 	ret0, _ := ret[0].(string)

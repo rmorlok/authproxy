@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -26,9 +27,9 @@ func TestJwtTokenClaims(t *testing.T) {
 			RegisteredClaims: jwt.RegisteredClaims{
 				Subject: "admin/bobdole",
 			},
-			Actor: &Actor{
-				Id:    "admin/bobdole",
-				Admin: true,
+			Actor: &core.Actor{
+				ExternalId: "admin/bobdole",
+				Admin:      true,
 			},
 		}
 
@@ -46,9 +47,9 @@ func TestJwtTokenClaims(t *testing.T) {
 			RegisteredClaims: jwt.RegisteredClaims{
 				Subject: "admin/bobdole",
 			},
-			Actor: &Actor{
-				Id:    "admin/bobdole",
-				Admin: false,
+			Actor: &core.Actor{
+				ExternalId: "admin/bobdole",
+				Admin:      false,
 			},
 		}
 
@@ -71,9 +72,9 @@ func TestJwtTokenClaims(t *testing.T) {
 			RegisteredClaims: jwt.RegisteredClaims{
 				Subject: "admin/bobdole",
 			},
-			Actor: &Actor{
-				Id:    "admin/bobdole",
-				Admin: true,
+			Actor: &core.Actor{
+				ExternalId: "admin/bobdole",
+				Admin:      true,
 			},
 		}
 		username, err := j.AdminUsername()
@@ -85,7 +86,7 @@ func TestJwtTokenClaims(t *testing.T) {
 			RegisteredClaims: jwt.RegisteredClaims{
 				Subject: "admin/bobdole",
 			},
-			Actor: &Actor{
+			Actor: &core.Actor{
 				Admin: true,
 			},
 		}
@@ -105,9 +106,9 @@ func TestJwtTokenClaims(t *testing.T) {
 		// No subject
 		j = AuthProxyClaims{
 			RegisteredClaims: jwt.RegisteredClaims{},
-			Actor: &Actor{
-				Id:    "admin/bobdole",
-				Admin: true,
+			Actor: &core.Actor{
+				ExternalId: "admin/bobdole",
+				Admin:      true,
 			},
 		}
 		_, err = j.AdminUsername()
@@ -118,9 +119,9 @@ func TestJwtTokenClaims(t *testing.T) {
 			RegisteredClaims: jwt.RegisteredClaims{
 				Subject: "admin/bobsmith",
 			},
-			Actor: &Actor{
-				Id:    "admin/bobdole",
-				Admin: true,
+			Actor: &core.Actor{
+				ExternalId: "admin/bobdole",
+				Admin:      true,
 			},
 		}
 		_, err = j.AdminUsername()
@@ -131,9 +132,9 @@ func TestJwtTokenClaims(t *testing.T) {
 			RegisteredClaims: jwt.RegisteredClaims{
 				Subject: "bobdole",
 			},
-			Actor: &Actor{
-				Id:    "bobdole",
-				Admin: true,
+			Actor: &core.Actor{
+				ExternalId: "bobdole",
+				Admin:      true,
 			},
 		}
 		_, err = j.AdminUsername()
@@ -144,9 +145,9 @@ func TestJwtTokenClaims(t *testing.T) {
 			RegisteredClaims: jwt.RegisteredClaims{
 				Subject: "admin/bobdole",
 			},
-			Actor: &Actor{
-				Id:    "admin/bobdole",
-				Admin: false,
+			Actor: &core.Actor{
+				ExternalId: "admin/bobdole",
+				Admin:      false,
 			},
 		}
 		_, err = j.AdminUsername()

@@ -4,7 +4,7 @@ import (
 	"context"
 	"errors"
 
-	auth "github.com/rmorlok/authproxy/internal/apauth/service"
+	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/config/common"
@@ -92,7 +92,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 				BuildStatusError()
 		}
 
-		ra := auth.GetAuthFromContext(ctx)
+		ra := core.GetAuthFromContext(ctx)
 		o2 := s.getOAuth2Factory().NewOAuth2(connection)
 		url, err := o2.SetStateAndGeneratePublicUrl(ctx, ra.MustGetActor(), req.ReturnToUrl)
 		if err != nil {

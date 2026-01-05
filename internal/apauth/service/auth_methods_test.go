@@ -12,6 +12,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/mohae/deepcopy"
+	"github.com/rmorlok/authproxy/internal/apauth/core"
 	jwt2 "github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config"
@@ -55,9 +56,9 @@ func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 			IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 		},
 
-		Actor: &jwt2.Actor{
-			Id:    "id1",
-			Email: "me@example.com",
+		Actor: &core.Actor{
+			ExternalId: "id1",
+			Email:      "me@example.com",
 		},
 	}
 
@@ -113,9 +114,9 @@ func TestAuth_RoundtripPublicPrivate(t *testing.T) {
 			IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 		},
 
-		Actor: &jwt2.Actor{
-			Id:    "id1",
-			Email: "me@example.com",
+		Actor: &core.Actor{
+			ExternalId: "id1",
+			Email:      "me@example.com",
 		},
 	}
 
@@ -149,9 +150,9 @@ func TestAuth_SecretKey(t *testing.T) {
 			IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 		},
 
-		Actor: &jwt2.Actor{
-			Id:    "id7",
-			Email: "me@example.com",
+		Actor: &core.Actor{
+			ExternalId: "id7",
+			Email:      "me@example.com",
 		},
 	}
 
@@ -200,9 +201,9 @@ func TestAuth_Parse(t *testing.T) {
 				IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 			},
 
-			Actor: &jwt2.Actor{
-				Id:    "id1",
-				Email: "me@example.com",
+			Actor: &core.Actor{
+				ExternalId: "id1",
+				Email:      "me@example.com",
 			},
 		}
 
@@ -229,9 +230,9 @@ func TestAuth_Parse(t *testing.T) {
 				IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 			},
 
-			Actor: &jwt2.Actor{
-				Id:    "id1",
-				Email: "me@example.com",
+			Actor: &core.Actor{
+				ExternalId: "id1",
+				Email:      "me@example.com",
 			},
 		}
 
@@ -424,11 +425,11 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
 				require.NoError(t, err)
 				require.True(t, ra.IsAuthenticated())
-				require.Equal(t, testClaims().Actor.Id, ra.MustGetActor().ExternalId)
+				require.Equal(t, testClaims().Actor.ExternalId, ra.MustGetActor().ExternalId)
 
-				actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.Id)
+				actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.ExternalId)
 				require.NoError(t, err)
-				require.Equal(t, testClaims().Actor.Id, actor.ExternalId)
+				require.Equal(t, testClaims().Actor.ExternalId, actor.ExternalId)
 			})
 
 			t.Run("actor loaded from database", func(t *testing.T) {
@@ -437,7 +438,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				dbActorId := uuid.New()
 				dbActor := &database.Actor{
 					Id:         dbActorId,
-					ExternalId: testClaims().Actor.Id,
+					ExternalId: testClaims().Actor.ExternalId,
 					Email:      testClaims().Actor.Email,
 				}
 				require.NoError(t, db.CreateActor(testContext, dbActor))
@@ -454,7 +455,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
 				require.NoError(t, err)
 				require.True(t, ra.IsAuthenticated())
-				require.Equal(t, testClaims().Actor.Id, ra.MustGetActor().ExternalId)
+				require.Equal(t, testClaims().Actor.ExternalId, ra.MustGetActor().ExternalId)
 			})
 
 			t.Run("actor updated in database", func(t *testing.T) {
@@ -463,7 +464,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				dbActorId := uuid.New()
 				dbActor := &database.Actor{
 					Id:         dbActorId,
-					ExternalId: testClaims().Actor.Id,
+					ExternalId: testClaims().Actor.ExternalId,
 					Email:      "old-" + testClaims().Actor.Email,
 				}
 				require.NoError(t, db.CreateActor(testContext, dbActor))
@@ -477,7 +478,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
 				require.NoError(t, err)
 				require.True(t, ra.IsAuthenticated())
-				require.Equal(t, testClaims().Actor.Id, ra.MustGetActor().ExternalId)
+				require.Equal(t, testClaims().Actor.ExternalId, ra.MustGetActor().ExternalId)
 				require.Equal(t, testClaims().Actor.Email, ra.MustGetActor().Email)
 			})
 		})
@@ -500,7 +501,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			_, err = raw.establishAuthFromRequest(futureCtx, true, req, w)
 			require.NotNil(t, err)
 
-			actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.Id)
+			actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.ExternalId)
 			require.ErrorIs(t, err, database.ErrNotFound)
 			require.Nil(t, actor)
 		})
@@ -514,7 +515,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			_, err := raw.establishAuthFromRequest(testContext, true, req, w)
 			require.NotNil(t, err)
 
-			actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.Id)
+			actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.ExternalId)
 			require.ErrorIs(t, err, database.ErrNotFound)
 			require.Nil(t, actor)
 		})
@@ -577,7 +578,7 @@ func TestAuth_Nonce(t *testing.T) {
 		r := gin.Default()
 		r.GET("/", auth.Required(), func(c *gin.Context) {
 			ra := MustGetAuthFromGinContext(c)
-			c.String(200, util.ToPtr(ra.MustGetActor()).ExternalId)
+			c.String(200, ra.MustGetActor().ExternalId)
 		})
 
 		return &TestSetup{
@@ -601,7 +602,7 @@ func TestAuth_Nonce(t *testing.T) {
 		req := httptest.NewRequest("GET", "/?auth_token="+tok, nil).WithContext(ctx)
 		ts.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code)
-		require.Equal(t, c.Actor.Id, w.Body.String())
+		require.Equal(t, c.Actor.ExternalId, w.Body.String())
 	})
 
 	t.Run("expired", func(t *testing.T) {
@@ -635,7 +636,7 @@ func TestAuth_Nonce(t *testing.T) {
 		req := httptest.NewRequest("GET", "/?auth_token="+tok, nil).WithContext(ctx)
 		ts.Gin.ServeHTTP(w, req)
 		require.Equal(t, http.StatusOK, w.Code)
-		require.Equal(t, c.Actor.Id, w.Body.String())
+		require.Equal(t, c.Actor.ExternalId, w.Body.String())
 
 		// Second request fail
 		w = httptest.NewRecorder()
@@ -698,9 +699,9 @@ func testClaims() *jwt2.AuthProxyClaims {
 			IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 		},
 
-		Actor: &jwt2.Actor{
-			Id:    "id1",
-			Email: "me@example.com",
+		Actor: &core.Actor{
+			ExternalId: "id1",
+			Email:      "me@example.com",
 		},
 	}
 }

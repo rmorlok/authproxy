@@ -5,7 +5,6 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 )
 
 type DeletedHandling bool
@@ -17,6 +16,15 @@ const (
 	// DeletedHandlingInclude will include deleted records in the result set
 	DeletedHandlingInclude DeletedHandling = true
 )
+
+type IActorData interface {
+	GetId() uuid.UUID
+	GetExternalId() string
+	GetPermissions() []string
+	IsAdmin() bool
+	IsSuperAdmin() bool
+	GetEmail() string
+}
 
 //go:generate mockgen -source=./interface.go -destination=./mock/db.go -package=mock
 type DB interface {
@@ -41,7 +49,7 @@ type DB interface {
 	GetActor(ctx context.Context, id uuid.UUID) (*Actor, error)
 	GetActorByExternalId(ctx context.Context, externalId string) (*Actor, error)
 	CreateActor(ctx context.Context, actor *Actor) error
-	UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, error)
+	UpsertActor(ctx context.Context, actor IActorData) (*Actor, error)
 	DeleteActor(ctx context.Context, id uuid.UUID) error
 	ListActorsBuilder() ListActorsBuilder
 	ListActorsFromCursor(ctx context.Context, cursor string) (ListActorsExecutor, error)

@@ -13,7 +13,6 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -91,6 +90,18 @@ type Actor struct {
 	DeletedAt   *time.Time
 }
 
+func (a *Actor) GetExternalId() string {
+	return a.ExternalId
+}
+
+func (a *Actor) GetPermissions() []string {
+	return a.Permissions
+}
+
+func (a *Actor) GetEmail() string {
+	return a.Email
+}
+
 func (a *Actor) cols() []string {
 	return []string{
 		"id",
@@ -133,32 +144,22 @@ func (a *Actor) values() []any {
 	}
 }
 
-func (a *Actor) setFromJwt(ja *jwt.Actor) {
-	a.ExternalId = ja.Id
-	a.Email = ja.Email
-	a.Permissions = ja.Permissions
-	a.Admin = ja.IsAdmin()
-	a.SuperAdmin = ja.IsSuperAdmin()
+func (a *Actor) setFromData(d IActorData) {
+	a.ExternalId = d.GetExternalId()
+	a.Email = d.GetEmail()
+	a.Permissions = d.GetPermissions()
+	a.Admin = d.IsAdmin()
+	a.SuperAdmin = d.IsSuperAdmin()
 }
 
-func (a *Actor) sameAsJwt(ja *jwt.Actor) bool {
+func (a *Actor) sameAsData(d IActorData) bool {
 	slices.Sort(a.Permissions)
 
-	return a.ExternalId == ja.Id &&
-		a.Email == ja.Email &&
-		slices.Equal(a.Permissions, ja.Permissions) &&
-		a.Admin == ja.IsAdmin() &&
-		a.SuperAdmin == ja.IsSuperAdmin()
-}
-
-func (a *Actor) ToJwtActor() jwt.Actor {
-	return jwt.Actor{
-		Id:          a.ExternalId,
-		Email:       a.Email,
-		Permissions: a.Permissions,
-		Admin:       a.Admin,
-		SuperAdmin:  a.SuperAdmin,
-	}
+	return a.ExternalId == d.GetExternalId() &&
+		a.Email == d.GetEmail() &&
+		slices.Equal(a.Permissions, d.GetPermissions()) &&
+		a.Admin == d.IsAdmin() &&
+		a.SuperAdmin == d.IsSuperAdmin()
 }
 
 func (a *Actor) GetId() uuid.UUID {
@@ -225,6 +226,8 @@ func (a *Actor) validate() error {
 
 	return nil
 }
+
+var _ IActorData = (*Actor)(nil)
 
 func (s *service) GetActor(ctx context.Context, id uuid.UUID) (*Actor, error) {
 	var result Actor
@@ -327,14 +330,14 @@ func (s *service) CreateActor(ctx context.Context, a *Actor) error {
 	})
 }
 
-func (s *service) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, error) {
-	if actor == nil {
+func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error) {
+	if d == nil {
 		return nil, errors.New("actor is nil")
 	}
 
 	// This is covered in validation, but cover here to prevent any sort of lookup against an invalid id
-	if actor.Id == "" {
-		return nil, errors.New("actor id is empty")
+	if d.GetExternalId() == "" {
+		return nil, errors.New("actor external id is empty")
 	}
 
 	var result *Actor
@@ -344,7 +347,7 @@ func (s *service) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 		err := s.sq.
 			Select(existingActor.cols()...).
 			From(ActorTable).
-			Where(sq.Eq{"external_id": actor.Id}).
+			Where(sq.Eq{"external_id": d.GetExternalId()}).
 			RunWith(s.db).
 			QueryRow().
 			Scan(existingActor.fields()...)
@@ -357,7 +360,7 @@ func (s *service) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 					CreatedAt: now,
 					UpdatedAt: now,
 				}
-				newActor.setFromJwt(actor)
+				newActor.setFromData(d)
 				newActor.normalize()
 				validationErr := newActor.validate()
 				if validationErr != nil {
@@ -390,8 +393,8 @@ func (s *service) UpsertActor(ctx context.Context, actor *jwt.Actor) (*Actor, er
 			return err
 		}
 
-		if !existingActor.sameAsJwt(actor) {
-			existingActor.setFromJwt(actor)
+		if !existingActor.sameAsData(d) {
+			existingActor.setFromData(d)
 			existingActor.normalize()
 			validationErr := existingActor.validate()
 			if validationErr != nil {

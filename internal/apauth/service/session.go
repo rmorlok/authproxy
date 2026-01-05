@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
+	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/config"
@@ -105,8 +106,8 @@ func (s *service) establishAuthFromSession(
 	requireSessionXsrf bool,
 	r *http.Request,
 	w http.ResponseWriter,
-	fromJwt *RequestAuth,
-) (*RequestAuth, error) {
+	fromJwt *core.RequestAuth,
+) (*core.RequestAuth, error) {
 	if !s.service.SupportsSession() {
 		// This service doesn't support sessions, so do nothing
 		return fromJwt, nil
@@ -141,12 +142,12 @@ func (s *service) establishAuthFromSession(
 
 	// Sanity check
 	if sess.Id != sessionCookieId.Id {
-		return NewUnauthenticatedRequestAuth(), errors.Errorf("session id mismatch: %s != %s", sess.Id.String(), sessionCookieId.Id.String())
+		return core.NewUnauthenticatedRequestAuth(), errors.Errorf("session id mismatch: %s != %s", sess.Id.String(), sessionCookieId.Id.String())
 	}
 
 	// Sanity check to avoid session hijacking in redis
 	if sess.ActorId != sessionCookieId.ActorId {
-		return NewUnauthenticatedRequestAuth(), errors.Errorf("session actor mismatch: %s != %s", sess.ActorId.String(), sessionCookieId.ActorId.String())
+		return core.NewUnauthenticatedRequestAuth(), errors.Errorf("session actor mismatch: %s != %s", sess.ActorId.String(), sessionCookieId.ActorId.String())
 	}
 
 	if fromJwt.IsAuthenticated() {
@@ -156,14 +157,14 @@ func (s *service) establishAuthFromSession(
 			// re-establish session if it wants it.
 			err = s.deleteSessionFromRedis(ctx, sessionCookieId.Id)
 			if err != nil {
-				return NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to delete session from redis")
+				return core.NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to delete session from redis")
 			}
 
 			return fromJwt, nil
 		}
 
 		// The session agrees with the user. The user is "doubly" authenticated.
-		fromJwt.setSessionId(&sess.Id)
+		fromJwt.SetSessionId(&sess.Id)
 		return fromJwt, nil
 	} else {
 		// User was not authenticated by JWT but does have a valid session. In order to authenticate this request, we
@@ -173,7 +174,7 @@ func (s *service) establishAuthFromSession(
 		if requireSessionXsrf && r.Method != http.MethodGet {
 			xsrfTokenHeader := r.Header.Get(xsrfHeaderKey)
 			if xsrfTokenHeader == "" {
-				return NewUnauthenticatedRequestAuth(), api_common.
+				return core.NewUnauthenticatedRequestAuth(), api_common.
 					NewHttpStatusErrorBuilder().
 					WithStatusForbidden().
 					WithResponseMsg("missing XSRF token").
@@ -191,7 +192,7 @@ func (s *service) establishAuthFromSession(
 			}
 
 			if !isValidXsrf {
-				return NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+				return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
 					WithStatusForbidden().
 					WithResponseMsg("invalid XSRF token").
 					Build()
@@ -201,24 +202,21 @@ func (s *service) establishAuthFromSession(
 
 	actor, err := s.db.GetActor(ctx, sess.ActorId)
 	if err != nil {
-		return NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to get actor from database")
+		return core.NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to get actor from database")
 	}
 
 	err = s.extendSession(ctx, sess, w)
 	if err != nil {
-		return NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to extend session")
+		return core.NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to extend session")
 	}
 
-	return &RequestAuth{
-		actor:     actor,
-		sessionId: &sess.Id,
-	}, nil
+	return core.NewAuthenticatedRequestAuthWithSession(actor, &sess.Id), nil
 }
 
 // EstablishSession is used to start a new session explicitly from a service that is using auth. Generally this
 // will be used to session a user after that request has already been authenticated using a JWT. This method does
 // check for existing sessions and either extends them or cancels them if the auth is inconsistent.
-func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, ra *RequestAuth) error {
+func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, ra *core.RequestAuth) error {
 	if !ra.IsAuthenticated() {
 		return errors.New("request is not authenticated")
 	}
@@ -236,7 +234,7 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 	var sess *session
 
 	if ra.IsSession() {
-		sessionId := *ra.getSessionId()
+		sessionId := *ra.GetSessionId()
 		sess, err = s.tryReadSessionFromRedis(ctx, sessionId)
 		if err != nil {
 			return errors.Wrap(err, "failed to read session from redis")
@@ -271,7 +269,7 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 		return errors.Wrap(err, "failed to set session cookie")
 	}
 
-	ra.setSessionId(&sess.Id)
+	ra.SetSessionId(&sess.Id)
 
 	return nil
 }
@@ -329,9 +327,9 @@ func (s *service) setSessionCookie(ctx context.Context, w http.ResponseWriter, s
 
 // EndSession terminates a session that is in progress by clearing the session information from redis and clearing
 // session id cookies on the response.
-func (s *service) EndSession(ctx context.Context, w http.ResponseWriter, ra *RequestAuth) error {
+func (s *service) EndSession(ctx context.Context, w http.ResponseWriter, ra *core.RequestAuth) error {
 	if ra.IsSession() {
-		err := s.deleteSessionFromRedis(ctx, *ra.getSessionId())
+		err := s.deleteSessionFromRedis(ctx, *ra.GetSessionId())
 		if err != nil {
 			return errors.Wrap(err, "failed to delete session from redis")
 		}

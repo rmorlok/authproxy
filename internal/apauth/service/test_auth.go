@@ -11,6 +11,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apauth/core"
 	jwt2 "github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apredis"
@@ -67,7 +68,7 @@ func TestAuthServiceWithDb(serviceId config.ServiceId, cfg config.C, db database
 	return cfg, hs, &AuthTestUtil{cfg: cfg, s: hs.(*service), serviceId: serviceId}
 }
 
-func (atu *AuthTestUtil) NewSignedRequestForActorId(method, url string, body io.Reader, actorId string) (*http.Request, error) {
+func (atu *AuthTestUtil) NewSignedRequestForActorExternalId(method, url string, body io.Reader, actorExternalId string) (*http.Request, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
@@ -76,8 +77,8 @@ func (atu *AuthTestUtil) NewSignedRequestForActorId(method, url string, body io.
 	req, err = atu.SignRequestHeaderAs(
 		context.Background(),
 		req,
-		jwt2.Actor{
-			Id: actorId,
+		core.Actor{
+			ExternalId: actorExternalId,
 		},
 	)
 	if err != nil {
@@ -87,11 +88,11 @@ func (atu *AuthTestUtil) NewSignedRequestForActorId(method, url string, body io.
 	return req, nil
 }
 
-func (atu *AuthTestUtil) claimsForActor(a jwt2.Actor) *jwt2.AuthProxyClaims {
+func (atu *AuthTestUtil) claimsForActor(a core.Actor) *jwt2.AuthProxyClaims {
 	claims := &jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:   "test",
-			Subject:  a.Id,
+			Subject:  a.Id.String(),
 			Audience: []string{string(atu.serviceId)},
 			ID:       uuid.UUID{}.String(),
 		},
@@ -105,7 +106,7 @@ func (atu *AuthTestUtil) claimsForActor(a jwt2.Actor) *jwt2.AuthProxyClaims {
 	return claims
 }
 
-func (atu *AuthTestUtil) SignRequestHeaderAs(ctx context.Context, req *http.Request, a jwt2.Actor) (*http.Request, error) {
+func (atu *AuthTestUtil) SignRequestHeaderAs(ctx context.Context, req *http.Request, a core.Actor) (*http.Request, error) {
 	claims := atu.claimsForActor(a)
 
 	tokenString, err := atu.s.Token(ctx, claims)
@@ -118,7 +119,7 @@ func (atu *AuthTestUtil) SignRequestHeaderAs(ctx context.Context, req *http.Requ
 	return req, nil
 }
 
-func (atu *AuthTestUtil) SignRequestQueryAs(ctx context.Context, req *http.Request, a jwt2.Actor) (*http.Request, error) {
+func (atu *AuthTestUtil) SignRequestQueryAs(ctx context.Context, req *http.Request, a core.Actor) (*http.Request, error) {
 	claims := atu.claimsForActor(a)
 	claims.Nonce = util.ToPtr(uuid.New())
 	claims.ExpiresAt = &jwt.NumericDate{apctx.GetClock(ctx).Now().Add(time.Hour)}

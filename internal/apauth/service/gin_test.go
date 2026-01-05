@@ -8,6 +8,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/rmorlok/authproxy/internal/apauth/core"
 	jwt2 "github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config"
@@ -31,9 +32,9 @@ func TestAuth_Gin(t *testing.T) {
 				Subject:   "id1",
 			},
 
-			Actor: &jwt2.Actor{
-				Id:    "id1",
-				Email: "me@example.com",
+			Actor: &core.Actor{
+				ExternalId: "id1",
+				Email:      "me@example.com",
 			},
 		}
 	}
@@ -50,10 +51,10 @@ func TestAuth_Gin(t *testing.T) {
 				Subject:   "admin/aid1",
 			},
 
-			Actor: &jwt2.Actor{
-				Id:    "admin/aid1",
-				Email: "me@example.com",
-				Admin: true,
+			Actor: &core.Actor{
+				ExternalId: "admin/aid1",
+				Email:      "me@example.com",
+				Admin:      true,
 			},
 		}
 	}
@@ -98,7 +99,7 @@ func TestAuth_Gin(t *testing.T) {
 			SetJwtRequestHeader(req, tok)
 			ts.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
-			require.Equal(t, c.Actor.Id, w.Body.String())
+			require.Equal(t, c.Actor.ExternalId, w.Body.String())
 		})
 
 		t.Run("valid with admin", func(t *testing.T) {
@@ -113,7 +114,7 @@ func TestAuth_Gin(t *testing.T) {
 			SetJwtRequestHeader(req, tok)
 			ts.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
-			require.Equal(t, c.Actor.Id, w.Body.String())
+			require.Equal(t, c.Actor.ExternalId, w.Body.String())
 		})
 
 		t.Run("expired", func(t *testing.T) {
@@ -180,7 +181,7 @@ func TestAuth_Gin(t *testing.T) {
 			SetJwtRequestHeader(req, tok)
 			ts.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
-			require.Equal(t, c.Actor.Id, w.Body.String())
+			require.Equal(t, c.Actor.ExternalId, w.Body.String())
 		})
 
 		t.Run("valid with admin", func(t *testing.T) {
@@ -195,7 +196,7 @@ func TestAuth_Gin(t *testing.T) {
 			SetJwtRequestHeader(req, tok)
 			ts.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
-			require.Equal(t, c.Actor.Id, w.Body.String())
+			require.Equal(t, c.Actor.ExternalId, w.Body.String())
 		})
 
 		t.Run("valid without auth", func(t *testing.T) {
@@ -263,13 +264,13 @@ func TestAuth_Gin(t *testing.T) {
 			SetJwtRequestHeader(req, tok)
 			ts.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
-			require.Equal(t, c.Actor.Id, w.Body.String())
+			require.Equal(t, c.Actor.ExternalId, w.Body.String())
 		})
 
 		t.Run("not valid admin", func(t *testing.T) {
 			ts := setup(t, authFunc)
 			c := testAdminClaims()
-			c.Actor.Id = "admin/unknown"
+			c.Actor.ExternalId = "admin/unknown"
 			c.RegisteredClaims.Subject = "admin/unknown"
 
 			tok, err := jwt2.NewJwtTokenBuilder().

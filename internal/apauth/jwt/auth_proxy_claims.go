@@ -9,6 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
 )
 
@@ -20,7 +21,7 @@ type AuthProxyClaims struct {
 	// Actor is the entity taking the action. Specifying the full actor here (versus just the ID in the subject)
 	// implies that the actor should be upserted into the system as specified versus only working against a previous
 	// actor configured in the system.
-	Actor *Actor `json:"actor,omitempty"`
+	Actor *core.Actor `json:"actor,omitempty"`
 
 	// SelfSigned indicates this token is signed with the GlobalAESKey. This mean that that AuthProxy has signed
 	// this token to itself for auth transfer between services, etc.
@@ -52,7 +53,7 @@ func (tc *AuthProxyClaims) AdminUsername() (string, error) {
 		return "", errors.New("not admin")
 	}
 
-	if tc.Actor != nil && tc.Subject != tc.Actor.Id {
+	if tc.Actor != nil && tc.Subject != tc.Actor.GetExternalId() {
 		return "", errors.New("token subject and actor id do not match")
 	}
 

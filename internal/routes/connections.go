@@ -303,7 +303,7 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 	}
 
 	taskId, err := ti.
-		BindToActor(util.ToPtr(ra.MustGetActor())).
+		BindToActor(ra.MustGetActor()).
 		ToSecureEncryptedString(ctx, r.encrypt)
 
 	if err != nil {

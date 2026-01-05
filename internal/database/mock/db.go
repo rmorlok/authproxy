@@ -12,8 +12,100 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
 	database "github.com/rmorlok/authproxy/internal/database"
-	jwt "github.com/rmorlok/authproxy/internal/apauth/jwt"
 )
+
+// MockIActorData is a mock of IActorData interface.
+type MockIActorData struct {
+	ctrl     *gomock.Controller
+	recorder *MockIActorDataMockRecorder
+}
+
+// MockIActorDataMockRecorder is the mock recorder for MockIActorData.
+type MockIActorDataMockRecorder struct {
+	mock *MockIActorData
+}
+
+// NewMockIActorData creates a new mock instance.
+func NewMockIActorData(ctrl *gomock.Controller) *MockIActorData {
+	mock := &MockIActorData{ctrl: ctrl}
+	mock.recorder = &MockIActorDataMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockIActorData) EXPECT() *MockIActorDataMockRecorder {
+	return m.recorder
+}
+
+// GetEmail mocks base method.
+func (m *MockIActorData) GetEmail() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEmail")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetEmail indicates an expected call of GetEmail.
+func (mr *MockIActorDataMockRecorder) GetEmail() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEmail", reflect.TypeOf((*MockIActorData)(nil).GetEmail))
+}
+
+// GetExternalId mocks base method.
+func (m *MockIActorData) GetExternalId() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetExternalId")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetExternalId indicates an expected call of GetExternalId.
+func (mr *MockIActorDataMockRecorder) GetExternalId() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExternalId", reflect.TypeOf((*MockIActorData)(nil).GetExternalId))
+}
+
+// GetPermissions mocks base method.
+func (m *MockIActorData) GetPermissions() []string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPermissions")
+	ret0, _ := ret[0].([]string)
+	return ret0
+}
+
+// GetPermissions indicates an expected call of GetPermissions.
+func (mr *MockIActorDataMockRecorder) GetPermissions() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPermissions", reflect.TypeOf((*MockIActorData)(nil).GetPermissions))
+}
+
+// IsAdmin mocks base method.
+func (m *MockIActorData) IsAdmin() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsAdmin")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsAdmin indicates an expected call of IsAdmin.
+func (mr *MockIActorDataMockRecorder) IsAdmin() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsAdmin", reflect.TypeOf((*MockIActorData)(nil).IsAdmin))
+}
+
+// IsSuperAdmin mocks base method.
+func (m *MockIActorData) IsSuperAdmin() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsSuperAdmin")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsSuperAdmin indicates an expected call of IsSuperAdmin.
+func (mr *MockIActorDataMockRecorder) IsSuperAdmin() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsSuperAdmin", reflect.TypeOf((*MockIActorData)(nil).IsSuperAdmin))
+}
 
 // MockDB is a mock of DB interface.
 type MockDB struct {
@@ -591,7 +683,7 @@ func (mr *MockDBMockRecorder) SetNamespaceState(ctx, path, state interface{}) *g
 }
 
 // UpsertActor mocks base method.
-func (m *MockDB) UpsertActor(ctx context.Context, actor *jwt.Actor) (*database.Actor, error) {
+func (m *MockDB) UpsertActor(ctx context.Context, actor database.IActorData) (*database.Actor, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpsertActor", ctx, actor)
 	ret0, _ := ret[0].(*database.Actor)

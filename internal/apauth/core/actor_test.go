@@ -1,4 +1,4 @@
-package jwt
+package core
 
 import (
 	"crypto/sha1" //nolint

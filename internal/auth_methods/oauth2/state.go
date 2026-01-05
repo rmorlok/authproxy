@@ -53,11 +53,11 @@ func getStateRedisKey(u uuid.UUID) string {
 	return fmt.Sprintf("oauth2:state:%s", u.String())
 }
 
-func (o *oAuth2Connection) saveStateToRedis(ctx context.Context, actor database.Actor, stateId uuid.UUID, returnToUrl string) error {
+func (o *oAuth2Connection) saveStateToRedis(ctx context.Context, actor IActorData, stateId uuid.UUID, returnToUrl string) error {
 	ttl := o.cfg.GetRoot().Oauth.GetRoundTripTtlOrDefault()
 	s := &state{
 		Id:               stateId,
-		ActorId:          actor.Id,
+		ActorId:          actor.GetId(),
 		ConnectorId:      o.connection.GetConnectorVersionEntity().GetId(),
 		ConnectorVersion: o.connection.GetConnectorVersionEntity().GetVersion(),
 		ConnectionId:     o.connection.GetId(),
@@ -83,12 +83,12 @@ func getOAuth2State(
 	httpf httpf.F,
 	encrypt encrypt.E,
 	logger *slog.Logger,
-	actor database.Actor,
+	actor IActorData,
 	stateId uuid.UUID,
 ) (OAuth2Connection, error) {
 	logger.DebugContext(ctx, "getting oauth state",
 		"state_id", stateId,
-		"actor_id", actor.Id,
+		"actor_id", actor.GetId(),
 	)
 
 	result := r.Get(ctx, getStateRedisKey(stateId))
@@ -110,8 +110,8 @@ func getOAuth2State(
 		return nil, errors.Errorf("state %s has expired", stateId.String())
 	}
 
-	if s.ActorId != actor.Id {
-		return nil, errors.Errorf("actor id %s does not match state actor id %s", actor.Id, s.ActorId)
+	if s.ActorId != actor.GetId() {
+		return nil, errors.Errorf("actor id %s does not match state actor id %s", actor.GetId(), s.ActorId)
 	}
 
 	connection, err := core.GetConnection(ctx, s.ConnectionId)

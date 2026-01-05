@@ -4,6 +4,7 @@ import (
 	"testing"
 	"time"
 
+	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/stretchr/testify/require"
@@ -21,7 +22,7 @@ func TestClaimsBuilder(t *testing.T) {
 		cb.WithServiceId(config.ServiceIdPublic).
 			WithExpiresIn(10 * time.Minute).
 			WithAdmin().
-			WithActorId("bob-dole").
+			WithActorExternalId("bob-dole").
 			WithActorEmail("bobdole@example.com"). // This does nothing because the actor isn't specified
 			WithIssuer("me")
 
@@ -42,10 +43,10 @@ func TestClaimsBuilder(t *testing.T) {
 		cb := NewClaimsBuilder()
 
 		cb.WithServiceId(config.ServiceIdPublic).
-			WithActor(&Actor{}).
+			WithActor(&core.Actor{}).
 			WithExpiresIn(10 * time.Minute).
 			WithAdmin().
-			WithActorId("bob-dole").
+			WithActorExternalId("bob-dole").
 			WithActorEmail("bobdole@example.com").
 			WithIssuer("me")
 
@@ -55,7 +56,7 @@ func TestClaimsBuilder(t *testing.T) {
 		require.NotEmpty(t, claims.ID)
 		require.Equal(t, "me", claims.Issuer)
 		require.Equal(t, "public", claims.Audience[0])
-		require.Equal(t, "admin/bob-dole", claims.Actor.Id)
+		require.Equal(t, "admin/bob-dole", claims.Actor.ExternalId)
 		require.Equal(t, "admin/bob-dole", claims.Subject)
 		require.Equal(t, "bobdole@example.com", claims.Actor.Email)
 		require.True(t, claims.Actor.IsAdmin())
@@ -70,7 +71,7 @@ func TestClaimsBuilder(t *testing.T) {
 
 			cb.WithServiceId(config.ServiceIdPublic).
 				WithAdmin().
-				WithActorId("bob-dole").
+				WithActorExternalId("bob-dole").
 				WithIssuer("me").
 				WithExpiresIn(10 * time.Minute).
 				WithNonce()
@@ -92,9 +93,9 @@ func TestClaimsBuilder(t *testing.T) {
 			cb := NewClaimsBuilder()
 
 			cb.WithServiceId(config.ServiceIdPublic).
-				WithActor(&Actor{}).
+				WithActor(&core.Actor{}).
 				WithAdmin().
-				WithActorId("bob-dole").
+				WithActorExternalId("bob-dole").
 				WithActorEmail("bobdole@example.com").
 				WithIssuer("me").
 				WithExpiresIn(10 * time.Minute).
@@ -106,7 +107,7 @@ func TestClaimsBuilder(t *testing.T) {
 			require.NotEmpty(t, claims.ID)
 			require.Equal(t, "me", claims.Issuer)
 			require.Equal(t, "public", claims.Audience[0])
-			require.Equal(t, "admin/bob-dole", claims.Actor.Id)
+			require.Equal(t, "admin/bob-dole", claims.Actor.ExternalId)
 			require.Equal(t, "admin/bob-dole", claims.Subject)
 			require.Equal(t, "bobdole@example.com", claims.Actor.Email)
 			require.True(t, claims.Actor.IsAdmin())
@@ -121,7 +122,7 @@ func TestClaimsBuilder(t *testing.T) {
 
 			cb.WithServiceId(config.ServiceIdPublic).
 				WithAdmin().
-				WithActorId("bob-dole").
+				WithActorExternalId("bob-dole").
 				WithActorEmail("bobdole@example.com").
 				WithIssuer("me").
 				WithNonce()

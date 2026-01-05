@@ -9,6 +9,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -29,8 +30,8 @@ type ClaimsBuilder interface {
 	WithAdmin() ClaimsBuilder
 	WithSelfSigned() ClaimsBuilder
 	WithActorEmail(email string) ClaimsBuilder
-	WithActorId(id string) ClaimsBuilder
-	WithActor(actor *Actor) ClaimsBuilder
+	WithActorExternalId(id string) ClaimsBuilder
+	WithActor(actor core.IActorData) ClaimsBuilder
 	WithNonce() ClaimsBuilder
 	BuildCtx(context.Context) (*AuthProxyClaims, error)
 	Build() (*AuthProxyClaims, error)
@@ -39,17 +40,17 @@ type ClaimsBuilder interface {
 }
 
 type claimsBuilder struct {
-	issuer     *string
-	audiences  []string
-	expiresIn  *time.Duration
-	expiration *time.Time
-	superAdmin *bool
-	admin      *bool
-	email      *string
-	id         *string
-	actor      *Actor
-	selfSigned bool
-	nonce      *uuid.UUID
+	issuer      *string
+	audiences   []string
+	expiresIn   *time.Duration
+	expiration  *time.Time
+	superAdmin  *bool
+	admin       *bool
+	email       *string
+	external_id *string
+	actor       *core.Actor
+	selfSigned  bool
+	nonce       *uuid.UUID
 }
 
 func (b *claimsBuilder) WithIssuer(issuer string) ClaimsBuilder {
@@ -113,13 +114,13 @@ func (b *claimsBuilder) WithActorEmail(email string) ClaimsBuilder {
 	return b
 }
 
-func (b *claimsBuilder) WithActorId(id string) ClaimsBuilder {
-	b.id = &id
+func (b *claimsBuilder) WithActorExternalId(id string) ClaimsBuilder {
+	b.external_id = &id
 	return b
 }
 
-func (b *claimsBuilder) WithActor(actor *Actor) ClaimsBuilder {
-	b.actor = actor
+func (b *claimsBuilder) WithActor(actor core.IActorData) ClaimsBuilder {
+	b.actor = core.CreateActor(actor)
 	return b
 }
 
@@ -135,23 +136,23 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 	}
 
 	if util.CoerceBool(b.superAdmin) {
-		b.id = util.ToPtr("superadmin/superadmin")
+		b.external_id = util.ToPtr("superadmin/superadmin")
 	}
 
 	if b.actor != nil {
-		if b.actor.Id != "" {
-			b.id = util.ToPtr(b.actor.Id)
+		if b.actor.GetExternalId() != "" {
+			b.external_id = util.ToPtr(b.actor.GetExternalId())
 		}
 	}
 
-	if b.id == nil {
+	if b.external_id == nil {
 		return nil, errors.New("id is required")
 	}
 
-	if util.CoerceBool(b.admin) && !strings.HasPrefix(*b.id, "admin/") {
-		b.id = util.ToPtr(fmt.Sprintf("admin/%s", *b.id))
+	if util.CoerceBool(b.admin) && !strings.HasPrefix(*b.external_id, "admin/") {
+		b.external_id = util.ToPtr(fmt.Sprintf("admin/%s", *b.external_id))
 		if b.actor != nil {
-			b.actor.Id = *b.id
+			b.actor.ExternalId = *b.external_id
 		}
 	}
 
@@ -167,7 +168,7 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 
 	c := AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:  util.CoerceString(b.id),
+			Subject:  util.CoerceString(b.external_id),
 			IssuedAt: &jwt.NumericDate{apctx.GetClock(ctx).Now()},
 			ID:       apctx.GetUuidGenerator(ctx).NewString(),
 		},

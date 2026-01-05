@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/assert"
@@ -20,6 +21,7 @@ func TestActorOnRequest(t *testing.T) {
 	}
 
 	r := util.Must(http.NewRequest("GET", "https://example.com", nil))
-	r = SetAuthOnRequestContext(r, &RequestAuth{actor: &a})
-	assert.Equal(t, &a, GetAuthFromRequest(r).GetActor())
+	r = SetAuthOnRequestContext(r, core.NewAuthenticatedRequestAuth(&a))
+	assert.Equal(t, a.Id, GetAuthFromRequest(r).GetActor().GetId())
+	assert.Equal(t, a.ExternalId, GetAuthFromRequest(r).GetActor().GetExternalId())
 }

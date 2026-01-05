@@ -78,7 +78,7 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 		return
 	}
 
-	if !util.ToPtr(ra.MustGetActor()).IsAdmin() {
+	if !ra.MustGetActor().IsAdmin() {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusForbidden().
 			WithResponseMsg("only admins can delete actors").
@@ -193,7 +193,7 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	if !util.ToPtr(ra.MustGetActor()).IsAdmin() {
+	if !ra.MustGetActor().IsAdmin() {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusForbidden().
 			WithResponseMsg("only admins can delete actors").
@@ -266,7 +266,7 @@ func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 		return
 	}
 
-	if !util.ToPtr(ra.MustGetActor()).IsAdmin() {
+	if !ra.MustGetActor().IsAdmin() {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusForbidden().
 			WithResponseMsg("only admins can delete actors").
@@ -351,7 +351,7 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 		return
 	}
 
-	if !util.ToPtr(ra.MustGetActor()).IsAdmin() {
+	if !ra.MustGetActor().IsAdmin() {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusForbidden().
 			WithResponseMsg("only admins can delete actors").
@@ -421,7 +421,7 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 		return
 	}
 
-	if !util.ToPtr(ra.MustGetActor()).IsAdmin() {
+	if !ra.MustGetActor().IsAdmin() {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusForbidden().
 			WithResponseMsg("only admins can delete actors").

@@ -15,6 +15,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/apredis"
@@ -428,7 +429,7 @@ func (ts *TestSetup) MustGetInvalidAdminUser(ctx context.Context) database.Actor
 	}
 }
 
-func actorIsBobDole(ra *RequestAuth) (bool, string) {
+func actorIsBobDole(ra *core.RequestAuth) (bool, string) {
 	if ra.GetActor().ExternalId == "bobdole" {
 		return true, ""
 	}

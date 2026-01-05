@@ -1,4 +1,4 @@
-package jwt
+package core
 
 import (
 	"encoding/hex"
@@ -7,19 +7,47 @@ import (
 	"hash/crc64"
 	"io"
 	"regexp"
+
+	"github.com/google/uuid"
 )
 
 var reValidSha = regexp.MustCompile("^[a-fA-F0-9]{40}$")
 var reValidCrc64 = regexp.MustCompile("^[a-fA-F0-9]{16}$")
 
-// Actor is the information that identifies who is making a request. This can be a actor in the calling
+type IActorData interface {
+	GetId() uuid.UUID
+	GetExternalId() string
+	GetPermissions() []string
+	IsAdmin() bool
+	IsSuperAdmin() bool
+	GetEmail() string
+}
+
+// Actor is the information that identifies who is making a request. This can be an actor in the calling
 // system, an admin from the calling system, a devops admin from the cli, etc.
 type Actor struct {
-	Id          string   `json:"id"`
-	Permissions []string `json:"permissions"`
-	Admin       bool     `json:"admin,omitempty"`
-	SuperAdmin  bool     `json:"super_admin,omitempty"`
-	Email       string   `json:"email,omitempty"`
+	Id          uuid.UUID `json:"-"` // This is the database ID of the actor. It cannot be set in the JWT directly.
+	ExternalId  string    `json:"external_id"`
+	Permissions []string  `json:"permissions"`
+	Admin       bool      `json:"admin,omitempty"`
+	SuperAdmin  bool      `json:"super_admin,omitempty"`
+	Email       string    `json:"email,omitempty"`
+}
+
+func (a *Actor) GetId() uuid.UUID {
+	return a.Id
+}
+
+func (a *Actor) GetExternalId() string {
+	return a.ExternalId
+}
+
+func (a *Actor) GetPermissions() []string {
+	return a.Permissions
+}
+
+func (a *Actor) GetEmail() string {
+	return a.Email
 }
 
 // IsAdmin is a helper to wrap the Admin attribute
@@ -50,6 +78,21 @@ func (a *Actor) IsNormalActor() bool {
 	return !a.IsSuperAdmin() && !a.IsAdmin()
 }
 
+func CreateActor(data IActorData) *Actor {
+	if a, ok := data.(*Actor); ok {
+		return a
+	}
+
+	return &Actor{
+		Id:          data.GetId(),
+		ExternalId:  data.GetExternalId(),
+		Permissions: data.GetPermissions(),
+		Admin:       data.IsAdmin(),
+		SuperAdmin:  data.IsSuperAdmin(),
+		Email:       data.GetEmail(),
+	}
+}
+
 // HashID tries to hash val with hash.Hash and fallback to crc if needed
 func HashID(h hash.Hash, val string) string {
 
@@ -69,3 +112,5 @@ func HashID(h hash.Hash, val string) string {
 	}
 	return hex.EncodeToString(h.Sum(nil))
 }
+
+var _ IActorData = &Actor{}
