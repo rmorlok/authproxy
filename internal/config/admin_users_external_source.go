@@ -5,11 +5,13 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+
+	"github.com/rmorlok/authproxy/internal/config/common"
 )
 
 type AdminUsersExternalSource struct {
-	KeysPath    string   `json:"keys_path" yaml:"keys_path"`
-	Permissions []string `json:"permissions,omitempty" yaml:"permissions,omitempty"`
+	KeysPath    string              `json:"keys_path" yaml:"keys_path"`
+	Permissions []common.Permission `json:"permissions,omitempty" yaml:"permissions,omitempty"`
 }
 
 func (s *AdminUsersExternalSource) All() []*AdminUser {

@@ -12,8 +12,10 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/config/common"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -30,8 +32,8 @@ const (
 	ActorOrderByDeletedAt  ActorOrderByField = "deleted_at"
 )
 
-// Permissions is a custom type for a slice of permissions
-type Permissions []string
+// Permissions is a custom type for a slice of permissions. The values are serlized to json.
+type Permissions []common.Permission
 
 // Value implements the driver.Valuer interface for Permissions
 func (p Permissions) Value() (driver.Value, error) {
@@ -94,7 +96,7 @@ func (a *Actor) GetExternalId() string {
 	return a.ExternalId
 }
 
-func (a *Actor) GetPermissions() []string {
+func (a *Actor) GetPermissions() []common.Permission {
 	return a.Permissions
 }
 
@@ -153,11 +155,9 @@ func (a *Actor) setFromData(d IActorData) {
 }
 
 func (a *Actor) sameAsData(d IActorData) bool {
-	slices.Sort(a.Permissions)
-
 	return a.ExternalId == d.GetExternalId() &&
 		a.Email == d.GetEmail() &&
-		slices.Equal(a.Permissions, d.GetPermissions()) &&
+		slices.EqualFunc(a.Permissions, d.GetPermissions(), func(p1, p2 common.Permission) bool { return p1.Equal(p2) }) &&
 		a.Admin == d.IsAdmin() &&
 		a.SuperAdmin == d.IsSuperAdmin()
 }
@@ -195,36 +195,44 @@ func (a *Actor) IsNormalActor() bool {
 }
 
 func (a *Actor) normalize() {
-	// Permissions are stores sorted so that we don't have to sort on load
-	slices.Sort(a.Permissions)
+	// No actions currently
 }
 
 func (a *Actor) validate() error {
+	result := &multierror.Error{}
+
 	if a.Id == uuid.Nil {
-		return errors.New("actor id is empty")
+		result = multierror.Append(result, errors.New("actor id is empty"))
 	}
 
 	if a.ExternalId == "" {
-		return errors.New("actor external id is empty")
+		result = multierror.Append(result, errors.New("actor external id is empty"))
 	}
 
 	if a.Admin && !strings.HasPrefix(a.ExternalId, "admin/") {
-		return errors.New("admin external id is not correctly formatted")
+		result = multierror.Append(result, errors.New("admin external id is not correctly formatted"))
 	}
 
 	if strings.HasPrefix(a.ExternalId, "admin/") && !a.Admin {
-		return errors.New("normal actor cannot have admin/ Id prefix")
+		result = multierror.Append(result, errors.New("normal actor cannot have admin/ Id prefix"))
 	}
 
 	if a.SuperAdmin && !strings.HasPrefix(a.ExternalId, "superadmin/") {
-		return errors.New("super admin Id is not correctly formatted")
+		result = multierror.Append(result, errors.New("super admin Id is not correctly formatted"))
 	}
 
 	if strings.HasPrefix(a.ExternalId, "superadmin/") && !a.SuperAdmin {
-		return errors.New("normal actor cannot have superadmin/ Id prefix")
+		result = multierror.Append(result, errors.New("normal actor cannot have superadmin/ Id prefix"))
 	}
 
-	return nil
+	for i, p := range a.Permissions {
+		err := p.Validate()
+		if err != nil {
+			result = multierror.Append(result, fmt.Errorf("actor permission %d is invalid: %w", i, err))
+		}
+	}
+
+	return result.ErrorOrNil()
 }
 
 var _ IActorData = (*Actor)(nil)

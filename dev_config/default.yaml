@@ -42,7 +42,11 @@ system_auth:
   admin_users:
     keys_path: ./dev_config/keys/admin
     permissions:
-      - root.**#**
+      - namespace: root.**
+        resources:
+          - "*"
+        verbs:
+          - "*"
   global_aes_key:
     env_var_base64: GLOBAL_AES_KEY
 

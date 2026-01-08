@@ -3,6 +3,7 @@ package config
 import (
 	"testing"
 
+	"github.com/rmorlok/authproxy/internal/config/common"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -40,9 +41,18 @@ key:
 username: bobdole
 email: bob@example.com
 permissions:
-  - admin:read
-  - admin:write
-  - connectors:manage
+  - namespace: root
+    resources: 
+      - connectors
+    verbs: 
+      - list
+  - namespace: root
+    resources: 
+      - connections
+    verbs: 
+      - list
+      - get
+      - disconnect
 key:
   public_key:
     value: some-key-value
@@ -53,10 +63,17 @@ key:
 			assert.Equal(AdminUser{
 				Username: "bobdole",
 				Email:    "bob@example.com",
-				Permissions: []string{
-					"admin:read",
-					"admin:write",
-					"connectors:manage",
+				Permissions: []common.Permission{
+					{
+						Namespace: "root",
+						Resources: []string{"connectors"},
+						Verbs:     []string{"list"},
+					},
+					{
+						Namespace: "root",
+						Resources: []string{"connections"},
+						Verbs:     []string{"list", "get", "disconnect"},
+					},
 				},
 				Key: &Key{
 					InnerVal: &KeyPublicPrivate{

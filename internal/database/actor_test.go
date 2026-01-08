@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/config/common"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
@@ -37,16 +38,6 @@ func TestActor(t *testing.T) {
 			Id: uuid.New(),
 		}).validate())
 		require.Error(t, util.ToPtr(Actor{}).validate())
-	})
-	t.Run("Normalize", func(t *testing.T) {
-		// It sorts permissions
-		a := &Actor{
-			Id:          uuid.New(),
-			ExternalId:  "1234567890",
-			Permissions: Permissions{"c", "a", "b"},
-		}
-		a.normalize()
-		require.Equal(t, Permissions{"a", "b", "c"}, a.Permissions)
 	})
 	t.Run("GetActor", func(t *testing.T) {
 		setup(t)
@@ -115,10 +106,16 @@ func TestActor(t *testing.T) {
 
 			id := uuid.New()
 			actor := &Actor{
-				Id:          id,
-				ExternalId:  id.String(),
-				Email:       "bobdole@example.com",
-				Permissions: []string{"read", "write"},
+				Id:         id,
+				ExternalId: id.String(),
+				Email:      "bobdole@example.com",
+				Permissions: Permissions{
+					common.Permission{
+						Namespace: "root",
+						Resources: []string{"*"},
+						Verbs:     []string{"*"},
+					},
+				},
 			}
 			require.NoError(t, db.CreateActor(ctx, actor))
 
@@ -234,8 +231,11 @@ func TestActor(t *testing.T) {
 					ExternalId: externalId,
 					Email:      "bobdole@example.com",
 					Permissions: Permissions{
-						"read",
-						"write",
+						common.Permission{
+							Namespace: "root",
+							Resources: []string{"connections", "connectors"},
+							Verbs:     []string{"read", "create"},
+						},
 					},
 				})
 				require.NoError(t, err)
@@ -244,35 +244,62 @@ func TestActor(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, id, retrieved.Id)
 				require.Equal(t, Permissions{
-					"read",
-					"write",
+					common.Permission{
+						Namespace: "root",
+						Resources: []string{"connections", "connectors"},
+						Verbs:     []string{"read", "create"},
+					},
 				}, retrieved.Permissions)
 
 				actor, err := db.UpsertActor(ctx, &core.Actor{
 					ExternalId: externalId,
 					Email:      "bobdole@example.com",
-					Permissions: []string{
-						"execute",
-						"read",
-						"write",
+					Permissions: []common.Permission{
+						{
+							Namespace: "root",
+							Resources: []string{"connections", "connectors"},
+							Verbs:     []string{"read", "create"},
+						},
+						{
+							Namespace:   "root",
+							Resources:   []string{"connections"},
+							ResourceIds: []string{"1234567890"},
+							Verbs:       []string{"proxy"},
+						},
 					},
 				})
 				require.NoError(t, err)
 				require.Equal(t, externalId, actor.ExternalId)
 				require.Equal(t, id, actor.Id)
 				require.Equal(t, Permissions{
-					"execute",
-					"read",
-					"write",
+					{
+						Namespace: "root",
+						Resources: []string{"connections", "connectors"},
+						Verbs:     []string{"read", "create"},
+					},
+					{
+						Namespace:   "root",
+						Resources:   []string{"connections"},
+						ResourceIds: []string{"1234567890"},
+						Verbs:       []string{"proxy"},
+					},
 				}, actor.Permissions)
 
 				retrieved, err = db.GetActorByExternalId(ctx, externalId)
 				require.NoError(t, err)
 				require.Equal(t, id, retrieved.Id)
 				require.Equal(t, Permissions{
-					"execute",
-					"read",
-					"write",
+					{
+						Namespace: "root",
+						Resources: []string{"connections", "connectors"},
+						Verbs:     []string{"read", "create"},
+					},
+					{
+						Namespace:   "root",
+						Resources:   []string{"connections"},
+						ResourceIds: []string{"1234567890"},
+						Verbs:       []string{"proxy"},
+					},
 				}, retrieved.Permissions)
 			})
 		})

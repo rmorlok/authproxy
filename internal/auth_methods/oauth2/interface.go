@@ -6,6 +6,7 @@ import (
 	"net/url"
 
 	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/config/common"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/request_log"
 )
@@ -13,7 +14,7 @@ import (
 type IActorData interface {
 	GetId() uuid.UUID
 	GetExternalId() string
-	GetPermissions() []string
+	GetPermissions() []common.Permission
 	IsAdmin() bool
 	IsSuperAdmin() bool
 	GetEmail() string

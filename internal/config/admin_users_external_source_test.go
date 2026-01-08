@@ -1,6 +1,7 @@
 package config
 
 import (
+	"github.com/rmorlok/authproxy/internal/config/common"
 	tu "github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -24,8 +25,19 @@ keys_path: some/path/to/keys
 	})
 	t.Run("loads users from path", func(t *testing.T) {
 		aues := AdminUsersExternalSource{
-			KeysPath:    tu.TestDataPath("admin_user_keys"),
-			Permissions: []string{"read", "write"},
+			KeysPath: tu.TestDataPath("admin_user_keys"),
+			Permissions: []common.Permission{
+				{
+					Namespace: "root",
+					Resources: []string{"connectors"},
+					Verbs:     []string{"list"},
+				},
+				{
+					Namespace: "root",
+					Resources: []string{"connections"},
+					Verbs:     []string{"list", "get", "disconnect"},
+				},
+			},
 		}
 
 		// Check the test_data/admin_user_keys folder to see what this count should be
@@ -35,19 +47,52 @@ keys_path: some/path/to/keys
 		assert.True(found)
 		assert.NotNil(u)
 		assert.True(u.Key.CanVerifySignature())
-		assert.Equal([]string{"read", "write"}, u.Permissions)
+		assert.Equal([]common.Permission{
+			{
+				Namespace: "root",
+				Resources: []string{"connectors"},
+				Verbs:     []string{"list"},
+			},
+			{
+				Namespace: "root",
+				Resources: []string{"connections"},
+				Verbs:     []string{"list", "get", "disconnect"},
+			},
+		}, u.Permissions)
 
 		u, found = aues.GetByUsername("bobdole")
 		assert.True(found)
 		assert.NotNil(u)
 		assert.True(u.Key.CanVerifySignature())
-		assert.Equal([]string{"read", "write"}, u.Permissions)
+		assert.Equal([]common.Permission{
+			{
+				Namespace: "root",
+				Resources: []string{"connectors"},
+				Verbs:     []string{"list"},
+			},
+			{
+				Namespace: "root",
+				Resources: []string{"connections"},
+				Verbs:     []string{"list", "get", "disconnect"},
+			},
+		}, u.Permissions)
 
 		u, found = aues.GetByUsername("bobdole")
 		assert.True(found)
 		assert.NotNil(u)
 		assert.True(u.Key.CanVerifySignature())
-		assert.Equal([]string{"read", "write"}, u.Permissions)
+		assert.Equal([]common.Permission{
+			{
+				Namespace: "root",
+				Resources: []string{"connectors"},
+				Verbs:     []string{"list"},
+			},
+			{
+				Namespace: "root",
+				Resources: []string{"connections"},
+				Verbs:     []string{"list", "get", "disconnect"},
+			},
+		}, u.Permissions)
 	})
 	t.Run("get by jwt subject", func(t *testing.T) {
 		aues := AdminUsersExternalSource{

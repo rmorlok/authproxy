@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/config/common"
 )
 
 type DeletedHandling bool
@@ -20,7 +21,7 @@ const (
 type IActorData interface {
 	GetId() uuid.UUID
 	GetExternalId() string
-	GetPermissions() []string
+	GetPermissions() []common.Permission
 	IsAdmin() bool
 	IsSuperAdmin() bool
 	GetEmail() string
