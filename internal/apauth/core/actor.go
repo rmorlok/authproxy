@@ -1,11 +1,6 @@
 package core
 
 import (
-	"encoding/hex"
-	"fmt"
-	"hash"
-	"hash/crc64"
-	"io"
 	"regexp"
 
 	"github.com/google/uuid"
@@ -95,26 +90,6 @@ func CreateActor(data IActorData) *Actor {
 		SuperAdmin:  data.IsSuperAdmin(),
 		Email:       data.GetEmail(),
 	}
-}
-
-// HashID tries to hash val with hash.Hash and fallback to crc if needed
-func HashID(h hash.Hash, val string) string {
-
-	if reValidSha.MatchString(val) {
-		return val // already hashed or empty
-	}
-
-	if _, err := io.WriteString(h, val); err != nil {
-		// fail back to crc64
-		if val == "" {
-			val = "!empty string!"
-		}
-		if reValidCrc64.MatchString(val) {
-			return val // already crced
-		}
-		return fmt.Sprintf("%x", crc64.Checksum([]byte(val), crc64.MakeTable(crc64.ECMA)))
-	}
-	return hex.EncodeToString(h.Sum(nil))
 }
 
 var _ IActorData = &Actor{}
