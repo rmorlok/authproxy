@@ -89,6 +89,22 @@ func (atu *AuthTestUtil) NewSignedRequestForActorExternalId(method, url string, 
 	return req, nil
 }
 
+// NewSignedRequestForActor creates a signed request with a custom actor.
+// This allows tests to specify exact permissions or admin/superadmin status.
+func (atu *AuthTestUtil) NewSignedRequestForActor(method, url string, body io.Reader, actor core.Actor) (*http.Request, error) {
+	req, err := http.NewRequest(method, url, body)
+	if err != nil {
+		return nil, err
+	}
+
+	req, err = atu.SignRequestHeaderAs(context.Background(), req, actor)
+	if err != nil {
+		return nil, err
+	}
+
+	return req, nil
+}
+
 func (atu *AuthTestUtil) claimsForActor(a core.Actor) *jwt2.AuthProxyClaims {
 	claims := &jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
