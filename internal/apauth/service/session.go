@@ -13,7 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/api_common"
-	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 const (

@@ -6,8 +6,8 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/aplog"
-	cfg "github.com/rmorlok/authproxy/internal/config/connectors"
 	"github.com/rmorlok/authproxy/internal/core/iface"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
 const (
@@ -17,7 +17,7 @@ const (
 )
 
 type probeBase struct {
-	cfg    *cfg.Probe
+	cfg    *cschema.Probe
 	s      *service
 	cv     *ConnectorVersion
 	c      *connection
@@ -72,7 +72,7 @@ func (p *probeBase) recordInvokeOutcome(
 	return outcome, err
 }
 
-func NewProbe(cfg *cfg.Probe, s *service, cv *ConnectorVersion, c *connection) iface.Probe {
+func NewProbe(cfg *cschema.Probe, s *service, cv *ConnectorVersion, c *connection) iface.Probe {
 	base := probeBase{
 		cfg: cfg,
 		s:   s,

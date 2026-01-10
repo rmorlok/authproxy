@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/require"
 )
 

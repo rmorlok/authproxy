@@ -16,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/request_log"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 type DependencyManager struct {
@@ -44,7 +45,7 @@ func (dm *DependencyManager) GetConfig() config.C {
 	return dm.cfg
 }
 
-func (dm *DependencyManager) GetConfigRoot() *config.Root {
+func (dm *DependencyManager) GetConfigRoot() *sconfig.Root {
 	return dm.cfg.GetRoot()
 }
 

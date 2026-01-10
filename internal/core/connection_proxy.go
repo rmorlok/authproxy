@@ -6,9 +6,9 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/auth_methods/no_auth"
-	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/request_log"
+	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 var ErrProxyNotImplemented = errors.New("auth type for connection does not implement proxy")

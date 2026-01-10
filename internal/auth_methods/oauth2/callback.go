@@ -5,8 +5,8 @@ import (
 	"net/url"
 
 	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/request_log"
+	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 func (o *oAuth2Connection) getPublicCallbackUrl() (string, error) {

@@ -8,7 +8,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/internal/apredis"
-	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 type redisLogRetriever struct {

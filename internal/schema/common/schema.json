@@ -1,0 +1,207 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/common/schema.json",
+  "$defs": {
+    "HumanByteSize": {
+      "type": "string",
+      "pattern": "(?i)^[0-9]+\\s?(b|kb|mb|gb|pb|eb|kib|mib|gib|tib|pib|eib)$",
+      "description": "A human-readable byte size string, e.g., '2mb'. For kb, mb, etc it will use base 10 parsing (1kb = 1000 bytes). For bases 2 parsing using IEC (2kib = 1024 bytes)."
+    },
+    "HumanDuration": {
+      "type": "string",
+      "pattern": "^([0-9]+d)?([0-9]+h)?([0-9]+m)?([0-9]+s)?([0-9]+ms)?$",
+      "description": "A human-readable duration string, e.g., '10s', '20h', '2d3h', etc."
+    },
+    "Cron": {
+      "type": "string",
+      "description": "A cron expression, e.g., '0 0 1 * * *'."
+    },
+    "UUID": {
+      "type": "string",
+      "pattern": "^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$",
+      "description": "A UUID, e.g., 'e8f7dda-7b82-476c-99ff-37c8357da4ae'."
+    },
+    "ImagePublicUrlString": {
+      "type": "string",
+      "description": "An image represented as a publicly accessible URL."
+    },
+    "ImagePublicUrl": {
+      "properties": {
+        "public_url": {
+          "type": "string",
+          "format": "uri",
+          "description": "A publicly accessible URL to the image."
+        }
+      },
+      "type": "object",
+      "required": [
+        "public_url"
+      ],
+      "additionalProperties": false,
+      "description": "An image represented as a publicly accessible URL."
+    },
+    "ImageBase64": {
+      "properties": {
+        "mime_type": {
+          "type": "string",
+          "description": "The MIME type of the image, e.g., 'image/jpeg'."
+        },
+        "base64": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "pattern": "^[A-Za-z0-9+/]*(=|==)?$",
+          "description": "The base64 encoded image data."
+        }
+      },
+      "type": "object",
+      "required": [
+        "mime_type",
+        "base64"
+      ],
+      "additionalProperties": false,
+      "description": "An image represented as a base64 encoded string with associated MIME type. This is used to avoid having to store the image on a separate the server. This should be limited to small images less than 100kb in size."
+    },
+    "Image": {
+      "oneOf": [
+        { "$ref": "#/$defs/ImagePublicUrlString" },
+        { "$ref": "#/$defs/ImagePublicUrl" },
+        { "$ref": "#/$defs/ImageBase64" }
+      ],
+      "description": "An image, either as a publicly accessible URL or as a base64 encoded string."
+    },
+    "StringValueInlineString": {
+      "type": "string",
+      "description": "A string value used in configuration"
+    },
+    "StringValueInlineNumber": {
+      "type": "number",
+      "description": "A boolean value used in configuration"
+    },
+    "StringValueInlineBool": {
+      "type": "boolean",
+      "description": "A boolean value used in configuration"
+    },
+    "StringValueDirect": {
+      "properties": {
+        "value": {
+          "type": "string",
+          "description": "A string value used in configuration."
+        }
+      },
+      "type": "object",
+      "required": [
+        "value"
+      ],
+      "additionalProperties": false,
+      "description": "A string value used in configuration"
+    },
+    "StringValueBase64": {
+      "properties": {
+        "base64": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "pattern": "^[A-Za-z0-9+/]*(=|==)?$",
+          "description": "The base64 encoded string data."
+        }
+      },
+      "type": "object",
+      "required": [
+        "base64"
+      ],
+      "additionalProperties": false,
+      "description": "A string value that is encoded as base64 data."
+    },
+    "StringValueEnvVar": {
+      "properties": {
+        "env_var": {
+          "type": "string",
+          "description": "An environment variable from which the value will be read."
+        },
+        "default": {
+          "type": "string",
+          "description": "An optional, default value to use if the environment variable is not set."
+        }
+      },
+      "type": "object",
+      "required": [
+        "env_var"
+      ],
+      "additionalProperties": false,
+      "description": "A string value used in configuration"
+    },
+    "StringValueEnvVarBase64": {
+      "properties": {
+        "env_var_base64": {
+          "type": "string",
+          "description": "An environment variable from which the value will be read as base64."
+        },
+        "default": {
+          "type": "string",
+          "contentEncoding": "base64",
+          "pattern": "^[A-Za-z0-9+/]*(=|==)?$",
+          "description": "An optional, default value to use if the environment variable is not set."
+        }
+      },
+      "type": "object",
+      "required": [
+        "env_var_base64"
+      ],
+      "additionalProperties": false,
+      "description": "A string value used in configuration"
+    },
+    "StringValueFile": {
+      "properties": {
+        "path": {
+          "type": "string",
+          "description": "The path of the file to load for the value of the string."
+        }
+      },
+      "type": "object",
+      "required": [
+        "path"
+      ],
+      "additionalProperties": false,
+      "description": "A string value used in configuration"
+    },
+    "StringValue": {
+      "oneOf": [
+        { "$ref": "#/$defs/StringValueInlineString" },
+        { "$ref": "#/$defs/StringValueInlineNumber" },
+        { "$ref": "#/$defs/StringValueInlineBool" },
+        { "$ref": "#/$defs/StringValueDirect" },
+        { "$ref": "#/$defs/StringValueBase64" },
+        { "$ref": "#/$defs/StringValueEnvVar" },
+        { "$ref": "#/$defs/StringValueEnvVarBase64" },
+        { "$ref": "#/$defs/StringValueFile" }
+      ],
+      "description": "A string value used in configuration that can be expressed in on of several ways."
+    },
+    "StringValueNumber": {
+      "oneOf": [
+        { "$ref": "#/$defs/StringValueInlineNumber" },
+        { "$ref": "#/$defs/StringValueDirect" },
+        { "$ref": "#/$defs/StringValueBase64" },
+        { "$ref": "#/$defs/StringValueEnvVar" },
+        { "$ref": "#/$defs/StringValueEnvVarBase64" },
+        { "$ref": "#/$defs/StringValueFile" }
+      ],
+      "description": "A number value used in configuration that can be expressed in on of several ways. When taken from other sources, the string value is parsed as a number."
+    },
+    "StringValueBool": {
+      "oneOf": [
+        { "$ref": "#/$defs/StringValueInlineBool" },
+        { "$ref": "#/$defs/StringValueDirect" },
+        { "$ref": "#/$defs/StringValueBase64" },
+        { "$ref": "#/$defs/StringValueEnvVar" },
+        { "$ref": "#/$defs/StringValueEnvVarBase64" },
+        { "$ref": "#/$defs/StringValueFile" }
+      ],
+      "description": "A boolean value used in configuration that can be expressed in on of several ways. When taken from other sources, the string value is parsed as a bool."
+    },
+    "NamespacePath": {
+      "type": "string",
+      "pattern": "^root(?:.[a-zA-Z0-9_]+[a-zA-Z0-9_\\-]*)*$",
+      "description": "The fully qualified path to the namespace a resource lives within. For example, 'root/prod/some-feature'. Must begin with 'root'."
+    }
+  }
+}

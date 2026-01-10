@@ -13,7 +13,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
-	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/schema/config"
 	"golang.org/x/crypto/ssh"
 )
 

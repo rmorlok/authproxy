@@ -7,12 +7,12 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	mockLog "github.com/rmorlok/authproxy/internal/aplog/mock"
-	cfg "github.com/rmorlok/authproxy/internal/config/connectors"
 	mockCore "github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
 	mockEncrypt "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	mockH "github.com/rmorlok/authproxy/internal/httpf/mock"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/stretchr/testify/require"
 	genmock "gopkg.in/h2non/gentleman-mock.v2"
 )
@@ -21,13 +21,13 @@ func TestSupportsRevokeRefreshToken(t *testing.T) {
 	o2 := oAuth2Connection{}
 	require.False(t, o2.SupportsRevokeTokens())
 
-	o2.auth = &cfg.AuthOAuth2{
-		Type: cfg.AuthTypeOAuth2,
+	o2.auth = &cschema.AuthOAuth2{
+		Type: cschema.AuthTypeOAuth2,
 	}
 
 	require.False(t, o2.SupportsRevokeTokens())
 
-	o2.auth.Revocation = &cfg.AuthOauth2Revocation{}
+	o2.auth.Revocation = &cschema.AuthOauth2Revocation{}
 
 	require.False(t, o2.SupportsRevokeTokens())
 
@@ -58,9 +58,9 @@ func TestRevokeRefreshToken(t *testing.T) {
 			connection: &mockCore.Connection{
 				Id: connectionId,
 			},
-			auth: &cfg.AuthOAuth2{
-				Type: cfg.AuthTypeOAuth2,
-				Revocation: &cfg.AuthOauth2Revocation{
+			auth: &cschema.AuthOAuth2{
+				Type: cschema.AuthTypeOAuth2,
+				Revocation: &cschema.AuthOauth2Revocation{
 					Endpoint: "http://example.com/revoke",
 				},
 			},

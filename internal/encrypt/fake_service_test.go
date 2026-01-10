@@ -8,6 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -25,11 +26,11 @@ func TestFakeService(t *testing.T) {
 				EncryptedDefinition: "test",
 			}
 
-			cfg := config.FromRoot(&config.Root{
-				SystemAuth: config.SystemAuth{
-					GlobalAESKey: config.NewKeyDataRandomBytes(),
+			cfg := config.FromRoot(&sconfig.Root{
+				SystemAuth: sconfig.SystemAuth{
+					GlobalAESKey: sconfig.NewKeyDataRandomBytes(),
 				},
-				DevSettings: &config.DevSettings{
+				DevSettings: &sconfig.DevSettings{
 					FakeEncryption:           true,
 					FakeEncryptionSkipBase64: !doBase64,
 				},

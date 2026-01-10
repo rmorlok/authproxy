@@ -9,9 +9,9 @@ import (
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/config"
-	cfgConnectors "github.com/rmorlok/authproxy/internal/config/connectors"
 	connIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 
@@ -83,7 +83,7 @@ type ConnectorVersionJson struct {
 	Version    uint64                         `json:"version"`
 	State      database.ConnectorVersionState `json:"state"`
 	Type       string                         `json:"type"`
-	Definition cfgConnectors.Connector        `json:"definition"`
+	Definition cschema.Connector              `json:"definition"`
 	CreatedAt  time.Time                      `json:"created_at"`
 	UpdatedAt  time.Time                      `json:"updated_at"`
 }

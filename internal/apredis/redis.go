@@ -6,7 +6,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
-	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 var redisClient *redis.Client

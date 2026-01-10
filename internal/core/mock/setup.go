@@ -8,14 +8,14 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/apctx"
-	cfg "github.com/rmorlok/authproxy/internal/config/connectors"
 	"github.com/rmorlok/authproxy/internal/database"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
 	mockE "github.com/rmorlok/authproxy/internal/encrypt/mock"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
 // MockConnectionRetrieval sets up the service to retrieve a connection with an associated connector any number of times
-func MockConnectionRetrieval(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.MockE, connUuuid uuid.UUID, c *cfg.Connector) {
+func MockConnectionRetrieval(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.MockE, connUuuid uuid.UUID, c *cschema.Connector) {
 	clock := apctx.GetClock(ctx)
 
 	dbMock.
@@ -35,7 +35,7 @@ func MockConnectionRetrieval(ctx context.Context, dbMock *mockDb.MockDB, e *mock
 }
 
 // MockConnectorRetrival sets up mocks to retrieve a connector from the service any number of times.
-func MockConnectorRetrival(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.MockE, c *cfg.Connector) {
+func MockConnectorRetrival(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.MockE, c *cschema.Connector) {
 	state := database.ConnectorVersionStatePrimary
 	if c.State != "" {
 		state = database.ConnectorVersionState(c.State)

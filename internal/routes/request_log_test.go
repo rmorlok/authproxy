@@ -15,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/request_log"
 	"github.com/rmorlok/authproxy/internal/request_log/mock"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
 )
@@ -29,7 +30,7 @@ func TestRequestLogRoutes(t *testing.T) {
 	setup := func(t *testing.T, cfg config.C) *TestSetup {
 		ctrl := gomock.NewController(t)
 		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
-		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(config.ServiceIdApi, cfg, db)
+		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
 
 		rlr := mock.NewMockLogRetriever(ctrl)
 		rl := NewRequestLogRoutes(cfg, auth, rlr)

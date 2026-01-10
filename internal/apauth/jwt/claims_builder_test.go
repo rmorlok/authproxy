@@ -6,7 +6,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
-	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
 )

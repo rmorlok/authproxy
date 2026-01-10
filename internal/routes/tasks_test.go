@@ -4,6 +4,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"net/http"
+	"net/http/httptest"
+	"testing"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
@@ -13,12 +18,9 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/tasks"
 	"github.com/stretchr/testify/require"
-	"net/http"
-	"net/http/httptest"
-	"testing"
-	"time"
 )
 
 func TestTasks(t *testing.T) {
@@ -32,7 +34,7 @@ func TestTasks(t *testing.T) {
 
 	setup := func(t *testing.T, cfg config.C) *TestSetup {
 		if cfg == nil {
-			cfg = config.FromRoot(&config.Root{})
+			cfg = config.FromRoot(&sconfig.Root{})
 		}
 
 		ctrl := gomock.NewController(t)
@@ -40,7 +42,7 @@ func TestTasks(t *testing.T) {
 		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
 		// Use fake encryption service with doBase64Encode set to false
 		e := encrypt.NewFakeEncryptService(false)
-		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(config.ServiceIdApi, cfg, db)
+		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
 
 		tr := NewTaskRoutes(cfg, auth, e, mockInspector)
 

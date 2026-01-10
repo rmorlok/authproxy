@@ -17,6 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 type state struct {
@@ -125,7 +126,7 @@ func getOAuth2State(
 
 	cv := connection.GetConnectorVersionEntity()
 	connector := cv.GetDefinition()
-	if connector.Auth.GetType() != config.AuthTypeOAuth2 {
+	if connector.Auth.GetType() != sconfig.AuthTypeOAuth2 {
 		return nil, errors.Errorf("connector %s is not an oauth2 connector", s.ConnectorId)
 	}
 

@@ -8,11 +8,11 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	"github.com/rmorlok/authproxy/internal/config"
 	mockCore "github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
 	database_mock "github.com/rmorlok/authproxy/internal/database/mock"
 	encrypt_mock "github.com/rmorlok/authproxy/internal/encrypt/mock"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"gopkg.in/h2non/gock.v1"
 )
@@ -91,8 +91,8 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 			oauth := &oAuth2Connection{
 				db:      mockDB,
 				encrypt: mockEncrypt,
-				auth: &config.AuthOAuth2{
-					Scopes: []config.Scope{{Id: "read"}, {Id: "write"}},
+				auth: &sconfig.AuthOAuth2{
+					Scopes: []sconfig.Scope{{Id: "read"}, {Id: "write"}},
 				},
 				connection: &mockCore.Connection{
 					Id: uuid.MustParse("12345678-1234-1234-1234-123456789abc"),

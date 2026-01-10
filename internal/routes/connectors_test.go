@@ -19,6 +19,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/internal/httpf"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
@@ -33,9 +34,9 @@ func TestConnectors(t *testing.T) {
 
 	setup := func(t *testing.T, cfg config.C) *TestSetup {
 		if cfg == nil {
-			cfg = config.FromRoot(&config.Root{
-				Connectors: &config.Connectors{
-					LoadFromList: []config.Connector{},
+			cfg = config.FromRoot(&sconfig.Root{
+				Connectors: &sconfig.Connectors{
+					LoadFromList: []sconfig.Connector{},
 				},
 			})
 		}
@@ -46,7 +47,7 @@ func TestConnectors(t *testing.T) {
 		}
 
 		if len(root.Connectors.LoadFromList) == 0 {
-			root.Connectors.LoadFromList = []config.Connector{
+			root.Connectors.LoadFromList = []sconfig.Connector{
 				{
 					Id:          uuid.MustParse("10000000-0000-0000-0000-000000000001"),
 					Namespace:   util.ToPtr("root"),
@@ -66,7 +67,7 @@ func TestConnectors(t *testing.T) {
 		ac := asynqmock.NewMockClient(ctrl)
 		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
-		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(config.ServiceIdApi, cfg, db)
+		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
 		rs := mock.NewMockClient(ctrl)
 		h := httpf2.CreateFactory(cfg, rs, aplog.NewNoopLogger())
 		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())

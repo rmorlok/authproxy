@@ -23,6 +23,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
@@ -42,7 +43,7 @@ type route struct {
 type TestGinServerBuilder struct {
 	testName                          string
 	pingCounter                       int
-	service                           config.ServiceId
+	service                           sconfig.ServiceId
 	cfg                               config.C
 	db                                database.DB
 	r                                 apredis.Client
@@ -147,47 +148,47 @@ func (b *TestGinServerBuilder) WithGetPingAdminAuthRoute(path string, validators
 }
 
 func (b *TestGinServerBuilder) Build() TestSetup {
-	if b.service == config.ServiceId("") {
-		b.service = config.ServiceIdPublic
+	if b.service == "" {
+		b.service = sconfig.ServiceIdPublic
 	}
 
 	if b.cfg == nil {
-		adminSigningKey := config.NewKeyDataRandomBytes()
-		b.cfg = config.FromRoot(&config.Root{
-			Public: config.ServicePublic{
-				ServiceHttp: config.ServiceHttp{
-					PortVal:    &config.StringValue{&config.StringValueDirect{Value: "8080"}},
+		adminSigningKey := sconfig.NewKeyDataRandomBytes()
+		b.cfg = config.FromRoot(&sconfig.Root{
+			Public: sconfig.ServicePublic{
+				ServiceHttp: sconfig.ServiceHttp{
+					PortVal:    &sconfig.StringValue{&sconfig.StringValueDirect{Value: "8080"}},
 					DomainVal:  "example.com",
 					IsHttpsVal: false,
 				},
-				CookieVal: &config.CookieConfig{
+				CookieVal: &sconfig.CookieConfig{
 					DomainVal: util.ToPtr("example.com"),
 				},
-				SessionTimeoutVal: &config.HumanDuration{Duration: 10 * time.Hour},
+				SessionTimeoutVal: &sconfig.HumanDuration{Duration: 10 * time.Hour},
 
 				XsrfRequestQueueDepthVal: util.ToPtr(5),
 			},
-			SystemAuth: config.SystemAuth{
-				JwtSigningKey: &config.Key{
-					InnerVal: &config.KeyShared{
-						SharedKey: config.NewKeyDataRandomBytes(),
+			SystemAuth: sconfig.SystemAuth{
+				JwtSigningKey: &sconfig.Key{
+					InnerVal: &sconfig.KeyShared{
+						SharedKey: sconfig.NewKeyDataRandomBytes(),
 					},
 				},
-				GlobalAESKey: config.NewKeyDataRandomBytes(),
-				AdminUsers: &config.AdminUsers{
-					InnerVal: config.AdminUsersList{
-						&config.AdminUser{
+				GlobalAESKey: sconfig.NewKeyDataRandomBytes(),
+				AdminUsers: &sconfig.AdminUsers{
+					InnerVal: sconfig.AdminUsersList{
+						&sconfig.AdminUser{
 							Username: "bobdole",
-							Key: &config.Key{
-								InnerVal: &config.KeyShared{
+							Key: &sconfig.Key{
+								InnerVal: &sconfig.KeyShared{
 									SharedKey: adminSigningKey,
 								},
 							},
 						},
-						&config.AdminUser{
+						&sconfig.AdminUser{
 							Username: "ronaldreagan",
-							Key: &config.Key{
-								InnerVal: &config.KeyShared{
+							Key: &sconfig.Key{
+								InnerVal: &sconfig.KeyShared{
 									SharedKey: adminSigningKey,
 								},
 							},
@@ -211,7 +212,7 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 
 	e := encrypt.NewFakeEncryptService(true)
 
-	auth := NewService(b.cfg, b.cfg.MustGetService(b.service).(config.HttpService), b.db, b.r, e, test_utils.NewTestLogger())
+	auth := NewService(b.cfg, b.cfg.MustGetService(b.service).(sconfig.HttpService), b.db, b.r, e, test_utils.NewTestLogger())
 
 	if len(b.defaultValidators) > 0 {
 		auth = auth.WithDefaultAuthValidators(b.defaultValidators...)
@@ -251,7 +252,7 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 
 type TestSetup struct {
 	pingCounter *int
-	Service     config.ServiceId
+	Service     sconfig.ServiceId
 	Gin         *gin.Engine
 	Cfg         config.C
 	Db          database.DB
@@ -323,11 +324,11 @@ func (ts *TestSetup) GetPingCount() int {
 	return *ts.pingCounter
 }
 
-func (ts *TestSetup) MustGetValidSigningTokenForUser() *config.Key {
+func (ts *TestSetup) MustGetValidSigningTokenForUser() *sconfig.Key {
 	return ts.Cfg.GetRoot().SystemAuth.JwtSigningKey
 }
 
-func (ts *TestSetup) MustGetValidSigningTokenForAdmin() *config.Key {
+func (ts *TestSetup) MustGetValidSigningTokenForAdmin() *sconfig.Key {
 	return ts.Cfg.GetRoot().SystemAuth.AdminUsers.All()[0].Key
 }
 

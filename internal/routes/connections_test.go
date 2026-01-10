@@ -18,11 +18,11 @@ import (
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/apredis/mock"
 	"github.com/rmorlok/authproxy/internal/config"
-	cfg "github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/internal/httpf"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/assert"
@@ -42,9 +42,9 @@ func TestConnections(t *testing.T) {
 	connectorVersion := uint64(1)
 
 	setup := func(t *testing.T, cfg config.C) (*TestSetup, func()) {
-		cfg = config.FromRoot(&config.Root{
-			Connectors: &config.Connectors{
-				LoadFromList: []config.Connector{
+		cfg = config.FromRoot(&sconfig.Root{
+			Connectors: &sconfig.Connectors{
+				LoadFromList: []sconfig.Connector{
 					{
 						Id:          connectorId,
 						Version:     connectorVersion,
@@ -56,7 +56,7 @@ func TestConnections(t *testing.T) {
 		})
 		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
 		cfg, rds := apredis.MustApplyTestConfig(cfg)
-		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(config.ServiceIdApi, cfg, db)
+		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
 		h := httpf2.CreateFactory(cfg, rds, aplog.NewNoopLogger())
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
 		ctrl := gomock.NewController(t)
@@ -84,7 +84,7 @@ func TestConnections(t *testing.T) {
 		u := uuid.New()
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 			Id:               u,
-			Namespace:        cfg.RootNamespace,
+			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
 			State:            database.ConnectionStateCreated,
@@ -235,7 +235,7 @@ func TestConnections(t *testing.T) {
 		u := uuid.New()
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 			Id:               u,
-			Namespace:        cfg.RootNamespace,
+			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
 			State:            database.ConnectionStateCreated,

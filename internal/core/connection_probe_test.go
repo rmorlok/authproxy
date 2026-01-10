@@ -3,15 +3,15 @@ package core
 import (
 	"testing"
 
-	"github.com/rmorlok/authproxy/internal/config/common"
-	cfg "github.com/rmorlok/authproxy/internal/config/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/common"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/stretchr/testify/require"
 )
 
 func TestConnection_Probe(t *testing.T) {
-	noProbes := newTestConnection(cfg.Connector{})
-	hasProbes := newTestConnection(cfg.Connector{
-		Probes: []cfg.Probe{
+	noProbes := newTestConnection(cschema.Connector{})
+	hasProbes := newTestConnection(cschema.Connector{
+		Probes: []cschema.Probe{
 			{
 				Id:     "probe-1",
 				Period: common.HumanDurationFor("30m"),

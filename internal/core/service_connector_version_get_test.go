@@ -6,8 +6,8 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
-	cfg "github.com/rmorlok/authproxy/internal/config/connectors"
 	"github.com/rmorlok/authproxy/internal/core/mock"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -18,12 +18,12 @@ func TestGetConnectorVersion(t *testing.T) {
 	id := uuid.New()
 	version := uint64(1)
 
-	mock.MockConnectorRetrival(context.Background(), db, e, &cfg.Connector{
+	mock.MockConnectorRetrival(context.Background(), db, e, &cschema.Connector{
 		Id:          id,
 		Version:     version,
 		DisplayName: "Test Connector",
 		Type:        "test",
-		Auth:        cfg.NewNoAuth(),
+		Auth:        cschema.NewNoAuth(),
 	})
 
 	c, err := s.GetConnectorVersion(context.Background(), id, version)

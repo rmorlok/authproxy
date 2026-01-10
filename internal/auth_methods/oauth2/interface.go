@@ -6,9 +6,9 @@ import (
 	"net/url"
 
 	"github.com/google/uuid"
-	"github.com/rmorlok/authproxy/internal/config/common"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/request_log"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
 type IActorData interface {

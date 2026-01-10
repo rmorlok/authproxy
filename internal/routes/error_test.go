@@ -7,17 +7,18 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/internal/config"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestErrorRoutes(t *testing.T) {
 	// Setup a test configuration with ErrorPages
-	root := &config.Root{
-		ErrorPages: config.ErrorPages{},
-		Public: config.ServicePublic{
-			ServiceHttp: config.ServiceHttp{
-				PortVal:    &config.StringValue{&config.StringValueDirect{Value: "8080"}},
+	root := &sconfig.Root{
+		ErrorPages: sconfig.ErrorPages{},
+		Public: sconfig.ServicePublic{
+			ServiceHttp: sconfig.ServiceHttp{
+				PortVal:    &sconfig.StringValue{&sconfig.StringValueDirect{Value: "8080"}},
 				DomainVal:  "localhost",
 				IsHttpsVal: false,
 			},

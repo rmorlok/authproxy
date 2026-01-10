@@ -5,7 +5,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/rmorlok/authproxy/internal/config/common"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
 type DeletedHandling bool

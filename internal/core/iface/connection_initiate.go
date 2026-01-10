@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
-	"github.com/rmorlok/authproxy/internal/config/common"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
 type InitiateConnectionRequest struct {

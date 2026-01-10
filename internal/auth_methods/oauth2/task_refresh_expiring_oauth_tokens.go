@@ -6,8 +6,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/aplog"
-	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 const taskTypeRefreshExpiringOAuthTokens = "oauth2:refresh_expiring_oauth_tokens"

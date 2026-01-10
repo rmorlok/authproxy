@@ -7,8 +7,8 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/aplog"
-	"github.com/rmorlok/authproxy/internal/config"
 	encryptmock "github.com/rmorlok/authproxy/internal/encrypt/mock"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -49,7 +49,7 @@ func TestVersionBuilder_WithConfig(t *testing.T) {
 
 	// Create a test configuration
 	connectorID := uuid.New()
-	c := &config.Connector{
+	c := &cschema.Connector{
 		Id:          connectorID,
 		Version:     1,
 		Type:        "test-connector",
@@ -103,7 +103,7 @@ func TestVersionBuilder_WithId(t *testing.T) {
 	assert.Equal(t, connectorID, cv.Id)
 
 	// Test the config setter function
-	c := &config.Connector{}
+	c := &cschema.Connector{}
 	builder.configSetters[0](c)
 	assert.Equal(t, connectorID, c.Id)
 }
@@ -138,7 +138,7 @@ func TestVersionBuilder_WithType(t *testing.T) {
 	assert.Equal(t, connectorType, cv.Type)
 
 	// Test the config setter function
-	c := &config.Connector{}
+	c := &cschema.Connector{}
 	builder.configSetters[0](c)
 	assert.Equal(t, connectorType, c.Type)
 }
@@ -173,7 +173,7 @@ func TestVersionBuilder_WithVersion(t *testing.T) {
 	assert.Equal(t, version, cv.Version)
 
 	// Test the config setter function
-	c := &config.Connector{}
+	c := &cschema.Connector{}
 	builder.configSetters[0](c)
 	assert.Equal(t, uint64(version), c.Version)
 }
@@ -193,7 +193,7 @@ func TestVersionBuilder_Build_Success(t *testing.T) {
 
 	// Create a test configuration
 	connectorID := uuid.New()
-	c := &config.Connector{
+	c := &cschema.Connector{
 		Id:          connectorID,
 		Version:     1,
 		Type:        "test-connector",
@@ -258,7 +258,7 @@ func TestVersionBuilder_Build_EncryptError(t *testing.T) {
 
 	// Create a test configuration
 	connectorID := uuid.New()
-	c := &config.Connector{
+	c := &cschema.Connector{
 		Id:          connectorID,
 		Version:     1,
 		Type:        "test-connector",

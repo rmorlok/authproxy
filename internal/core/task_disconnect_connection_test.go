@@ -10,11 +10,11 @@ import (
 	"github.com/rmorlok/authproxy/internal/apasynq"
 	mockAsynq "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	mockLog "github.com/rmorlok/authproxy/internal/aplog/mock"
-	cfg "github.com/rmorlok/authproxy/internal/config/connectors"
 	"github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
 	mockEncrypt "github.com/rmorlok/authproxy/internal/encrypt/mock"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -24,11 +24,11 @@ func TestTaskDisconnectConnection(t *testing.T) {
 	connectionId := uuid.New()
 	connectorId := uuid.New()
 
-	apiKeyConnector := &cfg.Connector{
+	apiKeyConnector := &cschema.Connector{
 		Id:          connectorId,
 		Version:     1,
 		DisplayName: "Test Connector",
-		Auth:        &cfg.Auth{InnerVal: &cfg.AuthApiKey{Type: cfg.AuthTypeAPIKey}},
+		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 	}
 
 	setupWithMocks := func(t *testing.T) (*service, *mockDb.MockDB, *mockAsynq.MockClient, *mockEncrypt.MockE, *gomock.Controller) {

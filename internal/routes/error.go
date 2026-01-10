@@ -3,6 +3,7 @@ package routes
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/internal/config"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 type ErrorRoutes struct {
@@ -10,9 +11,9 @@ type ErrorRoutes struct {
 }
 
 func (r *ErrorRoutes) error(gctx *gin.Context) {
-	errVal := config.ErrorPage(gctx.DefaultQuery("error", string(config.ErrorPageInternalError)))
+	errVal := sconfig.ErrorPage(gctx.DefaultQuery("error", string(sconfig.ErrorPageInternalError)))
 
-	vals := config.ErrorTemplateValues{
+	vals := sconfig.ErrorTemplateValues{
 		Error: errVal,
 	}
 	r.cfg.GetRoot().ErrorPages.RenderErrorPage(gctx, vals)

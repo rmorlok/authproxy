@@ -13,6 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 type oAuth2Connection struct {
@@ -22,7 +23,7 @@ type oAuth2Connection struct {
 	connectors coreIface.C
 	encrypt    encrypt.E
 	logger     *slog.Logger
-	auth       *config.AuthOAuth2
+	auth       *sconfig.AuthOAuth2
 	httpf      httpf.F
 
 	connection coreIface.Connection
@@ -43,7 +44,7 @@ func newOAuth2(
 ) *oAuth2Connection {
 	cv := connection.GetConnectorVersionEntity()
 	connector := cv.GetDefinition()
-	auth, ok := connector.Auth.Inner().(*config.AuthOAuth2)
+	auth, ok := connector.Auth.Inner().(*sconfig.AuthOAuth2)
 	if !ok {
 		panic(fmt.Sprintf("connector id %s is not an oauth2 connector", connector.Id))
 	}

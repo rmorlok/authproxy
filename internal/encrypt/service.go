@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 type service struct {
@@ -28,11 +29,11 @@ func NewTestEncryptService(
 	db database.DB,
 ) (config.C, E) {
 	if cfg == nil {
-		cfg = config.FromRoot(&config.Root{})
+		cfg = config.FromRoot(&sconfig.Root{})
 	}
 
 	if cfg.GetRoot().SystemAuth.GlobalAESKey == nil {
-		cfg.GetRoot().SystemAuth.GlobalAESKey = &config.KeyData{InnerVal: &config.KeyDataRandomBytes{}}
+		cfg.GetRoot().SystemAuth.GlobalAESKey = &sconfig.KeyData{InnerVal: &sconfig.KeyDataRandomBytes{}}
 	}
 
 	return cfg, NewEncryptService(cfg, db)

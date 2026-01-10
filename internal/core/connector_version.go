@@ -9,9 +9,9 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/aplog"
-	cfg "github.com/rmorlok/authproxy/internal/config/connectors"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
@@ -22,7 +22,7 @@ type ConnectorVersion struct {
 
 	s     *service
 	defMu sync.RWMutex
-	def   *cfg.Connector
+	def   *cschema.Connector
 	l     *slog.Logger
 }
 
@@ -62,7 +62,7 @@ func (cv *ConnectorVersion) GetHash() string {
 	return cv.ConnectorVersion.Hash
 }
 
-func (cv *ConnectorVersion) GetDefinition() *cfg.Connector {
+func (cv *ConnectorVersion) GetDefinition() *cschema.Connector {
 	return util.Must(cv.getDefinition())
 }
 
@@ -74,7 +74,7 @@ func (cv *ConnectorVersion) GetUpdatedAt() time.Time {
 	return cv.ConnectorVersion.UpdatedAt
 }
 
-func (cv *ConnectorVersion) getDefinition() (*cfg.Connector, error) {
+func (cv *ConnectorVersion) getDefinition() (*cschema.Connector, error) {
 	cv.defMu.RLock()
 	defer cv.defMu.RUnlock()
 	if cv.def == nil {
@@ -83,7 +83,7 @@ func (cv *ConnectorVersion) getDefinition() (*cfg.Connector, error) {
 			return nil, err
 		}
 
-		var def cfg.Connector
+		var def cschema.Connector
 		err = json.Unmarshal([]byte(decrypted), &def)
 		if err != nil {
 			return nil, err
@@ -94,7 +94,7 @@ func (cv *ConnectorVersion) getDefinition() (*cfg.Connector, error) {
 	return cv.def, nil
 }
 
-func (cv *ConnectorVersion) setDefinition(def *cfg.Connector) error {
+func (cv *ConnectorVersion) setDefinition(def *cschema.Connector) error {
 	cv.defMu.Lock()
 	defer cv.defMu.Unlock()
 

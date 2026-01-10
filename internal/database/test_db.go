@@ -10,6 +10,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/config"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 // MustApplyBlankTestDbConfig applies a test database configuration to the specified config root. The database
@@ -39,7 +40,7 @@ func MustApplyBlankTestDbConfigRaw(testName string, cfg config.C) (config.C, DB,
 	}
 
 	if cfg == nil {
-		cfg = config.FromRoot(&config.Root{})
+		cfg = config.FromRoot(&sconfig.Root{})
 	}
 
 	root := cfg.GetRoot()
@@ -72,11 +73,11 @@ func MustApplyBlankTestDbConfigRaw(testName string, cfg config.C) (config.C, DB,
 		panic(err)
 	}
 
-	root.Database = &config.DatabaseSqlite{
+	root.Database = &sconfig.DatabaseSqlite{
 		Path: tempFilePath,
 	}
 	if root.SystemAuth.GlobalAESKey == nil {
-		root.SystemAuth.GlobalAESKey = &config.KeyData{InnerVal: &config.KeyDataRandomBytes{}}
+		root.SystemAuth.GlobalAESKey = &sconfig.KeyData{InnerVal: &sconfig.KeyDataRandomBytes{}}
 	}
 
 	db, err := NewConnectionForRoot(root, root.GetRootLogger())

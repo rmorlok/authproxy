@@ -3,10 +3,10 @@ package no_auth
 import (
 	"log/slog"
 
-	"github.com/rmorlok/authproxy/internal/config"
 	connIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 type noAuthConnection struct {

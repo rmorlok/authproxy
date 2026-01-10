@@ -12,6 +12,7 @@ import (
 	jwt2 "github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
 )
@@ -25,7 +26,7 @@ func TestAuth_Gin(t *testing.T) {
 			RegisteredClaims: jwt.RegisteredClaims{
 				ID:        "random id",
 				Issuer:    "remark42",
-				Audience:  []string{string(config.ServiceIdApi)},
+				Audience:  []string{string(sconfig.ServiceIdApi)},
 				ExpiresAt: nil,
 				NotBefore: nil,
 				IssuedAt:  &jwt.NumericDate{apctx.GetClock(ctx).Now()},
@@ -44,7 +45,7 @@ func TestAuth_Gin(t *testing.T) {
 			RegisteredClaims: jwt.RegisteredClaims{
 				ID:        "random id",
 				Issuer:    "remark42",
-				Audience:  []string{string(config.ServiceIdApi)},
+				Audience:  []string{string(sconfig.ServiceIdApi)},
 				ExpiresAt: nil,
 				NotBefore: nil,
 				IssuedAt:  &jwt.NumericDate{apctx.GetClock(ctx).Now()},
@@ -67,7 +68,7 @@ func TestAuth_Gin(t *testing.T) {
 
 	setup := func(t *testing.T, authMethod func(A) gin.HandlerFunc) *TestSetup {
 		cfg := config.FromRoot(&testConfigPublicPrivateKey)
-		cfg, auth, authUtil := TestAuthService(t, config.ServiceIdApi, cfg)
+		cfg, auth, authUtil := TestAuthService(t, sconfig.ServiceIdApi, cfg)
 		r := gin.Default()
 		r.GET("/", authMethod(auth), func(c *gin.Context) {
 			a := GetAuthFromGinContext(c)

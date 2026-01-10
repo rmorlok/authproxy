@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/request_log"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"gopkg.in/h2non/gentleman.v2"
 	"gopkg.in/h2non/gentleman.v2/plugins/transport"
 )
@@ -30,7 +31,7 @@ func CreateFactory(cfg config.C, r apredis.Client, logger *slog.Logger) F {
 		r:      r,
 		logger: logger,
 		requestInfo: request_log.RequestInfo{
-			Namespace: config.RootNamespace,
+			Namespace: sconfig.RootNamespace,
 			Type:      request_log.RequestTypeGlobal,
 		},
 	}
@@ -86,7 +87,7 @@ func (f *clientFactory) New() *gentleman.Client {
 		root := f.cfg.GetRoot()
 		if root.HttpLogging.IsEnabled() {
 			expiration := root.HttpLogging.GetRetention()
-			recordFullRequest := root.HttpLogging.GetFullRequestRecording() == config.FullRequestRecordingAlways
+			recordFullRequest := root.HttpLogging.GetFullRequestRecording() == sconfig.FullRequestRecordingAlways
 			maxFullRequestSize := root.HttpLogging.GetMaxRequestSize()
 			maxFullResponseSize := root.HttpLogging.GetMaxResponseSize()
 			maxResponseWait := root.HttpLogging.GetMaxResponseWait()

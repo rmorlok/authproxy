@@ -1,6 +1,9 @@
 package apredis
 
-import "github.com/rmorlok/authproxy/internal/config"
+import (
+	"github.com/rmorlok/authproxy/internal/config"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+)
 
 func MustApplyTestConfig(cfg config.C) (config.C, Client) {
 	// Avoid shared singletons for test cases, while still going through wireup logic
@@ -17,7 +20,7 @@ func MustApplyTestConfig(cfg config.C) (config.C, Client) {
 	miniredisErr = nil
 
 	if cfg == nil {
-		cfg = config.FromRoot(&config.Root{})
+		cfg = config.FromRoot(&sconfig.Root{})
 	}
 
 	root := cfg.GetRoot()
@@ -26,12 +29,12 @@ func MustApplyTestConfig(cfg config.C) (config.C, Client) {
 		panic("No root in config")
 	}
 
-	redisCfg := &config.RedisMiniredis{
-		Provider: config.RedisProviderMiniredis,
+	redisCfg := &sconfig.RedisMiniredis{
+		Provider: sconfig.RedisProviderMiniredis,
 	}
 	root.Redis = redisCfg
 	if root.SystemAuth.GlobalAESKey == nil {
-		root.SystemAuth.GlobalAESKey = &config.KeyData{InnerVal: &config.KeyDataRandomBytes{}}
+		root.SystemAuth.GlobalAESKey = &sconfig.KeyData{InnerVal: &sconfig.KeyDataRandomBytes{}}
 	}
 
 	r, err := NewMiniredis(redisCfg)

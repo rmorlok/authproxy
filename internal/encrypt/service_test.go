@@ -7,6 +7,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -15,8 +16,8 @@ func TestService(t *testing.T) {
 	someString := "some string"
 
 	t.Run("bad configuration", func(t *testing.T) {
-		cfg := config.FromRoot(&config.Root{
-			SystemAuth: config.SystemAuth{
+		cfg := config.FromRoot(&sconfig.Root{
+			SystemAuth: sconfig.SystemAuth{
 				GlobalAESKey: nil,
 			},
 		})
@@ -25,10 +26,10 @@ func TestService(t *testing.T) {
 		_, err := s.EncryptGlobal(context.Background(), someBytes)
 		require.Error(t, err)
 
-		cfg = config.FromRoot(&config.Root{
-			SystemAuth: config.SystemAuth{
-				GlobalAESKey: &config.KeyData{
-					InnerVal: &config.KeyDataEnvVar{
+		cfg = config.FromRoot(&sconfig.Root{
+			SystemAuth: sconfig.SystemAuth{
+				GlobalAESKey: &sconfig.KeyData{
+					InnerVal: &sconfig.KeyDataEnvVar{
 						EnvVar: "DOES_NOT_EXIST",
 					},
 				},
@@ -40,9 +41,9 @@ func TestService(t *testing.T) {
 		require.Error(t, err)
 	})
 
-	cfg := config.FromRoot(&config.Root{
-		SystemAuth: config.SystemAuth{
-			GlobalAESKey: config.NewKeyDataRandomBytes(),
+	cfg := config.FromRoot(&sconfig.Root{
+		SystemAuth: sconfig.SystemAuth{
+			GlobalAESKey: sconfig.NewKeyDataRandomBytes(),
 		},
 	})
 	cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)

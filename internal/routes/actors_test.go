@@ -20,6 +20,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/stretchr/testify/require"
 )
@@ -34,7 +35,7 @@ func TestActorsRoutes(t *testing.T) {
 
 	setup := func(t *testing.T, cfg config.C) (*TestSetup, func()) {
 		if cfg == nil {
-			cfg = config.FromRoot(&config.Root{})
+			cfg = config.FromRoot(&sconfig.Root{})
 		}
 
 		// Real DB for actors to simplify pagination/cursor behavior
@@ -42,7 +43,7 @@ func TestActorsRoutes(t *testing.T) {
 		// Real redis config (in-memory test) for httpf factory
 		cfg, rds := apredis.MustApplyTestConfig(cfg)
 		// Auth service bound to this DB
-		cfg, auth, authUtil := authService.TestAuthServiceWithDb(config.ServiceIdApi, cfg, db)
+		cfg, auth, authUtil := authService.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
 		// Test encrypt service and http factory
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
 		h := httpf.CreateFactory(cfg, rds, test_utils.NewTestLogger())

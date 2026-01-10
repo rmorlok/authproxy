@@ -7,11 +7,11 @@ import (
 	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/aplog"
-	cfg "github.com/rmorlok/authproxy/internal/config/connectors"
 	coreMock "github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	encryptmock "github.com/rmorlok/authproxy/internal/encrypt/mock"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -69,7 +69,7 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 	cv := wrapConnectorVersion(dbConnectorVersion, s)
 
 	// Create a connector definition
-	def := &cfg.Connector{
+	def := &cschema.Connector{
 		Type:        "test-connector",
 		DisplayName: "Test Connector",
 		Description: "A test connector",
@@ -118,7 +118,7 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 	cv := wrapConnectorVersion(dbConnectorVersion, s)
 
 	// Create a connector definition
-	def := &cfg.Connector{
+	def := &cschema.Connector{
 		Type:        "test-connector",
 		DisplayName: "Test Connector",
 		Description: "A test connector",
@@ -149,7 +149,7 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 }
 
 // NewTestConnectorVersion creates a new test connector version using provided connector configuration data.
-func NewTestConnectorVersion(c cfg.Connector) *ConnectorVersion {
+func NewTestConnectorVersion(c cschema.Connector) *ConnectorVersion {
 	e := encrypt.NewFakeEncryptService(false)
 	connectorId := uuid.New()
 	if c.Id != uuid.Nil {

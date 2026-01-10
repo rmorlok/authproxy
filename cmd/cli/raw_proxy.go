@@ -14,7 +14,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/cmd/cli/config"
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
-	server_config "github.com/rmorlok/authproxy/internal/config"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/spf13/cobra"
 )
 
@@ -117,11 +117,11 @@ func cmdRawProxy() *cobra.Command {
 			baseUrl := ""
 			if strings.HasPrefix(proxyTo, "http") {
 				baseUrl = proxyTo
-			} else if proxyTo == string(server_config.ServiceIdApi) {
+			} else if proxyTo == string(sconfig.ServiceIdApi) {
 				baseUrl, err = resolver.ResolveApiUrl()
-			} else if proxyTo == string(server_config.ServiceIdPublic) {
+			} else if proxyTo == string(sconfig.ServiceIdPublic) {
 				baseUrl, err = resolver.ResolveAuthUrl()
-			} else if proxyTo == string(server_config.ServiceIdAdminApi) {
+			} else if proxyTo == string(sconfig.ServiceIdAdminApi) {
 				baseUrl, err = resolver.ResolveAdminApiUrl()
 			}
 

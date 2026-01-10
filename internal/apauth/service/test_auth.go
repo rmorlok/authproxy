@@ -18,6 +18,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
@@ -25,10 +26,10 @@ import (
 type AuthTestUtil struct {
 	cfg       config.C
 	s         *service
-	serviceId config.ServiceId
+	serviceId sconfig.ServiceId
 }
 
-func TestAuthService(t *testing.T, serviceId config.ServiceId, cfg config.C) (config.C, A, *AuthTestUtil) {
+func TestAuthService(t *testing.T, serviceId sconfig.ServiceId, cfg config.C) (config.C, A, *AuthTestUtil) {
 	testName := "unknown"
 	if t != nil {
 		testName = t.Name()
@@ -38,9 +39,9 @@ func TestAuthService(t *testing.T, serviceId config.ServiceId, cfg config.C) (co
 	return TestAuthServiceWithDb(serviceId, cfg, db)
 }
 
-func TestAuthServiceWithDb(serviceId config.ServiceId, cfg config.C, db database.DB) (config.C, A, *AuthTestUtil) {
+func TestAuthServiceWithDb(serviceId sconfig.ServiceId, cfg config.C, db database.DB) (config.C, A, *AuthTestUtil) {
 	if cfg == nil {
-		cfg = config.FromRoot(&config.Root{})
+		cfg = config.FromRoot(&sconfig.Root{})
 	}
 
 	root := cfg.GetRoot()
@@ -49,12 +50,12 @@ func TestAuthServiceWithDb(serviceId config.ServiceId, cfg config.C, db database
 	}
 
 	if root.SystemAuth.GlobalAESKey == nil {
-		root.SystemAuth.GlobalAESKey = config.NewKeyDataRandomBytes()
+		root.SystemAuth.GlobalAESKey = sconfig.NewKeyDataRandomBytes()
 	}
 	if root.SystemAuth.JwtSigningKey == nil {
-		root.SystemAuth.JwtSigningKey = &config.Key{
-			InnerVal: &config.KeyShared{
-				SharedKey: config.NewKeyDataRandomBytes(),
+		root.SystemAuth.JwtSigningKey = &sconfig.Key{
+			InnerVal: &sconfig.KeyShared{
+				SharedKey: sconfig.NewKeyDataRandomBytes(),
 			},
 		}
 	}
@@ -63,7 +64,7 @@ func TestAuthServiceWithDb(serviceId config.ServiceId, cfg config.C, db database
 	s := cfg.MustGetService(serviceId)
 	e := encrypt.NewFakeEncryptService(false)
 
-	hs := NewService(cfg, s.(config.HttpService), db, r, e, cfg.GetRootLogger())
+	hs := NewService(cfg, s.(sconfig.HttpService), db, r, e, cfg.GetRootLogger())
 
 	return cfg, hs, &AuthTestUtil{cfg: cfg, s: hs.(*service), serviceId: serviceId}
 }

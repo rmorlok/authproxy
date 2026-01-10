@@ -1,7 +1,7 @@
 package core
 
 import (
-	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 // getRevokeCredentialsOperations returns the operations that can be performed to revoke credentials for this

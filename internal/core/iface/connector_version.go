@@ -4,8 +4,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	cfg "github.com/rmorlok/authproxy/internal/config/connectors"
 	"github.com/rmorlok/authproxy/internal/database"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
 type ConnectorVersion interface {
@@ -17,5 +17,5 @@ type ConnectorVersion interface {
 	GetHash() string
 	GetCreatedAt() time.Time
 	GetUpdatedAt() time.Time
-	GetDefinition() *cfg.Connector
+	GetDefinition() *cschema.Connector
 }

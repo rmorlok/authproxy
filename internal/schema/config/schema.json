@@ -1,0 +1,367 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/config/schema.json",
+  "$defs": {
+    "Connectors": {
+      "properties": {
+        "auto_migrate": {
+          "type": "boolean"
+        },
+        "auto_migration_lock_duration": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "load_from_list": {
+          "items": {
+            "$ref": "../connectors/schema.json"
+          },
+          "type": "array"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "CookieConfig": {
+      "properties": {
+        "domain": {
+          "type": "string"
+        },
+        "same_site": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "CorsConfig": {
+      "properties": {
+        "allowed_origins": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "allowed_methods": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "allowed_headers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "exposed_headers": {
+          "items": {
+            "type": "string"
+          },
+          "type": "array"
+        },
+        "max_age": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "allow_credentials": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "DevSettings": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "fake_encryption": {
+          "type": "boolean"
+        },
+        "fake_encryption_skip_base64": {
+          "type": "boolean"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ErrorPages": {
+      "properties": {
+        "not_found": {
+          "type": "string"
+        },
+        "unauthorized": {
+          "type": "string"
+        },
+        "internal_error": {
+          "type": "string"
+        },
+        "template": true
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "HostApplication": {
+      "properties": {
+        "initiate_session_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "HttpLogging": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "auto_migrate": {
+          "type": "boolean"
+        },
+        "retention": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "max_request_size": {
+          "$ref": "../common/schema.json#/$defs/HumanByteSize"
+        },
+        "max_response_size": {
+          "$ref": "../common/schema.json#/$defs/HumanByteSize"
+        },
+        "max_response_wait": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "full_request_recording": {
+          "type": "string"
+        },
+        "full_request_retention": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "Marketplace": {
+      "properties": {
+        "base_url": true
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "OAuth": {
+      "properties": {
+        "initiate_to_redirect_ttl": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "round_trip_ttl": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "refresh_tokens_in_background": {
+          "type": "boolean"
+        },
+        "refresh_tokens_time_before_expiry": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "refresh_tokens_cron_schedule": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ServiceAdminApi": {
+      "properties": {
+        "health_check_port": true,
+        "port": true,
+        "domain": {
+          "type": "string"
+        },
+        "https": {
+          "type": "boolean"
+        },
+        "cors": {
+          "$ref": "#/$defs/CorsConfig"
+        },
+        "tls": true,
+        "ui": {
+          "$ref": "#/$defs/ServiceAdminUi"
+        },
+        "session_timeout": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "xsrf_request_queue_depth": {
+          "type": "integer"
+        },
+        "static": {
+          "$ref": "#/$defs/ServicePublicStaticContentConfig"
+        },
+        "cookie": {
+          "$ref": "#/$defs/CookieConfig"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ServiceAdminUi": {
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "base_url": true,
+        "initiate_session_url": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ServiceApi": {
+      "properties": {
+        "health_check_port": true,
+        "port": true,
+        "domain": {
+          "type": "string"
+        },
+        "https": {
+          "type": "boolean"
+        },
+        "cors": {
+          "$ref": "#/$defs/CorsConfig"
+        },
+        "tls": true
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ServicePublic": {
+      "properties": {
+        "health_check_port": true,
+        "port": {
+          "type": "integer"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "https": {
+          "type": "boolean"
+        },
+        "cors": {
+          "$ref": "#/$defs/CorsConfig"
+        },
+        "tls": true,
+        "session_timeout": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "xsrf_request_queue_depth": {
+          "type": "integer"
+        },
+        "enable_marketplace_apis": {
+          "type": "boolean"
+        },
+        "enable_proxy": {
+          "type": "boolean"
+        },
+        "static": {
+          "$ref": "#/$defs/ServicePublicStaticContentConfig"
+        },
+        "cookie": {
+          "$ref": "#/$defs/CookieConfig"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ServicePublicStaticContentConfig": {
+      "properties": {
+        "mount_at": {
+          "type": "string"
+        },
+        "serve_from": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ServiceWorker": {
+      "properties": {
+        "health_check_port": {
+          "$ref": "../common/schema.json#/$defs/StringValueNumber",
+          "description": "The port on which the worker will listen for health checks."
+        },
+        "concurrency": {
+          "$ref": "../common/schema.json#/$defs/StringValue",
+          "description": "The number of concurrent tasks that a single instance of the worker will run. If not set, the default is 0, which means that the worker will use the number of CPUs to be the maximum number of parallel tasks."
+        },
+        "cron_sync_interval": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration",
+          "description": "The interval at which the the system will sync the list of cron tasks. Cron tasks are both global and connection specific. If not set, the default is every 5 minutes."
+        }
+      },
+      "required": ["health_check_port"],
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "SystemAuth": {
+      "properties": {
+        "jwt_signing_key": true,
+        "jwt_issuer": {
+          "type": "string"
+        },
+        "jwt_token_duration": {
+          "type": "integer"
+        },
+        "disable_xsrf": {
+          "type": "boolean"
+        },
+        "admin_users": true,
+        "admin_email_domain": {
+          "type": "string"
+        },
+        "global_aes_key": true
+      },
+      "additionalProperties": false,
+      "type": "object"
+    }
+  },
+  "properties": {
+    "admin_api": {
+      "$ref": "#/$defs/ServiceAdminApi"
+    },
+    "api": {
+      "$ref": "#/$defs/ServiceApi"
+    },
+    "public": {
+      "$ref": "#/$defs/ServicePublic"
+    },
+    "worker": {
+      "$ref": "#/$defs/ServiceWorker"
+    },
+    "marketplace": {
+      "$ref": "#/$defs/Marketplace"
+    },
+    "host_application": {
+      "$ref": "#/$defs/HostApplication"
+    },
+    "system_auth": {
+      "$ref": "#/$defs/SystemAuth"
+    },
+    "database": true,
+    "logging": true,
+    "redis": true,
+    "oauth": {
+      "$ref": "#/$defs/OAuth"
+    },
+    "error_pages": {
+      "$ref": "#/$defs/ErrorPages"
+    },
+    "connectors": {
+      "$ref": "#/$defs/Connectors"
+    },
+    "http_logging": {
+      "$ref": "#/$defs/HttpLogging"
+    },
+    "dev_settings": {
+      "$ref": "#/$defs/DevSettings"
+    }
+  },
+  "additionalProperties": false,
+  "type": "object"
+}

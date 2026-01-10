@@ -17,6 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
@@ -31,7 +32,7 @@ func pathToTestData(path string) string {
 func TestAuth_Token(t *testing.T) {
 	t.Parallel()
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
+	j := NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 
 	res, err := j.Token(testContext, testClaims())
 	require.NoError(t, err)
@@ -44,13 +45,13 @@ func TestAuth_Token(t *testing.T) {
 func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 	t.Parallel()
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
+	j := NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 
 	claims := jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        "random id",
 			Issuer:    "remark42",
-			Audience:  []string{string(config.ServiceIdAdminApi)},
+			Audience:  []string{string(sconfig.ServiceIdAdminApi)},
 			ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
 			NotBefore: &jwt.NumericDate{time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
 			IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
@@ -102,13 +103,13 @@ func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 func TestAuth_RoundtripPublicPrivate(t *testing.T) {
 	t.Parallel()
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
+	j := NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 
 	claims := jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        "random id",
 			Issuer:    "remark42",
-			Audience:  []string{string(config.ServiceIdAdminApi)},
+			Audience:  []string{string(sconfig.ServiceIdAdminApi)},
 			ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
 			NotBefore: &jwt.NumericDate{time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
 			IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
@@ -138,13 +139,13 @@ func TestAuth_RoundtripPublicPrivate(t *testing.T) {
 func TestAuth_SecretKey(t *testing.T) {
 	t.Parallel()
 	cfg := config.FromRoot(&testConfigSecretKey)
-	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
+	j := NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 
 	claims := jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        "random id",
 			Issuer:    "remark42",
-			Audience:  []string{string(config.ServiceIdAdminApi)},
+			Audience:  []string{string(sconfig.ServiceIdAdminApi)},
 			ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
 			NotBefore: &jwt.NumericDate{time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
 			IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
@@ -179,7 +180,7 @@ func TestAuth_SecretKey(t *testing.T) {
 func TestAuth_Parse(t *testing.T) {
 	t.Parallel()
 	cfg := config.FromRoot(&testConfigPublicPrivateKey)
-	j := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
+	j := NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 	t.Run("valid", func(t *testing.T) {
 		tok, err := j.Token(testContext, testClaims())
 		require.NoError(t, err)
@@ -195,7 +196,7 @@ func TestAuth_Parse(t *testing.T) {
 			RegisteredClaims: jwt.RegisteredClaims{
 				ID:        "random id",
 				Issuer:    "remark42",
-				Audience:  []string{string(config.ServiceIdAdminApi)},
+				Audience:  []string{string(sconfig.ServiceIdAdminApi)},
 				ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
 				NotBefore: &jwt.NumericDate{time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
 				IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
@@ -224,7 +225,7 @@ func TestAuth_Parse(t *testing.T) {
 			RegisteredClaims: jwt.RegisteredClaims{
 				ID:        "random id",
 				Issuer:    "remark42",
-				Audience:  []string{string(config.ServiceIdAdminApi)},
+				Audience:  []string{string(sconfig.ServiceIdAdminApi)},
 				ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
 				NotBefore: &jwt.NumericDate{time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
 				IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
@@ -265,32 +266,32 @@ func TestAuth_Parse(t *testing.T) {
 		_, err = serv1.Parse(testContext, tokServ1)
 		require.NoError(t, err)
 
-		cfg := config.FromRoot(&config.Root{
-			SystemAuth: config.SystemAuth{
+		cfg := config.FromRoot(&sconfig.Root{
+			SystemAuth: sconfig.SystemAuth{
 				JwtTokenDurationVal: 12 * time.Hour,
 				JwtIssuerVal:        "example",
-				JwtSigningKey: &config.Key{
-					InnerVal: &config.KeyPublicPrivate{
-						PublicKey: &config.KeyData{
-							InnerVal: &config.KeyDataFile{
+				JwtSigningKey: &sconfig.Key{
+					InnerVal: &sconfig.KeyPublicPrivate{
+						PublicKey: &sconfig.KeyData{
+							InnerVal: &sconfig.KeyDataFile{
 								Path: pathToTestData("system_keys/other-system.pub"),
 							},
 						},
-						PrivateKey: &config.KeyData{
-							InnerVal: &config.KeyDataFile{
+						PrivateKey: &sconfig.KeyData{
+							InnerVal: &sconfig.KeyDataFile{
 								Path: pathToTestData("system_keys/other-system"),
 							},
 						},
 					},
 				},
 			},
-			AdminApi: config.ServiceAdminApi{
-				ServiceHttp: config.ServiceHttp{
-					PortVal: &config.StringValue{&config.StringValueDirect{Value: "8080"}},
+			AdminApi: sconfig.ServiceAdminApi{
+				ServiceHttp: sconfig.ServiceHttp{
+					PortVal: &sconfig.StringValue{&sconfig.StringValueDirect{Value: "8080"}},
 				},
 			},
 		})
-		serv2 := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
+		serv2 := NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 
 		tb2, err := jwt2.NewJwtTokenBuilder().WithConfigKey(testContext, cfg.GetRoot().SystemAuth.JwtSigningKey)
 		require.NoError(t, err)
@@ -312,16 +313,16 @@ func TestAuth_Parse(t *testing.T) {
 	})
 
 	t.Run("admin", func(t *testing.T) {
-		cfg := config.FromRoot(&config.Root{
-			SystemAuth: config.SystemAuth{
-				AdminUsers: &config.AdminUsers{
-					InnerVal: &config.AdminUsersList{
-						&config.AdminUser{
+		cfg := config.FromRoot(&sconfig.Root{
+			SystemAuth: sconfig.SystemAuth{
+				AdminUsers: &sconfig.AdminUsers{
+					InnerVal: &sconfig.AdminUsersList{
+						&sconfig.AdminUser{
 							Username: "bobdole",
-							Key: &config.Key{
-								InnerVal: &config.KeyPublicPrivate{
-									PublicKey: &config.KeyData{
-										InnerVal: &config.KeyDataFile{
+							Key: &sconfig.Key{
+								InnerVal: &sconfig.KeyPublicPrivate{
+									PublicKey: &sconfig.KeyData{
+										InnerVal: &sconfig.KeyDataFile{
 											Path: pathToTestData("admin_user_keys/bobdole.pub"),
 										},
 									},
@@ -332,28 +333,28 @@ func TestAuth_Parse(t *testing.T) {
 				},
 				JwtTokenDurationVal: 12 * time.Hour,
 				JwtIssuerVal:        "example",
-				JwtSigningKey: &config.Key{
-					&config.KeyPublicPrivate{
-						PublicKey: &config.KeyData{
-							InnerVal: &config.KeyDataFile{
+				JwtSigningKey: &sconfig.Key{
+					&sconfig.KeyPublicPrivate{
+						PublicKey: &sconfig.KeyData{
+							InnerVal: &sconfig.KeyDataFile{
 								Path: pathToTestData("system_keys/other-system.pub"),
 							},
 						},
-						PrivateKey: &config.KeyData{
-							InnerVal: &config.KeyDataFile{
+						PrivateKey: &sconfig.KeyData{
+							InnerVal: &sconfig.KeyDataFile{
 								Path: pathToTestData("system_keys/other-system"),
 							},
 						},
 					},
 				},
 			},
-			AdminApi: config.ServiceAdminApi{
-				ServiceHttp: config.ServiceHttp{
-					PortVal: &config.StringValue{&config.StringValueDirect{Value: "8080"}},
+			AdminApi: sconfig.ServiceAdminApi{
+				ServiceHttp: sconfig.ServiceHttp{
+					PortVal: &sconfig.StringValue{&sconfig.StringValueDirect{Value: "8080"}},
 				},
 			},
 		})
-		adminSrv := NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), nil, nil, nil, test_utils.NewTestLogger())
+		adminSrv := NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), nil, nil, nil, test_utils.NewTestLogger())
 
 		t.Run("valid", func(t *testing.T) {
 			token, err := jwt2.NewJwtTokenBuilder().
@@ -361,7 +362,7 @@ func TestAuth_Parse(t *testing.T) {
 				WithActorEmail("bobdole@example.com").
 				WithPrivateKeyPath(pathToTestData("admin_user_keys/bobdole")).
 				WithAdmin().
-				WithAudience(string(config.ServiceIdAdminApi)).
+				WithAudience(string(sconfig.ServiceIdAdminApi)).
 				TokenCtx(testContext)
 			require.NoError(t, err)
 
@@ -407,7 +408,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 	setup := func(t *testing.T) {
 		cfg := config.FromRoot(&testConfigPublicPrivateKey)
 		cfg, db = database.MustApplyBlankTestDbConfig(t.Name(), cfg)
-		a = NewService(cfg, cfg.MustGetService(config.ServiceIdAdminApi).(config.HttpService), db, nil, nil, test_utils.NewTestLogger())
+		a = NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), db, nil, nil, test_utils.NewTestLogger())
 		raw = a.(*service)
 	}
 
@@ -574,7 +575,7 @@ func TestAuth_Nonce(t *testing.T) {
 
 	setup := func(t *testing.T) *TestSetup {
 		cfg := config.FromRoot(&testConfigPublicPrivateKey)
-		cfg, auth, authUtil := TestAuthService(t, config.ServiceIdAdminApi, cfg)
+		cfg, auth, authUtil := TestAuthService(t, sconfig.ServiceIdAdminApi, cfg)
 		r := gin.Default()
 		r.GET("/", auth.Required(), func(c *gin.Context) {
 			ra := MustGetAuthFromGinContext(c)
@@ -693,7 +694,7 @@ func testClaims() *jwt2.AuthProxyClaims {
 			ID:        "random id",
 			Subject:   "id1",
 			Issuer:    "remark42",
-			Audience:  []string{string(config.ServiceIdAdminApi)},
+			Audience:  []string{string(sconfig.ServiceIdAdminApi)},
 			ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
 			NotBefore: &jwt.NumericDate{time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
 			IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
@@ -706,37 +707,37 @@ func testClaims() *jwt2.AuthProxyClaims {
 	}
 }
 
-var testConfigPublicPrivateKey = config.Root{
-	SystemAuth: config.SystemAuth{
+var testConfigPublicPrivateKey = sconfig.Root{
+	SystemAuth: sconfig.SystemAuth{
 		JwtTokenDurationVal: 12 * time.Hour,
 		JwtIssuerVal:        "example",
-		JwtSigningKey: &config.Key{
-			InnerVal: &config.KeyPublicPrivate{
-				PublicKey: &config.KeyData{
-					InnerVal: &config.KeyDataFile{
+		JwtSigningKey: &sconfig.Key{
+			InnerVal: &sconfig.KeyPublicPrivate{
+				PublicKey: &sconfig.KeyData{
+					InnerVal: &sconfig.KeyDataFile{
 						Path: pathToTestData("system_keys/system.pub"),
 					},
 				},
-				PrivateKey: &config.KeyData{
-					InnerVal: &config.KeyDataFile{
+				PrivateKey: &sconfig.KeyData{
+					InnerVal: &sconfig.KeyDataFile{
 						Path: pathToTestData("system_keys/system"),
 					},
 				},
 			},
 		},
-		AdminUsers: &config.AdminUsers{
-			InnerVal: config.AdminUsersList{
-				&config.AdminUser{
+		AdminUsers: &sconfig.AdminUsers{
+			InnerVal: sconfig.AdminUsersList{
+				&sconfig.AdminUser{
 					Username: "aid1",
-					Key: &config.Key{
-						InnerVal: &config.KeyPublicPrivate{
-							PublicKey: &config.KeyData{
-								InnerVal: &config.KeyDataFile{
+					Key: &sconfig.Key{
+						InnerVal: &sconfig.KeyPublicPrivate{
+							PublicKey: &sconfig.KeyData{
+								InnerVal: &sconfig.KeyDataFile{
 									Path: pathToTestData("system_keys/system.pub"),
 								},
 							},
-							PrivateKey: &config.KeyData{
-								InnerVal: &config.KeyDataFile{
+							PrivateKey: &sconfig.KeyData{
+								InnerVal: &sconfig.KeyDataFile{
 									Path: pathToTestData("system_keys/system"),
 								},
 							},
@@ -745,41 +746,41 @@ var testConfigPublicPrivateKey = config.Root{
 				},
 			},
 		},
-		GlobalAESKey: &config.KeyData{
-			InnerVal: &config.KeyDataBase64Val{
+		GlobalAESKey: &sconfig.KeyData{
+			InnerVal: &sconfig.KeyDataBase64Val{
 				Base64: "tOqE5HtiujnwB7pXt6lQLH8/gCh6TmMq9uSLFtJxZtU=",
 			},
 		},
 	},
-	AdminApi: config.ServiceAdminApi{
-		ServiceHttp: config.ServiceHttp{
-			PortVal: &config.StringValue{&config.StringValueDirect{Value: "8080"}},
+	AdminApi: sconfig.ServiceAdminApi{
+		ServiceHttp: sconfig.ServiceHttp{
+			PortVal: &sconfig.StringValue{&sconfig.StringValueDirect{Value: "8080"}},
 		},
 	},
 }
 
-var testConfigSecretKey = config.Root{
-	SystemAuth: config.SystemAuth{
+var testConfigSecretKey = sconfig.Root{
+	SystemAuth: sconfig.SystemAuth{
 		JwtTokenDurationVal: 12 * time.Hour,
 		JwtIssuerVal:        "example",
-		JwtSigningKey: &config.Key{
-			InnerVal: &config.KeyShared{
-				SharedKey: &config.KeyData{
-					InnerVal: &config.KeyDataBase64Val{
+		JwtSigningKey: &sconfig.Key{
+			InnerVal: &sconfig.KeyShared{
+				SharedKey: &sconfig.KeyData{
+					InnerVal: &sconfig.KeyDataBase64Val{
 						Base64: "+xKbTv+pdvWK+4ucIsUcAHqzEhelLWuud80+fy1pQzc=",
 					},
 				},
 			},
 		},
-		GlobalAESKey: &config.KeyData{
-			InnerVal: &config.KeyDataBase64Val{
+		GlobalAESKey: &sconfig.KeyData{
+			InnerVal: &sconfig.KeyDataBase64Val{
 				Base64: "tOqE5HtiujnwB7pXt6lQLH8/gCh6TmMq9uSLFtJxZtU=",
 			},
 		},
 	},
-	AdminApi: config.ServiceAdminApi{
-		ServiceHttp: config.ServiceHttp{
-			PortVal: &config.StringValue{&config.StringValueDirect{Value: "8080"}},
+	AdminApi: sconfig.ServiceAdminApi{
+		ServiceHttp: sconfig.ServiceHttp{
+			PortVal: &sconfig.StringValue{&sconfig.StringValueDirect{Value: "8080"}},
 		},
 	},
 }

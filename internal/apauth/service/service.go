@@ -7,12 +7,13 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 // service is the implementation of the core auth service.
 type service struct {
 	config                config.C
-	service               config.HttpService
+	service               sconfig.HttpService
 	db                    database.DB
 	r                     apredis.Client
 	encrypt               encrypt.E
@@ -21,7 +22,7 @@ type service struct {
 }
 
 // NewService makes an auth service
-func NewService(cfg config.C, svc config.HttpService, db database.DB, r apredis.Client, e encrypt.E, logger *slog.Logger) A {
+func NewService(cfg config.C, svc sconfig.HttpService, db database.DB, r apredis.Client, e encrypt.E, logger *slog.Logger) A {
 	if cfg == nil {
 		panic("config is required")
 	}
