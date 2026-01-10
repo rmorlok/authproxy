@@ -1,14 +1,9 @@
 package core
 
 import (
-	"regexp"
-
 	"github.com/google/uuid"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
-
-var reValidSha = regexp.MustCompile("^[a-fA-F0-9]{40}$")
-var reValidCrc64 = regexp.MustCompile("^[a-fA-F0-9]{16}$")
 
 type IActorData interface {
 	GetId() uuid.UUID
