@@ -12,7 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/api_common"
-	"github.com/rmorlok/authproxy/internal/schema/common"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -85,10 +85,10 @@ func (ns *Namespace) Validate() error {
 }
 
 var (
-	ValidateNamespacePath        = common.ValidateNamespacePath
-	ValidateNamespaceMatcher     = common.ValidateNamespaceMatcher
-	SplitNamespacePathToPrefixes = common.SplitNamespacePathToPrefixes
-	DepthOfNamespacePath         = common.DepthOfNamespacePath
+	ValidateNamespacePath        = aschema.ValidateNamespacePath
+	ValidateNamespaceMatcher     = aschema.ValidateNamespaceMatcher
+	SplitNamespacePathToPrefixes = aschema.SplitNamespacePathToPrefixes
+	DepthOfNamespacePath         = aschema.DepthOfNamespacePath
 )
 
 // restrictToNamespaceMatcher applies a restriction where the query must match the namespace matcher.
@@ -420,10 +420,10 @@ func (l *listNamespacesFilters) applyRestrictions(ctx context.Context) sq.Select
 	}
 
 	if l.PathPrefixVal != "" {
-		if len(l.PathPrefixVal) >= 2 && string(l.PathPrefixVal[len(l.PathPrefixVal)-1]) == common.NamespacePathSeparator {
+		if len(l.PathPrefixVal) >= 2 && string(l.PathPrefixVal[len(l.PathPrefixVal)-1]) == aschema.NamespacePathSeparator {
 			q = q.Where("(path = ? OR path LIKE ?)", l.PathPrefixVal[:len(l.PathPrefixVal)-2], l.PathPrefixVal+"%")
 		} else {
-			q = q.Where("(path = ? OR path LIKE ?)", l.PathPrefixVal, l.PathPrefixVal+common.NamespacePathSeparator+"%")
+			q = q.Where("(path = ? OR path LIKE ?)", l.PathPrefixVal, l.PathPrefixVal+aschema.NamespacePathSeparator+"%")
 		}
 	}
 

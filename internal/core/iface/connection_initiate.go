@@ -5,7 +5,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
-	"github.com/rmorlok/authproxy/internal/schema/common"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
 type InitiateConnectionRequest struct {
@@ -31,7 +31,7 @@ func (icr *InitiateConnectionRequest) Validate() error {
 	}
 
 	if icr.HasIntoNamespace() {
-		if err := common.ValidateNamespacePath(icr.IntoNamespace); err != nil {
+		if err := aschema.ValidateNamespacePath(icr.IntoNamespace); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}

@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/google/uuid"
-	"github.com/rmorlok/authproxy/internal/schema/common"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/stretchr/testify/require"
 )
 
@@ -39,7 +39,7 @@ func TestRequestAuth_Allows(t *testing.T) {
 			ra: NewAuthenticatedRequestAuth(&Actor{
 				Id:         uuid.New(),
 				ExternalId: "user",
-				Permissions: []common.Permission{
+				Permissions: []aschema.Permission{
 					{
 						Namespace: "root",
 						Resources: []string{"connections"},
@@ -57,7 +57,7 @@ func TestRequestAuth_Allows(t *testing.T) {
 			ra: NewAuthenticatedRequestAuth(&Actor{
 				Id:         uuid.New(),
 				ExternalId: "user",
-				Permissions: []common.Permission{
+				Permissions: []aschema.Permission{
 					{
 						Namespace: "root",
 						Resources: []string{"connectors"},
@@ -75,7 +75,7 @@ func TestRequestAuth_Allows(t *testing.T) {
 			ra: NewAuthenticatedRequestAuth(&Actor{
 				Id:         uuid.New(),
 				ExternalId: "user",
-				Permissions: []common.Permission{
+				Permissions: []aschema.Permission{
 					{
 						Namespace: "root.**",
 						Resources: []string{"connections"},
@@ -93,7 +93,7 @@ func TestRequestAuth_Allows(t *testing.T) {
 			ra: NewAuthenticatedRequestAuth(&Actor{
 				Id:         uuid.New(),
 				ExternalId: "user",
-				Permissions: []common.Permission{
+				Permissions: []aschema.Permission{
 					{
 						Namespace: "root",
 						Resources: []string{"*"},
@@ -111,7 +111,7 @@ func TestRequestAuth_Allows(t *testing.T) {
 			ra: NewAuthenticatedRequestAuth(&Actor{
 				Id:         uuid.New(),
 				ExternalId: "user",
-				Permissions: []common.Permission{
+				Permissions: []aschema.Permission{
 					{
 						Namespace: "root",
 						Resources: []string{"connections"},
@@ -129,7 +129,7 @@ func TestRequestAuth_Allows(t *testing.T) {
 			ra: NewAuthenticatedRequestAuth(&Actor{
 				Id:         uuid.New(),
 				ExternalId: "user",
-				Permissions: []common.Permission{
+				Permissions: []aschema.Permission{
 					{
 						Namespace:   "root",
 						Resources:   []string{"connections"},
@@ -149,7 +149,7 @@ func TestRequestAuth_Allows(t *testing.T) {
 			ra: NewAuthenticatedRequestAuth(&Actor{
 				Id:         uuid.New(),
 				ExternalId: "user",
-				Permissions: []common.Permission{
+				Permissions: []aschema.Permission{
 					{
 						Namespace:   "root",
 						Resources:   []string{"connections"},
@@ -177,8 +177,8 @@ func TestRequestAuth_Allows(t *testing.T) {
 func TestRequestAuth_AllowsWithRequestPermissions(t *testing.T) {
 	tests := []struct {
 		name               string
-		actorPermissions   []common.Permission
-		requestPermissions []common.Permission
+		actorPermissions   []aschema.Permission
+		requestPermissions []aschema.Permission
 		namespace          string
 		resource           string
 		verb               string
@@ -187,7 +187,7 @@ func TestRequestAuth_AllowsWithRequestPermissions(t *testing.T) {
 	}{
 		{
 			name: "actor allowed, no request permissions",
-			actorPermissions: []common.Permission{
+			actorPermissions: []aschema.Permission{
 				{
 					Namespace: "root.**",
 					Resources: []string{"*"},
@@ -202,14 +202,14 @@ func TestRequestAuth_AllowsWithRequestPermissions(t *testing.T) {
 		},
 		{
 			name: "actor allowed, request permissions also allowed",
-			actorPermissions: []common.Permission{
+			actorPermissions: []aschema.Permission{
 				{
 					Namespace: "root.**",
 					Resources: []string{"*"},
 					Verbs:     []string{"*"},
 				},
 			},
-			requestPermissions: []common.Permission{
+			requestPermissions: []aschema.Permission{
 				{
 					Namespace: "root.foo",
 					Resources: []string{"connections"},
@@ -223,14 +223,14 @@ func TestRequestAuth_AllowsWithRequestPermissions(t *testing.T) {
 		},
 		{
 			name: "actor allowed, request permissions restrict namespace",
-			actorPermissions: []common.Permission{
+			actorPermissions: []aschema.Permission{
 				{
 					Namespace: "root.**",
 					Resources: []string{"*"},
 					Verbs:     []string{"*"},
 				},
 			},
-			requestPermissions: []common.Permission{
+			requestPermissions: []aschema.Permission{
 				{
 					Namespace: "root.foo",
 					Resources: []string{"connections"},
@@ -244,14 +244,14 @@ func TestRequestAuth_AllowsWithRequestPermissions(t *testing.T) {
 		},
 		{
 			name: "actor allowed, request permissions restrict resource",
-			actorPermissions: []common.Permission{
+			actorPermissions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"*"},
 					Verbs:     []string{"*"},
 				},
 			},
-			requestPermissions: []common.Permission{
+			requestPermissions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"connections"},
@@ -265,14 +265,14 @@ func TestRequestAuth_AllowsWithRequestPermissions(t *testing.T) {
 		},
 		{
 			name: "actor allowed, request permissions restrict verb",
-			actorPermissions: []common.Permission{
+			actorPermissions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"connections"},
 					Verbs:     []string{"*"},
 				},
 			},
-			requestPermissions: []common.Permission{
+			requestPermissions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"connections"},
@@ -286,14 +286,14 @@ func TestRequestAuth_AllowsWithRequestPermissions(t *testing.T) {
 		},
 		{
 			name: "actor allowed, request permissions restrict resource id",
-			actorPermissions: []common.Permission{
+			actorPermissions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"connections"},
 					Verbs:     []string{"*"},
 				},
 			},
-			requestPermissions: []common.Permission{
+			requestPermissions: []aschema.Permission{
 				{
 					Namespace:   "root",
 					Resources:   []string{"connections"},
@@ -309,14 +309,14 @@ func TestRequestAuth_AllowsWithRequestPermissions(t *testing.T) {
 		},
 		{
 			name: "actor not allowed, request permissions would allow",
-			actorPermissions: []common.Permission{
+			actorPermissions: []aschema.Permission{
 				{
 					Namespace: "root.other",
 					Resources: []string{"connections"},
 					Verbs:     []string{"get"},
 				},
 			},
-			requestPermissions: []common.Permission{
+			requestPermissions: []aschema.Permission{
 				{
 					Namespace: "root.**",
 					Resources: []string{"*"},
@@ -381,7 +381,7 @@ func TestRequestAuth_AllowsReason(t *testing.T) {
 			ra: NewAuthenticatedRequestAuth(&Actor{
 				Id:         uuid.New(),
 				ExternalId: "user",
-				Permissions: []common.Permission{
+				Permissions: []aschema.Permission{
 					{
 						Namespace: "root.other",
 						Resources: []string{"connections"},
@@ -401,7 +401,7 @@ func TestRequestAuth_AllowsReason(t *testing.T) {
 				&Actor{
 					Id:         uuid.New(),
 					ExternalId: "user",
-					Permissions: []common.Permission{
+					Permissions: []aschema.Permission{
 						{
 							Namespace: "root.**",
 							Resources: []string{"*"},
@@ -409,7 +409,7 @@ func TestRequestAuth_AllowsReason(t *testing.T) {
 						},
 					},
 				},
-				[]common.Permission{
+				[]aschema.Permission{
 					{
 						Namespace: "root.foo",
 						Resources: []string{"connections"},
@@ -428,7 +428,7 @@ func TestRequestAuth_AllowsReason(t *testing.T) {
 			ra: NewAuthenticatedRequestAuth(&Actor{
 				Id:         uuid.New(),
 				ExternalId: "user",
-				Permissions: []common.Permission{
+				Permissions: []aschema.Permission{
 					{
 						Namespace: "root",
 						Resources: []string{"connections"},

@@ -9,7 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
-	"github.com/rmorlok/authproxy/internal/schema/common"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
 func (s *service) CreateConnection(
@@ -24,7 +24,7 @@ func (s *service) CreateConnection(
 		"connector_version", cv.GetVersion(),
 	)
 
-	if !common.NamespaceIsSameOrChild(cv.GetNamespace(), namespace) {
+	if !aschema.NamespaceIsSameOrChild(cv.GetNamespace(), namespace) {
 		return nil, api_common.
 			NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().

@@ -1,7 +1,7 @@
 package config
 
 import (
-	"github.com/rmorlok/authproxy/internal/schema/common"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	tu "github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
@@ -26,7 +26,7 @@ keys_path: some/path/to/keys
 	t.Run("loads users from path", func(t *testing.T) {
 		aues := AdminUsersExternalSource{
 			KeysPath: tu.TestDataPath("admin_user_keys"),
-			Permissions: []common.Permission{
+			Permissions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"connectors"},
@@ -47,7 +47,7 @@ keys_path: some/path/to/keys
 		assert.True(found)
 		assert.NotNil(u)
 		assert.True(u.Key.CanVerifySignature())
-		assert.Equal([]common.Permission{
+		assert.Equal([]aschema.Permission{
 			{
 				Namespace: "root",
 				Resources: []string{"connectors"},
@@ -64,7 +64,7 @@ keys_path: some/path/to/keys
 		assert.True(found)
 		assert.NotNil(u)
 		assert.True(u.Key.CanVerifySignature())
-		assert.Equal([]common.Permission{
+		assert.Equal([]aschema.Permission{
 			{
 				Namespace: "root",
 				Resources: []string{"connectors"},
@@ -81,7 +81,7 @@ keys_path: some/path/to/keys
 		assert.True(found)
 		assert.NotNil(u)
 		assert.True(u.Key.CanVerifySignature())
-		assert.Equal([]common.Permission{
+		assert.Equal([]aschema.Permission{
 			{
 				Namespace: "root",
 				Resources: []string{"connectors"},

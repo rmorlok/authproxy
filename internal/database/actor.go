@@ -15,7 +15,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
-	"github.com/rmorlok/authproxy/internal/schema/common"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -33,7 +33,7 @@ const (
 )
 
 // Permissions is a custom type for a slice of permissions. The values are serlized to json.
-type Permissions []common.Permission
+type Permissions []aschema.Permission
 
 // Value implements the driver.Valuer interface for Permissions
 func (p Permissions) Value() (driver.Value, error) {
@@ -96,7 +96,7 @@ func (a *Actor) GetExternalId() string {
 	return a.ExternalId
 }
 
-func (a *Actor) GetPermissions() []common.Permission {
+func (a *Actor) GetPermissions() []aschema.Permission {
 	return a.Permissions
 }
 
@@ -157,7 +157,7 @@ func (a *Actor) setFromData(d IActorData) {
 func (a *Actor) sameAsData(d IActorData) bool {
 	return a.ExternalId == d.GetExternalId() &&
 		a.Email == d.GetEmail() &&
-		slices.EqualFunc(a.Permissions, d.GetPermissions(), func(p1, p2 common.Permission) bool { return p1.Equal(p2) }) &&
+		slices.EqualFunc(a.Permissions, d.GetPermissions(), func(p1, p2 aschema.Permission) bool { return p1.Equal(p2) }) &&
 		a.Admin == d.IsAdmin() &&
 		a.SuperAdmin == d.IsSuperAdmin()
 }

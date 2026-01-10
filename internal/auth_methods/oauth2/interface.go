@@ -8,13 +8,13 @@ import (
 	"github.com/google/uuid"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/request_log"
-	"github.com/rmorlok/authproxy/internal/schema/common"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
 type IActorData interface {
 	GetId() uuid.UUID
 	GetExternalId() string
-	GetPermissions() []common.Permission
+	GetPermissions() []aschema.Permission
 	IsAdmin() bool
 	IsSuperAdmin() bool
 	GetEmail() string

@@ -9,7 +9,7 @@ import (
 	"regexp"
 
 	"github.com/google/uuid"
-	"github.com/rmorlok/authproxy/internal/schema/common"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
 var reValidSha = regexp.MustCompile("^[a-fA-F0-9]{40}$")
@@ -18,7 +18,7 @@ var reValidCrc64 = regexp.MustCompile("^[a-fA-F0-9]{16}$")
 type IActorData interface {
 	GetId() uuid.UUID
 	GetExternalId() string
-	GetPermissions() []common.Permission
+	GetPermissions() []aschema.Permission
 	IsAdmin() bool
 	IsSuperAdmin() bool
 	GetEmail() string
@@ -30,12 +30,12 @@ type Actor struct {
 	// This version of the actor is deserialized from the JWT directly. The JSON annotations apply to
 	// how the JWT is structured.
 
-	Id          uuid.UUID           `json:"-"` // This is the database ID of the actor. It cannot be set in the JWT directly.
-	ExternalId  string              `json:"external_id"`
-	Permissions []common.Permission `json:"permissions"`
-	Admin       bool                `json:"admin,omitempty"`
-	SuperAdmin  bool                `json:"super_admin,omitempty"`
-	Email       string              `json:"email,omitempty"`
+	Id          uuid.UUID            `json:"-"` // This is the database ID of the actor. It cannot be set in the JWT directly.
+	ExternalId  string               `json:"external_id"`
+	Permissions []aschema.Permission `json:"permissions"`
+	Admin       bool                 `json:"admin,omitempty"`
+	SuperAdmin  bool                 `json:"super_admin,omitempty"`
+	Email       string               `json:"email,omitempty"`
 }
 
 func (a *Actor) GetId() uuid.UUID {
@@ -46,7 +46,7 @@ func (a *Actor) GetExternalId() string {
 	return a.ExternalId
 }
 
-func (a *Actor) GetPermissions() []common.Permission {
+func (a *Actor) GetPermissions() []aschema.Permission {
 	return a.Permissions
 }
 

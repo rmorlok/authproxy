@@ -14,7 +14,7 @@ import (
 	goredis "github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/apredis"
-	"github.com/rmorlok/authproxy/internal/schema/common"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -120,7 +120,7 @@ func (l *listRequestsFilters) Limit(limit int32) ListRequestBuilder {
 }
 
 func (l *listRequestsFilters) WithNamespaceMatcher(matcher string) ListRequestBuilder {
-	if err := common.ValidateNamespaceMatcher(matcher); err != nil {
+	if err := aschema.ValidateNamespaceMatcher(matcher); err != nil {
 		return l.addError(err)
 	} else {
 		l.NamespaceMatcher = &matcher

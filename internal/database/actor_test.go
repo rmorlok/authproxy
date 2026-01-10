@@ -8,7 +8,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
-	"github.com/rmorlok/authproxy/internal/schema/common"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
@@ -110,7 +110,7 @@ func TestActor(t *testing.T) {
 				ExternalId: id.String(),
 				Email:      "bobdole@example.com",
 				Permissions: Permissions{
-					common.Permission{
+					aschema.Permission{
 						Namespace: "root",
 						Resources: []string{"*"},
 						Verbs:     []string{"*"},
@@ -231,7 +231,7 @@ func TestActor(t *testing.T) {
 					ExternalId: externalId,
 					Email:      "bobdole@example.com",
 					Permissions: Permissions{
-						common.Permission{
+						aschema.Permission{
 							Namespace: "root",
 							Resources: []string{"connections", "connectors"},
 							Verbs:     []string{"read", "create"},
@@ -244,7 +244,7 @@ func TestActor(t *testing.T) {
 				require.NoError(t, err)
 				require.Equal(t, id, retrieved.Id)
 				require.Equal(t, Permissions{
-					common.Permission{
+					aschema.Permission{
 						Namespace: "root",
 						Resources: []string{"connections", "connectors"},
 						Verbs:     []string{"read", "create"},
@@ -254,7 +254,7 @@ func TestActor(t *testing.T) {
 				actor, err := db.UpsertActor(ctx, &core.Actor{
 					ExternalId: externalId,
 					Email:      "bobdole@example.com",
-					Permissions: []common.Permission{
+					Permissions: []aschema.Permission{
 						{
 							Namespace: "root",
 							Resources: []string{"connections", "connectors"},

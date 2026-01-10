@@ -8,7 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
-	"github.com/rmorlok/authproxy/internal/schema/common"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
@@ -52,7 +52,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 		targetNamespace = req.IntoNamespace
 	}
 
-	if err := common.ValidateNamespacePath(targetNamespace); err != nil {
+	if err := aschema.ValidateNamespacePath(targetNamespace); err != nil {
 		return nil, api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsgf("invalid namespace '%s'", targetNamespace).
@@ -60,7 +60,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 			BuildStatusError()
 	}
 
-	if !common.NamespaceIsSameOrChild(cv.GetNamespace(), targetNamespace) {
+	if !aschema.NamespaceIsSameOrChild(cv.GetNamespace(), targetNamespace) {
 		return nil, api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsgf("target namespace '%s' is not a child of the connector's namespace '%s'", targetNamespace, cv.GetNamespace()).

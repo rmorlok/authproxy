@@ -4,7 +4,7 @@ import (
 	"slices"
 	"strings"
 
-	"github.com/rmorlok/authproxy/internal/schema/common"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
 // Allows checks if this permission allows the specified action.
@@ -24,7 +24,7 @@ import (
 //   - Verbs: Exact match with any verb in the permission, or permission contains "*".
 //   - ResourceIds: If permission has no ResourceIds, all IDs are allowed. If permission has
 //     ResourceIds, the requested ID must be in the list.
-func allows(p common.Permission, namespace, resource, verb, resourceId string) bool {
+func allows(p aschema.Permission, namespace, resource, verb, resourceId string) bool {
 	if !matchesNamespace(p, namespace) {
 		return false
 	}
@@ -46,16 +46,16 @@ func allows(p common.Permission, namespace, resource, verb, resourceId string) b
 
 // matchesNamespace checks if this permission's namespace matches the target namespace.
 // Supports wildcard matching with ".**" suffix.
-func matchesNamespace(p common.Permission, targetNamespace string) bool {
+func matchesNamespace(p aschema.Permission, targetNamespace string) bool {
 	if p.Namespace == "" || targetNamespace == "" {
 		return false
 	}
 
 	// Check for wildcard namespace (e.g., "root.**")
-	if strings.HasSuffix(p.Namespace, common.NamespaceWildcardSuffix) {
-		baseNamespace := p.Namespace[:len(p.Namespace)-len(common.NamespaceWildcardSuffix)]
+	if strings.HasSuffix(p.Namespace, aschema.NamespaceWildcardSuffix) {
+		baseNamespace := p.Namespace[:len(p.Namespace)-len(aschema.NamespaceWildcardSuffix)]
 		// Match the base namespace itself or any child namespace
-		return targetNamespace == baseNamespace || common.NamespaceIsChild(baseNamespace, targetNamespace)
+		return targetNamespace == baseNamespace || aschema.NamespaceIsChild(baseNamespace, targetNamespace)
 	}
 
 	// Exact match
@@ -64,13 +64,13 @@ func matchesNamespace(p common.Permission, targetNamespace string) bool {
 
 // matchesResource checks if this permission allows access to the target resource.
 // Supports wildcard matching with "*".
-func matchesResource(p common.Permission, targetResource string) bool {
+func matchesResource(p aschema.Permission, targetResource string) bool {
 	if targetResource == "" {
 		return false
 	}
 
 	for _, r := range p.Resources {
-		if r == common.PermissionWildcard || r == targetResource {
+		if r == aschema.PermissionWildcard || r == targetResource {
 			return true
 		}
 	}
@@ -80,13 +80,13 @@ func matchesResource(p common.Permission, targetResource string) bool {
 
 // matchesVerb checks if this permission allows the target verb.
 // Supports wildcard matching with "*".
-func matchesVerb(p common.Permission, targetVerb string) bool {
+func matchesVerb(p aschema.Permission, targetVerb string) bool {
 	if targetVerb == "" {
 		return false
 	}
 
 	for _, v := range p.Verbs {
-		if v == common.PermissionWildcard || v == targetVerb {
+		if v == aschema.PermissionWildcard || v == targetVerb {
 			return true
 		}
 	}
@@ -97,7 +97,7 @@ func matchesVerb(p common.Permission, targetVerb string) bool {
 // matchesResourceId checks if this permission allows access to the target resource ID.
 // If the permission has no ResourceIds specified, all IDs are allowed.
 // If the permission has ResourceIds, the target must be in the list.
-func matchesResourceId(p common.Permission, targetResourceId string) bool {
+func matchesResourceId(p aschema.Permission, targetResourceId string) bool {
 	// If no specific resource IDs are required by the permission, allow all
 	if len(p.ResourceIds) == 0 {
 		return true
@@ -117,7 +117,7 @@ func matchesResourceId(p common.Permission, targetResourceId string) bool {
 // Permissions are additive - if any single permission allows the action, it is permitted.
 //
 // This is the primary function for checking if an actor has permission to perform an action.
-func PermissionsAllow(permissions []common.Permission, namespace, resource, verb, resourceId string) bool {
+func PermissionsAllow(permissions []aschema.Permission, namespace, resource, verb, resourceId string) bool {
 	for _, p := range permissions {
 		if allows(p, namespace, resource, verb, resourceId) {
 			return true
@@ -142,8 +142,8 @@ func PermissionsAllow(permissions []common.Permission, namespace, resource, verb
 //   - restrictions: Optional additional restrictions. If nil or empty, only actor permissions are checked.
 //   - namespace, resource, verb, resourceId: The action being checked.
 func PermissionsAllowWithRestrictions(
-	actorPermissions []common.Permission,
-	restrictions []common.Permission,
+	actorPermissions []aschema.Permission,
+	restrictions []aschema.Permission,
 	namespace, resource, verb, resourceId string,
 ) bool {
 	// First check if the actor's permissions allow the action

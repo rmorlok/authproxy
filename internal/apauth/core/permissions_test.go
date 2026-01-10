@@ -3,14 +3,14 @@ package core
 import (
 	"testing"
 
-	"github.com/rmorlok/authproxy/internal/schema/common"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/stretchr/testify/require"
 )
 
 func TestPermission_Allows(t *testing.T) {
 	tests := []struct {
 		name       string
-		p          common.Permission
+		p          aschema.Permission
 		namespace  string
 		resource   string
 		verb       string
@@ -20,7 +20,7 @@ func TestPermission_Allows(t *testing.T) {
 		// Exact namespace matching
 		{
 			name: "exact namespace match",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root",
 				Resources: []string{"connections"},
 				Verbs:     []string{"get"},
@@ -32,7 +32,7 @@ func TestPermission_Allows(t *testing.T) {
 		},
 		{
 			name: "exact namespace no match",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root.foo",
 				Resources: []string{"connections"},
 				Verbs:     []string{"get"},
@@ -44,7 +44,7 @@ func TestPermission_Allows(t *testing.T) {
 		},
 		{
 			name: "exact namespace child no match",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root",
 				Resources: []string{"connections"},
 				Verbs:     []string{"get"},
@@ -58,7 +58,7 @@ func TestPermission_Allows(t *testing.T) {
 		// Wildcard namespace matching
 		{
 			name: "wildcard namespace matches base",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root.**",
 				Resources: []string{"connections"},
 				Verbs:     []string{"get"},
@@ -70,7 +70,7 @@ func TestPermission_Allows(t *testing.T) {
 		},
 		{
 			name: "wildcard namespace matches child",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root.**",
 				Resources: []string{"connections"},
 				Verbs:     []string{"get"},
@@ -82,7 +82,7 @@ func TestPermission_Allows(t *testing.T) {
 		},
 		{
 			name: "wildcard namespace matches deep child",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root.**",
 				Resources: []string{"connections"},
 				Verbs:     []string{"get"},
@@ -94,7 +94,7 @@ func TestPermission_Allows(t *testing.T) {
 		},
 		{
 			name: "wildcard namespace partial match",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root.foo.**",
 				Resources: []string{"connections"},
 				Verbs:     []string{"get"},
@@ -106,7 +106,7 @@ func TestPermission_Allows(t *testing.T) {
 		},
 		{
 			name: "wildcard namespace no match sibling",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root.foo.**",
 				Resources: []string{"connections"},
 				Verbs:     []string{"get"},
@@ -120,7 +120,7 @@ func TestPermission_Allows(t *testing.T) {
 		// Resource matching
 		{
 			name: "resource match",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root",
 				Resources: []string{"connections", "connectors"},
 				Verbs:     []string{"get"},
@@ -132,7 +132,7 @@ func TestPermission_Allows(t *testing.T) {
 		},
 		{
 			name: "resource no match",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root",
 				Resources: []string{"connectors"},
 				Verbs:     []string{"get"},
@@ -144,7 +144,7 @@ func TestPermission_Allows(t *testing.T) {
 		},
 		{
 			name: "resource wildcard",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root",
 				Resources: []string{"*"},
 				Verbs:     []string{"get"},
@@ -158,7 +158,7 @@ func TestPermission_Allows(t *testing.T) {
 		// Verb matching
 		{
 			name: "verb match",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root",
 				Resources: []string{"connections"},
 				Verbs:     []string{"get", "list"},
@@ -170,7 +170,7 @@ func TestPermission_Allows(t *testing.T) {
 		},
 		{
 			name: "verb no match",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root",
 				Resources: []string{"connections"},
 				Verbs:     []string{"list"},
@@ -182,7 +182,7 @@ func TestPermission_Allows(t *testing.T) {
 		},
 		{
 			name: "verb wildcard",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root",
 				Resources: []string{"connections"},
 				Verbs:     []string{"*"},
@@ -196,7 +196,7 @@ func TestPermission_Allows(t *testing.T) {
 		// Resource ID matching
 		{
 			name: "no resource ids allows any",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root",
 				Resources: []string{"connections"},
 				Verbs:     []string{"get"},
@@ -209,7 +209,7 @@ func TestPermission_Allows(t *testing.T) {
 		},
 		{
 			name: "resource id match",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace:   "root",
 				Resources:   []string{"connections"},
 				ResourceIds: []string{"abc-123", "def-456"},
@@ -223,7 +223,7 @@ func TestPermission_Allows(t *testing.T) {
 		},
 		{
 			name: "resource id no match",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace:   "root",
 				Resources:   []string{"connections"},
 				ResourceIds: []string{"abc-123"},
@@ -237,7 +237,7 @@ func TestPermission_Allows(t *testing.T) {
 		},
 		{
 			name: "resource ids specified but empty request id allowed (list operation)",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace:   "root",
 				Resources:   []string{"connections"},
 				ResourceIds: []string{"abc-123"},
@@ -253,7 +253,7 @@ func TestPermission_Allows(t *testing.T) {
 		// Full wildcard permission
 		{
 			name: "full wildcard admin permission",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root.**",
 				Resources: []string{"*"},
 				Verbs:     []string{"*"},
@@ -268,7 +268,7 @@ func TestPermission_Allows(t *testing.T) {
 		// Edge cases
 		{
 			name: "empty namespace in request",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root",
 				Resources: []string{"connections"},
 				Verbs:     []string{"get"},
@@ -280,7 +280,7 @@ func TestPermission_Allows(t *testing.T) {
 		},
 		{
 			name: "empty resource in request",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root",
 				Resources: []string{"connections"},
 				Verbs:     []string{"get"},
@@ -292,7 +292,7 @@ func TestPermission_Allows(t *testing.T) {
 		},
 		{
 			name: "empty verb in request",
-			p: common.Permission{
+			p: aschema.Permission{
 				Namespace: "root",
 				Resources: []string{"connections"},
 				Verbs:     []string{"get"},
@@ -315,7 +315,7 @@ func TestPermission_Allows(t *testing.T) {
 func TestPermissionsAllow(t *testing.T) {
 	tests := []struct {
 		name        string
-		permissions []common.Permission
+		permissions []aschema.Permission
 		namespace   string
 		resource    string
 		verb        string
@@ -324,7 +324,7 @@ func TestPermissionsAllow(t *testing.T) {
 	}{
 		{
 			name:        "empty permissions",
-			permissions: []common.Permission{},
+			permissions: []aschema.Permission{},
 			namespace:   "root",
 			resource:    "connections",
 			verb:        "get",
@@ -340,7 +340,7 @@ func TestPermissionsAllow(t *testing.T) {
 		},
 		{
 			name: "single matching permission",
-			permissions: []common.Permission{
+			permissions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"connections"},
@@ -354,7 +354,7 @@ func TestPermissionsAllow(t *testing.T) {
 		},
 		{
 			name: "multiple permissions first matches",
-			permissions: []common.Permission{
+			permissions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"connections"},
@@ -373,7 +373,7 @@ func TestPermissionsAllow(t *testing.T) {
 		},
 		{
 			name: "multiple permissions second matches",
-			permissions: []common.Permission{
+			permissions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"connectors"},
@@ -392,7 +392,7 @@ func TestPermissionsAllow(t *testing.T) {
 		},
 		{
 			name: "multiple permissions none match",
-			permissions: []common.Permission{
+			permissions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"connectors"},
@@ -411,7 +411,7 @@ func TestPermissionsAllow(t *testing.T) {
 		},
 		{
 			name: "additive permissions combine resources",
-			permissions: []common.Permission{
+			permissions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"connections"},
@@ -441,8 +441,8 @@ func TestPermissionsAllow(t *testing.T) {
 func TestPermissionsAllowWithRestrictions(t *testing.T) {
 	tests := []struct {
 		name             string
-		actorPermissions []common.Permission
-		restrictions     []common.Permission
+		actorPermissions []aschema.Permission
+		restrictions     []aschema.Permission
 		namespace        string
 		resource         string
 		verb             string
@@ -451,7 +451,7 @@ func TestPermissionsAllowWithRestrictions(t *testing.T) {
 	}{
 		{
 			name: "actor allowed, no restrictions",
-			actorPermissions: []common.Permission{
+			actorPermissions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"connections"},
@@ -466,14 +466,14 @@ func TestPermissionsAllowWithRestrictions(t *testing.T) {
 		},
 		{
 			name: "actor allowed, empty restrictions",
-			actorPermissions: []common.Permission{
+			actorPermissions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"connections"},
 					Verbs:     []string{"get"},
 				},
 			},
-			restrictions: []common.Permission{},
+			restrictions: []aschema.Permission{},
 			namespace:    "root",
 			resource:     "connections",
 			verb:         "get",
@@ -481,7 +481,7 @@ func TestPermissionsAllowWithRestrictions(t *testing.T) {
 		},
 		{
 			name:             "actor not allowed",
-			actorPermissions: []common.Permission{},
+			actorPermissions: []aschema.Permission{},
 			restrictions:     nil,
 			namespace:        "root",
 			resource:         "connections",
@@ -490,14 +490,14 @@ func TestPermissionsAllowWithRestrictions(t *testing.T) {
 		},
 		{
 			name: "actor allowed, restrictions allowed",
-			actorPermissions: []common.Permission{
+			actorPermissions: []aschema.Permission{
 				{
 					Namespace: "root.**",
 					Resources: []string{"*"},
 					Verbs:     []string{"*"},
 				},
 			},
-			restrictions: []common.Permission{
+			restrictions: []aschema.Permission{
 				{
 					Namespace: "root.foo",
 					Resources: []string{"connections"},
@@ -511,14 +511,14 @@ func TestPermissionsAllowWithRestrictions(t *testing.T) {
 		},
 		{
 			name: "actor allowed, restrictions deny different namespace",
-			actorPermissions: []common.Permission{
+			actorPermissions: []aschema.Permission{
 				{
 					Namespace: "root.**",
 					Resources: []string{"*"},
 					Verbs:     []string{"*"},
 				},
 			},
-			restrictions: []common.Permission{
+			restrictions: []aschema.Permission{
 				{
 					Namespace: "root.foo",
 					Resources: []string{"connections"},
@@ -532,14 +532,14 @@ func TestPermissionsAllowWithRestrictions(t *testing.T) {
 		},
 		{
 			name: "actor allowed, restrictions deny different resource",
-			actorPermissions: []common.Permission{
+			actorPermissions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"*"},
 					Verbs:     []string{"*"},
 				},
 			},
-			restrictions: []common.Permission{
+			restrictions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"connections"},
@@ -553,14 +553,14 @@ func TestPermissionsAllowWithRestrictions(t *testing.T) {
 		},
 		{
 			name: "actor allowed, restrictions deny different verb",
-			actorPermissions: []common.Permission{
+			actorPermissions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"connections"},
 					Verbs:     []string{"*"},
 				},
 			},
-			restrictions: []common.Permission{
+			restrictions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"connections"},
@@ -574,14 +574,14 @@ func TestPermissionsAllowWithRestrictions(t *testing.T) {
 		},
 		{
 			name: "restrictions are additive within themselves",
-			actorPermissions: []common.Permission{
+			actorPermissions: []aschema.Permission{
 				{
 					Namespace: "root.**",
 					Resources: []string{"*"},
 					Verbs:     []string{"*"},
 				},
 			},
-			restrictions: []common.Permission{
+			restrictions: []aschema.Permission{
 				{
 					Namespace: "root.foo",
 					Resources: []string{"connections"},
@@ -600,14 +600,14 @@ func TestPermissionsAllowWithRestrictions(t *testing.T) {
 		},
 		{
 			name: "restriction with resource ids",
-			actorPermissions: []common.Permission{
+			actorPermissions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"connections"},
 					Verbs:     []string{"*"},
 				},
 			},
-			restrictions: []common.Permission{
+			restrictions: []aschema.Permission{
 				{
 					Namespace:   "root",
 					Resources:   []string{"connections"},
@@ -623,14 +623,14 @@ func TestPermissionsAllowWithRestrictions(t *testing.T) {
 		},
 		{
 			name: "restriction with resource ids denies other ids",
-			actorPermissions: []common.Permission{
+			actorPermissions: []aschema.Permission{
 				{
 					Namespace: "root",
 					Resources: []string{"connections"},
 					Verbs:     []string{"*"},
 				},
 			},
-			restrictions: []common.Permission{
+			restrictions: []aschema.Permission{
 				{
 					Namespace:   "root",
 					Resources:   []string{"connections"},

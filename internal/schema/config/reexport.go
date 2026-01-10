@@ -1,6 +1,7 @@
 package config
 
 import (
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/connectors"
 )
@@ -27,14 +28,14 @@ var (
 	MustMarshalToYamlString      = common.MustMarshalToYamlString
 	NewStringValueDirect         = common.NewStringValueDirect
 	NewStringValueDirectInline   = common.NewStringValueDirectInline
-	ValidateNamespacePath        = common.ValidateNamespacePath
-	SplitNamespacePathToPrefixes = common.SplitNamespacePathToPrefixes
-	NamespacePathFromRoot        = common.NamespacePathFromRoot
+	ValidateNamespacePath        = aschema.ValidateNamespacePath
+	SplitNamespacePathToPrefixes = aschema.SplitNamespacePathToPrefixes
+	NamespacePathFromRoot        = aschema.NamespacePathFromRoot
 )
 
 // Re-export constants from the connectors sub-package
 var (
-	RootNamespace = common.RootNamespace
+	RootNamespace = aschema.RootNamespace
 )
 
 // Re-export types from the connectors sub-package

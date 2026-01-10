@@ -3,7 +3,7 @@ package service
 import (
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
-	"github.com/rmorlok/authproxy/internal/schema/common"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
 // PermissionValidatorBuilder constructs gin middleware that validates permissions for a request.
@@ -103,7 +103,7 @@ func (pb *PermissionValidatorBuilder) getNamespace(c *gin.Context) string {
 	}
 
 	// Default to root namespace
-	return common.RootNamespace
+	return aschema.RootNamespace
 }
 
 // getResourceId extracts the resource ID from the request if an ID field is configured.

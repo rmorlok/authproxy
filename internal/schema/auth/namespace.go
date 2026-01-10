@@ -1,4 +1,4 @@
-package common
+package auth
 
 import (
 	"errors"
@@ -11,8 +11,17 @@ import (
 
 var validPathRegex = regexp.MustCompile(`^root(?:\.[a-zA-Z0-9_]+[a-zA-Z0-9_\-]*)*$`)
 
+// RootNamespace represents the base namespace for all hierarchical paths in the system. Other namespaces
+// follow from this path using NamespacePathSeparator, e.g. root.child.grandchild
 const RootNamespace = "root"
+
+// NamespacePathSeparator is the character used to separate namespace parts in a path.
 const NamespacePathSeparator = "."
+
+// NamespaceUnknown is a sentinal value used to indicate that the namespace is not currently known. During permission
+// checking, at the API layer namespace won't generally be known, so permission checking starts with resource and
+// verb. This sentinal value is used to to indicate that namespace checking for permissions should be ignored.
+const NamespaceUnknown = "<UNKNOWN>"
 
 // ValidateNamespacePath checks if the path is valid. It returns an error if it is not with a descriptive message.
 func ValidateNamespacePath(path string) error {

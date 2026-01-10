@@ -35,6 +35,7 @@ func loadSchema(t *testing.T, c *jsonschemav5.Compiler, path string) string {
 func Test_SchemaAgainstRealData(t *testing.T) {
 	c := jsonschemav5.NewCompiler()
 
+	_ = loadSchema(t, c, "../auth/schema.json")
 	_ = loadSchema(t, c, "../common/schema.json")
 	_ = loadSchema(t, c, "../connectors/schema-oauth.json")
 	_ = loadSchema(t, c, "../connectors/schema.json")

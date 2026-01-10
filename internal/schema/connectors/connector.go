@@ -7,6 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
@@ -91,7 +92,7 @@ func (c *Connector) Validate(vc *common.ValidationContext) error {
 	}
 
 	if c.Namespace != nil {
-		if err := common.ValidateNamespacePath(*c.Namespace); err != nil {
+		if err := aschema.ValidateNamespacePath(*c.Namespace); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
@@ -166,7 +167,7 @@ func (c *Connector) IsDraft() bool {
 // GetNamespace returns the namespace of the connector. Defaults to root if unspecified.
 func (c *Connector) GetNamespace() string {
 	if c == nil || c.Namespace == nil {
-		return common.RootNamespace
+		return aschema.RootNamespace
 	}
 
 	return *c.Namespace

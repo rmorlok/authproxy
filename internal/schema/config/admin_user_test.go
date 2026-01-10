@@ -3,7 +3,7 @@ package config
 import (
 	"testing"
 
-	"github.com/rmorlok/authproxy/internal/schema/common"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"
 )
@@ -63,7 +63,7 @@ key:
 			assert.Equal(AdminUser{
 				Username: "bobdole",
 				Email:    "bob@example.com",
-				Permissions: []common.Permission{
+				Permissions: []aschema.Permission{
 					{
 						Namespace: "root",
 						Resources: []string{"connectors"},

@@ -7,18 +7,18 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
-	"github.com/rmorlok/authproxy/internal/schema/common"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 func (s *service) EnsureNamespaceAncestorPath(ctx context.Context, targetNamespace string) (iface.Namespace, error) {
-	if err := common.ValidateNamespacePath(targetNamespace); err != nil {
+	if err := aschema.ValidateNamespacePath(targetNamespace); err != nil {
 		return nil, err
 	}
 
 	var err error
 	var final *database.Namespace
-	for _, ns := range common.SplitNamespacePathToPrefixes(targetNamespace) {
+	for _, ns := range aschema.SplitNamespacePathToPrefixes(targetNamespace) {
 		final, err = s.db.GetNamespace(ctx, ns)
 		if err != nil {
 			if errors.Is(err, database.ErrNotFound) {

@@ -4,7 +4,7 @@ import (
 	"context"
 
 	"github.com/google/uuid"
-	"github.com/rmorlok/authproxy/internal/schema/common"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
 const authContextKey = "auth"
@@ -31,7 +31,7 @@ type RequestAuth struct {
 	// If nil or empty, the actor's full permissions apply.
 	// If set, both the actor's permissions AND these restrictions must allow the action.
 	// This enables scoped API tokens, temporary permission grants, etc.
-	permissions []common.Permission
+	permissions []aschema.Permission
 }
 
 func (ra *RequestAuth) IsAuthenticated() bool {
@@ -68,13 +68,13 @@ func (a *RequestAuth) ContextWith(ctx context.Context) context.Context {
 
 // GetPermissions returns the request-level permission restrictions.
 // Returns nil if no restrictions are set.
-func (ra *RequestAuth) GetPermissions() []common.Permission {
+func (ra *RequestAuth) GetPermissions() []aschema.Permission {
 	return ra.permissions
 }
 
 // SetPermissions sets request-level permission restrictions.
 // When set, actions must be allowed by both actor permissions AND these restrictions.
-func (ra *RequestAuth) SetPermissions(permissions []common.Permission) {
+func (ra *RequestAuth) SetPermissions(permissions []aschema.Permission) {
 	ra.permissions = permissions
 }
 
@@ -153,7 +153,7 @@ func NewAuthenticatedRequestAuthWithSession(a IActorData, sess *uuid.UUID) *Requ
 
 // NewAuthenticatedRequestAuthWithPermissions creates a RequestAuth with both an actor
 // and request-level permission restrictions.
-func NewAuthenticatedRequestAuthWithPermissions(a IActorData, permissions []common.Permission) *RequestAuth {
+func NewAuthenticatedRequestAuthWithPermissions(a IActorData, permissions []aschema.Permission) *RequestAuth {
 	return &RequestAuth{
 		actor:       CreateActor(a),
 		permissions: permissions,
@@ -162,7 +162,7 @@ func NewAuthenticatedRequestAuthWithPermissions(a IActorData, permissions []comm
 
 // NewAuthenticatedRequestAuthWithSessionAndPermissions creates a RequestAuth with an actor,
 // session, and request-level permission restrictions.
-func NewAuthenticatedRequestAuthWithSessionAndPermissions(a IActorData, sess *uuid.UUID, permissions []common.Permission) *RequestAuth {
+func NewAuthenticatedRequestAuthWithSessionAndPermissions(a IActorData, sess *uuid.UUID, permissions []aschema.Permission) *RequestAuth {
 	return &RequestAuth{
 		actor:       CreateActor(a),
 		sessionId:   sess,
