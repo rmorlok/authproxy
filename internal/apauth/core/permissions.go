@@ -51,6 +51,10 @@ func matchesNamespace(p aschema.Permission, targetNamespace string) bool {
 		return false
 	}
 
+	if targetNamespace == aschema.NamespaceSkipNamespacePermissionChecks {
+		return true
+	}
+
 	// Check for wildcard namespace (e.g., "root.**")
 	if strings.HasSuffix(p.Namespace, aschema.NamespaceWildcardSuffix) {
 		baseNamespace := p.Namespace[:len(p.Namespace)-len(aschema.NamespaceWildcardSuffix)]

@@ -100,6 +100,11 @@ func TestNamespaces(t *testing.T) {
 					path:      "root.child!@#",
 					expectErr: true,
 				},
+				{
+					name:      "sentinel",
+					path:      NamespaceSkipNamespacePermissionChecks,
+					expectErr: true,
+				},
 			}
 
 			for _, tt := range tests {

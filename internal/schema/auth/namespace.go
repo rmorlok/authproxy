@@ -18,15 +18,21 @@ const RootNamespace = "root"
 // NamespacePathSeparator is the character used to separate namespace parts in a path.
 const NamespacePathSeparator = "."
 
-// NamespaceUnknown is a sentinal value used to indicate that the namespace is not currently known. During permission
-// checking, at the API layer namespace won't generally be known, so permission checking starts with resource and
-// verb. This sentinal value is used to to indicate that namespace checking for permissions should be ignored.
-const NamespaceUnknown = "<UNKNOWN>"
+// NamespaceSkipNamespacePermissionChecks is a sentinel value used to indicate that the namespace is not currently
+// known at the time of permission checking. During permission checking, at the API layer namespace won't generally be
+// known, so permission checking starts with resource and  verb. This essential value is used to indicate that
+// namespace checking for permissions should be ignored.
+const NamespaceSkipNamespacePermissionChecks = "<SKIP_NAMESPACE_PERMISSION_CHECK>"
 
 // ValidateNamespacePath checks if the path is valid. It returns an error if it is not with a descriptive message.
 func ValidateNamespacePath(path string) error {
 	if path == "" {
 		return errors.New("path is required")
+	}
+
+	if path == NamespaceSkipNamespacePermissionChecks {
+		// This wouldn't be valid anyway, but to just be explicit to guard against future changes.
+		return errors.New("disallowed sentinel value")
 	}
 
 	if path != RootNamespace && !strings.HasPrefix(path, RootNamespace+NamespacePathSeparator) {
