@@ -26,21 +26,6 @@ type A interface {
 	AdminOnly(validators ...AuthValidator) gin.HandlerFunc
 
 	/*
-	 * Middleware not specific to a framework
-	 */
-
-	// Auth middleware adds auth from session and populates actor info
-	Auth(next http.Handler, abort func(), validators ...AuthValidator) http.Handler
-
-	// Trace middleware doesn't require a valid actor but if an actor is present it populates the actor info. If present
-	// the actor is validated against the supplied validators.
-	Trace(next http.Handler, abort func(), validators ...AuthValidator) http.Handler
-
-	// TraceXsrfNotRequired is the same as the Trace middleware except that it doesn't require a valid Xsrf token if session
-	// auth is being used.
-	TraceXsrfNotRequired(next http.Handler, abort func(), validators ...AuthValidator) http.Handler
-
-	/*
 	 * Other helpers to set and get authentication.
 	 */
 

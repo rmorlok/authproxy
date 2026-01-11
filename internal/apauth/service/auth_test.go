@@ -430,7 +430,7 @@ func (ts *TestSetup) MustGetInvalidAdminUser(ctx context.Context) database.Actor
 	}
 }
 
-func actorIsBobDole(ra *core.RequestAuth) (bool, string) {
+func actorIsBobDole(gctx *gin.Context, ra *core.RequestAuth) (bool, string) {
 	if ra.GetActor().ExternalId == "bobdole" {
 		return true, ""
 	}

@@ -25,8 +25,8 @@ func GetAuthFromGinContext(c *gin.Context) *core.RequestAuth {
 	return core.GetAuthFromContext(c.Request.Context())
 }
 
-// ApplyAuthToGinContext applies the auth info to the request context.
-func ApplyAuthToGinContext(c *gin.Context, ra *core.RequestAuth) {
+// applyAuthToGinContext applies the auth info to the request context.
+func applyAuthToGinContext(c *gin.Context, ra *core.RequestAuth) {
 	if c == nil || c.Request == nil {
 		return
 	}
@@ -63,10 +63,22 @@ func (j *service) Required(validators ...AuthValidator) gin.HandlerFunc {
 				return
 			}
 
-			ApplyAuthToGinContext(c, a)
+			combinedValidators := combineAuthValidators(j.defaultAuthValidators, validators)
+			valid, reason := validateAllAuthValidators(combinedValidators, c, a)
+			if !valid {
+				api_common.NewHttpStatusErrorBuilder().
+					WithStatusForbidden().
+					WithResponseMsg(reason).
+					BuildStatusError().
+					WriteResponse(j.config, w)
+				c.Abort()
+				return
+			}
+
+			applyAuthToGinContext(c, a)
 			c.Next()
 		})
-		j.Auth(_next, c.Abort, validators...).ServeHTTP(c.Writer, c.Request)
+		j.Auth(_next, c.Abort).ServeHTTP(c.Writer, c.Request)
 	}
 }
 
@@ -77,12 +89,24 @@ func (j *service) Optional(validators ...AuthValidator) gin.HandlerFunc {
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			a := GetAuthFromRequest(r)
 			if a.IsAuthenticated() {
-				ApplyAuthToGinContext(c, a)
+
+				combinedValidators := combineAuthValidators(j.defaultAuthValidators, validators)
+				valid, reason := validateAllAuthValidators(combinedValidators, c, a)
+				if !valid {
+					api_common.NewHttpStatusErrorBuilder().
+						WithStatusForbidden().
+						WithResponseMsg(reason).
+						BuildStatusError().
+						WriteResponse(j.config, w)
+					c.Abort()
+					return
+				}
+				applyAuthToGinContext(c, a)
 			}
 
 			c.Next()
 		})
-		j.Trace(_next, c.Abort, validators...).ServeHTTP(c.Writer, c.Request)
+		j.Trace(_next, c.Abort).ServeHTTP(c.Writer, c.Request)
 	}
 }
 
@@ -94,12 +118,23 @@ func (j *service) OptionalXsrfNotRequired(validators ...AuthValidator) gin.Handl
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			a := GetAuthFromRequest(r)
 			if a.IsAuthenticated() {
-				ApplyAuthToGinContext(c, a)
+				combinedValidators := combineAuthValidators(j.defaultAuthValidators, validators)
+				valid, reason := validateAllAuthValidators(combinedValidators, c, a)
+				if !valid {
+					api_common.NewHttpStatusErrorBuilder().
+						WithStatusForbidden().
+						WithResponseMsg(reason).
+						BuildStatusError().
+						WriteResponse(j.config, w)
+					c.Abort()
+					return
+				}
+				applyAuthToGinContext(c, a)
 			}
 
 			c.Next()
 		})
-		j.TraceXsrfNotRequired(_next, c.Abort, validators...).ServeHTTP(c.Writer, c.Request)
+		j.TraceXsrfNotRequired(_next, c.Abort).ServeHTTP(c.Writer, c.Request)
 	}
 }
 

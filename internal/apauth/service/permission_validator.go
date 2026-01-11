@@ -135,7 +135,7 @@ func (pb *PermissionValidatorBuilder) Build() gin.HandlerFunc {
 	}
 
 	// Create a permission-checking AuthValidator
-	permissionValidator := func(ra *core.RequestAuth) (valid bool, reason string) {
+	permissionValidator := func(gctx *gin.Context, ra *core.RequestAuth) (valid bool, reason string) {
 		if ra == nil || !ra.IsAuthenticated() {
 			return false, "not authenticated"
 		}

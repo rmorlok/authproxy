@@ -1,13 +1,16 @@
 package service
 
-import "github.com/rmorlok/authproxy/internal/apauth/core"
+import (
+	"github.com/gin-gonic/gin"
+	"github.com/rmorlok/authproxy/internal/apauth/core"
+)
 
 // AuthValidator is a function that validates the auth for a request. It returns true if the auth is valid,
 // false otherwise. If an actor is not valid for a request, a forbidden response should be returned.
-type AuthValidator func(ra *core.RequestAuth) (valid bool, reason string)
+type AuthValidator func(gctx *gin.Context, ra *core.RequestAuth) (valid bool, reason string)
 
 // AuthValidatorActorIsAdmin asserts that the actor is an admin.
-func AuthValidatorActorIsAdmin(ra *core.RequestAuth) (bool, string) {
+func AuthValidatorActorIsAdmin(_ *gin.Context, ra *core.RequestAuth) (bool, string) {
 	if ra == nil {
 		return false, "auth not present"
 	}
@@ -25,13 +28,13 @@ func AuthValidatorActorIsAdmin(ra *core.RequestAuth) (bool, string) {
 
 // validateAllActorValidators validates all actor validators against the actor. It returns true if all validators
 // pass, false otherwise.
-func validateAllAuthValidators(validators []AuthValidator, ra *core.RequestAuth) (valid bool, reason string) {
+func validateAllAuthValidators(validators []AuthValidator, gctx *gin.Context, ra *core.RequestAuth) (valid bool, reason string) {
 	if ra == nil {
 		return false, "auth present"
 	}
 
 	for _, v := range validators {
-		valid, reason = v(ra)
+		valid, reason = v(gctx, ra)
 		if !valid {
 			return false, reason
 		}

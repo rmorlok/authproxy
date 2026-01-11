@@ -11,7 +11,7 @@ import (
  This file implements middleware not specific to any particular framework.
 */
 
-// MustGetAuthFromRequest gets an authenticated info for the request. If the request is not authenticated, it
+// MustGetAuthFromRequest gets a RequestInfo for the request. If the request is not authenticated, it
 // panics.
 func MustGetAuthFromRequest(r *http.Request) *core.RequestAuth {
 	a := GetAuthFromRequest(r)
@@ -41,24 +41,24 @@ func SetAuthOnRequestContext(r *http.Request, auth *core.RequestAuth) *http.Requ
 }
 
 // Auth middleware adds auth from session and populates actor info
-func (j *service) Auth(next http.Handler, abort func(), validators ...AuthValidator) http.Handler {
-	return j.auth(true, true, abort, validators)(next)
+func (j *service) Auth(next http.Handler, abort func()) http.Handler {
+	return j.auth(true, true, abort)(next)
 }
 
 // Trace middleware doesn't require a valid actor but if an actor is present it populates the actor info. If present
 // the actor is validated against the supplied validators.
-func (j *service) Trace(next http.Handler, abort func(), validators ...AuthValidator) http.Handler {
-	return j.auth(false, true, abort, validators)(next)
+func (j *service) Trace(next http.Handler, abort func()) http.Handler {
+	return j.auth(false, true, abort)(next)
 }
 
 // TraceXsrfNotRequired is the same as the Trace middleware except that it doesn't require a valid Xsrf token if session
 // auth is being used.
-func (j *service) TraceXsrfNotRequired(next http.Handler, abort func(), validators ...AuthValidator) http.Handler {
-	return j.auth(false, false, abort, validators)(next)
+func (j *service) TraceXsrfNotRequired(next http.Handler, abort func()) http.Handler {
+	return j.auth(false, false, abort)(next)
 }
 
 // auth implements all logic for authentication (reqAuth=true) and tracing (reqAuth=false)
-func (j *service) auth(requireAuth bool, requireSessionXsrf bool, abort func(), validators []AuthValidator) func(http.Handler) http.Handler {
+func (j *service) auth(requireAuth bool, requireSessionXsrf bool, abort func()) func(http.Handler) http.Handler {
 	f := func(h http.Handler) http.Handler {
 		fn := func(w http.ResponseWriter, r *http.Request) {
 			ctx := r.Context()
@@ -80,20 +80,6 @@ func (j *service) auth(requireAuth bool, requireSessionXsrf bool, abort func(), 
 					WriteResponse(j.config, w)
 				abort()
 				return
-			}
-
-			if requestAuth.IsAuthenticated() {
-				combinedValidators := combineAuthValidators(j.defaultAuthValidators, validators)
-				valid, reason := validateAllAuthValidators(combinedValidators, requestAuth)
-				if !valid {
-					api_common.NewHttpStatusErrorBuilder().
-						WithStatusForbidden().
-						WithResponseMsg(reason).
-						BuildStatusError().
-						WriteResponse(j.config, w)
-					abort()
-					return
-				}
 			}
 
 			r = SetAuthOnRequestContext(r, requestAuth) // populate auth/actor info to request context
