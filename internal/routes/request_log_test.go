@@ -15,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/request_log"
 	"github.com/rmorlok/authproxy/internal/request_log/mock"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
@@ -57,9 +58,30 @@ func TestRequestLogRoutes(t *testing.T) {
 			require.Equal(t, http.StatusUnauthorized, w.Code)
 		})
 
+		t.Run("forbidden", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/request-log",
+				nil,
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connectors", "list"), // Wrong resource
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
 		t.Run("no results", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/request-log", nil, "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/request-log",
+				nil,
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "request-log", "list"),
+			)
 			require.NoError(t, err)
 
 			b := mock.MockListRequestBuilderExecutor{
@@ -81,7 +103,13 @@ func TestRequestLogRoutes(t *testing.T) {
 
 		t.Run("results", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/request-log", nil, "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/request-log",
+				nil,
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "request-log", "list"),
+			)
 			require.NoError(t, err)
 
 			id := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
@@ -115,7 +143,13 @@ func TestRequestLogRoutes(t *testing.T) {
 
 		t.Run("multiple pages of results", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/request-log", nil, "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/request-log",
+				nil,
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "request-log", "list"),
+			)
 			require.NoError(t, err)
 
 			id := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
@@ -150,7 +184,13 @@ func TestRequestLogRoutes(t *testing.T) {
 
 		t.Run("from cursor", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/request-log?cursor=some-cursor", nil, "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/request-log?cursor=some-cursor",
+				nil,
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "request-log", "list"),
+			)
 			require.NoError(t, err)
 
 			id := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
@@ -183,7 +223,13 @@ func TestRequestLogRoutes(t *testing.T) {
 
 		t.Run("bad cursor", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/request-log?cursor=some-cursor", nil, "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/request-log?cursor=some-cursor",
+				nil,
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "request-log", "list"),
+			)
 			require.NoError(t, err)
 
 			cursorError := errors.New("bad cursor")

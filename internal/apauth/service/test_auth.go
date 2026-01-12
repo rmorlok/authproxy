@@ -18,6 +18,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 )
@@ -69,7 +70,7 @@ func TestAuthServiceWithDb(serviceId sconfig.ServiceId, cfg config.C, db databas
 	return cfg, hs, &AuthTestUtil{cfg: cfg, s: hs.(*service), serviceId: serviceId}
 }
 
-func (atu *AuthTestUtil) NewSignedRequestForActorExternalId(method, url string, body io.Reader, actorExternalId string) (*http.Request, error) {
+func (atu *AuthTestUtil) NewSignedRequestForActorExternalId(method, url string, body io.Reader, actorExternalId string, permissions []aschema.Permission) (*http.Request, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
@@ -79,7 +80,8 @@ func (atu *AuthTestUtil) NewSignedRequestForActorExternalId(method, url string, 
 		context.Background(),
 		req,
 		core.Actor{
-			ExternalId: actorExternalId,
+			ExternalId:  actorExternalId,
+			Permissions: permissions,
 		},
 	)
 	if err != nil {

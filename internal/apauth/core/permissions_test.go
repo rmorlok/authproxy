@@ -496,7 +496,7 @@ func TestPermissionsAllow(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := PermissionsAllow(tt.permissions, tt.namespace, tt.resource, tt.verb, tt.resourceId)
+			result := permissionsAllow(tt.permissions, tt.namespace, tt.resource, tt.verb, tt.resourceId)
 			require.Equal(t, tt.allowed, result)
 		})
 	}
@@ -712,7 +712,7 @@ func TestPermissionsAllowWithRestrictions(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := PermissionsAllowWithRestrictions(
+			result := permissionsAllowWithRestrictions(
 				tt.actorPermissions,
 				tt.restrictions,
 				tt.namespace,

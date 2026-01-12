@@ -18,6 +18,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/tasks"
 	"github.com/stretchr/testify/require"
@@ -72,7 +73,7 @@ func TestTasks(t *testing.T) {
 
 		t.Run("invalid encrypted task info", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/invalid-encrypted-task-info", nil, "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/invalid-encrypted-task-info", nil, "some-actor", aschema.NoPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -95,7 +96,7 @@ func TestTasks(t *testing.T) {
 			require.NoError(t, err)
 
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "unauthorized-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "unauthorized-actor", aschema.NoPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -122,7 +123,7 @@ func TestTasks(t *testing.T) {
 				Return(nil, asynq.ErrTaskNotFound)
 
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "some-actor", aschema.NoPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -149,7 +150,7 @@ func TestTasks(t *testing.T) {
 				Return(nil, errors.New("inspector error"))
 
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "some-actor", aschema.NoPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -171,7 +172,7 @@ func TestTasks(t *testing.T) {
 			require.NoError(t, err)
 
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "some-actor", aschema.NoPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -191,7 +192,7 @@ func TestTasks(t *testing.T) {
 			require.NoError(t, err)
 
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "some-actor", aschema.NoPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -229,7 +230,7 @@ func TestTasks(t *testing.T) {
 				Return(asynqTaskInfo, nil)
 
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "some-actor", aschema.NoPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -275,7 +276,7 @@ func TestTasks(t *testing.T) {
 				Return(asynqTaskInfo, nil)
 
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "some-actor")
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "some-actor", aschema.NoPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)

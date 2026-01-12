@@ -235,9 +235,31 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 }
 
 func (r *NamespacesRoutes) Register(g gin.IRouter) {
-	g.GET("/namespaces", r.authService.Required(), r.list)
-	g.POST("/namespaces", r.authService.Required(), r.create)
-	g.GET("/namespaces/:path", r.authService.Required(), r.get)
+	g.GET(
+		"/namespaces",
+		r.authService.NewRequiredBuilder().
+			ForResource("namespaces").
+			ForVerb("list").
+			Build(),
+		r.list,
+	)
+	g.POST(
+		"/namespaces",
+		r.authService.NewRequiredBuilder().
+			ForResource("namespaces").
+			ForVerb("create").
+			Build(),
+		r.create,
+	)
+	g.GET(
+		"/namespaces/:path",
+		r.authService.NewRequiredBuilder().
+			ForResource("namespaces").
+			ForIdField("path").
+			ForVerb("get").
+			Build(),
+		r.get,
+	)
 }
 
 func NewNamespacesRoutes(cfg config.C, authService auth.A, c coreIface.C) *NamespacesRoutes {

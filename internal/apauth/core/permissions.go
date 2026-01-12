@@ -117,11 +117,11 @@ func matchesResourceId(p aschema.Permission, targetResourceId string) bool {
 	return slices.Contains(p.ResourceIds, targetResourceId)
 }
 
-// PermissionsAllow checks if any permission in the slice allows the specified action.
+// permissionsAllow checks if any permission in the slice allows the specified action.
 // Permissions are additive - if any single permission allows the action, it is permitted.
 //
 // This is the primary function for checking if an actor has permission to perform an action.
-func PermissionsAllow(permissions []aschema.Permission, namespace, resource, verb, resourceId string) bool {
+func permissionsAllow(permissions []aschema.Permission, namespace, resource, verb, resourceId string) bool {
 	for _, p := range permissions {
 		if allows(p, namespace, resource, verb, resourceId) {
 			return true
@@ -131,7 +131,7 @@ func PermissionsAllow(permissions []aschema.Permission, namespace, resource, ver
 	return false
 }
 
-// PermissionsAllowWithRestrictions checks if an action is allowed by both the actor's permissions
+// permissionsAllowWithRestrictions checks if an action is allowed by both the actor's permissions
 // and any additional request-level restrictions.
 //
 // This implements the intersection of two permission sets:
@@ -145,13 +145,13 @@ func PermissionsAllow(permissions []aschema.Permission, namespace, resource, ver
 //   - actorPermissions: The permissions granted to the actor (user/service).
 //   - restrictions: Optional additional restrictions. If nil or empty, only actor permissions are checked.
 //   - namespace, resource, verb, resourceId: The action being checked.
-func PermissionsAllowWithRestrictions(
+func permissionsAllowWithRestrictions(
 	actorPermissions []aschema.Permission,
 	restrictions []aschema.Permission,
 	namespace, resource, verb, resourceId string,
 ) bool {
 	// First check if the actor's permissions allow the action
-	if !PermissionsAllow(actorPermissions, namespace, resource, verb, resourceId) {
+	if !permissionsAllow(actorPermissions, namespace, resource, verb, resourceId) {
 		return false
 	}
 
@@ -161,5 +161,5 @@ func PermissionsAllowWithRestrictions(
 	}
 
 	// Check if the restrictions also allow the action
-	return PermissionsAllow(restrictions, namespace, resource, verb, resourceId)
+	return permissionsAllow(restrictions, namespace, resource, verb, resourceId)
 }

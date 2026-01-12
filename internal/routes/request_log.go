@@ -275,8 +275,23 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 }
 
 func (r *RequestLogRoutes) Register(g gin.IRouter) {
-	g.GET("/request-log/:id", r.auth.Required(), r.get)
-	g.GET("/request-log", r.auth.Required(), r.list)
+	g.GET(
+		"/request-log/:id",
+		r.auth.NewRequiredBuilder().
+			ForResource("request-log").
+			ForIdField("id").
+			ForVerb("get").
+			Build(),
+		r.get,
+	)
+	g.GET(
+		"/request-log",
+		r.auth.NewRequiredBuilder().
+			ForResource("request-log").
+			ForVerb("list").
+			Build(),
+		r.list,
+	)
 }
 
 func NewRequestLogRoutes(

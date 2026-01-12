@@ -98,7 +98,7 @@ func (ra *RequestAuth) Allows(namespace, resource, verb, resourceId string) bool
 	actor := ra.GetActor()
 
 	// Check actor permissions with optional request-level restrictions
-	return PermissionsAllowWithRestrictions(
+	return permissionsAllowWithRestrictions(
 		actor.GetPermissions(),
 		ra.permissions,
 		namespace, resource, verb, resourceId,
@@ -119,13 +119,13 @@ func (ra *RequestAuth) AllowsReason(namespace, resource, verb, resourceId string
 	actor := ra.GetActor()
 
 	// Check actor permissions
-	if !PermissionsAllow(actor.GetPermissions(), namespace, resource, verb, resourceId) {
+	if !permissionsAllow(actor.GetPermissions(), namespace, resource, verb, resourceId) {
 		return false, "actor permissions do not allow this action"
 	}
 
 	// Check request-level restrictions if present
 	if len(ra.permissions) > 0 {
-		if !PermissionsAllow(ra.permissions, namespace, resource, verb, resourceId) {
+		if !permissionsAllow(ra.permissions, namespace, resource, verb, resourceId) {
 			return false, "request permissions do not allow this action"
 		}
 	}

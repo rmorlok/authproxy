@@ -63,3 +63,30 @@ func (p Permission) Validate() error {
 
 	return result.ErrorOrNil()
 }
+
+// NoPermissions returns an empty list of permissions.
+func NoPermissions() []Permission {
+	return []Permission{}
+}
+
+// AllPermissions returns a permission that matches all resources and verbs.
+func AllPermissions() []Permission {
+	return []Permission{
+		{
+			Namespace: "root.**",
+			Resources: []string{"*"},
+			Verbs:     []string{"*"},
+		},
+	}
+}
+
+// PermissionsSingle returns a permission that matches the specified resource and verb.
+func PermissionsSingle(namespace, resource, verb string) []Permission {
+	return []Permission{
+		{
+			Namespace: namespace,
+			Resources: []string{resource},
+			Verbs:     []string{verb},
+		},
+	}
+}

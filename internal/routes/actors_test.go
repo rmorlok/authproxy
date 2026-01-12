@@ -20,6 +20,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/stretchr/testify/require"
@@ -83,7 +84,15 @@ func TestActorsRoutes(t *testing.T) {
 	// Build an admin-authenticated request from a base request
 	adminize := func(t *testing.T, tu *TestSetup, req *http.Request) *http.Request {
 		var err error
-		req, err = tu.AuthUtil.SignRequestHeaderAs(context.Background(), req, coreAuth.Actor{ExternalId: "admin/test", Admin: true})
+		req, err = tu.AuthUtil.SignRequestHeaderAs(
+			context.Background(),
+			req,
+			coreAuth.Actor{
+				ExternalId:  "admin/test",
+				Admin:       true,
+				Permissions: aschema.AllPermissions(),
+			},
+		)
 		require.NoError(t, err)
 		return req
 	}

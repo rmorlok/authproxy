@@ -463,10 +463,40 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 }
 
 func (r *ConnectorsRoutes) Register(g gin.IRouter) {
-	g.GET("/connectors", r.authService.Required(), r.list)
-	g.GET("/connectors/:id", r.authService.Required(), r.get)
-	g.GET("/connectors/:id/versions", r.authService.Required(), r.listVersions)
-	g.GET("/connectors/:id/versions/:version", r.authService.Required(), r.getVersion)
+	g.GET(
+		"/connectors",
+		r.authService.NewRequiredBuilder().
+			ForResource("connectors").
+			ForVerb("list").
+			Build(),
+		r.list,
+	)
+	g.GET(
+		"/connectors/:id",
+		r.authService.NewRequiredBuilder().
+			ForResource("connectors").
+			ForIdField("id").
+			ForVerb("get").
+			Build(),
+		r.get,
+	)
+	g.GET("/connectors/:id/versions",
+		r.authService.NewRequiredBuilder().
+			ForResource("connectors").
+			ForIdField("id").
+			ForVerb("list/versions").
+			Build(),
+		r.listVersions,
+	)
+	g.GET(
+		"/connectors/:id/versions/:version",
+		r.authService.NewRequiredBuilder().
+			ForResource("connectors").
+			ForIdField("id").
+			ForVerb("list/versions").
+			Build(),
+		r.getVersion,
+	)
 }
 
 func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *ConnectorsRoutes {

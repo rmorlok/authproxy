@@ -102,8 +102,8 @@ func (pb *PermissionValidatorBuilder) getNamespace(c *gin.Context) string {
 		return pb.namespace
 	}
 
-	// Default to root namespace
-	return aschema.RootNamespace
+	// Default to skipping permission check at the namespace level
+	return aschema.NamespaceSkipNamespacePermissionChecks
 }
 
 // getResourceId extracts the resource ID from the request if an ID field is configured.
@@ -140,10 +140,7 @@ func (pb *PermissionValidatorBuilder) Build() gin.HandlerFunc {
 			return false, "not authenticated"
 		}
 
-		// Since we don't have access to gin.Context here (for namespace/resourceId),
-		// we check permissions in the middleware below using the stored config.
-		// This validator just ensures the actor is authenticated.
-		return true, ""
+		return ra.AllowsReason(pb.getNamespace(gctx), pb.resource, pb.verb, pb.getResourceId(gctx))
 	}
 
 	return pb.s.Required(permissionValidator)

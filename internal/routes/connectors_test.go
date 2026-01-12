@@ -19,6 +19,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/internal/httpf"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -100,7 +101,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("malformed id", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/bad-connector", nil, "some-actor")
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/bad-connector", nil, "some-actor", aschema.AllPermissions())
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
@@ -109,16 +110,37 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("invalid id", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001", nil, "some-actor")
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001", nil, "some-actor", aschema.AllPermissions())
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusNotFound, w.Code)
 			})
 
+			t.Run("forbidden", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors/10000000-0000-0000-0000-000000000001",
+					nil,
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "actors", "get"), // Wrong resource
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusForbidden, w.Code)
+			})
+
 			t.Run("valid", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/10000000-0000-0000-0000-000000000001", nil, "some-actor")
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors/10000000-0000-0000-0000-000000000001",
+					nil,
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "get"),
+				)
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
@@ -144,9 +166,30 @@ func TestConnectors(t *testing.T) {
 				require.Equal(t, http.StatusUnauthorized, w.Code)
 			})
 
+			t.Run("forbidden", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors?order=id%20asc",
+					nil,
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "delete"), // Wrong verb
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusForbidden, w.Code)
+			})
+
 			t.Run("valid", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors?order=id%20asc", nil, "some-actor")
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors?order=id%20asc",
+					nil,
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "list"),
+				)
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
@@ -164,7 +207,13 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("namespace filter", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors?order=id%20asc&namespace=root.child", nil, "some-actor")
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors?order=id%20asc&namespace=root.child",
+					nil,
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "list"),
+				)
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
@@ -195,7 +244,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("malformed id", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/bad-connector/versions/1", nil, "some-actor")
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/bad-connector/versions/1", nil, "some-actor", aschema.AllPermissions())
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
@@ -204,7 +253,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("invalid id", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001/versions/1", nil, "some-actor")
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001/versions/1", nil, "some-actor", aschema.AllPermissions())
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
@@ -213,16 +262,52 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("invalid version", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001/versions/999", nil, "some-actor")
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001/versions/999", nil, "some-actor", aschema.AllPermissions())
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusNotFound, w.Code)
 			})
 
+			t.Run("forbidden", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors/10000000-0000-0000-0000-000000000001/versions/1",
+					nil,
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "get"), // Wrong verb
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusForbidden, w.Code)
+			})
+
+			t.Run("forbidden", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors/10000000-0000-0000-0000-000000000001/versions/1",
+					nil,
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "get"), // Wrong verb
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusForbidden, w.Code)
+			})
+
 			t.Run("valid", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/10000000-0000-0000-0000-000000000001/versions/1", nil, "some-actor")
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors/10000000-0000-0000-0000-000000000001/versions/1",
+					nil,
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
+				)
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
@@ -249,7 +334,13 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("valid", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/10000000-0000-0000-0000-000000000001/versions?order=id%20asc", nil, "some-actor")
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors/10000000-0000-0000-0000-000000000001/versions?order=id%20asc",
+					nil,
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
+				)
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
@@ -265,7 +356,13 @@ func TestConnectors(t *testing.T) {
 			t.Run("namespace filter", func(t *testing.T) {
 				w := httptest.NewRecorder()
 				// Namespace filter doesn't actually make sense here because versions can't change namespaces
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/10000000-0000-0000-0000-000000000001/versions?order=id%20asc&namespace=root.child", nil, "some-actor")
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors/10000000-0000-0000-0000-000000000001/versions?order=id%20asc&namespace=root.child",
+					nil,
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
+				)
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)

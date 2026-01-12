@@ -276,12 +276,12 @@ func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 	}
 
 	ctx := gctx.Request.Context()
-	externalId := gctx.Param("externalId")
+	externalId := gctx.Param("external_id")
 
 	if externalId == "" {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
-			WithResponseMsg("externalId is required").
+			WithResponseMsg("external_id is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
 	}
@@ -399,12 +399,12 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 
 func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
-	externalId := gctx.Param("externalId")
+	externalId := gctx.Param("external_id")
 
 	if externalId == "" {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
-			WithResponseMsg("externalId is required").
+			WithResponseMsg("external_id is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
 		return
@@ -468,11 +468,50 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 }
 
 func (r *ActorsRoutes) Register(g gin.IRouter) {
-	g.GET("/actors", r.auth.AdminOnly(), r.list)
-	g.GET("/actors/external-id/:externalId", r.auth.AdminOnly(), r.getByExternalId)
-	g.DELETE("/actors/external-id/:externalId", r.auth.AdminOnly(), r.deleteByExternalId)
-	g.GET("/actors/:id", r.auth.AdminOnly(), r.get)
-	g.DELETE("/actors/:id", r.auth.AdminOnly(), r.delete)
+	g.GET(
+		"/actors",
+		r.auth.NewRequiredBuilder().
+			ForResource("actors").
+			ForVerb("list").
+			Build(),
+		r.list,
+	)
+	g.GET(
+		"/actors/external-id/:external_id",
+		r.auth.NewRequiredBuilder().
+			ForResource("actors").
+			ForIdField("external_id").
+			ForVerb("get").
+			Build(),
+		r.getByExternalId,
+	)
+	g.DELETE(
+		"/actors/external-id/:external_id",
+		r.auth.NewRequiredBuilder().
+			ForResource("actors").
+			ForIdField("external_id").
+			ForVerb("delete").
+			Build(),
+		r.deleteByExternalId,
+	)
+	g.GET(
+		"/actors/:id",
+		r.auth.NewRequiredBuilder().
+			ForResource("actors").
+			ForIdField("id").
+			ForVerb("get").
+			Build(),
+		r.get,
+	)
+	g.DELETE(
+		"/actors/:id",
+		r.auth.NewRequiredBuilder().
+			ForResource("actors").
+			ForIdField("id").
+			ForVerb("delete").
+			Build(),
+		r.delete,
+	)
 }
 
 func NewActorsRoutes(

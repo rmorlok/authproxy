@@ -2,6 +2,9 @@ package routes
 
 import (
 	"errors"
+	"net/http"
+	"time"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
@@ -11,8 +14,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/tasks"
-	"net/http"
-	"time"
 )
 
 type TaskRoutes struct {
@@ -191,7 +192,11 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 }
 
 func (r *TaskRoutes) Register(g gin.IRouter) {
-	g.GET("/tasks/:encryptedTaskInfo", r.auth.Required(), r.get)
+	g.GET(
+		"/tasks/:encryptedTaskInfo",
+		r.auth.Required(),
+		r.get,
+	) // Not covered by permissions because of encrypted field-based permission checking
 }
 
 func NewTaskRoutes(
