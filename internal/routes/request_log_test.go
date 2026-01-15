@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
@@ -243,6 +244,120 @@ func TestRequestLogRoutes(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+	})
+
+	t.Run("get", func(t *testing.T) {
+		tu := setup(t, nil)
+		testId := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
+		otherId := uuid.MustParse("660e8400-e29b-41d4-a716-446655440001")
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/request-log/"+testId.String(), nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/request-log/"+testId.String(),
+				nil,
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connectors", "get"), // Wrong resource
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("allowed with matching resource id permission", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/request-log/"+testId.String(),
+				nil,
+				"some-actor",
+				aschema.PermissionsSingleWithResourceIds("root.**", "request-log", "get", testId.String()),
+			)
+			require.NoError(t, err)
+
+			entry := &request_log.Entry{
+				Id:        testId,
+				Namespace: "root",
+				Timestamp: time.Now().UTC(),
+			}
+
+			tu.MockRetriever.EXPECT().
+				GetFullLog(gomock.Any(), testId).
+				Return(entry, nil)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+		})
+
+		t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/request-log/"+testId.String(),
+				nil,
+				"some-actor",
+				aschema.PermissionsSingleWithResourceIds("root.**", "request-log", "get", otherId.String()),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/request-log/"+testId.String(),
+				nil,
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "request-log", "get"),
+			)
+			require.NoError(t, err)
+
+			tu.MockRetriever.EXPECT().
+				GetFullLog(gomock.Any(), testId).
+				Return(nil, request_log.ErrNotFound)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("valid", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/request-log/"+testId.String(),
+				nil,
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "request-log", "get"),
+			)
+			require.NoError(t, err)
+
+			entry := &request_log.Entry{
+				Id:        testId,
+				Namespace: "root",
+				Timestamp: time.Now().UTC(),
+			}
+
+			tu.MockRetriever.EXPECT().
+				GetFullLog(gomock.Any(), testId).
+				Return(entry, nil)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
 		})
 	})
 }

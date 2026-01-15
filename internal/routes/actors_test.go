@@ -176,6 +176,7 @@ func TestActorsRoutes(t *testing.T) {
 		defer done()
 
 		a := createActor(t, tu.Db, "user/10", "u10@example.com", false, false)
+		otherId := uuid.New()
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
@@ -184,6 +185,21 @@ func TestActorsRoutes(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/actors/"+a.Id.String(),
+				nil,
+				"some-actor",
+				aschema.PermissionsSingleWithResourceIds("root.**", "actors", "get", otherId.String()),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
 		})
 
 		t.Run("bad uuid", func(t *testing.T) {
@@ -237,6 +253,21 @@ func TestActorsRoutes(t *testing.T) {
 			require.Equal(t, http.StatusUnauthorized, w.Code)
 		})
 
+		t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/actors/external-id/"+a.ExternalId,
+				nil,
+				"some-actor",
+				aschema.PermissionsSingleWithResourceIds("root.**", "actors", "get", "other-external-id"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
 		t.Run("not found", func(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := http.NewRequest(http.MethodGet, "/actors/external-id/does-not-exist", nil)
@@ -268,6 +299,7 @@ func TestActorsRoutes(t *testing.T) {
 		defer done()
 
 		a := createActor(t, tu.Db, "user/30", "u30@example.com", false, false)
+		otherId := uuid.New()
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
@@ -276,6 +308,21 @@ func TestActorsRoutes(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodDelete,
+				"/actors/"+a.Id.String(),
+				nil,
+				"some-actor",
+				aschema.PermissionsSingleWithResourceIds("root.**", "actors", "delete", otherId.String()),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
 		})
 
 		t.Run("bad uuid", func(t *testing.T) {
@@ -326,6 +373,21 @@ func TestActorsRoutes(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodDelete,
+				"/actors/external-id/"+a.ExternalId,
+				nil,
+				"some-actor",
+				aschema.PermissionsSingleWithResourceIds("root.**", "actors", "delete", "other-external-id"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
 		})
 
 		t.Run("not found returns 204", func(t *testing.T) {

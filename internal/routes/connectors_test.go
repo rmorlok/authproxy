@@ -132,6 +132,56 @@ func TestConnectors(t *testing.T) {
 				require.Equal(t, http.StatusForbidden, w.Code)
 			})
 
+			t.Run("allowed with matching resource id permission", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors/10000000-0000-0000-0000-000000000001",
+					nil,
+					"some-actor",
+					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "get", "10000000-0000-0000-0000-000000000001"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp ConnectorJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Equal(t, uuid.MustParse("10000000-0000-0000-0000-000000000001"), resp.Id)
+			})
+
+			t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors/10000000-0000-0000-0000-000000000001",
+					nil,
+					"some-actor",
+					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "get", "20000000-0000-0000-0000-000000000002"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusForbidden, w.Code)
+			})
+
+			t.Run("allowed with multiple resource ids including target", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors/10000000-0000-0000-0000-000000000001",
+					nil,
+					"some-actor",
+					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "get", "20000000-0000-0000-0000-000000000002", "10000000-0000-0000-0000-000000000001"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+			})
+
 			t.Run("valid", func(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -284,14 +334,34 @@ func TestConnectors(t *testing.T) {
 				require.Equal(t, http.StatusForbidden, w.Code)
 			})
 
-			t.Run("forbidden", func(t *testing.T) {
+			t.Run("allowed with matching resource id permission", func(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
 					"/connectors/10000000-0000-0000-0000-000000000001/versions/1",
 					nil,
 					"some-actor",
-					aschema.PermissionsSingle("root.**", "connectors", "get"), // Wrong verb
+					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "list/versions", "10000000-0000-0000-0000-000000000001"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp ConnectorVersionJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Equal(t, uuid.MustParse("10000000-0000-0000-0000-000000000001"), resp.Id)
+			})
+
+			t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors/10000000-0000-0000-0000-000000000001/versions/1",
+					nil,
+					"some-actor",
+					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "list/versions", "20000000-0000-0000-0000-000000000002"),
 				)
 				require.NoError(t, err)
 
