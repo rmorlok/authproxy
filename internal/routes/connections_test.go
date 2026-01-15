@@ -139,6 +139,63 @@ func TestConnections(t *testing.T) {
 			require.Equal(t, u, resp.Id)
 			require.Equal(t, database.ConnectionStateCreated, resp.State)
 		})
+
+		t.Run("allowed with matching resource id permission", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/"+u.String(),
+				nil,
+				"some-actor",
+				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "get", u.String()),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ConnectionJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Equal(t, u, resp.Id)
+		})
+
+		t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
+			otherResourceId := uuid.New()
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/"+u.String(),
+				nil,
+				"some-actor",
+				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "get", otherResourceId.String()),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("allowed with multiple resource ids including target", func(t *testing.T) {
+			otherResourceId := uuid.New()
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/"+u.String(),
+				nil,
+				"some-actor",
+				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "get", otherResourceId.String(), u.String()),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ConnectionJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Equal(t, u, resp.Id)
+		})
 	})
 
 	t.Run("list connections", func(t *testing.T) {
@@ -337,6 +394,47 @@ func TestConnections(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, u, resp.Id)
 			require.Equal(t, database.ConnectionStateDisconnected, resp.State)
+		})
+
+		t.Run("allowed with matching resource id permission", func(t *testing.T) {
+			// Reset state first
+			err := tu.Db.SetConnectionState(context.Background(), u, database.ConnectionStateCreated)
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/connections/"+u.String()+"/_force_state",
+				util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}),
+				"some-actor",
+				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "force_state", u.String()),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ConnectionJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Equal(t, u, resp.Id)
+			require.Equal(t, database.ConnectionStateDisconnected, resp.State)
+		})
+
+		t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
+			otherResourceId := uuid.New()
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/connections/"+u.String()+"/_force_state",
+				util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateReady}),
+				"some-actor",
+				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "force_state", otherResourceId.String()),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
 		})
 	})
 }

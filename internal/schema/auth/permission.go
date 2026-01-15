@@ -90,3 +90,16 @@ func PermissionsSingle(namespace, resource, verb string) []Permission {
 		},
 	}
 }
+
+// PermissionsSingleWithResourceIds returns a permission that matches the specified resource,
+// verb, and resource IDs.
+func PermissionsSingleWithResourceIds(namespace, resource, verb string, resourceIds ...string) []Permission {
+	return []Permission{
+		{
+			Namespace:   namespace,
+			Resources:   []string{resource},
+			ResourceIds: resourceIds,
+			Verbs:       []string{verb},
+		},
+	}
+}
