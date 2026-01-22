@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/rmorlok/authproxy/internal/apauth/core"
+	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -17,8 +18,12 @@ import (
  * heavily tied to the request/response structure, it also deeply depends on the connector configuration logic.
  */
 
+// InitiateConnection starts the process of initiating the connection. This method provides auth validation as part of
+// the logic.
 func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConnectionRequest) (iface.InitiateConnectionResponse, error) {
+	val := auth.MustGetValidatorFromContext(ctx)
 	if err := req.Validate(); err != nil {
+		val.MarkErrorReturn()
 		return nil, api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithPublicErr(err).
@@ -34,6 +39,8 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 	}
 
 	if err != nil {
+		val.MarkErrorReturn()
+
 		if errors.Is(err, ErrNotFound) {
 			return nil, api_common.NewHttpStatusErrorBuilder().
 				WithStatusNotFound().
@@ -53,6 +60,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 	}
 
 	if err := aschema.ValidateNamespacePath(targetNamespace); err != nil {
+		val.MarkErrorReturn()
 		return nil, api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsgf("invalid namespace '%s'", targetNamespace).
@@ -61,14 +69,26 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 	}
 
 	if !aschema.NamespaceIsSameOrChild(cv.GetNamespace(), targetNamespace) {
+		val.MarkErrorReturn()
 		return nil, api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsgf("target namespace '%s' is not a child of the connector's namespace '%s'", targetNamespace, cv.GetNamespace()).
 			BuildStatusError()
 	}
 
+	// Primary validation for the request -- make sure the user can initiate connections in the target namespace with
+	// the specified connector id.
+	if err := val.ValidateNamespaceResourceId(targetNamespace, cv.GetId().String()); err != nil {
+		val.MarkErrorReturn()
+		return nil, api_common.NewHttpStatusErrorBuilder().
+			WithStatusForbidden().
+			WithPublicErr(err).
+			BuildStatusError()
+	}
+
 	_, err = s.EnsureNamespaceAncestorPath(ctx, targetNamespace)
 	if err != nil {
+		val.MarkErrorReturn()
 		return nil, api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().
 			WithInternalErr(err).
@@ -77,6 +97,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 
 	connection, err := s.CreateConnection(ctx, targetNamespace, cv)
 	if err != nil {
+		val.MarkErrorReturn()
 		return nil, api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().
 			WithInternalErr(err).
@@ -86,6 +107,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 	connector := cv.GetDefinition()
 	if _, ok := connector.Auth.Inner().(*config.AuthOAuth2); ok {
 		if req.ReturnToUrl == "" {
+			val.MarkErrorReturn()
 			return nil, api_common.NewHttpStatusErrorBuilder().
 				WithStatusBadRequest().
 				WithResponseMsg("must specify return_to_url").
@@ -96,6 +118,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 		o2 := s.getOAuth2Factory().NewOAuth2(connection)
 		url, err := o2.SetStateAndGeneratePublicUrl(ctx, ra.MustGetActor(), req.ReturnToUrl)
 		if err != nil {
+			val.MarkErrorReturn()
 			return nil, api_common.NewHttpStatusErrorBuilder().
 				WithStatusInternalServerError().
 				WithInternalErr(err).
@@ -109,6 +132,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 		}, nil
 	}
 
+	val.MarkErrorReturn()
 	return nil, api_common.NewHttpStatusErrorBuilder().
 		WithStatusInternalServerError().
 		WithResponseMsg("unsupported connector auth type").

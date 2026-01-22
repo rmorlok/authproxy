@@ -7,6 +7,83 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+func TestNamespaceMatches(t *testing.T) {
+	tests := []struct {
+		name      string
+		matcher   string
+		namespace string
+		result    bool
+	}{
+		{
+			name:      "ExactMatch",
+			matcher:   "root.child",
+			namespace: "root.child",
+			result:    true,
+		},
+		{
+			name:      "MatchWithWildcardSuffix",
+			matcher:   "root.child.**",
+			namespace: "root.child.grandchild",
+			result:    true,
+		},
+		{
+			name:      "WildcardSuffixMatchBaseNamespace",
+			matcher:   "root.child.**",
+			namespace: "root.child",
+			result:    true,
+		},
+		{
+			name:      "NoMatchWithoutWildcard",
+			matcher:   "root.child",
+			namespace: "root.child.grandchild",
+			result:    false,
+		},
+		{
+			name:      "NoMatchWithWildcardAndMismatchingNamespace",
+			matcher:   "root.child.**",
+			namespace: "root.anotherchild",
+			result:    false,
+		},
+		{
+			name:      "EmptyMatcher",
+			matcher:   "",
+			namespace: "root.child",
+			result:    false,
+		},
+		{
+			name:      "EmptyNamespace",
+			matcher:   "root.child",
+			namespace: "",
+			result:    false,
+		},
+		{
+			name:      "BothEmpty",
+			matcher:   "",
+			namespace: "",
+			result:    false,
+		},
+		{
+			name:      "MatchWithNonExactChild",
+			matcher:   "root.**",
+			namespace: "root.child1.grandchild",
+			result:    true,
+		},
+		{
+			name:      "MismatchedNamespaceWithNoRelation",
+			matcher:   "root.child",
+			namespace: "anotherroot.child",
+			result:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result := NamespaceMatches(tt.matcher, tt.namespace)
+			require.Equal(t, tt.result, result)
+		})
+	}
+}
+
 func TestNamespaces(t *testing.T) {
 	t.Run("path", func(t *testing.T) {
 		t.Run("validation", func(t *testing.T) {
@@ -495,4 +572,105 @@ func TestNamespaces(t *testing.T) {
 			})
 		}
 	})
+}
+
+func TestNamespaceMatcherConstrained(t *testing.T) {
+	tests := []struct {
+		name     string
+		matcher1 string
+		matcher2 string
+		ok       bool
+		result   string
+	}{
+		{
+			name:     "ExactMatch",
+			matcher1: "root.child",
+			matcher2: "root.child",
+			ok:       true,
+			result:   "root.child",
+		},
+		{
+			name:     "ExactMatch wildcard",
+			matcher1: "root.child.**",
+			matcher2: "root.child.**",
+			ok:       true,
+			result:   "root.child.**",
+		},
+		{
+			name:     "MatchWithWildcardSuffix",
+			matcher1: "root.child.**",
+			matcher2: "root.child.grandchild",
+			result:   "root.child.grandchild",
+			ok:       true,
+		},
+		{
+			name:     "WildcardSuffixMatchBaseNamespace",
+			matcher1: "root.child.**",
+			matcher2: "root.child",
+			ok:       true,
+			result:   "root.child",
+		},
+		{
+			name:     "Wildcard must apply on separator boundary",
+			matcher1: "root.child.**",
+			matcher2: "root.children",
+			ok:       false,
+		},
+		{
+			name:     "NoMatchWithoutWildcard",
+			matcher1: "root.child",
+			matcher2: "root.child.grandchild",
+			ok:       false,
+		},
+		{
+			name:     "NoMatchWithWildcardAndMismatchingNamespace",
+			matcher1: "root.child.**",
+			matcher2: "root.anotherchild",
+			ok:       false,
+		},
+		{
+			name:     "EmptyMatcher",
+			matcher1: "",
+			matcher2: "root.child",
+			ok:       false,
+		},
+		{
+			name:     "BothEmpty",
+			matcher1: "",
+			matcher2: "",
+			ok:       false,
+		},
+		{
+			name:     "MatchWithNonExactChild",
+			matcher1: "root.**",
+			matcher2: "root.child1.grandchild",
+			ok:       true,
+			result:   "root.child1.grandchild",
+		},
+		{
+			name:     "Constrained wildcard",
+			matcher1: "root.child.**",
+			matcher2: "root.child.grandchild.**",
+			ok:       true,
+			result:   "root.child.grandchild.**",
+		},
+		{
+			name:     "MismatchedNamespaceWithNoRelation",
+			matcher1: "root.child",
+			matcher2: "anotherroot.child",
+			ok:       false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			result, ok := NamespaceMatcherConstrained(tt.matcher1, tt.matcher2)
+			require.Equal(t, tt.ok, ok)
+			require.Equal(t, tt.result, result)
+
+			result, ok = NamespaceMatcherConstrained(tt.matcher2, tt.matcher1)
+			require.Equal(t, tt.ok, ok)
+			require.Equal(t, tt.result, result)
+		})
+	}
 }

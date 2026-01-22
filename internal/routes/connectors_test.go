@@ -76,7 +76,7 @@ func TestConnectors(t *testing.T) {
 
 		cr := NewConnectorsRoutes(cfg, auth, c)
 
-		r := gin.Default()
+		r := gin.New()
 		cr.Register(r)
 
 		return &TestSetup{

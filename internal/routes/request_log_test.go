@@ -37,7 +37,7 @@ func TestRequestLogRoutes(t *testing.T) {
 		rlr := mock.NewMockLogRetriever(ctrl)
 		rl := NewRequestLogRoutes(cfg, auth, rlr)
 
-		r := gin.Default()
+		r := gin.New()
 		rl.Register(r)
 
 		return &TestSetup{

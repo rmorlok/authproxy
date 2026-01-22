@@ -348,7 +348,7 @@ func TestActor(t *testing.T) {
 
 			total := 10
 			cursor := result.Cursor
-			var last Actor
+			var last *Actor
 
 			for cursor != "" {
 				ex, err := db.ListActorsFromCursor(ctx, cursor)
@@ -367,9 +367,9 @@ func TestActor(t *testing.T) {
 		})
 
 		t.Run("reverse order", func(t *testing.T) {
-			var allResults []Actor
+			var allResults []*Actor
 			q := db.ListActorsBuilder().Limit(7).OrderBy(ActorOrderByCreatedAt, pagination.OrderByDesc)
-			err := q.Enumerate(ctx, func(result pagination.PageResult[Actor]) (bool, error) {
+			err := q.Enumerate(ctx, func(result pagination.PageResult[*Actor]) (bool, error) {
 				allResults = append(allResults, result.Results...)
 				return true, nil
 			})

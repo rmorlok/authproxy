@@ -47,7 +47,7 @@ func TestTasks(t *testing.T) {
 
 		tr := NewTaskRoutes(cfg, auth, e, mockInspector)
 
-		r := gin.Default()
+		r := gin.New()
 		tr.Register(r)
 
 		return &TestSetup{
