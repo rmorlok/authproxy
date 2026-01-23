@@ -17,6 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -482,6 +483,77 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				require.Equal(t, testClaims().Actor.ExternalId, ra.MustGetActor().ExternalId)
 				require.Equal(t, testClaims().Actor.Email, ra.MustGetActor().Email)
 			})
+
+			t.Run("actor permissions updated in database", func(t *testing.T) {
+				setup(t)
+
+				dbActorId := uuid.New()
+				externalId := "perm-test-actor"
+				oldPerms := database.Permissions{
+					{
+						Namespace: "root",
+						Resources: []string{"connections"},
+						Verbs:     []string{"read"},
+					},
+				}
+				dbActor := &database.Actor{
+					Id:          dbActorId,
+					ExternalId:  externalId,
+					Email:       "permtest@example.com",
+					Permissions: oldPerms,
+				}
+				require.NoError(t, db.CreateActor(testContext, dbActor))
+
+				// Verify old permissions are in DB
+				retrieved, err := db.GetActorByExternalId(testContext, externalId)
+				require.NoError(t, err)
+				require.Equal(t, oldPerms, retrieved.Permissions)
+
+				// Create JWT with new permissions
+				newPerms := []aschema.Permission{
+					{
+						Namespace: "root",
+						Resources: []string{"connections", "connectors"},
+						Verbs:     []string{"read", "create", "delete"},
+					},
+				}
+				claims := &jwt2.AuthProxyClaims{
+					RegisteredClaims: jwt.RegisteredClaims{
+						ID:        "random id",
+						Subject:   externalId,
+						Issuer:    "remark42",
+						Audience:  []string{string(sconfig.ServiceIdAdminApi)},
+						ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
+						NotBefore: &jwt.NumericDate{time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
+						IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
+					},
+					Actor: &core.Actor{
+						ExternalId:  externalId,
+						Email:       "permtest@example.com",
+						Permissions: newPerms,
+					},
+				}
+
+				tok, err := a.Token(testContext, claims)
+				require.NoError(t, err)
+
+				req := httptest.NewRequest("GET", "/", nil)
+				req.Header.Add(JwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
+				w := httptest.NewRecorder()
+				ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
+				require.NoError(t, err)
+				require.True(t, ra.IsAuthenticated())
+				require.Equal(t, externalId, ra.MustGetActor().ExternalId)
+
+				// Verify the returned auth has new permissions
+				require.Equal(t, newPerms, ra.MustGetActor().Permissions)
+
+				// Verify the database was updated with new permissions
+				retrieved, err = db.GetActorByExternalId(testContext, externalId)
+				require.NoError(t, err)
+				require.Equal(t, dbActorId, retrieved.Id, "should preserve original database ID")
+				require.Equal(t, database.Permissions(newPerms), retrieved.Permissions, "permissions should be updated in database")
+			})
 		})
 
 		t.Run("expired", func(t *testing.T) {
@@ -560,6 +632,187 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			_, err := raw.establishAuthFromRequest(testContext, true, req, w)
 			require.NotNil(t, err)
 		})
+	})
+}
+
+func TestAuth_AdminPermissionsSync(t *testing.T) {
+	// Test that admin permissions are synced from config when the admin already exists in DB
+	configPerms := []aschema.Permission{
+		{
+			Namespace: "root",
+			Resources: []string{"connections", "connectors"},
+			Verbs:     []string{"read", "create", "delete"},
+		},
+	}
+
+	adminConfig := sconfig.Root{
+		SystemAuth: sconfig.SystemAuth{
+			AdminEmailDomain:    "example.com",
+			JwtTokenDurationVal: 12 * time.Hour,
+			JwtIssuerVal:        "example",
+			JwtSigningKey: &sconfig.Key{
+				InnerVal: &sconfig.KeyPublicPrivate{
+					PublicKey: &sconfig.KeyData{
+						InnerVal: &sconfig.KeyDataFile{
+							Path: pathToTestData("system_keys/system.pub"),
+						},
+					},
+					PrivateKey: &sconfig.KeyData{
+						InnerVal: &sconfig.KeyDataFile{
+							Path: pathToTestData("system_keys/system"),
+						},
+					},
+				},
+			},
+			AdminUsers: &sconfig.AdminUsers{
+				InnerVal: sconfig.AdminUsersList{
+					&sconfig.AdminUser{
+						Username:    "aid1",
+						Permissions: configPerms,
+						Key: &sconfig.Key{
+							InnerVal: &sconfig.KeyPublicPrivate{
+								PublicKey: &sconfig.KeyData{
+									InnerVal: &sconfig.KeyDataFile{
+										Path: pathToTestData("system_keys/system.pub"),
+									},
+								},
+								PrivateKey: &sconfig.KeyData{
+									InnerVal: &sconfig.KeyDataFile{
+										Path: pathToTestData("system_keys/system"),
+									},
+								},
+							},
+						},
+					},
+				},
+			},
+			GlobalAESKey: &sconfig.KeyData{
+				InnerVal: &sconfig.KeyDataBase64Val{
+					Base64: "tOqE5HtiujnwB7pXt6lQLH8/gCh6TmMq9uSLFtJxZtU=",
+				},
+			},
+		},
+		AdminApi: sconfig.ServiceAdminApi{
+			ServiceHttp: sconfig.ServiceHttp{
+				PortVal: &sconfig.StringValue{&sconfig.StringValueDirect{Value: "8080"}},
+			},
+		},
+	}
+
+	var a A
+	var raw *service
+	var db database.DB
+
+	setup := func(t *testing.T) {
+		cfg := config.FromRoot(&adminConfig)
+		cfg, db = database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+		a = NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), db, nil, nil, test_utils.NewTestLogger())
+		raw = a.(*service)
+	}
+
+	t.Run("admin permissions synced from config on existing actor", func(t *testing.T) {
+		setup(t)
+
+		adminExternalId := "admin/aid1"
+		oldPerms := database.Permissions{
+			{
+				Namespace: "root",
+				Resources: []string{"connections"},
+				Verbs:     []string{"read"},
+			},
+		}
+
+		// Create admin actor in database with OLD permissions
+		dbActorId := uuid.New()
+		dbActor := &database.Actor{
+			Id:          dbActorId,
+			ExternalId:  adminExternalId,
+			Email:       "aid1@example.com",
+			Admin:       true,
+			Permissions: oldPerms,
+		}
+		require.NoError(t, db.CreateActor(testContext, dbActor))
+
+		// Verify old permissions are in DB
+		retrieved, err := db.GetActorByExternalId(testContext, adminExternalId)
+		require.NoError(t, err)
+		require.Equal(t, oldPerms, retrieved.Permissions)
+
+		// Create JWT for admin WITHOUT Actor field (should sync from config)
+		claims := &jwt2.AuthProxyClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				ID:        "random id",
+				Subject:   adminExternalId,
+				Issuer:    "remark42",
+				Audience:  []string{string(sconfig.ServiceIdAdminApi)},
+				ExpiresAt: &jwt.NumericDate{Time: time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
+				NotBefore: &jwt.NumericDate{Time: time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
+				IssuedAt:  &jwt.NumericDate{Time: apctx.GetClock(testContext).Now()},
+			},
+			Actor: nil, // No actor - should sync from config
+		}
+
+		tok, err := a.Token(testContext, claims)
+		require.NoError(t, err)
+
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Add(JwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
+		w := httptest.NewRecorder()
+		ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
+		require.NoError(t, err)
+		require.True(t, ra.IsAuthenticated())
+		require.Equal(t, adminExternalId, ra.MustGetActor().ExternalId)
+		require.True(t, ra.MustGetActor().Admin)
+
+		// Verify the returned auth has new permissions from config
+		require.Equal(t, configPerms, ra.MustGetActor().Permissions)
+
+		// Verify the database was updated with new permissions from config
+		retrieved, err = db.GetActorByExternalId(testContext, adminExternalId)
+		require.NoError(t, err)
+		require.Equal(t, dbActorId, retrieved.Id, "should preserve original database ID")
+		require.Equal(t, database.Permissions(configPerms), retrieved.Permissions, "permissions should be updated from config")
+	})
+
+	t.Run("admin created with permissions from config", func(t *testing.T) {
+		setup(t)
+
+		adminExternalId := "admin/aid1"
+
+		// Create JWT for admin WITHOUT Actor field (should create from config)
+		claims := &jwt2.AuthProxyClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				ID:        "random id",
+				Subject:   adminExternalId,
+				Issuer:    "remark42",
+				Audience:  []string{string(sconfig.ServiceIdAdminApi)},
+				ExpiresAt: &jwt.NumericDate{Time: time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
+				NotBefore: &jwt.NumericDate{Time: time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
+				IssuedAt:  &jwt.NumericDate{Time: apctx.GetClock(testContext).Now()},
+			},
+			Actor: nil, // No actor - should create from config
+		}
+
+		tok, err := a.Token(testContext, claims)
+		require.NoError(t, err)
+
+		req := httptest.NewRequest("GET", "/", nil)
+		req.Header.Add(JwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
+		w := httptest.NewRecorder()
+		ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
+		require.NoError(t, err)
+		require.True(t, ra.IsAuthenticated())
+		require.Equal(t, adminExternalId, ra.MustGetActor().ExternalId)
+		require.True(t, ra.MustGetActor().Admin)
+
+		// Verify the returned auth has permissions from config
+		require.Equal(t, configPerms, ra.MustGetActor().Permissions)
+
+		// Verify the database has the admin with correct permissions
+		retrieved, err := db.GetActorByExternalId(testContext, adminExternalId)
+		require.NoError(t, err)
+		require.Equal(t, database.Permissions(configPerms), retrieved.Permissions, "permissions should match config")
+		require.True(t, retrieved.Admin)
 	})
 }
 
