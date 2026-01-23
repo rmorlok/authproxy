@@ -29,6 +29,10 @@ type Namespace struct {
 	DeletedAt *time.Time
 }
 
+func (ns *Namespace) GetNamespace() string {
+	return ns.Path
+}
+
 func (ns *Namespace) cols() []string {
 	return []string{
 		"path",

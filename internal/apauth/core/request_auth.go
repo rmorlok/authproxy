@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"slices"
 
 	"github.com/google/uuid"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
@@ -76,6 +77,51 @@ func (ra *RequestAuth) GetPermissions() []aschema.Permission {
 // When set, actions must be allowed by both actor permissions AND these restrictions.
 func (ra *RequestAuth) SetPermissions(permissions []aschema.Permission) {
 	ra.permissions = permissions
+}
+
+func (ra *RequestAuth) GetNamespacesAllowed(resource, verb string) []string {
+	if ra == nil || !ra.IsAuthenticated() {
+		return nil
+	}
+
+	candidateNamespaces := make([]string, 0, len(ra.actor.Permissions))
+	for _, permission := range ra.actor.Permissions {
+		appliesToResource := slices.Contains(permission.Resources, resource) ||
+			slices.Contains(permission.Resources, aschema.PermissionWildcard)
+		appliesToVerb := slices.Contains(permission.Verbs, verb) ||
+			slices.Contains(permission.Verbs, aschema.PermissionWildcard)
+
+		if appliesToResource && appliesToVerb {
+			candidateNamespaces = append(candidateNamespaces, permission.Namespace)
+		}
+	}
+
+	var finalNamespaces []string
+
+	if len(ra.permissions) > 0 {
+		finalNamespaces = make([]string, 0, len(candidateNamespaces))
+
+		for _, permission := range ra.permissions {
+			appliesToResource := slices.Contains(permission.Resources, resource) ||
+				slices.Contains(permission.Resources, aschema.PermissionWildcard)
+			appliesToVerb := slices.Contains(permission.Verbs, verb) ||
+				slices.Contains(permission.Verbs, aschema.PermissionWildcard)
+
+			if appliesToResource && appliesToVerb {
+				for _, candidateNamespace := range candidateNamespaces {
+					if restricted, ok := aschema.NamespaceMatcherConstrained(permission.Namespace, candidateNamespace); ok {
+						finalNamespaces = append(finalNamespaces, restricted)
+					}
+				}
+			}
+		}
+	} else {
+		finalNamespaces = candidateNamespaces
+	}
+
+	// Only return unique namespaces
+	slices.Sort(finalNamespaces)
+	return slices.Compact(finalNamespaces)
 }
 
 // Allows checks if this request is authorized to perform the specified action.

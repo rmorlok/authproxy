@@ -456,3 +456,603 @@ func TestRequestAuth_AllowsReason(t *testing.T) {
 		})
 	}
 }
+
+func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
+	tests := []struct {
+		name       string
+		ra         *RequestAuth
+		resource   string
+		verb       string
+		namespaces []string
+	}{
+		{
+			name:       "nil RequestAuth",
+			ra:         nil,
+			resource:   "connections",
+			verb:       "get",
+			namespaces: nil,
+		},
+		{
+			name:       "unauthenticated",
+			ra:         NewUnauthenticatedRequestAuth(),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: nil,
+		},
+		{
+			name: "no permission verb",
+			ra: NewAuthenticatedRequestAuth(&Actor{
+				Id:         uuid.New(),
+				ExternalId: "user",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.other",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			}),
+			resource:   "connections",
+			verb:       "force_state",
+			namespaces: []string{},
+		},
+		{
+			name: "no permission resource",
+			ra: NewAuthenticatedRequestAuth(&Actor{
+				Id:         uuid.New(),
+				ExternalId: "user",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.other",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			}),
+			resource:   "actors",
+			verb:       "get",
+			namespaces: []string{},
+		},
+		{
+			name: "single permission",
+			ra: NewAuthenticatedRequestAuth(&Actor{
+				Id:         uuid.New(),
+				ExternalId: "user",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.other",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			}),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: []string{"root.other"},
+		},
+		{
+			name: "multiple permissions",
+			ra: NewAuthenticatedRequestAuth(&Actor{
+				Id:         uuid.New(),
+				ExternalId: "user",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.one",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.two",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.three",
+						Resources: []string{"actors"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.four",
+						Resources: []string{"connections"},
+						Verbs:     []string{"list"},
+					},
+				},
+			}),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: []string{"root.one", "root.two"},
+		},
+		{
+			name: "request permissions no intersection - namespace",
+			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
+				Id:         uuid.New(),
+				ExternalId: "user",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.one",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.two",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.three",
+						Resources: []string{"actors"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.four",
+						Resources: []string{"connections"},
+						Verbs:     []string{"list"},
+					},
+				},
+			},
+				[]aschema.Permission{
+					{
+						Namespace: "root.other", // No intersection
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: []string{},
+		},
+		{
+			name: "request permissions no intersection - verb",
+			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
+				Id:         uuid.New(),
+				ExternalId: "user",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.one",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.two",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.three",
+						Resources: []string{"actors"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.four",
+						Resources: []string{"connections"},
+						Verbs:     []string{"list"},
+					},
+				},
+			},
+				[]aschema.Permission{
+					{
+						Namespace: "root.two",
+						Resources: []string{"connections"},
+						Verbs:     []string{"list"}, // No intersection
+					},
+				},
+			),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: []string{},
+		},
+		{
+			name: "request permissions no intersection - resource",
+			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
+				Id:         uuid.New(),
+				ExternalId: "user",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.one",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.two",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.three",
+						Resources: []string{"actors"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.four",
+						Resources: []string{"connections"},
+						Verbs:     []string{"list"},
+					},
+				},
+			},
+				[]aschema.Permission{
+					{
+						Namespace: "root.two",
+						Resources: []string{"actors"}, // No intersection
+						Verbs:     []string{"get"},
+					},
+				},
+			),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: []string{},
+		},
+		{
+			name: "request permissions single intersection",
+			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
+				Id:         uuid.New(),
+				ExternalId: "user",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.one",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.two",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.three",
+						Resources: []string{"actors"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.four",
+						Resources: []string{"connections"},
+						Verbs:     []string{"list"},
+					},
+				},
+			},
+				[]aschema.Permission{
+					{
+						Namespace: "root.two",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: []string{"root.two"},
+		},
+		{
+			name: "request permissions multiple intersection",
+			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
+				Id:         uuid.New(),
+				ExternalId: "user",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.one",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.two",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.three",
+						Resources: []string{"actors"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.four",
+						Resources: []string{"connections"},
+						Verbs:     []string{"list"},
+					},
+				},
+			},
+				[]aschema.Permission{
+					{
+						Namespace: "root.one",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.two",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: []string{"root.one", "root.two"},
+		},
+		{
+			name: "wildcard resource actor permissions",
+			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
+				Id:         uuid.New(),
+				ExternalId: "user",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.one",
+						Resources: []string{"*"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.two",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.three",
+						Resources: []string{"actors"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.four",
+						Resources: []string{"connections"},
+						Verbs:     []string{"list"},
+					},
+				},
+			},
+				[]aschema.Permission{
+					{
+						Namespace: "root.one",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: []string{"root.one"},
+		},
+		{
+			name: "wildcard resource request permissions",
+			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
+				Id:         uuid.New(),
+				ExternalId: "user",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.one",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.two",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.three",
+						Resources: []string{"actors"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.four",
+						Resources: []string{"connections"},
+						Verbs:     []string{"list"},
+					},
+				},
+			},
+				[]aschema.Permission{
+					{
+						Namespace: "root.one",
+						Resources: []string{"*"},
+						Verbs:     []string{"get"},
+					},
+				},
+			),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: []string{"root.one"},
+		},
+		{
+			name: "wildcard verb actor permissions",
+			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
+				Id:         uuid.New(),
+				ExternalId: "user",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.one",
+						Resources: []string{"connections"},
+						Verbs:     []string{"*"},
+					},
+					{
+						Namespace: "root.two",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.three",
+						Resources: []string{"actors"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.four",
+						Resources: []string{"connections"},
+						Verbs:     []string{"list"},
+					},
+				},
+			},
+				[]aschema.Permission{
+					{
+						Namespace: "root.one",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: []string{"root.one"},
+		},
+		{
+			name: "wildcard verb request permissions",
+			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
+				Id:         uuid.New(),
+				ExternalId: "user",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.one",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.two",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.three",
+						Resources: []string{"actors"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.four",
+						Resources: []string{"connections"},
+						Verbs:     []string{"list"},
+					},
+				},
+			},
+				[]aschema.Permission{
+					{
+						Namespace: "root.one",
+						Resources: []string{"connections"},
+						Verbs:     []string{"*"},
+					},
+				},
+			),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: []string{"root.one"},
+		},
+		{
+			name: "request permissions wildcard",
+			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
+				Id:         uuid.New(),
+				ExternalId: "user",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.child.one",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.child.two",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.other.three",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.four",
+						Resources: []string{"connections"},
+						Verbs:     []string{"list"},
+					},
+				},
+			},
+				[]aschema.Permission{
+					{
+						Namespace: "root.child.**",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: []string{"root.child.one", "root.child.two"},
+		},
+		{
+			name: "actor and request permissions wildcard",
+			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
+				Id:         uuid.New(),
+				ExternalId: "user",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.child.one.**",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.child.two",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.other.three",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.four",
+						Resources: []string{"connections"},
+						Verbs:     []string{"list"},
+					},
+				},
+			},
+				[]aschema.Permission{
+					{
+						Namespace: "root.child.**",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: []string{"root.child.one.**", "root.child.two"},
+		},
+		{
+			name: "actor wildcard resolved to concrete",
+			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
+				Id:         uuid.New(),
+				ExternalId: "user",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.child.one.**",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.child.two",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.other.three",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+					{
+						Namespace: "root.four",
+						Resources: []string{"connections"},
+						Verbs:     []string{"list"},
+					},
+				},
+			},
+				[]aschema.Permission{
+					{
+						Namespace: "root.child.one.bobcat",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: []string{"root.child.one.bobcat"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			namespaces := tt.ra.GetNamespacesAllowed(tt.resource, tt.verb)
+			require.Equal(t, tt.namespaces, namespaces)
+		})
+	}
+}

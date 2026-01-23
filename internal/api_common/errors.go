@@ -55,7 +55,7 @@ func (e *HttpStatusError) toErrorResponse(cfg Debuggable) *ErrorResponse {
 		Error: e.ResponseMsgOrDefault(),
 	}
 
-	if cfg.IsDebugMode() {
+	if cfg != nil && cfg.IsDebugMode() {
 		if e.InternalErr != nil {
 			resp.StackTrace = fmt.Sprintf("%+v", e.InternalErr)
 		}

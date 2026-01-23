@@ -36,6 +36,17 @@ func applyAuthToGinContext(c *gin.Context, ra *core.RequestAuth) {
 	c.Request = c.Request.WithContext(ctx)
 }
 
+// applyValidatorToGinContext applies the validator to the request context.
+func applyValidatorToGinContext(c *gin.Context, rpv *ResourcePermissionValidator) {
+	if c == nil || c.Request == nil {
+		return
+	}
+
+	ctx := c.Request.Context()
+	ctx = rpv.ContextWith(ctx)
+	c.Request = c.Request.WithContext(ctx)
+}
+
 // MustGetAuthFromGinContext returns an authenticated request info. If the request is not authenticated, this
 // method panics.
 func MustGetAuthFromGinContext(c *gin.Context) *core.RequestAuth {
@@ -46,9 +57,20 @@ func MustGetAuthFromGinContext(c *gin.Context) *core.RequestAuth {
 	return ra
 }
 
+// MustGetValidatorFromGinContext returns a resource validator. If none is present, it panics.
+func MustGetValidatorFromGinContext(c *gin.Context) *ResourcePermissionValidator {
+	return MustGetValidatorFromContext(c.Request.Context())
+}
+
 // Required middleware requires authentication and validates the actor. There must be an authenticated actor, and
 // the actor must pass the validators passed here and defaulted in the service.
 func (j *service) Required(validators ...AuthValidator) gin.HandlerFunc {
+	return j.requiredWithPostValidation(validators, nil)
+}
+
+// Required middleware requires authentication and validates the actor. There must be an authenticated actor, and
+// the actor must pass the validators passed here and defaulted in the service.
+func (j *service) requiredWithPostValidation(validators []AuthValidator, postValidation func(gctx *gin.Context, ra *core.RequestAuth)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			a := GetAuthFromRequest(r)
@@ -77,6 +99,10 @@ func (j *service) Required(validators ...AuthValidator) gin.HandlerFunc {
 
 			applyAuthToGinContext(c, a)
 			c.Next()
+
+			if postValidation != nil {
+				postValidation(c, a)
+			}
 		})
 		j.Auth(_next, c.Abort).ServeHTTP(c.Writer, c.Request)
 	}

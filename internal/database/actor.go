@@ -166,6 +166,10 @@ func (a *Actor) GetId() uuid.UUID {
 	return a.Id
 }
 
+func (a *Actor) GetNamespace() string {
+	return "root" // Hardcoded for now
+}
+
 // IsAdmin is a helper to wrap the Admin attribute
 func (a *Actor) IsAdmin() bool {
 	if a == nil {
@@ -414,6 +418,7 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 			dbResult, err := s.sq.
 				Update(ActorTable).
 				SetMap(util.ZipToMap(existingActor.cols(), existingActor.values())).
+				Where(sq.Eq{"id": existingActor.Id}).
 				RunWith(tx).
 				Exec()
 			if err != nil {
@@ -472,8 +477,8 @@ func (s *service) DeleteActor(ctx context.Context, id uuid.UUID) error {
 }
 
 type ListActorsExecutor interface {
-	FetchPage(context.Context) pagination.PageResult[Actor]
-	Enumerate(context.Context, func(pagination.PageResult[Actor]) (keepGoing bool, err error)) error
+	FetchPage(context.Context) pagination.PageResult[*Actor]
+	Enumerate(context.Context, func(pagination.PageResult[*Actor]) (keepGoing bool, err error)) error
 }
 
 type ListActorsBuilder interface {
@@ -575,25 +580,25 @@ func (l *listActorsFilters) applyRestrictions(ctx context.Context) sq.SelectBuil
 	return q
 }
 
-func (l *listActorsFilters) fetchPage(ctx context.Context) pagination.PageResult[Actor] {
+func (l *listActorsFilters) fetchPage(ctx context.Context) pagination.PageResult[*Actor] {
 	var err error
 
 	rows, err := l.applyRestrictions(ctx).
 		RunWith(l.s.db).
 		Query()
 	if err != nil {
-		return pagination.PageResult[Actor]{Error: err}
+		return pagination.PageResult[*Actor]{Error: err}
 	}
 	defer rows.Close()
 
-	var results []Actor
+	var results []*Actor
 	for rows.Next() {
 		var r Actor
 		err := rows.Scan(r.fields()...)
 		if err != nil {
-			return pagination.PageResult[Actor]{Error: err}
+			return pagination.PageResult[*Actor]{Error: err}
 		}
-		results = append(results, r)
+		results = append(results, &r)
 	}
 
 	l.Offset = l.Offset + uint64(len(results)) - 1 // we request one more than the page size we return
@@ -603,22 +608,22 @@ func (l *listActorsFilters) fetchPage(ctx context.Context) pagination.PageResult
 	if hasMore {
 		cursor, err = pagination.MakeCursor(ctx, l.s.secretKey, l)
 		if err != nil {
-			return pagination.PageResult[Actor]{Error: err}
+			return pagination.PageResult[*Actor]{Error: err}
 		}
 	}
 
-	return pagination.PageResult[Actor]{
+	return pagination.PageResult[*Actor]{
 		HasMore: hasMore,
 		Results: results[:util.MinUint64(l.LimitVal, uint64(len(results)))],
 		Cursor:  cursor,
 	}
 }
 
-func (l *listActorsFilters) FetchPage(ctx context.Context) pagination.PageResult[Actor] {
+func (l *listActorsFilters) FetchPage(ctx context.Context) pagination.PageResult[*Actor] {
 	return l.fetchPage(ctx)
 }
 
-func (l *listActorsFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[Actor]) (keepGoing bool, err error)) error {
+func (l *listActorsFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[*Actor]) (keepGoing bool, err error)) error {
 	var err error
 	keepGoing := true
 	hasMore := true

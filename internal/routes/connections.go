@@ -34,16 +34,7 @@ type ConnectionsRoutes struct {
 
 func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
-
-	ra := auth.GetAuthFromGinContext(gctx)
-	if !ra.IsAuthenticated() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusUnauthorized().
-			WithResponseMsg("unauthorized").
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
-		return
-	}
+	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req coreIface.InitiateConnectionRequest
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
@@ -52,9 +43,11 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
+	// InitiateConnection also performs request validation for security
 	resp, err := r.core.InitiateConnection(ctx, req)
 	if err != nil {
 		api_common.HttpStatusErrorBuilderFromError(err).
@@ -62,6 +55,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -105,6 +99,7 @@ type ListConnectionResponseJson struct {
 
 func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req ListConnectionRequestQuery
 	var err error
@@ -116,6 +111,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 			WithResponseMsg(err.Error()).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -129,6 +125,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 				WithInternalErr(err).
 				BuildStatusError().
 				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
 			return
 		}
 	} else {
@@ -155,6 +152,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 					WithResponseMsg(err.Error()).
 					BuildStatusError().
 					WriteGinResponse(r.cfg, gctx)
+				val.MarkErrorReturn()
 				return
 			}
 
@@ -164,6 +162,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 					WithResponseMsgf("invalid sort field '%s'", field).
 					BuildStatusError().
 					WriteGinResponse(r.cfg, gctx)
+				val.MarkErrorReturn()
 				return
 			}
 
@@ -181,11 +180,12 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 			WithInternalErr(result.Error).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
 	gctx.PureJSON(http.StatusOK, ListConnectionResponseJson{
-		Items: util.Map(result.Results, func(c coreIface.Connection) ConnectionJson {
+		Items: util.Map(auth.FilterForValidatedResources(val, result.Results), func(c coreIface.Connection) ConnectionJson {
 			return ConnectionToJson(c)
 		}),
 		Cursor: result.Cursor,
@@ -194,6 +194,8 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 
 func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
 	id, err := uuid.Parse(gctx.Param("id"))
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
@@ -202,6 +204,7 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -212,6 +215,8 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 			WithResponseMsg("id is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
 	}
 
 	c, err := r.core.GetConnection(ctx, id)
@@ -222,13 +227,16 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 				WithResponseMsg("connection not found").
 				BuildStatusError().
 				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
 			return
 		}
+
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -238,6 +246,12 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 			WithResponseMsg("connection not found").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
@@ -251,6 +265,8 @@ type DisconnectResponseJson struct {
 
 func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
 	id, err := uuid.Parse(gctx.Param("id"))
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
@@ -259,6 +275,7 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -269,16 +286,7 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 			WithResponseMsg("id is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
-	}
-
-	// The Auth check is duplicative of the annotation for the route, but being done since are pulling auth anyway.
-	ra := auth.GetAuthFromGinContext(gctx)
-	if !ra.IsAuthenticated() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusUnauthorized().
-			WithResponseMsg("unauthorized").
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -289,6 +297,12 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
@@ -299,9 +313,11 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
+	ra := auth.MustGetAuthFromGinContext(gctx)
 	taskId, err := ti.
 		BindToActor(ra.MustGetActor()).
 		ToSecureEncryptedString(ctx, r.encrypt)
@@ -312,6 +328,7 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -333,6 +350,8 @@ type ForceStateRequestJson struct {
 
 func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
 	id, err := uuid.Parse(gctx.Param("id"))
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
@@ -341,6 +360,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -351,16 +371,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 			WithResponseMsg("id is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
-	}
-
-	// The Auth check is duplicative of the annotation for the route, but being done since are pulling auth anyway.
-	ra := auth.GetAuthFromGinContext(gctx)
-	if !ra.IsAuthenticated() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusUnauthorized().
-			WithResponseMsg("unauthorized").
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -372,6 +383,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -381,6 +393,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 			WithResponseMsg("state is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -392,13 +405,21 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 				WithResponseMsg("connection not found").
 				BuildStatusError().
 				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
 			return
 		}
+
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
@@ -414,6 +435,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 

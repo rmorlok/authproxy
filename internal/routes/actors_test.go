@@ -51,7 +51,7 @@ func TestActorsRoutes(t *testing.T) {
 
 		// Build routes
 		ar := NewActorsRoutes(cfg, auth, db, rds, h, e, test_utils.NewTestLogger())
-		r := gin.Default()
+		r := gin.New()
 		ar.Register(r)
 
 		// gomock controller (only for redis mock if we needed, but kept for parity)

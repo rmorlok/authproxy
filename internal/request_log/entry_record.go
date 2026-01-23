@@ -43,6 +43,14 @@ type EntryRecord struct {
 	FullRequestRecorded bool                `json:"full_request_recorded,omitempty"`
 }
 
+func (e *EntryRecord) GetId() uuid.UUID {
+	return e.RequestId
+}
+
+func (e *EntryRecord) GetNamespace() string {
+	return e.Namespace
+}
+
 func (e *EntryRecord) setRedisRecordFields(vals map[string]string) {
 	vals[fieldNamespace] = e.Namespace
 	vals[fieldType] = string(e.Type)

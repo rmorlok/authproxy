@@ -2,7 +2,6 @@ package core
 
 import (
 	"slices"
-	"strings"
 
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
@@ -55,15 +54,7 @@ func matchesNamespace(p aschema.Permission, targetNamespace string) bool {
 		return true
 	}
 
-	// Check for wildcard namespace (e.g., "root.**")
-	if strings.HasSuffix(p.Namespace, aschema.NamespaceWildcardSuffix) {
-		baseNamespace := p.Namespace[:len(p.Namespace)-len(aschema.NamespaceWildcardSuffix)]
-		// Match the base namespace itself or any child namespace
-		return targetNamespace == baseNamespace || aschema.NamespaceIsChild(baseNamespace, targetNamespace)
-	}
-
-	// Exact match
-	return p.Namespace == targetNamespace
+	return aschema.NamespaceMatches(p.Namespace, targetNamespace)
 }
 
 // matchesResource checks if this permission allows access to the target resource.

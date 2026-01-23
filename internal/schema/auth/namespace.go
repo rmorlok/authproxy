@@ -18,6 +18,13 @@ const RootNamespace = "root"
 // NamespacePathSeparator is the character used to separate namespace parts in a path.
 const NamespacePathSeparator = "."
 
+const NamespaceWildcard = "**"
+
+// NamespaceWildcardSuffix is appended to a namespace to indicate all child namespaces are included.
+// For example, "root.**" matches "root", "root.foo", "root.foo.bar", etc. This constant should be used
+// if a namespace matches a recursive wildcard. Using wildcard directly leads to matching with foo.bar**
+const NamespaceWildcardSuffix = NamespacePathSeparator + NamespaceWildcard
+
 // NamespaceSkipNamespacePermissionChecks is a sentinel value used to indicate that the namespace is not currently
 // known at the time of permission checking. During permission checking, at the API layer namespace won't generally be
 // known, so permission checking starts with resource and  verb. This essential value is used to indicate that
@@ -72,7 +79,7 @@ func DepthOfNamespacePath(path string) uint64 {
 
 // SplitNamespacePathToPrefixes returns all the prefix paths for a given path, including the given path.
 //
-// So if the path is "root/foo/bar", it will return ["root", "root/foo", "root/foo/bar"]. The output will be
+// So if the path is "root.foo.bar", it will return ["root", "root.foo", "root.foo.bar"]. The output will be
 // ordered in increasing path length.
 func SplitNamespacePathToPrefixes(path string) []string {
 	if path == "" {
@@ -146,4 +153,62 @@ func NamespaceIsChild(parentPath, childPath string) bool {
 // or if the child path is a child of the parent path.
 func NamespaceIsSameOrChild(parentPath, childPath string) bool {
 	return parentPath == childPath || NamespaceIsChild(parentPath, childPath)
+}
+
+// NamespaceMatcherConstrained returns a constrained namespace matcher to the most constrained intersection of the
+// two namespaces matchers, including consideration for wildcard matching. The return value is the constrained matcher
+// and a boolean indicating if the operation was successful.
+func NamespaceMatcherConstrained(ns1, ns2 string) (constrained string, ok bool) {
+	if ns1 == "" || ns2 == "" {
+		return "", false
+	}
+
+	if ns1 == ns2 {
+		return ns1, true
+	}
+
+	shorter := ns1
+	longer := ns2
+
+	if len(ns1) > len(ns2) {
+		shorter = ns2
+		longer = ns1
+	}
+
+	if shorter == longer[:len(longer)-len(NamespaceWildcardSuffix)] {
+		// This covers case (root.child, root.child.**) -> root.child
+		return shorter, true
+	}
+
+	shorterHasWildcard := strings.HasSuffix(shorter, NamespaceWildcardSuffix)
+
+	if !shorterHasWildcard {
+		// The shorter namespace doesn't have a wildcard, so it can't be a parent of the longer namespace
+		return "", false
+	}
+
+	if strings.HasPrefix(longer, shorter[:len(shorter)-len(NamespaceWildcard)]) {
+		// The shorter namespace is a parent of the longer namespace
+		// and it has wildcards, so return the longer namespace
+		return longer, true
+	}
+
+	return "", false
+}
+
+// NamespaceMatches determines if a given namespace matches a matcher, considering support for wildcard matching.
+func NamespaceMatches(matcher, namespace string) bool {
+	if matcher == "" || namespace == "" {
+		return false
+	}
+
+	// Check for wildcard namespace (e.g., "root.**")
+	if strings.HasSuffix(matcher, NamespaceWildcardSuffix) {
+		baseNamespace := matcher[:len(matcher)-len(NamespaceWildcardSuffix)]
+		// Match the base namespace itself or any child namespace
+		return namespace == baseNamespace || NamespaceIsChild(baseNamespace, namespace)
+	}
+
+	// Exact match
+	return matcher == namespace
 }

@@ -8,7 +8,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	jwt2 "github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/apctx"
@@ -259,60 +258,59 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 		if claims.Actor == nil {
 			// This implies that the subject of the claim is the external id of the actor, and the actor must already
 			// exist. If the actor does not exist, the claim is invalid. Admins are special cased so that they can
-			// be created dynamically based on information in the system.
-			actor, err = s.db.GetActorByExternalId(ctx, claims.Subject)
-			if err != nil && !errors.Is(err, database.ErrNotFound) {
-				return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
-					WithStatusInternalServerError().
-					WithResponseMsg("database error").
-					WithInternalErr(errors.Wrap(err, "failed to get actor")).
-					Build()
-			}
-			if errors.Is(err, database.ErrNotFound) || actor == nil {
-				unauthenticatedError := api_common.NewHttpStatusErrorBuilder().
-					WithStatusUnauthorized().
-					WithResponseMsg("actor does not exist").
-					WithInternalErr(errors.Errorf("actor '%s' not found", claims.Subject)).
-					Build()
+			// be created or updated dynamically based on information in the config.
+			if claims.IsAdmin() {
+				cfgAdmin, ok := s.config.GetRoot().SystemAuth.AdminUsers.GetByJwtSubject(claims.Subject)
+				if !ok {
+					return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+						WithStatusUnauthorized().
+						WithResponseMsg("actor does not exist").
+						WithInternalErr(errors.Errorf("admin '%s' not found in config", claims.Subject)).
+						Build()
+				}
 
-				if claims.IsAdmin() {
-					if cfgAdmin, ok := s.config.GetRoot().SystemAuth.AdminUsers.GetByJwtSubject(claims.Subject); ok {
-						adminDomain := "local"
-						if s.config.GetRoot().SystemAuth.AdminEmailDomain != "" {
-							adminDomain = s.config.GetRoot().SystemAuth.AdminEmailDomain
-						}
+				adminDomain := "local"
+				if s.config.GetRoot().SystemAuth.AdminEmailDomain != "" {
+					adminDomain = s.config.GetRoot().SystemAuth.AdminEmailDomain
+				}
 
-						email := fmt.Sprintf("%s@%s", cfgAdmin.Username, adminDomain)
-						if cfgAdmin.Email != "" {
-							email = cfgAdmin.Email
-						}
+				email := fmt.Sprintf("%s@%s", cfgAdmin.Username, adminDomain)
+				if cfgAdmin.Email != "" {
+					email = cfgAdmin.Email
+				}
 
-						adminActor := database.Actor{
-							Id:          uuid.New(),
-							ExternalId:  claims.Subject,
-							Email:       email,
-							Admin:       true,
-							Permissions: database.Permissions(cfgAdmin.Permissions),
-						}
+				// Use UpsertActor to create or update the admin actor with current config permissions
+				adminActorData := &core.Actor{
+					ExternalId:  claims.Subject,
+					Email:       email,
+					Admin:       true,
+					Permissions: cfgAdmin.Permissions,
+				}
 
-						err = s.db.CreateActor(ctx, &adminActor)
-						if err != nil {
-							return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
-								WithStatusInternalServerError().
-								WithResponseMsg("database error").
-								WithInternalErr(errors.Wrap(err, "failed to upsert admin actor")).
-								Build()
-						}
-
-						// success
-						actor = &adminActor
-
-					} else {
-						return core.NewUnauthenticatedRequestAuth(), unauthenticatedError
+				actor, err = s.db.UpsertActor(ctx, adminActorData)
+				if err != nil {
+					return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+						WithStatusInternalServerError().
+						WithResponseMsg("database error").
+						WithInternalErr(errors.Wrap(err, "failed to upsert admin actor")).
+						Build()
+				}
+			} else {
+				// Non-admin actor must already exist in the database
+				actor, err = s.db.GetActorByExternalId(ctx, claims.Subject)
+				if err != nil {
+					if errors.Is(err, database.ErrNotFound) {
+						return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+							WithStatusUnauthorized().
+							WithResponseMsg("actor does not exist").
+							WithInternalErr(errors.Errorf("actor '%s' not found", claims.Subject)).
+							Build()
 					}
-
-				} else {
-					return core.NewUnauthenticatedRequestAuth(), unauthenticatedError
+					return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+						WithStatusInternalServerError().
+						WithResponseMsg("database error").
+						WithInternalErr(errors.Wrap(err, "failed to get actor")).
+						Build()
 				}
 			}
 		} else {

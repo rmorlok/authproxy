@@ -126,13 +126,14 @@ func (q *ListRequestsQuery) ApplyToBuilder(
 }
 
 type ListRequestsResponseJson struct {
-	Items  []request_log.EntryRecord `json:"items"`
-	Cursor string                    `json:"cursor,omitempty"`
-	Total  *int64                    `json:"total,omitempty"`
+	Items  []*request_log.EntryRecord `json:"items"`
+	Cursor string                     `json:"cursor,omitempty"`
+	Total  *int64                     `json:"total,omitempty"`
 }
 
 func (r *RequestLogRoutes) get(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	logIdStr := gctx.Param("id")
 
@@ -142,6 +143,7 @@ func (r *RequestLogRoutes) get(gctx *gin.Context) {
 			WithResponseMsg("id is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -152,6 +154,7 @@ func (r *RequestLogRoutes) get(gctx *gin.Context) {
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -161,6 +164,8 @@ func (r *RequestLogRoutes) get(gctx *gin.Context) {
 			WithResponseMsg("id is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
 	}
 
 	entry, err := r.rl.GetFullLog(ctx, logId)
@@ -172,6 +177,7 @@ func (r *RequestLogRoutes) get(gctx *gin.Context) {
 				WithResponseMsg("request log not found").
 				BuildStatusError().
 				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
 			return
 		}
 
@@ -180,6 +186,12 @@ func (r *RequestLogRoutes) get(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(entry); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
@@ -188,6 +200,7 @@ func (r *RequestLogRoutes) get(gctx *gin.Context) {
 
 func (r *RequestLogRoutes) list(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req ListRequestsQuery
 	var err error
@@ -199,6 +212,7 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 			WithResponseMsg(err.Error()).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -213,6 +227,7 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 				WithResponseMsg("failed to list requests from cursor").
 				BuildStatusError().
 				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
 			return
 		}
 	} else {
@@ -223,6 +238,7 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 			api_common.HttpStatusErrorBuilderFromError(err).
 				BuildStatusError().
 				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
 			return
 		}
 
@@ -239,6 +255,7 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 					WithResponseMsg("invalid order by").
 					BuildStatusError().
 					WriteGinResponse(r.cfg, gctx)
+				val.MarkErrorReturn()
 				return
 			}
 
@@ -248,6 +265,7 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 					WithResponseMsg("invalid order by field").
 					BuildStatusError().
 					WriteGinResponse(r.cfg, gctx)
+				val.MarkErrorReturn()
 				return
 			}
 
@@ -264,11 +282,12 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 			DefaultResponseMsg("failed to list requests").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
 	gctx.PureJSON(200, &ListRequestsResponseJson{
-		Items:  result.Results,
+		Items:  auth.FilterForValidatedResources(val, result.Results),
 		Cursor: result.Cursor,
 		Total:  result.Total,
 	})

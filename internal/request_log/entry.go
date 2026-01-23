@@ -79,6 +79,14 @@ type Entry struct {
 	Response            EntryResponse       `json:"res"`
 }
 
+func (e *Entry) GetId() uuid.UUID {
+	return e.Id
+}
+
+func (e *Entry) GetNamespace() string {
+	return e.Namespace
+}
+
 func (e *Entry) setRedisRecordFields(er *EntryRecord) {
 	if e == nil {
 		return

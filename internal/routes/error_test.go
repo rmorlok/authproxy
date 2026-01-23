@@ -30,7 +30,7 @@ func TestErrorRoutes(t *testing.T) {
 	errorRoutes := NewErrorRoutes(cfg)
 
 	// Create a Gin router and register the routes
-	router := gin.Default()
+	router := gin.New()
 	errorRoutes.Register(router)
 
 	t.Run("default error", func(t *testing.T) {

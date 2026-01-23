@@ -10,14 +10,10 @@ import (
 // Wildcard constant for resources and verbs that matches any value.
 const PermissionWildcard = "*"
 
-// NamespaceWildcardSuffix is appended to a namespace to indicate all child namespaces are included.
-// For example, "root.**" matches "root", "root.foo", "root.foo.bar", etc.
-const NamespaceWildcardSuffix = ".**"
-
 type Permission struct {
 	Namespace   string   `json:"namespace" yaml:"namespace"`
 	Resources   []string `json:"resources" yaml:"resources"`
-	ResourceIds []string `json:"resource_ids" yaml:"resource_ids"`
+	ResourceIds []string `json:"resource_ids,omitempty" yaml:"resource_ids,omitempty"`
 	Verbs       []string `json:"verbs" yaml:"verbs"`
 }
 

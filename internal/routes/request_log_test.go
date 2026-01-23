@@ -37,7 +37,7 @@ func TestRequestLogRoutes(t *testing.T) {
 		rlr := mock.NewMockLogRetriever(ctrl)
 		rl := NewRequestLogRoutes(cfg, auth, rlr)
 
-		r := gin.Default()
+		r := gin.New()
 		rl.Register(r)
 
 		return &TestSetup{
@@ -86,7 +86,7 @@ func TestRequestLogRoutes(t *testing.T) {
 			require.NoError(t, err)
 
 			b := mock.MockListRequestBuilderExecutor{
-				ReturnResults: pagination.PageResult[request_log.EntryRecord]{},
+				ReturnResults: pagination.PageResult[*request_log.EntryRecord]{},
 			}
 
 			tu.MockRetriever.EXPECT().
@@ -115,9 +115,10 @@ func TestRequestLogRoutes(t *testing.T) {
 
 			id := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
 			b := mock.MockListRequestBuilderExecutor{
-				ReturnResults: pagination.PageResult[request_log.EntryRecord]{
-					Results: []request_log.EntryRecord{
+				ReturnResults: pagination.PageResult[*request_log.EntryRecord]{
+					Results: []*request_log.EntryRecord{
 						{
+							Namespace:          "root",
 							Type:               request_log.RequestTypeProxy,
 							RequestId:          id,
 							Method:             "GET",
@@ -155,9 +156,10 @@ func TestRequestLogRoutes(t *testing.T) {
 
 			id := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
 			b := mock.MockListRequestBuilderExecutor{
-				ReturnResults: pagination.PageResult[request_log.EntryRecord]{
-					Results: []request_log.EntryRecord{
+				ReturnResults: pagination.PageResult[*request_log.EntryRecord]{
+					Results: []*request_log.EntryRecord{
 						{
+							Namespace:          "root",
 							Type:               request_log.RequestTypeProxy,
 							RequestId:          id,
 							Method:             "GET",
@@ -196,9 +198,10 @@ func TestRequestLogRoutes(t *testing.T) {
 
 			id := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
 			b := mock.MockListRequestBuilderExecutor{
-				ReturnResults: pagination.PageResult[request_log.EntryRecord]{
-					Results: []request_log.EntryRecord{
+				ReturnResults: pagination.PageResult[*request_log.EntryRecord]{
+					Results: []*request_log.EntryRecord{
 						{
+							Namespace:          "root",
 							Type:               request_log.RequestTypeProxy,
 							RequestId:          id,
 							Method:             "GET",

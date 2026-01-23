@@ -39,7 +39,7 @@ type ActorJson struct {
 	UpdatedAt  time.Time `json:"updated_at"`
 }
 
-func DatabaseActorToJson(a database.Actor) ActorJson {
+func DatabaseActorToJson(a *database.Actor) ActorJson {
 	return ActorJson{
 		Id:         a.Id,
 		ExternalId: a.ExternalId,
@@ -67,26 +67,7 @@ type ListActorsResponseJson struct {
 }
 
 func (r *ActorsRoutes) list(gctx *gin.Context) {
-	// The Auth check is duplicative of the annotation for the route, but being done since are pulling auth anyway.
-	ra := auth.GetAuthFromGinContext(gctx)
-	if !ra.IsAuthenticated() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusUnauthorized().
-			WithResponseMsg("unauthorized").
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
-		return
-	}
-
-	if !ra.MustGetActor().IsAdmin() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusForbidden().
-			WithResponseMsg("only admins can delete actors").
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
-		return
-	}
-
+	val := auth.MustGetValidatorFromGinContext(gctx)
 	ctx := gctx.Request.Context()
 
 	var req ListActorsRequestQuery
@@ -99,6 +80,7 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 			WithResponseMsg(err.Error()).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -112,6 +94,7 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 				WithInternalErr(err).
 				BuildStatusError().
 				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
 			return
 		}
 	} else {
@@ -146,6 +129,7 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 					WithResponseMsg(err.Error()).
 					BuildStatusError().
 					WriteGinResponse(r.cfg, gctx)
+				val.MarkErrorReturn()
 				return
 			}
 
@@ -155,10 +139,11 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 					WithResponseMsgf("invalid sort field '%s'", field).
 					BuildStatusError().
 					WriteGinResponse(r.cfg, gctx)
+				val.MarkErrorReturn()
 				return
 			}
 
-			b.OrderBy(database.ActorOrderByField(field), order)
+			b.OrderBy(field, order)
 		}
 
 		ex = b
@@ -172,37 +157,20 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 			WithInternalErr(result.Error).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
 	gctx.PureJSON(http.StatusOK, ListActorsResponseJson{
-		Items:  util.Map(result.Results, DatabaseActorToJson),
+		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), DatabaseActorToJson),
 		Cursor: result.Cursor,
 	})
 }
 
 func (r *ActorsRoutes) get(gctx *gin.Context) {
-	// The Auth check is duplicative of the annotation for the route, but being done since are pulling auth anyway.
-	ra := auth.GetAuthFromGinContext(gctx)
-	if !ra.IsAuthenticated() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusUnauthorized().
-			WithResponseMsg("unauthorized").
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
-		return
-	}
-
-	if !ra.MustGetActor().IsAdmin() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusForbidden().
-			WithResponseMsg("only admins can delete actors").
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
-		return
-	}
-
+	val := auth.MustGetValidatorFromGinContext(gctx)
 	ctx := gctx.Request.Context()
+
 	id, err := uuid.Parse(gctx.Param("id"))
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
@@ -211,6 +179,7 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -221,6 +190,8 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 			WithResponseMsg("id is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
 	}
 
 	a, err := r.db.GetActor(ctx, id)
@@ -231,6 +202,7 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 				WithResponseMsg("actor not found").
 				BuildStatusError().
 				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
 			return
 		}
 
@@ -239,6 +211,7 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -248,35 +221,22 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 			WithResponseMsg("actor not found").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, DatabaseActorToJson(*a))
+	if httpErr := val.ValidateHttpStatusError(a); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, DatabaseActorToJson(a))
 }
 
 func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
-	// The Auth check is duplicative of the annotation for the route, but being done since are pulling auth anyway.
-	ra := auth.GetAuthFromGinContext(gctx)
-	if !ra.IsAuthenticated() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusUnauthorized().
-			WithResponseMsg("unauthorized").
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
-		return
-	}
-
-	if !ra.MustGetActor().IsAdmin() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusForbidden().
-			WithResponseMsg("only admins can delete actors").
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
-		return
-	}
-
 	ctx := gctx.Request.Context()
 	externalId := gctx.Param("external_id")
+	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	if externalId == "" {
 		api_common.NewHttpStatusErrorBuilder().
@@ -284,6 +244,8 @@ func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 			WithResponseMsg("external_id is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
 	}
 
 	a, err := r.db.GetActorByExternalId(ctx, externalId)
@@ -294,6 +256,7 @@ func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 				WithResponseMsg("actor not found").
 				BuildStatusError().
 				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
 			return
 		}
 
@@ -302,6 +265,7 @@ func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -311,14 +275,22 @@ func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 			WithResponseMsg("actor not found").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, DatabaseActorToJson(*a))
+	if httpErr := val.ValidateHttpStatusError(a); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, DatabaseActorToJson(a))
 }
 
 func (r *ActorsRoutes) delete(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
 	id, err := uuid.Parse(gctx.Param("id"))
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
@@ -327,6 +299,7 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -337,26 +310,7 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 			WithResponseMsg("id is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
-		return
-	}
-
-	// The Auth check is duplicative of the annotation for the route, but being done since are pulling auth anyway.
-	ra := auth.GetAuthFromGinContext(gctx)
-	if !ra.IsAuthenticated() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusUnauthorized().
-			WithResponseMsg("unauthorized").
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
-		return
-	}
-
-	if !ra.MustGetActor().IsAdmin() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusForbidden().
-			WithResponseMsg("only admins can delete actors").
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -364,6 +318,7 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			// The actor already doesn't exist
+			val.MarkValidated()
 			gctx.Status(http.StatusNoContent)
 			return
 		}
@@ -373,12 +328,19 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
 	// The actor already doesn't exist
 	if a == nil {
 		gctx.Status(http.StatusNoContent)
+		val.MarkValidated()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(a); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
@@ -391,6 +353,7 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -399,6 +362,7 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 
 func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
 	externalId := gctx.Param("external_id")
 
 	if externalId == "" {
@@ -407,26 +371,7 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 			WithResponseMsg("external_id is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
-		return
-	}
-
-	// The Auth check is duplicative of the annotation for the route, but being done since are pulling auth anyway.
-	ra := auth.GetAuthFromGinContext(gctx)
-	if !ra.IsAuthenticated() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusUnauthorized().
-			WithResponseMsg("unauthorized").
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
-		return
-	}
-
-	if !ra.MustGetActor().IsAdmin() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusForbidden().
-			WithResponseMsg("only admins can delete actors").
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -435,6 +380,7 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 		if errors.Is(err, database.ErrNotFound) {
 			// The actor already doesn't exist
 			gctx.Status(http.StatusNoContent)
+			val.MarkValidated()
 			return
 		}
 
@@ -443,12 +389,19 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
 	// The actor already doesn't exist
 	if a == nil {
 		gctx.Status(http.StatusNoContent)
+		val.MarkValidated()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(a); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
@@ -461,6 +414,7 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -481,6 +435,7 @@ func (r *ActorsRoutes) Register(g gin.IRouter) {
 		r.auth.NewRequiredBuilder().
 			ForResource("actors").
 			ForIdField("external_id").
+			ForIdExtractor(func(obj interface{}) string { return obj.(*database.Actor).ExternalId }).
 			ForVerb("get").
 			Build(),
 		r.getByExternalId,
@@ -490,6 +445,7 @@ func (r *ActorsRoutes) Register(g gin.IRouter) {
 		r.auth.NewRequiredBuilder().
 			ForResource("actors").
 			ForIdField("external_id").
+			ForIdExtractor(func(obj interface{}) string { return obj.(*database.Actor).ExternalId }).
 			ForVerb("delete").
 			Build(),
 		r.deleteByExternalId,
