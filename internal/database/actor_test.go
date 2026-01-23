@@ -302,6 +302,102 @@ func TestActor(t *testing.T) {
 					},
 				}, retrieved.Permissions)
 			})
+			t.Run("only updates target actor not others", func(t *testing.T) {
+				setup(t)
+
+				// Create first actor
+				id1 := uuid.New()
+				externalId1 := "actor1"
+				originalPerms1 := Permissions{
+					aschema.Permission{
+						Namespace: "root",
+						Resources: []string{"connections"},
+						Verbs:     []string{"read"},
+					},
+				}
+				err := db.CreateActor(ctx, &Actor{
+					Id:          id1,
+					ExternalId:  externalId1,
+					Email:       "actor1@example.com",
+					Permissions: originalPerms1,
+				})
+				require.NoError(t, err)
+
+				// Create second actor
+				id2 := uuid.New()
+				externalId2 := "actor2"
+				originalPerms2 := Permissions{
+					aschema.Permission{
+						Namespace: "root",
+						Resources: []string{"connectors"},
+						Verbs:     []string{"read"},
+					},
+				}
+				err = db.CreateActor(ctx, &Actor{
+					Id:          id2,
+					ExternalId:  externalId2,
+					Email:       "actor2@example.com",
+					Permissions: originalPerms2,
+				})
+				require.NoError(t, err)
+
+				// Create third actor
+				id3 := uuid.New()
+				externalId3 := "actor3"
+				originalPerms3 := Permissions{
+					aschema.Permission{
+						Namespace: "root",
+						Resources: []string{"*"},
+						Verbs:     []string{"*"},
+					},
+				}
+				err = db.CreateActor(ctx, &Actor{
+					Id:          id3,
+					ExternalId:  externalId3,
+					Email:       "actor3@example.com",
+					Permissions: originalPerms3,
+				})
+				require.NoError(t, err)
+
+				// Update only actor2's permissions
+				newPerms2 := []aschema.Permission{
+					{
+						Namespace: "root",
+						Resources: []string{"connectors", "connections"},
+						Verbs:     []string{"read", "create", "delete"},
+					},
+				}
+				actor2, err := db.UpsertActor(ctx, &core.Actor{
+					ExternalId:  externalId2,
+					Email:       "actor2-updated@example.com",
+					Permissions: newPerms2,
+				})
+				require.NoError(t, err)
+				require.Equal(t, id2, actor2.Id)
+				require.Equal(t, "actor2-updated@example.com", actor2.Email)
+				require.Equal(t, Permissions(newPerms2), actor2.Permissions)
+
+				// Verify actor1 was NOT affected
+				retrieved1, err := db.GetActorByExternalId(ctx, externalId1)
+				require.NoError(t, err)
+				require.Equal(t, id1, retrieved1.Id)
+				require.Equal(t, "actor1@example.com", retrieved1.Email)
+				require.Equal(t, originalPerms1, retrieved1.Permissions)
+
+				// Verify actor2 was updated correctly
+				retrieved2, err := db.GetActorByExternalId(ctx, externalId2)
+				require.NoError(t, err)
+				require.Equal(t, id2, retrieved2.Id)
+				require.Equal(t, "actor2-updated@example.com", retrieved2.Email)
+				require.Equal(t, Permissions(newPerms2), retrieved2.Permissions)
+
+				// Verify actor3 was NOT affected
+				retrieved3, err := db.GetActorByExternalId(ctx, externalId3)
+				require.NoError(t, err)
+				require.Equal(t, id3, retrieved3.Id)
+				require.Equal(t, "actor3@example.com", retrieved3.Email)
+				require.Equal(t, originalPerms3, retrieved3.Permissions)
+			})
 		})
 	})
 	t.Run("List", func(t *testing.T) {

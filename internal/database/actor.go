@@ -418,6 +418,7 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 			dbResult, err := s.sq.
 				Update(ActorTable).
 				SetMap(util.ZipToMap(existingActor.cols(), existingActor.values())).
+				Where(sq.Eq{"id": existingActor.Id}).
 				RunWith(tx).
 				Exec()
 			if err != nil {
