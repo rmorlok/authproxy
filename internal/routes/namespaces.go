@@ -222,7 +222,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 		}
 
 		if req.Namespace != nil {
-			b = b.ForChildrenOf(*req.Namespace)
+			b = b.ForNamespaceMatcher(*req.Namespace)
 		}
 
 		if req.OrderByVal != nil {

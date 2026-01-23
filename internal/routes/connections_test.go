@@ -218,7 +218,7 @@ func TestConnections(t *testing.T) {
 
 		now = now.Add(time.Second)
 		c.SetTime(now)
-		err = tu.Db.CreateConnection(context.Background(), &database.Connection{
+		err = tu.Db.CreateConnection(ctx, &database.Connection{
 			Id:               uuid.New(),
 			Namespace:        "root.child",
 			ConnectorId:      connectorId,
@@ -229,7 +229,7 @@ func TestConnections(t *testing.T) {
 
 		now = now.Add(time.Second)
 		c.SetTime(now)
-		err = tu.Db.CreateConnection(context.Background(), &database.Connection{
+		err = tu.Db.CreateConnection(ctx, &database.Connection{
 			Id:               uuid.New(),
 			Namespace:        "root.child",
 			ConnectorId:      connectorId,
@@ -240,7 +240,7 @@ func TestConnections(t *testing.T) {
 
 		now = now.Add(time.Second)
 		c.SetTime(now)
-		err = tu.Db.CreateConnection(context.Background(), &database.Connection{
+		err = tu.Db.CreateConnection(ctx, &database.Connection{
 			Id:               uuid.New(),
 			Namespace:        "root.child.grandchild",
 			ConnectorId:      connectorId,

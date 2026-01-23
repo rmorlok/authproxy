@@ -27,6 +27,10 @@ func wrapNamespace(ns database.Namespace, s *service) *Namespace {
 	}
 }
 
+func (ns *Namespace) GetNamespace() string {
+	return ns.Path
+}
+
 func (ns *Namespace) GetPath() string {
 	return ns.Path
 }
