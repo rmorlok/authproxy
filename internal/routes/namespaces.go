@@ -59,6 +59,7 @@ type NamespacesRoutes struct {
 
 func (r *NamespacesRoutes) get(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	path := gctx.Param("path")
 
@@ -68,6 +69,7 @@ func (r *NamespacesRoutes) get(gctx *gin.Context) {
 			WithResponseMsg("path is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -80,6 +82,7 @@ func (r *NamespacesRoutes) get(gctx *gin.Context) {
 				WithInternalErr(err).
 				BuildStatusError().
 				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
 			return
 		}
 
@@ -88,6 +91,12 @@ func (r *NamespacesRoutes) get(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
 		return
 	}
 
@@ -96,6 +105,7 @@ func (r *NamespacesRoutes) get(gctx *gin.Context) {
 
 func (r *NamespacesRoutes) create(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	var req CreateNamespaceRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
@@ -104,6 +114,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -114,6 +125,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 			WithResponseMsgf("invalid namespace path '%s': %s", req.Path, err.Error()).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -125,6 +137,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 			WithResponseMsgf("namespace '%s' already exists", req.Path).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -134,6 +147,17 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if err := val.ValidateNamespace(req.Path); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithPublicErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -144,13 +168,17 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
+
 	gctx.PureJSON(http.StatusOK, NamespaceToJson(ns))
 }
 
 func (r *NamespacesRoutes) list(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
 	var req ListNamespacesRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
 		api_common.NewHttpStatusErrorBuilder().
@@ -159,6 +187,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 			WithResponseMsg(err.Error()).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -174,6 +203,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 				WithResponseMsg("failed to list namespaces from cursor").
 				BuildStatusError().
 				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
 			return
 		}
 	} else {
@@ -204,6 +234,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 					WithResponseMsg(err.Error()).
 					BuildStatusError().
 					WriteGinResponse(r.cfg, gctx)
+				val.MarkErrorReturn()
 				return
 			}
 
@@ -213,10 +244,11 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 					WithResponseMsgf("invalid sort field '%s'", field).
 					BuildStatusError().
 					WriteGinResponse(r.cfg, gctx)
+				val.MarkErrorReturn()
 				return
 			}
 
-			b.OrderBy(database.NamespaceOrderByField(field), order)
+			b.OrderBy(field, order)
 		}
 
 		ex = b
@@ -226,10 +258,12 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 
 	if result.Error != nil {
 		gctx.PureJSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		val.MarkErrorReturn()
+		return
 	}
 
 	gctx.PureJSON(http.StatusOK, ListNamespacesResponseJson{
-		Items:  util.Map(result.Results, NamespaceToJson),
+		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), NamespaceToJson),
 		Cursor: result.Cursor,
 	})
 }
@@ -239,6 +273,7 @@ func (r *NamespacesRoutes) Register(g gin.IRouter) {
 		"/namespaces",
 		r.authService.NewRequiredBuilder().
 			ForResource("namespaces").
+			ForIdExtractor(func(ns interface{}) string { return ns.(coreIface.Namespace).GetPath() }).
 			ForVerb("list").
 			Build(),
 		r.list,
@@ -247,6 +282,7 @@ func (r *NamespacesRoutes) Register(g gin.IRouter) {
 		"/namespaces",
 		r.authService.NewRequiredBuilder().
 			ForResource("namespaces").
+			ForIdExtractor(func(ns interface{}) string { return ns.(coreIface.Namespace).GetPath() }).
 			ForVerb("create").
 			Build(),
 		r.create,
@@ -256,6 +292,7 @@ func (r *NamespacesRoutes) Register(g gin.IRouter) {
 		r.authService.NewRequiredBuilder().
 			ForResource("namespaces").
 			ForIdField("path").
+			ForIdExtractor(func(ns interface{}) string { return ns.(coreIface.Namespace).GetPath() }).
 			ForVerb("get").
 			Build(),
 		r.get,

@@ -12,7 +12,7 @@ import (
 
 type MockListRequestBuilderExecutor struct {
 	FromCursorError error
-	ReturnResults   pagination.PageResult[request_log.EntryRecord]
+	ReturnResults   pagination.PageResult[*request_log.EntryRecord]
 	CursorVal       string
 	LimitVal        int32
 	OffsetVal       int32
@@ -126,11 +126,11 @@ func (l *MockListRequestBuilderExecutor) FromCursor(_ context.Context, cursor st
 	return l, l.FromCursorError
 }
 
-func (l *MockListRequestBuilderExecutor) FetchPage(ctx context.Context) pagination.PageResult[request_log.EntryRecord] {
+func (l *MockListRequestBuilderExecutor) FetchPage(ctx context.Context) pagination.PageResult[*request_log.EntryRecord] {
 	return l.ReturnResults
 }
 
-func (l *MockListRequestBuilderExecutor) Enumerate(ctx context.Context, callback func(pagination.PageResult[request_log.EntryRecord]) (keepGoing bool, err error)) error {
+func (l *MockListRequestBuilderExecutor) Enumerate(ctx context.Context, callback func(pagination.PageResult[*request_log.EntryRecord]) (keepGoing bool, err error)) error {
 	var err error
 	keepGoing := true
 	hasMore := true

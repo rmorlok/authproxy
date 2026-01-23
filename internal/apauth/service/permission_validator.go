@@ -46,6 +46,9 @@ func MustGetValidatorFromContext(ctx context.Context) *ResourcePermissionValidat
 }
 
 func FilterForValidatedResources[T any](validator *ResourcePermissionValidator, objs []T) []T {
+	// Even if there are no objects to validate, validation has been done
+	validator.MarkValidated()
+
 	filtered := make([]T, 0, len(objs))
 	for _, obj := range objs {
 		if validator.Validate(obj) == nil {

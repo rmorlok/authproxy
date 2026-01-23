@@ -123,15 +123,16 @@ type ConnectorsRoutes struct {
 
 func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	connectorIdStr := gctx.Param("id")
-
 	if connectorIdStr == "" {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -142,6 +143,7 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -151,6 +153,8 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 			WithResponseMsg("id is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
 	}
 
 	result := r.connectors.
@@ -165,6 +169,7 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 			WithInternalErr(result.Error).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -174,15 +179,24 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 			WithResponseMsgf("connector '%s' not found", connectorId).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
 	c := result.Results[0]
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
 	gctx.PureJSON(http.StatusOK, ConnectorToJson(c))
 }
 
 func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
 	var req ListConnectorsRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
 		api_common.NewHttpStatusErrorBuilder().
@@ -191,6 +205,7 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 			WithResponseMsg(err.Error()).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -206,6 +221,7 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 				WithResponseMsg("failed to list core from cursor").
 				BuildStatusError().
 				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
 			return
 		}
 	} else {
@@ -236,6 +252,7 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 					WithResponseMsg(err.Error()).
 					BuildStatusError().
 					WriteGinResponse(r.cfg, gctx)
+				val.MarkErrorReturn()
 				return
 			}
 
@@ -245,10 +262,11 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 					WithResponseMsgf("invalid sort field '%s'", field).
 					BuildStatusError().
 					WriteGinResponse(r.cfg, gctx)
+				val.MarkErrorReturn()
 				return
 			}
 
-			b.OrderBy(database.ConnectorOrderByField(field), order)
+			b.OrderBy(field, order)
 		}
 
 		ex = b
@@ -258,16 +276,19 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 
 	if result.Error != nil {
 		gctx.PureJSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		val.MarkErrorReturn()
+		return
 	}
 
 	gctx.PureJSON(http.StatusOK, ListConnectorsResponseJson{
-		Items:  util.Map(result.Results, ConnectorToJson),
+		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), ConnectorToJson),
 		Cursor: result.Cursor,
 	})
 }
 
 func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	connectorIdStr := gctx.Param("id")
 
@@ -277,6 +298,7 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 			WithResponseMsg("id is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -287,6 +309,7 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -296,6 +319,8 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 			WithResponseMsg("id is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
 	}
 
 	b := r.connectors.
@@ -311,6 +336,7 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 			WithResponseMsg("version is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -321,6 +347,7 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 			WithResponseMsg("failed to parse version as an integer").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -335,6 +362,7 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 			WithInternalErr(result.Error).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -344,14 +372,24 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 			WithResponseMsgf("connector version '%s:%d' not found", connectorId, version).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
 	cv := result.Results[0]
+
+	if httpErr := val.ValidateHttpStatusError(cv); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
 	gctx.PureJSON(http.StatusOK, ConnectorVersionToJson(cv))
 }
 
 func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
 	var err error
 	var ex connIface.ListConnectorVersionsExecutor
 
@@ -363,6 +401,7 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 			WithResponseMsg("id is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -373,6 +412,7 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -382,9 +422,10 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 			WithResponseMsg("id is required").
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
 	}
 
-	ctx := gctx.Request.Context()
 	var req ListConnectorVersionsRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
 		api_common.NewHttpStatusErrorBuilder().
@@ -393,6 +434,7 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 			WithResponseMsg(err.Error()).
 			BuildStatusError().
 			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -405,6 +447,7 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 				WithResponseMsg("failed to list connector versions from cursor").
 				BuildStatusError().
 				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
 			return
 		}
 	} else {
@@ -432,6 +475,7 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 					WithResponseMsg(err.Error()).
 					BuildStatusError().
 					WriteGinResponse(r.cfg, gctx)
+				val.MarkErrorReturn()
 				return
 			}
 
@@ -441,6 +485,7 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 					WithResponseMsgf("invalid sort field '%s'", field).
 					BuildStatusError().
 					WriteGinResponse(r.cfg, gctx)
+				val.MarkErrorReturn()
 				return
 			}
 
@@ -454,10 +499,12 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 
 	if result.Error != nil {
 		gctx.PureJSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		val.MarkErrorReturn()
+		return
 	}
 
 	gctx.PureJSON(http.StatusOK, ListConnectorVersionsResponseJson{
-		Items:  util.Map(result.Results, ConnectorVersionToJson),
+		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), ConnectorVersionToJson),
 		Cursor: result.Cursor,
 	})
 }

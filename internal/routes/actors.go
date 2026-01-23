@@ -318,6 +318,7 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			// The actor already doesn't exist
+			val.MarkValidated()
 			gctx.Status(http.StatusNoContent)
 			return
 		}

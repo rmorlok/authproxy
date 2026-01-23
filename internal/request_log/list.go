@@ -56,8 +56,8 @@ func IsValidOrderByField(field RequestOrderByField) bool {
 }
 
 type ListRequestExecutor interface {
-	FetchPage(context.Context) pagination.PageResult[EntryRecord]
-	Enumerate(context.Context, func(pagination.PageResult[EntryRecord]) (keepGoing bool, err error)) error
+	FetchPage(context.Context) pagination.PageResult[*EntryRecord]
+	Enumerate(context.Context, func(pagination.PageResult[*EntryRecord]) (keepGoing bool, err error)) error
 }
 
 type ListRequestBuilder interface {
@@ -468,16 +468,16 @@ func (l *listRequestsFilters) validate() error {
 	return nil
 }
 
-func (l *listRequestsFilters) fetchPage(ctx context.Context) pagination.PageResult[EntryRecord] {
+func (l *listRequestsFilters) fetchPage(ctx context.Context) pagination.PageResult[*EntryRecord] {
 	var err error
-	entries := make([]EntryRecord, 0)
+	entries := make([]*EntryRecord, 0)
 
 	if err = l.Errors.ErrorOrNil(); err != nil {
-		return pagination.PageResult[EntryRecord]{Error: err}
+		return pagination.PageResult[*EntryRecord]{Error: err}
 	}
 
 	if err = l.validate(); err != nil {
-		return pagination.PageResult[EntryRecord]{Error: err}
+		return pagination.PageResult[*EntryRecord]{Error: err}
 	}
 
 	client := l.r
@@ -486,15 +486,15 @@ func (l *listRequestsFilters) fetchPage(ctx context.Context) pagination.PageResu
 	res, err := client.FTSearchWithArgs(ctx, RequestLogRedisIndexName, query, options).Result()
 
 	if err != nil {
-		return pagination.PageResult[EntryRecord]{Error: err}
+		return pagination.PageResult[*EntryRecord]{Error: err}
 	}
 
 	for _, doc := range res.Docs {
 		er, err := EntryRecordFromRedisFields(doc.Fields)
 		if err != nil {
-			return pagination.PageResult[EntryRecord]{Error: err}
+			return pagination.PageResult[*EntryRecord]{Error: err}
 		}
-		entries = append(entries, *er)
+		entries = append(entries, er)
 	}
 
 	l.Offset = l.Offset + int32(len(entries)) - 1 // we request one more than the page size we return
@@ -504,22 +504,22 @@ func (l *listRequestsFilters) fetchPage(ctx context.Context) pagination.PageResu
 	if hasMore {
 		cursor, err = pagination.MakeCursor(ctx, l.cursorKey, l)
 		if err != nil {
-			return pagination.PageResult[EntryRecord]{Error: err}
+			return pagination.PageResult[*EntryRecord]{Error: err}
 		}
 	}
 
-	return pagination.PageResult[EntryRecord]{
+	return pagination.PageResult[*EntryRecord]{
 		HasMore: hasMore,
 		Results: entries[:util.MinInt32(l.LimitVal, int32(len(entries)))],
 		Cursor:  cursor,
 	}
 }
 
-func (l *listRequestsFilters) FetchPage(ctx context.Context) pagination.PageResult[EntryRecord] {
+func (l *listRequestsFilters) FetchPage(ctx context.Context) pagination.PageResult[*EntryRecord] {
 	return l.fetchPage(ctx)
 }
 
-func (l *listRequestsFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[EntryRecord]) (keepGoing bool, err error)) error {
+func (l *listRequestsFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[*EntryRecord]) (keepGoing bool, err error)) error {
 	var err error
 	keepGoing := true
 	hasMore := true
