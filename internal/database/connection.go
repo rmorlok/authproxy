@@ -288,6 +288,7 @@ type ListConnectionsBuilder interface {
 	ForState(ConnectionState) ListConnectionsBuilder
 	ForStates([]ConnectionState) ListConnectionsBuilder
 	ForNamespaceMatcher(matcher string) ListConnectionsBuilder
+	ForNamespaceMatchers(matchers []string) ListConnectionsBuilder
 	OrderBy(ConnectionOrderByField, pagination.OrderBy) ListConnectionsBuilder
 	IncludeDeleted() ListConnectionsBuilder
 	WithDeletedHandling(DeletedHandling) ListConnectionsBuilder
@@ -298,7 +299,7 @@ type listConnectionsFilters struct {
 	LimitVal          uint64                  `json:"limit"`
 	Offset            uint64                  `json:"offset"`
 	StatesVal         []ConnectionState       `json:"states,omitempty"`
-	NamespaceMatcher  *string                 `json:"namespace_matcher,omitempty"`
+	NamespaceMatchers []string                `json:"namespace_matchers,omitempty"`
 	OrderByFieldVal   *ConnectionOrderByField `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy     `json:"order_by"`
 	IncludeDeletedVal bool                    `json:"include_deleted,omitempty"`
@@ -323,9 +324,19 @@ func (l *listConnectionsFilters) ForNamespaceMatcher(matcher string) ListConnect
 	if err := ValidateNamespaceMatcher(matcher); err != nil {
 		return l.addError(err)
 	} else {
-		l.NamespaceMatcher = &matcher
+		l.NamespaceMatchers = []string{matcher}
 	}
 
+	return l
+}
+
+func (l *listConnectionsFilters) ForNamespaceMatchers(matchers []string) ListConnectionsBuilder {
+	for _, matcher := range matchers {
+		if err := ValidateNamespaceMatcher(matcher); err != nil {
+			return l.addError(err)
+		}
+	}
+	l.NamespaceMatchers = matchers
 	return l
 }
 
@@ -392,8 +403,8 @@ func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) sq.Selec
 		q = q.Where(sq.Eq{"state": l.StatesVal})
 	}
 
-	if l.NamespaceMatcher != nil {
-		q = restrictToNamespaceMatcher(q, "namespace", *l.NamespaceMatcher)
+	if len(l.NamespaceMatchers) > 0 {
+		q = restrictToNamespaceMatchers(q, "namespace", l.NamespaceMatchers)
 	}
 
 	if l.OrderByFieldVal != nil {

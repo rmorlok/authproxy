@@ -20,6 +20,7 @@ type MockListRequestBuilderExecutor struct {
 	OrderByVal      *pagination.OrderBy
 
 	Namespace                *string     `json:"namespace,omitempty"`
+	Namespaces               []string    `json:"namespaces,omitempty"`
 	RequestType              *string     `json:"request_type,omitempty"`
 	CorrelationId            *string     `json:"correlation_id,omitempty"`
 	ConnectionId             *uuid.UUID  `json:"connection_id,omitempty"`
@@ -34,7 +35,12 @@ type MockListRequestBuilderExecutor struct {
 }
 
 func (l *MockListRequestBuilderExecutor) WithNamespaceMatcher(matcher string) request_log.ListRequestBuilder {
-	l.RequestType = util.ToPtr(matcher)
+	l.Namespace = util.ToPtr(matcher)
+	return l
+}
+
+func (l *MockListRequestBuilderExecutor) WithNamespaceMatchers(matchers []string) request_log.ListRequestBuilder {
+	l.Namespaces = matchers
 	return l
 }
 

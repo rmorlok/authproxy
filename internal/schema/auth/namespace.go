@@ -31,6 +31,10 @@ const NamespaceWildcardSuffix = NamespacePathSeparator + NamespaceWildcard
 // namespace checking for permissions should be ignored.
 const NamespaceSkipNamespacePermissionChecks = "<SKIP_NAMESPACE_PERMISSION_CHECK>"
 
+// NamespaceNoMatchSentinel is a sentinel value used to indicate that the set of allowed namespaces is an empty set.
+// This is a value used to indicate that the intersection of requested and allowed namespaces is empty.
+const NamespaceNoMatchSentinel = "<NO_MATCH>"
+
 // ValidateNamespacePath checks if the path is valid. It returns an error if it is not with a descriptive message.
 func ValidateNamespacePath(path string) error {
 	if path == "" {

@@ -239,9 +239,7 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 			b = b.ForState(*req.StateVal)
 		}
 
-		if req.NamespaceVal != nil {
-			b = b.ForNamespaceMatcher(*req.NamespaceVal)
-		}
+		b = b.ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
 
 		if req.OrderByVal != nil {
 			field, order, err := pagination.SplitOrderByParam[database.ConnectorOrderByField](*req.OrderByVal)
@@ -442,6 +440,15 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 		return
 	}
 
+	// Compute effective namespace matchers for permission-based filtering at query level
+	effectiveMatchers := val.GetEffectiveNamespaceMatchers(req.NamespaceVal)
+	if effectiveMatchers != nil && len(effectiveMatchers) == 0 {
+		// No access to any namespaces for this resource/verb
+		val.MarkValidated()
+		gctx.PureJSON(http.StatusOK, ListConnectorVersionsResponseJson{Items: []ConnectorVersionJson{}})
+		return
+	}
+
 	if req.Cursor != nil {
 		ex, err = r.connectors.ListConnectorVersionsFromCursor(ctx, *req.Cursor)
 		if err != nil {
@@ -466,7 +473,11 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 			b = b.ForState(*req.StateVal)
 		}
 
-		if req.NamespaceVal != nil {
+		// Apply namespace restrictions at query level
+		if effectiveMatchers != nil {
+			b = b.ForNamespaceMatchers(effectiveMatchers)
+		} else if req.NamespaceVal != nil {
+			// Admin users with a query filter
 			b = b.ForNamespaceMatcher(*req.NamespaceVal)
 		}
 

@@ -233,6 +233,8 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 	} else {
 		b := r.rl.NewListRequestsBuilder()
 
+		b = b.WithNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.Namespace))
+
 		b, err = req.ApplyToBuilder(b)
 		if err != nil {
 			api_common.HttpStatusErrorBuilderFromError(err).

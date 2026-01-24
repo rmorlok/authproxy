@@ -149,6 +149,13 @@ func (l *listNamespaceWrapper) ForNamespaceMatcher(matcher string) iface.ListNam
 	}
 }
 
+func (l *listNamespaceWrapper) ForNamespaceMatchers(matchers []string) iface.ListNamespacesBuilder {
+	return &listNamespaceWrapper{
+		l: l.l.ForNamespaceMatchers(matchers),
+		s: l.s,
+	}
+}
+
 func (l *listNamespaceWrapper) ForState(s database.NamespaceState) iface.ListNamespacesBuilder {
 	return &listNamespaceWrapper{
 		l: l.l.ForState(s),

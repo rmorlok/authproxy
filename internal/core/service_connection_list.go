@@ -105,6 +105,10 @@ func (l *listConnectionsWrapper) ForNamespaceMatcher(m string) iface.ListConnect
 	return l.cloneWithBuilder(l.l.ForNamespaceMatcher(m))
 }
 
+func (l *listConnectionsWrapper) ForNamespaceMatchers(matchers []string) iface.ListConnectionsBuilder {
+	return l.cloneWithBuilder(l.l.ForNamespaceMatchers(matchers))
+}
+
 func (l *listConnectionsWrapper) OrderBy(f database.ConnectionOrderByField, o pagination.OrderBy) iface.ListConnectionsBuilder {
 	return l.cloneWithBuilder(l.l.OrderBy(f, o))
 }

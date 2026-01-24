@@ -612,6 +612,7 @@ type ListConnectorVersionsBuilder interface {
 	ForState(ConnectorVersionState) ListConnectorVersionsBuilder
 	ForStates([]ConnectorVersionState) ListConnectorVersionsBuilder
 	ForNamespaceMatcher(string) ListConnectorVersionsBuilder
+	ForNamespaceMatchers([]string) ListConnectorVersionsBuilder
 	OrderBy(ConnectorVersionOrderByField, pagination.OrderBy) ListConnectorVersionsBuilder
 	IncludeDeleted() ListConnectorVersionsBuilder
 }
@@ -621,7 +622,7 @@ type listConnectorVersionsFilters struct {
 	LimitVal          uint64                        `json:"limit"`
 	Offset            uint64                        `json:"offset"`
 	StatesVal         []ConnectorVersionState       `json:"states,omitempty"`
-	NamespaceMatcher  *string                       `json:"namespace_matcher,omitempty"`
+	NamespaceMatchers []string                      `json:"namespace_matchers,omitempty"`
 	TypeVal           []string                      `json:"types,omitempty"`
 	IdsVal            []uuid.UUID                   `json:"ids,omitempty"`
 	VersionsVal       []uint64                      `json:"versions,omitempty"`
@@ -655,9 +656,19 @@ func (l *listConnectorVersionsFilters) ForNamespaceMatcher(matcher string) ListC
 	if err := ValidateNamespaceMatcher(matcher); err != nil {
 		return l.addError(err)
 	} else {
-		l.NamespaceMatcher = &matcher
+		l.NamespaceMatchers = []string{matcher}
 	}
 
+	return l
+}
+
+func (l *listConnectorVersionsFilters) ForNamespaceMatchers(matchers []string) ListConnectorVersionsBuilder {
+	for _, matcher := range matchers {
+		if err := ValidateNamespaceMatcher(matcher); err != nil {
+			return l.addError(err)
+		}
+	}
+	l.NamespaceMatchers = matchers
 	return l
 }
 
@@ -728,8 +739,8 @@ func (l *listConnectorVersionsFilters) applyRestrictions(ctx context.Context) sq
 		q = q.Where(sq.Eq{"states": l.StatesVal})
 	}
 
-	if l.NamespaceMatcher != nil {
-		q = restrictToNamespaceMatcher(q, "namespace", *l.NamespaceMatcher)
+	if len(l.NamespaceMatchers) > 0 {
+		q = restrictToNamespaceMatchers(q, "namespace", l.NamespaceMatchers)
 	}
 
 	if !l.IncludeDeletedVal {

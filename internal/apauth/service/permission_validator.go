@@ -69,16 +69,16 @@ type ResourcePermissionValidator struct {
 	errorReturn      bool
 }
 
-func (a *ResourcePermissionValidator) MarkValidated() {
-	a.hasBeenValidated = true
+func (rpv *ResourcePermissionValidator) MarkValidated() {
+	rpv.hasBeenValidated = true
 }
 
-func (a *ResourcePermissionValidator) MarkErrorReturn() {
-	a.errorReturn = true
+func (rpv *ResourcePermissionValidator) MarkErrorReturn() {
+	rpv.errorReturn = true
 }
 
-func (a *ResourcePermissionValidator) ContextWith(ctx context.Context) context.Context {
-	return context.WithValue(ctx, validatorContextKey, a)
+func (rpv *ResourcePermissionValidator) ContextWith(ctx context.Context) context.Context {
+	return context.WithValue(ctx, validatorContextKey, rpv)
 }
 
 // ValidateNamespaceResourceId validates that the actor has permission to perform the route's action on the specified
@@ -134,6 +134,45 @@ func (rpv *ResourcePermissionValidator) ValidateHttpStatusError(obj interface{})
 		WithStatusForbidden().
 		WithPublicErr(err).
 		BuildStatusError()
+}
+
+// GetEffectiveNamespaceMatchers computes the namespace matchers that should be applied to a database query.
+// `queryMatcher` should be the namespace matcher received as a query param to an endpoint intented as filter.
+//
+// It returns:
+// - the allowed namespaces for the resource/verb, optionally intersected with queryMatcher
+// - a slice with NamespaceNoMatchSentinel if no namespaces can be matched
+func (rpv *ResourcePermissionValidator) GetEffectiveNamespaceMatchers(queryMatcher *string) []string {
+	if rpv.ra == nil || !rpv.ra.IsAuthenticated() {
+		return []string{aschema.NamespaceNoMatchSentinel} // No access if not authenticated
+	}
+
+	// Get the namespaces this actor can access for this resource/verb
+	allowedNamespaces := rpv.ra.GetNamespacesAllowed(rpv.pvb.resource, rpv.pvb.verb)
+	if len(allowedNamespaces) == 0 {
+		return []string{} // Empty slice means no access
+	}
+
+	// If no query filter, return the allowed namespaces directly
+	if queryMatcher == nil {
+		return allowedNamespaces
+	}
+
+	// Intersect each allowed namespace with the query matcher
+	result := make([]string, 0, len(allowedNamespaces))
+	for _, allowed := range allowedNamespaces {
+		if constrained, ok := aschema.NamespaceMatcherConstrained(allowed, *queryMatcher); ok {
+			result = append(result, constrained)
+		}
+	}
+
+	if len(result) == 0 {
+		// Return a set that indicates that no resources can be matched because the intersection of the allowed
+		// namespaces and the requested namespaces is an empty set.
+		return []string{aschema.NamespaceNoMatchSentinel}
+	}
+
+	return result
 }
 
 // PermissionValidatorBuilder constructs gin middleware that validates permissions for a request.

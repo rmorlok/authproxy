@@ -108,6 +108,38 @@ func restrictToNamespaceMatcher(q sq.SelectBuilder, field string, matcher string
 	}
 }
 
+// namespaceMatcherCondition returns a squirrel condition for a single namespace matcher.
+func namespaceMatcherCondition(field string, matcher string) sq.Sqlizer {
+	if strings.HasSuffix(matcher, ".**") {
+		statedNamespace := matcher[:len(matcher)-3]
+		return sq.Or{
+			sq.Eq{field: statedNamespace},
+			sq.Like{field: statedNamespace + ".%"},
+		}
+	} else {
+		return sq.Eq{field: matcher}
+	}
+}
+
+// restrictToNamespaceMatchers applies a restriction where the query must match at least one of the namespace matchers
+// (OR logic). If matchers is empty, no restriction is applied.
+func restrictToNamespaceMatchers(q sq.SelectBuilder, field string, matchers []string) sq.SelectBuilder {
+	if len(matchers) == 0 {
+		return q
+	}
+
+	if len(matchers) == 1 {
+		return restrictToNamespaceMatcher(q, field, matchers[0])
+	}
+
+	conditions := make([]sq.Sqlizer, 0, len(matchers))
+	for _, matcher := range matchers {
+		conditions = append(conditions, namespaceMatcherCondition(field, matcher))
+	}
+
+	return q.Where(sq.Or(conditions))
+}
+
 type NamespaceState string
 
 const (
@@ -324,6 +356,7 @@ type ListNamespacesBuilder interface {
 	ForDepth(depth uint64) ListNamespacesBuilder
 	ForChildrenOf(path string) ListNamespacesBuilder
 	ForNamespaceMatcher(matcher string) ListNamespacesBuilder
+	ForNamespaceMatchers(matchers []string) ListNamespacesBuilder
 	ForState(NamespaceState) ListNamespacesBuilder
 	OrderBy(NamespaceOrderByField, pagination.OrderBy) ListNamespacesBuilder
 	IncludeDeleted() ListNamespacesBuilder
@@ -336,7 +369,7 @@ type listNamespacesFilters struct {
 	StatesVal         []NamespaceState       `json:"states,omitempty"`
 	PathPrefixVal     string                 `json:"path_prefix,omitempty"`
 	DepthVal          *uint64                `json:"depth,omitempty"`
-	NamespaceMatcher  *string                `json:"namespace_matcher,omitempty"`
+	NamespaceMatchers []string               `json:"namespace_matchers,omitempty"`
 	OrderByFieldVal   *NamespaceOrderByField `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy    `json:"order_by"`
 	IncludeDeletedVal bool                   `json:"include_deleted,omitempty"`
@@ -383,9 +416,19 @@ func (l *listNamespacesFilters) ForNamespaceMatcher(matcher string) ListNamespac
 	if err := ValidateNamespaceMatcher(matcher); err != nil {
 		return l.addError(err)
 	} else {
-		l.NamespaceMatcher = &matcher
+		l.NamespaceMatchers = []string{matcher}
 	}
 
+	return l
+}
+
+func (l *listNamespacesFilters) ForNamespaceMatchers(matchers []string) ListNamespacesBuilder {
+	for _, matcher := range matchers {
+		if err := ValidateNamespaceMatcher(matcher); err != nil {
+			return l.addError(err)
+		}
+	}
+	l.NamespaceMatchers = matchers
 	return l
 }
 
@@ -443,8 +486,8 @@ func (l *listNamespacesFilters) applyRestrictions(ctx context.Context) sq.Select
 		q = q.Where(sq.Eq{"deleted_at": nil})
 	}
 
-	if l.NamespaceMatcher != nil {
-		q = restrictToNamespaceMatcher(q, "path", *l.NamespaceMatcher)
+	if len(l.NamespaceMatchers) > 0 {
+		q = restrictToNamespaceMatchers(q, "path", l.NamespaceMatchers)
 	}
 
 	// Always limit to one more than limit to check if there are more records

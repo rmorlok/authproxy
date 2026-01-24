@@ -101,6 +101,13 @@ func (l *listConnectorWrapper) ForNamespaceMatcher(m string) iface.ListConnector
 	}
 }
 
+func (l *listConnectorWrapper) ForNamespaceMatchers(matchers []string) iface.ListConnectorsBuilder {
+	return &listConnectorWrapper{
+		l: l.l.ForNamespaceMatchers(matchers),
+		s: l.s,
+	}
+}
+
 func (l *listConnectorWrapper) OrderBy(f database.ConnectorOrderByField, o pagination.OrderBy) iface.ListConnectorsBuilder {
 	return &listConnectorWrapper{
 		l: l.l.OrderBy(f, o),

@@ -61,6 +61,7 @@ type ListConnectorsBuilder interface {
 	ForType(string) ListConnectorsBuilder
 	ForId(uuid.UUID) ListConnectorsBuilder
 	ForNamespaceMatcher(string) ListConnectorsBuilder
+	ForNamespaceMatchers([]string) ListConnectorsBuilder
 	ForState(ConnectorVersionState) ListConnectorsBuilder
 	ForStates([]ConnectorVersionState) ListConnectorsBuilder
 	OrderBy(ConnectorOrderByField, pagination.OrderBy) ListConnectorsBuilder
@@ -72,7 +73,7 @@ type listConnectorsFilters struct {
 	LimitVal          uint64                  `json:"limit"`
 	Offset            uint64                  `json:"offset"`
 	StatesVal         []ConnectorVersionState `json:"states,omitempty"`
-	NamespaceMatcher  *string                 `json:"namespace_matcher,omitempty"`
+	NamespaceMatchers []string                `json:"namespace_matchers,omitempty"`
 	TypeVal           []string                `json:"types,omitempty"`
 	IdsVal            []uuid.UUID             `json:"ids,omitempty"`
 	OrderByFieldVal   *ConnectorOrderByField  `json:"order_by_field"`
@@ -105,9 +106,19 @@ func (l *listConnectorsFilters) ForNamespaceMatcher(matcher string) ListConnecto
 	if err := ValidateNamespaceMatcher(matcher); err != nil {
 		return l.addError(err)
 	} else {
-		l.NamespaceMatcher = &matcher
+		l.NamespaceMatchers = []string{matcher}
 	}
 
+	return l
+}
+
+func (l *listConnectorsFilters) ForNamespaceMatchers(matchers []string) ListConnectorsBuilder {
+	for _, matcher := range matchers {
+		if err := ValidateNamespaceMatcher(matcher); err != nil {
+			return l.addError(err)
+		}
+	}
+	l.NamespaceMatchers = matchers
 	return l
 }
 
@@ -216,8 +227,8 @@ cvc.versions as total_versions
 		q = q.Where(sq.Eq{"rr.state": l.StatesVal})
 	}
 
-	if l.NamespaceMatcher != nil {
-		q = restrictToNamespaceMatcher(q, "rr.namespace", *l.NamespaceMatcher)
+	if len(l.NamespaceMatchers) > 0 {
+		q = restrictToNamespaceMatchers(q, "rr.namespace", l.NamespaceMatchers)
 	}
 
 	if !l.IncludeDeletedVal {

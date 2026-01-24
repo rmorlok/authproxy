@@ -70,6 +70,7 @@ type ListRequestBuilder interface {
 	 */
 
 	WithNamespaceMatcher(matcher string) ListRequestBuilder
+	WithNamespaceMatchers(matchers []string) ListRequestBuilder
 	WithRequestType(requestType RequestType) ListRequestBuilder
 	WithCorrelationId(correlationId string) ListRequestBuilder
 	WithConnectionId(u uuid.UUID) ListRequestBuilder
@@ -105,7 +106,7 @@ type listRequestsFilters struct {
 	TimestampRange           []time.Time       `json:"timestamp_range,omitempty"`
 	Path                     *string           `json:"path,omitempty"`
 	PathRegex                *string           `json:"path_regex,omitempty"`
-	NamespaceMatcher         *string           `json:"namespace_matcher,omitempty"`
+	NamespaceMatchers        []string          `json:"namespace_matchers,omitempty"`
 	Errors                   *multierror.Error `json:"-"`
 }
 
@@ -123,9 +124,19 @@ func (l *listRequestsFilters) WithNamespaceMatcher(matcher string) ListRequestBu
 	if err := aschema.ValidateNamespaceMatcher(matcher); err != nil {
 		return l.addError(err)
 	} else {
-		l.NamespaceMatcher = &matcher
+		l.NamespaceMatchers = []string{matcher}
 	}
 
+	return l
+}
+
+func (l *listRequestsFilters) WithNamespaceMatchers(matchers []string) ListRequestBuilder {
+	for _, matcher := range matchers {
+		if err := aschema.ValidateNamespaceMatcher(matcher); err != nil {
+			return l.addError(err)
+		}
+	}
+	l.NamespaceMatchers = matchers
 	return l
 }
 
@@ -436,8 +447,13 @@ func (l *listRequestsFilters) apply() (query string, options *goredis.FTSearchOp
 		clauses = append(clauses, fmt.Sprintf("@%s:{%s}", fieldPath, apredis.EscapeRedisSearchStringAllowWildcards(*l.RequestType)))
 	}
 
-	if l.NamespaceMatcher != nil {
-		clauses = append(clauses, namespaceMatcherRestriction(*l.NamespaceMatcher))
+	if len(l.NamespaceMatchers) > 0 {
+		// Multiple namespace matchers with OR logic
+		nsRestrictions := make([]string, 0, len(l.NamespaceMatchers))
+		for _, matcher := range l.NamespaceMatchers {
+			nsRestrictions = append(nsRestrictions, namespaceMatcherRestriction(matcher))
+		}
+		clauses = append(clauses, "("+strings.Join(nsRestrictions, " | ")+")")
 	}
 
 	if l.PathRegex != nil {

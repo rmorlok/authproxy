@@ -18,6 +18,7 @@ type ListConnectionsBuilder interface {
 	ForState(database.ConnectionState) ListConnectionsBuilder
 	ForStates([]database.ConnectionState) ListConnectionsBuilder
 	ForNamespaceMatcher(matcher string) ListConnectionsBuilder
+	ForNamespaceMatchers(matchers []string) ListConnectionsBuilder
 	OrderBy(database.ConnectionOrderByField, pagination.OrderBy) ListConnectionsBuilder
 	IncludeDeleted() ListConnectionsBuilder
 	WithDeletedHandling(database.DeletedHandling) ListConnectionsBuilder

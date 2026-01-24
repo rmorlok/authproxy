@@ -139,9 +139,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 			b = b.ForState(*req.StateVal)
 		}
 
-		if req.NamespaceVal != nil {
-			b = b.ForNamespaceMatcher(*req.NamespaceVal)
-		}
+		b = b.ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
 
 		if req.OrderByVal != nil {
 			field, order, err := pagination.SplitOrderByParam[database.ConnectionOrderByField](*req.OrderByVal)

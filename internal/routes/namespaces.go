@@ -38,12 +38,12 @@ func NamespaceToJson(ns coreIface.Namespace) NamespaceJson {
 }
 
 type ListNamespacesRequestQueryParams struct {
-	Cursor     *string                  `form:"cursor"`
-	LimitVal   *int32                   `form:"limit"`
-	StateVal   *database.NamespaceState `form:"state"`
-	ChildrenOf *string                  `form:"children_of"`
-	Namespace  *string                  `form:"namespace"`
-	OrderByVal *string                  `form:"order_by"`
+	Cursor       *string                  `form:"cursor"`
+	LimitVal     *int32                   `form:"limit"`
+	StateVal     *database.NamespaceState `form:"state"`
+	ChildrenOf   *string                  `form:"children_of"`
+	NamespaceVal *string                  `form:"namespace"`
+	OrderByVal   *string                  `form:"order_by"`
 }
 
 type ListNamespacesResponseJson struct {
@@ -221,9 +221,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 			b = b.ForChildrenOf(*req.ChildrenOf)
 		}
 
-		if req.Namespace != nil {
-			b = b.ForNamespaceMatcher(*req.Namespace)
-		}
+		b = b.ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
 
 		if req.OrderByVal != nil {
 			field, order, err := pagination.SplitOrderByParam[database.NamespaceOrderByField](*req.OrderByVal)

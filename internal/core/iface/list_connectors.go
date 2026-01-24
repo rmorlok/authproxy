@@ -21,6 +21,7 @@ type ListConnectorsBuilder interface {
 	ForState(database.ConnectorVersionState) ListConnectorsBuilder
 	ForStates([]database.ConnectorVersionState) ListConnectorsBuilder
 	ForNamespaceMatcher(string) ListConnectorsBuilder
+	ForNamespaceMatchers([]string) ListConnectorsBuilder
 	OrderBy(database.ConnectorOrderByField, pagination.OrderBy) ListConnectorsBuilder
 	IncludeDeleted() ListConnectorsBuilder
 }

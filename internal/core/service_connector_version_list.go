@@ -100,6 +100,13 @@ func (l *listConnectorVersionWrapper) ForNamespaceMatcher(m string) iface.ListCo
 	}
 }
 
+func (l *listConnectorVersionWrapper) ForNamespaceMatchers(matchers []string) iface.ListConnectorVersionsBuilder {
+	return &listConnectorVersionWrapper{
+		l: l.l.ForNamespaceMatchers(matchers),
+		s: l.s,
+	}
+}
+
 func (l *listConnectorVersionWrapper) OrderBy(f database.ConnectorVersionOrderByField, o pagination.OrderBy) iface.ListConnectorVersionsBuilder {
 	return &listConnectorVersionWrapper{
 		l: l.l.OrderBy(f, o),
