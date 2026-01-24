@@ -323,6 +323,96 @@ func TestConnections(t *testing.T) {
 		})
 	})
 
+	t.Run("disconnect connection", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+		u := uuid.New()
+		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
+			Id:               u,
+			Namespace:        sconfig.RootNamespace,
+			ConnectorId:      connectorId,
+			ConnectorVersion: connectorVersion,
+			State:            database.ConnectionStateReady,
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPost, "/connections/"+u.String()+"/_disconnect", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden wrong verb", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connections/"+u.String()+"/_disconnect",
+				nil,
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connections", "get"), // Wrong verb
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
+			otherResourceId := uuid.New()
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connections/"+u.String()+"/_disconnect",
+				nil,
+				"some-actor",
+				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "disconnect", otherResourceId.String()),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+	})
+
+	t.Run("initiate connection", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPost, "/connections/_initiate", util.JsonToReader(map[string]interface{}{
+				"connector_id":  connectorId.String(),
+				"return_to_url": "https://example.com/callback",
+			}))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden wrong verb", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connections/_initiate",
+				util.JsonToReader(map[string]interface{}{
+					"connector_id":  connectorId.String(),
+					"return_to_url": "https://example.com/callback",
+				}),
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connections", "get"), // Wrong verb
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+	})
+
 	t.Run("force connection state", func(t *testing.T) {
 		tu, done := setup(t, nil)
 		defer done()

@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -197,6 +198,121 @@ func TestNamespaces(t *testing.T) {
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "root.prod", resp.Path)
+		})
+	})
+
+	t.Run("create namespace", func(t *testing.T) {
+		tu, done := setup(t, context.Background(), nil)
+		defer done()
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			body := map[string]string{"path": "root.newns"}
+			jsonBody, _ := json.Marshal(body)
+			req, err := http.NewRequest(http.MethodPost, "/namespaces", bytes.NewReader(jsonBody))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden wrong verb", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			body := map[string]string{"path": "root.newns"}
+			jsonBody, _ := json.Marshal(body)
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/namespaces",
+				bytes.NewReader(jsonBody),
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "namespaces", "list"), // Wrong verb
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("forbidden namespace not allowed", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			body := map[string]string{"path": "root.restricted"}
+			jsonBody, _ := json.Marshal(body)
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/namespaces",
+				bytes.NewReader(jsonBody),
+				"some-actor",
+				aschema.PermissionsSingle("root.other.**", "namespaces", "create"), // Wrong namespace
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code) // ValidateNamespace returns bad request
+		})
+
+		t.Run("valid with create permission", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			body := map[string]string{"path": "root.allowed"}
+			jsonBody, _ := json.Marshal(body)
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/namespaces",
+				bytes.NewReader(jsonBody),
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "namespaces", "create"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp NamespaceJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Equal(t, "root.allowed", resp.Path)
+			require.Equal(t, database.NamespaceStateActive, resp.State)
+		})
+
+		t.Run("conflict when namespace already exists", func(t *testing.T) {
+			// First create the namespace
+			err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+				Path:  "root.existing",
+				State: database.NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			body := map[string]string{"path": "root.existing"}
+			jsonBody, _ := json.Marshal(body)
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/namespaces",
+				bytes.NewReader(jsonBody),
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusConflict, w.Code)
+		})
+
+		t.Run("bad request for invalid namespace path", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			body := map[string]string{"path": "invalid path with spaces"}
+			jsonBody, _ := json.Marshal(body)
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/namespaces",
+				bytes.NewReader(jsonBody),
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
 		})
 	})
 
