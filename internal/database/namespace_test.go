@@ -457,4 +457,116 @@ INSERT INTO namespaces
 		err = val.Validate()
 		require.Error(t, err)
 	})
+	t.Run("ForNamespaceMatchers", func(t *testing.T) {
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw("namespace_matchers", nil)
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		sql := `
+INSERT INTO namespaces
+(path,                   depth, state,       created_at,            updated_at,            deleted_at) VALUES
+('root',                 0,     'active',    '2023-10-01 00:00:00', '2023-11-01 00:00:00', null),
+('root.prod',            1,     'active',    '2023-10-02 00:00:00', '2023-11-02 00:00:00', null),
+('root.prod.tenant1',    2,     'active',    '2023-10-03 00:00:00', '2023-11-03 00:00:00', null),
+('root.prod.tenant2',    2,     'active',    '2023-10-04 00:00:00', '2023-11-04 00:00:00', null),
+('root.staging',         1,     'active',    '2023-10-05 00:00:00', '2023-11-05 00:00:00', null),
+('root.staging.tenant1', 2,     'active',    '2023-10-06 00:00:00', '2023-11-06 00:00:00', null),
+('root.dev',             1,     'active',    '2023-10-07 00:00:00', '2023-11-07 00:00:00', null)
+`
+		_, err := rawDb.Exec(sql)
+		require.NoError(t, err)
+
+		t.Run("empty matchers returns all", func(t *testing.T) {
+			pr := db.ListNamespacesBuilder().
+				ForNamespaceMatchers([]string{}).
+				OrderBy(NamespaceOrderByCreatedAt, pagination.OrderByAsc).
+				FetchPage(ctx)
+			require.NoError(t, pr.Error)
+			require.Len(t, pr.Results, 7)
+		})
+
+		t.Run("single exact matcher", func(t *testing.T) {
+			pr := db.ListNamespacesBuilder().
+				ForNamespaceMatchers([]string{"root.prod"}).
+				FetchPage(ctx)
+			require.NoError(t, pr.Error)
+			require.Len(t, pr.Results, 1)
+			require.Equal(t, "root.prod", pr.Results[0].Path)
+		})
+
+		t.Run("single wildcard matcher", func(t *testing.T) {
+			pr := db.ListNamespacesBuilder().
+				ForNamespaceMatchers([]string{"root.prod.**"}).
+				OrderBy(NamespaceOrderByCreatedAt, pagination.OrderByAsc).
+				FetchPage(ctx)
+			require.NoError(t, pr.Error)
+			require.Len(t, pr.Results, 3)
+			require.Equal(t, "root.prod", pr.Results[0].Path)
+			require.Equal(t, "root.prod.tenant1", pr.Results[1].Path)
+			require.Equal(t, "root.prod.tenant2", pr.Results[2].Path)
+		})
+
+		t.Run("multiple exact matchers (OR logic)", func(t *testing.T) {
+			pr := db.ListNamespacesBuilder().
+				ForNamespaceMatchers([]string{"root.prod", "root.staging", "root.dev"}).
+				OrderBy(NamespaceOrderByCreatedAt, pagination.OrderByAsc).
+				FetchPage(ctx)
+			require.NoError(t, pr.Error)
+			require.Len(t, pr.Results, 3)
+			paths := []string{pr.Results[0].Path, pr.Results[1].Path, pr.Results[2].Path}
+			require.Contains(t, paths, "root.prod")
+			require.Contains(t, paths, "root.staging")
+			require.Contains(t, paths, "root.dev")
+		})
+
+		t.Run("multiple wildcard matchers (OR logic)", func(t *testing.T) {
+			pr := db.ListNamespacesBuilder().
+				ForNamespaceMatchers([]string{"root.prod.**", "root.staging.**"}).
+				OrderBy(NamespaceOrderByCreatedAt, pagination.OrderByAsc).
+				FetchPage(ctx)
+			require.NoError(t, pr.Error)
+			require.Len(t, pr.Results, 5)
+			paths := make([]string, len(pr.Results))
+			for i, r := range pr.Results {
+				paths[i] = r.Path
+			}
+			require.Contains(t, paths, "root.prod")
+			require.Contains(t, paths, "root.prod.tenant1")
+			require.Contains(t, paths, "root.prod.tenant2")
+			require.Contains(t, paths, "root.staging")
+			require.Contains(t, paths, "root.staging.tenant1")
+		})
+
+		t.Run("mixed exact and wildcard matchers", func(t *testing.T) {
+			pr := db.ListNamespacesBuilder().
+				ForNamespaceMatchers([]string{"root.prod.**", "root.dev"}).
+				OrderBy(NamespaceOrderByCreatedAt, pagination.OrderByAsc).
+				FetchPage(ctx)
+			require.NoError(t, pr.Error)
+			require.Len(t, pr.Results, 4)
+			paths := make([]string, len(pr.Results))
+			for i, r := range pr.Results {
+				paths[i] = r.Path
+			}
+			require.Contains(t, paths, "root.prod")
+			require.Contains(t, paths, "root.prod.tenant1")
+			require.Contains(t, paths, "root.prod.tenant2")
+			require.Contains(t, paths, "root.dev")
+		})
+
+		t.Run("no matching namespaces", func(t *testing.T) {
+			pr := db.ListNamespacesBuilder().
+				ForNamespaceMatchers([]string{"root.nonexistent"}).
+				FetchPage(ctx)
+			require.NoError(t, pr.Error)
+			require.Len(t, pr.Results, 0)
+		})
+
+		t.Run("invalid matcher returns error", func(t *testing.T) {
+			pr := db.ListNamespacesBuilder().
+				ForNamespaceMatchers([]string{"root.prod", "invalid**"}).
+				FetchPage(ctx)
+			require.Error(t, pr.Error)
+		})
+	})
 }

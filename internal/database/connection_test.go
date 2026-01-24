@@ -252,6 +252,41 @@ func TestConnections(t *testing.T) {
 			assert.Empty(t, result.Cursor)
 		})
 
+		t.Run("filter by multiple namespace matchers", func(t *testing.T) {
+			// Multiple exact namespaces
+			result := db.ListConnectionsBuilder().
+				ForNamespaceMatchers([]string{"root.some-namespace.0", "root.some-namespace.1"}).
+				OrderBy(ConnectionOrderByCreatedAt, pagination.OrderByAsc).
+				Limit(51).
+				FetchPage(ctx)
+			assert.NoError(t, result.Error)
+			assert.Len(t, result.Results, 10) // 5 from each namespace
+
+			// Multiple namespace matchers with wildcards
+			result = db.ListConnectionsBuilder().
+				ForNamespaceMatchers([]string{"root.some-namespace.0", "root.some-namespace.1", "root.some-namespace.2"}).
+				OrderBy(ConnectionOrderByCreatedAt, pagination.OrderByAsc).
+				Limit(51).
+				FetchPage(ctx)
+			assert.NoError(t, result.Error)
+			assert.Len(t, result.Results, 15) // 5 from each of the 3 namespaces
+
+			// Empty matchers returns all
+			result = db.ListConnectionsBuilder().
+				ForNamespaceMatchers([]string{}).
+				Limit(100).
+				FetchPage(ctx)
+			assert.NoError(t, result.Error)
+			assert.Len(t, result.Results, 50) // All connections
+
+			// No matching namespaces
+			result = db.ListConnectionsBuilder().
+				ForNamespaceMatchers([]string{"root.nonexistent"}).
+				FetchPage(ctx)
+			assert.NoError(t, result.Error)
+			assert.Len(t, result.Results, 0)
+		})
+
 		t.Run("filter by state", func(t *testing.T) {
 			total := 0
 

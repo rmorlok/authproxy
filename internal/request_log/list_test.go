@@ -106,6 +106,124 @@ func TestWithParsedTimestampRange(t *testing.T) {
 	}
 }
 
+func TestWithNamespaceMatchers(t *testing.T) {
+	tests := []struct {
+		name              string
+		matchers          []string
+		expectedMatchers  []string
+		expectedError     bool
+	}{
+		{
+			name:             "empty matchers",
+			matchers:         []string{},
+			expectedMatchers: []string{},
+			expectedError:    false,
+		},
+		{
+			name:             "single exact matcher",
+			matchers:         []string{"root.prod"},
+			expectedMatchers: []string{"root.prod"},
+			expectedError:    false,
+		},
+		{
+			name:             "single wildcard matcher",
+			matchers:         []string{"root.prod.**"},
+			expectedMatchers: []string{"root.prod.**"},
+			expectedError:    false,
+		},
+		{
+			name:             "multiple exact matchers",
+			matchers:         []string{"root.prod", "root.staging"},
+			expectedMatchers: []string{"root.prod", "root.staging"},
+			expectedError:    false,
+		},
+		{
+			name:             "multiple wildcard matchers",
+			matchers:         []string{"root.prod.**", "root.staging.**"},
+			expectedMatchers: []string{"root.prod.**", "root.staging.**"},
+			expectedError:    false,
+		},
+		{
+			name:             "mixed exact and wildcard matchers",
+			matchers:         []string{"root.prod", "root.staging.**"},
+			expectedMatchers: []string{"root.prod", "root.staging.**"},
+			expectedError:    false,
+		},
+		{
+			name:             "invalid matcher",
+			matchers:         []string{"invalid**"},
+			expectedMatchers: nil,
+			expectedError:    true,
+		},
+		{
+			name:             "valid and invalid matchers",
+			matchers:         []string{"root.prod", "invalid**"},
+			expectedMatchers: nil,
+			expectedError:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filter := &listRequestsFilters{}
+
+			builder := filter.WithNamespaceMatchers(tt.matchers)
+
+			if tt.expectedError {
+				assert.NotNil(t, filter.Errors)
+			} else {
+				assert.Nil(t, filter.Errors)
+				assert.NotNil(t, builder)
+				assert.Equal(t, tt.expectedMatchers, filter.NamespaceMatchers)
+			}
+		})
+	}
+}
+
+func TestWithNamespaceMatcher(t *testing.T) {
+	tests := []struct {
+		name              string
+		matcher           string
+		expectedMatchers  []string
+		expectedError     bool
+	}{
+		{
+			name:             "exact matcher",
+			matcher:          "root.prod",
+			expectedMatchers: []string{"root.prod"},
+			expectedError:    false,
+		},
+		{
+			name:             "wildcard matcher",
+			matcher:          "root.prod.**",
+			expectedMatchers: []string{"root.prod.**"},
+			expectedError:    false,
+		},
+		{
+			name:             "invalid matcher",
+			matcher:          "invalid**",
+			expectedMatchers: nil,
+			expectedError:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			filter := &listRequestsFilters{}
+
+			builder := filter.WithNamespaceMatcher(tt.matcher)
+
+			if tt.expectedError {
+				assert.NotNil(t, filter.Errors)
+			} else {
+				assert.Nil(t, filter.Errors)
+				assert.NotNil(t, builder)
+				assert.Equal(t, tt.expectedMatchers, filter.NamespaceMatchers)
+			}
+		})
+	}
+}
+
 func TestWithParsedStatusCodeRange(t *testing.T) {
 	tests := []struct {
 		name             string

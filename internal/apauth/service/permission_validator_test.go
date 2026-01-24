@@ -253,6 +253,280 @@ func (fm *fakeModel) GetId() uuid.UUID {
 	return fm.id
 }
 
+func TestGetEffectiveNamespaceMatchers(t *testing.T) {
+	tests := []struct {
+		name         string
+		authenticated bool
+		permissions  []aschema.Permission
+		resource     string
+		verb         string
+		queryMatcher *string
+		expected     []string
+	}{
+		{
+			name:          "unauthenticated returns no match sentinel",
+			authenticated: false,
+			permissions:   nil,
+			resource:      "connections",
+			verb:          "list",
+			queryMatcher:  nil,
+			expected:      []string{aschema.NamespaceNoMatchSentinel},
+		},
+		{
+			name:          "authenticated with no matching permissions returns empty",
+			authenticated: true,
+			permissions:   []aschema.Permission{{Namespace: "root.prod", Resources: []string{"connectors"}, Verbs: []string{"list"}}},
+			resource:      "connections",
+			verb:          "list",
+			queryMatcher:  nil,
+			expected:      []string{},
+		},
+		{
+			name:          "authenticated with matching permission returns namespace",
+			authenticated: true,
+			permissions:   []aschema.Permission{{Namespace: "root.prod", Resources: []string{"connections"}, Verbs: []string{"list"}}},
+			resource:      "connections",
+			verb:          "list",
+			queryMatcher:  nil,
+			expected:      []string{"root.prod"},
+		},
+		{
+			name:          "wildcard namespace permission",
+			authenticated: true,
+			permissions:   []aschema.Permission{{Namespace: "root.prod.**", Resources: []string{"connections"}, Verbs: []string{"list"}}},
+			resource:      "connections",
+			verb:          "list",
+			queryMatcher:  nil,
+			expected:      []string{"root.prod.**"},
+		},
+		{
+			name:          "multiple namespace permissions",
+			authenticated: true,
+			permissions: []aschema.Permission{
+				{Namespace: "root.prod", Resources: []string{"connections"}, Verbs: []string{"list"}},
+				{Namespace: "root.staging", Resources: []string{"connections"}, Verbs: []string{"list"}},
+			},
+			resource:     "connections",
+			verb:         "list",
+			queryMatcher: nil,
+			expected:     []string{"root.prod", "root.staging"},
+		},
+		{
+			name:          "query matcher intersects with permission",
+			authenticated: true,
+			permissions:   []aschema.Permission{{Namespace: "root.prod.**", Resources: []string{"connections"}, Verbs: []string{"list"}}},
+			resource:      "connections",
+			verb:          "list",
+			queryMatcher:  strPtr("root.prod.tenant1"),
+			expected:      []string{"root.prod.tenant1"},
+		},
+		{
+			name:          "query matcher with wildcard intersects",
+			authenticated: true,
+			permissions:   []aschema.Permission{{Namespace: "root.prod.**", Resources: []string{"connections"}, Verbs: []string{"list"}}},
+			resource:      "connections",
+			verb:          "list",
+			queryMatcher:  strPtr("root.prod.tenant1.**"),
+			expected:      []string{"root.prod.tenant1.**"},
+		},
+		{
+			name:          "query matcher no intersection returns no match sentinel",
+			authenticated: true,
+			permissions:   []aschema.Permission{{Namespace: "root.prod.**", Resources: []string{"connections"}, Verbs: []string{"list"}}},
+			resource:      "connections",
+			verb:          "list",
+			queryMatcher:  strPtr("root.staging"),
+			expected:      []string{aschema.NamespaceNoMatchSentinel},
+		},
+		{
+			name:          "wildcard resource permission",
+			authenticated: true,
+			permissions:   []aschema.Permission{{Namespace: "root.prod", Resources: []string{"*"}, Verbs: []string{"list"}}},
+			resource:      "connections",
+			verb:          "list",
+			queryMatcher:  nil,
+			expected:      []string{"root.prod"},
+		},
+		{
+			name:          "wildcard verb permission",
+			authenticated: true,
+			permissions:   []aschema.Permission{{Namespace: "root.prod", Resources: []string{"connections"}, Verbs: []string{"*"}}},
+			resource:      "connections",
+			verb:          "list",
+			queryMatcher:  nil,
+			expected:      []string{"root.prod"},
+		},
+		{
+			name:          "permission for different verb returns empty",
+			authenticated: true,
+			permissions:   []aschema.Permission{{Namespace: "root.prod", Resources: []string{"connections"}, Verbs: []string{"get"}}},
+			resource:      "connections",
+			verb:          "list",
+			queryMatcher:  nil,
+			expected:      []string{},
+		},
+		{
+			name:          "multiple permissions with partial match",
+			authenticated: true,
+			permissions: []aschema.Permission{
+				{Namespace: "root.prod.**", Resources: []string{"connections"}, Verbs: []string{"list"}},
+				{Namespace: "root.staging", Resources: []string{"connectors"}, Verbs: []string{"list"}}, // Different resource
+			},
+			resource:     "connections",
+			verb:         "list",
+			queryMatcher: nil,
+			expected:     []string{"root.prod.**"},
+		},
+		{
+			name:          "query matcher constrains wildcard to exact",
+			authenticated: true,
+			permissions:   []aschema.Permission{{Namespace: "root.**", Resources: []string{"connections"}, Verbs: []string{"list"}}},
+			resource:      "connections",
+			verb:          "list",
+			queryMatcher:  strPtr("root.prod"),
+			expected:      []string{"root.prod"},
+		},
+		{
+			name:          "multiple permissions with query intersection",
+			authenticated: true,
+			permissions: []aschema.Permission{
+				{Namespace: "root.prod.**", Resources: []string{"connections"}, Verbs: []string{"list"}},
+				{Namespace: "root.staging.**", Resources: []string{"connections"}, Verbs: []string{"list"}},
+			},
+			resource:     "connections",
+			verb:         "list",
+			queryMatcher: strPtr("root.prod.tenant1"),
+			expected:     []string{"root.prod.tenant1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var ra *core.RequestAuth
+			if tt.authenticated {
+				ra = core.NewAuthenticatedRequestAuth(&core.Actor{
+					Permissions: tt.permissions,
+				})
+			} else {
+				ra = core.NewUnauthenticatedRequestAuth()
+			}
+
+			validator := &ResourcePermissionValidator{
+				ra: ra,
+				pvb: &PermissionValidatorBuilder{
+					resource: tt.resource,
+					verb:     tt.verb,
+				},
+			}
+
+			result := validator.GetEffectiveNamespaceMatchers(tt.queryMatcher)
+			assert.Equal(t, tt.expected, result)
+		})
+	}
+}
+
+func strPtr(s string) *string {
+	return &s
+}
+
+// filterTestResource implements hasNamespace and hasId for testing FilterForValidatedResources
+type filterTestResource struct {
+	namespace string
+	id        uuid.UUID
+}
+
+func (r *filterTestResource) GetNamespace() string {
+	return r.namespace
+}
+
+func (r *filterTestResource) GetId() uuid.UUID {
+	return r.id
+}
+
+func TestFilterForValidatedResources(t *testing.T) {
+	tests := []struct {
+		name               string
+		permissions        []aschema.Permission
+		resource           string
+		verb               string
+		inputNamespaces    []string
+		expectedNamespaces []string
+	}{
+		{
+			name:               "filter out resources not in allowed namespace",
+			permissions:        []aschema.Permission{{Namespace: "root.prod", Resources: []string{"connections"}, Verbs: []string{"list"}}},
+			resource:           "connections",
+			verb:               "list",
+			inputNamespaces:    []string{"root.prod", "root.staging", "root.prod"},
+			expectedNamespaces: []string{"root.prod", "root.prod"},
+		},
+		{
+			name:               "wildcard namespace matches child namespaces",
+			permissions:        []aschema.Permission{{Namespace: "root.prod.**", Resources: []string{"connections"}, Verbs: []string{"list"}}},
+			resource:           "connections",
+			verb:               "list",
+			inputNamespaces:    []string{"root.prod", "root.prod.tenant1", "root.staging"},
+			expectedNamespaces: []string{"root.prod", "root.prod.tenant1"},
+		},
+		{
+			name: "multiple namespace permissions",
+			permissions: []aschema.Permission{
+				{Namespace: "root.prod", Resources: []string{"connections"}, Verbs: []string{"list"}},
+				{Namespace: "root.staging", Resources: []string{"connections"}, Verbs: []string{"list"}},
+			},
+			resource:           "connections",
+			verb:               "list",
+			inputNamespaces:    []string{"root.prod", "root.staging", "root.dev"},
+			expectedNamespaces: []string{"root.prod", "root.staging"},
+		},
+		{
+			name:               "empty input returns empty",
+			permissions:        []aschema.Permission{{Namespace: "root.prod", Resources: []string{"connections"}, Verbs: []string{"list"}}},
+			resource:           "connections",
+			verb:               "list",
+			inputNamespaces:    []string{},
+			expectedNamespaces: []string{},
+		},
+		{
+			name:               "no matching namespaces returns empty",
+			permissions:        []aschema.Permission{{Namespace: "root.prod", Resources: []string{"connections"}, Verbs: []string{"list"}}},
+			resource:           "connections",
+			verb:               "list",
+			inputNamespaces:    []string{"root.staging", "root.dev"},
+			expectedNamespaces: []string{},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ra := core.NewAuthenticatedRequestAuth(&core.Actor{
+				Permissions: tt.permissions,
+			})
+
+			validator := &ResourcePermissionValidator{
+				ra: ra,
+				pvb: &PermissionValidatorBuilder{
+					resource: tt.resource,
+					verb:     tt.verb,
+				},
+			}
+
+			input := make([]*filterTestResource, len(tt.inputNamespaces))
+			for i, ns := range tt.inputNamespaces {
+				input[i] = &filterTestResource{namespace: ns, id: uuid.New()}
+			}
+
+			result := FilterForValidatedResources(validator, input)
+
+			assert.Equal(t, len(tt.expectedNamespaces), len(result))
+			for i, r := range result {
+				assert.Equal(t, tt.expectedNamespaces[i], r.namespace)
+			}
+			assert.True(t, validator.hasBeenValidated)
+		})
+	}
+}
+
 func TestValidatorOnRoutes(t *testing.T) {
 	type TestSetup struct {
 		Gin      *gin.Engine
