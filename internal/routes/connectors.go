@@ -275,7 +275,11 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 	result := ex.FetchPage(ctx)
 
 	if result.Error != nil {
-		gctx.PureJSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		api_common.NewHttpStatusErrorBuilder().
+			DefaultStatusInternalServerError().
+			WithInternalErr(result.Error).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -498,7 +502,11 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 	result := ex.FetchPage(ctx)
 
 	if result.Error != nil {
-		gctx.PureJSON(http.StatusInternalServerError, gin.H{"error": result.Error.Error()})
+		api_common.NewHttpStatusErrorBuilder().
+			DefaultStatusInternalServerError().
+			WithInternalErr(result.Error).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
 		val.MarkErrorReturn()
 		return
 	}
