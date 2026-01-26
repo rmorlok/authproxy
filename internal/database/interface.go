@@ -25,6 +25,7 @@ type IActorData interface {
 	IsAdmin() bool
 	IsSuperAdmin() bool
 	GetEmail() string
+	GetNamespace() string
 }
 
 //go:generate mockgen -source=./interface.go -destination=./mock/db.go -package=mock

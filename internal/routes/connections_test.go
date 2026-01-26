@@ -107,6 +107,7 @@ func TestConnections(t *testing.T) {
 				http.MethodGet,
 				"/connections/"+uuid.New().String(),
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connections", "list"), // Wrong verb
 			)
@@ -118,7 +119,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("invalid uuid", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections/"+uuid.New().String(), nil, "some-actor", aschema.AllPermissions())
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections/"+uuid.New().String(), nil, "root", "some-actor", aschema.AllPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -127,7 +128,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("valid", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections/"+u.String(), nil, "some-actor", aschema.AllPermissions())
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections/"+u.String(), nil, "root", "some-actor", aschema.AllPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -146,6 +147,7 @@ func TestConnections(t *testing.T) {
 				http.MethodGet,
 				"/connections/"+u.String(),
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "get", u.String()),
 			)
@@ -167,6 +169,7 @@ func TestConnections(t *testing.T) {
 				http.MethodGet,
 				"/connections/"+u.String(),
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "get", otherResourceId.String()),
 			)
@@ -183,6 +186,7 @@ func TestConnections(t *testing.T) {
 				http.MethodGet,
 				"/connections/"+u.String(),
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "get", otherResourceId.String(), u.String()),
 			)
@@ -264,6 +268,7 @@ func TestConnections(t *testing.T) {
 				http.MethodGet,
 				"/connections?limit=50&order=created_at%20asc",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connections", "get"), // Wrong verb
 			)
@@ -279,6 +284,7 @@ func TestConnections(t *testing.T) {
 				http.MethodGet,
 				"/connections?limit=50&order=created_at%20asc",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connections", "list"),
 			)
@@ -295,7 +301,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("filter to namespace", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections?limit=50&order=created_at%20asc&namespace=root", nil, "some-actor", aschema.AllPermissions())
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections?limit=50&order=created_at%20asc&namespace=root", nil, "root", "some-actor", aschema.AllPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -310,7 +316,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("filter to namespace matcher", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections?limit=50&order=created_at%20asc&namespace=root.child.**", nil, "some-actor", aschema.AllPermissions())
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections?limit=50&order=created_at%20asc&namespace=root.child.**", nil, "root", "some-actor", aschema.AllPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -351,6 +357,7 @@ func TestConnections(t *testing.T) {
 				http.MethodPost,
 				"/connections/"+u.String()+"/_disconnect",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connections", "get"), // Wrong verb
 			)
@@ -367,6 +374,7 @@ func TestConnections(t *testing.T) {
 				http.MethodPost,
 				"/connections/"+u.String()+"/_disconnect",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "disconnect", otherResourceId.String()),
 			)
@@ -403,6 +411,7 @@ func TestConnections(t *testing.T) {
 					"connector_id":  connectorId.String(),
 					"return_to_url": "https://example.com/callback",
 				}),
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connections", "get"), // Wrong verb
 			)
@@ -441,6 +450,7 @@ func TestConnections(t *testing.T) {
 				http.MethodPut,
 				"/connections/"+uuid.New().String()+"/_force_state",
 				util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}),
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connections", "get"), // Wrong verb
 			)
@@ -456,6 +466,7 @@ func TestConnections(t *testing.T) {
 				http.MethodPut,
 				"/connections/"+uuid.New().String()+"/_force_state",
 				util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}),
+				"root",
 				"some-actor",
 				aschema.AllPermissions(),
 			)
@@ -471,6 +482,7 @@ func TestConnections(t *testing.T) {
 				http.MethodPut,
 				"/connections/"+u.String()+"/_force_state",
 				util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}),
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connections", "force_state"),
 			)
@@ -496,6 +508,7 @@ func TestConnections(t *testing.T) {
 				http.MethodPut,
 				"/connections/"+u.String()+"/_force_state",
 				util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}),
+				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "force_state", u.String()),
 			)
@@ -518,6 +531,7 @@ func TestConnections(t *testing.T) {
 				http.MethodPut,
 				"/connections/"+u.String()+"/_force_state",
 				util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateReady}),
+				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "force_state", otherResourceId.String()),
 			)

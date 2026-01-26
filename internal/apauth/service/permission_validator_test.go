@@ -255,13 +255,13 @@ func (fm *fakeModel) GetId() uuid.UUID {
 
 func TestGetEffectiveNamespaceMatchers(t *testing.T) {
 	tests := []struct {
-		name         string
+		name          string
 		authenticated bool
-		permissions  []aschema.Permission
-		resource     string
-		verb         string
-		queryMatcher *string
-		expected     []string
+		permissions   []aschema.Permission
+		resource      string
+		verb          string
+		queryMatcher  *string
+		expected      []string
 	}{
 		{
 			name:          "unauthenticated returns no match sentinel",
@@ -591,6 +591,7 @@ func TestValidatorOnRoutes(t *testing.T) {
 				http.MethodGet,
 				"/cats",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.prod.**", "cats", "meow"),
 			)
@@ -606,6 +607,7 @@ func TestValidatorOnRoutes(t *testing.T) {
 				http.MethodGet,
 				"/cats",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "cats", "meow", "10000000-0000-0000-0000-000000000002"),
 			)
@@ -621,6 +623,7 @@ func TestValidatorOnRoutes(t *testing.T) {
 				http.MethodGet,
 				"/cats",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "cats", "woof"),
 			)
@@ -636,6 +639,7 @@ func TestValidatorOnRoutes(t *testing.T) {
 				http.MethodGet,
 				"/cats",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "dogs", "meow"),
 			)
@@ -651,6 +655,7 @@ func TestValidatorOnRoutes(t *testing.T) {
 				http.MethodGet,
 				"/cats",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "cats", "meow"),
 			)
@@ -670,6 +675,7 @@ func TestValidatorOnRoutes(t *testing.T) {
 				http.MethodGet,
 				"/cats",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "cats", "meow", "10000000-0000-0000-0000-000000000001"),
 			)
@@ -718,6 +724,7 @@ func TestValidatorOnRoutes(t *testing.T) {
 				http.MethodGet,
 				"/cats",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "cats", "meow"),
 			)
@@ -741,6 +748,7 @@ func TestValidatorOnRoutes(t *testing.T) {
 				http.MethodGet,
 				"/cats",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "cats", "meow", "10000000-0000-0000-0000-000000000001"),
 			)

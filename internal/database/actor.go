@@ -25,6 +25,7 @@ type ActorOrderByField string
 const (
 	ActorOrderByCreatedAt  ActorOrderByField = "created_at"
 	ActorOrderByUpdatedAt  ActorOrderByField = "updated_at"
+	ActorOrderByNamespace  ActorOrderByField = "namespace"
 	ActorOrderByEmail      ActorOrderByField = "email"
 	ActorOrderByExternalId ActorOrderByField = "external_id"
 	ActorOrderByAdmin      ActorOrderByField = "admin"
@@ -66,6 +67,7 @@ func IsValidActorOrderByField[T string | ActorOrderByField](field T) bool {
 	switch ActorOrderByField(field) {
 	case ActorOrderByCreatedAt,
 		ActorOrderByUpdatedAt,
+		ActorOrderByNamespace,
 		ActorOrderByEmail,
 		ActorOrderByExternalId,
 		ActorOrderByAdmin,
@@ -82,6 +84,7 @@ const ActorTable = "actors"
 // Actor is some entity taking action within the system.
 type Actor struct {
 	Id          uuid.UUID
+	Namespace   string
 	ExternalId  string
 	Email       string
 	Permissions Permissions
@@ -107,6 +110,7 @@ func (a *Actor) GetEmail() string {
 func (a *Actor) cols() []string {
 	return []string{
 		"id",
+		"namespace",
 		"external_id",
 		"email",
 		"permissions",
@@ -121,6 +125,7 @@ func (a *Actor) cols() []string {
 func (a *Actor) fields() []any {
 	return []any{
 		&a.Id,
+		&a.Namespace,
 		&a.ExternalId,
 		&a.Email,
 		&a.Permissions,
@@ -135,6 +140,7 @@ func (a *Actor) fields() []any {
 func (a *Actor) values() []any {
 	return []any{
 		a.Id,
+		a.Namespace,
 		a.ExternalId,
 		a.Email,
 		a.Permissions,
@@ -147,6 +153,7 @@ func (a *Actor) values() []any {
 }
 
 func (a *Actor) setFromData(d IActorData) {
+	a.Namespace = d.GetNamespace()
 	a.ExternalId = d.GetExternalId()
 	a.Email = d.GetEmail()
 	a.Permissions = d.GetPermissions()
@@ -155,7 +162,8 @@ func (a *Actor) setFromData(d IActorData) {
 }
 
 func (a *Actor) sameAsData(d IActorData) bool {
-	return a.ExternalId == d.GetExternalId() &&
+	return a.GetNamespace() == d.GetNamespace() &&
+		a.ExternalId == d.GetExternalId() &&
 		a.Email == d.GetEmail() &&
 		slices.EqualFunc(a.Permissions, d.GetPermissions(), func(p1, p2 aschema.Permission) bool { return p1.Equal(p2) }) &&
 		a.Admin == d.IsAdmin() &&
@@ -167,7 +175,7 @@ func (a *Actor) GetId() uuid.UUID {
 }
 
 func (a *Actor) GetNamespace() string {
-	return "root" // Hardcoded for now
+	return a.Namespace
 }
 
 // IsAdmin is a helper to wrap the Admin attribute
@@ -207,6 +215,10 @@ func (a *Actor) validate() error {
 
 	if a.Id == uuid.Nil {
 		result = multierror.Append(result, errors.New("actor id is empty"))
+	}
+
+	if err := ValidateNamespacePath(a.Namespace); err != nil {
+		result = multierror.Append(result, errors.Wrap(err, "invalid actor namespace"))
 	}
 
 	if a.ExternalId == "" {
@@ -487,6 +499,8 @@ type ListActorsBuilder interface {
 	ForEmail(email string) ListActorsBuilder
 	ForIsAdmin(isAdmin bool) ListActorsBuilder
 	ForIsSuperAdmin(isSuperAdmin bool) ListActorsBuilder
+	ForNamespaceMatcher(matcher string) ListActorsBuilder
+	ForNamespaceMatchers(matchers []string) ListActorsBuilder
 	Limit(int32) ListActorsBuilder
 	OrderBy(ActorOrderByField, pagination.OrderBy) ListActorsBuilder
 	IncludeDeleted() ListActorsBuilder
@@ -503,6 +517,8 @@ type listActorsFilters struct {
 	EmailVal          *string             `json:"email,omitempty"`
 	IsAdminVal        *bool               `json:"is_admin,omitempty"`
 	IsSuperAdminVal   *bool               `json:"is_super_admin,omitempty"`
+	NamespaceMatchers []string            `json:"namespace_matchers,omitempty"`
+	Errors            *multierror.Error   `json:"-"`
 }
 
 func (l *listActorsFilters) Limit(limit int32) ListActorsBuilder {
@@ -543,6 +559,29 @@ func (l *listActorsFilters) ForIsSuperAdmin(isSuperAdmin bool) ListActorsBuilder
 	return l
 }
 
+func (l *listActorsFilters) addError(e error) ListActorsBuilder {
+	l.Errors = multierror.Append(l.Errors, e)
+	return l
+}
+
+func (l *listActorsFilters) ForNamespaceMatcher(matcher string) ListActorsBuilder {
+	if err := ValidateNamespaceMatcher(matcher); err != nil {
+		return l.addError(err)
+	}
+	l.NamespaceMatchers = []string{matcher}
+	return l
+}
+
+func (l *listActorsFilters) ForNamespaceMatchers(matchers []string) ListActorsBuilder {
+	for _, matcher := range matchers {
+		if err := ValidateNamespaceMatcher(matcher); err != nil {
+			return l.addError(err)
+		}
+	}
+	l.NamespaceMatchers = matchers
+	return l
+}
+
 func (l *listActorsFilters) FromCursor(ctx context.Context, cursor string) (ListActorsExecutor, error) {
 	s := l.s
 	parsed, err := pagination.ParseCursor[listActorsFilters](ctx, s.secretKey, cursor)
@@ -573,6 +612,10 @@ func (l *listActorsFilters) applyRestrictions(ctx context.Context) sq.SelectBuil
 	// Always limit to one more than limit to check if there are more records
 	q = q.Limit(l.LimitVal + 1).Offset(l.Offset)
 
+	if len(l.NamespaceMatchers) > 0 {
+		q = restrictToNamespaceMatchers(q, "namespace", l.NamespaceMatchers)
+	}
+
 	if l.OrderByFieldVal != nil {
 		q = q.OrderBy(fmt.Sprintf("%s %s", string(*l.OrderByFieldVal), l.OrderByVal.String()))
 	}
@@ -582,6 +625,10 @@ func (l *listActorsFilters) applyRestrictions(ctx context.Context) sq.SelectBuil
 
 func (l *listActorsFilters) fetchPage(ctx context.Context) pagination.PageResult[*Actor] {
 	var err error
+
+	if err = l.Errors.ErrorOrNil(); err != nil {
+		return pagination.PageResult[*Actor]{Error: err}
+	}
 
 	rows, err := l.applyRestrictions(ctx).
 		RunWith(l.s.db).

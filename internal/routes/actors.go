@@ -31,6 +31,7 @@ type ActorsRoutes struct {
 
 type ActorJson struct {
 	Id         uuid.UUID `json:"id"`
+	Namespace  string    `json:"namespace"`
 	ExternalId string    `json:"external_id"`
 	Email      string    `json:"email"`
 	Admin      bool      `json:"admin"`
@@ -42,6 +43,7 @@ type ActorJson struct {
 func DatabaseActorToJson(a *database.Actor) ActorJson {
 	return ActorJson{
 		Id:         a.Id,
+		Namespace:  a.GetNamespace(),
 		ExternalId: a.ExternalId,
 		Email:      a.Email,
 		Admin:      a.Admin,
@@ -52,13 +54,14 @@ func DatabaseActorToJson(a *database.Actor) ActorJson {
 }
 
 type ListActorsRequestQuery struct {
-	Cursor     *string `form:"cursor"`
-	LimitVal   *int32  `form:"limit"`
-	ExternalId *string `form:"external_id"`
-	Email      *string `form:"email"`
-	Admin      *bool   `form:"admin"`
-	SuperAdmin *bool   `form:"super_admin"`
-	OrderByVal *string `form:"order_by"`
+	Cursor       *string `form:"cursor"`
+	LimitVal     *int32  `form:"limit"`
+	ExternalId   *string `form:"external_id"`
+	Email        *string `form:"email"`
+	Admin        *bool   `form:"admin"`
+	SuperAdmin   *bool   `form:"super_admin"`
+	NamespaceVal *string `form:"namespace"`
+	OrderByVal   *string `form:"order_by"`
 }
 
 type ListActorsResponseJson struct {
@@ -119,6 +122,8 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 		if req.SuperAdmin != nil {
 			b = b.ForIsSuperAdmin(*req.SuperAdmin)
 		}
+
+		b = b.ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
 
 		if req.OrderByVal != nil {
 			field, order, err := pagination.SplitOrderByParam[database.ActorOrderByField](*req.OrderByVal)

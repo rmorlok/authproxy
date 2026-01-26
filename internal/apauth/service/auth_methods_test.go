@@ -51,6 +51,7 @@ func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 	claims := jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        "random id",
+			Subject:   "id1",
 			Issuer:    "remark42",
 			Audience:  []string{string(sconfig.ServiceIdAdminApi)},
 			ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
@@ -60,6 +61,7 @@ func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 
 		Actor: &core.Actor{
 			ExternalId: "id1",
+			Namespace:  "root",
 			Email:      "me@example.com",
 		},
 	}
@@ -109,6 +111,7 @@ func TestAuth_RoundtripPublicPrivate(t *testing.T) {
 	claims := jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        "random id",
+			Subject:   "id1",
 			Issuer:    "remark42",
 			Audience:  []string{string(sconfig.ServiceIdAdminApi)},
 			ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
@@ -118,6 +121,7 @@ func TestAuth_RoundtripPublicPrivate(t *testing.T) {
 
 		Actor: &core.Actor{
 			ExternalId: "id1",
+			Namespace:  "root",
 			Email:      "me@example.com",
 		},
 	}
@@ -145,6 +149,7 @@ func TestAuth_SecretKey(t *testing.T) {
 	claims := jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        "random id",
+			Subject:   "id7",
 			Issuer:    "remark42",
 			Audience:  []string{string(sconfig.ServiceIdAdminApi)},
 			ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
@@ -154,6 +159,7 @@ func TestAuth_SecretKey(t *testing.T) {
 
 		Actor: &core.Actor{
 			ExternalId: "id7",
+			Namespace:  "root",
 			Email:      "me@example.com",
 		},
 	}
@@ -196,6 +202,7 @@ func TestAuth_Parse(t *testing.T) {
 		org := jwt2.AuthProxyClaims{
 			RegisteredClaims: jwt.RegisteredClaims{
 				ID:        "random id",
+				Subject:   "id1",
 				Issuer:    "remark42",
 				Audience:  []string{string(sconfig.ServiceIdAdminApi)},
 				ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
@@ -205,6 +212,7 @@ func TestAuth_Parse(t *testing.T) {
 
 			Actor: &core.Actor{
 				ExternalId: "id1",
+				Namespace:  "root",
 				Email:      "me@example.com",
 			},
 		}
@@ -225,6 +233,7 @@ func TestAuth_Parse(t *testing.T) {
 		org := jwt2.AuthProxyClaims{
 			RegisteredClaims: jwt.RegisteredClaims{
 				ID:        "random id",
+				Subject:   "id1",
 				Issuer:    "remark42",
 				Audience:  []string{string(sconfig.ServiceIdAdminApi)},
 				ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
@@ -234,6 +243,7 @@ func TestAuth_Parse(t *testing.T) {
 
 			Actor: &core.Actor{
 				ExternalId: "id1",
+				Namespace:  "root",
 				Email:      "me@example.com",
 			},
 		}
@@ -440,6 +450,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				dbActorId := uuid.New()
 				dbActor := &database.Actor{
 					Id:         dbActorId,
+					Namespace:  "root",
 					ExternalId: testClaims().Actor.ExternalId,
 					Email:      testClaims().Actor.Email,
 				}
@@ -466,6 +477,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				dbActorId := uuid.New()
 				dbActor := &database.Actor{
 					Id:         dbActorId,
+					Namespace:  "root",
 					ExternalId: testClaims().Actor.ExternalId,
 					Email:      "old-" + testClaims().Actor.Email,
 				}
@@ -498,6 +510,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				}
 				dbActor := &database.Actor{
 					Id:          dbActorId,
+					Namespace:   "root",
 					ExternalId:  externalId,
 					Email:       "permtest@example.com",
 					Permissions: oldPerms,
@@ -529,6 +542,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 					},
 					Actor: &core.Actor{
 						ExternalId:  externalId,
+						Namespace:   "root",
 						Email:       "permtest@example.com",
 						Permissions: newPerms,
 					},
@@ -726,6 +740,7 @@ func TestAuth_AdminPermissionsSync(t *testing.T) {
 		dbActorId := uuid.New()
 		dbActor := &database.Actor{
 			Id:          dbActorId,
+			Namespace:   "root",
 			ExternalId:  adminExternalId,
 			Email:       "aid1@example.com",
 			Admin:       true,
@@ -955,6 +970,7 @@ func testClaims() *jwt2.AuthProxyClaims {
 
 		Actor: &core.Actor{
 			ExternalId: "id1",
+			Namespace:  "root",
 			Email:      "me@example.com",
 		},
 	}

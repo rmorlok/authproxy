@@ -29,13 +29,16 @@ func TestActor(t *testing.T) {
 	t.Run("Validation", func(t *testing.T) {
 		require.NoError(t, util.ToPtr(Actor{
 			Id:         uuid.New(),
+			Namespace:  "root",
 			ExternalId: "1234567890",
 		}).validate())
 		require.Error(t, util.ToPtr(Actor{
+			Namespace:  "root",
 			ExternalId: "1234567890",
 		}).validate())
 		require.Error(t, util.ToPtr(Actor{
-			Id: uuid.New(),
+			Id:        uuid.New(),
+			Namespace: "root",
 		}).validate())
 		require.Error(t, util.ToPtr(Actor{}).validate())
 	})
@@ -45,6 +48,7 @@ func TestActor(t *testing.T) {
 		otherId := uuid.New()
 		otherActor := &Actor{
 			Id:         otherId,
+			Namespace:  "root",
 			ExternalId: otherId.String(),
 			Email:      "billclinton@example.com",
 		}
@@ -57,6 +61,7 @@ func TestActor(t *testing.T) {
 
 		actor := &Actor{
 			Id:         id,
+			Namespace:  "root",
 			ExternalId: id.String(),
 			Email:      "bobdole@example.com",
 		}
@@ -72,6 +77,7 @@ func TestActor(t *testing.T) {
 		otherId := uuid.New()
 		otherActor := &Actor{
 			Id:         otherId,
+			Namespace:  "root",
 			ExternalId: otherId.String(),
 			Email:      "billclinton@example.com",
 		}
@@ -84,6 +90,7 @@ func TestActor(t *testing.T) {
 
 		actor := &Actor{
 			Id:         id,
+			Namespace:  "root",
 			ExternalId: id.String(),
 			Email:      "bobdole@example.com",
 		}
@@ -107,6 +114,7 @@ func TestActor(t *testing.T) {
 			id := uuid.New()
 			actor := &Actor{
 				Id:         id,
+				Namespace:  "root",
 				ExternalId: id.String(),
 				Email:      "bobdole@example.com",
 				Permissions: Permissions{
@@ -140,6 +148,7 @@ func TestActor(t *testing.T) {
 
 			actor1 := &Actor{
 				Id:         uuid.New(),
+				Namespace:  "root",
 				ExternalId: "duplicate",
 				Email:      "bobdole@example.com",
 			}
@@ -158,6 +167,7 @@ func TestActor(t *testing.T) {
 			id := uuid.New()
 			actor1 := &Actor{
 				Id:         id,
+				Namespace:  "root",
 				ExternalId: uuid.New().String(),
 				Email:      "bobdole@example.com",
 			}
@@ -197,6 +207,7 @@ func TestActor(t *testing.T) {
 				externalId := "bobdole"
 				err := db.CreateActor(ctx, &Actor{
 					Id:         id,
+					Namespace:  "root",
 					ExternalId: externalId,
 					Email:      "bobdole@example.com",
 				})
@@ -228,6 +239,7 @@ func TestActor(t *testing.T) {
 				externalId := "bobdole"
 				err := db.CreateActor(ctx, &Actor{
 					Id:         id,
+					Namespace:  "root",
 					ExternalId: externalId,
 					Email:      "bobdole@example.com",
 					Permissions: Permissions{
@@ -317,6 +329,7 @@ func TestActor(t *testing.T) {
 				}
 				err := db.CreateActor(ctx, &Actor{
 					Id:          id1,
+					Namespace:   "root",
 					ExternalId:  externalId1,
 					Email:       "actor1@example.com",
 					Permissions: originalPerms1,
@@ -335,6 +348,7 @@ func TestActor(t *testing.T) {
 				}
 				err = db.CreateActor(ctx, &Actor{
 					Id:          id2,
+					Namespace:   "root",
 					ExternalId:  externalId2,
 					Email:       "actor2@example.com",
 					Permissions: originalPerms2,
@@ -353,6 +367,7 @@ func TestActor(t *testing.T) {
 				}
 				err = db.CreateActor(ctx, &Actor{
 					Id:          id3,
+					Namespace:   "root",
 					ExternalId:  externalId3,
 					Email:       "actor3@example.com",
 					Permissions: originalPerms3,
@@ -369,6 +384,7 @@ func TestActor(t *testing.T) {
 				}
 				actor2, err := db.UpsertActor(ctx, &core.Actor{
 					ExternalId:  externalId2,
+					Namespace:   "root",
 					Email:       "actor2-updated@example.com",
 					Permissions: newPerms2,
 				})
@@ -430,7 +446,14 @@ func TestActor(t *testing.T) {
 				externalID = "superadmin/" + externalID
 			}
 
-			err := db.CreateActor(ctx, &Actor{Id: u, ExternalId: externalID, Email: u.String() + "@example.com", Admin: isAdmin, SuperAdmin: isSuperAdmin})
+			err := db.CreateActor(ctx, &Actor{
+				Id:         u,
+				Namespace:  "root",
+				ExternalId: externalID,
+				Email:      u.String() + "@example.com",
+				Admin:      isAdmin,
+				SuperAdmin: isSuperAdmin,
+			})
 			require.NoError(t, err)
 		}
 
@@ -518,7 +541,7 @@ func TestActor(t *testing.T) {
 
 		// create a single actor
 		id := uuid.New()
-		a := &Actor{Id: id, ExternalId: id.String(), Email: "delete-me@example.com"}
+		a := &Actor{Id: id, Namespace: "root", ExternalId: id.String(), Email: "delete-me@example.com"}
 		require.NoError(t, db.CreateActor(ctx, a))
 
 		// delete it
@@ -546,6 +569,7 @@ func TestActor(t *testing.T) {
 		// Valid values (typed)
 		require.True(t, IsValidActorOrderByField(ActorOrderByCreatedAt))
 		require.True(t, IsValidActorOrderByField(ActorOrderByUpdatedAt))
+		require.True(t, IsValidActorOrderByField(ActorOrderByNamespace))
 		require.True(t, IsValidActorOrderByField(ActorOrderByEmail))
 		require.True(t, IsValidActorOrderByField(ActorOrderByExternalId))
 		require.True(t, IsValidActorOrderByField(ActorOrderByAdmin))
@@ -555,6 +579,7 @@ func TestActor(t *testing.T) {
 		// Valid values (as strings)
 		require.True(t, IsValidActorOrderByField("created_at"))
 		require.True(t, IsValidActorOrderByField("updated_at"))
+		require.True(t, IsValidActorOrderByField("namespace"))
 		require.True(t, IsValidActorOrderByField("email"))
 		require.True(t, IsValidActorOrderByField("external_id"))
 		require.True(t, IsValidActorOrderByField("admin"))
@@ -564,5 +589,148 @@ func TestActor(t *testing.T) {
 		// Invalid values
 		require.False(t, IsValidActorOrderByField(ActorOrderByField("nope")))
 		require.False(t, IsValidActorOrderByField("nope"))
+	})
+
+	t.Run("Namespace", func(t *testing.T) {
+		t.Run("validation", func(t *testing.T) {
+			t.Run("valid paths", func(t *testing.T) {
+				require.NoError(t, util.ToPtr(Actor{
+					Id:         uuid.New(),
+					Namespace:  "root",
+					ExternalId: "test",
+				}).validate())
+				require.NoError(t, util.ToPtr(Actor{
+					Id:         uuid.New(),
+					Namespace:  "root.tenant1",
+					ExternalId: "test",
+				}).validate())
+				require.NoError(t, util.ToPtr(Actor{
+					Id:         uuid.New(),
+					Namespace:  "root.tenant1.subtenant",
+					ExternalId: "test",
+				}).validate())
+			})
+			t.Run("invalid paths", func(t *testing.T) {
+				require.Error(t, util.ToPtr(Actor{
+					Id:         uuid.New(),
+					Namespace:  "",
+					ExternalId: "test",
+				}).validate())
+				require.Error(t, util.ToPtr(Actor{
+					Id:         uuid.New(),
+					Namespace:  "invalid",
+					ExternalId: "test",
+				}).validate())
+				require.Error(t, util.ToPtr(Actor{
+					Id:         uuid.New(),
+					Namespace:  "root.",
+					ExternalId: "test",
+				}).validate())
+			})
+		})
+
+		t.Run("create with custom namespace", func(t *testing.T) {
+			setup(t)
+
+			id := uuid.New()
+			actor := &Actor{
+				Id:         id,
+				Namespace:  "root.tenant1",
+				ExternalId: id.String(),
+				Email:      "bobdole@example.com",
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			a, err := db.GetActor(ctx, id)
+			require.NoError(t, err)
+			require.Equal(t, "root.tenant1", a.GetNamespace())
+		})
+
+		t.Run("upsert preserves namespace", func(t *testing.T) {
+			setup(t)
+
+			externalId := "namespaced-actor"
+
+			// Create with custom namespace
+			actor, err := db.UpsertActor(ctx, &core.Actor{
+				ExternalId: externalId,
+				Namespace:  "root.tenant1",
+				Email:      "actor@example.com",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "root.tenant1", actor.GetNamespace())
+
+			// Update with same namespace should preserve
+			actor, err = db.UpsertActor(ctx, &core.Actor{
+				ExternalId: externalId,
+				Namespace:  "root.tenant1",
+				Email:      "updated@example.com",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "root.tenant1", actor.GetNamespace())
+			require.Equal(t, "updated@example.com", actor.Email)
+
+			// Verify in database
+			retrieved, err := db.GetActorByExternalId(ctx, externalId)
+			require.NoError(t, err)
+			require.Equal(t, "root.tenant1", retrieved.GetNamespace())
+		})
+
+		t.Run("list filtering", func(t *testing.T) {
+			setup(t)
+
+			// Create actors in different namespaces
+			actors := []struct {
+				namespace  string
+				externalId string
+			}{
+				{"root", "actor1"},
+				{"root", "actor2"},
+				{"root.tenant1", "actor3"},
+				{"root.tenant1", "actor4"},
+				{"root.tenant1.sub", "actor5"},
+				{"root.tenant2", "actor6"},
+			}
+
+			for _, a := range actors {
+				id := uuid.New()
+				err := db.CreateActor(ctx, &Actor{
+					Id:         id,
+					Namespace:  a.namespace,
+					ExternalId: a.externalId,
+					Email:      a.externalId + "@example.com",
+				})
+				require.NoError(t, err)
+			}
+
+			t.Run("exact match", func(t *testing.T) {
+				result := db.ListActorsBuilder().ForNamespaceMatcher("root").FetchPage(ctx)
+				require.NoError(t, result.Error)
+				require.Len(t, result.Results, 2)
+				for _, a := range result.Results {
+					require.Equal(t, "root", a.Namespace)
+				}
+			})
+
+			t.Run("wildcard match", func(t *testing.T) {
+				result := db.ListActorsBuilder().ForNamespaceMatcher("root.tenant1.**").FetchPage(ctx)
+				require.NoError(t, result.Error)
+				require.Len(t, result.Results, 3) // actor3, actor4, actor5
+				for _, a := range result.Results {
+					require.True(t, a.Namespace == "root.tenant1" || a.Namespace == "root.tenant1.sub")
+				}
+			})
+
+			t.Run("multiple matchers", func(t *testing.T) {
+				result := db.ListActorsBuilder().ForNamespaceMatchers([]string{"root", "root.tenant2"}).FetchPage(ctx)
+				require.NoError(t, result.Error)
+				require.Len(t, result.Results, 3) // actor1, actor2, actor6
+			})
+
+			t.Run("invalid matcher returns error", func(t *testing.T) {
+				result := db.ListActorsBuilder().ForNamespaceMatcher("invalid").FetchPage(ctx)
+				require.Error(t, result.Error)
+			})
+		})
 	})
 }

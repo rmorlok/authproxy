@@ -101,7 +101,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("malformed id", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/bad-connector", nil, "some-actor", aschema.AllPermissions())
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/bad-connector", nil, "root", "some-actor", aschema.AllPermissions())
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
@@ -110,7 +110,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("invalid id", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001", nil, "some-actor", aschema.AllPermissions())
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001", nil, "root", "some-actor", aschema.AllPermissions())
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
@@ -123,6 +123,7 @@ func TestConnectors(t *testing.T) {
 					http.MethodGet,
 					"/connectors/10000000-0000-0000-0000-000000000001",
 					nil,
+					"root",
 					"some-actor",
 					aschema.PermissionsSingle("root.**", "actors", "get"), // Wrong resource
 				)
@@ -138,6 +139,7 @@ func TestConnectors(t *testing.T) {
 					http.MethodGet,
 					"/connectors/10000000-0000-0000-0000-000000000001",
 					nil,
+					"root",
 					"some-actor",
 					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "get", "10000000-0000-0000-0000-000000000001"),
 				)
@@ -158,6 +160,7 @@ func TestConnectors(t *testing.T) {
 					http.MethodGet,
 					"/connectors/10000000-0000-0000-0000-000000000001",
 					nil,
+					"root",
 					"some-actor",
 					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "get", "20000000-0000-0000-0000-000000000002"),
 				)
@@ -173,6 +176,7 @@ func TestConnectors(t *testing.T) {
 					http.MethodGet,
 					"/connectors/10000000-0000-0000-0000-000000000001",
 					nil,
+					"root",
 					"some-actor",
 					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "get", "20000000-0000-0000-0000-000000000002", "10000000-0000-0000-0000-000000000001"),
 				)
@@ -188,6 +192,7 @@ func TestConnectors(t *testing.T) {
 					http.MethodGet,
 					"/connectors/10000000-0000-0000-0000-000000000001",
 					nil,
+					"root",
 					"some-actor",
 					aschema.PermissionsSingle("root.**", "connectors", "get"),
 				)
@@ -222,6 +227,7 @@ func TestConnectors(t *testing.T) {
 					http.MethodGet,
 					"/connectors?order=id%20asc",
 					nil,
+					"root",
 					"some-actor",
 					aschema.PermissionsSingle("root.**", "connectors", "delete"), // Wrong verb
 				)
@@ -237,6 +243,7 @@ func TestConnectors(t *testing.T) {
 					http.MethodGet,
 					"/connectors?order=id%20asc",
 					nil,
+					"root",
 					"some-actor",
 					aschema.PermissionsSingle("root.**", "connectors", "list"),
 				)
@@ -261,6 +268,7 @@ func TestConnectors(t *testing.T) {
 					http.MethodGet,
 					"/connectors?order=id%20asc&namespace=root.child",
 					nil,
+					"root",
 					"some-actor",
 					aschema.PermissionsSingle("root.**", "connectors", "list"),
 				)
@@ -294,7 +302,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("malformed id", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/bad-connector/versions/1", nil, "some-actor", aschema.AllPermissions())
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/bad-connector/versions/1", nil, "root", "some-actor", aschema.AllPermissions())
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
@@ -303,7 +311,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("invalid id", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001/versions/1", nil, "some-actor", aschema.AllPermissions())
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001/versions/1", nil, "root", "some-actor", aschema.AllPermissions())
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
@@ -312,7 +320,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("invalid version", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001/versions/999", nil, "some-actor", aschema.AllPermissions())
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001/versions/999", nil, "root", "some-actor", aschema.AllPermissions())
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
@@ -325,6 +333,7 @@ func TestConnectors(t *testing.T) {
 					http.MethodGet,
 					"/connectors/10000000-0000-0000-0000-000000000001/versions/1",
 					nil,
+					"root",
 					"some-actor",
 					aschema.PermissionsSingle("root.**", "connectors", "get"), // Wrong verb
 				)
@@ -340,6 +349,7 @@ func TestConnectors(t *testing.T) {
 					http.MethodGet,
 					"/connectors/10000000-0000-0000-0000-000000000001/versions/1",
 					nil,
+					"root",
 					"some-actor",
 					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "list/versions", "10000000-0000-0000-0000-000000000001"),
 				)
@@ -360,6 +370,7 @@ func TestConnectors(t *testing.T) {
 					http.MethodGet,
 					"/connectors/10000000-0000-0000-0000-000000000001/versions/1",
 					nil,
+					"root",
 					"some-actor",
 					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "list/versions", "20000000-0000-0000-0000-000000000002"),
 				)
@@ -375,6 +386,7 @@ func TestConnectors(t *testing.T) {
 					http.MethodGet,
 					"/connectors/10000000-0000-0000-0000-000000000001/versions/1",
 					nil,
+					"root",
 					"some-actor",
 					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
 				)
@@ -408,6 +420,7 @@ func TestConnectors(t *testing.T) {
 					http.MethodGet,
 					"/connectors/10000000-0000-0000-0000-000000000001/versions?order=id%20asc",
 					nil,
+					"root",
 					"some-actor",
 					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
 				)
@@ -430,6 +443,7 @@ func TestConnectors(t *testing.T) {
 					http.MethodGet,
 					"/connectors/10000000-0000-0000-0000-000000000001/versions?order=id%20asc&namespace=root.child",
 					nil,
+					"root",
 					"some-actor",
 					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
 				)

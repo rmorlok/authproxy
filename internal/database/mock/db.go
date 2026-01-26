@@ -12,6 +12,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
 	database "github.com/rmorlok/authproxy/internal/database"
+	auth "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
 // MockIActorData is a mock of IActorData interface.
@@ -65,11 +66,39 @@ func (mr *MockIActorDataMockRecorder) GetExternalId() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExternalId", reflect.TypeOf((*MockIActorData)(nil).GetExternalId))
 }
 
+// GetId mocks base method.
+func (m *MockIActorData) GetId() uuid.UUID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetId")
+	ret0, _ := ret[0].(uuid.UUID)
+	return ret0
+}
+
+// GetId indicates an expected call of GetId.
+func (mr *MockIActorDataMockRecorder) GetId() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetId", reflect.TypeOf((*MockIActorData)(nil).GetId))
+}
+
+// GetNamespace mocks base method.
+func (m *MockIActorData) GetNamespace() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNamespace")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetNamespace indicates an expected call of GetNamespace.
+func (mr *MockIActorDataMockRecorder) GetNamespace() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespace", reflect.TypeOf((*MockIActorData)(nil).GetNamespace))
+}
+
 // GetPermissions mocks base method.
-func (m *MockIActorData) GetPermissions() []string {
+func (m *MockIActorData) GetPermissions() []auth.Permission {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetPermissions")
-	ret0, _ := ret[0].([]string)
+	ret0, _ := ret[0].([]auth.Permission)
 	return ret0
 }
 

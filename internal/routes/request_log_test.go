@@ -65,6 +65,7 @@ func TestRequestLogRoutes(t *testing.T) {
 				http.MethodGet,
 				"/request-log",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connectors", "list"), // Wrong resource
 			)
@@ -80,6 +81,7 @@ func TestRequestLogRoutes(t *testing.T) {
 				http.MethodGet,
 				"/request-log",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "request-log", "list"),
 			)
@@ -108,6 +110,7 @@ func TestRequestLogRoutes(t *testing.T) {
 				http.MethodGet,
 				"/request-log",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "request-log", "list"),
 			)
@@ -149,6 +152,7 @@ func TestRequestLogRoutes(t *testing.T) {
 				http.MethodGet,
 				"/request-log",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "request-log", "list"),
 			)
@@ -191,6 +195,7 @@ func TestRequestLogRoutes(t *testing.T) {
 				http.MethodGet,
 				"/request-log?cursor=some-cursor",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "request-log", "list"),
 			)
@@ -231,6 +236,7 @@ func TestRequestLogRoutes(t *testing.T) {
 				http.MethodGet,
 				"/request-log?cursor=some-cursor",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "request-log", "list"),
 			)
@@ -270,6 +276,7 @@ func TestRequestLogRoutes(t *testing.T) {
 				http.MethodGet,
 				"/request-log/"+testId.String(),
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connectors", "get"), // Wrong resource
 			)
@@ -285,6 +292,7 @@ func TestRequestLogRoutes(t *testing.T) {
 				http.MethodGet,
 				"/request-log/"+testId.String(),
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "request-log", "get", testId.String()),
 			)
@@ -310,6 +318,7 @@ func TestRequestLogRoutes(t *testing.T) {
 				http.MethodGet,
 				"/request-log/"+testId.String(),
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "request-log", "get", otherId.String()),
 			)
@@ -325,6 +334,7 @@ func TestRequestLogRoutes(t *testing.T) {
 				http.MethodGet,
 				"/request-log/"+testId.String(),
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "request-log", "get"),
 			)
@@ -344,6 +354,7 @@ func TestRequestLogRoutes(t *testing.T) {
 				http.MethodGet,
 				"/request-log/"+testId.String(),
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "request-log", "get"),
 			)

@@ -70,7 +70,7 @@ func TestAuthServiceWithDb(serviceId sconfig.ServiceId, cfg config.C, db databas
 	return cfg, hs, &AuthTestUtil{cfg: cfg, s: hs.(*service), serviceId: serviceId}
 }
 
-func (atu *AuthTestUtil) NewSignedRequestForActorExternalId(method, url string, body io.Reader, actorExternalId string, permissions []aschema.Permission) (*http.Request, error) {
+func (atu *AuthTestUtil) NewSignedRequestForActorExternalId(method, url string, body io.Reader, namespace, actorExternalId string, permissions []aschema.Permission) (*http.Request, error) {
 	req, err := http.NewRequest(method, url, body)
 	if err != nil {
 		return nil, err
@@ -81,6 +81,7 @@ func (atu *AuthTestUtil) NewSignedRequestForActorExternalId(method, url string, 
 		req,
 		core.Actor{
 			ExternalId:  actorExternalId,
+			Namespace:   namespace,
 			Permissions: permissions,
 		},
 	)
@@ -107,15 +108,17 @@ func (atu *AuthTestUtil) NewSignedRequestForActor(method, url string, body io.Re
 	return req, nil
 }
 
-func (atu *AuthTestUtil) claimsForActor(a core.Actor) *jwt2.AuthProxyClaims {
+func (atu *AuthTestUtil) claimsForActor(ctx context.Context, a core.Actor) *jwt2.AuthProxyClaims {
+	uuidGen := apctx.GetUuidGenerator(ctx)
 	claims := &jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:   "test",
-			Subject:  a.Id.String(),
+			Subject:  a.ExternalId,
 			Audience: []string{string(atu.serviceId)},
-			ID:       uuid.UUID{}.String(),
+			ID:       uuidGen.NewString(),
 		},
-		Actor: &a,
+		Namespace: a.Namespace,
+		Actor:     &a,
 	}
 
 	if claims.Subject == "" {
@@ -126,7 +129,7 @@ func (atu *AuthTestUtil) claimsForActor(a core.Actor) *jwt2.AuthProxyClaims {
 }
 
 func (atu *AuthTestUtil) SignRequestHeaderAs(ctx context.Context, req *http.Request, a core.Actor) (*http.Request, error) {
-	claims := atu.claimsForActor(a)
+	claims := atu.claimsForActor(ctx, a)
 
 	tokenString, err := atu.s.Token(ctx, claims)
 	if err != nil {
@@ -139,7 +142,7 @@ func (atu *AuthTestUtil) SignRequestHeaderAs(ctx context.Context, req *http.Requ
 }
 
 func (atu *AuthTestUtil) SignRequestQueryAs(ctx context.Context, req *http.Request, a core.Actor) (*http.Request, error) {
-	claims := atu.claimsForActor(a)
+	claims := atu.claimsForActor(ctx, a)
 	claims.Nonce = util.ToPtr(uuid.New())
 	claims.ExpiresAt = &jwt.NumericDate{apctx.GetClock(ctx).Now().Add(time.Hour)}
 

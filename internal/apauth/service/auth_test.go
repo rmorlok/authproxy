@@ -272,6 +272,7 @@ func (ts *TestSetup) MustGetValidAdminUser(ctx context.Context) database.Actor {
 	if errors.Is(err, database.ErrNotFound) {
 		a = &database.Actor{
 			Id:         uuid.New(),
+			Namespace:  "root",
 			ExternalId: "admin/bobdole",
 			Email:      "bobdole@example.com",
 			Admin:      true,
@@ -288,6 +289,7 @@ func (ts *TestSetup) MustGetValidAdminUser(ctx context.Context) database.Actor {
 func (ts *TestSetup) MustGetValidUninitializedAdminUser(ctx context.Context) database.Actor {
 	return database.Actor{
 		Id:         uuid.New(),
+		Namespace:  "root",
 		ExternalId: "admin/ronaldreagan",
 		Email:      "ronaldreagan@example.com",
 		Admin:      true,
@@ -305,6 +307,7 @@ func (ts *TestSetup) MustGetValidUserByExternalId(ctx context.Context, externalI
 	if errors.Is(err, database.ErrNotFound) {
 		a = &database.Actor{
 			Id:         uuid.New(),
+			Namespace:  "root",
 			ExternalId: externalId,
 			Email:      "jimmycarter@example.com",
 		}

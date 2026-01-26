@@ -67,13 +67,28 @@ func TestActorsRoutes(t *testing.T) {
 	}
 
 	// Helper to create an actor in DB
-	createActor := func(t *testing.T, db database.DB, externalId, email string, admin, superAdmin bool) *database.Actor {
+	createActor := func(t *testing.T, db database.DB, externalId, namespace, email string, admin, superAdmin bool) *database.Actor {
 		a := &database.Actor{
 			Id:         uuid.New(),
+			Namespace:  namespace,
 			ExternalId: externalId,
 			Email:      email,
 			Admin:      admin,
 			SuperAdmin: superAdmin,
+			CreatedAt:  time.Now().UTC(),
+			UpdatedAt:  time.Now().UTC(),
+		}
+		require.NoError(t, db.CreateActor(context.Background(), a))
+		return a
+	}
+
+	// Helper to create an actor with namespace in DB
+	createActorWithNamespace := func(t *testing.T, db database.DB, externalId, email, namespace string) *database.Actor {
+		a := &database.Actor{
+			Id:         uuid.New(),
+			Namespace:  namespace,
+			ExternalId: externalId,
+			Email:      email,
 			CreatedAt:  time.Now().UTC(),
 			UpdatedAt:  time.Now().UTC(),
 		}
@@ -126,9 +141,9 @@ func TestActorsRoutes(t *testing.T) {
 
 		t.Run("with results and pagination", func(t *testing.T) {
 			// create 3 normal actors
-			a1 := createActor(t, tu.Db, "user/1", "u1@example.com", false, false)
-			a2 := createActor(t, tu.Db, "user/2", "u2@example.com", false, false)
-			a3 := createActor(t, tu.Db, "user/3", "u3@example.com", false, false)
+			a1 := createActor(t, tu.Db, "user/1", "root", "u1@example.com", false, false)
+			a2 := createActor(t, tu.Db, "user/2", "root", "u2@example.com", false, false)
+			a3 := createActor(t, tu.Db, "user/3", "root", "u3@example.com", false, false)
 			_ = a1
 			_ = a2
 			_ = a3
@@ -175,7 +190,7 @@ func TestActorsRoutes(t *testing.T) {
 		tu, done := setup(t, nil)
 		defer done()
 
-		a := createActor(t, tu.Db, "user/10", "u10@example.com", false, false)
+		a := createActor(t, tu.Db, "user/10", "root", "u10@example.com", false, false)
 		otherId := uuid.New()
 
 		t.Run("unauthorized", func(t *testing.T) {
@@ -193,6 +208,7 @@ func TestActorsRoutes(t *testing.T) {
 				http.MethodGet,
 				"/actors/"+a.Id.String(),
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "actors", "get", otherId.String()),
 			)
@@ -242,7 +258,7 @@ func TestActorsRoutes(t *testing.T) {
 		tu, done := setup(t, nil)
 		defer done()
 
-		a := createActor(t, tu.Db, "user-20", "u20@example.com", false, false)
+		a := createActor(t, tu.Db, "user-20", "root", "u20@example.com", false, false)
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
@@ -259,6 +275,7 @@ func TestActorsRoutes(t *testing.T) {
 				http.MethodGet,
 				"/actors/external-id/"+a.ExternalId,
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "actors", "get", "other-external-id"),
 			)
@@ -298,7 +315,7 @@ func TestActorsRoutes(t *testing.T) {
 		tu, done := setup(t, nil)
 		defer done()
 
-		a := createActor(t, tu.Db, "user/30", "u30@example.com", false, false)
+		a := createActor(t, tu.Db, "user/30", "root", "u30@example.com", false, false)
 		otherId := uuid.New()
 
 		t.Run("unauthorized", func(t *testing.T) {
@@ -316,6 +333,7 @@ func TestActorsRoutes(t *testing.T) {
 				http.MethodDelete,
 				"/actors/"+a.Id.String(),
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "actors", "delete", otherId.String()),
 			)
@@ -364,7 +382,7 @@ func TestActorsRoutes(t *testing.T) {
 		tu, done := setup(t, nil)
 		defer done()
 
-		a := createActor(t, tu.Db, "user-40", "u40@example.com", false, false)
+		a := createActor(t, tu.Db, "user-40", "root", "u40@example.com", false, false)
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
@@ -381,6 +399,7 @@ func TestActorsRoutes(t *testing.T) {
 				http.MethodDelete,
 				"/actors/external-id/"+a.ExternalId,
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "actors", "delete", "other-external-id"),
 			)
@@ -412,6 +431,98 @@ func TestActorsRoutes(t *testing.T) {
 			got, err := tu.Db.GetActorByExternalId(context.Background(), a.ExternalId)
 			require.ErrorIs(t, err, database.ErrNotFound)
 			require.Nil(t, got)
+		})
+	})
+
+	t.Run("namespace in response", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		a := createActorWithNamespace(t, tu.Db, "ns-user-1", "ns1@example.com", "root.tenant1")
+
+		t.Run("get by id includes namespace", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+a.Id.String(), nil)
+			require.NoError(t, err)
+			req = adminize(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ActorJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "root.tenant1", resp.Namespace)
+		})
+
+		t.Run("get by external id includes namespace", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/external-id/"+a.ExternalId, nil)
+			require.NoError(t, err)
+			req = adminize(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ActorJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "root.tenant1", resp.Namespace)
+		})
+
+		t.Run("list includes namespace", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors?namespace=root.tenant1", nil)
+			require.NoError(t, err)
+			req = adminize(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ListActorsResponseJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Len(t, resp.Items, 1)
+			require.Equal(t, "root.tenant1", resp.Items[0].Namespace)
+		})
+	})
+
+	t.Run("namespace filtering", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		// Create actors in different namespaces
+		createActorWithNamespace(t, tu.Db, "filter-user-1", "f1@example.com", "root")
+		createActorWithNamespace(t, tu.Db, "filter-user-2", "f2@example.com", "root.tenant1")
+		createActorWithNamespace(t, tu.Db, "filter-user-3", "f3@example.com", "root.tenant1.sub")
+		createActorWithNamespace(t, tu.Db, "filter-user-4", "f4@example.com", "root.tenant2")
+
+		t.Run("exact namespace filter", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors?namespace=root.tenant1", nil)
+			require.NoError(t, err)
+			req = adminize(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ListActorsResponseJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			// Should only get the actor in root.tenant1 exactly, not sub-namespaces
+			require.Len(t, resp.Items, 1)
+			require.Equal(t, "root.tenant1", resp.Items[0].Namespace)
+		})
+
+		t.Run("wildcard namespace filter", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors?namespace="+url.QueryEscape("root.tenant1.**"), nil)
+			require.NoError(t, err)
+			req = adminize(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ListActorsResponseJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			// Should get both root.tenant1 and root.tenant1.sub
+			require.Len(t, resp.Items, 2)
 		})
 	})
 }

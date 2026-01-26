@@ -112,6 +112,7 @@ func TestNamespaces(t *testing.T) {
 				http.MethodGet,
 				"/namespaces/root",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "namespaces", "list"), // Wrong verb
 			)
@@ -123,7 +124,7 @@ func TestNamespaces(t *testing.T) {
 
 		t.Run("invalid path", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/namespaces/root.does-not-exist", nil, "some-actor", aschema.AllPermissions())
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/namespaces/root.does-not-exist", nil, "root", "some-actor", aschema.AllPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -132,7 +133,7 @@ func TestNamespaces(t *testing.T) {
 
 		t.Run("valid", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/namespaces/root.dev", nil, "some-actor", aschema.AllPermissions())
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/namespaces/root.dev", nil, "root", "some-actor", aschema.AllPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -151,6 +152,7 @@ func TestNamespaces(t *testing.T) {
 				http.MethodGet,
 				"/namespaces/root.dev",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "namespaces", "get", "root.dev"),
 			)
@@ -171,6 +173,7 @@ func TestNamespaces(t *testing.T) {
 				http.MethodGet,
 				"/namespaces/root.prod",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "namespaces", "get", "root.dev"),
 			)
@@ -186,6 +189,7 @@ func TestNamespaces(t *testing.T) {
 				http.MethodGet,
 				"/namespaces/root.prod",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "namespaces", "get", "root.dev", "root.prod"),
 			)
@@ -225,6 +229,7 @@ func TestNamespaces(t *testing.T) {
 				http.MethodPost,
 				"/namespaces",
 				bytes.NewReader(jsonBody),
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "namespaces", "list"), // Wrong verb
 			)
@@ -242,6 +247,7 @@ func TestNamespaces(t *testing.T) {
 				http.MethodPost,
 				"/namespaces",
 				bytes.NewReader(jsonBody),
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.other.**", "namespaces", "create"), // Wrong namespace
 			)
@@ -259,6 +265,7 @@ func TestNamespaces(t *testing.T) {
 				http.MethodPost,
 				"/namespaces",
 				bytes.NewReader(jsonBody),
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "namespaces", "create"),
 			)
@@ -289,6 +296,7 @@ func TestNamespaces(t *testing.T) {
 				http.MethodPost,
 				"/namespaces",
 				bytes.NewReader(jsonBody),
+				"root",
 				"some-actor",
 				aschema.AllPermissions(),
 			)
@@ -306,6 +314,7 @@ func TestNamespaces(t *testing.T) {
 				http.MethodPost,
 				"/namespaces",
 				bytes.NewReader(jsonBody),
+				"root",
 				"some-actor",
 				aschema.AllPermissions(),
 			)
@@ -370,6 +379,7 @@ func TestNamespaces(t *testing.T) {
 				http.MethodGet,
 				"/namespaces?limit=50&order=created_at%20asc",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "namespaces", "get"), // Wrong verb
 			)
@@ -385,6 +395,7 @@ func TestNamespaces(t *testing.T) {
 				http.MethodGet,
 				"/namespaces?limit=50&order=created_at%20asc",
 				nil,
+				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "namespaces", "list"),
 			)
@@ -401,7 +412,7 @@ func TestNamespaces(t *testing.T) {
 
 		t.Run("filter to namespace", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/namespaces?limit=50&order=created_at%20asc&namespace=root.dev", nil, "some-actor", aschema.AllPermissions())
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/namespaces?limit=50&order=created_at%20asc&namespace=root.dev", nil, "root", "some-actor", aschema.AllPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -416,7 +427,7 @@ func TestNamespaces(t *testing.T) {
 
 		t.Run("filter to namespace matcher", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/namespaces?limit=50&order=created_at%20asc&namespace=root.dev.**", nil, "some-actor", aschema.AllPermissions())
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/namespaces?limit=50&order=created_at%20asc&namespace=root.dev.**", nil, "root", "some-actor", aschema.AllPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)

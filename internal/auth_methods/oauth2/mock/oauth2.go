@@ -14,35 +14,63 @@ import (
 	uuid "github.com/google/uuid"
 	oauth2 "github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	iface "github.com/rmorlok/authproxy/internal/core/iface"
-	database "github.com/rmorlok/authproxy/internal/database"
 	request_log "github.com/rmorlok/authproxy/internal/request_log"
+	auth "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
-// MockActor is a mock of IActorData interface.
-type MockActor struct {
+// MockIActorData is a mock of IActorData interface.
+type MockIActorData struct {
 	ctrl     *gomock.Controller
-	recorder *MockActorMockRecorder
+	recorder *MockIActorDataMockRecorder
 }
 
-// MockActorMockRecorder is the mock recorder for MockActor.
-type MockActorMockRecorder struct {
-	mock *MockActor
+// MockIActorDataMockRecorder is the mock recorder for MockIActorData.
+type MockIActorDataMockRecorder struct {
+	mock *MockIActorData
 }
 
-// NewMockActor creates a new mock instance.
-func NewMockActor(ctrl *gomock.Controller) *MockActor {
-	mock := &MockActor{ctrl: ctrl}
-	mock.recorder = &MockActorMockRecorder{mock}
+// NewMockIActorData creates a new mock instance.
+func NewMockIActorData(ctrl *gomock.Controller) *MockIActorData {
+	mock := &MockIActorData{ctrl: ctrl}
+	mock.recorder = &MockIActorDataMockRecorder{mock}
 	return mock
 }
 
 // EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockActor) EXPECT() *MockActorMockRecorder {
+func (m *MockIActorData) EXPECT() *MockIActorDataMockRecorder {
 	return m.recorder
 }
 
+// GetEmail mocks base method.
+func (m *MockIActorData) GetEmail() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEmail")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetEmail indicates an expected call of GetEmail.
+func (mr *MockIActorDataMockRecorder) GetEmail() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEmail", reflect.TypeOf((*MockIActorData)(nil).GetEmail))
+}
+
+// GetExternalId mocks base method.
+func (m *MockIActorData) GetExternalId() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetExternalId")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetExternalId indicates an expected call of GetExternalId.
+func (mr *MockIActorDataMockRecorder) GetExternalId() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExternalId", reflect.TypeOf((*MockIActorData)(nil).GetExternalId))
+}
+
 // GetId mocks base method.
-func (m *MockActor) GetId() uuid.UUID {
+func (m *MockIActorData) GetId() uuid.UUID {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetId")
 	ret0, _ := ret[0].(uuid.UUID)
@@ -50,9 +78,65 @@ func (m *MockActor) GetId() uuid.UUID {
 }
 
 // GetId indicates an expected call of GetId.
-func (mr *MockActorMockRecorder) GetId() *gomock.Call {
+func (mr *MockIActorDataMockRecorder) GetId() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetId", reflect.TypeOf((*MockActor)(nil).GetId))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetId", reflect.TypeOf((*MockIActorData)(nil).GetId))
+}
+
+// GetNamespace mocks base method.
+func (m *MockIActorData) GetNamespace() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNamespace")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetNamespace indicates an expected call of GetNamespace.
+func (mr *MockIActorDataMockRecorder) GetNamespace() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespace", reflect.TypeOf((*MockIActorData)(nil).GetNamespace))
+}
+
+// GetPermissions mocks base method.
+func (m *MockIActorData) GetPermissions() []auth.Permission {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPermissions")
+	ret0, _ := ret[0].([]auth.Permission)
+	return ret0
+}
+
+// GetPermissions indicates an expected call of GetPermissions.
+func (mr *MockIActorDataMockRecorder) GetPermissions() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPermissions", reflect.TypeOf((*MockIActorData)(nil).GetPermissions))
+}
+
+// IsAdmin mocks base method.
+func (m *MockIActorData) IsAdmin() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsAdmin")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsAdmin indicates an expected call of IsAdmin.
+func (mr *MockIActorDataMockRecorder) IsAdmin() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsAdmin", reflect.TypeOf((*MockIActorData)(nil).IsAdmin))
+}
+
+// IsSuperAdmin mocks base method.
+func (m *MockIActorData) IsSuperAdmin() bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsSuperAdmin")
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsSuperAdmin indicates an expected call of IsSuperAdmin.
+func (mr *MockIActorDataMockRecorder) IsSuperAdmin() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsSuperAdmin", reflect.TypeOf((*MockIActorData)(nil).IsSuperAdmin))
 }
 
 // MockFactory is a mock of Factory interface.
@@ -232,7 +316,7 @@ func (mr *MockOAuth2ConnectionMockRecorder) RevokeTokens(ctx interface{}) *gomoc
 }
 
 // SetStateAndGeneratePublicUrl mocks base method.
-func (m *MockOAuth2Connection) SetStateAndGeneratePublicUrl(ctx context.Context, actor database.Actor, returnToUrl string) (string, error) {
+func (m *MockOAuth2Connection) SetStateAndGeneratePublicUrl(ctx context.Context, actor oauth2.IActorData, returnToUrl string) (string, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetStateAndGeneratePublicUrl", ctx, actor, returnToUrl)
 	ret0, _ := ret[0].(string)

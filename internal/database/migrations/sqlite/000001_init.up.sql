@@ -1,6 +1,7 @@
 create table actors
 (
     id          text primary key,
+    namespace   text,
     external_id text,
     email       text,
     admin       numeric,
@@ -16,6 +17,9 @@ create index idx_actors_deleted_at
 
 create index idx_actors_email
     on actors (email);
+
+create index idx_actors_namespace
+    on actors (namespace);
 
 create table connections
 (

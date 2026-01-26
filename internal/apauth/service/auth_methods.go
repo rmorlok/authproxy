@@ -121,7 +121,7 @@ func (s *service) validate(ctx context.Context, claims *jwt2.AuthProxyClaims) er
 		}),
 	)
 
-	return v.Validate(claims)
+	return claims.Validate(v)
 }
 
 func JwtBearerHeaderVal(tokenString string) string {
@@ -213,6 +213,13 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 	if tokenString != "" {
 		claims, err = s.Parse(ctx, tokenString)
 		if err != nil {
+			if errors.Is(err, jwt2.ErrInvalidClaims) {
+				return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+					WithStatusUnauthorized().
+					WithPublicErr(err).
+					Build()
+			}
+
 			return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
 				WithStatusUnauthorized().
 				WithResponseMsg("invalid token").
@@ -282,6 +289,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 				// Use UpsertActor to create or update the admin actor with current config permissions
 				adminActorData := &core.Actor{
 					ExternalId:  claims.Subject,
+					Namespace:   "root",
 					Email:       email,
 					Admin:       true,
 					Permissions: cfgAdmin.Permissions,
