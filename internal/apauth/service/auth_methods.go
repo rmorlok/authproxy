@@ -289,7 +289,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 				// Use UpsertActor to create or update the admin actor with current config permissions
 				adminActorData := &core.Actor{
 					ExternalId:  claims.Subject,
-					Namespace:   "root",
+					Namespace:   claims.GetNamespace(),
 					Email:       email,
 					Admin:       true,
 					Permissions: cfgAdmin.Permissions,
@@ -305,7 +305,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 				}
 			} else {
 				// Non-admin actor must already exist in the database
-				actor, err = s.db.GetActorByExternalId(ctx, claims.Subject)
+				actor, err = s.db.GetActorByExternalId(ctx, claims.GetNamespace(), claims.Subject)
 				if err != nil {
 					if errors.Is(err, database.ErrNotFound) {
 						return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().

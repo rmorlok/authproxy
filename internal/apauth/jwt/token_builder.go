@@ -40,7 +40,7 @@ type TokenBuilder interface {
 	WithAdmin() TokenBuilder
 	WithSelfSigned() TokenBuilder
 	WithActorEmail(email string) TokenBuilder
-	WithActorId(id string) TokenBuilder
+	WithActorExternalId(id string) TokenBuilder
 	WithActor(actor core.IActorData) TokenBuilder
 	WithNonce() TokenBuilder
 
@@ -134,7 +134,7 @@ func (tb *tokenBuilder) WithActorEmail(email string) TokenBuilder {
 	return tb
 }
 
-func (tb *tokenBuilder) WithActorId(id string) TokenBuilder {
+func (tb *tokenBuilder) WithActorExternalId(id string) TokenBuilder {
 	tb.jwtBuilder.WithActorExternalId(id)
 	return tb
 }

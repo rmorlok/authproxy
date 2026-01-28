@@ -217,6 +217,62 @@ func (s *service) getNamespaceByPath(ctx context.Context, tx sq.BaseRunner, path
 	return &result, nil
 }
 
+func (s *service) createNamespace(ctx context.Context, tx *sql.Tx, ns *Namespace) error {
+	prefixes := SplitNamespacePathToPrefixes(ns.Path)
+	state := ns.State
+
+	for i := 0; i < len(prefixes)-1; i++ {
+		parent, err := s.getNamespaceByPath(ctx, tx, prefixes[i])
+		if err != nil {
+			if errors.Is(err, ErrNotFound) {
+				return api_common.NewHttpStatusErrorBuilder().
+					WithStatusBadRequest().
+					WithPublicErrf("cannot create namespace '%s' because parent namespace '%s' does not exist or is deleted", ns.Path, prefixes[i]).
+					Build()
+			}
+			return err
+		}
+
+		state = advanceNamespaceState(state, parent.State)
+	}
+
+	// Check if the namespace already exists
+	_, err := s.getNamespaceByPath(ctx, tx, ns.Path)
+	if err != nil && !errors.Is(err, ErrNotFound) {
+		return err
+	} else if err == nil {
+		return errors.Errorf("cannot create namespace '%s' because it already exists", ns.Path)
+	}
+
+	// Update the state so that we are always bound by the parent namespace state
+	ns.State = state
+
+	now := apctx.GetClock(ctx).Now()
+	ns.CreatedAt = now
+	ns.UpdatedAt = now
+
+	dbResult, err := s.sq.
+		Insert(NamespacesTable).
+		Columns(ns.cols()...).
+		Values(ns.values()...).
+		RunWith(tx).
+		Exec()
+	if err != nil {
+		return errors.Wrap(err, "failed to create namespace")
+	}
+
+	affected, err := dbResult.RowsAffected()
+	if err != nil {
+		return errors.Wrap(err, "failed to create namespace")
+	}
+
+	if affected == 0 {
+		return errors.New("failed to create namespace; no rows inserted")
+	}
+
+	return nil
+}
+
 func (s *service) CreateNamespace(ctx context.Context, ns *Namespace) error {
 	ns.normalize()
 	if err := ns.Validate(); err != nil {
@@ -224,56 +280,45 @@ func (s *service) CreateNamespace(ctx context.Context, ns *Namespace) error {
 	}
 
 	err := s.transaction(func(tx *sql.Tx) error {
-		prefixes := SplitNamespacePathToPrefixes(ns.Path)
-		state := ns.State
+		return s.createNamespace(ctx, tx, ns)
+	})
 
-		for i := 0; i < len(prefixes)-1; i++ {
-			parent, err := s.getNamespaceByPath(ctx, tx, prefixes[i])
+	return err
+}
+
+// EnsureNamespaceByPath ensures that a namespace exists with the given path, creating it if necessary. It will
+// recursively create all parent namespaces if they do not exist. If any parent is not active, it will return an error.
+func (s *service) EnsureNamespaceByPath(ctx context.Context, path string) error {
+	if err := aschema.ValidateNamespacePath(path); err != nil {
+		return err
+	}
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		prefixes := SplitNamespacePathToPrefixes(path)
+
+		for i := 0; i < len(prefixes); i++ {
+			ns, err := s.getNamespaceByPath(ctx, tx, prefixes[i])
 			if err != nil {
 				if errors.Is(err, ErrNotFound) {
-					return api_common.NewHttpStatusErrorBuilder().
-						WithStatusBadRequest().
-						WithPublicErrf("cannot create namespace '%s' because parent namespace '%s' does not exist or is deleted", ns.Path, prefixes[i]).
-						Build()
+					err = s.createNamespace(ctx, tx, &Namespace{
+						Path:  prefixes[i],
+						State: NamespaceStateActive,
+					})
+					if err != nil {
+						return err
+					}
+					continue
 				}
+
 				return err
 			}
 
-			state = advanceNamespaceState(state, parent.State)
-		}
-
-		// Check if the namespace already exists
-		_, err := s.getNamespaceByPath(ctx, tx, ns.Path)
-		if err != nil && !errors.Is(err, ErrNotFound) {
-			return err
-		} else if err == nil {
-			return errors.Errorf("cannot create namespace '%s' because it already exists", ns.Path)
-		}
-
-		// Update the state so that we are always bound by the parent namespace state
-		ns.State = state
-
-		now := apctx.GetClock(ctx).Now()
-		ns.CreatedAt = now
-		ns.UpdatedAt = now
-
-		dbResult, err := s.sq.
-			Insert(NamespacesTable).
-			Columns(ns.cols()...).
-			Values(ns.values()...).
-			RunWith(tx).
-			Exec()
-		if err != nil {
-			return errors.Wrap(err, "failed to create namespace")
-		}
-
-		affected, err := dbResult.RowsAffected()
-		if err != nil {
-			return errors.Wrap(err, "failed to create namespace")
-		}
-
-		if affected == 0 {
-			return errors.New("failed to create namespace; no rows inserted")
+			if ns.State != NamespaceStateActive {
+				return api_common.NewHttpStatusErrorBuilder().
+					WithStatusBadRequest().
+					WithPublicErrf("namespace '%s' is not active", prefixes[i]).
+					Build()
+			}
 		}
 
 		return nil

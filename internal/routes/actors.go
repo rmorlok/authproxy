@@ -240,9 +240,9 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 
 func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
-	externalId := gctx.Param("external_id")
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
+	externalId := gctx.Param("external_id")
 	if externalId == "" {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
@@ -253,7 +253,13 @@ func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 		return
 	}
 
-	a, err := r.db.GetActorByExternalId(ctx, externalId)
+	ra := auth.MustGetAuthFromGinContext(gctx)
+	namespace := ra.GetActor().GetNamespace()
+	if gctx.Query("namespace") != "" {
+		namespace = gctx.Query("namespace")
+	}
+
+	a, err := r.db.GetActorByExternalId(ctx, namespace, externalId)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			api_common.NewHttpStatusErrorBuilder().
@@ -380,7 +386,13 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 		return
 	}
 
-	a, err := r.db.GetActorByExternalId(ctx, externalId)
+	ra := auth.MustGetAuthFromGinContext(gctx)
+	namespace := ra.GetActor().GetNamespace()
+	if gctx.Query("namespace") != "" {
+		namespace = gctx.Query("namespace")
+	}
+
+	a, err := r.db.GetActorByExternalId(ctx, namespace, externalId)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			// The actor already doesn't exist
@@ -441,6 +453,7 @@ func (r *ActorsRoutes) Register(g gin.IRouter) {
 			ForResource("actors").
 			ForIdField("external_id").
 			ForIdExtractor(func(obj interface{}) string { return obj.(*database.Actor).ExternalId }).
+			ForNamespaceQueryParam("namespace").
 			ForVerb("get").
 			Build(),
 		r.getByExternalId,
@@ -451,6 +464,7 @@ func (r *ActorsRoutes) Register(g gin.IRouter) {
 			ForResource("actors").
 			ForIdField("external_id").
 			ForIdExtractor(func(obj interface{}) string { return obj.(*database.Actor).ExternalId }).
+			ForNamespaceQueryParam("namespace").
 			ForVerb("delete").
 			Build(),
 		r.deleteByExternalId,

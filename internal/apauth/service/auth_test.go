@@ -264,7 +264,7 @@ type TestSetup struct {
 // MustGetValidAdminUser gives an admin user that can sign JWTs. This method makes sure the admin exists in the database
 // regardless of if they have interacted with the system previously.
 func (ts *TestSetup) MustGetValidAdminUser(ctx context.Context) database.Actor {
-	a, err := ts.Db.GetActorByExternalId(ctx, "admin/bobdole")
+	a, err := ts.Db.GetActorByExternalId(ctx, "root", "admin/bobdole")
 	if err != nil && !errors.Is(err, database.ErrNotFound) {
 		panic(err)
 	}
@@ -299,7 +299,7 @@ func (ts *TestSetup) MustGetValidUninitializedAdminUser(ctx context.Context) dat
 // MustGetValidUser gives an user that can sign JWTs. This method makes sure the admin exists in the database
 // regardless of if they have interacted with the system previously.
 func (ts *TestSetup) MustGetValidUserByExternalId(ctx context.Context, externalId string) database.Actor {
-	a, err := ts.Db.GetActorByExternalId(ctx, externalId)
+	a, err := ts.Db.GetActorByExternalId(ctx, "root", externalId)
 	if err != nil && !errors.Is(err, database.ErrNotFound) {
 		panic(err)
 	}
@@ -496,7 +496,7 @@ func TestAuth(t *testing.T) {
 
 				s := jwt.NewJwtTokenBuilder().
 					WithServiceId(ts.Service).
-					WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+					WithActorExternalId(ts.MustGetValidUser(ctx).ExternalId).
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 					MustSignerCtx(ctx)
 
@@ -511,7 +511,7 @@ func TestAuth(t *testing.T) {
 					Build()
 
 				s := jwt.NewJwtTokenBuilder().
-					WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+					WithActorExternalId(ts.MustGetValidUser(ctx).ExternalId).
 					WithServiceId(ts.Service).
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 					MustSignerCtx(ctx)
@@ -529,7 +529,7 @@ func TestAuth(t *testing.T) {
 					Build()
 
 				s := jwt.NewJwtTokenBuilder().
-					WithActorId(ts.MustGetValidUserByExternalId(ctx, "bobdole").ExternalId).
+					WithActorExternalId(ts.MustGetValidUserByExternalId(ctx, "bobdole").ExternalId).
 					WithServiceId(ts.Service).
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 					MustSignerCtx(ctx)
@@ -541,7 +541,7 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, 1, ts.GetPingCount())
 
 				s = jwt.NewJwtTokenBuilder().
-					WithActorId(ts.MustGetValidUserByExternalId(ctx, "jimmycarter").ExternalId).
+					WithActorExternalId(ts.MustGetValidUserByExternalId(ctx, "jimmycarter").ExternalId).
 					WithServiceId(ts.Service).
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 					MustSignerCtx(ctx)
@@ -558,7 +558,7 @@ func TestAuth(t *testing.T) {
 					Build()
 
 				s := jwt.NewJwtTokenBuilder().
-					WithActorId(ts.MustGetValidUserByExternalId(ctx, "bobdole").ExternalId).
+					WithActorExternalId(ts.MustGetValidUserByExternalId(ctx, "bobdole").ExternalId).
 					WithServiceId(ts.Service).
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 					MustSignerCtx(ctx)
@@ -570,7 +570,7 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, 1, ts.GetPingCount())
 
 				s = jwt.NewJwtTokenBuilder().
-					WithActorId(ts.MustGetValidUserByExternalId(ctx, "jimmycarter").ExternalId).
+					WithActorExternalId(ts.MustGetValidUserByExternalId(ctx, "jimmycarter").ExternalId).
 					WithServiceId(ts.Service).
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 					MustSignerCtx(ctx)
@@ -587,7 +587,7 @@ func TestAuth(t *testing.T) {
 					Build()
 
 				s := jwt.NewJwtTokenBuilder().
-					WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+					WithActorExternalId(ts.MustGetValidUser(ctx).ExternalId).
 					WithServiceId(ts.Service).
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 					MustSignerCtx(ctx)
@@ -604,7 +604,7 @@ func TestAuth(t *testing.T) {
 					Build()
 
 				s := jwt.NewJwtTokenBuilder().
-					WithActorId(ts.MustGetValidUserByExternalId(ctx, "bobdole").ExternalId).
+					WithActorExternalId(ts.MustGetValidUserByExternalId(ctx, "bobdole").ExternalId).
 					WithServiceId(ts.Service).
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 					MustSignerCtx(ctx)
@@ -616,7 +616,7 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, 1, ts.GetPingCount())
 
 				s = jwt.NewJwtTokenBuilder().
-					WithActorId(ts.MustGetValidUserByExternalId(ctx, "jimmycarter").ExternalId).
+					WithActorExternalId(ts.MustGetValidUserByExternalId(ctx, "jimmycarter").ExternalId).
 					WithServiceId(ts.Service).
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 					MustSignerCtx(ctx)
@@ -633,7 +633,7 @@ func TestAuth(t *testing.T) {
 					Build()
 
 				s := jwt.NewJwtTokenBuilder().
-					WithActorId(ts.MustGetValidUserByExternalId(ctx, "bobdole").ExternalId).
+					WithActorExternalId(ts.MustGetValidUserByExternalId(ctx, "bobdole").ExternalId).
 					WithServiceId(ts.Service).
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 					MustSignerCtx(ctx)
@@ -645,7 +645,7 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, 1, ts.GetPingCount())
 
 				s = jwt.NewJwtTokenBuilder().
-					WithActorId(ts.MustGetValidUserByExternalId(ctx, "jimmycarter").ExternalId).
+					WithActorExternalId(ts.MustGetValidUserByExternalId(ctx, "jimmycarter").ExternalId).
 					WithServiceId(ts.Service).
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 					MustSignerCtx(ctx)
@@ -665,7 +665,7 @@ func TestAuth(t *testing.T) {
 
 				s := jwt.NewJwtTokenBuilder().
 					WithServiceId(ts.Service).
-					WithActorId(ts.MustGetValidAdminUser(ctx).ExternalId).
+					WithActorExternalId(ts.MustGetValidAdminUser(ctx).ExternalId).
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForAdmin()).
 					MustSignerCtx(ctx)
 
@@ -681,7 +681,7 @@ func TestAuth(t *testing.T) {
 
 				s := jwt.NewJwtTokenBuilder().
 					WithServiceId(ts.Service).
-					WithActorId(ts.MustGetValidAdminUser(ctx).ExternalId).
+					WithActorExternalId(ts.MustGetValidAdminUser(ctx).ExternalId).
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForAdmin()).
 					MustSignerCtx(ctx)
 
@@ -698,7 +698,7 @@ func TestAuth(t *testing.T) {
 
 				s := jwt.NewJwtTokenBuilder().
 					WithServiceId(ts.Service).
-					WithActorId(ts.MustGetValidAdminUser(ctx).ExternalId).
+					WithActorExternalId(ts.MustGetValidAdminUser(ctx).ExternalId).
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForAdmin()).
 					MustSignerCtx(ctx)
 
@@ -714,7 +714,7 @@ func TestAuth(t *testing.T) {
 
 				s := jwt.NewJwtTokenBuilder().
 					WithServiceId(ts.Service).
-					WithActorId(ts.MustGetInvalidAdminUser(ctx).ExternalId).
+					WithActorExternalId(ts.MustGetInvalidAdminUser(ctx).ExternalId).
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForAdmin()).
 					MustSignerCtx(ctx)
 
@@ -731,7 +731,7 @@ func TestAuth(t *testing.T) {
 				// because this admin is listed as valid in the system.
 				s := jwt.NewJwtTokenBuilder().
 					WithServiceId(ts.Service).
-					WithActorId(ts.MustGetValidUninitializedAdminUser(ctx).ExternalId).
+					WithActorExternalId(ts.MustGetValidUninitializedAdminUser(ctx).ExternalId).
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForAdmin()).
 					MustSignerCtx(ctx)
 
@@ -749,7 +749,7 @@ func TestAuth(t *testing.T) {
 				Build()
 
 			s := jwt.NewJwtTokenBuilder().
-				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				WithActorExternalId(ts.MustGetValidUser(ctx).ExternalId).
 				WithServiceId(ts.Service).
 				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 				MustSignerCtx(ctx)
@@ -765,7 +765,7 @@ func TestAuth(t *testing.T) {
 				Build()
 
 			s := jwt.NewJwtTokenBuilder().
-				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				WithActorExternalId(ts.MustGetValidUser(ctx).ExternalId).
 				WithServiceId(ts.Service).
 				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 				MustSignerCtx(ctx)
@@ -782,7 +782,7 @@ func TestAuth(t *testing.T) {
 				Build()
 
 			s := jwt.NewJwtTokenBuilder().
-				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				WithActorExternalId(ts.MustGetValidUser(ctx).ExternalId).
 				WithServiceId(ts.Service).
 				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 				MustSignerCtx(ctx)
@@ -799,7 +799,7 @@ func TestAuth(t *testing.T) {
 				Build()
 
 			s := jwt.NewJwtTokenBuilder().
-				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				WithActorExternalId(ts.MustGetValidUser(ctx).ExternalId).
 				WithServiceId(ts.Service).
 				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 				MustSignerCtx(ctx)
@@ -819,7 +819,7 @@ func TestAuth(t *testing.T) {
 
 				s := jwt.NewJwtTokenBuilder().
 					WithAudience("invalid").
-					WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+					WithActorExternalId(ts.MustGetValidUser(ctx).ExternalId).
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 					MustSignerCtx(ctx)
 
@@ -833,7 +833,7 @@ func TestAuth(t *testing.T) {
 					Build()
 
 				s := jwt.NewJwtTokenBuilder().
-					WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+					WithActorExternalId(ts.MustGetValidUser(ctx).ExternalId).
 					WithAudience("invalid").
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 					MustSignerCtx(ctx)
@@ -849,7 +849,7 @@ func TestAuth(t *testing.T) {
 					Build()
 
 				s := jwt.NewJwtTokenBuilder().
-					WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+					WithActorExternalId(ts.MustGetValidUser(ctx).ExternalId).
 					WithAudience("invalid").
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 					MustSignerCtx(ctx)
@@ -865,7 +865,7 @@ func TestAuth(t *testing.T) {
 					Build()
 
 				s := jwt.NewJwtTokenBuilder().
-					WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+					WithActorExternalId(ts.MustGetValidUser(ctx).ExternalId).
 					WithAudience("invalid").
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 					MustSignerCtx(ctx)
@@ -929,7 +929,7 @@ func TestAuth(t *testing.T) {
 			require.Equal(t, http.StatusUnauthorized, statusCode, debugHeader)
 
 			s := jwt.NewJwtTokenBuilder().
-				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				WithActorExternalId(ts.MustGetValidUser(ctx).ExternalId).
 				WithServiceId(ts.Service).
 				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 				MustSignerCtx(ctx)
@@ -968,7 +968,7 @@ func TestAuth(t *testing.T) {
 			ts := setup(t)
 
 			s := jwt.NewJwtTokenBuilder().
-				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				WithActorExternalId(ts.MustGetValidUser(ctx).ExternalId).
 				WithServiceId(ts.Service).
 				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 				MustSignerCtx(ctx)
@@ -1055,7 +1055,7 @@ func TestAuth(t *testing.T) {
 			require.Equal(t, gin.H{"ok": true, "terminated": false}, resp)
 
 			s := jwt.NewJwtTokenBuilder().
-				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				WithActorExternalId(ts.MustGetValidUser(ctx).ExternalId).
 				WithServiceId(ts.Service).
 				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 				MustSignerCtx(ctx)
@@ -1094,7 +1094,7 @@ func TestAuth(t *testing.T) {
 			ts := setup(t)
 
 			s := jwt.NewJwtTokenBuilder().
-				WithActorId(ts.MustGetValidUser(ctx).ExternalId).
+				WithActorExternalId(ts.MustGetValidUser(ctx).ExternalId).
 				WithServiceId(ts.Service).
 				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
 				MustSignerCtx(ctx)

@@ -273,12 +273,16 @@ func (s *service) GetActor(ctx context.Context, id uuid.UUID) (*Actor, error) {
 	return &result, nil
 }
 
-func (s *service) GetActorByExternalId(ctx context.Context, externalId string) (*Actor, error) {
+func (s *service) GetActorByExternalId(ctx context.Context, namespace, externalId string) (*Actor, error) {
 	var result Actor
 	err := sq.
 		Select(result.cols()...).
 		From(ActorTable).
-		Where(sq.Eq{"external_id": externalId, "deleted_at": nil}).
+		Where(sq.Eq{
+			"namespace":   namespace,
+			"external_id": externalId,
+			"deleted_at":  nil,
+		}).
 		RunWith(s.db).
 		QueryRow().
 		Scan(result.fields()...)
@@ -313,7 +317,10 @@ func (s *service) CreateActor(ctx context.Context, a *Actor) error {
 			From(ActorTable).
 			Where(sq.Or{
 				sq.Eq{"id": a.Id},
-				sq.Eq{"external_id": a.ExternalId},
+				sq.Eq{
+					"namespace":   a.Namespace,
+					"external_id": a.ExternalId,
+				},
 			}).
 			RunWith(tx).
 			QueryRow().
@@ -324,6 +331,23 @@ func (s *service) CreateActor(ctx context.Context, a *Actor) error {
 
 		if count > 0 {
 			return errors.New("actor already exists")
+		}
+
+		err = s.sq.
+			Select("COUNT(*)").
+			From(NamespacesTable).
+			Where(sq.Or{
+				sq.Eq{"path": a.Namespace},
+			}).
+			RunWith(tx).
+			QueryRow().
+			Scan(&count)
+		if err != nil {
+			return err
+		}
+
+		if count == 0 {
+			return errors.New("actor namespace does not exist")
 		}
 
 		cpy := *a
@@ -359,9 +383,24 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 		return nil, errors.New("actor is nil")
 	}
 
-	// This is covered in validation, but cover here to prevent any sort of lookup against an invalid id
-	if d.GetExternalId() == "" {
-		return nil, errors.New("actor external id is empty")
+	var lookupCond sq.Eq
+
+	if d.GetId() != uuid.Nil {
+		lookupCond = sq.Eq{"id": d.GetId()}
+	} else {
+		lookupCond = sq.Eq{
+			"namespace":   d.GetNamespace(),
+			"external_id": d.GetExternalId(),
+		}
+
+		// This is covered in validation, but cover here to prevent any sort of lookup against an invalid id
+		if d.GetExternalId() == "" {
+			return nil, errors.New("actor external id is empty")
+		}
+
+		if err := ValidateNamespacePath(d.GetNamespace()); err != nil {
+			return nil, errors.Wrap(err, "invalid actor namespace")
+		}
 	}
 
 	var result *Actor
@@ -371,7 +410,7 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 		err := s.sq.
 			Select(existingActor.cols()...).
 			From(ActorTable).
-			Where(sq.Eq{"external_id": d.GetExternalId()}).
+			Where(lookupCond).
 			RunWith(s.db).
 			QueryRow().
 			Scan(existingActor.fields()...)
@@ -379,8 +418,14 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 			if errors.Is(err, sql.ErrNoRows) {
 				// Actor does not exist. Create a new actor.
 				now := apctx.GetClock(ctx).Now()
+				uuidGen := apctx.GetUuidGenerator(ctx)
+
+				id := d.GetId()
+				if id == uuid.Nil {
+					id = uuidGen.New()
+				}
 				newActor := Actor{
-					Id:        uuid.New(),
+					Id:        id,
 					CreatedAt: now,
 					UpdatedAt: now,
 				}

@@ -31,6 +31,7 @@ type ClaimsBuilder interface {
 	WithSelfSigned() ClaimsBuilder
 	WithActorEmail(email string) ClaimsBuilder
 	WithActorExternalId(id string) ClaimsBuilder
+	WithNamespace(namespace string) ClaimsBuilder
 	WithActor(actor core.IActorData) ClaimsBuilder
 	WithNonce() ClaimsBuilder
 	BuildCtx(context.Context) (*AuthProxyClaims, error)
@@ -48,6 +49,7 @@ type claimsBuilder struct {
 	admin       *bool
 	email       *string
 	external_id *string
+	namespace   *string
 	actor       *core.Actor
 	selfSigned  bool
 	nonce       *uuid.UUID
@@ -119,6 +121,11 @@ func (b *claimsBuilder) WithActorExternalId(id string) ClaimsBuilder {
 	return b
 }
 
+func (b *claimsBuilder) WithNamespace(namespace string) ClaimsBuilder {
+	b.namespace = &namespace
+	return b
+}
+
 func (b *claimsBuilder) WithActor(actor core.IActorData) ClaimsBuilder {
 	b.actor = core.CreateActor(actor)
 	return b
@@ -143,10 +150,18 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 		if b.actor.GetExternalId() != "" {
 			b.external_id = util.ToPtr(b.actor.GetExternalId())
 		}
+
+		if b.actor.GetNamespace() != "" {
+			b.namespace = util.ToPtr(b.actor.GetNamespace())
+		}
+
+		if b.namespace == nil {
+			return nil, errors.New("namespace is required if specifying an actor")
+		}
 	}
 
 	if b.external_id == nil {
-		return nil, errors.New("id is required")
+		return nil, errors.New("external_id is required")
 	}
 
 	if util.CoerceBool(b.admin) && !strings.HasPrefix(*b.external_id, "admin/") {
@@ -164,6 +179,10 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 		if b.admin != nil {
 			b.actor.Admin = *b.admin
 		}
+
+		if b.namespace != nil {
+			b.actor.Namespace = *b.namespace
+		}
 	}
 
 	c := AuthProxyClaims{
@@ -174,6 +193,10 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 		},
 		Actor:      b.actor,
 		SelfSigned: b.selfSigned,
+	}
+
+	if b.namespace != nil {
+		c.Namespace = *b.namespace
 	}
 
 	if b.issuer != nil {

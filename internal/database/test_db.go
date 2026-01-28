@@ -90,5 +90,13 @@ func MustApplyBlankTestDbConfigRaw(testName string, cfg config.C) (config.C, DB,
 		panic(err)
 	}
 
+	err = db.CreateNamespace(context.Background(), &Namespace{
+		Path:  "root",
+		State: NamespaceStateActive,
+	})
+	if err != nil {
+		panic(err)
+	}
+
 	return cfg, db, db.(*service).db
 }

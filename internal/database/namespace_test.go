@@ -7,6 +7,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apctx"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
@@ -48,9 +49,12 @@ func TestNamespaces(t *testing.T) {
 		}
 	})
 	t.Run("basic", func(t *testing.T) {
-		_, db, rawDb := MustApplyBlankTestDbConfigRaw("namespaces", nil)
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		_, err := rawDb.Exec(`DELETE FROM namespaces`)
+		require.NoError(t, err)
 
 		sql := `
 INSERT INTO namespaces 
@@ -65,7 +69,7 @@ INSERT INTO namespaces
 ('root.prod.88888',      2,     'destroyed', '2023-10-03 04:00:00', '2023-11-04 04:00:00', '2023-11-04 05:00:00'),
 ('root.dev',             1,     'active',    '2023-10-02 01:00:00', '2023-11-05 00:00:00', null)
 `
-		_, err := rawDb.Exec(sql)
+		_, err = rawDb.Exec(sql)
 		require.NoError(t, err)
 
 		ns, err := db.GetNamespace(ctx, sconfig.RootNamespace)
@@ -169,9 +173,12 @@ INSERT INTO namespaces
 	t.Run("CreateNamespace", func(t *testing.T) {
 		t.Run("creates a new namespace", func(t *testing.T) {
 			// Setup
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			_, err := rawDb.Exec(`DELETE FROM namespaces`)
+			require.NoError(t, err)
 
 			ns := &Namespace{
 				Path:  sconfig.RootNamespace,
@@ -179,7 +186,7 @@ INSERT INTO namespaces
 			}
 
 			// Test
-			err := db.CreateNamespace(ctx, ns)
+			err = db.CreateNamespace(ctx, ns)
 			require.NoError(t, err)
 
 			// Verify
@@ -196,19 +203,11 @@ INSERT INTO namespaces
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			ns := &Namespace{
-				Path:  sconfig.RootNamespace,
-				State: NamespaceStateActive,
-			}
-
-			err := db.CreateNamespace(ctx, ns)
-			require.NoError(t, err)
-
-			ns = &Namespace{
 				Path:  "root.child",
 				State: NamespaceStateActive,
 			}
 
-			err = db.CreateNamespace(ctx, ns)
+			err := db.CreateNamespace(ctx, ns)
 			require.NoError(t, err)
 
 			// Verify
@@ -225,19 +224,11 @@ INSERT INTO namespaces
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			ns := &Namespace{
-				Path:  sconfig.RootNamespace,
-				State: NamespaceStateActive,
-			}
-
-			err := db.CreateNamespace(ctx, ns)
-			require.NoError(t, err)
-
-			ns = &Namespace{
 				Path:  "root.#invalid#",
 				State: NamespaceStateActive,
 			}
 
-			err = db.CreateNamespace(ctx, ns)
+			err := db.CreateNamespace(ctx, ns)
 			require.Error(t, err)
 
 			// Verify
@@ -253,19 +244,11 @@ INSERT INTO namespaces
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			ns := &Namespace{
-				Path:  sconfig.RootNamespace,
-				State: NamespaceStateActive,
-			}
-
-			err := db.CreateNamespace(ctx, ns)
-			require.NoError(t, err)
-
-			ns = &Namespace{
 				Path:  "child",
 				State: NamespaceStateActive,
 			}
 
-			err = db.CreateNamespace(ctx, ns)
+			err := db.CreateNamespace(ctx, ns)
 			require.Error(t, err)
 
 			// Verify
@@ -281,19 +264,11 @@ INSERT INTO namespaces
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			ns := &Namespace{
-				Path:  sconfig.RootNamespace,
-				State: NamespaceStateActive,
-			}
-
-			err := db.CreateNamespace(ctx, ns)
-			require.NoError(t, err)
-
-			ns = &Namespace{
 				Path:  "root.does-not-exist.child",
 				State: NamespaceStateActive,
 			}
 
-			err = db.CreateNamespace(ctx, ns)
+			err := db.CreateNamespace(ctx, ns)
 			require.Error(t, err)
 
 			// Verify
@@ -309,19 +284,11 @@ INSERT INTO namespaces
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			ns := &Namespace{
-				Path:  sconfig.RootNamespace,
-				State: NamespaceStateActive,
-			}
-
-			err := db.CreateNamespace(ctx, ns)
-			require.NoError(t, err)
-
-			ns = &Namespace{
 				Path:  "root.parent",
 				State: NamespaceStateActive,
 			}
 
-			err = db.CreateNamespace(ctx, ns)
+			err := db.CreateNamespace(ctx, ns)
 			require.NoError(t, err)
 
 			err = db.DeleteNamespace(ctx, ns.Path)
@@ -347,18 +314,10 @@ INSERT INTO namespaces
 		now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ns := &Namespace{
-			Path:  sconfig.RootNamespace,
-			State: NamespaceStateActive,
-		}
-
-		err := db.CreateNamespace(ctx, ns)
-		require.NoError(t, err)
-
 		retrieved, err := db.GetNamespace(ctx, sconfig.RootNamespace)
 		require.NoError(t, err)
-		require.Equal(t, ns.Path, retrieved.Path)
-		require.Equal(t, ns.State, retrieved.State)
+		require.Equal(t, sconfig.RootNamespace, retrieved.Path)
+		require.Equal(t, NamespaceStateActive, retrieved.State)
 	})
 	t.Run("DeleteNamespace", func(t *testing.T) {
 		// Setup
@@ -366,18 +325,9 @@ INSERT INTO namespaces
 		now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ns := &Namespace{
-			Path:  sconfig.RootNamespace,
-			State: NamespaceStateActive,
-		}
-
-		err := db.CreateNamespace(ctx, ns)
-		require.NoError(t, err)
-
 		retrieved, err := db.GetNamespace(ctx, sconfig.RootNamespace)
 		require.NoError(t, err)
-		require.Equal(t, ns.Path, retrieved.Path)
-		require.Equal(t, ns.State, retrieved.State)
+		require.Equal(t, sconfig.RootNamespace, retrieved.Path)
 
 		err = db.DeleteNamespace(ctx, sconfig.RootNamespace)
 		require.NoError(t, err)
@@ -392,25 +342,17 @@ INSERT INTO namespaces
 		now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		ns := &Namespace{
-			Path:  sconfig.RootNamespace,
-			State: NamespaceStateActive,
-		}
-
-		err := db.CreateNamespace(ctx, ns)
-		require.NoError(t, err)
-
 		retrieved, err := db.GetNamespace(ctx, sconfig.RootNamespace)
 		require.NoError(t, err)
-		require.Equal(t, ns.Path, retrieved.Path)
-		require.Equal(t, ns.State, retrieved.State)
+		require.Equal(t, sconfig.RootNamespace, retrieved.Path)
+		require.Equal(t, NamespaceStateActive, retrieved.State)
 
 		err = db.SetNamespaceState(ctx, sconfig.RootNamespace, NamespaceStateDestroying)
 		require.NoError(t, err)
 
 		retrieved, err = db.GetNamespace(ctx, sconfig.RootNamespace)
 		require.NoError(t, err)
-		require.Equal(t, ns.Path, sconfig.RootNamespace)
+		require.Equal(t, sconfig.RootNamespace, sconfig.RootNamespace)
 		require.Equal(t, NamespaceStateDestroying, retrieved.State)
 	})
 	t.Run("normalize", func(t *testing.T) {
@@ -462,6 +404,9 @@ INSERT INTO namespaces
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
+		_, err := rawDb.Exec(`DELETE FROM namespaces`)
+		require.NoError(t, err)
+
 		sql := `
 INSERT INTO namespaces
 (path,                   depth, state,       created_at,            updated_at,            deleted_at) VALUES
@@ -473,7 +418,7 @@ INSERT INTO namespaces
 ('root.staging.tenant1', 2,     'active',    '2023-10-06 00:00:00', '2023-11-06 00:00:00', null),
 ('root.dev',             1,     'active',    '2023-10-07 00:00:00', '2023-11-07 00:00:00', null)
 `
-		_, err := rawDb.Exec(sql)
+		_, err = rawDb.Exec(sql)
 		require.NoError(t, err)
 
 		t.Run("empty matchers returns all", func(t *testing.T) {
@@ -568,5 +513,96 @@ INSERT INTO namespaces
 				FetchPage(ctx)
 			require.Error(t, pr.Error)
 		})
+	})
+	t.Run("EnsureNamespaceByPath", func(t *testing.T) {
+		t.Run("does not duplicate namespaces", func(t *testing.T) {
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.EnsureNamespaceByPath(ctx, "root")
+			require.NoError(t, err)
+			err = db.EnsureNamespaceByPath(ctx, "root.prod")
+			require.NoError(t, err)
+			err = db.EnsureNamespaceByPath(ctx, "root.prod.12345")
+			require.NoError(t, err)
+			err = db.EnsureNamespaceByPath(ctx, "root.prod.12345")
+			require.NoError(t, err)
+
+			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM namespaces WHERE path = 'root'"))
+			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM namespaces WHERE path = 'root.prod'"))
+			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM namespaces WHERE path = 'root.prod.12345'"))
+		})
+
+		tests := []struct {
+			name        string
+			setupSQL    string
+			path        string
+			expectError bool
+		}{
+			{
+				name:        "creates new namespace successfully",
+				path:        "root.newnamespace",
+				expectError: false,
+			},
+			{
+				name:        "recursively creates child namespaces",
+				path:        "root.child.grandchild.greatgrandchild",
+				expectError: false,
+			},
+			{
+				name:        "handles existing active namespace",
+				setupSQL:    "INSERT INTO namespaces (path, depth, state, created_at, updated_at) VALUES ('root.active', 0, 'active', '2023-10-01', '2023-10-01');",
+				path:        "root.active",
+				expectError: false,
+			},
+			{
+				name:        "returns error when namespace is inactive",
+				setupSQL:    "INSERT INTO namespaces (path, depth, state, created_at, updated_at) VALUES ('root.inactive', 0, 'destroyed', '2023-10-01', '2023-10-01');",
+				path:        "root.inactive",
+				expectError: true,
+			},
+			{
+				name:        "fails with invalid namespace path",
+				setupSQL:    "",
+				path:        "invalid-path-%",
+				expectError: true,
+			},
+			{
+				name:        "handles transactional error",
+				setupSQL:    "ALTER TABLE namespaces RENAME TO namespaces_temp;", // Breaks table availability
+				path:        "root.transactionerror",
+				expectError: true,
+			},
+		}
+
+		for _, test := range tests {
+			t.Run(test.name, func(t *testing.T) {
+				// Setup
+				_, service, rawDb := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+				now := time.Date(2023, 10, 15, 12, 0, 0, 0, time.UTC)
+				ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+				if test.setupSQL != "" {
+					_, err := rawDb.Exec(test.setupSQL)
+					require.NoError(t, err)
+				}
+
+				// Execute
+				err := service.EnsureNamespaceByPath(ctx, test.path)
+
+				// Assertions
+				if test.expectError {
+					require.Error(t, err)
+				} else {
+					require.NoError(t, err)
+					// Verify namespace exists
+					ns, err := service.GetNamespace(ctx, test.path)
+					require.NoError(t, err)
+					require.Equal(t, test.path, ns.Path)
+					require.Equal(t, NamespaceStateActive, ns.State)
+				}
+			})
+		}
 	})
 }

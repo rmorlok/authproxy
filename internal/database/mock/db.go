@@ -286,6 +286,20 @@ func (mr *MockDBMockRecorder) DeleteOAuth2Token(ctx, tokenId interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteOAuth2Token", reflect.TypeOf((*MockDB)(nil).DeleteOAuth2Token), ctx, tokenId)
 }
 
+// EnsureNamespaceByPath mocks base method.
+func (m *MockDB) EnsureNamespaceByPath(ctx context.Context, path string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EnsureNamespaceByPath", ctx, path)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// EnsureNamespaceByPath indicates an expected call of EnsureNamespaceByPath.
+func (mr *MockDBMockRecorder) EnsureNamespaceByPath(ctx, path interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureNamespaceByPath", reflect.TypeOf((*MockDB)(nil).EnsureNamespaceByPath), ctx, path)
+}
+
 // EnumerateOAuth2TokensExpiringWithin mocks base method.
 func (m *MockDB) EnumerateOAuth2TokensExpiringWithin(ctx context.Context, duration time.Duration, callback func([]*database.OAuth2TokenWithConnection, bool) (bool, error)) error {
 	m.ctrl.T.Helper()
@@ -316,18 +330,18 @@ func (mr *MockDBMockRecorder) GetActor(ctx, id interface{}) *gomock.Call {
 }
 
 // GetActorByExternalId mocks base method.
-func (m *MockDB) GetActorByExternalId(ctx context.Context, externalId string) (*database.Actor, error) {
+func (m *MockDB) GetActorByExternalId(ctx context.Context, namespace, externalId string) (*database.Actor, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetActorByExternalId", ctx, externalId)
+	ret := m.ctrl.Call(m, "GetActorByExternalId", ctx, namespace, externalId)
 	ret0, _ := ret[0].(*database.Actor)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // GetActorByExternalId indicates an expected call of GetActorByExternalId.
-func (mr *MockDBMockRecorder) GetActorByExternalId(ctx, externalId interface{}) *gomock.Call {
+func (mr *MockDBMockRecorder) GetActorByExternalId(ctx, namespace, externalId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActorByExternalId", reflect.TypeOf((*MockDB)(nil).GetActorByExternalId), ctx, externalId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActorByExternalId", reflect.TypeOf((*MockDB)(nil).GetActorByExternalId), ctx, namespace, externalId)
 }
 
 // GetConnection mocks base method.

@@ -40,6 +40,11 @@ func TestActor(t *testing.T) {
 			Id:        uuid.New(),
 			Namespace: "root",
 		}).validate())
+		require.Error(t, util.ToPtr(Actor{
+			Id:         uuid.New(),
+			Namespace:  "bad",
+			ExternalId: "1234567890",
+		}).validate())
 		require.Error(t, util.ToPtr(Actor{}).validate())
 	})
 	t.Run("GetActor", func(t *testing.T) {
@@ -84,7 +89,7 @@ func TestActor(t *testing.T) {
 		require.NoError(t, db.CreateActor(ctx, otherActor))
 
 		id := uuid.New()
-		a, err := db.GetActorByExternalId(ctx, id.String())
+		a, err := db.GetActorByExternalId(ctx, "root", id.String())
 		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, a, "actor should not exist")
 
@@ -96,14 +101,14 @@ func TestActor(t *testing.T) {
 		}
 		require.NoError(t, db.CreateActor(ctx, actor))
 
-		a, err = db.GetActorByExternalId(ctx, actor.ExternalId)
+		a, err = db.GetActorByExternalId(ctx, "root", actor.ExternalId)
 		require.NoError(t, err)
 		require.Equal(t, actor.Email, a.Email)
 
 		err = db.DeleteActor(ctx, actor.Id)
 		require.NoError(t, err)
 
-		a, err = db.GetActorByExternalId(ctx, actor.ExternalId)
+		a, err = db.GetActorByExternalId(ctx, "root", actor.ExternalId)
 		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, a, "actor should not exist")
 	})
@@ -188,12 +193,13 @@ func TestActor(t *testing.T) {
 			externalId := "bobdole"
 			actor, err := db.UpsertActor(ctx, &core.Actor{
 				ExternalId: externalId,
+				Namespace:  "root",
 				Email:      "bobdole@example.com",
 			})
 			require.NoError(t, err)
 			require.Equal(t, externalId, actor.ExternalId)
 
-			retrieved, err := db.GetActorByExternalId(ctx, externalId)
+			retrieved, err := db.GetActorByExternalId(ctx, "root", externalId)
 			require.NoError(t, err)
 			require.Equal(t, actor.Id, retrieved.Id)
 			require.Equal(t, actor.Email, retrieved.Email)
@@ -213,13 +219,14 @@ func TestActor(t *testing.T) {
 				})
 				require.NoError(t, err)
 
-				retrieved, err := db.GetActorByExternalId(ctx, externalId)
+				retrieved, err := db.GetActorByExternalId(ctx, "root", externalId)
 				require.NoError(t, err)
 				require.Equal(t, id, retrieved.Id)
 				require.Equal(t, "bobdole@example.com", retrieved.Email)
 
 				actor, err := db.UpsertActor(ctx, &core.Actor{
 					ExternalId: externalId,
+					Namespace:  "root",
 					Email:      "thomasjefferson@example.com",
 				})
 				require.NoError(t, err)
@@ -227,7 +234,7 @@ func TestActor(t *testing.T) {
 				require.Equal(t, id, actor.Id)
 				require.Equal(t, "thomasjefferson@example.com", actor.Email)
 
-				retrieved, err = db.GetActorByExternalId(ctx, externalId)
+				retrieved, err = db.GetActorByExternalId(ctx, "root", externalId)
 				require.NoError(t, err)
 				require.Equal(t, id, retrieved.Id)
 				require.Equal(t, "thomasjefferson@example.com", retrieved.Email)
@@ -252,7 +259,7 @@ func TestActor(t *testing.T) {
 				})
 				require.NoError(t, err)
 
-				retrieved, err := db.GetActorByExternalId(ctx, externalId)
+				retrieved, err := db.GetActorByExternalId(ctx, "root", externalId)
 				require.NoError(t, err)
 				require.Equal(t, id, retrieved.Id)
 				require.Equal(t, Permissions{
@@ -266,6 +273,7 @@ func TestActor(t *testing.T) {
 				actor, err := db.UpsertActor(ctx, &core.Actor{
 					ExternalId: externalId,
 					Email:      "bobdole@example.com",
+					Namespace:  "root",
 					Permissions: []aschema.Permission{
 						{
 							Namespace: "root",
@@ -297,7 +305,7 @@ func TestActor(t *testing.T) {
 					},
 				}, actor.Permissions)
 
-				retrieved, err = db.GetActorByExternalId(ctx, externalId)
+				retrieved, err = db.GetActorByExternalId(ctx, "root", externalId)
 				require.NoError(t, err)
 				require.Equal(t, id, retrieved.Id)
 				require.Equal(t, Permissions{
@@ -394,21 +402,21 @@ func TestActor(t *testing.T) {
 				require.Equal(t, Permissions(newPerms2), actor2.Permissions)
 
 				// Verify actor1 was NOT affected
-				retrieved1, err := db.GetActorByExternalId(ctx, externalId1)
+				retrieved1, err := db.GetActorByExternalId(ctx, "root", externalId1)
 				require.NoError(t, err)
 				require.Equal(t, id1, retrieved1.Id)
 				require.Equal(t, "actor1@example.com", retrieved1.Email)
 				require.Equal(t, originalPerms1, retrieved1.Permissions)
 
 				// Verify actor2 was updated correctly
-				retrieved2, err := db.GetActorByExternalId(ctx, externalId2)
+				retrieved2, err := db.GetActorByExternalId(ctx, "root", externalId2)
 				require.NoError(t, err)
 				require.Equal(t, id2, retrieved2.Id)
 				require.Equal(t, "actor2-updated@example.com", retrieved2.Email)
 				require.Equal(t, Permissions(newPerms2), retrieved2.Permissions)
 
 				// Verify actor3 was NOT affected
-				retrieved3, err := db.GetActorByExternalId(ctx, externalId3)
+				retrieved3, err := db.GetActorByExternalId(ctx, "root", externalId3)
 				require.NoError(t, err)
 				require.Equal(t, id3, retrieved3.Id)
 				require.Equal(t, "actor3@example.com", retrieved3.Email)
@@ -632,6 +640,8 @@ func TestActor(t *testing.T) {
 		t.Run("create with custom namespace", func(t *testing.T) {
 			setup(t)
 
+			err := db.EnsureNamespaceByPath(ctx, "root.tenant1")
+			require.NoError(t, err)
 			id := uuid.New()
 			actor := &Actor{
 				Id:         id,
@@ -671,7 +681,7 @@ func TestActor(t *testing.T) {
 			require.Equal(t, "updated@example.com", actor.Email)
 
 			// Verify in database
-			retrieved, err := db.GetActorByExternalId(ctx, externalId)
+			retrieved, err := db.GetActorByExternalId(ctx, "root.tenant1", externalId)
 			require.NoError(t, err)
 			require.Equal(t, "root.tenant1", retrieved.GetNamespace())
 		})
@@ -691,6 +701,24 @@ func TestActor(t *testing.T) {
 				{"root.tenant1.sub", "actor5"},
 				{"root.tenant2", "actor6"},
 			}
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:  "root.tenant1",
+				State: NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			err = db.CreateNamespace(ctx, &Namespace{
+				Path:  "root.tenant1.sub",
+				State: NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			err = db.CreateNamespace(ctx, &Namespace{
+				Path:  "root.tenant2",
+				State: NamespaceStateActive,
+			})
+			require.NoError(t, err)
 
 			for _, a := range actors {
 				id := uuid.New()

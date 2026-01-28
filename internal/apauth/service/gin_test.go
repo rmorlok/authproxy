@@ -33,8 +33,10 @@ func TestAuth_Gin(t *testing.T) {
 				Subject:   "id1",
 			},
 
+			Namespace: "root",
 			Actor: &core.Actor{
 				ExternalId: "id1",
+				Namespace:  "root",
 				Email:      "me@example.com",
 			},
 		}
@@ -51,9 +53,10 @@ func TestAuth_Gin(t *testing.T) {
 				IssuedAt:  &jwt.NumericDate{apctx.GetClock(ctx).Now()},
 				Subject:   "admin/aid1",
 			},
-
+			Namespace: "root",
 			Actor: &core.Actor{
 				ExternalId: "admin/aid1",
+				Namespace:  "root",
 				Email:      "me@example.com",
 				Admin:      true,
 			},

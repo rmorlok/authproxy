@@ -39,6 +39,7 @@ type DB interface {
 
 	GetNamespace(ctx context.Context, path string) (*Namespace, error)
 	CreateNamespace(ctx context.Context, ns *Namespace) error
+	EnsureNamespaceByPath(ctx context.Context, path string) error
 	DeleteNamespace(ctx context.Context, path string) error
 	SetNamespaceState(ctx context.Context, path string, state NamespaceState) error
 	ListNamespacesBuilder() ListNamespacesBuilder
@@ -49,7 +50,7 @@ type DB interface {
 	 */
 
 	GetActor(ctx context.Context, id uuid.UUID) (*Actor, error)
-	GetActorByExternalId(ctx context.Context, externalId string) (*Actor, error)
+	GetActorByExternalId(ctx context.Context, namespace, externalId string) (*Actor, error)
 	CreateActor(ctx context.Context, actor *Actor) error
 	UpsertActor(ctx context.Context, actor IActorData) (*Actor, error)
 	DeleteActor(ctx context.Context, id uuid.UUID) error

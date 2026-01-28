@@ -47,9 +47,6 @@ func (a *Actor) GetEmail() string {
 }
 
 func (a *Actor) GetNamespace() string {
-	if a.Namespace == "" {
-		return "root"
-	}
 	return a.Namespace
 }
 

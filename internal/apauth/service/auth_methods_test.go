@@ -369,7 +369,7 @@ func TestAuth_Parse(t *testing.T) {
 
 		t.Run("valid", func(t *testing.T) {
 			token, err := jwt2.NewJwtTokenBuilder().
-				WithActorId("bobdole").
+				WithActorExternalId("bobdole").
 				WithActorEmail("bobdole@example.com").
 				WithPrivateKeyPath(pathToTestData("admin_user_keys/bobdole")).
 				WithAdmin().
@@ -385,7 +385,7 @@ func TestAuth_Parse(t *testing.T) {
 
 		t.Run("unknown admin", func(t *testing.T) {
 			token, err := jwt2.NewJwtTokenBuilder().
-				WithActorId("billclinton").
+				WithActorExternalId("billclinton").
 				WithActorEmail("billclinton@example.com").
 				WithPrivateKeyPath(pathToTestData("admin_user_keys/billclinton")).
 				WithAdmin().
@@ -398,7 +398,7 @@ func TestAuth_Parse(t *testing.T) {
 
 		t.Run("wrong key for admin", func(t *testing.T) {
 			token, err := jwt2.NewJwtTokenBuilder().
-				WithActorId("bobdole").
+				WithActorExternalId("bobdole").
 				WithActorEmail("bobdole@example.com").
 				WithPrivateKeyPath(pathToTestData("admin_user_keys/billclinton")).
 				WithAdmin().
@@ -439,7 +439,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				require.True(t, ra.IsAuthenticated())
 				require.Equal(t, testClaims().Actor.ExternalId, ra.MustGetActor().ExternalId)
 
-				actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.ExternalId)
+				actor, err := db.GetActorByExternalId(testContext, "root", testClaims().Actor.ExternalId)
 				require.NoError(t, err)
 				require.Equal(t, testClaims().Actor.ExternalId, actor.ExternalId)
 			})
@@ -518,7 +518,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				require.NoError(t, db.CreateActor(testContext, dbActor))
 
 				// Verify old permissions are in DB
-				retrieved, err := db.GetActorByExternalId(testContext, externalId)
+				retrieved, err := db.GetActorByExternalId(testContext, "root", externalId)
 				require.NoError(t, err)
 				require.Equal(t, oldPerms, retrieved.Permissions)
 
@@ -563,7 +563,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				require.Equal(t, newPerms, ra.MustGetActor().Permissions)
 
 				// Verify the database was updated with new permissions
-				retrieved, err = db.GetActorByExternalId(testContext, externalId)
+				retrieved, err = db.GetActorByExternalId(testContext, "root", externalId)
 				require.NoError(t, err)
 				require.Equal(t, dbActorId, retrieved.Id, "should preserve original database ID")
 				require.Equal(t, database.Permissions(newPerms), retrieved.Permissions, "permissions should be updated in database")
@@ -588,7 +588,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			_, err = raw.establishAuthFromRequest(futureCtx, true, req, w)
 			require.NotNil(t, err)
 
-			actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.ExternalId)
+			actor, err := db.GetActorByExternalId(testContext, "root", testClaims().Actor.ExternalId)
 			require.ErrorIs(t, err, database.ErrNotFound)
 			require.Nil(t, actor)
 		})
@@ -602,7 +602,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			_, err := raw.establishAuthFromRequest(testContext, true, req, w)
 			require.NotNil(t, err)
 
-			actor, err := db.GetActorByExternalId(testContext, testClaims().Actor.ExternalId)
+			actor, err := db.GetActorByExternalId(testContext, "root", testClaims().Actor.ExternalId)
 			require.ErrorIs(t, err, database.ErrNotFound)
 			require.Nil(t, actor)
 		})
@@ -749,7 +749,7 @@ func TestAuth_AdminPermissionsSync(t *testing.T) {
 		require.NoError(t, db.CreateActor(testContext, dbActor))
 
 		// Verify old permissions are in DB
-		retrieved, err := db.GetActorByExternalId(testContext, adminExternalId)
+		retrieved, err := db.GetActorByExternalId(testContext, "root", adminExternalId)
 		require.NoError(t, err)
 		require.Equal(t, oldPerms, retrieved.Permissions)
 
@@ -783,7 +783,7 @@ func TestAuth_AdminPermissionsSync(t *testing.T) {
 		require.Equal(t, configPerms, ra.MustGetActor().Permissions)
 
 		// Verify the database was updated with new permissions from config
-		retrieved, err = db.GetActorByExternalId(testContext, adminExternalId)
+		retrieved, err = db.GetActorByExternalId(testContext, "root", adminExternalId)
 		require.NoError(t, err)
 		require.Equal(t, dbActorId, retrieved.Id, "should preserve original database ID")
 		require.Equal(t, database.Permissions(configPerms), retrieved.Permissions, "permissions should be updated from config")
@@ -824,7 +824,7 @@ func TestAuth_AdminPermissionsSync(t *testing.T) {
 		require.Equal(t, configPerms, ra.MustGetActor().Permissions)
 
 		// Verify the database has the admin with correct permissions
-		retrieved, err := db.GetActorByExternalId(testContext, adminExternalId)
+		retrieved, err := db.GetActorByExternalId(testContext, "root", adminExternalId)
 		require.NoError(t, err)
 		require.Equal(t, database.Permissions(configPerms), retrieved.Permissions, "permissions should match config")
 		require.True(t, retrieved.Admin)
@@ -968,6 +968,7 @@ func testClaims() *jwt2.AuthProxyClaims {
 			IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
 		},
 
+		Namespace: "root",
 		Actor: &core.Actor{
 			ExternalId: "id1",
 			Namespace:  "root",

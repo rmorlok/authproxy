@@ -68,6 +68,7 @@ func TestActorsRoutes(t *testing.T) {
 
 	// Helper to create an actor in DB
 	createActor := func(t *testing.T, db database.DB, externalId, namespace, email string, admin, superAdmin bool) *database.Actor {
+		require.NoError(t, db.EnsureNamespaceByPath(context.Background(), namespace))
 		a := &database.Actor{
 			Id:         uuid.New(),
 			Namespace:  namespace,
@@ -84,6 +85,7 @@ func TestActorsRoutes(t *testing.T) {
 
 	// Helper to create an actor with namespace in DB
 	createActorWithNamespace := func(t *testing.T, db database.DB, externalId, email, namespace string) *database.Actor {
+		db.EnsureNamespaceByPath(context.Background(), namespace)
 		a := &database.Actor{
 			Id:         uuid.New(),
 			Namespace:  namespace,
@@ -104,6 +106,7 @@ func TestActorsRoutes(t *testing.T) {
 			req,
 			coreAuth.Actor{
 				ExternalId:  "admin/test",
+				Namespace:   "root",
 				Admin:       true,
 				Permissions: aschema.AllPermissions(),
 			},
@@ -383,6 +386,7 @@ func TestActorsRoutes(t *testing.T) {
 		defer done()
 
 		a := createActor(t, tu.Db, "user-40", "root", "u40@example.com", false, false)
+		a2 := createActor(t, tu.Db, "user-40", "root.some-namespace", "u50@example.com", false, false)
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
@@ -428,7 +432,21 @@ func TestActorsRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusNoContent, w.Code)
 
-			got, err := tu.Db.GetActorByExternalId(context.Background(), a.ExternalId)
+			got, err := tu.Db.GetActorByExternalId(context.Background(), a.Namespace, a.ExternalId)
+			require.ErrorIs(t, err, database.ErrNotFound)
+			require.Nil(t, got)
+		})
+
+		t.Run("success in other namespace", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodDelete, "/actors/external-id/"+a2.ExternalId+"?namespace="+a2.Namespace, nil)
+			require.NoError(t, err)
+			req = adminize(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNoContent, w.Code)
+
+			got, err := tu.Db.GetActorByExternalId(context.Background(), a2.Namespace, a2.ExternalId)
 			require.ErrorIs(t, err, database.ErrNotFound)
 			require.Nil(t, got)
 		})
@@ -456,7 +474,7 @@ func TestActorsRoutes(t *testing.T) {
 
 		t.Run("get by external id includes namespace", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodGet, "/actors/external-id/"+a.ExternalId, nil)
+			req, err := http.NewRequest(http.MethodGet, "/actors/external-id/"+a.ExternalId+"?namespace=root.tenant1", nil)
 			require.NoError(t, err)
 			req = adminize(t, tu, req)
 
