@@ -24,6 +24,7 @@ type Namespace struct {
 	Path      string
 	depth     uint64
 	State     NamespaceState
+	Labels    Labels
 	CreatedAt time.Time
 	UpdatedAt time.Time
 	DeletedAt *time.Time
@@ -38,6 +39,7 @@ func (ns *Namespace) cols() []string {
 		"path",
 		"depth",
 		"state",
+		"labels",
 		"created_at",
 		"updated_at",
 		"deleted_at",
@@ -49,6 +51,7 @@ func (ns *Namespace) fields() []any {
 		&ns.Path,
 		&ns.depth,
 		&ns.State,
+		&ns.Labels,
 		&ns.CreatedAt,
 		&ns.UpdatedAt,
 		&ns.DeletedAt,
@@ -60,6 +63,7 @@ func (ns *Namespace) values() []any {
 		ns.Path,
 		ns.depth,
 		ns.State,
+		ns.Labels,
 		ns.CreatedAt,
 		ns.UpdatedAt,
 		ns.DeletedAt,
@@ -83,6 +87,10 @@ func (ns *Namespace) Validate() error {
 
 	if !IsValidNamespaceState(ns.State) {
 		result = multierror.Append(result, errors.New("invalid namespace state"))
+	}
+
+	if err := ns.Labels.Validate(); err != nil {
+		result = multierror.Append(result, errors.Wrap(err, "invalid namespace labels"))
 	}
 
 	return result.ErrorOrNil()

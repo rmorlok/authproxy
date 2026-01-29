@@ -117,6 +117,7 @@ type ConnectorVersion struct {
 	Type                string
 	Hash                string
 	EncryptedDefinition string
+	Labels              Labels
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 	DeletedAt           *time.Time
@@ -131,6 +132,7 @@ func (cv *ConnectorVersion) cols() []string {
 		"type",
 		"hash",
 		"encrypted_definition",
+		"labels",
 		"created_at",
 		"updated_at",
 		"deleted_at",
@@ -146,6 +148,7 @@ func (cv *ConnectorVersion) fields() []any {
 		&cv.Type,
 		&cv.Hash,
 		&cv.EncryptedDefinition,
+		&cv.Labels,
 		&cv.CreatedAt,
 		&cv.UpdatedAt,
 		&cv.DeletedAt,
@@ -161,6 +164,7 @@ func (cv *ConnectorVersion) values() []any {
 		cv.Type,
 		cv.Hash,
 		cv.EncryptedDefinition,
+		cv.Labels,
 		cv.CreatedAt,
 		cv.UpdatedAt,
 		cv.DeletedAt,
@@ -212,6 +216,10 @@ func (cv *ConnectorVersion) Validate() error {
 
 	if cv.EncryptedDefinition == "" {
 		result = multierror.Append(result, errors.New("encrypted definition is required"))
+	}
+
+	if err := cv.Labels.Validate(); err != nil {
+		result = multierror.Append(result, errors.Wrap(err, "invalid connector version labels"))
 	}
 
 	return result.ErrorOrNil()

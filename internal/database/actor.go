@@ -88,6 +88,7 @@ type Actor struct {
 	ExternalId  string
 	Email       string
 	Permissions Permissions
+	Labels      Labels
 	Admin       bool
 	SuperAdmin  bool
 	CreatedAt   time.Time
@@ -114,6 +115,7 @@ func (a *Actor) cols() []string {
 		"external_id",
 		"email",
 		"permissions",
+		"labels",
 		"admin",
 		"super_admin",
 		"created_at",
@@ -129,6 +131,7 @@ func (a *Actor) fields() []any {
 		&a.ExternalId,
 		&a.Email,
 		&a.Permissions,
+		&a.Labels,
 		&a.Admin,
 		&a.SuperAdmin,
 		&a.CreatedAt,
@@ -144,6 +147,7 @@ func (a *Actor) values() []any {
 		a.ExternalId,
 		a.Email,
 		a.Permissions,
+		a.Labels,
 		a.Admin,
 		a.SuperAdmin,
 		a.CreatedAt,
@@ -246,6 +250,10 @@ func (a *Actor) validate() error {
 		if err != nil {
 			result = multierror.Append(result, fmt.Errorf("actor permission %d is invalid: %w", i, err))
 		}
+	}
+
+	if err := a.Labels.Validate(); err != nil {
+		result = multierror.Append(result, errors.Wrap(err, "invalid actor labels"))
 	}
 
 	return result.ErrorOrNil()

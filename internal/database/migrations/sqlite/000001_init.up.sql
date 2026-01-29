@@ -2,6 +2,7 @@ create table actors
 (
     id          text primary key,
     namespace   text,
+    labels      text,
     external_id text,
     email       text,
     admin       numeric,
@@ -25,6 +26,7 @@ create table connections
 (
     id                text primary key,
     namespace         text,
+    labels            text,
     state             text,
     connector_id      text,
     connector_version integer,
@@ -41,6 +43,7 @@ create table connector_versions
     id                   text,
     version              integer,
     namespace            text,
+    labels               text,
     state                text,
     type                 text,
     hash                 text,
@@ -57,6 +60,7 @@ create index idx_connector_versions_deleted_at
 create table namespaces
 (
     path       text primary key,
+    labels     text,
     depth      integer,
     state      text,
     created_at datetime,

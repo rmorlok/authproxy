@@ -46,6 +46,7 @@ type Connection struct {
 	State            ConnectionState
 	ConnectorId      uuid.UUID
 	ConnectorVersion uint64
+	Labels           Labels
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	DeletedAt        *time.Time
@@ -58,6 +59,7 @@ func (c *Connection) cols() []string {
 		"state",
 		"connector_id",
 		"connector_version",
+		"labels",
 		"created_at",
 		"updated_at",
 		"deleted_at",
@@ -71,6 +73,7 @@ func (c *Connection) fields() []any {
 		&c.State,
 		&c.ConnectorId,
 		&c.ConnectorVersion,
+		&c.Labels,
 		&c.CreatedAt,
 		&c.UpdatedAt,
 		&c.DeletedAt,
@@ -84,6 +87,7 @@ func (c *Connection) values() []any {
 		c.State,
 		c.ConnectorId,
 		c.ConnectorVersion,
+		c.Labels,
 		c.CreatedAt,
 		c.UpdatedAt,
 		c.DeletedAt,
@@ -127,6 +131,10 @@ func (c *Connection) Validate() error {
 
 	if c.ConnectorVersion == 0 {
 		result = multierror.Append(result, errors.New("connection connector version is required"))
+	}
+
+	if err := c.Labels.Validate(); err != nil {
+		result = multierror.Append(result, errors.Wrap(err, "invalid connection labels"))
 	}
 
 	return result.ErrorOrNil()
