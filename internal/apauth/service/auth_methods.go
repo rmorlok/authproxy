@@ -24,7 +24,12 @@ import (
 // fact that admin users will verify with different keys to sign/verify tokens.
 // For admin users, the key is retrieved from the database where it is stored encrypted.
 func (s *service) keyForToken(ctx context.Context, claims *jwt2.AuthProxyClaims) (*config.Key, error) {
-	// Look up admin actor from database
+	// If no database is configured, fall back to JWT signing key
+	if s.db == nil {
+		return s.config.GetRoot().SystemAuth.JwtSigningKey, nil
+	}
+
+	// Look up actor from database to check for self-signing key
 	actor, err := s.db.GetActorByExternalId(ctx, claims.GetNamespace(), claims.Subject)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
