@@ -623,6 +623,7 @@ type ListConnectorVersionsBuilder interface {
 	ForNamespaceMatchers([]string) ListConnectorVersionsBuilder
 	OrderBy(ConnectorVersionOrderByField, pagination.OrderBy) ListConnectorVersionsBuilder
 	IncludeDeleted() ListConnectorVersionsBuilder
+	ForLabelSelector(selector string) ListConnectorVersionsBuilder
 }
 
 type listConnectorVersionsFilters struct {
@@ -637,6 +638,7 @@ type listConnectorVersionsFilters struct {
 	OrderByFieldVal   *ConnectorVersionOrderByField `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy           `json:"order_by"`
 	IncludeDeletedVal bool                          `json:"include_deleted,omitempty"`
+	LabelSelectorVal  *string                       `json:"label_selector,omitempty"`
 	Errors            *multierror.Error             `json:"-"`
 }
 
@@ -708,6 +710,11 @@ func (l *listConnectorVersionsFilters) IncludeDeleted() ListConnectorVersionsBui
 	return l
 }
 
+func (l *listConnectorVersionsFilters) ForLabelSelector(selector string) ListConnectorVersionsBuilder {
+	l.LabelSelectorVal = &selector
+	return l
+}
+
 func (l *listConnectorVersionsFilters) FromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error) {
 	s := l.s
 	parsed, err := pagination.ParseCursor[listConnectorVersionsFilters](ctx, s.secretKey, cursor)
@@ -726,6 +733,15 @@ func (l *listConnectorVersionsFilters) applyRestrictions(ctx context.Context) sq
 	q := l.s.sq.
 		Select(util.ToPtr(ConnectorVersion{}).cols()...).
 		From(ConnectorVersionsTable)
+
+	if l.LabelSelectorVal != nil {
+		selector, err := ParseLabelSelector(*l.LabelSelectorVal)
+		if err != nil {
+			l.addError(err)
+		} else {
+			q = selector.ApplyToSqlBuilder(q, "labels")
+		}
+	}
 
 	if l.LimitVal <= 0 {
 		l.LimitVal = 100

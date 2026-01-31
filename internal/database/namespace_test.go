@@ -605,4 +605,41 @@ INSERT INTO namespaces
 			})
 		}
 	})
+	t.Run("Labels", func(t *testing.T) {
+		_, db, _ := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+		now := time.Date(2023, 10, 15, 12, 0, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		// Seed data for Namespaces
+		namespaces := []*Namespace{
+			{
+				Path:   "root.n1",
+				State:  NamespaceStateActive,
+				Labels: Labels{"type": "system"},
+			},
+			{
+				Path:   "root.n2",
+				State:  NamespaceStateActive,
+				Labels: Labels{"type": "user", "active": "true"},
+			},
+			{
+				Path:   "root.n3",
+				State:  NamespaceStateActive,
+				Labels: Labels{"type": "user", "active": "false"},
+			},
+		}
+
+		for _, ns := range namespaces {
+			require.NoError(t, db.CreateNamespace(ctx, ns))
+		}
+
+		t.Run("Namespace labels", func(t *testing.T) {
+			pr := db.ListNamespacesBuilder().
+				ForLabelSelector("type=user,active=true").
+				FetchPage(ctx)
+			require.NoError(t, pr.Error)
+			require.Len(t, pr.Results, 1)
+			require.Equal(t, "root.n2", pr.Results[0].Path)
+		})
+	})
 }

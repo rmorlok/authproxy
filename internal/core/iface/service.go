@@ -91,10 +91,10 @@ type C interface {
 	GetNamespace(ctx context.Context, path string) (Namespace, error)
 
 	// CreateNamespace creates a new namespace.
-	CreateNamespace(ctx context.Context, path string) (Namespace, error)
+	CreateNamespace(ctx context.Context, path string, labels map[string]string) (Namespace, error)
 
 	// EnsureNamespaceAncestorPath ensures that the specified namespace path exists in the database.
-	EnsureNamespaceAncestorPath(ctx context.Context, targetNamespace string) (Namespace, error)
+	EnsureNamespaceAncestorPath(ctx context.Context, targetNamespace string, labels map[string]string) (Namespace, error)
 
 	// ListNamespacesBuilder returns a builder to allow the caller to list namespaces matching certain criteria.
 	ListNamespacesBuilder() ListNamespacesBuilder

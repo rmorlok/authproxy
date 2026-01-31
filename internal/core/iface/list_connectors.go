@@ -24,4 +24,5 @@ type ListConnectorsBuilder interface {
 	ForNamespaceMatchers([]string) ListConnectorsBuilder
 	OrderBy(database.ConnectorOrderByField, pagination.OrderBy) ListConnectorsBuilder
 	IncludeDeleted() ListConnectorsBuilder
+	ForLabelSelector(selector string) ListConnectorsBuilder
 }

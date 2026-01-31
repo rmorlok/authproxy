@@ -608,6 +608,7 @@ type ListActorsBuilder interface {
 	Limit(int32) ListActorsBuilder
 	OrderBy(ActorOrderByField, pagination.OrderBy) ListActorsBuilder
 	IncludeDeleted() ListActorsBuilder
+	ForLabelSelector(selector string) ListActorsBuilder
 }
 
 type listActorsFilters struct {
@@ -625,6 +626,7 @@ type listActorsFilters struct {
 	LabelExistsKey    *string             `json:"label_exists_key,omitempty"`
 	LabelEqualsKey    *string             `json:"label_equals_key,omitempty"`
 	LabelEqualsValue  *string             `json:"label_equals_value,omitempty"`
+	LabelSelectorVal  *string             `json:"label_selector,omitempty"`
 	Errors            *multierror.Error   `json:"-"`
 }
 
@@ -689,6 +691,11 @@ func (l *listActorsFilters) ForNamespaceMatchers(matchers []string) ListActorsBu
 	return l
 }
 
+func (l *listActorsFilters) ForLabelSelector(selector string) ListActorsBuilder {
+	l.LabelSelectorVal = &selector
+	return l
+}
+
 func (l *listActorsFilters) ForLabelExists(key string) ListActorsBuilder {
 	if err := ValidateLabelKey(key); err != nil {
 		return l.addError(err)
@@ -727,6 +734,15 @@ func (l *listActorsFilters) applyRestrictions(ctx context.Context) sq.SelectBuil
 	q := l.s.sq.
 		Select(util.ToPtr(Actor{}).cols()...).
 		From(ActorTable)
+
+	if l.LabelSelectorVal != nil {
+		selector, err := ParseLabelSelector(*l.LabelSelectorVal)
+		if err != nil {
+			l.addError(err)
+		} else {
+			q = selector.ApplyToSqlBuilder(q, "labels")
+		}
+	}
 
 	if !l.IncludeDeletedVal {
 		q = q.Where(sq.Eq{"deleted_at": nil})

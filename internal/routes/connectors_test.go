@@ -284,6 +284,52 @@ func TestConnectors(t *testing.T) {
 				require.Equal(t, uuid.MustParse("20000000-0000-0000-0000-000000000002"), resp.Items[0].Id)
 				require.Equal(t, "Test ConnectorJson 2", resp.Items[0].DisplayName)
 			})
+
+			t.Run("label filter", func(t *testing.T) {
+				connectorId := uuid.MustParse("10000000-0000-0000-0000-000000000001")
+				cfg := config.FromRoot(&sconfig.Root{
+					Connectors: &sconfig.Connectors{
+						LoadFromList: []sconfig.Connector{
+							{
+								Id:          uuid.MustParse("10000000-0000-0000-0000-000000000123"),
+								Version:     1,
+								Type:        "test-connector",
+								DisplayName: "Test Connector",
+								Labels:      map[string]string{"env": "dev"},
+							},
+							{
+								Id:          connectorId,
+								Version:     1,
+								Type:        "test-connector",
+								DisplayName: "Test Connector",
+								Labels:      map[string]string{"env": "prod"},
+							},
+						},
+					},
+				})
+				tu := setup(t, cfg)
+
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors?label_selector=env%3Dprod",
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "list"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp ListConnectorsResponseJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Len(t, resp.Items, 1)
+				require.Equal(t, connectorId, resp.Items[0].Id)
+				require.Equal(t, "prod", resp.Items[0].Labels["env"])
+			})
 		})
 	})
 

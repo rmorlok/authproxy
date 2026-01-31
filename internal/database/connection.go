@@ -300,6 +300,7 @@ type ListConnectionsBuilder interface {
 	OrderBy(ConnectionOrderByField, pagination.OrderBy) ListConnectionsBuilder
 	IncludeDeleted() ListConnectionsBuilder
 	WithDeletedHandling(DeletedHandling) ListConnectionsBuilder
+	ForLabelSelector(selector string) ListConnectionsBuilder
 }
 
 type listConnectionsFilters struct {
@@ -311,6 +312,7 @@ type listConnectionsFilters struct {
 	OrderByFieldVal   *ConnectionOrderByField `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy     `json:"order_by"`
 	IncludeDeletedVal bool                    `json:"include_deleted,omitempty"`
+	LabelSelectorVal  *string                 `json:"label_selector,omitempty"`
 	Errors            *multierror.Error       `json:"-"`
 }
 
@@ -377,6 +379,11 @@ func (l *listConnectionsFilters) WithDeletedHandling(h DeletedHandling) ListConn
 	return l
 }
 
+func (l *listConnectionsFilters) ForLabelSelector(selector string) ListConnectionsBuilder {
+	l.LabelSelectorVal = &selector
+	return l
+}
+
 func (l *listConnectionsFilters) FromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error) {
 	s := l.s
 	parsed, err := pagination.ParseCursor[listConnectionsFilters](ctx, s.secretKey, cursor)
@@ -395,6 +402,15 @@ func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) sq.Selec
 	q := l.s.sq.
 		Select(util.ToPtr(Connection{}).cols()...).
 		From(ConnectionsTable)
+
+	if l.LabelSelectorVal != nil {
+		selector, err := ParseLabelSelector(*l.LabelSelectorVal)
+		if err != nil {
+			l.addError(err)
+		} else {
+			q = selector.ApplyToSqlBuilder(q, "labels")
+		}
+	}
 
 	if !l.IncludeDeletedVal {
 		q = q.Where(sq.Eq{"deleted_at": nil})

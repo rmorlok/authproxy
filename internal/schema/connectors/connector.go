@@ -58,6 +58,9 @@ type Connector struct {
 
 	// Probes are a list of probes to run against connections of this connector type to validation the connection.
 	Probes []Probe `json:"probes,omitempty" yaml:"probes,omitempty"`
+
+	// Labels are the labels for the connector.
+	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
 
 func (c *Connector) Clone() *Connector {
@@ -73,6 +76,13 @@ func (c *Connector) Clone() *Connector {
 
 	if c.Auth != nil {
 		clone.Auth = c.Auth.CloneValue()
+	}
+
+	if c.Labels != nil {
+		clone.Labels = make(map[string]string, len(c.Labels))
+		for k, v := range c.Labels {
+			clone.Labels[k] = v
+		}
 	}
 
 	return &clone

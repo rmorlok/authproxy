@@ -86,7 +86,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 			BuildStatusError()
 	}
 
-	_, err = s.EnsureNamespaceAncestorPath(ctx, targetNamespace)
+	_, err = s.EnsureNamespaceAncestorPath(ctx, targetNamespace, nil)
 	if err != nil {
 		val.MarkErrorReturn()
 		return nil, api_common.NewHttpStatusErrorBuilder().

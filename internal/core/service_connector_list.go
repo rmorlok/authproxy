@@ -122,6 +122,13 @@ func (l *listConnectorWrapper) IncludeDeleted() iface.ListConnectorsBuilder {
 	}
 }
 
+func (l *listConnectorWrapper) ForLabelSelector(s string) iface.ListConnectorsBuilder {
+	return &listConnectorWrapper{
+		l: l.l.ForLabelSelector(s),
+		s: l.s,
+	}
+}
+
 func (s *service) ListConnectorsBuilder() iface.ListConnectorsBuilder {
 	return &listConnectorWrapper{
 		l: s.db.ListConnectorsBuilder(),

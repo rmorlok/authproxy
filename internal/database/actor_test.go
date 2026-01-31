@@ -849,6 +849,124 @@ func TestActor(t *testing.T) {
 			require.Len(t, result.Results, 1)
 			require.Equal(t, "actor2", result.Results[0].ExternalId)
 		})
+
+		t.Run("Filtering", func(t *testing.T) {
+			_, db, _ := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+			now := time.Date(2023, 10, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			// Seed data for Actors
+			actors := []*Actor{
+				{
+					Id:         uuid.New(),
+					Namespace:  "root",
+					ExternalId: "actor1",
+					Labels:     Labels{"app": "web", "env": "prod"},
+				},
+				{
+					Id:         uuid.New(),
+					Namespace:  "root",
+					ExternalId: "actor2",
+					Labels:     Labels{"app": "api", "env": "prod"},
+				},
+				{
+					Id:         uuid.New(),
+					Namespace:  "root",
+					ExternalId: "actor3",
+					Labels:     Labels{"app": "web", "env": "dev", "tier": "frontend"},
+				},
+				{
+					Id:         uuid.New(),
+					Namespace:  "root",
+					ExternalId: "actor4",
+					Labels:     Labels{"env": "dev"},
+				},
+			}
+
+			for _, a := range actors {
+				require.NoError(t, db.CreateActor(ctx, a))
+			}
+
+			// Seed data for Namespaces
+			namespaces := []*Namespace{
+				{
+					Path:   "root.n1",
+					State:  NamespaceStateActive,
+					Labels: Labels{"type": "system"},
+				},
+				{
+					Path:   "root.n2",
+					State:  NamespaceStateActive,
+					Labels: Labels{"type": "user", "active": "true"},
+				},
+				{
+					Path:   "root.n3",
+					State:  NamespaceStateActive,
+					Labels: Labels{"type": "user", "active": "false"},
+				},
+			}
+
+			for _, ns := range namespaces {
+				require.NoError(t, db.CreateNamespace(ctx, ns))
+			}
+
+			t.Run("Actor equality filter", func(t *testing.T) {
+				pr := db.ListActorsBuilder().
+					ForLabelSelector("app=web").
+					FetchPage(ctx)
+				require.NoError(t, pr.Error)
+				require.Len(t, pr.Results, 2)
+
+				ids := []string{pr.Results[0].ExternalId, pr.Results[1].ExternalId}
+				require.Contains(t, ids, "actor1")
+				require.Contains(t, ids, "actor3")
+			})
+
+			t.Run("Actor inequality filter", func(t *testing.T) {
+				// env!=prod should return actor3, actor4
+				pr := db.ListActorsBuilder().
+					ForLabelSelector("env!=prod").
+					FetchPage(ctx)
+				require.NoError(t, pr.Error)
+				require.Len(t, pr.Results, 2)
+
+				ids := []string{pr.Results[0].ExternalId, pr.Results[1].ExternalId}
+				require.Contains(t, ids, "actor3")
+				require.Contains(t, ids, "actor4")
+			})
+
+			t.Run("Actor existence filter", func(t *testing.T) {
+				pr := db.ListActorsBuilder().
+					ForLabelSelector("tier").
+					FetchPage(ctx)
+				require.NoError(t, pr.Error)
+				require.Len(t, pr.Results, 1)
+				require.Equal(t, "actor3", pr.Results[0].ExternalId)
+			})
+
+			t.Run("Actor non-existence filter", func(t *testing.T) {
+				// !tier should return actor1, actor2, actor4
+				pr := db.ListActorsBuilder().
+					ForLabelSelector("!tier").
+					FetchPage(ctx)
+				require.NoError(t, pr.Error)
+				require.Len(t, pr.Results, 3)
+
+				ids := []string{pr.Results[0].ExternalId, pr.Results[1].ExternalId, pr.Results[2].ExternalId}
+				require.Contains(t, ids, "actor1")
+				require.Contains(t, ids, "actor2")
+				require.Contains(t, ids, "actor4")
+			})
+
+			t.Run("Actor multiple filters", func(t *testing.T) {
+				pr := db.ListActorsBuilder().
+					ForLabelSelector("app=web,env=dev").
+					FetchPage(ctx)
+				require.NoError(t, pr.Error)
+				require.Len(t, pr.Results, 1)
+				require.Equal(t, "actor3", pr.Results[0].ExternalId)
+			})
+		})
 	})
 
 	t.Run("EncryptedKey", func(t *testing.T) {
