@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
+	authSync "github.com/rmorlok/authproxy/internal/apauth/sync"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"
@@ -131,6 +132,14 @@ func Serve(cfg config.C) {
 	oauth2TaskHandler.RegisterTasks(mux)
 	dm.GetCoreService().RegisterTasks(mux)
 
+	adminSyncTaskHandler := authSync.NewTaskHandler(
+		cfg,
+		dm.GetDatabase(),
+		dm.GetEncryptService(),
+		logger,
+	)
+	adminSyncTaskHandler.RegisterTasks(mux)
+
 	var wg sync.WaitGroup
 
 	wg.Add(1)
@@ -151,7 +160,8 @@ func Serve(cfg config.C) {
 		workerConfig.GetCronSyncInterval(),
 	).
 		addRegistrar(oauth2TaskHandler).
-		addRegistrar(dm.GetCoreService())
+		addRegistrar(dm.GetCoreService()).
+		addRegistrar(adminSyncTaskHandler)
 
 	wg.Add(1)
 	go func() {

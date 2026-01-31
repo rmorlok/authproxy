@@ -1,6 +1,8 @@
 package service
 
 import (
+	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -10,6 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/golang/mock/gomock"
 	"github.com/google/uuid"
 	"github.com/mohae/deepcopy"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
@@ -17,6 +20,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/database/mock"
+	"github.com/rmorlok/authproxy/internal/encrypt"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
@@ -144,12 +149,26 @@ func TestAuth_RoundtripPublicPrivate(t *testing.T) {
 func TestAuth_SecretKey(t *testing.T) {
 	t.Parallel()
 	cfg := config.FromRoot(&testConfigSecretKey)
-	j := NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), nil, nil, nil, test_utils.NewTestLogger())
+	ctrl := gomock.NewController(t)
+	mockDb := mock.NewMockDB(ctrl)
+	mockDb.
+		EXPECT().
+		GetActorByExternalId(gomock.Any(), "root", "external-id7").
+		Return(
+			// Actor that does not define a self-signing key
+			&database.Actor{
+				ExternalId: "external-id7",
+				Namespace:  "root",
+				Email:      "me@example.com",
+			},
+			nil,
+		)
+	authService := NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), mockDb, nil, nil, test_utils.NewTestLogger())
 
 	claims := jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			ID:        "random id",
-			Subject:   "id7",
+			Subject:   "external-id7",
 			Issuer:    "remark42",
 			Audience:  []string{string(sconfig.ServiceIdAdminApi)},
 			ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
@@ -158,7 +177,7 @@ func TestAuth_SecretKey(t *testing.T) {
 		},
 
 		Actor: &core.Actor{
-			ExternalId: "id7",
+			ExternalId: "external-id7",
 			Namespace:  "root",
 			Email:      "me@example.com",
 		},
@@ -170,7 +189,7 @@ func TestAuth_SecretKey(t *testing.T) {
 	tok, err := tb.WithClaims(&claims).TokenCtx(testContext)
 	require.NoError(t, err)
 
-	rtClaims, err := j.Parse(testContext, tok)
+	rtClaims, err := authService.Parse(testContext, tok)
 	require.NoError(t, err)
 	require.Equal(t, claims.Actor.Id, rtClaims.Actor.Id)
 
@@ -179,7 +198,7 @@ func TestAuth_SecretKey(t *testing.T) {
 		tokRunes[9] = 'X' // Replace the 10th character (0-based index 9)
 	}
 	tok = string(tokRunes)
-	_, err = j.Parse(testContext, tok)
+	_, err = authService.Parse(testContext, tok)
 	require.Error(t, err)
 
 }
@@ -324,21 +343,24 @@ func TestAuth_Parse(t *testing.T) {
 	})
 
 	t.Run("admin", func(t *testing.T) {
+		// Set up admin key config
+		bobdoleKey := &sconfig.Key{
+			InnerVal: &sconfig.KeyPublicPrivate{
+				PublicKey: &sconfig.KeyData{
+					InnerVal: &sconfig.KeyDataFile{
+						Path: pathToTestData("admin_user_keys/bobdole.pub"),
+					},
+				},
+			},
+		}
+
 		cfg := config.FromRoot(&sconfig.Root{
 			SystemAuth: sconfig.SystemAuth{
 				AdminUsers: &sconfig.AdminUsers{
 					InnerVal: &sconfig.AdminUsersList{
 						&sconfig.AdminUser{
 							Username: "bobdole",
-							Key: &sconfig.Key{
-								InnerVal: &sconfig.KeyPublicPrivate{
-									PublicKey: &sconfig.KeyData{
-										InnerVal: &sconfig.KeyDataFile{
-											Path: pathToTestData("admin_user_keys/bobdole.pub"),
-										},
-									},
-								},
-							},
+							Key:      bobdoleKey,
 						},
 					},
 				},
@@ -365,7 +387,33 @@ func TestAuth_Parse(t *testing.T) {
 				},
 			},
 		})
-		adminSrv := NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), nil, nil, nil, test_utils.NewTestLogger())
+
+		// Set up database and encrypt service for admin tests
+		var testDb database.DB
+		var enc encrypt.E
+		cfg, testDb = database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+		cfg, enc = encrypt.NewTestEncryptService(cfg, testDb)
+
+		ctx := context.Background()
+
+		// Marshal and encrypt the admin key for storage in database
+		keyJson, err := json.Marshal(bobdoleKey)
+		require.NoError(t, err)
+		encryptedKey, err := enc.EncryptStringGlobal(ctx, string(keyJson))
+		require.NoError(t, err)
+
+		// Create the admin actor in the database
+		err = testDb.CreateActor(ctx, &database.Actor{
+			Id:           uuid.New(),
+			Namespace:    "root",
+			ExternalId:   "admin/bobdole",
+			Email:        "bobdole@example.com",
+			Admin:        true,
+			EncryptedKey: &encryptedKey,
+		})
+		require.NoError(t, err)
+
+		adminSrv := NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), testDb, nil, enc, test_utils.NewTestLogger())
 
 		t.Run("valid", func(t *testing.T) {
 			token, err := jwt2.NewJwtTokenBuilder().
@@ -724,11 +772,11 @@ func TestAuth_AdminPermissionsSync(t *testing.T) {
 		raw = a.(*service)
 	}
 
-	t.Run("admin permissions synced from config on existing actor", func(t *testing.T) {
+	t.Run("admin auth uses permissions from database", func(t *testing.T) {
 		setup(t)
 
 		adminExternalId := "admin/aid1"
-		oldPerms := database.Permissions{
+		dbPerms := database.Permissions{
 			{
 				Namespace: "root",
 				Resources: []string{"connections"},
@@ -736,7 +784,7 @@ func TestAuth_AdminPermissionsSync(t *testing.T) {
 			},
 		}
 
-		// Create admin actor in database with OLD permissions
+		// Create admin actor in database with permissions (simulating admin_sync)
 		dbActorId := uuid.New()
 		dbActor := &database.Actor{
 			Id:          dbActorId,
@@ -744,16 +792,11 @@ func TestAuth_AdminPermissionsSync(t *testing.T) {
 			ExternalId:  adminExternalId,
 			Email:       "aid1@example.com",
 			Admin:       true,
-			Permissions: oldPerms,
+			Permissions: dbPerms,
 		}
 		require.NoError(t, db.CreateActor(testContext, dbActor))
 
-		// Verify old permissions are in DB
-		retrieved, err := db.GetActorByExternalId(testContext, "root", adminExternalId)
-		require.NoError(t, err)
-		require.Equal(t, oldPerms, retrieved.Permissions)
-
-		// Create JWT for admin WITHOUT Actor field (should sync from config)
+		// Create JWT for admin WITHOUT Actor field (should use existing actor from DB)
 		claims := &jwt2.AuthProxyClaims{
 			RegisteredClaims: jwt.RegisteredClaims{
 				ID:        "random id",
@@ -764,7 +807,7 @@ func TestAuth_AdminPermissionsSync(t *testing.T) {
 				NotBefore: &jwt.NumericDate{Time: time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
 				IssuedAt:  &jwt.NumericDate{Time: apctx.GetClock(testContext).Now()},
 			},
-			Actor: nil, // No actor - should sync from config
+			Actor: nil, // No actor - should use existing actor from database
 		}
 
 		tok, err := a.Token(testContext, claims)
@@ -779,22 +822,17 @@ func TestAuth_AdminPermissionsSync(t *testing.T) {
 		require.Equal(t, adminExternalId, ra.MustGetActor().ExternalId)
 		require.True(t, ra.MustGetActor().Admin)
 
-		// Verify the returned auth has new permissions from config
-		require.Equal(t, configPerms, ra.MustGetActor().Permissions)
-
-		// Verify the database was updated with new permissions from config
-		retrieved, err = db.GetActorByExternalId(testContext, "root", adminExternalId)
-		require.NoError(t, err)
-		require.Equal(t, dbActorId, retrieved.Id, "should preserve original database ID")
-		require.Equal(t, database.Permissions(configPerms), retrieved.Permissions, "permissions should be updated from config")
+		// Verify the returned auth has permissions from database (not from config)
+		// Cast to []aschema.Permission for comparison since database.Permissions is a type alias
+		require.Equal(t, []aschema.Permission(dbPerms), ra.MustGetActor().Permissions)
 	})
 
-	t.Run("admin created with permissions from config", func(t *testing.T) {
+	t.Run("admin auth fails if not in database", func(t *testing.T) {
 		setup(t)
 
 		adminExternalId := "admin/aid1"
 
-		// Create JWT for admin WITHOUT Actor field (should create from config)
+		// Create JWT for admin that doesn't exist in database
 		claims := &jwt2.AuthProxyClaims{
 			RegisteredClaims: jwt.RegisteredClaims{
 				ID:        "random id",
@@ -805,7 +843,7 @@ func TestAuth_AdminPermissionsSync(t *testing.T) {
 				NotBefore: &jwt.NumericDate{Time: time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
 				IssuedAt:  &jwt.NumericDate{Time: apctx.GetClock(testContext).Now()},
 			},
-			Actor: nil, // No actor - should create from config
+			Actor: nil, // No actor
 		}
 
 		tok, err := a.Token(testContext, claims)
@@ -815,19 +853,8 @@ func TestAuth_AdminPermissionsSync(t *testing.T) {
 		req.Header.Add(JwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
 		w := httptest.NewRecorder()
 		ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
-		require.NoError(t, err)
-		require.True(t, ra.IsAuthenticated())
-		require.Equal(t, adminExternalId, ra.MustGetActor().ExternalId)
-		require.True(t, ra.MustGetActor().Admin)
-
-		// Verify the returned auth has permissions from config
-		require.Equal(t, configPerms, ra.MustGetActor().Permissions)
-
-		// Verify the database has the admin with correct permissions
-		retrieved, err := db.GetActorByExternalId(testContext, "root", adminExternalId)
-		require.NoError(t, err)
-		require.Equal(t, database.Permissions(configPerms), retrieved.Permissions, "permissions should match config")
-		require.True(t, retrieved.Admin)
+		require.Error(t, err) // Should fail because admin not in database
+		require.False(t, ra.IsAuthenticated())
 	})
 }
 

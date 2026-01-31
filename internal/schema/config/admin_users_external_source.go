@@ -10,8 +10,9 @@ import (
 )
 
 type AdminUsersExternalSource struct {
-	KeysPath    string               `json:"keys_path" yaml:"keys_path"`
-	Permissions []aschema.Permission `json:"permissions,omitempty" yaml:"permissions,omitempty"`
+	KeysPath         string               `json:"keys_path" yaml:"keys_path"`
+	Permissions      []aschema.Permission `json:"permissions,omitempty" yaml:"permissions,omitempty"`
+	SyncCronSchedule string               `json:"sync_cron_schedule,omitempty" yaml:"sync_cron_schedule,omitempty"`
 }
 
 func (s *AdminUsersExternalSource) All() []*AdminUser {
@@ -66,6 +67,15 @@ func (s *AdminUsersExternalSource) GetByJwtSubject(subject string) (*AdminUser, 
 
 	username := strings.TrimPrefix(subject, "admin/")
 	return s.GetByUsername(username)
+}
+
+// GetSyncCronScheduleOrDefault returns the cron schedule for admin users sync,
+// or a default of every 5 minutes if not configured.
+func (sa *AdminUsersExternalSource) GetSyncCronScheduleOrDefault() string {
+	if sa == nil || sa.SyncCronSchedule == "" {
+		return "*/5 * * * *" // Every 5 minutes
+	}
+	return sa.SyncCronSchedule
 }
 
 var _ AdminUsersType = (*AdminUsersExternalSource)(nil)

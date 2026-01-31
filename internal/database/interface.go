@@ -26,6 +26,15 @@ type IActorData interface {
 	IsSuperAdmin() bool
 	GetEmail() string
 	GetNamespace() string
+	GetLabels() map[string]string
+}
+
+// IActorDataExtended extends IActorData with additional fields for labels and encrypted key.
+// This interface is used when creating or updating actors with extended data such as
+// labels for tracking the source of admin syncs, or encrypted keys for admin authentication.
+type IActorDataExtended interface {
+	IActorData
+	GetEncryptedKey() *string
 }
 
 //go:generate mockgen -source=./interface.go -destination=./mock/db.go -package=mock

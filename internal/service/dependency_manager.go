@@ -7,6 +7,8 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apauth/sync"
+	authSync "github.com/rmorlok/authproxy/internal/apauth/sync"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
@@ -214,8 +216,62 @@ func (dm *DependencyManager) AutoMigrateCore() {
 	}
 }
 
+// AutoMigratePredefinedActors synchronizes actors from AdminUsersList configuration to the database.
+// This only runs for AdminUsersList configuration (not AdminUsersExternalSource which uses cron).
+// Uses a distributed Redis lock to ensure only one instance performs the migration.
+func (dm *DependencyManager) AutoMigratePredefinedActors() {
+	adminUsers := dm.GetConfigRoot().SystemAuth.AdminUsers
+	if adminUsers == nil {
+		return
+	}
+
+	if _, ok := adminUsers.InnerVal.(*sconfig.AdminUsersExternalSource); ok {
+		// Don't actually run the sync here, just enqueue a task to run immediately.
+		task := authSync.GetTaskTypeSyncActorsExternalSourceTask()
+		_, err := dm.GetAsyncClient().Enqueue(task)
+		if err != nil {
+			panic(errors.Wrap(err, "failed to enqueue sync actors external source task"))
+		}
+
+		return
+	}
+
+	if _, ok := adminUsers.InnerVal.(sconfig.AdminUsersList); !ok {
+		// There aren't any other value types that we migrate
+		return
+	}
+
+	func() {
+		m := apredis.NewMutex(
+			dm.GetRedisClient(),
+			"actor_sync:migrate",
+			apredis.MutexOptionLockFor(30*time.Second),
+			apredis.MutexOptionRetryFor(31*time.Second),
+			apredis.MutexOptionRetryExponentialBackoff(100*time.Millisecond, 5*time.Second),
+			apredis.MutexOptionDetailedLockMetadata(),
+		)
+		err := m.Lock(context.Background())
+		if err != nil {
+			panic(errors.Wrap(err, "failed to establish lock for admin users migration"))
+		}
+		defer m.Unlock(context.Background())
+
+		svc := sync.NewService(
+			dm.GetConfig(),
+			dm.GetDatabase(),
+			dm.GetEncryptService(),
+			dm.GetLogger(),
+		)
+
+		if err := svc.SyncActorList(context.Background()); err != nil {
+			panic(errors.Wrap(err, "failed to sync actors from config list"))
+		}
+	}()
+}
+
 func (dm *DependencyManager) AutoMigrateAll() {
 	dm.AutoMigrateDatabase()
 	dm.AutoMigrateLogRetriever()
 	dm.AutoMigrateCore()
+	dm.AutoMigratePredefinedActors()
 }

@@ -13,6 +13,7 @@ type IActorData interface {
 	IsSuperAdmin() bool
 	GetEmail() string
 	GetNamespace() string
+	GetLabels() map[string]string
 }
 
 // Actor is the information that identifies who is making a request. This can be an actor in the calling
@@ -24,6 +25,7 @@ type Actor struct {
 	Id          uuid.UUID            `json:"-"` // This is the database ID of the actor. It cannot be set in the JWT directly.
 	ExternalId  string               `json:"external_id"`
 	Namespace   string               `json:"namespace,omitempty"`
+	Labels      map[string]string    `json:"labels,omitempty"`
 	Permissions []aschema.Permission `json:"permissions"`
 	Admin       bool                 `json:"admin,omitempty"`
 	SuperAdmin  bool                 `json:"super_admin,omitempty"`
@@ -49,6 +51,8 @@ func (a *Actor) GetEmail() string {
 func (a *Actor) GetNamespace() string {
 	return a.Namespace
 }
+
+func (a *Actor) GetLabels() map[string]string { return a.Labels }
 
 // IsAdmin is a helper to wrap the Admin attribute
 func (a *Actor) IsAdmin() bool {
@@ -87,6 +91,7 @@ func CreateActor(data IActorData) *Actor {
 		Id:          data.GetId(),
 		ExternalId:  data.GetExternalId(),
 		Namespace:   data.GetNamespace(),
+		Labels:      data.GetLabels(),
 		Permissions: data.GetPermissions(),
 		Admin:       data.IsAdmin(),
 		SuperAdmin:  data.IsSuperAdmin(),

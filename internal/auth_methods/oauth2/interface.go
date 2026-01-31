@@ -14,6 +14,7 @@ import (
 type IActorData interface {
 	GetId() uuid.UUID
 	GetExternalId() string
+	GetLabels() map[string]string
 	GetPermissions() []aschema.Permission
 	IsAdmin() bool
 	IsSuperAdmin() bool

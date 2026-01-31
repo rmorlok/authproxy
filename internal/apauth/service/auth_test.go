@@ -153,11 +153,14 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 	}
 
 	if b.cfg == nil {
-		adminSigningKey := sconfig.NewKeyDataRandomBytes()
+		// Use base64-encoded key data for admin keys so they can be serialized to database
+		adminSigningKey := &sconfig.KeyData{
+			InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdGFkbWlua2V5MTIzNDU2Nzg="},
+		}
 		b.cfg = config.FromRoot(&sconfig.Root{
 			Public: sconfig.ServicePublic{
 				ServiceHttp: sconfig.ServiceHttp{
-					PortVal:    &sconfig.StringValue{&sconfig.StringValueDirect{Value: "8080"}},
+					PortVal:    &sconfig.StringValue{InnerVal: &sconfig.StringValueDirect{Value: "8080"}},
 					DomainVal:  "example.com",
 					IsHttpsVal: false,
 				},
@@ -246,6 +249,7 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 		Cfg:         b.cfg,
 		Db:          b.db,
 		R:           b.r,
+		Enc:         e,
 		CookieJar:   util.Must(cookiejar.New(nil)),
 	}
 }
@@ -257,6 +261,7 @@ type TestSetup struct {
 	Cfg         config.C
 	Db          database.DB
 	R           apredis.Client
+	Enc         encrypt.E
 	CookieJar   http.CookieJar
 	XSRFToken   string
 }
@@ -270,12 +275,24 @@ func (ts *TestSetup) MustGetValidAdminUser(ctx context.Context) database.Actor {
 	}
 
 	if errors.Is(err, database.ErrNotFound) {
+		// Get the admin key from config and encrypt it for storage
+		adminKey := ts.MustGetValidSigningTokenForAdmin()
+		keyJson, err := json.Marshal(adminKey)
+		if err != nil {
+			panic(errors.Wrap(err, "failed to marshal admin key"))
+		}
+		encryptedKey, err := ts.Enc.EncryptStringGlobal(ctx, string(keyJson))
+		if err != nil {
+			panic(errors.Wrap(err, "failed to encrypt admin key"))
+		}
+
 		a = &database.Actor{
-			Id:         uuid.New(),
-			Namespace:  "root",
-			ExternalId: "admin/bobdole",
-			Email:      "bobdole@example.com",
-			Admin:      true,
+			Id:           uuid.New(),
+			Namespace:    "root",
+			ExternalId:   "admin/bobdole",
+			Email:        "bobdole@example.com",
+			Admin:        true,
+			EncryptedKey: &encryptedKey,
 		}
 		if err := ts.Db.CreateActor(ctx, a); err != nil {
 			panic(err)
@@ -727,18 +744,17 @@ func TestAuth(t *testing.T) {
 					WithGetPingRequiredAuthRoute("/ping").
 					Build()
 
-				// Even though we don't send the actor for the admin, the system should initialize the admin user
-				// because this admin is listed as valid in the system.
+				// Admin users must be synced to the database before they can authenticate.
+				// If an admin is in config but not in the database, authentication fails.
 				s := jwt.NewJwtTokenBuilder().
 					WithServiceId(ts.Service).
 					WithActorExternalId(ts.MustGetValidUninitializedAdminUser(ctx).ExternalId).
 					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForAdmin()).
 					MustSignerCtx(ctx)
 
-				resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
-				require.Equal(t, http.StatusOK, statusCode, debugHeader)
-				require.Equal(t, gin.H{"ok": true}, resp)
-				require.Equal(t, 1, ts.GetPingCount())
+				_, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
+				require.Equal(t, http.StatusUnauthorized, statusCode, debugHeader)
+				require.Equal(t, 0, ts.GetPingCount())
 			})
 		})
 	})

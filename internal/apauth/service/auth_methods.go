@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -21,22 +22,36 @@ import (
 
 // keyForToken loads an appropriate key to sign or verify a given token. This accounts for the
 // fact that admin users will verify with different keys to sign/verify tokens.
-func (s *service) keyForToken(claims *jwt2.AuthProxyClaims) (*config.Key, error) {
-	if claims.IsAdmin() {
-		adminUsername, err := claims.AdminUsername()
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to establish admin username to sign jwt")
+// For admin users, the key is retrieved from the database where it is stored encrypted.
+func (s *service) keyForToken(ctx context.Context, claims *jwt2.AuthProxyClaims) (*config.Key, error) {
+	// Look up admin actor from database
+	actor, err := s.db.GetActorByExternalId(ctx, claims.GetNamespace(), claims.Subject)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			// Actor does not exist. Fall back to JWT signing key
+			return s.config.GetRoot().SystemAuth.JwtSigningKey, nil
 		}
+		return nil, errors.Wrap(err, "failed to get actor")
+	}
 
-		adminUser, ok := s.config.GetRoot().SystemAuth.AdminUsers.GetByUsername(adminUsername)
-		if !ok {
-			return nil, errors.Errorf("admin user '%s' not found", adminUsername)
-		}
-
-		return adminUser.Key, nil
-	} else {
+	if actor.EncryptedKey == nil {
+		// Actor is not configured with self-signing key
 		return s.config.GetRoot().SystemAuth.JwtSigningKey, nil
 	}
+
+	// Decrypt the key JSON
+	decrypted, err := s.encrypt.DecryptStringGlobal(ctx, *actor.EncryptedKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decrypt actor key")
+	}
+
+	// Unmarshal to *config.Key
+	var key config.Key
+	if err := json.Unmarshal([]byte(decrypted), &key); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal actor key")
+	}
+
+	return &key, nil
 }
 
 // Token mints a signed JWT with the specified claims. The token will be self-signed using the GlobalAESKey. The
@@ -77,7 +92,7 @@ func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProx
 				return s.config.GetRoot().SystemAuth.GlobalAESKey, true, nil
 			}
 
-			key, err := s.keyForToken(unverified)
+			key, err := s.keyForToken(ctx, unverified)
 			if err != nil {
 				return nil, false, errors.Wrap(err, "failed to get key")
 			}
@@ -264,62 +279,21 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 		var actor *database.Actor
 		if claims.Actor == nil {
 			// This implies that the subject of the claim is the external id of the actor, and the actor must already
-			// exist. If the actor does not exist, the claim is invalid. Admins are special cased so that they can
-			// be created or updated dynamically based on information in the config.
-			if claims.IsAdmin() {
-				cfgAdmin, ok := s.config.GetRoot().SystemAuth.AdminUsers.GetByJwtSubject(claims.Subject)
-				if !ok {
+			// exist in the database. If the actor does not exist, the claim is invalid.
+			actor, err = s.db.GetActorByExternalId(ctx, claims.GetNamespace(), claims.Subject)
+			if err != nil {
+				if errors.Is(err, database.ErrNotFound) {
 					return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
 						WithStatusUnauthorized().
 						WithResponseMsg("actor does not exist").
-						WithInternalErr(errors.Errorf("admin '%s' not found in config", claims.Subject)).
+						WithInternalErr(errors.Errorf("actor '%s' not found", claims.Subject)).
 						Build()
 				}
-
-				adminDomain := "local"
-				if s.config.GetRoot().SystemAuth.AdminEmailDomain != "" {
-					adminDomain = s.config.GetRoot().SystemAuth.AdminEmailDomain
-				}
-
-				email := fmt.Sprintf("%s@%s", cfgAdmin.Username, adminDomain)
-				if cfgAdmin.Email != "" {
-					email = cfgAdmin.Email
-				}
-
-				// Use UpsertActor to create or update the admin actor with current config permissions
-				adminActorData := &core.Actor{
-					ExternalId:  claims.Subject,
-					Namespace:   claims.GetNamespace(),
-					Email:       email,
-					Admin:       true,
-					Permissions: cfgAdmin.Permissions,
-				}
-
-				actor, err = s.db.UpsertActor(ctx, adminActorData)
-				if err != nil {
-					return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
-						WithStatusInternalServerError().
-						WithResponseMsg("database error").
-						WithInternalErr(errors.Wrap(err, "failed to upsert admin actor")).
-						Build()
-				}
-			} else {
-				// Non-admin actor must already exist in the database
-				actor, err = s.db.GetActorByExternalId(ctx, claims.GetNamespace(), claims.Subject)
-				if err != nil {
-					if errors.Is(err, database.ErrNotFound) {
-						return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
-							WithStatusUnauthorized().
-							WithResponseMsg("actor does not exist").
-							WithInternalErr(errors.Errorf("actor '%s' not found", claims.Subject)).
-							Build()
-					}
-					return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
-						WithStatusInternalServerError().
-						WithResponseMsg("database error").
-						WithInternalErr(errors.Wrap(err, "failed to get actor")).
-						Build()
-				}
+				return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+					WithStatusInternalServerError().
+					WithResponseMsg("database error").
+					WithInternalErr(errors.Wrap(err, "failed to get actor")).
+					Build()
 			}
 		} else {
 			// The actor was specified in the JWT. This means that we can upsert an actor, either creating it or making

@@ -271,25 +271,6 @@ func TestAuth_Gin(t *testing.T) {
 			require.Equal(t, c.Actor.ExternalId, w.Body.String())
 		})
 
-		t.Run("not valid admin", func(t *testing.T) {
-			ts := setup(t, authFunc)
-			c := testAdminClaims()
-			c.Actor.ExternalId = "admin/unknown"
-			c.RegisteredClaims.Subject = "admin/unknown"
-
-			tok, err := jwt2.NewJwtTokenBuilder().
-				WithClaims(c).
-				WithPrivateKeyPath(pathToTestData("system_keys/system")).
-				TokenCtx(testContext)
-			require.NoError(t, err)
-
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil).WithContext(ctx)
-			SetJwtRequestHeader(req, tok)
-			ts.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusUnauthorized, w.Code)
-		})
-
 		t.Run("not admin", func(t *testing.T) {
 			ts := setup(t, authFunc)
 			c := testClaims()
@@ -341,7 +322,9 @@ func TestAuth_Gin(t *testing.T) {
 			req := httptest.NewRequest("GET", "/", nil).WithContext(ctx)
 			SetJwtRequestHeader(req, tok)
 			ts.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusOK, w.Code) // admin will be created from just jwt with no actor if valid
+			// Admin must be synced to database via admin_sync before authentication can succeed
+			// Without the actor in the token and without the admin in the database, auth fails
+			require.Equal(t, http.StatusUnauthorized, w.Code)
 		})
 
 		t.Run("invalid admin", func(t *testing.T) {

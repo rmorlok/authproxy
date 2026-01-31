@@ -83,17 +83,18 @@ const ActorTable = "actors"
 
 // Actor is some entity taking action within the system.
 type Actor struct {
-	Id          uuid.UUID
-	Namespace   string
-	ExternalId  string
-	Email       string
-	Permissions Permissions
-	Labels      Labels
-	Admin       bool
-	SuperAdmin  bool
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
-	DeletedAt   *time.Time
+	Id           uuid.UUID
+	Namespace    string
+	ExternalId   string
+	Email        string
+	Permissions  Permissions
+	Labels       Labels
+	EncryptedKey *string
+	Admin        bool
+	SuperAdmin   bool
+	CreatedAt    time.Time
+	UpdatedAt    time.Time
+	DeletedAt    *time.Time
 }
 
 func (a *Actor) GetExternalId() string {
@@ -116,6 +117,7 @@ func (a *Actor) cols() []string {
 		"email",
 		"permissions",
 		"labels",
+		"encrypted_key",
 		"admin",
 		"super_admin",
 		"created_at",
@@ -132,6 +134,7 @@ func (a *Actor) fields() []any {
 		&a.Email,
 		&a.Permissions,
 		&a.Labels,
+		&a.EncryptedKey,
 		&a.Admin,
 		&a.SuperAdmin,
 		&a.CreatedAt,
@@ -148,6 +151,7 @@ func (a *Actor) values() []any {
 		a.Email,
 		a.Permissions,
 		a.Labels,
+		a.EncryptedKey,
 		a.Admin,
 		a.SuperAdmin,
 		a.CreatedAt,
@@ -163,15 +167,51 @@ func (a *Actor) setFromData(d IActorData) {
 	a.Permissions = d.GetPermissions()
 	a.Admin = d.IsAdmin()
 	a.SuperAdmin = d.IsSuperAdmin()
+	a.Labels = d.GetLabels()
+
+	// Handle extended fields via type assertion
+	if extended, ok := d.(IActorDataExtended); ok {
+		a.EncryptedKey = extended.GetEncryptedKey()
+	}
 }
 
 func (a *Actor) sameAsData(d IActorData) bool {
-	return a.GetNamespace() == d.GetNamespace() &&
+	// Compare labels
+	dLabels := d.GetLabels()
+
+	if len(a.Labels) != len(dLabels) {
+		return false
+	}
+	for k, v := range a.Labels {
+		if dv, ok := dLabels[k]; !ok || dv != v {
+			return false
+		}
+	}
+
+	basicMatch := a.GetNamespace() == d.GetNamespace() &&
 		a.ExternalId == d.GetExternalId() &&
 		a.Email == d.GetEmail() &&
 		slices.EqualFunc(a.Permissions, d.GetPermissions(), func(p1, p2 aschema.Permission) bool { return p1.Equal(p2) }) &&
 		a.Admin == d.IsAdmin() &&
 		a.SuperAdmin == d.IsSuperAdmin()
+
+	if !basicMatch {
+		return false
+	}
+
+	// Handle extended fields via type assertion
+	if extended, ok := d.(IActorDataExtended); ok {
+		// Compare encrypted key
+		dEncryptedKey := extended.GetEncryptedKey()
+		if (a.EncryptedKey == nil) != (dEncryptedKey == nil) {
+			return false
+		}
+		if a.EncryptedKey != nil && dEncryptedKey != nil && *a.EncryptedKey != *dEncryptedKey {
+			return false
+		}
+	}
+
+	return true
 }
 
 func (a *Actor) GetId() uuid.UUID {
@@ -180,6 +220,14 @@ func (a *Actor) GetId() uuid.UUID {
 
 func (a *Actor) GetNamespace() string {
 	return a.Namespace
+}
+
+func (a *Actor) GetLabels() map[string]string {
+	return a.Labels
+}
+
+func (a *Actor) GetEncryptedKey() *string {
+	return a.EncryptedKey
 }
 
 // IsAdmin is a helper to wrap the Admin attribute
@@ -260,6 +308,7 @@ func (a *Actor) validate() error {
 }
 
 var _ IActorData = (*Actor)(nil)
+var _ IActorDataExtended = (*Actor)(nil)
 
 func (s *service) GetActor(ctx context.Context, id uuid.UUID) (*Actor, error) {
 	var result Actor
@@ -554,6 +603,8 @@ type ListActorsBuilder interface {
 	ForIsSuperAdmin(isSuperAdmin bool) ListActorsBuilder
 	ForNamespaceMatcher(matcher string) ListActorsBuilder
 	ForNamespaceMatchers(matchers []string) ListActorsBuilder
+	ForLabelExists(key string) ListActorsBuilder
+	ForLabelEquals(key, value string) ListActorsBuilder
 	Limit(int32) ListActorsBuilder
 	OrderBy(ActorOrderByField, pagination.OrderBy) ListActorsBuilder
 	IncludeDeleted() ListActorsBuilder
@@ -571,6 +622,9 @@ type listActorsFilters struct {
 	IsAdminVal        *bool               `json:"is_admin,omitempty"`
 	IsSuperAdminVal   *bool               `json:"is_super_admin,omitempty"`
 	NamespaceMatchers []string            `json:"namespace_matchers,omitempty"`
+	LabelExistsKey    *string             `json:"label_exists_key,omitempty"`
+	LabelEqualsKey    *string             `json:"label_equals_key,omitempty"`
+	LabelEqualsValue  *string             `json:"label_equals_value,omitempty"`
 	Errors            *multierror.Error   `json:"-"`
 }
 
@@ -635,6 +689,26 @@ func (l *listActorsFilters) ForNamespaceMatchers(matchers []string) ListActorsBu
 	return l
 }
 
+func (l *listActorsFilters) ForLabelExists(key string) ListActorsBuilder {
+	if err := ValidateLabelKey(key); err != nil {
+		return l.addError(err)
+	}
+	l.LabelExistsKey = &key
+	return l
+}
+
+func (l *listActorsFilters) ForLabelEquals(key, value string) ListActorsBuilder {
+	if err := ValidateLabelKey(key); err != nil {
+		return l.addError(err)
+	}
+	if err := ValidateLabelValue(value); err != nil {
+		return l.addError(err)
+	}
+	l.LabelEqualsKey = &key
+	l.LabelEqualsValue = &value
+	return l
+}
+
 func (l *listActorsFilters) FromCursor(ctx context.Context, cursor string) (ListActorsExecutor, error) {
 	s := l.s
 	parsed, err := pagination.ParseCursor[listActorsFilters](ctx, s.secretKey, cursor)
@@ -667,6 +741,21 @@ func (l *listActorsFilters) applyRestrictions(ctx context.Context) sq.SelectBuil
 
 	if len(l.NamespaceMatchers) > 0 {
 		q = restrictToNamespaceMatchers(q, "namespace", l.NamespaceMatchers)
+	}
+
+	// Filter by label existence (key exists in labels JSON)
+	if l.LabelExistsKey != nil {
+		// Use json_extract to check if the key exists in the labels JSON
+		// Use bracket notation for keys with special characters like slashes and dots
+		jsonPath := fmt.Sprintf("$.\"%s\"", *l.LabelExistsKey)
+		q = q.Where(sq.Expr("json_extract(labels, ?) IS NOT NULL", jsonPath))
+	}
+
+	// Filter by label key-value equality
+	if l.LabelEqualsKey != nil && l.LabelEqualsValue != nil {
+		// Use bracket notation for keys with special characters like slashes and dots
+		jsonPath := fmt.Sprintf("$.\"%s\"", *l.LabelEqualsKey)
+		q = q.Where(sq.Expr("json_extract(labels, ?) = ?", jsonPath, *l.LabelEqualsValue))
 	}
 
 	if l.OrderByFieldVal != nil {

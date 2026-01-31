@@ -1,16 +1,17 @@
 create table actors
 (
-    id          text primary key,
-    namespace   text,
-    labels      text,
-    external_id text,
-    email       text,
-    admin       numeric,
-    super_admin numeric,
-    permissions text,
-    created_at  datetime,
-    updated_at  datetime,
-    deleted_at  datetime
+    id            text primary key,
+    namespace     text,
+    labels        text,
+    external_id   text,
+    encrypted_key text,
+    email         text,
+    admin         numeric,
+    super_admin   numeric,
+    permissions   text,
+    created_at    datetime,
+    updated_at    datetime,
+    deleted_at    datetime
 );
 
 create index idx_actors_deleted_at
