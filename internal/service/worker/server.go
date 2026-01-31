@@ -11,7 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
-	authSync "github.com/rmorlok/authproxy/internal/apauth/sync"
+	authSync "github.com/rmorlok/authproxy/internal/apauth/tasks"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"

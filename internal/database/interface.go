@@ -125,4 +125,5 @@ type DB interface {
 
 	HasNonceBeenUsed(ctx context.Context, nonce uuid.UUID) (hasBeenUsed bool, err error)
 	CheckNonceValidAndMarkUsed(ctx context.Context, nonce uuid.UUID, retainRecordUntil time.Time) (wasValid bool, err error)
+	DeleteExpiredNonces(ctx context.Context) (err error)
 }

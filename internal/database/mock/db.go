@@ -258,6 +258,20 @@ func (mr *MockDBMockRecorder) DeleteConnection(ctx, id interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteConnection", reflect.TypeOf((*MockDB)(nil).DeleteConnection), ctx, id)
 }
 
+// DeleteExpiredNonces mocks base method.
+func (m *MockDB) DeleteExpiredNonces(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteExpiredNonces", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteExpiredNonces indicates an expected call of DeleteExpiredNonces.
+func (mr *MockDBMockRecorder) DeleteExpiredNonces(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteExpiredNonces", reflect.TypeOf((*MockDB)(nil).DeleteExpiredNonces), ctx)
+}
+
 // DeleteNamespace mocks base method.
 func (m *MockDB) DeleteNamespace(ctx context.Context, path string) error {
 	m.ctrl.T.Helper()
