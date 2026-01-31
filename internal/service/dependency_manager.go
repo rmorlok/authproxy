@@ -7,8 +7,8 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/internal/apauth/sync"
-	authSync "github.com/rmorlok/authproxy/internal/apauth/sync"
+	"github.com/rmorlok/authproxy/internal/apauth/tasks"
+	authSync "github.com/rmorlok/authproxy/internal/apauth/tasks"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
@@ -227,7 +227,7 @@ func (dm *DependencyManager) AutoMigratePredefinedActors() {
 
 	if _, ok := adminUsers.InnerVal.(*sconfig.AdminUsersExternalSource); ok {
 		// Don't actually run the sync here, just enqueue a task to run immediately.
-		task := authSync.GetTaskTypeSyncActorsExternalSourceTask()
+		task := authSync.NewSyncActorsExternalSourceTask()
 		_, err := dm.GetAsyncClient().Enqueue(task)
 		if err != nil {
 			panic(errors.Wrap(err, "failed to enqueue sync actors external source task"))
@@ -256,7 +256,7 @@ func (dm *DependencyManager) AutoMigratePredefinedActors() {
 		}
 		defer m.Unlock(context.Background())
 
-		svc := sync.NewService(
+		svc := tasks.NewService(
 			dm.GetConfig(),
 			dm.GetDatabase(),
 			dm.GetEncryptService(),

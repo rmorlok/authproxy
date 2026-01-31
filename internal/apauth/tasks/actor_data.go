@@ -1,4 +1,4 @@
-package sync
+package tasks
 
 import (
 	"github.com/google/uuid"
