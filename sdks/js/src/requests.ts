@@ -81,6 +81,7 @@ export interface ListRequestsParams {
 
     namespace?: string;
     request_type?: RequestType;
+    label_selector?: string;
     correlation_id?: string;
     connection_id?: string;
     connector_type?: string;

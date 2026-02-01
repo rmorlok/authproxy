@@ -28,7 +28,7 @@ type ConnectorJson struct {
 	Highlight   string                         `json:"highlight,omitempty"`
 	Description string                         `json:"description"`
 	Logo        string                         `json:"logo"`
-	Labels      map[string]string              `json:"labels"`
+	Labels      map[string]string              `json:"labels,omitempty"`
 	CreatedAt   time.Time                      `json:"created_at"`
 	UpdatedAt   time.Time                      `json:"updated_at"`
 
@@ -87,7 +87,7 @@ type ConnectorVersionJson struct {
 	State      database.ConnectorVersionState `json:"state"`
 	Type       string                         `json:"type"`
 	Definition cschema.Connector              `json:"definition"`
-	Labels     map[string]string              `json:"labels"`
+	Labels     map[string]string              `json:"labels,omitempty"`
 	CreatedAt  time.Time                      `json:"created_at"`
 	UpdatedAt  time.Time                      `json:"updated_at"`
 }

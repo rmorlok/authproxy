@@ -16,6 +16,7 @@ export interface Connection {
     namespace: string;
     connector: Connector;
     state: ConnectionState;
+    labels?: Record<string, string>;
     created_at: string;
     updated_at: string;
 }
@@ -31,6 +32,7 @@ export function canBeDisconnected(connection: Connection): boolean {
 export interface InitiateConnectionRequest {
     connector_id: string;
     return_to_url: string;
+    labels?: Record<string, string>;
 }
 
 export enum InitiateConnectionResponseType {
@@ -65,6 +67,7 @@ export interface ForceConnectionStateResponse extends Connection {
 export interface ListConnectionsParams {
     state?: ConnectionState;
     namespace?: string;
+    label_selector?: string;
     cursor?: string;
     limit?: number;
     order_by?: string;
@@ -87,10 +90,15 @@ export const getConnection = (id: string) => {
 /**
  * Initiate a new connection
  */
-export const initiateConnection = (connectorId: string, returnToUrl: string) => {
+export const initiateConnection = (
+    connectorId: string,
+    returnToUrl: string,
+    labels?: Record<string, string>
+) => {
     const request: InitiateConnectionRequest = {
         connector_id: connectorId,
         return_to_url: returnToUrl,
+        labels,
     };
 
     return client.post<InitiateConnectionRedirectResponse>(

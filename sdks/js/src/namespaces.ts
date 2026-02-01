@@ -16,8 +16,14 @@ export enum NamespaceState {
 export interface Namespace {
   path: string;
   state: NamespaceState;
+  labels?: Record<string, string>;
   created_at: string;
   updated_at: string;
+}
+
+export interface CreateNamespaceRequest {
+    path: string;
+    labels?: Record<string, string>;
 }
 
 /**
@@ -25,6 +31,8 @@ export interface Namespace {
  */
 export interface ListNamespaceParams {
   state?: NamespaceState;
+  namespace?: string;
+  label_selector?: string;
   cursor?: string;
   limit?: number;
   order_by?: string;
@@ -56,13 +64,22 @@ export const listNamespaces = (params: ListNamespaceParams) => {
 };
 
 /**
+ * Create a new namespace
+ * @param request The namespace to create
+ */
+export const createNamespace = (request: CreateNamespaceRequest) => {
+    return client.post<Namespace>('/api/v1/namespaces', request);
+};
+
+/**
  * Get a specific namespace by path
  */
 export const getNamespaceByPath = (path: string) => {
-  return client.get<Namespace>(`/api/v1/namespaces/${path}`);
+  return client.get<Namespace>(`/api/v1/namespaces/path/${path}`);
 };
 
 export const namespaces = {
   list: listNamespaces,
+  create: createNamespace,
   getByPath: getNamespaceByPath,
 };
