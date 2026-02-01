@@ -26,6 +26,8 @@ go.work
 .idea
 .DS_Store
 
+.output.txt
+
 tmp
 
 .junie

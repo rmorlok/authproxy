@@ -144,7 +144,7 @@ func TestEnsureNamespaceAncestorPath(t *testing.T) {
 			tc.setupMocks()
 			defer ctrl.Finish()
 
-			ns, err := svc.EnsureNamespaceAncestorPath(ctx, tc.targetNS)
+			ns, err := svc.EnsureNamespaceAncestorPath(ctx, tc.targetNS, nil)
 
 			if tc.expectedError != nil {
 				assert.EqualError(t, err, tc.expectedError.Error())

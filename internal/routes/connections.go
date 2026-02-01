@@ -65,6 +65,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 type ConnectionJson struct {
 	Id        uuid.UUID                `json:"id"`
 	Namespace string                   `json:"namespace"`
+	Labels    map[string]string        `json:"labels"`
 	State     database.ConnectionState `json:"state"`
 	Connector ConnectorJson            `json:"connector"`
 	CreatedAt time.Time                `json:"created_at"`
@@ -77,6 +78,7 @@ func ConnectionToJson(conn coreIface.Connection) ConnectionJson {
 	return ConnectionJson{
 		Id:        conn.GetId(),
 		Namespace: conn.GetNamespace(),
+		Labels:    conn.GetLabels(),
 		State:     conn.GetState(),
 		Connector: connector,
 		CreatedAt: conn.GetCreatedAt(),
@@ -85,11 +87,12 @@ func ConnectionToJson(conn coreIface.Connection) ConnectionJson {
 }
 
 type ListConnectionRequestQuery struct {
-	Cursor       *string                   `form:"cursor"`
-	LimitVal     *int32                    `form:"limit"`
-	StateVal     *database.ConnectionState `form:"state"`
-	NamespaceVal *string                   `form:"namespace"`
-	OrderByVal   *string                   `form:"order_by"`
+	Cursor        *string                   `form:"cursor"`
+	LimitVal      *int32                    `form:"limit"`
+	StateVal      *database.ConnectionState `form:"state"`
+	NamespaceVal  *string                   `form:"namespace"`
+	LabelSelector *string                   `form:"label_selector"`
+	OrderByVal    *string                   `form:"order_by"`
 }
 
 type ListConnectionResponseJson struct {
@@ -140,6 +143,10 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 		}
 
 		b = b.ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
+
+		if req.LabelSelector != nil {
+			b = b.ForLabelSelector(*req.LabelSelector)
+		}
 
 		if req.OrderByVal != nil {
 			field, order, err := pagination.SplitOrderByParam[database.ConnectionOrderByField](*req.OrderByVal)

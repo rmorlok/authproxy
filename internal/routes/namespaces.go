@@ -20,30 +20,34 @@ import (
 type NamespaceJson struct {
 	Path      string                  `json:"path"`
 	State     database.NamespaceState `json:"state"`
+	Labels    map[string]string       `json:"labels"`
 	CreatedAt time.Time               `json:"created_at"`
 	UpdatedAt time.Time               `json:"updated_at"`
 }
 
 type CreateNamespaceRequestJson struct {
-	Path string `json:"path"`
+	Path   string            `json:"path"`
+	Labels map[string]string `json:"labels"`
 }
 
 func NamespaceToJson(ns coreIface.Namespace) NamespaceJson {
 	return NamespaceJson{
 		Path:      ns.GetPath(),
 		State:     ns.GetState(),
+		Labels:    ns.GetLabels(),
 		CreatedAt: ns.GetCreatedAt(),
 		UpdatedAt: ns.GetUpdatedAt(),
 	}
 }
 
 type ListNamespacesRequestQueryParams struct {
-	Cursor       *string                  `form:"cursor"`
-	LimitVal     *int32                   `form:"limit"`
-	StateVal     *database.NamespaceState `form:"state"`
-	ChildrenOf   *string                  `form:"children_of"`
-	NamespaceVal *string                  `form:"namespace"`
-	OrderByVal   *string                  `form:"order_by"`
+	Cursor        *string                  `form:"cursor"`
+	LimitVal      *int32                   `form:"limit"`
+	StateVal      *database.NamespaceState `form:"state"`
+	ChildrenOf    *string                  `form:"children_of"`
+	NamespaceVal  *string                  `form:"namespace"`
+	LabelSelector *string                  `form:"label_selector"`
+	OrderByVal    *string                  `form:"order_by"`
 }
 
 type ListNamespacesResponseJson struct {
@@ -161,7 +165,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 		return
 	}
 
-	ns, err = r.core.CreateNamespace(ctx, req.Path)
+	ns, err = r.core.CreateNamespace(ctx, req.Path, req.Labels)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			DefaultStatusInternalServerError().
@@ -222,6 +226,10 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 		}
 
 		b = b.ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
+
+		if req.LabelSelector != nil {
+			b = b.ForLabelSelector(*req.LabelSelector)
+		}
 
 		if req.OrderByVal != nil {
 			field, order, err := pagination.SplitOrderByParam[database.NamespaceOrderByField](*req.OrderByVal)

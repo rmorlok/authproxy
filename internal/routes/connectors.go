@@ -28,6 +28,7 @@ type ConnectorJson struct {
 	Highlight   string                         `json:"highlight,omitempty"`
 	Description string                         `json:"description"`
 	Logo        string                         `json:"logo"`
+	Labels      map[string]string              `json:"labels"`
 	CreatedAt   time.Time                      `json:"created_at"`
 	UpdatedAt   time.Time                      `json:"updated_at"`
 
@@ -59,18 +60,20 @@ func ConnectorVersionToConnectorJson(cv connIface.ConnectorVersion) ConnectorJso
 		DisplayName: def.DisplayName,
 		Description: def.Description,
 		Logo:        logo,
+		Labels:      cv.GetLabels(),
 		CreatedAt:   cv.GetCreatedAt(),
 		UpdatedAt:   cv.GetUpdatedAt(),
 	}
 }
 
 type ListConnectorsRequestQueryParams struct {
-	Cursor       *string                         `form:"cursor"`
-	LimitVal     *int32                          `form:"limit"`
-	StateVal     *database.ConnectorVersionState `form:"state"`
-	NamespaceVal *string                         `form:"namespace"`
-	TypeVal      *string                         `form:"type"`
-	OrderByVal   *string                         `form:"order_by"`
+	Cursor        *string                         `form:"cursor"`
+	LimitVal      *int32                          `form:"limit"`
+	StateVal      *database.ConnectorVersionState `form:"state"`
+	NamespaceVal  *string                         `form:"namespace"`
+	TypeVal       *string                         `form:"type"`
+	LabelSelector *string                         `form:"label_selector"`
+	OrderByVal    *string                         `form:"order_by"`
 }
 
 type ListConnectorsResponseJson struct {
@@ -84,6 +87,7 @@ type ConnectorVersionJson struct {
 	State      database.ConnectorVersionState `json:"state"`
 	Type       string                         `json:"type"`
 	Definition cschema.Connector              `json:"definition"`
+	Labels     map[string]string              `json:"labels"`
 	CreatedAt  time.Time                      `json:"created_at"`
 	UpdatedAt  time.Time                      `json:"updated_at"`
 }
@@ -97,17 +101,19 @@ func ConnectorVersionToJson(cv connIface.ConnectorVersion) ConnectorVersionJson 
 		State:      cv.GetState(),
 		Type:       cv.GetType(),
 		Definition: *def,
+		Labels:     cv.GetLabels(),
 		CreatedAt:  cv.GetCreatedAt(),
 		UpdatedAt:  cv.GetUpdatedAt(),
 	}
 }
 
 type ListConnectorVersionsRequestQueryParams struct {
-	Cursor       *string                         `form:"cursor"`
-	LimitVal     *int32                          `form:"limit"`
-	StateVal     *database.ConnectorVersionState `form:"state"`
-	NamespaceVal *string                         `form:"namespace"`
-	OrderByVal   *string                         `form:"order_by"`
+	Cursor        *string                         `form:"cursor"`
+	LimitVal      *int32                          `form:"limit"`
+	StateVal      *database.ConnectorVersionState `form:"state"`
+	NamespaceVal  *string                         `form:"namespace"`
+	LabelSelector *string                         `form:"label_selector"`
+	OrderByVal    *string                         `form:"order_by"`
 }
 
 type ListConnectorVersionsResponseJson struct {
@@ -240,6 +246,10 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 		}
 
 		b = b.ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
+
+		if req.LabelSelector != nil {
+			b = b.ForLabelSelector(*req.LabelSelector)
+		}
 
 		if req.OrderByVal != nil {
 			field, order, err := pagination.SplitOrderByParam[database.ConnectorOrderByField](*req.OrderByVal)
@@ -479,6 +489,10 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 		} else if req.NamespaceVal != nil {
 			// Admin users with a query filter
 			b = b.ForNamespaceMatcher(*req.NamespaceVal)
+		}
+
+		if req.LabelSelector != nil {
+			b = b.ForLabelSelector(*req.LabelSelector)
 		}
 
 		if req.OrderByVal != nil {

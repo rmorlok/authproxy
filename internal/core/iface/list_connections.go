@@ -22,4 +22,5 @@ type ListConnectionsBuilder interface {
 	OrderBy(database.ConnectionOrderByField, pagination.OrderBy) ListConnectionsBuilder
 	IncludeDeleted() ListConnectionsBuilder
 	WithDeletedHandling(database.DeletedHandling) ListConnectionsBuilder
+	ForLabelSelector(selector string) ListConnectionsBuilder
 }

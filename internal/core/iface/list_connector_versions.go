@@ -29,4 +29,5 @@ type ListConnectorVersionsBuilder interface {
 	ForNamespaceMatchers([]string) ListConnectorVersionsBuilder
 	OrderBy(database.ConnectorVersionOrderByField, pagination.OrderBy) ListConnectorVersionsBuilder
 	IncludeDeleted() ListConnectorVersionsBuilder
+	ForLabelSelector(selector string) ListConnectorVersionsBuilder
 }

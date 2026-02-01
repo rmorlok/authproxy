@@ -23,6 +23,7 @@ type Connection interface {
 	GetCreatedAt() time.Time
 	GetUpdatedAt() time.Time
 	GetDeletedAt() *time.Time
+	GetLabels() map[string]string
 
 	/*
 	 * Nested entities

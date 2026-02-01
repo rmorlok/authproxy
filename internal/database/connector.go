@@ -66,6 +66,7 @@ type ListConnectorsBuilder interface {
 	ForStates([]ConnectorVersionState) ListConnectorsBuilder
 	OrderBy(ConnectorOrderByField, pagination.OrderBy) ListConnectorsBuilder
 	IncludeDeleted() ListConnectorsBuilder
+	ForLabelSelector(selector string) ListConnectorsBuilder
 }
 
 type listConnectorsFilters struct {
@@ -79,6 +80,7 @@ type listConnectorsFilters struct {
 	OrderByFieldVal   *ConnectorOrderByField  `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy     `json:"order_by"`
 	IncludeDeletedVal bool                    `json:"include_deleted,omitempty"`
+	LabelSelectorVal  *string                 `json:"label_selector,omitempty"`
 	Errors            *multierror.Error       `json:"-"`
 }
 
@@ -145,6 +147,11 @@ func (l *listConnectorsFilters) IncludeDeleted() ListConnectorsBuilder {
 	return l
 }
 
+func (l *listConnectorsFilters) ForLabelSelector(selector string) ListConnectorsBuilder {
+	l.LabelSelectorVal = &selector
+	return l
+}
+
 func (l *listConnectorsFilters) FromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error) {
 	s := l.s
 	parsed, err := pagination.ParseCursor[listConnectorsFilters](ctx, s.secretKey, cursor)
@@ -199,6 +206,7 @@ func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageRe
 	q := l.s.sq.Select(`
 rr.id as id,
 rr.namespace as namespace,
+rr.labels as labels,
 rr.version as version,
 rr.state as state,
 rr.type as type,
@@ -231,6 +239,15 @@ cvc.versions as total_versions
 		q = restrictToNamespaceMatchers(q, "rr.namespace", l.NamespaceMatchers)
 	}
 
+	if l.LabelSelectorVal != nil {
+		selector, err := ParseLabelSelector(*l.LabelSelectorVal)
+		if err != nil {
+			return pagination.PageResult[Connector]{Error: err}
+		}
+
+		q = selector.ApplyToSqlBuilder(q, "rr.labels")
+	}
+
 	if !l.IncludeDeletedVal {
 		q = q.Where(sq.Eq{"rr.deleted_at": nil})
 	}
@@ -256,6 +273,7 @@ cvc.versions as total_versions
 		err := rows.Scan(
 			&c.Id,
 			&c.Namespace,
+			&c.Labels,
 			&c.Version,
 			&c.State,
 			&c.Type,

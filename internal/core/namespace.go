@@ -47,6 +47,10 @@ func (ns *Namespace) GetUpdatedAt() time.Time {
 	return ns.UpdatedAt
 }
 
+func (ns *Namespace) GetLabels() map[string]string {
+	return ns.Labels
+}
+
 func (ns *Namespace) Logger() *slog.Logger {
 	return ns.logger
 }

@@ -413,6 +413,7 @@ type ListNamespacesBuilder interface {
 	ForState(NamespaceState) ListNamespacesBuilder
 	OrderBy(NamespaceOrderByField, pagination.OrderBy) ListNamespacesBuilder
 	IncludeDeleted() ListNamespacesBuilder
+	ForLabelSelector(selector string) ListNamespacesBuilder
 }
 
 type listNamespacesFilters struct {
@@ -426,6 +427,7 @@ type listNamespacesFilters struct {
 	OrderByFieldVal   *NamespaceOrderByField `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy    `json:"order_by"`
 	IncludeDeletedVal bool                   `json:"include_deleted,omitempty"`
+	LabelSelectorVal  *string                `json:"label_selector,omitempty"`
 	Errors            *multierror.Error      `json:"-"`
 }
 
@@ -496,6 +498,11 @@ func (l *listNamespacesFilters) IncludeDeleted() ListNamespacesBuilder {
 	return l
 }
 
+func (l *listNamespacesFilters) ForLabelSelector(selector string) ListNamespacesBuilder {
+	l.LabelSelectorVal = &selector
+	return l
+}
+
 func (l *listNamespacesFilters) FromCursor(ctx context.Context, cursor string) (ListNamespacesExecutor, error) {
 	s := l.s
 	parsed, err := pagination.ParseCursor[listNamespacesFilters](ctx, s.secretKey, cursor)
@@ -514,6 +521,15 @@ func (l *listNamespacesFilters) applyRestrictions(ctx context.Context) sq.Select
 	q := l.s.sq.
 		Select(util.ToPtr(Namespace{}).cols()...).
 		From(NamespacesTable)
+
+	if l.LabelSelectorVal != nil {
+		selector, err := ParseLabelSelector(*l.LabelSelectorVal)
+		if err != nil {
+			l.addError(err)
+		} else {
+			q = selector.ApplyToSqlBuilder(q, "labels")
+		}
+	}
 
 	if l.LimitVal <= 0 {
 		l.LimitVal = 100

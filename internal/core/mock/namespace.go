@@ -3,9 +3,41 @@ package mock
 import (
 	"fmt"
 
+	"time"
+
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 )
+
+type Namespace struct {
+	Path      string
+	State     database.NamespaceState
+	CreatedAt time.Time
+	UpdatedAt time.Time
+	Labels    map[string]string
+}
+
+func (m *Namespace) GetPath() string {
+	return m.Path
+}
+
+func (m *Namespace) GetState() database.NamespaceState {
+	return m.State
+}
+
+func (m *Namespace) GetCreatedAt() time.Time {
+	return m.CreatedAt
+}
+
+func (m *Namespace) GetUpdatedAt() time.Time {
+	return m.UpdatedAt
+}
+
+func (m *Namespace) GetLabels() map[string]string {
+	return m.Labels
+}
+
+var _ iface.Namespace = (*Namespace)(nil)
 
 type NamespaceMatcher struct {
 	ExpectedPath  string

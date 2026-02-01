@@ -83,8 +83,9 @@ func (s *service) MigrateNamespaces(ctx context.Context) error {
 	for _, nsPath := range toCreatePaths {
 		s.logger.Info("migrating namespace", "namespace", nsPath)
 		err := s.db.CreateNamespace(context.Background(), &database.Namespace{
-			Path:  nsPath,
-			State: database.NamespaceStateActive,
+			Path:   nsPath,
+			State:  database.NamespaceStateActive,
+			Labels: make(database.Labels),
 		})
 		if err != nil {
 			return errors.Wrapf(err, "failed to create namespace %s", nsPath)
@@ -136,6 +137,8 @@ func (s *service) configConnectorToVersion(configConnector *config.Connector) (*
 	return &database.ConnectorVersion{
 		Id:                  configConnector.Id,
 		Version:             configConnector.Version,
+		Namespace:           configConnector.GetNamespace(),
+		Labels:              configConnector.Labels,
 		Type:                configConnector.Type,
 		Hash:                configConnector.Hash(),
 		State:               database.ConnectorVersionStateDraft,

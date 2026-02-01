@@ -187,6 +187,32 @@ func TestActorsRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusBadRequest, w.Code)
 		})
+
+		t.Run("with label_selector", func(t *testing.T) {
+			createActor(t, tu.Db, "user/l1", "root", "l1@example.com", false, false)
+			// Need to update the actor because createActor helper doesn't support labels
+			_, err := tu.Db.UpsertActor(context.Background(), &database.Actor{
+				ExternalId: "user/l1",
+				Namespace:  "root",
+				Email:      "l1@example.com",
+				Labels:     database.Labels{"app": "test-app"},
+			})
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors?label_selector=app%3Dtest-app", nil)
+			require.NoError(t, err)
+			req = adminize(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ListActorsResponseJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Len(t, resp.Items, 1)
+			require.Equal(t, "user/l1", resp.Items[0].ExternalId)
+			require.Equal(t, "test-app", resp.Items[0].Labels["app"])
+		})
 	})
 
 	t.Run("get by id", func(t *testing.T) {
