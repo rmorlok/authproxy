@@ -16,6 +16,7 @@ export interface Connection {
     namespace: string;
     connector: Connector;
     state: ConnectionState;
+    labels: Record<string, string>;
     created_at: string;
     updated_at: string;
 }
@@ -65,6 +66,7 @@ export interface ForceConnectionStateResponse extends Connection {
 export interface ListConnectionsParams {
     state?: ConnectionState;
     namespace?: string;
+    label_selector?: string;
     cursor?: string;
     limit?: number;
     order_by?: string;

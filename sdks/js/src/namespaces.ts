@@ -16,6 +16,7 @@ export enum NamespaceState {
 export interface Namespace {
   path: string;
   state: NamespaceState;
+  labels: Record<string, string>;
   created_at: string;
   updated_at: string;
 }
@@ -25,6 +26,8 @@ export interface Namespace {
  */
 export interface ListNamespaceParams {
   state?: NamespaceState;
+  namespace?: string;
+  label_selector?: string;
   cursor?: string;
   limit?: number;
   order_by?: string;
