@@ -36,7 +36,7 @@ type taskHandler struct {
 	logger  *slog.Logger
 }
 
-// NewTaskHandler creates a new task handler for admin sync operations.
+// NewTaskHandler creates a new task handler for actor sync operations.
 func NewTaskHandler(
 	cfg config.C,
 	db database.DB,
@@ -51,43 +51,43 @@ func NewTaskHandler(
 	}
 }
 
-// RegisterTasks registers the admin sync task handlers with the asynq mux.
+// RegisterTasks registers the actor sync task handlers with the asynq mux.
 func (th *taskHandler) RegisterTasks(mux *asynq.ServeMux) {
-	mux.HandleFunc(taskTypeSyncActorsExternalSource, th.syncAdminUsersExternalSource)
+	mux.HandleFunc(taskTypeSyncActorsExternalSource, th.syncConfiguredActorsExternalSource)
 }
 
-// GetCronTasks returns the cron task configurations for admin sync.
-// Only returns tasks if AdminUsersExternalSource is configured.
+// GetCronTasks returns the cron task configurations for actor sync.
+// Only returns tasks if ConfiguredActorsExternalSource is configured.
 func (th *taskHandler) GetCronTasks() []*asynq.PeriodicTaskConfig {
-	adminUsers := th.cfg.GetRoot().SystemAuth.AdminUsers
-	if adminUsers == nil {
+	actors := th.cfg.GetRoot().SystemAuth.Actors
+	if actors == nil {
 		return nil
 	}
 
 	// Only create cron task for external source configuration
-	aues, ok := adminUsers.InnerVal.(*sconfig.AdminUsersExternalSource)
+	caes, ok := actors.InnerVal.(*sconfig.ConfiguredActorsExternalSource)
 	if !ok {
 		return nil
 	}
 
 	return []*asynq.PeriodicTaskConfig{
 		{
-			Cronspec: aues.GetSyncCronScheduleOrDefault(),
+			Cronspec: caes.GetSyncCronScheduleOrDefault(),
 			Task:     GetTaskTypeSyncActorsExternalSourceTask(),
 		},
 	}
 }
 
-// syncAdminUsersExternalSource is the task handler for syncing admin users from external source.
-func (th *taskHandler) syncAdminUsersExternalSource(ctx context.Context, task *asynq.Task) error {
-	th.logger.Info("starting admin users external source sync task")
+// syncConfiguredActorsExternalSource is the task handler for syncing actors from external source.
+func (th *taskHandler) syncConfiguredActorsExternalSource(ctx context.Context, task *asynq.Task) error {
+	th.logger.Info("starting configured actors external source sync task")
 
 	svc := NewService(th.cfg, th.db, th.encrypt, th.logger)
-	if err := svc.SyncAdminUsersExternalSource(ctx); err != nil {
-		th.logger.Error("admin users external source sync failed", "error", err)
+	if err := svc.SyncConfiguredActorsExternalSource(ctx); err != nil {
+		th.logger.Error("configured actors external source sync failed", "error", err)
 		return err
 	}
 
-	th.logger.Info("admin users external source sync task completed")
+	th.logger.Info("configured actors external source sync task completed")
 	return nil
 }

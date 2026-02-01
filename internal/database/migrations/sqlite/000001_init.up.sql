@@ -5,9 +5,6 @@ create table actors
     labels        text,
     external_id   text,
     encrypted_key text,
-    email         text,
-    admin         numeric,
-    super_admin   numeric,
     permissions   text,
     created_at    datetime,
     updated_at    datetime,
@@ -16,9 +13,6 @@ create table actors
 
 create index idx_actors_deleted_at
     on actors (deleted_at);
-
-create index idx_actors_email
-    on actors (email);
 
 create unique index idx_actors_namespace
     on actors (namespace, external_id);

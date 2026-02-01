@@ -9,9 +9,6 @@ type IActorData interface {
 	GetId() uuid.UUID
 	GetExternalId() string
 	GetPermissions() []aschema.Permission
-	IsAdmin() bool
-	IsSuperAdmin() bool
-	GetEmail() string
 	GetNamespace() string
 	GetLabels() map[string]string
 }
@@ -27,9 +24,6 @@ type Actor struct {
 	Namespace   string               `json:"namespace,omitempty"`
 	Labels      map[string]string    `json:"labels,omitempty"`
 	Permissions []aschema.Permission `json:"permissions"`
-	Admin       bool                 `json:"admin,omitempty"`
-	SuperAdmin  bool                 `json:"super_admin,omitempty"`
-	Email       string               `json:"email,omitempty"`
 }
 
 func (a *Actor) GetId() uuid.UUID {
@@ -44,43 +38,11 @@ func (a *Actor) GetPermissions() []aschema.Permission {
 	return a.Permissions
 }
 
-func (a *Actor) GetEmail() string {
-	return a.Email
-}
-
 func (a *Actor) GetNamespace() string {
 	return a.Namespace
 }
 
 func (a *Actor) GetLabels() map[string]string { return a.Labels }
-
-// IsAdmin is a helper to wrap the Admin attribute
-func (a *Actor) IsAdmin() bool {
-	if a == nil {
-		return false
-	}
-
-	return a.Admin
-}
-
-// IsSuperAdmin is a helper to wrap the SuperAdmin attribute
-func (a *Actor) IsSuperAdmin() bool {
-	if a == nil {
-		return false
-	}
-
-	return a.SuperAdmin
-}
-
-// IsNormalActor indicates that an actor is not an admin or superadmin
-func (a *Actor) IsNormalActor() bool {
-	if a == nil {
-		// actors default to normal
-		return true
-	}
-
-	return !a.IsSuperAdmin() && !a.IsAdmin()
-}
 
 func CreateActor(data IActorData) *Actor {
 	if a, ok := data.(*Actor); ok {
@@ -93,9 +55,6 @@ func CreateActor(data IActorData) *Actor {
 		Namespace:   data.GetNamespace(),
 		Labels:      data.GetLabels(),
 		Permissions: data.GetPermissions(),
-		Admin:       data.IsAdmin(),
-		SuperAdmin:  data.IsSuperAdmin(),
-		Email:       data.GetEmail(),
 	}
 }
 

@@ -7,7 +7,6 @@ import (
 	"encoding/json"
 	"fmt"
 	"slices"
-	"strings"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
@@ -26,10 +25,7 @@ const (
 	ActorOrderByCreatedAt  ActorOrderByField = "created_at"
 	ActorOrderByUpdatedAt  ActorOrderByField = "updated_at"
 	ActorOrderByNamespace  ActorOrderByField = "namespace"
-	ActorOrderByEmail      ActorOrderByField = "email"
 	ActorOrderByExternalId ActorOrderByField = "external_id"
-	ActorOrderByAdmin      ActorOrderByField = "admin"
-	ActorOrderBySuperAdmin ActorOrderByField = "super_admin"
 	ActorOrderByDeletedAt  ActorOrderByField = "deleted_at"
 )
 
@@ -68,10 +64,7 @@ func IsValidActorOrderByField[T string | ActorOrderByField](field T) bool {
 	case ActorOrderByCreatedAt,
 		ActorOrderByUpdatedAt,
 		ActorOrderByNamespace,
-		ActorOrderByEmail,
 		ActorOrderByExternalId,
-		ActorOrderByAdmin,
-		ActorOrderBySuperAdmin,
 		ActorOrderByDeletedAt:
 		return true
 	default:
@@ -86,12 +79,9 @@ type Actor struct {
 	Id           uuid.UUID
 	Namespace    string
 	ExternalId   string
-	Email        string
 	Permissions  Permissions
 	Labels       Labels
 	EncryptedKey *string
-	Admin        bool
-	SuperAdmin   bool
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
 	DeletedAt    *time.Time
@@ -105,8 +95,12 @@ func (a *Actor) GetPermissions() []aschema.Permission {
 	return a.Permissions
 }
 
-func (a *Actor) GetEmail() string {
-	return a.Email
+// CanSelfSign returns true if this actor has an encrypted key and can self-sign requests
+func (a *Actor) CanSelfSign() bool {
+	if a == nil {
+		return false
+	}
+	return a.EncryptedKey != nil
 }
 
 func (a *Actor) cols() []string {
@@ -114,12 +108,9 @@ func (a *Actor) cols() []string {
 		"id",
 		"namespace",
 		"external_id",
-		"email",
 		"permissions",
 		"labels",
 		"encrypted_key",
-		"admin",
-		"super_admin",
 		"created_at",
 		"updated_at",
 		"deleted_at",
@@ -131,12 +122,9 @@ func (a *Actor) fields() []any {
 		&a.Id,
 		&a.Namespace,
 		&a.ExternalId,
-		&a.Email,
 		&a.Permissions,
 		&a.Labels,
 		&a.EncryptedKey,
-		&a.Admin,
-		&a.SuperAdmin,
 		&a.CreatedAt,
 		&a.UpdatedAt,
 		&a.DeletedAt,
@@ -148,12 +136,9 @@ func (a *Actor) values() []any {
 		a.Id,
 		a.Namespace,
 		a.ExternalId,
-		a.Email,
 		a.Permissions,
 		a.Labels,
 		a.EncryptedKey,
-		a.Admin,
-		a.SuperAdmin,
 		a.CreatedAt,
 		a.UpdatedAt,
 		a.DeletedAt,
@@ -163,10 +148,7 @@ func (a *Actor) values() []any {
 func (a *Actor) setFromData(d IActorData) {
 	a.Namespace = d.GetNamespace()
 	a.ExternalId = d.GetExternalId()
-	a.Email = d.GetEmail()
 	a.Permissions = d.GetPermissions()
-	a.Admin = d.IsAdmin()
-	a.SuperAdmin = d.IsSuperAdmin()
 	a.Labels = d.GetLabels()
 
 	// Handle extended fields via type assertion
@@ -190,10 +172,7 @@ func (a *Actor) sameAsData(d IActorData) bool {
 
 	basicMatch := a.GetNamespace() == d.GetNamespace() &&
 		a.ExternalId == d.GetExternalId() &&
-		a.Email == d.GetEmail() &&
-		slices.EqualFunc(a.Permissions, d.GetPermissions(), func(p1, p2 aschema.Permission) bool { return p1.Equal(p2) }) &&
-		a.Admin == d.IsAdmin() &&
-		a.SuperAdmin == d.IsSuperAdmin()
+		slices.EqualFunc(a.Permissions, d.GetPermissions(), func(p1, p2 aschema.Permission) bool { return p1.Equal(p2) })
 
 	if !basicMatch {
 		return false
@@ -230,34 +209,6 @@ func (a *Actor) GetEncryptedKey() *string {
 	return a.EncryptedKey
 }
 
-// IsAdmin is a helper to wrap the Admin attribute
-func (a *Actor) IsAdmin() bool {
-	if a == nil {
-		return false
-	}
-
-	return a.Admin
-}
-
-// IsSuperAdmin is a helper to wrap the SuperAdmin attribute
-func (a *Actor) IsSuperAdmin() bool {
-	if a == nil {
-		return false
-	}
-
-	return a.SuperAdmin
-}
-
-// IsNormalActor indicates that an actor is not an admin or superadmin
-func (a *Actor) IsNormalActor() bool {
-	if a == nil {
-		// actors default to normal
-		return true
-	}
-
-	return !a.IsSuperAdmin() && !a.IsAdmin()
-}
-
 func (a *Actor) normalize() {
 	// No actions currently
 }
@@ -275,22 +226,6 @@ func (a *Actor) validate() error {
 
 	if a.ExternalId == "" {
 		result = multierror.Append(result, errors.New("actor external id is empty"))
-	}
-
-	if a.Admin && !strings.HasPrefix(a.ExternalId, "admin/") {
-		result = multierror.Append(result, errors.New("admin external id is not correctly formatted"))
-	}
-
-	if strings.HasPrefix(a.ExternalId, "admin/") && !a.Admin {
-		result = multierror.Append(result, errors.New("normal actor cannot have admin/ Id prefix"))
-	}
-
-	if a.SuperAdmin && !strings.HasPrefix(a.ExternalId, "superadmin/") {
-		result = multierror.Append(result, errors.New("super admin Id is not correctly formatted"))
-	}
-
-	if strings.HasPrefix(a.ExternalId, "superadmin/") && !a.SuperAdmin {
-		result = multierror.Append(result, errors.New("normal actor cannot have superadmin/ Id prefix"))
 	}
 
 	for i, p := range a.Permissions {
@@ -598,9 +533,6 @@ type ListActorsExecutor interface {
 type ListActorsBuilder interface {
 	ListActorsExecutor
 	ForExternalId(externalId string) ListActorsBuilder
-	ForEmail(email string) ListActorsBuilder
-	ForIsAdmin(isAdmin bool) ListActorsBuilder
-	ForIsSuperAdmin(isSuperAdmin bool) ListActorsBuilder
 	ForNamespaceMatcher(matcher string) ListActorsBuilder
 	ForNamespaceMatchers(matchers []string) ListActorsBuilder
 	ForLabelExists(key string) ListActorsBuilder
@@ -618,9 +550,6 @@ type listActorsFilters struct {
 	OrderByVal        *pagination.OrderBy `json:"order_by"`
 	IncludeDeletedVal bool                `json:"include_deleted,omitempty"`
 	ExternalIdVal     *string             `json:"external_id,omitempty"`
-	EmailVal          *string             `json:"email,omitempty"`
-	IsAdminVal        *bool               `json:"is_admin,omitempty"`
-	IsSuperAdminVal   *bool               `json:"is_super_admin,omitempty"`
 	NamespaceMatchers []string            `json:"namespace_matchers,omitempty"`
 	LabelExistsKey    *string             `json:"label_exists_key,omitempty"`
 	LabelEqualsKey    *string             `json:"label_equals_key,omitempty"`
@@ -648,21 +577,6 @@ func (l *listActorsFilters) IncludeDeleted() ListActorsBuilder {
 
 func (l *listActorsFilters) ForExternalId(externalId string) ListActorsBuilder {
 	l.ExternalIdVal = &externalId
-	return l
-}
-
-func (l *listActorsFilters) ForEmail(email string) ListActorsBuilder {
-	l.EmailVal = &email
-	return l
-}
-
-func (l *listActorsFilters) ForIsAdmin(isAdmin bool) ListActorsBuilder {
-	l.IsAdminVal = &isAdmin
-	return l
-}
-
-func (l *listActorsFilters) ForIsSuperAdmin(isSuperAdmin bool) ListActorsBuilder {
-	l.IsSuperAdminVal = &isSuperAdmin
 	return l
 }
 

@@ -216,16 +216,16 @@ func (dm *DependencyManager) AutoMigrateCore() {
 	}
 }
 
-// AutoMigratePredefinedActors synchronizes actors from AdminUsersList configuration to the database.
-// This only runs for AdminUsersList configuration (not AdminUsersExternalSource which uses cron).
+// AutoMigratePredefinedActors synchronizes actors from ConfiguredActorsList configuration to the database.
+// This only runs for ConfiguredActorsList configuration (not ConfiguredActorsExternalSource which uses cron).
 // Uses a distributed Redis lock to ensure only one instance performs the migration.
 func (dm *DependencyManager) AutoMigratePredefinedActors() {
-	adminUsers := dm.GetConfigRoot().SystemAuth.AdminUsers
-	if adminUsers == nil {
+	actors := dm.GetConfigRoot().SystemAuth.Actors
+	if actors == nil {
 		return
 	}
 
-	if _, ok := adminUsers.InnerVal.(*sconfig.AdminUsersExternalSource); ok {
+	if _, ok := actors.InnerVal.(*sconfig.ConfiguredActorsExternalSource); ok {
 		// Don't actually run the sync here, just enqueue a task to run immediately.
 		task := authSync.GetTaskTypeSyncActorsExternalSourceTask()
 		_, err := dm.GetAsyncClient().Enqueue(task)
@@ -236,7 +236,7 @@ func (dm *DependencyManager) AutoMigratePredefinedActors() {
 		return
 	}
 
-	if _, ok := adminUsers.InnerVal.(sconfig.AdminUsersList); !ok {
+	if _, ok := actors.InnerVal.(sconfig.ConfiguredActorsList); !ok {
 		// There aren't any other value types that we migrate
 		return
 	}
