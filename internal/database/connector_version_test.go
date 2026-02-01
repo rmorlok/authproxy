@@ -20,24 +20,24 @@ func TestConnectorVersions(t *testing.T) {
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		sql := `
-INSERT INTO connector_versions 
-(id,                                     version, namespace,          state,     type,            encrypted_definition, hash,    created_at,            updated_at,            deleted_at) VALUES 
-('6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11', 1,       'root',             'active',  'gmail',         'encrypted-def',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
-('6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11', 2,       'root',             'primary',  'gmail',        'encrypted-def',      'hash2', '2023-10-10 00:00:00', '2023-10-10 00:00:00', null),
-('8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64', 1,       'root.child',       'archived', 'gmail',        'encrypted-def',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
-('8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64', 2,       'root.child',       'primary',  'gmail',        'encrypted-def',      'hash4', '2023-10-11 00:00:00', '2023-10-11 00:00:00', null),
-('4a9f3c22-a8d5-423e-af53-e459f1d7c8da', 1,       'root.child2',      'active',   'outlook',      'encrypted-def',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
-('4a9f3c22-a8d5-423e-af53-e459f1d7c8da', 2,       'root.child2',      'primary',  'outlook',      'encrypted-def',      'hash6', '2023-10-12 00:00:00', '2023-10-12 00:00:00', null),
-('c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa', 1,       'root.child.grand', 'archived', 'google_drive', 'encrypted-def',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null),
-('c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa', 2,       'root.child.grand', 'active',   'google_drive', 'encrypted-def',      'hash8', '2023-10-13 00:00:00', '2023-10-13 00:00:00', null),
-('c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa', 3,       'root.child.grand', 'primary',  'google_drive', 'encrypted-def',      'hash9', '2023-10-14 00:00:00', '2023-10-14 00:00:00', null);
+INSERT INTO connector_versions
+(id,                                     version, namespace,          labels,                      state,     encrypted_definition, hash,    created_at,            updated_at,            deleted_at) VALUES
+('6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11', 1,       'root',             '{"type":"gmail"}',          'active',  'encrypted-def',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
+('6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11', 2,       'root',             '{"type":"gmail"}',          'primary', 'encrypted-def',      'hash2', '2023-10-10 00:00:00', '2023-10-10 00:00:00', null),
+('8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64', 1,       'root.child',       '{"type":"gmail"}',          'archived','encrypted-def',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
+('8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64', 2,       'root.child',       '{"type":"gmail"}',          'primary', 'encrypted-def',      'hash4', '2023-10-11 00:00:00', '2023-10-11 00:00:00', null),
+('4a9f3c22-a8d5-423e-af53-e459f1d7c8da', 1,       'root.child2',      '{"type":"outlook"}',        'active',  'encrypted-def',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
+('4a9f3c22-a8d5-423e-af53-e459f1d7c8da', 2,       'root.child2',      '{"type":"outlook"}',        'primary', 'encrypted-def',      'hash6', '2023-10-12 00:00:00', '2023-10-12 00:00:00', null),
+('c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa', 1,       'root.child.grand', '{"type":"google_drive"}',   'archived','encrypted-def',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null),
+('c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa', 2,       'root.child.grand', '{"type":"google_drive"}',   'active',  'encrypted-def',      'hash8', '2023-10-13 00:00:00', '2023-10-13 00:00:00', null),
+('c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa', 3,       'root.child.grand', '{"type":"google_drive"}',   'primary', 'encrypted-def',      'hash9', '2023-10-14 00:00:00', '2023-10-14 00:00:00', null);
 `
 		_, err := rawDb.Exec(sql)
 		require.NoError(t, err)
 
 		v, err := db.GetConnectorVersion(ctx, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1)
 		require.NoError(t, err)
-		require.Equal(t, "gmail", v.Type)
+		require.Equal(t, "gmail", v.Labels["type"])
 		require.Equal(t, ConnectorVersionStateActive, v.State)
 
 		results, err := db.GetConnectorVersions(ctx, []ConnectorVersionId{
@@ -45,7 +45,7 @@ INSERT INTO connector_versions
 		})
 		require.NoError(t, err)
 		require.Len(t, results, 1)
-		require.Equal(t, "gmail", results[ConnectorVersionId{uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1}].Type)
+		require.Equal(t, "gmail", results[ConnectorVersionId{uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1}].Labels["type"])
 		require.Equal(t, ConnectorVersionStateActive, results[ConnectorVersionId{uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1}].State)
 
 		results, err = db.GetConnectorVersions(ctx, []ConnectorVersionId{
@@ -54,9 +54,9 @@ INSERT INTO connector_versions
 		})
 		require.NoError(t, err)
 		require.Len(t, results, 2)
-		require.Equal(t, "gmail", results[ConnectorVersionId{uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1}].Type)
+		require.Equal(t, "gmail", results[ConnectorVersionId{uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1}].Labels["type"])
 		require.Equal(t, ConnectorVersionStateActive, results[ConnectorVersionId{uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1}].State)
-		require.Equal(t, "gmail", results[ConnectorVersionId{uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), 2}].Type)
+		require.Equal(t, "gmail", results[ConnectorVersionId{uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), 2}].Labels["type"])
 		require.Equal(t, ConnectorVersionStatePrimary, results[ConnectorVersionId{uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), 2}].State)
 
 		// Version doesn't exist
@@ -71,7 +71,7 @@ INSERT INTO connector_versions
 
 		v, err = db.GetConnectorVersionForState(ctx, uuid.MustParse("4a9f3c22-a8d5-423e-af53-e459f1d7c8da"), ConnectorVersionStatePrimary)
 		require.NoError(t, err)
-		require.Equal(t, "outlook", v.Type)
+		require.Equal(t, "outlook", v.Labels["type"])
 		require.Equal(t, ConnectorVersionStatePrimary, v.State)
 
 		v, err = db.GetConnectorVersionForState(ctx, uuid.MustParse("4a9f3c22-a8d5-423e-af53-e459f1d7c8da"), ConnectorVersionStateArchived)
@@ -79,7 +79,7 @@ INSERT INTO connector_versions
 		require.Nil(t, v)
 
 		pr := db.ListConnectorVersionsBuilder().
-			ForType("gmail").
+			ForLabelSelector("type=gmail").
 			OrderBy(ConnectorVersionOrderByCreatedAt, pagination.OrderByDesc).
 			FetchPage(ctx)
 		require.NoError(t, pr.Error)
@@ -118,11 +118,11 @@ INSERT INTO connector_versions
 
 		sql := `
 INSERT INTO connector_versions
-(id,                                     version, namespace,            state,     type,            encrypted_definition, hash,    created_at,            updated_at,            deleted_at) VALUES
-('6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11', 1,       'root.prod',          'primary', 'gmail',         'encrypted-def',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
-('8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64', 1,       'root.staging',       'primary', 'gmail',         'encrypted-def',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
-('4a9f3c22-a8d5-423e-af53-e459f1d7c8da', 1,       'root.dev',           'primary', 'outlook',       'encrypted-def',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
-('c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa', 1,       'root.prod.tenant1',  'primary', 'google_drive',  'encrypted-def',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null);
+(id,                                     version, namespace,            labels,                      state,     encrypted_definition, hash,    created_at,            updated_at,            deleted_at) VALUES
+('6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11', 1,       'root.prod',          '{"type":"gmail"}',          'primary', 'encrypted-def',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
+('8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64', 1,       'root.staging',       '{"type":"gmail"}',          'primary', 'encrypted-def',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
+('4a9f3c22-a8d5-423e-af53-e459f1d7c8da', 1,       'root.dev',           '{"type":"outlook"}',        'primary', 'encrypted-def',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
+('c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa', 1,       'root.prod.tenant1',  '{"type":"google_drive"}',   'primary', 'encrypted-def',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null);
 `
 		_, err := rawDb.Exec(sql)
 		require.NoError(t, err)
@@ -198,7 +198,7 @@ INSERT INTO connector_versions
 				Version:             1,
 				Namespace:           "root.some-namespace",
 				State:               ConnectorVersionStateDraft,
-				Type:                "test_connector",
+				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash",
 				EncryptedDefinition: "test_encrypted_definition",
 			}
@@ -214,7 +214,7 @@ INSERT INTO connector_versions
 			assert.Equal(t, connectorID, savedCV.Id)
 			assert.Equal(t, uint64(1), savedCV.Version)
 			assert.Equal(t, ConnectorVersionStateDraft, savedCV.State)
-			assert.Equal(t, "test_connector", savedCV.Type)
+			assert.Equal(t, "test_connector", savedCV.Labels["type"])
 			assert.Equal(t, "root.some-namespace", savedCV.Namespace)
 			assert.Equal(t, "test_hash", savedCV.Hash)
 			assert.Equal(t, "test_encrypted_definition", savedCV.EncryptedDefinition)
@@ -234,7 +234,7 @@ INSERT INTO connector_versions
 				Version:             1,
 				Namespace:           "root.some-namespace",
 				State:               ConnectorVersionStateActive,
-				Type:                "test_connector",
+				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash",
 				EncryptedDefinition: "test_encrypted_definition",
 			}
@@ -263,7 +263,7 @@ INSERT INTO connector_versions
 				Version:             1,
 				Namespace:           sconfig.RootNamespace,
 				State:               ConnectorVersionStateDraft,
-				Type:                "test_connector",
+				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash",
 				EncryptedDefinition: "test_encrypted_definition",
 			}
@@ -279,7 +279,7 @@ INSERT INTO connector_versions
 			assert.Equal(t, connectorID, savedCV.Id)
 			assert.Equal(t, uint64(1), savedCV.Version)
 			assert.Equal(t, ConnectorVersionStateDraft, savedCV.State)
-			assert.Equal(t, "test_connector", savedCV.Type)
+			assert.Equal(t, "test_connector", savedCV.Labels["type"])
 			assert.Equal(t, "test_hash", savedCV.Hash)
 			assert.Equal(t, "test_encrypted_definition", savedCV.EncryptedDefinition)
 			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_versions"))
@@ -298,7 +298,7 @@ INSERT INTO connector_versions
 				Version:             1,
 				Namespace:           sconfig.RootNamespace,
 				State:               ConnectorVersionStateDraft,
-				Type:                "test_connector",
+				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash",
 				EncryptedDefinition: "test_encrypted_definition",
 			}
@@ -339,7 +339,7 @@ INSERT INTO connector_versions
 				Version:             1,
 				Namespace:           sconfig.RootNamespace,
 				State:               ConnectorVersionStateDraft,
-				Type:                "test_connector",
+				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash_v1",
 				EncryptedDefinition: "test_encrypted_definition_v1",
 			}
@@ -353,7 +353,7 @@ INSERT INTO connector_versions
 				Version:             2,
 				Namespace:           sconfig.RootNamespace,
 				State:               ConnectorVersionStateDraft,
-				Type:                "test_connector",
+				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash_v2",
 				EncryptedDefinition: "test_encrypted_definition_v2",
 			}
@@ -391,7 +391,7 @@ INSERT INTO connector_versions
 				Version:             1,
 				Namespace:           sconfig.RootNamespace,
 				State:               ConnectorVersionStatePrimary,
-				Type:                "test_connector",
+				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash",
 				EncryptedDefinition: "test_encrypted_definition",
 			}
@@ -423,7 +423,7 @@ INSERT INTO connector_versions
 				Version:             1,
 				Namespace:           sconfig.RootNamespace,
 				State:               ConnectorVersionStatePrimary,
-				Type:                "test_connector",
+				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash_v1",
 				EncryptedDefinition: "test_encrypted_definition_v1",
 			}
@@ -443,7 +443,7 @@ INSERT INTO connector_versions
 				Version:             2,
 				Namespace:           sconfig.RootNamespace,
 				State:               ConnectorVersionStatePrimary,
-				Type:                "test_connector",
+				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash_v2",
 				EncryptedDefinition: "test_encrypted_definition_v2",
 			}
@@ -480,7 +480,7 @@ INSERT INTO connector_versions
 				Version:             1,
 				Namespace:           sconfig.RootNamespace,
 				State:               ConnectorVersionStatePrimary,
-				Type:                "test_connector",
+				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash_v1",
 				EncryptedDefinition: "test_encrypted_definition_v1",
 			}
@@ -500,7 +500,7 @@ INSERT INTO connector_versions
 				Version:             3,
 				Namespace:           sconfig.RootNamespace,
 				State:               ConnectorVersionStatePrimary,
-				Type:                "test_connector",
+				Labels:              Labels{"type": "test_connector"},
 				Hash:                "test_hash_v2",
 				EncryptedDefinition: "test_encrypted_definition_v2",
 			}

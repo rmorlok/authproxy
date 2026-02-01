@@ -6,6 +6,7 @@ import CircularProgress from '@mui/material/CircularProgress';
 import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
+import Chip from '@mui/material/Chip';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import {connectors, ConnectorVersion} from '@authproxy/api';
@@ -140,7 +141,7 @@ export default function ConnectorVersionDetail(
             <Stack direction="row" spacing={2} alignItems="center">
                 {cv.definition.logo &&
                     <Avatar alt={cv.definition.display_name} src={getLogoUrlFromDefinition(cv)} sx={{width: 40, height: 40}}/>}
-                <Typography variant="h5">{cv.definition.display_name || cv.type}</Typography>
+                <Typography variant="h5">{cv.definition.display_name || cv.labels?.type || 'Unnamed Connector'}</Typography>
                 <StateChip state={cv.state}/>
             </Stack>
 
@@ -150,8 +151,16 @@ export default function ConnectorVersionDetail(
                     <Typography variant="body1" sx={{wordBreak: 'break-all'}}>{cv.id}</Typography>
                 </Box>
                 <Box>
-                    <Typography variant="subtitle2" color="text.secondary">Type</Typography>
-                    <Typography variant="body1">{cv.type}</Typography>
+                    <Typography variant="subtitle2" color="text.secondary">Labels</Typography>
+                    {cv.labels && Object.keys(cv.labels).length > 0 ? (
+                        <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5 }}>
+                            {Object.entries(cv.labels).map(([key, value]) => (
+                                <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined" />
+                            ))}
+                        </Stack>
+                    ) : (
+                        <Typography variant="body2" color="text.secondary">No labels</Typography>
+                    )}
                 </Box>
                 <Box>
                     <Typography variant="subtitle2" color="text.secondary">Version</Typography>

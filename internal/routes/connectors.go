@@ -23,7 +23,6 @@ type ConnectorJson struct {
 	Version     uint64                         `json:"version"`
 	Namespace   string                         `json:"namespace"`
 	State       database.ConnectorVersionState `json:"state"`
-	Type        string                         `json:"type"`
 	DisplayName string                         `json:"display_name"`
 	Highlight   string                         `json:"highlight,omitempty"`
 	Description string                         `json:"description"`
@@ -55,7 +54,6 @@ func ConnectorVersionToConnectorJson(cv connIface.ConnectorVersion) ConnectorJso
 		Version:     cv.GetVersion(),
 		Namespace:   cv.GetNamespace(),
 		State:       cv.GetState(),
-		Type:        cv.GetType(),
 		Highlight:   def.Highlight,
 		DisplayName: def.DisplayName,
 		Description: def.Description,
@@ -71,7 +69,6 @@ type ListConnectorsRequestQueryParams struct {
 	LimitVal      *int32                          `form:"limit"`
 	StateVal      *database.ConnectorVersionState `form:"state"`
 	NamespaceVal  *string                         `form:"namespace"`
-	TypeVal       *string                         `form:"type"`
 	LabelSelector *string                         `form:"label_selector"`
 	OrderByVal    *string                         `form:"order_by"`
 }
@@ -84,8 +81,8 @@ type ListConnectorsResponseJson struct {
 type ConnectorVersionJson struct {
 	Id         uuid.UUID                      `json:"id"`
 	Version    uint64                         `json:"version"`
+	Namespace  string                         `json:"namespace"`
 	State      database.ConnectorVersionState `json:"state"`
-	Type       string                         `json:"type"`
 	Definition cschema.Connector              `json:"definition"`
 	Labels     map[string]string              `json:"labels,omitempty"`
 	CreatedAt  time.Time                      `json:"created_at"`
@@ -98,8 +95,8 @@ func ConnectorVersionToJson(cv connIface.ConnectorVersion) ConnectorVersionJson 
 	return ConnectorVersionJson{
 		Id:         cv.GetId(),
 		Version:    cv.GetVersion(),
+		Namespace:  cv.GetNamespace(),
 		State:      cv.GetState(),
-		Type:       cv.GetType(),
 		Definition: *def,
 		Labels:     cv.GetLabels(),
 		CreatedAt:  cv.GetCreatedAt(),
@@ -235,10 +232,6 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 
 		if req.LimitVal != nil {
 			b = b.Limit(*req.LimitVal)
-		}
-
-		if req.TypeVal != nil {
-			b = b.ForType(*req.TypeVal)
 		}
 
 		if req.StateVal != nil {

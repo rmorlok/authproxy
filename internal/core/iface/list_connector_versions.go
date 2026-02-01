@@ -20,7 +20,6 @@ type ListConnectorVersionsExecutor interface {
 type ListConnectorVersionsBuilder interface {
 	ListConnectorVersionsExecutor
 	Limit(int32) ListConnectorVersionsBuilder
-	ForType(string) ListConnectorVersionsBuilder
 	ForId(uuid.UUID) ListConnectorVersionsBuilder
 	ForVersion(version uint64) ListConnectorVersionsBuilder
 	ForState(database.ConnectorVersionState) ListConnectorVersionsBuilder

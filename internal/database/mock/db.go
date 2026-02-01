@@ -38,20 +38,6 @@ func (m *MockIActorData) EXPECT() *MockIActorDataMockRecorder {
 	return m.recorder
 }
 
-// GetEmail mocks base method.
-func (m *MockIActorData) GetEmail() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetEmail")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// GetEmail indicates an expected call of GetEmail.
-func (mr *MockIActorDataMockRecorder) GetEmail() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEmail", reflect.TypeOf((*MockIActorData)(nil).GetEmail))
-}
-
 // GetExternalId mocks base method.
 func (m *MockIActorData) GetExternalId() string {
 	m.ctrl.T.Helper()
@@ -78,6 +64,20 @@ func (m *MockIActorData) GetId() uuid.UUID {
 func (mr *MockIActorDataMockRecorder) GetId() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetId", reflect.TypeOf((*MockIActorData)(nil).GetId))
+}
+
+// GetLabels mocks base method.
+func (m *MockIActorData) GetLabels() map[string]string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLabels")
+	ret0, _ := ret[0].(map[string]string)
+	return ret0
+}
+
+// GetLabels indicates an expected call of GetLabels.
+func (mr *MockIActorDataMockRecorder) GetLabels() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLabels", reflect.TypeOf((*MockIActorData)(nil).GetLabels))
 }
 
 // GetNamespace mocks base method.
@@ -108,32 +108,111 @@ func (mr *MockIActorDataMockRecorder) GetPermissions() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPermissions", reflect.TypeOf((*MockIActorData)(nil).GetPermissions))
 }
 
-// IsAdmin mocks base method.
-func (m *MockIActorData) IsAdmin() bool {
+// MockIActorDataExtended is a mock of IActorDataExtended interface.
+type MockIActorDataExtended struct {
+	ctrl     *gomock.Controller
+	recorder *MockIActorDataExtendedMockRecorder
+}
+
+// MockIActorDataExtendedMockRecorder is the mock recorder for MockIActorDataExtended.
+type MockIActorDataExtendedMockRecorder struct {
+	mock *MockIActorDataExtended
+}
+
+// NewMockIActorDataExtended creates a new mock instance.
+func NewMockIActorDataExtended(ctrl *gomock.Controller) *MockIActorDataExtended {
+	mock := &MockIActorDataExtended{ctrl: ctrl}
+	mock.recorder = &MockIActorDataExtendedMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockIActorDataExtended) EXPECT() *MockIActorDataExtendedMockRecorder {
+	return m.recorder
+}
+
+// GetEncryptedKey mocks base method.
+func (m *MockIActorDataExtended) GetEncryptedKey() *string {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsAdmin")
-	ret0, _ := ret[0].(bool)
+	ret := m.ctrl.Call(m, "GetEncryptedKey")
+	ret0, _ := ret[0].(*string)
 	return ret0
 }
 
-// IsAdmin indicates an expected call of IsAdmin.
-func (mr *MockIActorDataMockRecorder) IsAdmin() *gomock.Call {
+// GetEncryptedKey indicates an expected call of GetEncryptedKey.
+func (mr *MockIActorDataExtendedMockRecorder) GetEncryptedKey() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsAdmin", reflect.TypeOf((*MockIActorData)(nil).IsAdmin))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEncryptedKey", reflect.TypeOf((*MockIActorDataExtended)(nil).GetEncryptedKey))
 }
 
-// IsSuperAdmin mocks base method.
-func (m *MockIActorData) IsSuperAdmin() bool {
+// GetExternalId mocks base method.
+func (m *MockIActorDataExtended) GetExternalId() string {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsSuperAdmin")
-	ret0, _ := ret[0].(bool)
+	ret := m.ctrl.Call(m, "GetExternalId")
+	ret0, _ := ret[0].(string)
 	return ret0
 }
 
-// IsSuperAdmin indicates an expected call of IsSuperAdmin.
-func (mr *MockIActorDataMockRecorder) IsSuperAdmin() *gomock.Call {
+// GetExternalId indicates an expected call of GetExternalId.
+func (mr *MockIActorDataExtendedMockRecorder) GetExternalId() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsSuperAdmin", reflect.TypeOf((*MockIActorData)(nil).IsSuperAdmin))
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetExternalId", reflect.TypeOf((*MockIActorDataExtended)(nil).GetExternalId))
+}
+
+// GetId mocks base method.
+func (m *MockIActorDataExtended) GetId() uuid.UUID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetId")
+	ret0, _ := ret[0].(uuid.UUID)
+	return ret0
+}
+
+// GetId indicates an expected call of GetId.
+func (mr *MockIActorDataExtendedMockRecorder) GetId() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetId", reflect.TypeOf((*MockIActorDataExtended)(nil).GetId))
+}
+
+// GetLabels mocks base method.
+func (m *MockIActorDataExtended) GetLabels() map[string]string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLabels")
+	ret0, _ := ret[0].(map[string]string)
+	return ret0
+}
+
+// GetLabels indicates an expected call of GetLabels.
+func (mr *MockIActorDataExtendedMockRecorder) GetLabels() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLabels", reflect.TypeOf((*MockIActorDataExtended)(nil).GetLabels))
+}
+
+// GetNamespace mocks base method.
+func (m *MockIActorDataExtended) GetNamespace() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNamespace")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetNamespace indicates an expected call of GetNamespace.
+func (mr *MockIActorDataExtendedMockRecorder) GetNamespace() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespace", reflect.TypeOf((*MockIActorDataExtended)(nil).GetNamespace))
+}
+
+// GetPermissions mocks base method.
+func (m *MockIActorDataExtended) GetPermissions() []auth.Permission {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetPermissions")
+	ret0, _ := ret[0].([]auth.Permission)
+	return ret0
+}
+
+// GetPermissions indicates an expected call of GetPermissions.
+func (mr *MockIActorDataExtendedMockRecorder) GetPermissions() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetPermissions", reflect.TypeOf((*MockIActorDataExtended)(nil).GetPermissions))
 }
 
 // MockDB is a mock of DB interface.
@@ -388,6 +467,36 @@ func (mr *MockDBMockRecorder) GetConnectorVersion(ctx, id, version interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersion", reflect.TypeOf((*MockDB)(nil).GetConnectorVersion), ctx, id, version)
 }
 
+// GetConnectorVersionForLabels mocks base method.
+func (m *MockDB) GetConnectorVersionForLabels(ctx context.Context, labelSelector string) (*database.ConnectorVersion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetConnectorVersionForLabels", ctx, labelSelector)
+	ret0, _ := ret[0].(*database.ConnectorVersion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetConnectorVersionForLabels indicates an expected call of GetConnectorVersionForLabels.
+func (mr *MockDBMockRecorder) GetConnectorVersionForLabels(ctx, labelSelector interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersionForLabels", reflect.TypeOf((*MockDB)(nil).GetConnectorVersionForLabels), ctx, labelSelector)
+}
+
+// GetConnectorVersionForLabelsAndVersion mocks base method.
+func (m *MockDB) GetConnectorVersionForLabelsAndVersion(ctx context.Context, labelSelector string, version uint64) (*database.ConnectorVersion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetConnectorVersionForLabelsAndVersion", ctx, labelSelector, version)
+	ret0, _ := ret[0].(*database.ConnectorVersion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetConnectorVersionForLabelsAndVersion indicates an expected call of GetConnectorVersionForLabelsAndVersion.
+func (mr *MockDBMockRecorder) GetConnectorVersionForLabelsAndVersion(ctx, labelSelector, version interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersionForLabelsAndVersion", reflect.TypeOf((*MockDB)(nil).GetConnectorVersionForLabelsAndVersion), ctx, labelSelector, version)
+}
+
 // GetConnectorVersionForState mocks base method.
 func (m *MockDB) GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state database.ConnectorVersionState) (*database.ConnectorVersion, error) {
 	m.ctrl.T.Helper()
@@ -401,36 +510,6 @@ func (m *MockDB) GetConnectorVersionForState(ctx context.Context, id uuid.UUID, 
 func (mr *MockDBMockRecorder) GetConnectorVersionForState(ctx, id, state interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersionForState", reflect.TypeOf((*MockDB)(nil).GetConnectorVersionForState), ctx, id, state)
-}
-
-// GetConnectorVersionForType mocks base method.
-func (m *MockDB) GetConnectorVersionForType(ctx context.Context, typ string) (*database.ConnectorVersion, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetConnectorVersionForType", ctx, typ)
-	ret0, _ := ret[0].(*database.ConnectorVersion)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetConnectorVersionForType indicates an expected call of GetConnectorVersionForType.
-func (mr *MockDBMockRecorder) GetConnectorVersionForType(ctx, typ interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersionForType", reflect.TypeOf((*MockDB)(nil).GetConnectorVersionForType), ctx, typ)
-}
-
-// GetConnectorVersionForTypeAndVersion mocks base method.
-func (m *MockDB) GetConnectorVersionForTypeAndVersion(ctx context.Context, typ string, version uint64) (*database.ConnectorVersion, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetConnectorVersionForTypeAndVersion", ctx, typ, version)
-	ret0, _ := ret[0].(*database.ConnectorVersion)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// GetConnectorVersionForTypeAndVersion indicates an expected call of GetConnectorVersionForTypeAndVersion.
-func (mr *MockDBMockRecorder) GetConnectorVersionForTypeAndVersion(ctx, typ, version interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersionForTypeAndVersion", reflect.TypeOf((*MockDB)(nil).GetConnectorVersionForTypeAndVersion), ctx, typ, version)
 }
 
 // GetConnectorVersions mocks base method.

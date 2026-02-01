@@ -49,7 +49,7 @@ func TestConnections(t *testing.T) {
 					{
 						Id:          connectorId,
 						Version:     connectorVersion,
-						Type:        "test-connector",
+						Labels:      map[string]string{"type": "test-connector"},
 						DisplayName: "Test Connector",
 					},
 				},

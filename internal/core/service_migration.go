@@ -115,7 +115,7 @@ func (s *service) MigrateConnectors(ctx context.Context) error {
 	s.logger.Info("precheck passed, migrating connectors", "connector_count", len(cfgRoot.Connectors.GetConnectors()))
 
 	for _, configConnector := range cfgRoot.Connectors.GetConnectors() {
-		if err := s.migrateConnector(ctx, &configConnector); err != nil {
+		if err := s.migrateConnector(ctx, cfgRoot.Connectors, &configConnector); err != nil {
 			return err
 		}
 	}
@@ -139,7 +139,6 @@ func (s *service) configConnectorToVersion(configConnector *config.Connector) (*
 		Version:             configConnector.Version,
 		Namespace:           configConnector.GetNamespace(),
 		Labels:              configConnector.Labels,
-		Type:                configConnector.Type,
 		Hash:                configConnector.Hash(),
 		State:               database.ConnectorVersionStateDraft,
 		EncryptedDefinition: encryptedDefinition,
@@ -163,16 +162,27 @@ func (s *service) precheckConnectorsForMigration(ctx context.Context, configConn
 		State string
 	}
 
+	identifyingLabels := configConnectors.GetIdentifyingLabels()
+
 	idVersionStateCounts := make(map[IdVersionStateTuple]int)
 	idVersionCounts := make(map[IdVersionTuple]int)
 	idStateCounts := make(map[IdStateTuple]int)
 	idCounts := make(map[uuid.UUID]int)
-	typeCounts := make(map[string]int)
+	identifyingLabelCounts := make(map[string]int)
+
+	// Helper to serialize identifying label values for map key
+	serializeLabels := func(c *config.Connector) string {
+		labelValues := c.GetIdentifyingLabelValues(identifyingLabels)
+		data, _ := json.Marshal(labelValues)
+		return string(data)
+	}
 
 	for _, configConnector := range configConnectors.GetConnectors() {
-		if err := s.precheckConnectorForMigration(ctx, &configConnector); err != nil {
+		if err := s.precheckConnectorForMigration(ctx, configConnectors, &configConnector); err != nil {
 			return err
 		}
+
+		labelKey := serializeLabels(&configConnector)
 
 		if configConnector.HasId() && configConnector.HasVersion() && configConnector.HasState() {
 			idVersionStateCounts[IdVersionStateTuple{
@@ -194,8 +204,9 @@ func (s *service) precheckConnectorsForMigration(ctx context.Context, configConn
 					}
 				}
 
-				if cc.Type == configConnector.Type && !cc.HasId() {
-					return errors.Errorf("a connector of type %s exists with an id, but not all connectors of that type have id", configConnector.Type)
+				ccLabelKey := serializeLabels(&cc)
+				if ccLabelKey == labelKey && !cc.HasId() {
+					return errors.Errorf("a connector with identifying labels %s exists with an id, but not all connectors with those labels have id", labelKey)
 				}
 			}
 		} else if configConnector.HasId() && configConnector.HasVersion() {
@@ -217,8 +228,9 @@ func (s *service) precheckConnectorsForMigration(ctx context.Context, configConn
 					}
 				}
 
-				if cc.Type == configConnector.Type && !cc.HasId() {
-					return errors.Errorf("a connector of type %s exists with an id, but not all connectors of that type have id", configConnector.Type)
+				ccLabelKey := serializeLabels(&cc)
+				if ccLabelKey == labelKey && !cc.HasId() {
+					return errors.Errorf("a connector with identifying labels %s exists with an id, but not all connectors with those labels have id", labelKey)
 				}
 			}
 		} else if configConnector.HasId() && configConnector.HasState() {
@@ -234,8 +246,9 @@ func (s *service) precheckConnectorsForMigration(ctx context.Context, configConn
 					continue
 				}
 
-				if cc.Type == configConnector.Type && !cc.HasId() {
-					return errors.Errorf("a connector of type %s exists with an id, but not all connectors of that type have id", configConnector.Type)
+				ccLabelKey := serializeLabels(&cc)
+				if ccLabelKey == labelKey && !cc.HasId() {
+					return errors.Errorf("a connector with identifying labels %s exists with an id, but not all connectors with those labels have id", labelKey)
 				}
 			}
 		} else if configConnector.HasId() {
@@ -248,13 +261,14 @@ func (s *service) precheckConnectorsForMigration(ctx context.Context, configConn
 					continue
 				}
 
-				if cc.Type == configConnector.Type && !cc.HasId() {
-					return errors.Errorf("a connector of type %s exists with an id, but not all connectors of that type have id", configConnector.Type)
+				ccLabelKey := serializeLabels(&cc)
+				if ccLabelKey == labelKey && !cc.HasId() {
+					return errors.Errorf("a connector with identifying labels %s exists with an id, but not all connectors with those labels have id", labelKey)
 				}
 			}
 		} else {
-			// Only type specified
-			typeCounts[configConnector.Type]++
+			// Only identifying labels specified
+			identifyingLabelCounts[labelKey]++
 		}
 	}
 
@@ -278,9 +292,9 @@ func (s *service) precheckConnectorsForMigration(ctx context.Context, configConn
 		}
 	}
 
-	for typ, count := range typeCounts {
+	for labelKey, count := range identifyingLabelCounts {
 		if count > 1 {
-			result = multierror.Append(result, errors.Errorf("connector type %s has multiple entries without differentiating id or version", typ))
+			result = multierror.Append(result, errors.Errorf("connector with identifying labels %s has multiple entries without differentiating id or version", labelKey))
 		}
 	}
 
@@ -290,9 +304,10 @@ func (s *service) precheckConnectorsForMigration(ctx context.Context, configConn
 // precheckConnectorForMigration checks the database to see if the connector definition aligns with the current state.
 // This covers enforcement that a version that is published cannot change, and what identifiers are required to
 // differentiate this connector definition from others that exist.
-func (s *service) precheckConnectorForMigration(ctx context.Context, configConnector *config.Connector) error {
+func (s *service) precheckConnectorForMigration(ctx context.Context, configConnectors *config.Connectors, configConnector *config.Connector) error {
 	// Don't modify original as we do all the checks
 	configConnector = configConnector.Clone()
+	identifyingLabels := configConnectors.GetIdentifyingLabels()
 
 	if configConnector.HasId() {
 		if configConnector.HasVersion() {
@@ -337,9 +352,12 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 			}
 		}
 	} else {
-		// No connector id means that connector type must be unique by id
+		// No connector id means that we need to look up by identifying labels
+		labelValues := configConnector.GetIdentifyingLabelValues(identifyingLabels)
+		labelSelector := database.BuildLabelSelectorFromMap(labelValues)
+
 		b := s.db.ListConnectorsBuilder().
-			ForType(configConnector.Type).
+			ForLabelSelector(labelSelector).
 			OrderBy(database.ConnectorOrderByCreatedAt, pagination.OrderByDesc).
 			Limit(100)
 
@@ -354,7 +372,7 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 
 		if len(results) > 1 {
 			connectorIds := strings.Join(util.Map(results, func(c database.Connector) string { return c.Id.String() }), ", ")
-			return errors.Errorf("connector type %s is not unique among existing defined connectors: %s", configConnector.Type, connectorIds)
+			return errors.Errorf("connector with identifying labels %s is not unique among existing defined connectors: %s", labelSelector, connectorIds)
 		} else if len(results) == 1 {
 			if results[0].Namespace != configConnector.GetNamespace() {
 				return errors.Errorf("connector %s currently has namespace path '%s' and cannot be changed to '%s'", configConnector.Id, results[0].Namespace, configConnector.GetNamespace())
@@ -366,8 +384,9 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 }
 
 // migrateConnector migrates a single connector from configuration to the database
-func (s *service) migrateConnector(ctx context.Context, configConnector *config.Connector) error {
+func (s *service) migrateConnector(ctx context.Context, configConnectors *config.Connectors, configConnector *config.Connector) error {
 	b := newConnectorVersionBuilder(s)
+	identifyingLabels := configConnectors.GetIdentifyingLabels()
 
 	id := apctx.GetUuidGenerator(ctx).New()
 	if configConnector.HasId() {
@@ -428,9 +447,12 @@ func (s *service) migrateConnector(ctx context.Context, configConnector *config.
 			version = existingVersion.Version + 1
 		}
 	} else if configConnector.HasVersion() {
-		existingVersion, err := s.db.GetConnectorVersionForTypeAndVersion(ctx, configConnector.Type, configConnector.Version)
-		if err != nil {
-			return errors.Wrap(err, "failed to get connector version for type/version")
+		// Pattern C: version only, no ID - use label-based lookup
+		labelValues := configConnector.GetIdentifyingLabelValues(identifyingLabels)
+		labelSelector := database.BuildLabelSelectorFromMap(labelValues)
+		existingVersion, err := s.db.GetConnectorVersionForLabelsAndVersion(ctx, labelSelector, configConnector.Version)
+		if err != nil && !errors.Is(err, database.ErrNotFound) {
+			return errors.Wrap(err, "failed to get connector version for labels/version")
 		}
 
 		if existingVersion != nil {
@@ -449,9 +471,12 @@ func (s *service) migrateConnector(ctx context.Context, configConnector *config.
 			id = existingVersion.Id
 		}
 	} else {
-		existingVersion, err := s.db.GetConnectorVersionForType(ctx, configConnector.Type)
+		// Pattern D: no ID, no version - use label-based lookup
+		labelValues := configConnector.GetIdentifyingLabelValues(identifyingLabels)
+		labelSelector := database.BuildLabelSelectorFromMap(labelValues)
+		existingVersion, err := s.db.GetConnectorVersionForLabels(ctx, labelSelector)
 		if err != nil && !errors.Is(err, database.ErrNotFound) {
-			return errors.Wrap(err, "failed to get connector version for type")
+			return errors.Wrap(err, "failed to get connector version for labels")
 		}
 
 		if existingVersion != nil {

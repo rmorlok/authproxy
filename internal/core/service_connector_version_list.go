@@ -58,13 +58,6 @@ func (l *listConnectorVersionWrapper) Limit(lim int32) iface.ListConnectorVersio
 	}
 }
 
-func (l *listConnectorVersionWrapper) ForType(t string) iface.ListConnectorVersionsBuilder {
-	return &listConnectorVersionWrapper{
-		l: l.l.ForType(t),
-		s: l.s,
-	}
-}
-
 func (l *listConnectorVersionWrapper) ForId(id uuid.UUID) iface.ListConnectorVersionsBuilder {
 	return &listConnectorVersionWrapper{
 		l: l.l.ForId(id),

@@ -63,7 +63,7 @@ func TestService(t *testing.T) {
 		Version:             1,
 		Namespace:           "root.some-namespace",
 		State:               database.ConnectorVersionStatePrimary,
-		Type:                "test",
+		Labels:              map[string]string{"type": "test"},
 		Hash:                "test",
 		EncryptedDefinition: "test",
 	}

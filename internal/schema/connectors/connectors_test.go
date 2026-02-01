@@ -13,7 +13,7 @@ func TestConnectors_Validate(t *testing.T) {
 	createConnector := func(id uuid.UUID, typ string, version uint64) Connector {
 		return Connector{
 			Id:          id,
-			Type:        typ,
+			Labels:      map[string]string{"type": typ},
 			Version:     version,
 			DisplayName: "Test Connector",
 			Description: "Test Description",
@@ -76,7 +76,7 @@ func TestConnectors_Validate(t *testing.T) {
 				createConnector(uuid.Nil, "type1", 0),
 			}),
 			wantErr: true,
-			errMsg:  "duplicate connectors exist for type type1 without ids or versions specified to fully differentiate",
+			errMsg:  "duplicate connectors exist for identifying labels",
 		},
 		{
 			name: "Invalid - Multiple connectors with same ID, no versions",
@@ -94,7 +94,7 @@ func TestConnectors_Validate(t *testing.T) {
 				createConnector(uuid.Nil, "type1", 1),
 			}),
 			wantErr: true,
-			errMsg:  "duplicate connectors exist for type type1 with version 1",
+			errMsg:  "duplicate connectors exist for identifying labels",
 		},
 		{
 			name: "Invalid - Multiple connectors with same ID and version",
@@ -137,7 +137,7 @@ func TestConnectors_Validate(t *testing.T) {
 				createConnector(uuid.Nil, "type1", 0),
 			}),
 			wantErr: true,
-			errMsg:  "duplicate connectors exist for type type1 without ids or versions specified to fully differentiate",
+			errMsg:  "duplicate connectors exist for identifying labels",
 		},
 		{
 			name: "Invalid - Some connectors with same type have IDs, some have versions",
@@ -147,7 +147,7 @@ func TestConnectors_Validate(t *testing.T) {
 				createConnector(uuid.Nil, "type1", 2),
 			}),
 			wantErr: true,
-			errMsg:  "duplicate connectors exist for type type1 without ids or versions specified to fully differentiate",
+			errMsg:  "duplicate connectors exist for identifying labels",
 		},
 		{
 			name: "Invalid - Some connectors with same ID have versions, some don't",
@@ -182,7 +182,7 @@ func TestConnectors_Validate_Exhaustive(t *testing.T) {
 	createConnector := func(id uuid.UUID, typ string, version uint64) Connector {
 		return Connector{
 			Id:          id,
-			Type:        typ,
+			Labels:      map[string]string{"type": typ},
 			Version:     version,
 			DisplayName: "Test Connector",
 			Description: "Test Description",
@@ -207,7 +207,7 @@ func TestConnectors_Validate_Exhaustive(t *testing.T) {
 			conn1:   createConnector(uuid.Nil, "type1", 0),
 			conn2:   createConnector(uuid.Nil, "type1", 0),
 			wantErr: true,
-			errMsg:  "duplicate connectors exist for type type1 without ids or versions specified to fully differentiate",
+			errMsg:  "duplicate connectors exist for identifying labels",
 		},
 		{
 			name:    "Same type, no IDs, different versions",
@@ -220,7 +220,7 @@ func TestConnectors_Validate_Exhaustive(t *testing.T) {
 			conn1:   createConnector(uuid.Nil, "type1", 1),
 			conn2:   createConnector(uuid.Nil, "type1", 1),
 			wantErr: true,
-			errMsg:  "duplicate connectors exist for type type1 with version 1",
+			errMsg:  "duplicate connectors exist for identifying labels",
 		},
 		{
 			name:    "Same type, different IDs, no versions",

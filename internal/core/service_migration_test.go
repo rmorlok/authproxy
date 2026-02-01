@@ -89,7 +89,7 @@ func TestMigration(t *testing.T) {
 					{
 						Id:      uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version: 1,
-						Type:    "fake",
+						Labels:  map[string]string{"type": "fake"},
 					},
 				})
 				defer cleanup()
@@ -119,12 +119,12 @@ func TestMigration(t *testing.T) {
 					{
 						Id:      uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version: 1,
-						Type:    "fake",
+						Labels:  map[string]string{"type": "fake"},
 					},
 					{
 						Id:      uuid.MustParse("00000000-0000-0000-0000-000000000002"),
 						Version: 1,
-						Type:    "fake",
+						Labels:  map[string]string{"type": "fake"},
 					},
 				})
 				defer cleanup()
@@ -159,12 +159,12 @@ func TestMigration(t *testing.T) {
 					{
 						Id:      uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version: 1,
-						Type:    "fake1",
+						Labels:  map[string]string{"type": "fake1"},
 					},
 					{
 						Id:      uuid.MustParse("00000000-0000-0000-0000-000000000002"),
 						Version: 1,
-						Type:    "fake2",
+						Labels:  map[string]string{"type": "fake2"},
 					},
 				})
 				defer cleanup()
@@ -175,23 +175,20 @@ func TestMigration(t *testing.T) {
 				type connectorResult struct {
 					Id      string
 					Version int64
-					Type    string
 					State   string
 				}
 
 				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, type, state FROM connector_versions ORDER BY id;
+			SELECT id, version, state FROM connector_versions ORDER BY id;
 		`, []connectorResult{
 					{
 						Id:      "00000000-0000-0000-0000-000000000001",
 						Version: 1,
-						Type:    "fake1",
 						State:   "primary",
 					},
 					{
 						Id:      "00000000-0000-0000-0000-000000000002",
 						Version: 1,
-						Type:    "fake2",
 						State:   "primary",
 					},
 				})
@@ -202,7 +199,7 @@ func TestMigration(t *testing.T) {
 					{
 						Id:      uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version: 1,
-						Type:    "fake",
+						Labels:  map[string]string{"type": "fake"},
 					},
 				})
 				defer cleanup()
@@ -235,7 +232,7 @@ func TestMigration(t *testing.T) {
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
 				})
@@ -280,7 +277,7 @@ func TestMigration(t *testing.T) {
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
 				})
@@ -294,7 +291,7 @@ func TestMigration(t *testing.T) {
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version:     2,
 					State:       "draft",
-					Type:        "fake",
+					Labels:      map[string]string{"type": "fake"},
 					DisplayName: "changed",
 				})
 
@@ -331,7 +328,7 @@ func TestMigration(t *testing.T) {
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
 				})
@@ -379,7 +376,7 @@ func TestMigration(t *testing.T) {
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
 				})
@@ -436,7 +433,7 @@ func TestMigration(t *testing.T) {
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
 				})
@@ -474,13 +471,13 @@ func TestMigration(t *testing.T) {
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "first",
 					},
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "second",
 					},
 				})
@@ -506,7 +503,7 @@ func TestMigration(t *testing.T) {
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "first",
 					},
 				})
@@ -518,7 +515,7 @@ func TestMigration(t *testing.T) {
 				cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, cschema.Connector{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 					Version:     1,
-					Type:        "fake",
+					Labels:      map[string]string{"type": "fake"},
 					DisplayName: "second",
 				})
 
@@ -550,7 +547,7 @@ func TestMigration(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
 						Id:   uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-						Type: "fake",
+						Labels: map[string]string{"type": "fake"},
 					},
 				})
 				defer cleanup()
@@ -579,11 +576,11 @@ func TestMigration(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
 						Id:   uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-						Type: "fake",
+						Labels: map[string]string{"type": "fake"},
 					},
 					{
 						Id:   uuid.MustParse("00000000-0000-0000-0000-000000000002"),
-						Type: "fake",
+						Labels: map[string]string{"type": "fake"},
 					},
 				})
 				defer cleanup()
@@ -617,7 +614,7 @@ func TestMigration(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
 						Id:   uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-						Type: "fake",
+						Labels: map[string]string{"type": "fake"},
 					},
 				})
 				defer cleanup()
@@ -649,7 +646,7 @@ func TestMigration(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
 				})
@@ -692,7 +689,7 @@ func TestMigration(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
 				})
@@ -703,7 +700,7 @@ func TestMigration(t *testing.T) {
 
 				cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, cschema.Connector{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-					Type:        "fake",
+					Labels:      map[string]string{"type": "fake"},
 					State:       "draft",
 					DisplayName: "changed",
 				})
@@ -740,7 +737,7 @@ func TestMigration(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
 				})
@@ -786,7 +783,7 @@ func TestMigration(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
 				})
@@ -840,12 +837,12 @@ func TestMigration(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "first",
 					},
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "second",
 					},
 				})
@@ -870,7 +867,7 @@ func TestMigration(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "first",
 					},
 				})
@@ -881,7 +878,7 @@ func TestMigration(t *testing.T) {
 
 				cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, cschema.Connector{
 					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-					Type:        "fake",
+					Labels:      map[string]string{"type": "fake"},
 					DisplayName: "second",
 				})
 
@@ -912,7 +909,7 @@ func TestMigration(t *testing.T) {
 			t.Run("single initial", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Type: "fake",
+						Labels: map[string]string{"type": "fake"},
 					},
 				})
 				defer cleanup()
@@ -938,7 +935,7 @@ func TestMigration(t *testing.T) {
 			t.Run("unchanged initial", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Type: "fake",
+						Labels: map[string]string{"type": "fake"},
 					},
 				})
 				defer cleanup()
@@ -967,7 +964,7 @@ func TestMigration(t *testing.T) {
 			t.Run("changed once", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
 				})
@@ -1006,7 +1003,7 @@ func TestMigration(t *testing.T) {
 			t.Run("changed once then unchanged", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
 				})
@@ -1048,7 +1045,7 @@ func TestMigration(t *testing.T) {
 			t.Run("changed twice", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
 				})
@@ -1097,11 +1094,11 @@ func TestMigration(t *testing.T) {
 			t.Run("does not allow duplicate type without id initial", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "first",
 					},
 					{
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "second",
 					},
 				})
@@ -1125,7 +1122,7 @@ func TestMigration(t *testing.T) {
 			t.Run("does not allow duplicate type without id when migrated", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "first",
 					},
 				})
@@ -1135,7 +1132,7 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, cschema.Connector{
-					Type:        "fake",
+					Labels:      map[string]string{"type": "fake"},
 					DisplayName: "second",
 				})
 
@@ -1166,13 +1163,13 @@ func TestMigration(t *testing.T) {
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 				})
@@ -1199,14 +1196,14 @@ func TestMigration(t *testing.T) {
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
 						State:       "primary",
-						Type:        "fake1",
+						Labels:      map[string]string{"type": "fake1"},
 						DisplayName: "duplicate",
 					},
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
 						State:       "primary",
-						Type:        "fake2",
+						Labels:      map[string]string{"type": "fake2"},
 						DisplayName: "duplicate",
 					},
 				})
@@ -1233,14 +1230,14 @@ func TestMigration(t *testing.T) {
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
 						State:       "draft",
-						Type:        "fake1",
+						Labels:      map[string]string{"type": "fake1"},
 						DisplayName: "duplicate",
 					},
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
 						State:       "draft",
-						Type:        "fake2",
+						Labels:      map[string]string{"type": "fake2"},
 						DisplayName: "duplicate",
 					},
 				})
@@ -1266,13 +1263,13 @@ func TestMigration(t *testing.T) {
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
-						Type:        "fake1",
+						Labels:      map[string]string{"type": "fake1"},
 						DisplayName: "duplicate",
 					},
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
-						Type:        "fake2",
+						Labels:      map[string]string{"type": "fake2"},
 						DisplayName: "duplicate",
 					},
 				})
@@ -1298,12 +1295,12 @@ func TestMigration(t *testing.T) {
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
-						Type:        "fake1",
+						Labels:      map[string]string{"type": "fake1"},
 						DisplayName: "duplicate",
 					},
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-						Type:        "fake2",
+						Labels:      map[string]string{"type": "fake2"},
 						DisplayName: "duplicate",
 					},
 				})
@@ -1329,11 +1326,11 @@ func TestMigration(t *testing.T) {
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 					{
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 				})
@@ -1346,12 +1343,12 @@ func TestMigration(t *testing.T) {
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 					{
 						Version:     2,
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 				})
@@ -1364,13 +1361,13 @@ func TestMigration(t *testing.T) {
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Version:     1,
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 					{
 						Version:     2,
 						State:       "draft",
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 				})
@@ -1395,11 +1392,11 @@ func TestMigration(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 					{
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 				})
@@ -1411,12 +1408,12 @@ func TestMigration(t *testing.T) {
 				cleanup2 := setup(t, []cschema.Connector{
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 					{
 						Version:     2,
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 				})
@@ -1428,13 +1425,13 @@ func TestMigration(t *testing.T) {
 				cleanup3 := setup(t, []cschema.Connector{
 					{
 						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 					{
 						Version:     2,
 						State:       "draft",
-						Type:        "fake",
+						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 				})

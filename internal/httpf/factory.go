@@ -58,7 +58,6 @@ func (f *clientFactory) ForConnectorVersion(cv ConnectorVersion) F {
 	ri.Namespace = cv.GetNamespace()
 	ri.ConnectorId = cv.GetId()
 	ri.ConnectorVersion = cv.GetVersion()
-	ri.ConnectorType = cv.GetType()
 
 	return f.ForRequestInfo(ri)
 }

@@ -14,7 +14,8 @@ func TestRootFullConfig(t *testing.T) {
 	data := `
 connectors:
   load_from_list:
-    - type: google-drive
+    - labels:
+        type: google-drive
       version: 1
       display_name: Google Drive
       logo:
@@ -39,7 +40,8 @@ connectors:
             required: false
             reason: |
               We need to be able to see what's been going on in drive
-    - type: greenhouse
+    - labels:
+        type: greenhouse
       version: 1
       display_name: Greenhouse
       logo:
@@ -52,7 +54,7 @@ connectors:
 	expected := &Root{
 		Connectors: connectors.FromList([]Connector{
 			{
-				Type:        "google-drive",
+				Labels:      map[string]string{"type": "google-drive"},
 				Version:     1,
 				DisplayName: "Google Drive",
 				Description: "This integration connects Google Drive to Acme app. This has the following advantages:\n\n1. Some reason\n2. Some other reason\n3. Even better reason\n",
@@ -84,7 +86,7 @@ connectors:
 				},
 			},
 			{
-				Type:        "greenhouse",
+				Labels:      map[string]string{"type": "greenhouse"},
 				Version:     1,
 				DisplayName: "Greenhouse",
 				Description: "This integration pushes candidates to greenhouse\n",
