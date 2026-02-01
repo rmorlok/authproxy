@@ -327,6 +327,33 @@ func TestConnections(t *testing.T) {
 			require.NoError(t, err)
 			require.Len(t, resp.Items, 3)
 		})
+
+		t.Run("filter with label_selector", func(t *testing.T) {
+			connId := uuid.New()
+			err := tu.Db.CreateConnection(ctx, &database.Connection{
+				Id:               connId,
+				Namespace:        "root",
+				ConnectorId:      connectorId,
+				ConnectorVersion: connectorVersion,
+				State:            database.ConnectionStateCreated,
+				Labels:           database.Labels{"env": "test-label-conn"},
+			})
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections?label_selector=env%3Dtest-label-conn", nil, "root", "some-actor", aschema.AllPermissions())
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ListConnectionResponseJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Len(t, resp.Items, 1)
+			require.Equal(t, connId, resp.Items[0].Id)
+			require.Equal(t, "test-label-conn", resp.Items[0].Labels["env"])
+		})
 	})
 
 	t.Run("disconnect connection", func(t *testing.T) {

@@ -11,7 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-func (s *service) EnsureNamespaceAncestorPath(ctx context.Context, targetNamespace string) (iface.Namespace, error) {
+func (s *service) EnsureNamespaceAncestorPath(ctx context.Context, targetNamespace string, labels map[string]string) (iface.Namespace, error) {
 	if err := aschema.ValidateNamespacePath(targetNamespace); err != nil {
 		return nil, err
 	}
@@ -25,6 +25,7 @@ func (s *service) EnsureNamespaceAncestorPath(ctx context.Context, targetNamespa
 				final = &database.Namespace{
 					Path:      ns,
 					State:     database.NamespaceStateActive,
+					Labels:    labels,
 					CreatedAt: apctx.GetClock(ctx).Now(),
 					UpdatedAt: apctx.GetClock(ctx).Now(),
 				}
@@ -58,10 +59,11 @@ func (s *service) GetNamespace(ctx context.Context, path string) (iface.Namespac
 	return wrapNamespace(*ns, s), nil
 }
 
-func (s *service) CreateNamespace(ctx context.Context, path string) (iface.Namespace, error) {
+func (s *service) CreateNamespace(ctx context.Context, path string, labels map[string]string) (iface.Namespace, error) {
 	ns := &database.Namespace{
-		Path:  path,
-		State: database.NamespaceStateActive,
+		Path:   path,
+		State:  database.NamespaceStateActive,
+		Labels: database.Labels(labels),
 	}
 
 	err := s.db.CreateNamespace(ctx, ns)
@@ -173,6 +175,13 @@ func (l *listNamespaceWrapper) OrderBy(f database.NamespaceOrderByField, o pagin
 func (l *listNamespaceWrapper) IncludeDeleted() iface.ListNamespacesBuilder {
 	return &listNamespaceWrapper{
 		l: l.l.IncludeDeleted(),
+		s: l.s,
+	}
+}
+
+func (l *listNamespaceWrapper) ForLabelSelector(s string) iface.ListNamespacesBuilder {
+	return &listNamespaceWrapper{
+		l: l.l.ForLabelSelector(s),
 		s: l.s,
 	}
 }

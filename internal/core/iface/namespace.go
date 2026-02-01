@@ -13,6 +13,7 @@ type Namespace interface {
 	GetState() database.NamespaceState
 	GetCreatedAt() time.Time
 	GetUpdatedAt() time.Time
+	GetLabels() map[string]string
 }
 
 /*
@@ -35,4 +36,5 @@ type ListNamespacesBuilder interface {
 	ForState(database.NamespaceState) ListNamespacesBuilder
 	OrderBy(database.NamespaceOrderByField, pagination.OrderBy) ListNamespacesBuilder
 	IncludeDeleted() ListNamespacesBuilder
+	ForLabelSelector(selector string) ListNamespacesBuilder
 }

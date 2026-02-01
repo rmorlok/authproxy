@@ -21,6 +21,7 @@ type Connection struct {
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	DeletedAt        *time.Time
+	Labels           map[string]string
 }
 
 func (m *Connection) GetId() uuid.UUID {
@@ -53,6 +54,10 @@ func (m *Connection) GetUpdatedAt() time.Time {
 
 func (m *Connection) GetDeletedAt() *time.Time {
 	return m.DeletedAt
+}
+
+func (m *Connection) GetLabels() map[string]string {
+	return m.Labels
 }
 
 func (m *Connection) GetConnectorVersionEntity() iface.ConnectorVersion {

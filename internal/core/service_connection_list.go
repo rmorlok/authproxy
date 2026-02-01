@@ -121,6 +121,10 @@ func (l *listConnectionsWrapper) WithDeletedHandling(h database.DeletedHandling)
 	return l.cloneWithBuilder(l.l.WithDeletedHandling(h))
 }
 
+func (l *listConnectionsWrapper) ForLabelSelector(s string) iface.ListConnectionsBuilder {
+	return l.cloneWithBuilder(l.l.ForLabelSelector(s))
+}
+
 func (s *service) ListConnectionsBuilder() iface.ListConnectionsBuilder {
 	return &listConnectionsWrapper{
 		l: s.db.ListConnectionsBuilder(),

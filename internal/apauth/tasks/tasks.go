@@ -1,7 +1,6 @@
-package sync
+package tasks
 
 import (
-	"context"
 	"log/slog"
 
 	"github.com/hibiken/asynq"
@@ -10,18 +9,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
-
-const (
-	taskTypeSyncActorsExternalSource = "actor_sync:sync_external_source"
-)
-
-func GetTaskTypeSyncActorsExternalSourceTask() *asynq.Task {
-	return asynq.NewTask(
-		taskTypeSyncActorsExternalSource,
-		nil,
-		asynq.MaxRetry(3),
-	)
-}
 
 // TaskRegistrar interface for registering tasks and providing cron configs.
 type TaskRegistrar interface {
@@ -53,6 +40,7 @@ func NewTaskHandler(
 
 // RegisterTasks registers the actor sync task handlers with the asynq mux.
 func (th *taskHandler) RegisterTasks(mux *asynq.ServeMux) {
+	mux.HandleFunc(taskTypeClearExpiredNonces, th.clearExpiredNonces)
 	mux.HandleFunc(taskTypeSyncActorsExternalSource, th.syncConfiguredActorsExternalSource)
 }
 
@@ -73,21 +61,11 @@ func (th *taskHandler) GetCronTasks() []*asynq.PeriodicTaskConfig {
 	return []*asynq.PeriodicTaskConfig{
 		{
 			Cronspec: caes.GetSyncCronScheduleOrDefault(),
-			Task:     GetTaskTypeSyncActorsExternalSourceTask(),
+			Task:     NewSyncActorsExternalSourceTask(),
+		},
+		{
+			Task:     newClearExpiredNoncesTask(),
+			Cronspec: "@hourly",
 		},
 	}
-}
-
-// syncConfiguredActorsExternalSource is the task handler for syncing actors from external source.
-func (th *taskHandler) syncConfiguredActorsExternalSource(ctx context.Context, task *asynq.Task) error {
-	th.logger.Info("starting configured actors external source sync task")
-
-	svc := NewService(th.cfg, th.db, th.encrypt, th.logger)
-	if err := svc.SyncConfiguredActorsExternalSource(ctx); err != nil {
-		th.logger.Error("configured actors external source sync failed", "error", err)
-		return err
-	}
-
-	th.logger.Info("configured actors external source sync task completed")
-	return nil
 }

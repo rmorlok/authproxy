@@ -281,6 +281,34 @@ func TestNamespaces(t *testing.T) {
 			require.Equal(t, database.NamespaceStateActive, resp.State)
 		})
 
+		t.Run("valid with labels", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			body := CreateNamespaceRequestJson{
+				Path:   "root.withlabels",
+				Labels: map[string]string{"env": "test", "team": "dev"},
+			}
+			jsonBody, _ := json.Marshal(body)
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/namespaces",
+				bytes.NewReader(jsonBody),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "namespaces", "create"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp NamespaceJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Equal(t, "root.withlabels", resp.Path)
+			require.Equal(t, "test", resp.Labels["env"])
+			require.Equal(t, "dev", resp.Labels["team"])
+		})
+
 		t.Run("conflict when namespace already exists", func(t *testing.T) {
 			// First create the namespace
 			err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
@@ -439,6 +467,29 @@ func TestNamespaces(t *testing.T) {
 			require.Len(t, resp.Items, 2)
 			require.Equal(t, resp.Items[0].Path, "root.dev")
 			require.Equal(t, resp.Items[1].Path, "root.dev.old")
+		})
+
+		t.Run("filter with label_selector", func(t *testing.T) {
+			err := tu.Db.CreateNamespace(ctx, &database.Namespace{
+				Path:   "root.labeled",
+				State:  database.NamespaceStateActive,
+				Labels: database.Labels{"env": "test-label"},
+			})
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/namespaces?label_selector=env%3Dtest-label", nil, "root", "some-actor", aschema.AllPermissions())
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ListNamespacesResponseJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Len(t, resp.Items, 1)
+			require.Equal(t, "root.labeled", resp.Items[0].Path)
+			require.Equal(t, "test-label", resp.Items[0].Labels["env"])
 		})
 	})
 }

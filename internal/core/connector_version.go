@@ -74,6 +74,10 @@ func (cv *ConnectorVersion) GetUpdatedAt() time.Time {
 	return cv.ConnectorVersion.UpdatedAt
 }
 
+func (cv *ConnectorVersion) GetLabels() map[string]string {
+	return cv.ConnectorVersion.Labels
+}
+
 func (cv *ConnectorVersion) getDefinition() (*cschema.Connector, error) {
 	cv.defMu.RLock()
 	defer cv.defMu.RUnlock()

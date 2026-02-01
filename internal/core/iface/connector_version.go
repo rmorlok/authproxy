@@ -17,5 +17,6 @@ type ConnectorVersion interface {
 	GetHash() string
 	GetCreatedAt() time.Time
 	GetUpdatedAt() time.Time
+	GetLabels() map[string]string
 	GetDefinition() *cschema.Connector
 }

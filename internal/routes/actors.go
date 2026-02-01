@@ -42,19 +42,20 @@ func DatabaseActorToJson(a *database.Actor) ActorJson {
 	return ActorJson{
 		Id:         a.Id,
 		Namespace:  a.GetNamespace(),
+		Labels:     a.GetLabels(),
 		ExternalId: a.ExternalId,
-		Labels:     a.Labels,
 		CreatedAt:  a.CreatedAt,
 		UpdatedAt:  a.UpdatedAt,
 	}
 }
 
 type ListActorsRequestQuery struct {
-	Cursor       *string `form:"cursor"`
-	LimitVal     *int32  `form:"limit"`
-	ExternalId   *string `form:"external_id"`
-	NamespaceVal *string `form:"namespace"`
-	OrderByVal   *string `form:"order_by"`
+	Cursor        *string `form:"cursor"`
+	LimitVal      *int32  `form:"limit"`
+	ExternalId    *string `form:"external_id"`
+	NamespaceVal  *string `form:"namespace"`
+	LabelSelector *string `form:"label_selector"`
+	OrderByVal    *string `form:"order_by"`
 }
 
 type ListActorsResponseJson struct {
@@ -105,6 +106,10 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 		}
 
 		b = b.ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))
+
+		if req.LabelSelector != nil {
+			b = b.ForLabelSelector(*req.LabelSelector)
+		}
 
 		if req.OrderByVal != nil {
 			field, order, err := pagination.SplitOrderByParam[database.ActorOrderByField](*req.OrderByVal)

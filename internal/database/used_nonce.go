@@ -126,3 +126,19 @@ func (s *service) CheckNonceValidAndMarkUsed(
 
 	return wasValid, nil
 }
+
+func (s *service) DeleteExpiredNonces(ctx context.Context) (err error) {
+	now := apctx.GetClock(ctx).Now()
+
+	_, err = s.sq.
+		Delete(UsedNoncesTable).
+		Where(sq.Lt{"retain_until": now}).
+		RunWith(s.db).
+		Exec()
+
+	if err != nil {
+		return errors.Wrap(err, "failed to delete expired nonces")
+	}
+
+	return nil
+}

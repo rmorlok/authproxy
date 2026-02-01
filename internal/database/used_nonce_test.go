@@ -40,4 +40,53 @@ func TestNonces(t *testing.T) {
 		assert.NoError(t, err)
 		assert.False(t, wasValid)
 	})
+
+	t.Run("nonce expiration", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig("nonce_expiration", nil)
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		fc := clock.NewFakeClock(now)
+		ctx := apctx.NewBuilderBackground().WithClock(fc).Build()
+
+		nonce1 := uuid.New()
+		nonce2 := uuid.New()
+
+		// Mark nonce1 to expire in 1 hour
+		wasValid, err := db.CheckNonceValidAndMarkUsed(ctx, nonce1, now.Add(time.Hour))
+		assert.NoError(t, err)
+		assert.True(t, wasValid)
+
+		// Mark nonce2 to expire in 2 hours
+		wasValid, err = db.CheckNonceValidAndMarkUsed(ctx, nonce2, now.Add(2*time.Hour))
+		assert.NoError(t, err)
+		assert.True(t, wasValid)
+
+		// Advance time by 1.5 hours
+		fc.Step(90 * time.Minute)
+
+		// Delete expired nonces
+		err = db.DeleteExpiredNonces(ctx)
+		assert.NoError(t, err)
+
+		// Nonce1 should be gone
+		hasBeenUsed, err := db.HasNonceBeenUsed(ctx, nonce1)
+		assert.NoError(t, err)
+		assert.False(t, hasBeenUsed, "nonce1 should have been deleted")
+
+		// Nonce2 should still be there
+		hasBeenUsed, err = db.HasNonceBeenUsed(ctx, nonce2)
+		assert.NoError(t, err)
+		assert.True(t, hasBeenUsed, "nonce2 should still exist")
+
+		// Advance time by another hour (2.5 hours total)
+		fc.Step(60 * time.Minute)
+
+		// Delete expired nonces
+		err = db.DeleteExpiredNonces(ctx)
+		assert.NoError(t, err)
+
+		// Nonce2 should be gone
+		hasBeenUsed, err = db.HasNonceBeenUsed(ctx, nonce2)
+		assert.NoError(t, err)
+		assert.False(t, hasBeenUsed, "nonce2 should have been deleted")
+	})
 }

@@ -121,6 +121,13 @@ func (l *listConnectorVersionWrapper) IncludeDeleted() iface.ListConnectorVersio
 	}
 }
 
+func (l *listConnectorVersionWrapper) ForLabelSelector(s string) iface.ListConnectorVersionsBuilder {
+	return &listConnectorVersionWrapper{
+		l: l.l.ForLabelSelector(s),
+		s: l.s,
+	}
+}
+
 func (s *service) ListConnectorVersionsBuilder() iface.ListConnectorVersionsBuilder {
 	return &listConnectorVersionWrapper{
 		l: s.db.ListConnectorVersionsBuilder(),
