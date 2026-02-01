@@ -18,16 +18,16 @@ func NewSyncActorsExternalSourceTask() *asynq.Task {
 	)
 }
 
-// syncAdminUsersExternalSource is the task handler for syncing admin users from external source.
-func (th *taskHandler) syncAdminUsersExternalSource(ctx context.Context, task *asynq.Task) error {
-	th.logger.Info("starting admin users external source sync task")
+// syncConfiguredActorsExternalSource is the task handler for syncing actors from external source.
+func (th *taskHandler) syncConfiguredActorsExternalSource(ctx context.Context, task *asynq.Task) error {
+	th.logger.Info("starting configured actors external source sync task")
 
 	svc := NewService(th.cfg, th.db, th.encrypt, th.logger)
-	if err := svc.SyncAdminUsersExternalSource(ctx); err != nil {
-		th.logger.Error("admin users external source sync failed", "error", err)
+	if err := svc.SyncConfiguredActorsExternalSource(ctx); err != nil {
+		th.logger.Error("configured actors external source sync failed", "error", err)
 		return err
 	}
 
-	th.logger.Info("admin users external source sync task completed")
+	th.logger.Info("configured actors external source sync task completed")
 	return nil
 }
