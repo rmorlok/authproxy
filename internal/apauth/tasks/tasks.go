@@ -23,7 +23,7 @@ type taskHandler struct {
 	logger  *slog.Logger
 }
 
-// NewTaskHandler creates a new task handler for admin sync operations.
+// NewTaskHandler creates a new task handler for actor sync operations.
 func NewTaskHandler(
 	cfg config.C,
 	db database.DB,
@@ -38,29 +38,29 @@ func NewTaskHandler(
 	}
 }
 
-// RegisterTasks registers the admin sync task handlers with the asynq mux.
+// RegisterTasks registers the actor sync task handlers with the asynq mux.
 func (th *taskHandler) RegisterTasks(mux *asynq.ServeMux) {
 	mux.HandleFunc(taskTypeClearExpiredNonces, th.clearExpiredNonces)
-	mux.HandleFunc(taskTypeSyncActorsExternalSource, th.syncAdminUsersExternalSource)
+	mux.HandleFunc(taskTypeSyncActorsExternalSource, th.syncConfiguredActorsExternalSource)
 }
 
-// GetCronTasks returns the cron task configurations for admin sync.
-// Only returns tasks if AdminUsersExternalSource is configured.
+// GetCronTasks returns the cron task configurations for actor sync.
+// Only returns tasks if ConfiguredActorsExternalSource is configured.
 func (th *taskHandler) GetCronTasks() []*asynq.PeriodicTaskConfig {
-	adminUsers := th.cfg.GetRoot().SystemAuth.AdminUsers
-	if adminUsers == nil {
+	actors := th.cfg.GetRoot().SystemAuth.Actors
+	if actors == nil {
 		return nil
 	}
 
 	// Only create cron task for external source configuration
-	aues, ok := adminUsers.InnerVal.(*sconfig.AdminUsersExternalSource)
+	caes, ok := actors.InnerVal.(*sconfig.ConfiguredActorsExternalSource)
 	if !ok {
 		return nil
 	}
 
 	return []*asynq.PeriodicTaskConfig{
 		{
-			Cronspec: aues.GetSyncCronScheduleOrDefault(),
+			Cronspec: caes.GetSyncCronScheduleOrDefault(),
 			Task:     NewSyncActorsExternalSourceTask(),
 		},
 		{

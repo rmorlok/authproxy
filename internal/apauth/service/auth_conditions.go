@@ -9,23 +9,6 @@ import (
 // false otherwise. If an actor is not valid for a request, a forbidden response should be returned.
 type AuthValidator func(gctx *gin.Context, ra *core.RequestAuth) (valid bool, reason string)
 
-// AuthValidatorActorIsAdmin asserts that the actor is an admin.
-func AuthValidatorActorIsAdmin(_ *gin.Context, ra *core.RequestAuth) (bool, string) {
-	if ra == nil {
-		return false, "auth not present"
-	}
-
-	if !ra.IsAuthenticated() {
-		return false, "actor not authenticated"
-	}
-
-	if ra.GetActor().Admin {
-		return true, ""
-	}
-
-	return false, "actor is not an admin"
-}
-
 // validateAllActorValidators validates all actor validators against the actor. It returns true if all validators
 // pass, false otherwise.
 func validateAllAuthValidators(validators []AuthValidator, gctx *gin.Context, ra *core.RequestAuth) (valid bool, reason string) {

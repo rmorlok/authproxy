@@ -11,7 +11,7 @@ func TestSystemAuth(t *testing.T) {
 	assert := require.New(t)
 
 	t.Run("yaml parse", func(t *testing.T) {
-		t.Run("admin users path", func(t *testing.T) {
+		t.Run("actors path", func(t *testing.T) {
 			data := `
   cookie_domain: localhost:8080
   jwt_signing_key:
@@ -19,8 +19,8 @@ func TestSystemAuth(t *testing.T) {
       path: ./dev_config/keys/system.pub
     private_key:
       path: ./dev_config/keys/system
-  admin_users:
-    keys_path: ./dev_config/keys/admin
+  actors:
+    keys_path: ./dev_config/keys/actors
 `
 			expected := SystemAuth{
 				JwtSigningKey: &Key{
@@ -37,9 +37,9 @@ func TestSystemAuth(t *testing.T) {
 						},
 					},
 				},
-				AdminUsers: &AdminUsers{
-					InnerVal: &AdminUsersExternalSource{
-						KeysPath: "./dev_config/keys/admin",
+				Actors: &ConfiguredActors{
+					InnerVal: &ConfiguredActorsExternalSource{
+						KeysPath: "./dev_config/keys/actors",
 					},
 				},
 			}
@@ -49,7 +49,7 @@ func TestSystemAuth(t *testing.T) {
 			assert.NoError(err)
 			assert.Equal(expected, sa)
 		})
-		t.Run("admin users list", func(t *testing.T) {
+		t.Run("actors list", func(t *testing.T) {
 			data := `
 cookie_domain: localhost:8080
 jwt_signing_key:
@@ -57,11 +57,11 @@ jwt_signing_key:
     path: ./dev_config/keys/system.pub
   private_key:
     path: ./dev_config/keys/system
-admin_users:
-  - username: bobdole
+actors:
+  - external_id: bobdole
     key:
       public_key:
-        path: ./dev_config/keys/admin/bobdole.pub
+        path: ./dev_config/keys/actors/bobdole.pub
 `
 			expected := SystemAuth{
 				JwtSigningKey: &Key{
@@ -78,15 +78,15 @@ admin_users:
 						},
 					},
 				},
-				AdminUsers: &AdminUsers{
-					InnerVal: AdminUsersList{
-						&AdminUser{
-							Username: "bobdole",
+				Actors: &ConfiguredActors{
+					InnerVal: ConfiguredActorsList{
+						&ConfiguredActor{
+							ExternalId: "bobdole",
 							Key: &Key{
 								InnerVal: &KeyPublicPrivate{
 									PublicKey: &KeyData{
 										InnerVal: &KeyDataFile{
-											Path: "./dev_config/keys/admin/bobdole.pub",
+											Path: "./dev_config/keys/actors/bobdole.pub",
 										},
 									},
 								},

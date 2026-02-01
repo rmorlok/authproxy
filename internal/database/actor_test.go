@@ -55,7 +55,6 @@ func TestActor(t *testing.T) {
 			Id:         otherId,
 			Namespace:  "root",
 			ExternalId: otherId.String(),
-			Email:      "billclinton@example.com",
 		}
 		require.NoError(t, db.CreateActor(ctx, otherActor))
 
@@ -68,13 +67,12 @@ func TestActor(t *testing.T) {
 			Id:         id,
 			Namespace:  "root",
 			ExternalId: id.String(),
-			Email:      "bobdole@example.com",
 		}
 		require.NoError(t, db.CreateActor(ctx, actor))
 
 		a, err = db.GetActor(ctx, id)
 		require.NoError(t, err)
-		require.Equal(t, actor.Email, a.Email)
+		require.Equal(t, actor.ExternalId, a.ExternalId)
 	})
 	t.Run("GetActorByExternalId", func(t *testing.T) {
 		setup(t)
@@ -84,7 +82,6 @@ func TestActor(t *testing.T) {
 			Id:         otherId,
 			Namespace:  "root",
 			ExternalId: otherId.String(),
-			Email:      "billclinton@example.com",
 		}
 		require.NoError(t, db.CreateActor(ctx, otherActor))
 
@@ -97,13 +94,12 @@ func TestActor(t *testing.T) {
 			Id:         id,
 			Namespace:  "root",
 			ExternalId: id.String(),
-			Email:      "bobdole@example.com",
 		}
 		require.NoError(t, db.CreateActor(ctx, actor))
 
 		a, err = db.GetActorByExternalId(ctx, "root", actor.ExternalId)
 		require.NoError(t, err)
-		require.Equal(t, actor.Email, a.Email)
+		require.Equal(t, actor.ExternalId, a.ExternalId)
 
 		err = db.DeleteActor(ctx, actor.Id)
 		require.NoError(t, err)
@@ -121,7 +117,6 @@ func TestActor(t *testing.T) {
 				Id:         id,
 				Namespace:  "root",
 				ExternalId: id.String(),
-				Email:      "bobdole@example.com",
 				Permissions: Permissions{
 					aschema.Permission{
 						Namespace: "root",
@@ -134,7 +129,6 @@ func TestActor(t *testing.T) {
 
 			a, err := db.GetActor(ctx, id)
 			require.NoError(t, err)
-			require.Equal(t, actor.Email, a.Email)
 			require.Equal(t, actor.Permissions, a.Permissions)
 		})
 		t.Run("validates", func(t *testing.T) {
@@ -144,7 +138,6 @@ func TestActor(t *testing.T) {
 			actor := &Actor{
 				Id: id,
 				// ExternalId omitted
-				Email: "bobdole@example.com",
 			}
 			require.Error(t, db.CreateActor(ctx, actor))
 		})
@@ -155,14 +148,12 @@ func TestActor(t *testing.T) {
 				Id:         uuid.New(),
 				Namespace:  "root",
 				ExternalId: "duplicate",
-				Email:      "bobdole@example.com",
 			}
 			require.NoError(t, db.CreateActor(ctx, actor1))
 
 			actor2 := &Actor{
 				Id:         uuid.New(),
 				ExternalId: "duplicate",
-				Email:      "billclinton@example.com",
 			}
 			require.Error(t, db.CreateActor(ctx, actor2))
 		})
@@ -174,14 +165,12 @@ func TestActor(t *testing.T) {
 				Id:         id,
 				Namespace:  "root",
 				ExternalId: uuid.New().String(),
-				Email:      "bobdole@example.com",
 			}
 			require.NoError(t, db.CreateActor(ctx, actor1))
 
 			actor2 := &Actor{
 				Id:         id,
 				ExternalId: uuid.New().String(),
-				Email:      "billclinton@example.com",
 			}
 			require.Error(t, db.CreateActor(ctx, actor2))
 		})
@@ -194,7 +183,6 @@ func TestActor(t *testing.T) {
 			actor, err := db.UpsertActor(ctx, &core.Actor{
 				ExternalId: externalId,
 				Namespace:  "root",
-				Email:      "bobdole@example.com",
 			})
 			require.NoError(t, err)
 			require.Equal(t, externalId, actor.ExternalId)
@@ -202,43 +190,9 @@ func TestActor(t *testing.T) {
 			retrieved, err := db.GetActorByExternalId(ctx, "root", externalId)
 			require.NoError(t, err)
 			require.Equal(t, actor.Id, retrieved.Id)
-			require.Equal(t, actor.Email, retrieved.Email)
 		})
 
 		t.Run("updates existing", func(t *testing.T) {
-			t.Run("email", func(t *testing.T) {
-				setup(t)
-
-				id := uuid.New()
-				externalId := "bobdole"
-				err := db.CreateActor(ctx, &Actor{
-					Id:         id,
-					Namespace:  "root",
-					ExternalId: externalId,
-					Email:      "bobdole@example.com",
-				})
-				require.NoError(t, err)
-
-				retrieved, err := db.GetActorByExternalId(ctx, "root", externalId)
-				require.NoError(t, err)
-				require.Equal(t, id, retrieved.Id)
-				require.Equal(t, "bobdole@example.com", retrieved.Email)
-
-				actor, err := db.UpsertActor(ctx, &core.Actor{
-					ExternalId: externalId,
-					Namespace:  "root",
-					Email:      "thomasjefferson@example.com",
-				})
-				require.NoError(t, err)
-				require.Equal(t, externalId, actor.ExternalId)
-				require.Equal(t, id, actor.Id)
-				require.Equal(t, "thomasjefferson@example.com", actor.Email)
-
-				retrieved, err = db.GetActorByExternalId(ctx, "root", externalId)
-				require.NoError(t, err)
-				require.Equal(t, id, retrieved.Id)
-				require.Equal(t, "thomasjefferson@example.com", retrieved.Email)
-			})
 			t.Run("permissions", func(t *testing.T) {
 				setup(t)
 
@@ -248,7 +202,6 @@ func TestActor(t *testing.T) {
 					Id:         id,
 					Namespace:  "root",
 					ExternalId: externalId,
-					Email:      "bobdole@example.com",
 					Permissions: Permissions{
 						aschema.Permission{
 							Namespace: "root",
@@ -272,7 +225,6 @@ func TestActor(t *testing.T) {
 
 				actor, err := db.UpsertActor(ctx, &core.Actor{
 					ExternalId: externalId,
-					Email:      "bobdole@example.com",
 					Namespace:  "root",
 					Permissions: []aschema.Permission{
 						{
@@ -339,7 +291,6 @@ func TestActor(t *testing.T) {
 					Id:          id1,
 					Namespace:   "root",
 					ExternalId:  externalId1,
-					Email:       "actor1@example.com",
 					Permissions: originalPerms1,
 				})
 				require.NoError(t, err)
@@ -358,7 +309,6 @@ func TestActor(t *testing.T) {
 					Id:          id2,
 					Namespace:   "root",
 					ExternalId:  externalId2,
-					Email:       "actor2@example.com",
 					Permissions: originalPerms2,
 				})
 				require.NoError(t, err)
@@ -377,7 +327,6 @@ func TestActor(t *testing.T) {
 					Id:          id3,
 					Namespace:   "root",
 					ExternalId:  externalId3,
-					Email:       "actor3@example.com",
 					Permissions: originalPerms3,
 				})
 				require.NoError(t, err)
@@ -393,33 +342,28 @@ func TestActor(t *testing.T) {
 				actor2, err := db.UpsertActor(ctx, &core.Actor{
 					ExternalId:  externalId2,
 					Namespace:   "root",
-					Email:       "actor2-updated@example.com",
 					Permissions: newPerms2,
 				})
 				require.NoError(t, err)
 				require.Equal(t, id2, actor2.Id)
-				require.Equal(t, "actor2-updated@example.com", actor2.Email)
 				require.Equal(t, Permissions(newPerms2), actor2.Permissions)
 
 				// Verify actor1 was NOT affected
 				retrieved1, err := db.GetActorByExternalId(ctx, "root", externalId1)
 				require.NoError(t, err)
 				require.Equal(t, id1, retrieved1.Id)
-				require.Equal(t, "actor1@example.com", retrieved1.Email)
 				require.Equal(t, originalPerms1, retrieved1.Permissions)
 
 				// Verify actor2 was updated correctly
 				retrieved2, err := db.GetActorByExternalId(ctx, "root", externalId2)
 				require.NoError(t, err)
 				require.Equal(t, id2, retrieved2.Id)
-				require.Equal(t, "actor2-updated@example.com", retrieved2.Email)
 				require.Equal(t, Permissions(newPerms2), retrieved2.Permissions)
 
 				// Verify actor3 was NOT affected
 				retrieved3, err := db.GetActorByExternalId(ctx, "root", externalId3)
 				require.NoError(t, err)
 				require.Equal(t, id3, retrieved3.Id)
-				require.Equal(t, "actor3@example.com", retrieved3.Email)
 				require.Equal(t, originalPerms3, retrieved3.Permissions)
 			})
 		})
@@ -438,29 +382,10 @@ func TestActor(t *testing.T) {
 			}
 			lastUuid = u
 
-			isAdmin := false
-			isSuperAdmin := false
-
-			if i%5 == 1 {
-				isAdmin = true
-			} else if i%13 == 1 {
-				isSuperAdmin = true
-			}
-
-			externalID := u.String()
-			if isAdmin {
-				externalID = "admin/" + externalID
-			} else if isSuperAdmin {
-				externalID = "superadmin/" + externalID
-			}
-
 			err := db.CreateActor(ctx, &Actor{
 				Id:         u,
 				Namespace:  "root",
-				ExternalId: externalID,
-				Email:      u.String() + "@example.com",
-				Admin:      isAdmin,
-				SuperAdmin: isSuperAdmin,
+				ExternalId: u.String(),
 			})
 			require.NoError(t, err)
 		}
@@ -507,49 +432,26 @@ func TestActor(t *testing.T) {
 			require.Equal(t, firstUuid, allResults[49].Id)
 		})
 	})
-	t.Run("IsAdmin", func(t *testing.T) {
+	t.Run("CanSelfSign", func(t *testing.T) {
 		u := Actor{}
-		require.False(t, u.IsAdmin())
-		u.Admin = true
-		require.True(t, u.IsAdmin())
-		u.Admin = false
-		require.False(t, u.IsAdmin())
+		require.False(t, u.CanSelfSign())
+
+		encryptedKey := "some-encrypted-key"
+		u.EncryptedKey = &encryptedKey
+		require.True(t, u.CanSelfSign())
+
+		u.EncryptedKey = nil
+		require.False(t, u.CanSelfSign())
 
 		var nila *Actor
-		require.False(t, nila.IsAdmin())
-	})
-	t.Run("IsSuperAdmin", func(t *testing.T) {
-		u := Actor{}
-		require.False(t, u.IsSuperAdmin())
-		u.SuperAdmin = true
-		require.True(t, u.IsSuperAdmin())
-		u.SuperAdmin = false
-		require.False(t, u.IsSuperAdmin())
-
-		var nila *Actor
-		require.False(t, nila.IsSuperAdmin())
-	})
-	t.Run("IsNormalActor", func(t *testing.T) {
-		u := Actor{}
-		require.True(t, u.IsNormalActor())
-		u.SuperAdmin = true
-		require.False(t, u.IsNormalActor())
-		u.SuperAdmin = false
-		u.Admin = true
-		require.False(t, u.IsNormalActor())
-		u.SuperAdmin = false
-		u.Admin = false
-		require.True(t, u.IsNormalActor())
-
-		var nila *Actor
-		require.True(t, nila.IsNormalActor())
+		require.False(t, nila.CanSelfSign())
 	})
 	t.Run("DeleteActor soft delete and IncludeDeleted listing", func(t *testing.T) {
 		setup(t)
 
 		// create a single actor
 		id := uuid.New()
-		a := &Actor{Id: id, Namespace: "root", ExternalId: id.String(), Email: "delete-me@example.com"}
+		a := &Actor{Id: id, Namespace: "root", ExternalId: id.String()}
 		require.NoError(t, db.CreateActor(ctx, a))
 
 		// delete it
@@ -578,20 +480,14 @@ func TestActor(t *testing.T) {
 		require.True(t, IsValidActorOrderByField(ActorOrderByCreatedAt))
 		require.True(t, IsValidActorOrderByField(ActorOrderByUpdatedAt))
 		require.True(t, IsValidActorOrderByField(ActorOrderByNamespace))
-		require.True(t, IsValidActorOrderByField(ActorOrderByEmail))
 		require.True(t, IsValidActorOrderByField(ActorOrderByExternalId))
-		require.True(t, IsValidActorOrderByField(ActorOrderByAdmin))
-		require.True(t, IsValidActorOrderByField(ActorOrderBySuperAdmin))
 		require.True(t, IsValidActorOrderByField(ActorOrderByDeletedAt))
 
 		// Valid values (as strings)
 		require.True(t, IsValidActorOrderByField("created_at"))
 		require.True(t, IsValidActorOrderByField("updated_at"))
 		require.True(t, IsValidActorOrderByField("namespace"))
-		require.True(t, IsValidActorOrderByField("email"))
 		require.True(t, IsValidActorOrderByField("external_id"))
-		require.True(t, IsValidActorOrderByField("admin"))
-		require.True(t, IsValidActorOrderByField("super_admin"))
 		require.True(t, IsValidActorOrderByField("deleted_at"))
 
 		// Invalid values
@@ -647,7 +543,6 @@ func TestActor(t *testing.T) {
 				Id:         id,
 				Namespace:  "root.tenant1",
 				ExternalId: id.String(),
-				Email:      "bobdole@example.com",
 			}
 			require.NoError(t, db.CreateActor(ctx, actor))
 
@@ -665,7 +560,6 @@ func TestActor(t *testing.T) {
 			actor, err := db.UpsertActor(ctx, &core.Actor{
 				ExternalId: externalId,
 				Namespace:  "root.tenant1",
-				Email:      "actor@example.com",
 			})
 			require.NoError(t, err)
 			require.Equal(t, "root.tenant1", actor.GetNamespace())
@@ -674,11 +568,9 @@ func TestActor(t *testing.T) {
 			actor, err = db.UpsertActor(ctx, &core.Actor{
 				ExternalId: externalId,
 				Namespace:  "root.tenant1",
-				Email:      "updated@example.com",
 			})
 			require.NoError(t, err)
 			require.Equal(t, "root.tenant1", actor.GetNamespace())
-			require.Equal(t, "updated@example.com", actor.Email)
 
 			// Verify in database
 			retrieved, err := db.GetActorByExternalId(ctx, "root.tenant1", externalId)
@@ -726,7 +618,6 @@ func TestActor(t *testing.T) {
 					Id:         id,
 					Namespace:  a.namespace,
 					ExternalId: a.externalId,
-					Email:      a.externalId + "@example.com",
 				})
 				require.NoError(t, err)
 			}
@@ -772,7 +663,7 @@ func TestActor(t *testing.T) {
 				Namespace:  "root",
 				ExternalId: "actor1",
 				Labels: Labels{
-					"authproxy.io/admin-sync-source": "config-list",
+					"authproxy.io/actor-sync-source": "config-list",
 				},
 			}
 			require.NoError(t, db.CreateActor(ctx, actor1))
@@ -782,7 +673,7 @@ func TestActor(t *testing.T) {
 				Namespace:  "root",
 				ExternalId: "actor2",
 				Labels: Labels{
-					"authproxy.io/admin-sync-source": "external-source",
+					"authproxy.io/actor-sync-source": "external-source",
 				},
 			}
 			require.NoError(t, db.CreateActor(ctx, actor2))
@@ -796,7 +687,7 @@ func TestActor(t *testing.T) {
 			require.NoError(t, db.CreateActor(ctx, actor3))
 
 			// Filter for label existence
-			result := db.ListActorsBuilder().ForLabelExists("authproxy.io/admin-sync-source").FetchPage(ctx)
+			result := db.ListActorsBuilder().ForLabelExists("authproxy.io/actor-sync-source").FetchPage(ctx)
 			require.NoError(t, result.Error)
 			require.Len(t, result.Results, 2)
 		})
@@ -810,7 +701,7 @@ func TestActor(t *testing.T) {
 				Namespace:  "root",
 				ExternalId: "actor1",
 				Labels: Labels{
-					"authproxy.io/admin-sync-source": "config-list",
+					"authproxy.io/actor-sync-source": "config-list",
 				},
 			}
 			require.NoError(t, db.CreateActor(ctx, actor1))
@@ -820,7 +711,7 @@ func TestActor(t *testing.T) {
 				Namespace:  "root",
 				ExternalId: "actor2",
 				Labels: Labels{
-					"authproxy.io/admin-sync-source": "external-source",
+					"authproxy.io/actor-sync-source": "external-source",
 				},
 			}
 			require.NoError(t, db.CreateActor(ctx, actor2))
@@ -830,21 +721,21 @@ func TestActor(t *testing.T) {
 				Namespace:  "root",
 				ExternalId: "actor3",
 				Labels: Labels{
-					"authproxy.io/admin-sync-source": "config-list",
+					"authproxy.io/actor-sync-source": "config-list",
 				},
 			}
 			require.NoError(t, db.CreateActor(ctx, actor3))
 
 			// Filter for specific label value
-			result := db.ListActorsBuilder().ForLabelEquals("authproxy.io/admin-sync-source", "config-list").FetchPage(ctx)
+			result := db.ListActorsBuilder().ForLabelEquals("authproxy.io/actor-sync-source", "config-list").FetchPage(ctx)
 			require.NoError(t, result.Error)
 			require.Len(t, result.Results, 2)
 			for _, a := range result.Results {
-				require.Equal(t, "config-list", a.Labels["authproxy.io/admin-sync-source"])
+				require.Equal(t, "config-list", a.Labels["authproxy.io/actor-sync-source"])
 			}
 
 			// Filter for different label value
-			result = db.ListActorsBuilder().ForLabelEquals("authproxy.io/admin-sync-source", "external-source").FetchPage(ctx)
+			result = db.ListActorsBuilder().ForLabelEquals("authproxy.io/actor-sync-source", "external-source").FetchPage(ctx)
 			require.NoError(t, result.Error)
 			require.Len(t, result.Results, 1)
 			require.Equal(t, "actor2", result.Results[0].ExternalId)
@@ -977,8 +868,7 @@ func TestActor(t *testing.T) {
 			actor := &Actor{
 				Id:           uuid.New(),
 				Namespace:    "root",
-				ExternalId:   "admin/testuser",
-				Admin:        true,
+				ExternalId:   "testuser",
 				EncryptedKey: &encryptedKeyVal,
 			}
 			require.NoError(t, db.CreateActor(ctx, actor))
@@ -995,8 +885,7 @@ func TestActor(t *testing.T) {
 			actor := &Actor{
 				Id:           uuid.New(),
 				Namespace:    "root",
-				ExternalId:   "admin/testuser2",
-				Admin:        true,
+				ExternalId:   "testuser2",
 				EncryptedKey: nil,
 			}
 			require.NoError(t, db.CreateActor(ctx, actor))

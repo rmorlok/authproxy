@@ -8,41 +8,25 @@ import (
 
 func TestActor(t *testing.T) {
 	t.Parallel()
-	t.Run("IsAdmin", func(t *testing.T) {
+	t.Run("GetExternalId", func(t *testing.T) {
 		u := Actor{}
-		assert.False(t, u.IsAdmin())
-		u.Admin = true
-		assert.True(t, u.IsAdmin())
-		u.Admin = false
-		assert.False(t, u.IsAdmin())
+		assert.Equal(t, "", u.GetExternalId())
 
-		var nila *Actor
-		assert.False(t, nila.IsAdmin())
+		u.ExternalId = "test-user"
+		assert.Equal(t, "test-user", u.GetExternalId())
 	})
-	t.Run("IsSuperAdmin", func(t *testing.T) {
+	t.Run("GetNamespace", func(t *testing.T) {
 		u := Actor{}
-		assert.False(t, u.IsSuperAdmin())
-		u.SuperAdmin = true
-		assert.True(t, u.IsSuperAdmin())
-		u.SuperAdmin = false
-		assert.False(t, u.IsSuperAdmin())
+		assert.Equal(t, "", u.GetNamespace())
 
-		var nila *Actor
-		assert.False(t, nila.IsSuperAdmin())
+		u.Namespace = "test-namespace"
+		assert.Equal(t, "test-namespace", u.GetNamespace())
 	})
-	t.Run("IsNormalActor", func(t *testing.T) {
+	t.Run("GetLabels", func(t *testing.T) {
 		u := Actor{}
-		assert.True(t, u.IsNormalActor())
-		u.SuperAdmin = true
-		assert.False(t, u.IsNormalActor())
-		u.SuperAdmin = false
-		u.Admin = true
-		assert.False(t, u.IsNormalActor())
-		u.SuperAdmin = false
-		u.Admin = false
-		assert.True(t, u.IsNormalActor())
+		assert.Nil(t, u.GetLabels())
 
-		var nila *Actor
-		assert.True(t, nila.IsNormalActor())
+		u.Labels = map[string]string{"key": "value"}
+		assert.Equal(t, map[string]string{"key": "value"}, u.GetLabels())
 	})
 }

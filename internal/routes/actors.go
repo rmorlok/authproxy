@@ -32,11 +32,8 @@ type ActorsRoutes struct {
 type ActorJson struct {
 	Id         uuid.UUID         `json:"id"`
 	Namespace  string            `json:"namespace"`
-	Labels     map[string]string `json:"labels"`
 	ExternalId string            `json:"external_id"`
-	Email      string            `json:"email"`
-	Admin      bool              `json:"admin"`
-	SuperAdmin bool              `json:"super_admin"`
+	Labels     map[string]string `json:"labels,omitempty"`
 	CreatedAt  time.Time         `json:"created_at"`
 	UpdatedAt  time.Time         `json:"updated_at"`
 }
@@ -47,9 +44,6 @@ func DatabaseActorToJson(a *database.Actor) ActorJson {
 		Namespace:  a.GetNamespace(),
 		Labels:     a.GetLabels(),
 		ExternalId: a.ExternalId,
-		Email:      a.Email,
-		Admin:      a.Admin,
-		SuperAdmin: a.SuperAdmin,
 		CreatedAt:  a.CreatedAt,
 		UpdatedAt:  a.UpdatedAt,
 	}
@@ -59,9 +53,6 @@ type ListActorsRequestQuery struct {
 	Cursor        *string `form:"cursor"`
 	LimitVal      *int32  `form:"limit"`
 	ExternalId    *string `form:"external_id"`
-	Email         *string `form:"email"`
-	Admin         *bool   `form:"admin"`
-	SuperAdmin    *bool   `form:"super_admin"`
 	NamespaceVal  *string `form:"namespace"`
 	LabelSelector *string `form:"label_selector"`
 	OrderByVal    *string `form:"order_by"`
@@ -112,18 +103,6 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 
 		if req.ExternalId != nil {
 			b = b.ForExternalId(*req.ExternalId)
-		}
-
-		if req.Email != nil {
-			b = b.ForEmail(*req.Email)
-		}
-
-		if req.Admin != nil {
-			b = b.ForIsAdmin(*req.Admin)
-		}
-
-		if req.SuperAdmin != nil {
-			b = b.ForIsSuperAdmin(*req.SuperAdmin)
 		}
 
 		b = b.ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))

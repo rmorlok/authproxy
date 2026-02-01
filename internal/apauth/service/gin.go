@@ -164,13 +164,6 @@ func (j *service) OptionalXsrfNotRequired(validators ...AuthValidator) gin.Handl
 	}
 }
 
-// AdminOnly middleware requires and authenticates an admin actor. It applies the validators passed in addition to the
-// admin validator and the default validators for the service.
-func (j *service) AdminOnly(validators ...AuthValidator) gin.HandlerFunc {
-	combined := combineAuthValidators(validators, []AuthValidator{AuthValidatorActorIsAdmin})
-	return j.Required(combined...)
-}
-
 func (j *service) EstablishGinSession(c *gin.Context, ra *core.RequestAuth) error {
 	return j.EstablishSession(c.Request.Context(), c.Writer, ra)
 }

@@ -39,7 +39,7 @@ system_auth:
       path: ./dev_config/keys/system.pub
     private_key:
       path: ./dev_config/keys/system
-  admin_users:
+  actors:
     keys_path: ./dev_config/keys/admin
     permissions:
       - namespace: root.**

@@ -311,10 +311,7 @@
         "disable_xsrf": {
           "type": "boolean"
         },
-        "admin_users": true,
-        "admin_email_domain": {
-          "type": "string"
-        },
+        "actors": true,
         "global_aes_key": true
       },
       "additionalProperties": false,
