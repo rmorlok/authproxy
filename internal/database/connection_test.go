@@ -37,6 +37,32 @@ func TestConnections(t *testing.T) {
 		assert.Equal(t, now, c.CreatedAt)
 		assert.Equal(t, now, c.UpdatedAt)
 	})
+	t.Run("round trip with labels", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig("connection_round_trip_with_labels", nil)
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		u := uuid.New()
+		labels := Labels{
+			"env":     "production",
+			"project": "authproxy",
+		}
+		err := db.CreateConnection(ctx, &Connection{
+			Id:               u,
+			Namespace:        "root.some-namespace",
+			ConnectorId:      uuid.New(),
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+			Labels:           labels,
+		})
+		assert.NoError(t, err)
+
+		c, err := db.GetConnection(ctx, u)
+		assert.NoError(t, err)
+		assert.NotNil(t, c)
+		assert.Equal(t, c.Id, u)
+		assert.Equal(t, labels, c.Labels)
+	})
 	t.Run("delete connection", func(t *testing.T) {
 		_, db, rawDb := MustApplyBlankTestDbConfigRaw("delete_connection", nil)
 		defer rawDb.Close()
@@ -319,6 +345,93 @@ func TestConnections(t *testing.T) {
 			assert.Equal(t, lastUuid, allResults[0].Id)
 			assert.Equal(t, firstUuid, allResults[49].Id)
 		})
+	})
+
+	t.Run("filter by label selector", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig("connection_label_filtering", nil)
+		ctx := apctx.NewBuilderBackground().Build()
+
+		// Create some connections with different labels
+		connections := []struct {
+			id     uuid.UUID
+			labels Labels
+		}{
+			{uuid.New(), Labels{"env": "prod", "tier": "web", "version": "v1"}},
+			{uuid.New(), Labels{"env": "prod", "tier": "db", "version": "v1"}},
+			{uuid.New(), Labels{"env": "staging", "tier": "web", "version": "v2"}},
+			{uuid.New(), Labels{"env": "staging", "tier": "db"}},
+			{uuid.New(), Labels{"project": "authproxy"}},
+		}
+
+		for _, conn := range connections {
+			err := db.CreateConnection(ctx, &Connection{
+				Id:               conn.id,
+				Namespace:        "root",
+				ConnectorId:      uuid.New(),
+				ConnectorVersion: 1,
+				State:            ConnectionStateCreated,
+				Labels:           conn.labels,
+			})
+			assert.NoError(t, err)
+		}
+
+		testCases := []struct {
+			name     string
+			selector string
+			expected []uuid.UUID
+		}{
+			{
+				name:     "equality",
+				selector: "env=prod",
+				expected: []uuid.UUID{connections[0].id, connections[1].id},
+			},
+			{
+				name:     "multiple equality",
+				selector: "env=prod,tier=web",
+				expected: []uuid.UUID{connections[0].id},
+			},
+			{
+				name:     "inequality",
+				selector: "env!=prod",
+				expected: []uuid.UUID{connections[2].id, connections[3].id, connections[4].id},
+			},
+			{
+				name:     "exists",
+				selector: "version",
+				expected: []uuid.UUID{connections[0].id, connections[1].id, connections[2].id},
+			},
+			{
+				name:     "not exists",
+				selector: "!version",
+				expected: []uuid.UUID{connections[3].id, connections[4].id},
+			},
+			{
+				name:     "complex",
+				selector: "env=staging,!version",
+				expected: []uuid.UUID{connections[3].id},
+			},
+			{
+				name:     "no match",
+				selector: "env=dev",
+				expected: []uuid.UUID{},
+			},
+		}
+
+		for _, tc := range testCases {
+			t.Run(tc.name, func(t *testing.T) {
+				result := db.ListConnectionsBuilder().
+					ForLabelSelector(tc.selector).
+					FetchPage(ctx)
+				assert.NoError(t, result.Error)
+				assert.Len(t, result.Results, len(tc.expected))
+
+				foundIds := make([]uuid.UUID, 0, len(result.Results))
+				for _, r := range result.Results {
+					foundIds = append(foundIds, r.Id)
+				}
+				assert.ElementsMatch(t, tc.expected, foundIds)
+			})
+		}
 	})
 
 	t.Run("enumerate connections", func(t *testing.T) {
