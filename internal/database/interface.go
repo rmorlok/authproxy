@@ -22,9 +22,6 @@ type IActorData interface {
 	GetId() uuid.UUID
 	GetExternalId() string
 	GetPermissions() []aschema.Permission
-	IsAdmin() bool
-	IsSuperAdmin() bool
-	GetEmail() string
 	GetNamespace() string
 	GetLabels() map[string]string
 }

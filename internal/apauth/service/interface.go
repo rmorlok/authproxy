@@ -23,7 +23,6 @@ type A interface {
 	Required(validators ...AuthValidator) gin.HandlerFunc
 	Optional(validators ...AuthValidator) gin.HandlerFunc
 	OptionalXsrfNotRequired(validators ...AuthValidator) gin.HandlerFunc
-	AdminOnly(validators ...AuthValidator) gin.HandlerFunc
 
 	/*
 	 * Other helpers to set and get authentication.

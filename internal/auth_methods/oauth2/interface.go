@@ -16,9 +16,6 @@ type IActorData interface {
 	GetExternalId() string
 	GetLabels() map[string]string
 	GetPermissions() []aschema.Permission
-	IsAdmin() bool
-	IsSuperAdmin() bool
-	GetEmail() string
 	GetNamespace() string
 }
 

@@ -67,7 +67,6 @@ func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 		Actor: &core.Actor{
 			ExternalId: "id1",
 			Namespace:  "root",
-			Email:      "me@example.com",
 		},
 	}
 
@@ -127,7 +126,6 @@ func TestAuth_RoundtripPublicPrivate(t *testing.T) {
 		Actor: &core.Actor{
 			ExternalId: "id1",
 			Namespace:  "root",
-			Email:      "me@example.com",
 		},
 	}
 
@@ -159,7 +157,6 @@ func TestAuth_SecretKey(t *testing.T) {
 			&database.Actor{
 				ExternalId: "external-id7",
 				Namespace:  "root",
-				Email:      "me@example.com",
 			},
 			nil,
 		)
@@ -179,7 +176,6 @@ func TestAuth_SecretKey(t *testing.T) {
 		Actor: &core.Actor{
 			ExternalId: "external-id7",
 			Namespace:  "root",
-			Email:      "me@example.com",
 		},
 	}
 
@@ -214,7 +210,7 @@ func TestAuth_Parse(t *testing.T) {
 		claims, err := j.Parse(testContext, tok)
 		require.NoError(t, err)
 		require.False(t, claims.IsExpired(testContext))
-		require.Equal(t, testClaims().Actor.Email, claims.Actor.Email)
+		require.Equal(t, testClaims().Actor.ExternalId, claims.Actor.ExternalId)
 
 	})
 	t.Run("expired", func(t *testing.T) {
@@ -232,7 +228,6 @@ func TestAuth_Parse(t *testing.T) {
 			Actor: &core.Actor{
 				ExternalId: "id1",
 				Namespace:  "root",
-				Email:      "me@example.com",
 			},
 		}
 
@@ -263,7 +258,6 @@ func TestAuth_Parse(t *testing.T) {
 			Actor: &core.Actor{
 				ExternalId: "id1",
 				Namespace:  "root",
-				Email:      "me@example.com",
 			},
 		}
 
@@ -342,8 +336,8 @@ func TestAuth_Parse(t *testing.T) {
 		require.NotNil(t, err, "bad token")
 	})
 
-	t.Run("admin", func(t *testing.T) {
-		// Set up admin key config
+	t.Run("self-signed actor", func(t *testing.T) {
+		// Set up actor key config
 		bobdoleKey := &sconfig.Key{
 			InnerVal: &sconfig.KeyPublicPrivate{
 				PublicKey: &sconfig.KeyData{
@@ -356,11 +350,11 @@ func TestAuth_Parse(t *testing.T) {
 
 		cfg := config.FromRoot(&sconfig.Root{
 			SystemAuth: sconfig.SystemAuth{
-				AdminUsers: &sconfig.AdminUsers{
-					InnerVal: &sconfig.AdminUsersList{
-						&sconfig.AdminUser{
-							Username: "bobdole",
-							Key:      bobdoleKey,
+				Actors: &sconfig.ConfiguredActors{
+					InnerVal: sconfig.ConfiguredActorsList{
+						&sconfig.ConfiguredActor{
+							ExternalId: "bobdole",
+							Key:        bobdoleKey,
 						},
 					},
 				},
@@ -388,7 +382,7 @@ func TestAuth_Parse(t *testing.T) {
 			},
 		})
 
-		// Set up database and encrypt service for admin tests
+		// Set up database and encrypt service for self-signed tests
 		var testDb database.DB
 		var enc encrypt.E
 		cfg, testDb = database.MustApplyBlankTestDbConfig(t.Name(), cfg)
@@ -396,64 +390,58 @@ func TestAuth_Parse(t *testing.T) {
 
 		ctx := context.Background()
 
-		// Marshal and encrypt the admin key for storage in database
+		// Marshal and encrypt the actor key for storage in database
 		keyJson, err := json.Marshal(bobdoleKey)
 		require.NoError(t, err)
 		encryptedKey, err := enc.EncryptStringGlobal(ctx, string(keyJson))
 		require.NoError(t, err)
 
-		// Create the admin actor in the database
+		// Create the actor in the database
 		err = testDb.CreateActor(ctx, &database.Actor{
 			Id:           uuid.New(),
 			Namespace:    "root",
-			ExternalId:   "admin/bobdole",
-			Email:        "bobdole@example.com",
-			Admin:        true,
+			ExternalId:   "bobdole",
 			EncryptedKey: &encryptedKey,
 		})
 		require.NoError(t, err)
 
-		adminSrv := NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), testDb, nil, enc, test_utils.NewTestLogger())
+		actorSrv := NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), testDb, nil, enc, test_utils.NewTestLogger())
 
 		t.Run("valid", func(t *testing.T) {
 			token, err := jwt2.NewJwtTokenBuilder().
 				WithActorExternalId("bobdole").
-				WithActorEmail("bobdole@example.com").
 				WithPrivateKeyPath(pathToTestData("admin_user_keys/bobdole")).
-				WithAdmin().
+				WithSelfSigned().
 				WithAudience(string(sconfig.ServiceIdAdminApi)).
 				TokenCtx(testContext)
 			require.NoError(t, err)
 
-			claims, err := adminSrv.Parse(testContext, token)
+			claims, err := actorSrv.Parse(testContext, token)
 			require.NoError(t, err)
-			require.Equal(t, "admin/bobdole", claims.Subject)
-			require.True(t, claims.IsAdmin())
+			require.Equal(t, "bobdole", claims.Subject)
 		})
 
-		t.Run("unknown admin", func(t *testing.T) {
+		t.Run("unknown actor", func(t *testing.T) {
 			token, err := jwt2.NewJwtTokenBuilder().
 				WithActorExternalId("billclinton").
-				WithActorEmail("billclinton@example.com").
 				WithPrivateKeyPath(pathToTestData("admin_user_keys/billclinton")).
-				WithAdmin().
+				WithSelfSigned().
 				TokenCtx(testContext)
 			require.NoError(t, err)
 
-			_, err = adminSrv.Parse(testContext, token)
+			_, err = actorSrv.Parse(testContext, token)
 			require.Error(t, err)
 		})
 
-		t.Run("wrong key for admin", func(t *testing.T) {
+		t.Run("wrong key for actor", func(t *testing.T) {
 			token, err := jwt2.NewJwtTokenBuilder().
 				WithActorExternalId("bobdole").
-				WithActorEmail("bobdole@example.com").
 				WithPrivateKeyPath(pathToTestData("admin_user_keys/billclinton")).
-				WithAdmin().
+				WithSelfSigned().
 				TokenCtx(testContext)
 			require.NoError(t, err)
 
-			_, err = adminSrv.Parse(testContext, token)
+			_, err = actorSrv.Parse(testContext, token)
 			require.Error(t, err)
 		})
 	})
@@ -500,7 +488,6 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 					Id:         dbActorId,
 					Namespace:  "root",
 					ExternalId: testClaims().Actor.ExternalId,
-					Email:      testClaims().Actor.Email,
 				}
 				require.NoError(t, db.CreateActor(testContext, dbActor))
 
@@ -519,31 +506,6 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				require.Equal(t, testClaims().Actor.ExternalId, ra.MustGetActor().ExternalId)
 			})
 
-			t.Run("actor updated in database", func(t *testing.T) {
-				setup(t)
-
-				dbActorId := uuid.New()
-				dbActor := &database.Actor{
-					Id:         dbActorId,
-					Namespace:  "root",
-					ExternalId: testClaims().Actor.ExternalId,
-					Email:      "old-" + testClaims().Actor.Email,
-				}
-				require.NoError(t, db.CreateActor(testContext, dbActor))
-
-				tok, err := a.Token(testContext, testClaims())
-				require.NoError(t, err)
-
-				req := httptest.NewRequest("GET", "/", nil)
-				req.Header.Add(JwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
-				w := httptest.NewRecorder()
-				ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
-				require.NoError(t, err)
-				require.True(t, ra.IsAuthenticated())
-				require.Equal(t, testClaims().Actor.ExternalId, ra.MustGetActor().ExternalId)
-				require.Equal(t, testClaims().Actor.Email, ra.MustGetActor().Email)
-			})
-
 			t.Run("actor permissions updated in database", func(t *testing.T) {
 				setup(t)
 
@@ -560,7 +522,6 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 					Id:          dbActorId,
 					Namespace:   "root",
 					ExternalId:  externalId,
-					Email:       "permtest@example.com",
 					Permissions: oldPerms,
 				}
 				require.NoError(t, db.CreateActor(testContext, dbActor))
@@ -591,7 +552,6 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 					Actor: &core.Actor{
 						ExternalId:  externalId,
 						Namespace:   "root",
-						Email:       "permtest@example.com",
 						Permissions: newPerms,
 					},
 				}
@@ -697,8 +657,8 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 	})
 }
 
-func TestAuth_AdminPermissionsSync(t *testing.T) {
-	// Test that admin permissions are synced from config when the admin already exists in DB
+func TestAuth_ActorPermissionsSync(t *testing.T) {
+	// Test that actor permissions are synced from config when the actor already exists in DB
 	configPerms := []aschema.Permission{
 		{
 			Namespace: "root",
@@ -707,9 +667,8 @@ func TestAuth_AdminPermissionsSync(t *testing.T) {
 		},
 	}
 
-	adminConfig := sconfig.Root{
+	actorConfig := sconfig.Root{
 		SystemAuth: sconfig.SystemAuth{
-			AdminEmailDomain:    "example.com",
 			JwtTokenDurationVal: 12 * time.Hour,
 			JwtIssuerVal:        "example",
 			JwtSigningKey: &sconfig.Key{
@@ -726,10 +685,10 @@ func TestAuth_AdminPermissionsSync(t *testing.T) {
 					},
 				},
 			},
-			AdminUsers: &sconfig.AdminUsers{
-				InnerVal: sconfig.AdminUsersList{
-					&sconfig.AdminUser{
-						Username:    "aid1",
+			Actors: &sconfig.ConfiguredActors{
+				InnerVal: sconfig.ConfiguredActorsList{
+					&sconfig.ConfiguredActor{
+						ExternalId:  "aid1",
 						Permissions: configPerms,
 						Key: &sconfig.Key{
 							InnerVal: &sconfig.KeyPublicPrivate{
@@ -766,16 +725,16 @@ func TestAuth_AdminPermissionsSync(t *testing.T) {
 	var db database.DB
 
 	setup := func(t *testing.T) {
-		cfg := config.FromRoot(&adminConfig)
+		cfg := config.FromRoot(&actorConfig)
 		cfg, db = database.MustApplyBlankTestDbConfig(t.Name(), cfg)
 		a = NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), db, nil, nil, test_utils.NewTestLogger())
 		raw = a.(*service)
 	}
 
-	t.Run("admin auth uses permissions from database", func(t *testing.T) {
+	t.Run("actor auth uses permissions from database", func(t *testing.T) {
 		setup(t)
 
-		adminExternalId := "admin/aid1"
+		actorExternalId := "aid1"
 		dbPerms := database.Permissions{
 			{
 				Namespace: "root",
@@ -784,23 +743,21 @@ func TestAuth_AdminPermissionsSync(t *testing.T) {
 			},
 		}
 
-		// Create admin actor in database with permissions (simulating admin_sync)
+		// Create actor in database with permissions (simulating actor sync)
 		dbActorId := uuid.New()
 		dbActor := &database.Actor{
 			Id:          dbActorId,
 			Namespace:   "root",
-			ExternalId:  adminExternalId,
-			Email:       "aid1@example.com",
-			Admin:       true,
+			ExternalId:  actorExternalId,
 			Permissions: dbPerms,
 		}
 		require.NoError(t, db.CreateActor(testContext, dbActor))
 
-		// Create JWT for admin WITHOUT Actor field (should use existing actor from DB)
+		// Create JWT for actor WITHOUT Actor field (should use existing actor from DB)
 		claims := &jwt2.AuthProxyClaims{
 			RegisteredClaims: jwt.RegisteredClaims{
 				ID:        "random id",
-				Subject:   adminExternalId,
+				Subject:   actorExternalId,
 				Issuer:    "remark42",
 				Audience:  []string{string(sconfig.ServiceIdAdminApi)},
 				ExpiresAt: &jwt.NumericDate{Time: time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
@@ -819,24 +776,23 @@ func TestAuth_AdminPermissionsSync(t *testing.T) {
 		ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
 		require.NoError(t, err)
 		require.True(t, ra.IsAuthenticated())
-		require.Equal(t, adminExternalId, ra.MustGetActor().ExternalId)
-		require.True(t, ra.MustGetActor().Admin)
+		require.Equal(t, actorExternalId, ra.MustGetActor().ExternalId)
 
 		// Verify the returned auth has permissions from database (not from config)
 		// Cast to []aschema.Permission for comparison since database.Permissions is a type alias
 		require.Equal(t, []aschema.Permission(dbPerms), ra.MustGetActor().Permissions)
 	})
 
-	t.Run("admin auth fails if not in database", func(t *testing.T) {
+	t.Run("actor auth fails if not in database", func(t *testing.T) {
 		setup(t)
 
-		adminExternalId := "admin/aid1"
+		actorExternalId := "aid1"
 
-		// Create JWT for admin that doesn't exist in database
+		// Create JWT for actor that doesn't exist in database
 		claims := &jwt2.AuthProxyClaims{
 			RegisteredClaims: jwt.RegisteredClaims{
 				ID:        "random id",
-				Subject:   adminExternalId,
+				Subject:   actorExternalId,
 				Issuer:    "remark42",
 				Audience:  []string{string(sconfig.ServiceIdAdminApi)},
 				ExpiresAt: &jwt.NumericDate{Time: time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
@@ -853,7 +809,7 @@ func TestAuth_AdminPermissionsSync(t *testing.T) {
 		req.Header.Add(JwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
 		w := httptest.NewRecorder()
 		ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
-		require.Error(t, err) // Should fail because admin not in database
+		require.Error(t, err) // Should fail because actor not in database
 		require.False(t, ra.IsAuthenticated())
 	})
 }
@@ -999,7 +955,6 @@ func testClaims() *jwt2.AuthProxyClaims {
 		Actor: &core.Actor{
 			ExternalId: "id1",
 			Namespace:  "root",
-			Email:      "me@example.com",
 		},
 	}
 }
@@ -1022,10 +977,10 @@ var testConfigPublicPrivateKey = sconfig.Root{
 				},
 			},
 		},
-		AdminUsers: &sconfig.AdminUsers{
-			InnerVal: sconfig.AdminUsersList{
-				&sconfig.AdminUser{
-					Username: "aid1",
+		Actors: &sconfig.ConfiguredActors{
+			InnerVal: sconfig.ConfiguredActorsList{
+				&sconfig.ConfiguredActor{
+					ExternalId: "aid1",
 					Key: &sconfig.Key{
 						InnerVal: &sconfig.KeyPublicPrivate{
 							PublicKey: &sconfig.KeyData{

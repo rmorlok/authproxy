@@ -11,7 +11,7 @@ system_auth:
       path: ./test_data/keys/system.pub
     private_key:
       path: ./test_data/keys/system
-  admin_users:
+  actors:
     keys_path: ./test_data/keys/admin
   global_aes_key:
     random:

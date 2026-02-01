@@ -2,8 +2,6 @@ package jwt
 
 import (
 	"context"
-	"fmt"
-	"strings"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -26,10 +24,7 @@ type ClaimsBuilder interface {
 	WithExpiration(expiration time.Time) ClaimsBuilder
 	WithExpiresIn(expiresIn time.Duration) ClaimsBuilder
 	WithExpiresInCtx(ctx context.Context, expiresIn time.Duration) ClaimsBuilder
-	WithSuperAdmin() ClaimsBuilder
-	WithAdmin() ClaimsBuilder
 	WithSelfSigned() ClaimsBuilder
-	WithActorEmail(email string) ClaimsBuilder
 	WithActorExternalId(id string) ClaimsBuilder
 	WithNamespace(namespace string) ClaimsBuilder
 	WithActor(actor core.IActorData) ClaimsBuilder
@@ -41,18 +36,15 @@ type ClaimsBuilder interface {
 }
 
 type claimsBuilder struct {
-	issuer      *string
-	audiences   []string
-	expiresIn   *time.Duration
-	expiration  *time.Time
-	superAdmin  *bool
-	admin       *bool
-	email       *string
-	external_id *string
-	namespace   *string
-	actor       *core.Actor
-	selfSigned  bool
-	nonce       *uuid.UUID
+	issuer     *string
+	audiences  []string
+	expiresIn  *time.Duration
+	expiration *time.Time
+	externalId *string
+	namespace  *string
+	actor      *core.Actor
+	selfSigned bool
+	nonce      *uuid.UUID
 }
 
 func (b *claimsBuilder) WithIssuer(issuer string) ClaimsBuilder {
@@ -94,30 +86,13 @@ func (b *claimsBuilder) WithExpiresInCtx(ctx context.Context, expiresIn time.Dur
 	return b
 }
 
-func (b *claimsBuilder) WithSuperAdmin() ClaimsBuilder {
-	b.admin = util.ToPtr(false)
-	b.superAdmin = util.ToPtr(true)
-	return b
-}
-
-func (b *claimsBuilder) WithAdmin() ClaimsBuilder {
-	b.admin = util.ToPtr(true)
-	b.superAdmin = util.ToPtr(false)
-	return b
-}
-
 func (b *claimsBuilder) WithSelfSigned() ClaimsBuilder {
 	b.selfSigned = true
 	return b
 }
 
-func (b *claimsBuilder) WithActorEmail(email string) ClaimsBuilder {
-	b.email = &email
-	return b
-}
-
 func (b *claimsBuilder) WithActorExternalId(id string) ClaimsBuilder {
-	b.external_id = &id
+	b.externalId = &id
 	return b
 }
 
@@ -138,17 +113,9 @@ func (b *claimsBuilder) WithNonce() ClaimsBuilder {
 }
 
 func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) {
-	if util.CoerceBool(b.admin) && util.CoerceBool(b.superAdmin) {
-		return nil, errors.New("cannot be both an admin and superadmin")
-	}
-
-	if util.CoerceBool(b.superAdmin) {
-		b.external_id = util.ToPtr("superadmin/superadmin")
-	}
-
 	if b.actor != nil {
 		if b.actor.GetExternalId() != "" {
-			b.external_id = util.ToPtr(b.actor.GetExternalId())
+			b.externalId = util.ToPtr(b.actor.GetExternalId())
 		}
 
 		if b.actor.GetNamespace() != "" {
@@ -158,36 +125,23 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 		if b.namespace == nil {
 			return nil, errors.New("namespace is required if specifying an actor")
 		}
-	}
-
-	if b.external_id == nil {
-		return nil, errors.New("external_id is required")
-	}
-
-	if util.CoerceBool(b.admin) && !strings.HasPrefix(*b.external_id, "admin/") {
-		b.external_id = util.ToPtr(fmt.Sprintf("admin/%s", *b.external_id))
-		if b.actor != nil {
-			b.actor.ExternalId = *b.external_id
-		}
-	}
-
-	if b.actor != nil {
-		if b.email != nil {
-			b.actor.Email = *b.email
-		}
-
-		if b.admin != nil {
-			b.actor.Admin = *b.admin
-		}
 
 		if b.namespace != nil {
 			b.actor.Namespace = *b.namespace
 		}
+
+		if b.externalId != nil {
+			b.actor.ExternalId = *b.externalId
+		}
+	}
+
+	if b.externalId == nil {
+		return nil, errors.New("external_id is required")
 	}
 
 	c := AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
-			Subject:  util.CoerceString(b.external_id),
+			Subject:  util.CoerceString(b.externalId),
 			IssuedAt: &jwt.NumericDate{apctx.GetClock(ctx).Now()},
 			ID:       apctx.GetUuidGenerator(ctx).NewString(),
 		},

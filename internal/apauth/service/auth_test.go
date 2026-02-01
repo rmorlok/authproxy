@@ -178,18 +178,18 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 					},
 				},
 				GlobalAESKey: sconfig.NewKeyDataRandomBytes(),
-				AdminUsers: &sconfig.AdminUsers{
-					InnerVal: sconfig.AdminUsersList{
-						&sconfig.AdminUser{
-							Username: "bobdole",
+				Actors: &sconfig.ConfiguredActors{
+					InnerVal: sconfig.ConfiguredActorsList{
+						&sconfig.ConfiguredActor{
+							ExternalId: "bobdole",
 							Key: &sconfig.Key{
 								InnerVal: &sconfig.KeyShared{
 									SharedKey: adminSigningKey,
 								},
 							},
 						},
-						&sconfig.AdminUser{
-							Username: "ronaldreagan",
+						&sconfig.ConfiguredActor{
+							ExternalId: "ronaldreagan",
 							Key: &sconfig.Key{
 								InnerVal: &sconfig.KeyShared{
 									SharedKey: adminSigningKey,
@@ -239,7 +239,7 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 	}
 
 	for _, r := range b.adminAuthRoutes {
-		b.ginEngine.Handle(r.method, r.path, auth.AdminOnly(r.validators...), func(gctx *gin.Context) { r.handler(gctx, auth) })
+		b.ginEngine.Handle(r.method, r.path, auth.Required(r.validators...), func(gctx *gin.Context) { r.handler(gctx, auth) })
 	}
 
 	return TestSetup{
@@ -266,32 +266,30 @@ type TestSetup struct {
 	XSRFToken   string
 }
 
-// MustGetValidAdminUser gives an admin user that can sign JWTs. This method makes sure the admin exists in the database
+// MustGetValidActorWithKey gives an actor that can sign JWTs. This method makes sure the actor exists in the database
 // regardless of if they have interacted with the system previously.
-func (ts *TestSetup) MustGetValidAdminUser(ctx context.Context) database.Actor {
-	a, err := ts.Db.GetActorByExternalId(ctx, "root", "admin/bobdole")
+func (ts *TestSetup) MustGetValidActorWithKey(ctx context.Context) database.Actor {
+	a, err := ts.Db.GetActorByExternalId(ctx, "root", "bobdole")
 	if err != nil && !errors.Is(err, database.ErrNotFound) {
 		panic(err)
 	}
 
 	if errors.Is(err, database.ErrNotFound) {
-		// Get the admin key from config and encrypt it for storage
-		adminKey := ts.MustGetValidSigningTokenForAdmin()
-		keyJson, err := json.Marshal(adminKey)
+		// Get the actor key from config and encrypt it for storage
+		actorKey := ts.MustGetValidSigningTokenForConfiguredActor()
+		keyJson, err := json.Marshal(actorKey)
 		if err != nil {
-			panic(errors.Wrap(err, "failed to marshal admin key"))
+			panic(errors.Wrap(err, "failed to marshal actor key"))
 		}
 		encryptedKey, err := ts.Enc.EncryptStringGlobal(ctx, string(keyJson))
 		if err != nil {
-			panic(errors.Wrap(err, "failed to encrypt admin key"))
+			panic(errors.Wrap(err, "failed to encrypt actor key"))
 		}
 
 		a = &database.Actor{
 			Id:           uuid.New(),
 			Namespace:    "root",
-			ExternalId:   "admin/bobdole",
-			Email:        "bobdole@example.com",
-			Admin:        true,
+			ExternalId:   "bobdole",
 			EncryptedKey: &encryptedKey,
 		}
 		if err := ts.Db.CreateActor(ctx, a); err != nil {
@@ -302,18 +300,16 @@ func (ts *TestSetup) MustGetValidAdminUser(ctx context.Context) database.Actor {
 	return *a
 }
 
-// MustGetValidUninitializedAdminUser give a valid admin, but does not create a user in the database ahead of time.
-func (ts *TestSetup) MustGetValidUninitializedAdminUser(ctx context.Context) database.Actor {
+// MustGetValidUninitializedActorWithKey gives a valid actor with a key in config, but does not create in the database ahead of time.
+func (ts *TestSetup) MustGetValidUninitializedActorWithKey(ctx context.Context) database.Actor {
 	return database.Actor{
 		Id:         uuid.New(),
 		Namespace:  "root",
-		ExternalId: "admin/ronaldreagan",
-		Email:      "ronaldreagan@example.com",
-		Admin:      true,
+		ExternalId: "ronaldreagan",
 	}
 }
 
-// MustGetValidUser gives an user that can sign JWTs. This method makes sure the admin exists in the database
+// MustGetValidUserByExternalId gives a user that can sign JWTs. This method makes sure the actor exists in the database
 // regardless of if they have interacted with the system previously.
 func (ts *TestSetup) MustGetValidUserByExternalId(ctx context.Context, externalId string) database.Actor {
 	a, err := ts.Db.GetActorByExternalId(ctx, "root", externalId)
@@ -326,7 +322,6 @@ func (ts *TestSetup) MustGetValidUserByExternalId(ctx context.Context, externalI
 			Id:         uuid.New(),
 			Namespace:  "root",
 			ExternalId: externalId,
-			Email:      "jimmycarter@example.com",
 		}
 		if err := ts.Db.CreateActor(ctx, a); err != nil {
 			panic(err)
@@ -348,8 +343,8 @@ func (ts *TestSetup) MustGetValidSigningTokenForUser() *sconfig.Key {
 	return ts.Cfg.GetRoot().SystemAuth.JwtSigningKey
 }
 
-func (ts *TestSetup) MustGetValidSigningTokenForAdmin() *sconfig.Key {
-	return ts.Cfg.GetRoot().SystemAuth.AdminUsers.All()[0].Key
+func (ts *TestSetup) MustGetValidSigningTokenForConfiguredActor() *sconfig.Key {
+	return ts.Cfg.GetRoot().SystemAuth.Actors.All()[0].Key
 }
 
 func (ts *TestSetup) GET(ctx context.Context, path string) (responseJson gin.H, statusCode int, debugHeader string) {
@@ -438,15 +433,13 @@ func (ts *TestSetup) PostWithSigner(ctx context.Context, path string, body gin.H
 	return responseJson, w.Code, w.Header().Get(api_common.DebugHeader)
 }
 
-// MustGetInvalidAdminUser gives an admin user that cannot be used to sign JWTs as it is not listed in the config
-// admin user list. This admin does not actually exist in the database, the database actor is just used to pass
+// MustGetInvalidActorWithKey gives an actor that cannot be used to sign JWTs as it is not listed in the config
+// actor list. This actor does not actually exist in the database, the database actor is just used to pass
 // the information.
-func (ts *TestSetup) MustGetInvalidAdminUser(ctx context.Context) database.Actor {
+func (ts *TestSetup) MustGetInvalidActorWithKey(ctx context.Context) database.Actor {
 	return database.Actor{
 		Id:         uuid.New(),
-		ExternalId: "admin/billclinton",
-		Email:      "billclinton@example.com",
-		Admin:      true,
+		ExternalId: "billclinton",
 	}
 }
 
@@ -682,8 +675,8 @@ func TestAuth(t *testing.T) {
 
 				s := jwt.NewJwtTokenBuilder().
 					WithServiceId(ts.Service).
-					WithActorExternalId(ts.MustGetValidAdminUser(ctx).ExternalId).
-					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForAdmin()).
+					WithActorExternalId(ts.MustGetValidActorWithKey(ctx).ExternalId).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForConfiguredActor()).
 					MustSignerCtx(ctx)
 
 				resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
@@ -698,8 +691,8 @@ func TestAuth(t *testing.T) {
 
 				s := jwt.NewJwtTokenBuilder().
 					WithServiceId(ts.Service).
-					WithActorExternalId(ts.MustGetValidAdminUser(ctx).ExternalId).
-					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForAdmin()).
+					WithActorExternalId(ts.MustGetValidActorWithKey(ctx).ExternalId).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForConfiguredActor()).
 					MustSignerCtx(ctx)
 
 				resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
@@ -715,8 +708,8 @@ func TestAuth(t *testing.T) {
 
 				s := jwt.NewJwtTokenBuilder().
 					WithServiceId(ts.Service).
-					WithActorExternalId(ts.MustGetValidAdminUser(ctx).ExternalId).
-					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForAdmin()).
+					WithActorExternalId(ts.MustGetValidActorWithKey(ctx).ExternalId).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForConfiguredActor()).
 					MustSignerCtx(ctx)
 
 				resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
@@ -731,8 +724,8 @@ func TestAuth(t *testing.T) {
 
 				s := jwt.NewJwtTokenBuilder().
 					WithServiceId(ts.Service).
-					WithActorExternalId(ts.MustGetInvalidAdminUser(ctx).ExternalId).
-					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForAdmin()).
+					WithActorExternalId(ts.MustGetInvalidActorWithKey(ctx).ExternalId).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForConfiguredActor()).
 					MustSignerCtx(ctx)
 
 				_, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))
@@ -748,8 +741,8 @@ func TestAuth(t *testing.T) {
 				// If an admin is in config but not in the database, authentication fails.
 				s := jwt.NewJwtTokenBuilder().
 					WithServiceId(ts.Service).
-					WithActorExternalId(ts.MustGetValidUninitializedAdminUser(ctx).ExternalId).
-					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForAdmin()).
+					WithActorExternalId(ts.MustGetValidUninitializedActorWithKey(ctx).ExternalId).
+					MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForConfiguredActor()).
 					MustSignerCtx(ctx)
 
 				_, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/ping"))

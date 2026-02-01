@@ -59,6 +59,57 @@ func (s *service) keyForToken(ctx context.Context, claims *jwt2.AuthProxyClaims)
 	return &key, nil
 }
 
+// keyForSelfSignedToken returns the key for verifying a self-signed token.
+// For actors with their own key, returns the actor's key.
+// For service-minted tokens, returns GlobalAESKey.
+func (s *service) keyForSelfSignedToken(ctx context.Context, claims *jwt2.AuthProxyClaims) (*config.Key, error) {
+	// If no database or encrypt service, fall back to GlobalAESKey
+	if s.db == nil || s.encrypt == nil {
+		return &config.Key{
+			InnerVal: &config.KeyShared{
+				SharedKey: s.config.GetRoot().SystemAuth.GlobalAESKey,
+			},
+		}, nil
+	}
+
+	// Look up actor from database to check for self-signing key
+	actor, err := s.db.GetActorByExternalId(ctx, claims.GetNamespace(), claims.Subject)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			// Actor does not exist. Fall back to GlobalAESKey
+			return &config.Key{
+				InnerVal: &config.KeyShared{
+					SharedKey: s.config.GetRoot().SystemAuth.GlobalAESKey,
+				},
+			}, nil
+		}
+		return nil, errors.Wrap(err, "failed to get actor")
+	}
+
+	if actor.EncryptedKey == nil {
+		// Actor is not configured with self-signing key
+		return &config.Key{
+			InnerVal: &config.KeyShared{
+				SharedKey: s.config.GetRoot().SystemAuth.GlobalAESKey,
+			},
+		}, nil
+	}
+
+	// Decrypt the key JSON
+	decrypted, err := s.encrypt.DecryptStringGlobal(ctx, *actor.EncryptedKey)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to decrypt actor key")
+	}
+
+	// Unmarshal to *config.Key
+	var key config.Key
+	if err := json.Unmarshal([]byte(decrypted), &key); err != nil {
+		return nil, errors.Wrap(err, "failed to unmarshal actor key")
+	}
+
+	return &key, nil
+}
+
 // Token mints a signed JWT with the specified claims. The token will be self-signed using the GlobalAESKey. The
 // claims will be modified prior to signing to indicate which service signed this token and that it is self-signed.
 func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (string, error) {
@@ -93,10 +144,24 @@ func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (stri
 func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProxyClaims, error) {
 	claims, err := jwt2.NewJwtTokenParserBuilder().
 		WithKeySelector(func(ctx context.Context, unverified *jwt2.AuthProxyClaims) (kd config.KeyDataType, isShared bool, err error) {
+			// For self-signed tokens, check if actor has their own key
 			if unverified.SelfSigned {
+				// Try to get actor's key from database
+				key, err := s.keyForSelfSignedToken(ctx, unverified)
+				if err != nil {
+					return nil, false, errors.Wrap(err, "failed to get key")
+				}
+
+				// If actor has their own asymmetric key, use it
+				if pk, ok := key.InnerVal.(*config.KeyPublicPrivate); ok {
+					return pk.PublicKey, false, nil
+				}
+
+				// Otherwise, use GlobalAESKey for service-minted tokens
 				return s.config.GetRoot().SystemAuth.GlobalAESKey, true, nil
 			}
 
+			// For non-self-signed tokens, use keyForToken
 			key, err := s.keyForToken(ctx, unverified)
 			if err != nil {
 				return nil, false, errors.Wrap(err, "failed to get key")

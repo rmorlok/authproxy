@@ -36,10 +36,7 @@ type TokenBuilder interface {
 	WithExpiration(expiration time.Time) TokenBuilder
 	WithExpiresIn(expiresIn time.Duration) TokenBuilder
 	WithExpiresInCtx(ctx context.Context, expiresIn time.Duration) TokenBuilder
-	WithSuperAdmin() TokenBuilder
-	WithAdmin() TokenBuilder
 	WithSelfSigned() TokenBuilder
-	WithActorEmail(email string) TokenBuilder
 	WithActorExternalId(id string) TokenBuilder
 	WithActor(actor core.IActorData) TokenBuilder
 	WithNonce() TokenBuilder
@@ -114,23 +111,8 @@ func (tb *tokenBuilder) WithExpiresInCtx(ctx context.Context, expiresIn time.Dur
 	return tb
 }
 
-func (tb *tokenBuilder) WithSuperAdmin() TokenBuilder {
-	tb.jwtBuilder.WithSuperAdmin()
-	return tb
-}
-
-func (tb *tokenBuilder) WithAdmin() TokenBuilder {
-	tb.jwtBuilder.WithAdmin()
-	return tb
-}
-
 func (tb *tokenBuilder) WithSelfSigned() TokenBuilder {
 	tb.jwtBuilder.WithSelfSigned()
-	return tb
-}
-
-func (tb *tokenBuilder) WithActorEmail(email string) TokenBuilder {
-	tb.jwtBuilder.WithActorEmail(email)
 	return tb
 }
 

@@ -16,31 +16,30 @@ import (
 	clock "k8s.io/utils/clock/testing"
 )
 
-func TestSyncAdminUsersList(t *testing.T) {
+func TestSyncActorsList(t *testing.T) {
 	var db database.DB
 	var enc encrypt.E
 	var ctx context.Context
 	now := time.Date(2024, time.January, 1, 12, 0, 0, 0, time.UTC)
 	clk := clock.NewFakeClock(now)
 
-	setup := func(t *testing.T, adminUsers *sconfig.AdminUsers) config.C {
+	setup := func(t *testing.T, actors *sconfig.ConfiguredActors) config.C {
 		var cfg config.C
 		cfg, db = database.MustApplyBlankTestDbConfig(t.Name(), nil)
 		cfg, enc = encrypt.NewTestEncryptService(cfg, db)
 		ctx = apctx.NewBuilderBackground().WithClock(clk).Build()
 
-		cfg.GetRoot().SystemAuth.AdminUsers = adminUsers
-		cfg.GetRoot().SystemAuth.AdminEmailDomain = "example.com"
+		cfg.GetRoot().SystemAuth.Actors = actors
 
 		return cfg
 	}
 
-	t.Run("syncs admin users from list", func(t *testing.T) {
-		adminUsers := &sconfig.AdminUsers{
-			InnerVal: sconfig.AdminUsersList{
+	t.Run("syncs actors from list", func(t *testing.T) {
+		actors := &sconfig.ConfiguredActors{
+			InnerVal: sconfig.ConfiguredActorsList{
 				{
-					Username: "alice",
-					Email:    "alice@custom.com",
+					ExternalId: "alice",
+					Labels:     map[string]string{"authproxy.io/team": "engineering"},
 					Key: &sconfig.Key{
 						InnerVal: &sconfig.KeyShared{
 							SharedKey: &sconfig.KeyData{
@@ -53,7 +52,7 @@ func TestSyncAdminUsersList(t *testing.T) {
 					},
 				},
 				{
-					Username: "bob",
+					ExternalId: "bob",
 					Key: &sconfig.Key{
 						InnerVal: &sconfig.KeyShared{
 							SharedKey: &sconfig.KeyData{
@@ -65,37 +64,34 @@ func TestSyncAdminUsersList(t *testing.T) {
 			},
 		}
 
-		cfg := setup(t, adminUsers)
+		cfg := setup(t, actors)
 		svc := NewService(cfg, db, enc, cfg.GetRootLogger())
 
 		err := svc.SyncActorList(ctx)
 		require.NoError(t, err)
 
 		// Verify alice was created
-		alice, err := db.GetActorByExternalId(ctx, "root", "admin/alice")
+		alice, err := db.GetActorByExternalId(ctx, "root", "alice")
 		require.NoError(t, err)
-		require.Equal(t, "alice@custom.com", alice.Email)
-		require.True(t, alice.Admin)
+		require.Equal(t, "engineering", alice.Labels["authproxy.io/team"])
 		require.NotNil(t, alice.EncryptedKey)
-		require.Equal(t, LabelValueConfigList, alice.Labels[LabelAdminSyncSource])
+		require.Equal(t, LabelValueConfigList, alice.Labels[LabelConfiguredActorSyncSource])
 
-		// Verify bob was created with generated email
-		bob, err := db.GetActorByExternalId(ctx, "root", "admin/bob")
+		// Verify bob was created
+		bob, err := db.GetActorByExternalId(ctx, "root", "bob")
 		require.NoError(t, err)
-		require.Equal(t, "bob@example.com", bob.Email)
-		require.True(t, bob.Admin)
 		require.NotNil(t, bob.EncryptedKey)
 	})
 
-	t.Run("deletes stale admin users", func(t *testing.T) {
-		adminUsers := &sconfig.AdminUsers{
-			InnerVal: sconfig.AdminUsersList{
-				{Username: "alice", Key: &sconfig.Key{InnerVal: &sconfig.KeyShared{SharedKey: &sconfig.KeyData{InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="}}}}},
-				{Username: "bob", Key: &sconfig.Key{InnerVal: &sconfig.KeyShared{SharedKey: &sconfig.KeyData{InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="}}}}},
+	t.Run("deletes stale actors", func(t *testing.T) {
+		actors := &sconfig.ConfiguredActors{
+			InnerVal: sconfig.ConfiguredActorsList{
+				{ExternalId: "alice", Key: &sconfig.Key{InnerVal: &sconfig.KeyShared{SharedKey: &sconfig.KeyData{InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="}}}}},
+				{ExternalId: "bob", Key: &sconfig.Key{InnerVal: &sconfig.KeyShared{SharedKey: &sconfig.KeyData{InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="}}}}},
 			},
 		}
 
-		cfg := setup(t, adminUsers)
+		cfg := setup(t, actors)
 		svc := NewService(cfg, db, enc, cfg.GetRootLogger())
 
 		// Initial sync
@@ -103,9 +99,9 @@ func TestSyncAdminUsersList(t *testing.T) {
 		require.NoError(t, err)
 
 		// Remove bob from config
-		cfg.GetRoot().SystemAuth.AdminUsers = &sconfig.AdminUsers{
-			InnerVal: sconfig.AdminUsersList{
-				{Username: "alice", Key: &sconfig.Key{InnerVal: &sconfig.KeyShared{SharedKey: &sconfig.KeyData{InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="}}}}},
+		cfg.GetRoot().SystemAuth.Actors = &sconfig.ConfiguredActors{
+			InnerVal: sconfig.ConfiguredActorsList{
+				{ExternalId: "alice", Key: &sconfig.Key{InnerVal: &sconfig.KeyShared{SharedKey: &sconfig.KeyData{InnerVal: &sconfig.KeyDataBase64Val{Base64: "dGVzdA=="}}}}},
 			},
 		}
 
@@ -114,19 +110,19 @@ func TestSyncAdminUsersList(t *testing.T) {
 		require.NoError(t, err)
 
 		// Alice should still exist
-		_, err = db.GetActorByExternalId(ctx, "root", "admin/alice")
+		_, err = db.GetActorByExternalId(ctx, "root", "alice")
 		require.NoError(t, err)
 
 		// Bob should be deleted
-		_, err = db.GetActorByExternalId(ctx, "root", "admin/bob")
+		_, err = db.GetActorByExternalId(ctx, "root", "bob")
 		require.ErrorIs(t, err, database.ErrNotFound)
 	})
 
 	t.Run("encrypted key can be decrypted", func(t *testing.T) {
-		adminUsers := &sconfig.AdminUsers{
-			InnerVal: sconfig.AdminUsersList{
+		actors := &sconfig.ConfiguredActors{
+			InnerVal: sconfig.ConfiguredActorsList{
 				{
-					Username: "alice",
+					ExternalId: "alice",
 					Key: &sconfig.Key{
 						InnerVal: &sconfig.KeyShared{
 							SharedKey: &sconfig.KeyData{
@@ -138,14 +134,14 @@ func TestSyncAdminUsersList(t *testing.T) {
 			},
 		}
 
-		cfg := setup(t, adminUsers)
+		cfg := setup(t, actors)
 		svc := NewService(cfg, db, enc, cfg.GetRootLogger())
 
 		err := svc.SyncActorList(ctx)
 		require.NoError(t, err)
 
 		// Get alice and decrypt her key
-		alice, err := db.GetActorByExternalId(ctx, "root", "admin/alice")
+		alice, err := db.GetActorByExternalId(ctx, "root", "alice")
 		require.NoError(t, err)
 		require.NotNil(t, alice.EncryptedKey)
 
@@ -163,14 +159,14 @@ func TestSyncAdminUsersList(t *testing.T) {
 		require.True(t, ok)
 	})
 
-	t.Run("skips sync for non-list admin users", func(t *testing.T) {
-		adminUsers := &sconfig.AdminUsers{
-			InnerVal: &sconfig.AdminUsersExternalSource{
+	t.Run("skips sync for non-list actors", func(t *testing.T) {
+		actors := &sconfig.ConfiguredActors{
+			InnerVal: &sconfig.ConfiguredActorsExternalSource{
 				KeysPath: "/tmp/keys",
 			},
 		}
 
-		cfg := setup(t, adminUsers)
+		cfg := setup(t, actors)
 		svc := NewService(cfg, db, enc, cfg.GetRootLogger())
 
 		// Should not error, just skip
@@ -178,7 +174,7 @@ func TestSyncAdminUsersList(t *testing.T) {
 		require.NoError(t, err)
 	})
 
-	t.Run("handles nil admin users", func(t *testing.T) {
+	t.Run("handles nil actors", func(t *testing.T) {
 		cfg := setup(t, nil)
 		svc := NewService(cfg, db, enc, cfg.GetRootLogger())
 

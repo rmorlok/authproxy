@@ -104,7 +104,6 @@ func (j *Resolver) resolveRoot() (*Root, error) {
 }
 
 func (j *Resolver) ResolveBuilder() (jwt.TokenBuilder, error) {
-	admin := j.admin
 	actorId := j.actorId
 
 	if actorId == "" {
@@ -113,12 +112,11 @@ func (j *Resolver) ResolveBuilder() (jwt.TokenBuilder, error) {
 			return nil, err
 		}
 		if root.AdminUsername() != "" {
-			admin = true
 			actorId = root.AdminUsername()
 		}
 	}
 
-	if admin && actorId == "" {
+	if j.admin && actorId == "" {
 		u, err := user.Current()
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to retrieve current user to sign admin jwt")
@@ -175,10 +173,6 @@ func (j *Resolver) ResolveBuilder() (jwt.TokenBuilder, error) {
 		b = b.WithPrivateKeyPath(privateKeyPath)
 	} else {
 		b = b.WithSecretKeyPath(secretKeyPath)
-	}
-
-	if admin {
-		b = b.WithAdmin()
 	}
 
 	return b, nil

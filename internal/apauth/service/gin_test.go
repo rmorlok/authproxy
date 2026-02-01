@@ -37,12 +37,11 @@ func TestAuth_Gin(t *testing.T) {
 			Actor: &core.Actor{
 				ExternalId: "id1",
 				Namespace:  "root",
-				Email:      "me@example.com",
 			},
 		}
 	}
 
-	testAdminClaims := func() *jwt2.AuthProxyClaims {
+	testAltClaims := func() *jwt2.AuthProxyClaims {
 		return &jwt2.AuthProxyClaims{
 			RegisteredClaims: jwt.RegisteredClaims{
 				ID:        "random id",
@@ -51,14 +50,12 @@ func TestAuth_Gin(t *testing.T) {
 				ExpiresAt: nil,
 				NotBefore: nil,
 				IssuedAt:  &jwt.NumericDate{apctx.GetClock(ctx).Now()},
-				Subject:   "admin/aid1",
+				Subject:   "aid1",
 			},
 			Namespace: "root",
 			Actor: &core.Actor{
-				ExternalId: "admin/aid1",
+				ExternalId: "aid1",
 				Namespace:  "root",
-				Email:      "me@example.com",
-				Admin:      true,
 			},
 		}
 	}
@@ -106,9 +103,9 @@ func TestAuth_Gin(t *testing.T) {
 			require.Equal(t, c.Actor.ExternalId, w.Body.String())
 		})
 
-		t.Run("valid with admin", func(t *testing.T) {
+		t.Run("valid with alt claims", func(t *testing.T) {
 			ts := setup(t, authFunc)
-			c := testAdminClaims()
+			c := testAltClaims()
 
 			tok, err := ts.AuthUtil.s.Token(testContext, c)
 			require.NoError(t, err)
@@ -188,9 +185,9 @@ func TestAuth_Gin(t *testing.T) {
 			require.Equal(t, c.Actor.ExternalId, w.Body.String())
 		})
 
-		t.Run("valid with admin", func(t *testing.T) {
+		t.Run("valid with alt claims", func(t *testing.T) {
 			ts := setup(t, authFunc)
-			c := testAdminClaims()
+			c := testAltClaims()
 
 			tok, err := ts.AuthUtil.s.Token(testContext, c)
 			require.NoError(t, err)
@@ -249,105 +246,6 @@ func TestAuth_Gin(t *testing.T) {
 			w := httptest.NewRecorder()
 			req := httptest.NewRequest("GET", "/", nil).WithContext(ctx)
 			SetJwtRequestHeader(req, tok)
-			ts.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusUnauthorized, w.Code)
-		})
-	})
-
-	t.Run("admin only", func(t *testing.T) {
-		authFunc := func(a A) gin.HandlerFunc { return a.AdminOnly() }
-		t.Run("valid", func(t *testing.T) {
-			ts := setup(t, authFunc)
-			c := testAdminClaims()
-
-			tok, err := ts.AuthUtil.s.Token(testContext, c)
-			require.NoError(t, err)
-
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil).WithContext(ctx)
-			SetJwtRequestHeader(req, tok)
-			ts.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusOK, w.Code)
-			require.Equal(t, c.Actor.ExternalId, w.Body.String())
-		})
-
-		t.Run("not admin", func(t *testing.T) {
-			ts := setup(t, authFunc)
-			c := testClaims()
-
-			tok, err := ts.AuthUtil.s.Token(testContext, c)
-			require.NoError(t, err)
-
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil).WithContext(ctx)
-			SetJwtRequestHeader(req, tok)
-			ts.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusForbidden, w.Code)
-		})
-
-		t.Run("expired", func(t *testing.T) {
-			ts := setup(t, authFunc)
-			c := testAdminClaims()
-			c.ExpiresAt = &jwt.NumericDate{now.Add(-time.Hour)}
-
-			tok, err := ts.AuthUtil.s.Token(testContext, c)
-			require.NoError(t, err)
-
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil).WithContext(ctx)
-			SetJwtRequestHeader(req, tok)
-			ts.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusUnauthorized, w.Code)
-		})
-
-		t.Run("bad value", func(t *testing.T) {
-			ts := setup(t, authFunc)
-
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil).WithContext(ctx)
-			SetJwtRequestHeader(req, "bad")
-			ts.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusUnauthorized, w.Code)
-		})
-
-		t.Run("no actor in token", func(t *testing.T) {
-			ts := setup(t, authFunc)
-			c := testAdminClaims()
-			c.Actor = nil
-
-			tok, err := ts.AuthUtil.s.Token(testContext, c)
-			require.NoError(t, err)
-
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil).WithContext(ctx)
-			SetJwtRequestHeader(req, tok)
-			ts.Gin.ServeHTTP(w, req)
-			// Admin must be synced to database via admin_sync before authentication can succeed
-			// Without the actor in the token and without the admin in the database, auth fails
-			require.Equal(t, http.StatusUnauthorized, w.Code)
-		})
-
-		t.Run("invalid admin", func(t *testing.T) {
-			ts := setup(t, authFunc)
-			c := testAdminClaims()
-			c.Subject = "admin/this-is-not-valid"
-			c.Actor = nil
-
-			tok, err := ts.AuthUtil.s.Token(testContext, c)
-			require.NoError(t, err)
-
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil).WithContext(ctx)
-			SetJwtRequestHeader(req, tok)
-			ts.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusUnauthorized, w.Code)
-		})
-
-		t.Run("not present", func(t *testing.T) {
-			ts := setup(t, authFunc)
-
-			w := httptest.NewRecorder()
-			req := httptest.NewRequest("GET", "/", nil).WithContext(ctx)
 			ts.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusUnauthorized, w.Code)
 		})

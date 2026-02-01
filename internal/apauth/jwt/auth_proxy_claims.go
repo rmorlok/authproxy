@@ -4,7 +4,6 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
-	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
@@ -85,53 +84,6 @@ func (tc *AuthProxyClaims) Validate(v *jwt.Validator) error {
 	}
 
 	return result.ErrorOrNil()
-}
-
-// AdminUsername retrieves the username of an admin actor. Admin actors must have their id and token subject formatted
-// in the form admin/username. If token subject and actor id do not match, or they are not correctly formatted, this
-// method will return an error.
-func (tc *AuthProxyClaims) AdminUsername() (string, error) {
-	if !tc.IsAdmin() {
-		return "", errors.New("not admin")
-	}
-
-	if tc.Actor != nil && tc.Subject != tc.Actor.GetExternalId() {
-		return "", errors.New("token subject and actor id do not match")
-	}
-
-	if !strings.HasPrefix(tc.Subject, "admin/") {
-		return "", errors.New("admin username is not correctly formatted")
-	}
-
-	return strings.TrimPrefix(tc.Subject, "admin/"), nil
-}
-
-// IsAdmin checks if the actor represented by these claims is an admin
-func (tc *AuthProxyClaims) IsAdmin() bool {
-	if tc == nil {
-		return false
-	}
-
-	return strings.HasPrefix(tc.Subject, "admin/") && (tc.Actor == nil || tc.Actor.IsAdmin())
-}
-
-// IsSuperAdmin checks if the actor represented by these claims is an admin
-func (tc *AuthProxyClaims) IsSuperAdmin() bool {
-	if tc == nil {
-		return false
-	}
-
-	return tc.Actor.IsSuperAdmin()
-}
-
-// IsNormalActor checks if the actor represented by these claims is not an admin or superadmin
-func (tc *AuthProxyClaims) IsNormalActor() bool {
-	if tc == nil {
-		// nil values default to normal actors to route to lower access paths
-		return true
-	}
-
-	return tc.Actor.IsNormalActor()
 }
 
 // IsExpired returns true if claims expired
