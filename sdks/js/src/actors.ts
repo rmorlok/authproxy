@@ -5,6 +5,8 @@ import { ListResponse } from './common';
 
 export interface Actor {
   id: string;
+  namespace: string;
+  labels: Record<string, string>;
   external_id: string;
   email: string;
   admin: boolean;
@@ -21,6 +23,8 @@ export interface ListActorsParams {
   email?: string;
   admin?: boolean;
   super_admin?: boolean;
+  namespace?: string;
+  label_selector?: string;
   cursor?: string;
   limit?: number;
   order_by?: string;
