@@ -5,12 +5,23 @@ import { ListResponse } from './common';
 
 export interface Actor {
   id: string;
+  namespace: string;
+  labels?: Record<string, string>;
   external_id: string;
   email: string;
   admin: boolean;
   super_admin: boolean;
   created_at: string;
   updated_at: string;
+}
+
+export interface CreateActorRequest {
+    namespace: string;
+    external_id: string;
+    email: string;
+    labels?: Record<string, string>;
+    admin?: boolean;
+    super_admin?: boolean;
 }
 
 /**
@@ -21,6 +32,8 @@ export interface ListActorsParams {
   email?: string;
   admin?: boolean;
   super_admin?: boolean;
+  namespace?: string;
+  label_selector?: string;
   cursor?: string;
   limit?: number;
   order_by?: string;
@@ -32,6 +45,14 @@ export interface ListActorsParams {
  */
 export const listActors = (params: ListActorsParams) => {
   return client.get<ListResponse<Actor>>('/api/v1/actors', { params });
+};
+
+/**
+ * Create a new actor
+ * @param request The actor to create
+ */
+export const createActor = (request: CreateActorRequest) => {
+    return client.post<Actor>('/api/v1/actors', request);
 };
 
 /**
@@ -71,6 +92,7 @@ export const deleteActorByExternalId = (externalId: string) => {
 
 export const actors = {
   list: listActors,
+  create: createActor,
   getById: getActorById,
   getByExternalId: getActorByExternalId,
   getByMe: getMe,

@@ -20,7 +20,7 @@ import (
 type NamespaceJson struct {
 	Path      string                  `json:"path"`
 	State     database.NamespaceState `json:"state"`
-	Labels    map[string]string       `json:"labels"`
+	Labels    map[string]string       `json:"labels,omitempty"`
 	CreatedAt time.Time               `json:"created_at"`
 	UpdatedAt time.Time               `json:"updated_at"`
 }

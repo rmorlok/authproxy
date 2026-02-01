@@ -65,7 +65,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 type ConnectionJson struct {
 	Id        uuid.UUID                `json:"id"`
 	Namespace string                   `json:"namespace"`
-	Labels    map[string]string        `json:"labels"`
+	Labels    map[string]string        `json:"labels,omitempty"`
 	State     database.ConnectionState `json:"state"`
 	Connector ConnectorJson            `json:"connector"`
 	CreatedAt time.Time                `json:"created_at"`
