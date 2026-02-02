@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"net/http"
@@ -561,6 +562,188 @@ func TestActorsRoutes(t *testing.T) {
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			// Should get both root.tenant1 and root.tenant1.sub
 			require.Len(t, resp.Items, 2)
+		})
+	})
+
+	t.Run("create", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		t.Run("unauthorized", func(t *testing.T) {
+			body := `{"external_id": "new-actor", "namespace": "root"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPost, "/actors", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden with non-matching namespace permission", func(t *testing.T) {
+			body := `{"external_id": "new-actor", "namespace": "root"}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/actors",
+				bytes.NewBufferString(body),
+				"root.other",
+				"some-actor",
+				aschema.PermissionsSingle("root.other.**", "actors", "create"),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("bad request - missing external_id", func(t *testing.T) {
+			body := `{"namespace": "root"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPost, "/actors", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("bad request - invalid namespace", func(t *testing.T) {
+			body := `{"external_id": "new-actor", "namespace": "invalid"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPost, "/actors", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("bad request - namespace does not exist", func(t *testing.T) {
+			body := `{"external_id": "new-actor", "namespace": "root.nonexistent"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPost, "/actors", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("bad request - invalid JSON", func(t *testing.T) {
+			body := `{invalid json}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPost, "/actors", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("conflict - duplicate external_id in same namespace", func(t *testing.T) {
+			// Create an actor first
+			createActor(t, tu.Db, "duplicate-actor", "root")
+
+			// Try to create another actor with the same external_id
+			body := `{"external_id": "duplicate-actor", "namespace": "root"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPost, "/actors", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusConflict, w.Code)
+		})
+
+		t.Run("success - basic actor", func(t *testing.T) {
+			body := `{"external_id": "created-actor", "namespace": "root"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPost, "/actors", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusCreated, w.Code)
+
+			var resp ActorJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.NotEqual(t, uuid.Nil, resp.Id)
+			require.Equal(t, "created-actor", resp.ExternalId)
+			require.Equal(t, "root", resp.Namespace)
+			require.NotZero(t, resp.CreatedAt)
+			require.NotZero(t, resp.UpdatedAt)
+
+			// Verify the actor exists in the database
+			actor, err := tu.Db.GetActorByExternalId(context.Background(), "root", "created-actor")
+			require.NoError(t, err)
+			require.NotNil(t, actor)
+			require.Equal(t, resp.Id, actor.Id)
+		})
+
+		t.Run("success - actor with labels", func(t *testing.T) {
+			body := `{"external_id": "actor-with-labels", "namespace": "root", "labels": {"env": "test", "team": "platform"}}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPost, "/actors", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusCreated, w.Code)
+
+			var resp ActorJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "actor-with-labels", resp.ExternalId)
+			require.Equal(t, "test", resp.Labels["env"])
+			require.Equal(t, "platform", resp.Labels["team"])
+
+			// Verify the actor exists in the database with labels
+			actor, err := tu.Db.GetActorByExternalId(context.Background(), "root", "actor-with-labels")
+			require.NoError(t, err)
+			require.NotNil(t, actor)
+			require.Equal(t, "test", actor.Labels["env"])
+			require.Equal(t, "platform", actor.Labels["team"])
+		})
+
+		t.Run("success - same external_id in different namespace", func(t *testing.T) {
+			// Create actor in root namespace
+			createActor(t, tu.Db, "multi-namespace-actor", "root")
+
+			// Create another actor with same external_id in different namespace
+			tu.Db.EnsureNamespaceByPath(context.Background(), "root.other")
+			body := `{"external_id": "multi-namespace-actor", "namespace": "root.other"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPost, "/actors", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusCreated, w.Code)
+
+			var resp ActorJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "multi-namespace-actor", resp.ExternalId)
+			require.Equal(t, "root.other", resp.Namespace)
+
+			// Verify both actors exist
+			actor1, err := tu.Db.GetActorByExternalId(context.Background(), "root", "multi-namespace-actor")
+			require.NoError(t, err)
+			require.NotNil(t, actor1)
+
+			actor2, err := tu.Db.GetActorByExternalId(context.Background(), "root.other", "multi-namespace-actor")
+			require.NoError(t, err)
+			require.NotNil(t, actor2)
+
+			require.NotEqual(t, actor1.Id, actor2.Id)
 		})
 	})
 }

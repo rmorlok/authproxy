@@ -38,6 +38,12 @@ type ActorJson struct {
 	UpdatedAt  time.Time         `json:"updated_at"`
 }
 
+type CreateActorRequestJson struct {
+	ExternalId string            `json:"external_id"`
+	Namespace  string            `json:"namespace"`
+	Labels     map[string]string `json:"labels,omitempty"`
+}
+
 func DatabaseActorToJson(a *database.Actor) ActorJson {
 	return ActorJson{
 		Id:         a.Id,
@@ -424,6 +430,146 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 	gctx.Status(http.StatusNoContent)
 }
 
+func (r *ActorsRoutes) create(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	var req CreateActorRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid request body").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Validate external_id is not empty
+	if req.ExternalId == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("external_id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Validate namespace path
+	if err := database.ValidateNamespacePath(req.Namespace); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid namespace '%s': %s", req.Namespace, err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Validate labels if provided
+	if req.Labels != nil {
+		if err := database.Labels(req.Labels).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid labels: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
+	// Validate authorization for the namespace
+	if err := val.ValidateNamespace(req.Namespace); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusForbidden().
+			WithPublicErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Check if actor already exists with the same external_id in the namespace
+	existingActor, err := r.db.GetActorByExternalId(ctx, req.Namespace, req.ExternalId)
+	if err == nil && existingActor != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatus(http.StatusConflict).
+			WithResponseMsgf("actor with external_id '%s' already exists in namespace '%s'", req.ExternalId, req.Namespace).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if err != nil && !errors.Is(err, database.ErrNotFound) {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Create the actor
+	actor := &database.Actor{
+		Id:         uuid.New(),
+		Namespace:  req.Namespace,
+		ExternalId: req.ExternalId,
+		Labels:     req.Labels,
+	}
+
+	if err := r.db.CreateActor(ctx, actor); err != nil {
+		// Handle specific error cases
+		if errors.Is(err, database.ErrNamespaceDoesNotExist) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithResponseMsgf("namespace '%s' does not exist", req.Namespace).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		if errors.Is(err, database.ErrDuplicate) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatus(http.StatusConflict).
+				WithResponseMsgf("actor with external_id '%s' already exists in namespace '%s'", req.ExternalId, req.Namespace).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Fetch the created actor to get the timestamps
+	createdActor, err := r.db.GetActor(ctx, actor.Id)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusCreated, DatabaseActorToJson(createdActor))
+}
+
 func (r *ActorsRoutes) Register(g gin.IRouter) {
 	g.GET(
 		"/actors",
@@ -432,6 +578,14 @@ func (r *ActorsRoutes) Register(g gin.IRouter) {
 			ForVerb("list").
 			Build(),
 		r.list,
+	)
+	g.POST(
+		"/actors",
+		r.auth.NewRequiredBuilder().
+			ForResource("actors").
+			ForVerb("create").
+			Build(),
+		r.create,
 	)
 	g.GET(
 		"/actors/external-id/:external_id",

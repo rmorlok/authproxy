@@ -322,7 +322,7 @@ func (s *service) CreateActor(ctx context.Context, a *Actor) error {
 		}
 
 		if count > 0 {
-			return errors.New("actor already exists")
+			return errors.Wrap(ErrDuplicate, "actor already exists")
 		}
 
 		err = s.sq.
@@ -339,7 +339,7 @@ func (s *service) CreateActor(ctx context.Context, a *Actor) error {
 		}
 
 		if count == 0 {
-			return errors.New("actor namespace does not exist")
+			return errors.Wrap(ErrNamespaceDoesNotExist, "actor namespace does not exist")
 		}
 
 		cpy := *a
