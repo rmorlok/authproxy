@@ -2,6 +2,7 @@ package database
 
 import (
 	"fmt"
+	"sort"
 	"strings"
 
 	sq "github.com/Masterminds/squirrel"
@@ -146,4 +147,24 @@ func (s LabelSelector) ApplyToSqlBuilder(q sq.SelectBuilder, labelsColumn string
 		}
 	}
 	return q
+}
+
+// BuildLabelSelectorFromMap creates a label selector string from key-value pairs.
+// Keys are sorted for deterministic output.
+// Example: {"type": "salesforce", "env": "prod"} -> "env=prod,type=salesforce"
+func BuildLabelSelectorFromMap(labels map[string]string) string {
+	if len(labels) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(labels))
+	for k := range labels {
+		keys = append(keys, k)
+	}
+	sort.Strings(keys)
+
+	parts := make([]string, 0, len(keys))
+	for _, k := range keys {
+		parts = append(parts, fmt.Sprintf("%s=%s", k, labels[k]))
+	}
+	return strings.Join(parts, ",")
 }

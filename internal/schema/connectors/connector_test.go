@@ -29,7 +29,7 @@ func TestConnectorRoundtrip(t *testing.T) {
 			name: "Basic Connector with API Key Auth",
 			connector: Connector{
 				Id:          testID,
-				Type:        "test-type",
+				Labels:      map[string]string{"type": "test-type"},
 				Version:     1,
 				State:       "primary",
 				DisplayName: "Test Connector",
@@ -48,7 +48,7 @@ func TestConnectorRoundtrip(t *testing.T) {
 			name: "Connector with OAuth2 Auth and Direct String Values",
 			connector: Connector{
 				Id:          testID,
-				Type:        "oauth2-type",
+				Labels:      map[string]string{"type": "oauth2-type"},
 				Version:     2,
 				State:       "draft",
 				DisplayName: "OAuth2 Connector",

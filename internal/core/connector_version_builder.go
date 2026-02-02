@@ -27,7 +27,6 @@ func (b *connectorVersionBuilder) WithConfig(c *config.Connector) *connectorVers
 	b.versionSetters = append([]func(v *ConnectorVersion){
 		func(v *ConnectorVersion) {
 			v.Version = c.Version
-			v.Type = c.Type
 			v.Id = c.Id
 			v.Namespace = c.GetNamespace()
 			v.Labels = c.Labels
@@ -47,21 +46,6 @@ func (b *connectorVersionBuilder) WithId(id uuid.UUID) *connectorVersionBuilder 
 	b.configSetters = append(b.configSetters,
 		func(c *config.Connector) {
 			c.Id = id
-		},
-	)
-	return b
-}
-
-func (b *connectorVersionBuilder) WithType(t string) *connectorVersionBuilder {
-	b.versionSetters = append(b.versionSetters,
-		func(v *ConnectorVersion) {
-			v.Type = t
-		},
-	)
-
-	b.configSetters = append(b.configSetters,
-		func(c *config.Connector) {
-			c.Type = t
 		},
 	)
 	return b

@@ -10,7 +10,6 @@ type ConnectorVersion interface {
 	GetId() uuid.UUID
 	GetNamespace() string
 	GetVersion() uint64
-	GetType() string
 }
 
 type GettableConnectorVersion interface {

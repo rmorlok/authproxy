@@ -29,7 +29,6 @@ const connector: Connector = {
     namespace: 'root',
     version: 1,
     state: ConnectorVersionState.ACTIVE,
-    type: 'oauth2',
     display_name: 'Google Calendar',
     description: 'Calendar app',
     highlight: undefined,

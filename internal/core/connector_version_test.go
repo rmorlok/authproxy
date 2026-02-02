@@ -30,7 +30,7 @@ func TestWrapConnectorVersion(t *testing.T) {
 	dbConnectorVersion := database.ConnectorVersion{
 		Id:                  connectorId,
 		Version:             1,
-		Type:                "test-connector",
+		Labels:              map[string]string{"type": "test-connector"},
 		State:               database.ConnectorVersionStateDraft,
 		Hash:                "some-hash",
 		EncryptedDefinition: "encrypted-data",
@@ -60,7 +60,7 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 	dbConnectorVersion := database.ConnectorVersion{
 		Id:                  connectorId,
 		Version:             1,
-		Type:                "test-connector",
+		Labels:              map[string]string{"type": "test-connector"},
 		State:               database.ConnectorVersionStateDraft,
 		Hash:                "some-hash",
 		EncryptedDefinition: "encrypted-data",
@@ -70,7 +70,7 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 
 	// Create a connector definition
 	def := &cschema.Connector{
-		Type:        "test-connector",
+		Labels:      map[string]string{"type": "test-connector"},
 		DisplayName: "Test Connector",
 		Description: "A test connector",
 	}
@@ -85,7 +85,6 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 	result := cv.GetDefinition()
 
 	// Verify
-	assert.Equal(t, def.Type, result.Type)
 	assert.Equal(t, def.DisplayName, result.DisplayName)
 	assert.Equal(t, def.Description, result.Description)
 
@@ -109,7 +108,7 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 	dbConnectorVersion := database.ConnectorVersion{
 		Id:                  connectorId,
 		Version:             1,
-		Type:                "test-connector",
+		Labels:              map[string]string{"type": "test-connector"},
 		State:               database.ConnectorVersionStateDraft,
 		Hash:                "some-hash",
 		EncryptedDefinition: "encrypted-data",
@@ -119,7 +118,7 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 
 	// Create a connector definition
 	def := &cschema.Connector{
-		Type:        "test-connector",
+		Labels:      map[string]string{"type": "test-connector"},
 		DisplayName: "Test Connector",
 		Description: "A test connector",
 	}
@@ -159,10 +158,6 @@ func NewTestConnectorVersion(c cschema.Connector) *ConnectorVersion {
 	if c.Version != 0 {
 		version = c.Version
 	}
-	t := "test-connector"
-	if c.Type != "" {
-		t = c.Type
-	}
 	state := database.ConnectorVersionStatePrimary
 	if c.State != "" {
 		state = database.ConnectorVersionState(c.State)
@@ -175,7 +170,7 @@ func NewTestConnectorVersion(c cschema.Connector) *ConnectorVersion {
 	dbConnectorVersion := database.ConnectorVersion{
 		Id:                  connectorId,
 		Version:             version,
-		Type:                t,
+		Labels:              map[string]string{"type": "test-connector"},
 		State:               state,
 		Hash:                "some-hash",
 		EncryptedDefinition: string(encryptedDefinition),

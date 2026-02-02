@@ -58,12 +58,22 @@ export const columns: GridColDef<Connection>[] = [
         renderCell: (params) => renderState(params.value as ConnectionState),
     },
     {
-        field: 'connector.type',
-        headerName: 'Connector Type',
-        flex: 0.5,
-        minWidth: 80,
+        field: 'connector.labels',
+        headerName: 'Connector Labels',
+        flex: 0.7,
+        minWidth: 120,
         sortable: false,
-        valueGetter: (_, row) => row.connector.type,
+        renderCell: (params) => {
+            const labels = params.row.connector?.labels as Record<string, string> | undefined;
+            if (!labels || Object.keys(labels).length === 0) return null;
+            return (
+                <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ py: 0.5 }}>
+                    {Object.entries(labels).map(([key, value]) => (
+                        <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined" />
+                    ))}
+                </Stack>
+            );
+        },
     },
     {
         field: 'connector.id',

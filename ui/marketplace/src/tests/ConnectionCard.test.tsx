@@ -46,7 +46,6 @@ describe('ConnectionCard', () => {
         namespace: 'root',
         version: 1,
         state: ConnectorVersionState.ACTIVE,
-        type: 'oauth2',
         display_name: 'Google Calendar',
         description: 'Connect to your Google Calendar to manage events and appointments.',
         highlight: undefined,

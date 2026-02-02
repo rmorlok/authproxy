@@ -52,7 +52,7 @@ func MockConnectorRetrival(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.
 			Id:                  c.Id,
 			Version:             c.Version,
 			State:               state,
-			Type:                c.Type,
+			Labels:              c.Labels,
 			Hash:                hash,
 			EncryptedDefinition: encryptedDefinition,
 			CreatedAt:           clock.Now(),

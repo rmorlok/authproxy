@@ -23,7 +23,6 @@ type EntryRecord struct {
 	Timestamp           time.Time           `json:"timestamp"`
 	MillisecondDuration MillisecondDuration `json:"duration"`
 	ConnectionId        uuid.UUID           `json:"connection_id,omitempty"`
-	ConnectorType       string              `json:"connector_type,omitempty"`
 	ConnectorId         uuid.UUID           `json:"connector_id,omitempty"`
 	ConnectorVersion    uint64              `json:"connector_version,omitempty"`
 	Method              string              `json:"method"`
@@ -62,9 +61,6 @@ func (e *EntryRecord) setRedisRecordFields(vals map[string]string) {
 	vals[fieldDurationMs] = strconv.FormatInt(e.MillisecondDuration.Duration().Milliseconds(), 10)
 	if e.ConnectionId != uuid.Nil {
 		vals[fieldConnectionId] = e.ConnectionId.String()
-	}
-	if e.ConnectorType != "" {
-		vals[fieldConnectorType] = e.ConnectorType
 	}
 	if e.ConnectorId != uuid.Nil {
 		vals[fieldConnectorId] = e.ConnectorId.String()
@@ -134,8 +130,6 @@ func EntryRecordFromRedisFields(vals map[string]string) (*EntryRecord, error) {
 	if er.ConnectionId, err = uuid.Parse(vals[fieldConnectionId]); err != nil {
 		return nil, errors.Wrap(err, "failed to parse connection id")
 	}
-
-	er.ConnectorType = vals[fieldConnectorType]
 
 	if er.ConnectorId, err = uuid.Parse(vals[fieldConnectorId]); err != nil {
 		return nil, errors.Wrap(err, "failed to parse connector id")

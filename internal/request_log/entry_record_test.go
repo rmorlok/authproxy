@@ -18,7 +18,6 @@ func TestEntryRecord(t *testing.T) {
 		Timestamp:           time.Date(1970, time.January, 1, 0, 20, 34, 567000000, time.UTC), // This only has millisecond precision
 		MillisecondDuration: MillisecondDuration(2 * time.Second),
 		ConnectionId:        uuid.New(),
-		ConnectorType:       "some-type",
 		ConnectorId:         uuid.New(),
 		ConnectorVersion:    7,
 		Method:              "GET",

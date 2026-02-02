@@ -21,7 +21,7 @@ func TestFakeService(t *testing.T) {
 				Id:                  uuid.New(),
 				Version:             1,
 				State:               database.ConnectorVersionStatePrimary,
-				Type:                "test",
+				Labels:              map[string]string{"type": "test"},
 				Hash:                "test",
 				EncryptedDefinition: "test",
 			}

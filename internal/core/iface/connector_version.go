@@ -13,7 +13,6 @@ type ConnectorVersion interface {
 	GetNamespace() string
 	GetVersion() uint64
 	GetState() database.ConnectorVersionState
-	GetType() string
 	GetHash() string
 	GetCreatedAt() time.Time
 	GetUpdatedAt() time.Time

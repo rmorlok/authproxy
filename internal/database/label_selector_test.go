@@ -116,3 +116,60 @@ func TestLabelSelector_String(t *testing.T) {
 	expected := "app=web,env!=prod,tier,!deprecated"
 	assert.Equal(t, expected, selector.String())
 }
+
+func TestBuildLabelSelectorFromMap(t *testing.T) {
+	tests := []struct {
+		name     string
+		labels   map[string]string
+		expected string
+	}{
+		{
+			name:     "nil map",
+			labels:   nil,
+			expected: "",
+		},
+		{
+			name:     "empty map",
+			labels:   map[string]string{},
+			expected: "",
+		},
+		{
+			name:     "single label",
+			labels:   map[string]string{"type": "salesforce"},
+			expected: "type=salesforce",
+		},
+		{
+			name:     "multiple labels sorted alphabetically",
+			labels:   map[string]string{"type": "salesforce", "env": "prod"},
+			expected: "env=prod,type=salesforce",
+		},
+		{
+			name:     "three labels sorted",
+			labels:   map[string]string{"type": "gmail", "env": "staging", "app": "email"},
+			expected: "app=email,env=staging,type=gmail",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := BuildLabelSelectorFromMap(tt.labels)
+			assert.Equal(t, tt.expected, got)
+		})
+	}
+}
+
+func TestBuildLabelSelectorFromMap_Roundtrip(t *testing.T) {
+	// Test that BuildLabelSelectorFromMap output can be parsed back
+	labels := map[string]string{"type": "salesforce", "env": "prod", "tier": "backend"}
+	selector := BuildLabelSelectorFromMap(labels)
+
+	parsed, err := ParseLabelSelector(selector)
+	assert.NoError(t, err)
+	assert.Len(t, parsed, 3)
+
+	// Verify all requirements are equality checks with correct values
+	for _, req := range parsed {
+		assert.Equal(t, LabelOperatorEqual, req.Operator)
+		assert.Equal(t, labels[req.Key], req.Value)
+	}
+}

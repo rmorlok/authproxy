@@ -16,7 +16,6 @@ type ListConnectorsExecutor interface {
 type ListConnectorsBuilder interface {
 	ListConnectorsExecutor
 	Limit(int32) ListConnectorsBuilder
-	ForType(string) ListConnectorsBuilder
 	ForId(uuid.UUID) ListConnectorsBuilder
 	ForState(database.ConnectorVersionState) ListConnectorsBuilder
 	ForStates([]database.ConnectorVersionState) ListConnectorsBuilder

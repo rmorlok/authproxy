@@ -22,11 +22,11 @@ func TestGetConnectorVersion(t *testing.T) {
 		Id:          id,
 		Version:     version,
 		DisplayName: "Test Connector",
-		Type:        "test",
+		Labels:      map[string]string{"type": "test"},
 		Auth:        cschema.NewNoAuth(),
 	})
 
 	c, err := s.GetConnectorVersion(context.Background(), id, version)
 	require.NoError(t, err)
-	require.Equal(t, c.GetType(), "test")
+	require.Equal(t, c.GetLabels()["type"], "test")
 }

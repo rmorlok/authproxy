@@ -7,7 +7,6 @@ export interface ConnectorVersion {
     version: number;
     namespace: string;
     state: ConnectorVersionState;
-    type: string;
     definition: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
     labels?: Record<string, string>;
     created_at: string;
@@ -19,7 +18,6 @@ export interface Connector {
     version: number;
     namespace: string;
     state: ConnectorVersionState;
-    type: string;
     display_name: string;
     description: string;
     highlight?: string;
@@ -41,7 +39,6 @@ export enum ConnectorVersionState {
 export interface ListConnectorsParams {
     state?: ConnectorVersionState;
     namespace?: string;
-    type?: string;
     label_selector?: string;
     cursor?: string;
     limit?: number;

@@ -6,6 +6,7 @@ import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
+import Chip from '@mui/material/Chip';
 import Drawer from '@mui/material/Drawer';
 import dayjs from 'dayjs';
 import {Connector, connectors, ConnectorVersion} from '@authproxy/api';
@@ -91,7 +92,7 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
     <Stack spacing={2} sx={{p: 2}}>
       <Stack direction="row" spacing={2} alignItems="center">
         {conn.logo && <Avatar alt={conn.display_name} src={conn.logo} sx={{width: 40, height: 40}} />}
-        <Typography variant="h5">{conn.display_name || conn.type}</Typography>
+        <Typography variant="h5">{conn.display_name || conn.labels?.type || 'Unnamed Connector'}</Typography>
         <StateChip state={conn.state}/>
       </Stack>
 
@@ -109,8 +110,16 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
           <Typography variant="body1" sx={{wordBreak: 'break-all'}}>{conn.id}</Typography>
         </Box>
         <Box>
-          <Typography variant="subtitle2" color="text.secondary">Type</Typography>
-          <Typography variant="body1">{conn.type}</Typography>
+          <Typography variant="subtitle2" color="text.secondary">Labels</Typography>
+          {conn.labels && Object.keys(conn.labels).length > 0 ? (
+            <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5 }}>
+              {Object.entries(conn.labels).map(([key, value]) => (
+                <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined" />
+              ))}
+            </Stack>
+          ) : (
+            <Typography variant="body2" color="text.secondary">No labels</Typography>
+          )}
         </Box>
         <Box>
           <Typography variant="subtitle2" color="text.secondary">Version</Typography>

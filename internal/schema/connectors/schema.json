@@ -97,8 +97,11 @@
     "namespace": {
       "$ref": "../auth/schema.json#/$defs/NamespacePath"
     },
-    "type": {
-      "type": "string"
+    "labels": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
     },
     "version": {
       "type": "integer"
@@ -132,7 +135,7 @@
       }
     }
   },
-  "required": ["type", "display_name", "logo", "auth"],
+  "required": ["labels", "display_name", "logo", "auth"],
   "additionalProperties": false,
   "type": "object"
 }

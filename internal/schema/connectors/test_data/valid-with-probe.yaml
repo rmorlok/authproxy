@@ -1,6 +1,7 @@
 # $schema: ./schema.json
 
-type: asana
+labels:
+  type: asana
 display_name: Asana
 logo:
   public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Asana_logo.svg/2880px-Asana_logo.svg.png

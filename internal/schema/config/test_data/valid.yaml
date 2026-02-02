@@ -75,7 +75,8 @@ connectors:
   auto_migrate: true
   auto_migration_lock_duration: 30s
   load_from_list:
-  - type: google-drive
+  - labels:
+      type: google-drive
     display_name: Google Drive
     logo:
       public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/1024px-Google_Drive_icon_%282020%29.svg.png?20221103153031
@@ -112,7 +113,8 @@ connectors:
           required: false
           reason: |
             We need to be able to see what's been going on in drive
-  - type: greenhouse
+  - labels:
+      type: greenhouse
     version: 1
     display_name: Greenhouse
     logo:
@@ -122,7 +124,8 @@ connectors:
       This integration pushes candidates to greenhouse
     auth:
       type: api-key
-  - type: google-calendar
+  - labels:
+      type: google-calendar
     display_name: Google Calendar
     logo: https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg
     description: |
@@ -145,7 +148,8 @@ connectors:
         - id: https://www.googleapis.com/auth/calendar.readonly
           reason: |
             We need to be able to read the calendar
-  - type: gmail
+  - labels:
+      type: gmail
     display_name: GMail
     logo:
       public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Gmail_icon_%282020%29.svg/2880px-Gmail_icon_%282020%29.svg.png
@@ -169,7 +173,8 @@ connectors:
         - id: https://www.googleapis.com/auth/gmail.readonly
           reason: |
             We need to be able to read your emails
-  - type: pipedrive
+  - labels:
+      type: pipedrive
     display_name: pipedrive
     logo:
       public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Pipedrive_logo.svg/2880px-Pipedrive_logo.svg.png
@@ -195,7 +200,8 @@ connectors:
         - id: webhooks:full
           reason: |
             Allows us to receive notification of changes in realtime
-  - type: asana
+  - labels:
+      type: asana
     display_name: Asana
     logo:
       public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Asana_logo.svg/2880px-Asana_logo.svg.png

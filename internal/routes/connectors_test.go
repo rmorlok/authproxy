@@ -52,13 +52,13 @@ func TestConnectors(t *testing.T) {
 				{
 					Id:          uuid.MustParse("10000000-0000-0000-0000-000000000001"),
 					Namespace:   util.ToPtr("root"),
-					Type:        "test-connector",
+					Labels:      map[string]string{"type": "test-connector"},
 					DisplayName: "Test ConnectorJson",
 				},
 				{
 					Id:          uuid.MustParse("20000000-0000-0000-0000-000000000002"),
 					Namespace:   util.ToPtr("root.child"),
-					Type:        "test-connector-2",
+					Labels:      map[string]string{"type": "test-connector-2"},
 					DisplayName: "Test ConnectorJson 2",
 				},
 			}
@@ -293,16 +293,14 @@ func TestConnectors(t *testing.T) {
 							{
 								Id:          uuid.MustParse("10000000-0000-0000-0000-000000000123"),
 								Version:     1,
-								Type:        "test-connector",
+								Labels:      map[string]string{"type": "test-connector", "env": "dev"},
 								DisplayName: "Test Connector",
-								Labels:      map[string]string{"env": "dev"},
 							},
 							{
 								Id:          connectorId,
 								Version:     1,
-								Type:        "test-connector",
+								Labels:      map[string]string{"type": "test-connector", "env": "prod"},
 								DisplayName: "Test Connector",
-								Labels:      map[string]string{"env": "prod"},
 							},
 						},
 					},

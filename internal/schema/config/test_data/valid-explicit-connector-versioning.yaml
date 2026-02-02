@@ -4,7 +4,8 @@ connectors:
   auto_migrate: true
   auto_migration_lock_duration: 30s
   load_from_list:
-  - type: asana
+  - labels:
+      type: asana
     id: D21753F8-2E91-43E7-ADEF-8ED80A6086AC
     version: 1
     display_name: Asana

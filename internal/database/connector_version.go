@@ -82,7 +82,7 @@ const (
 	ConnectorVersionStateDraft ConnectorVersionState = "draft"
 
 	// ConnectorVersionStatePrimary means that the version has been published and this should be the version used for
-	// new connections. Existing connections of this connector type will be upgraded to this version if possible, or
+	// new connections. Existing connections of this connector will be upgraded to this version if possible, or
 	// transitioned to a state where action is required to complete the upgrade.
 	ConnectorVersionStatePrimary ConnectorVersionState = "primary"
 
@@ -114,7 +114,6 @@ type ConnectorVersion struct {
 	Version             uint64
 	Namespace           string
 	State               ConnectorVersionState
-	Type                string
 	Hash                string
 	EncryptedDefinition string
 	Labels              Labels
@@ -129,7 +128,6 @@ func (cv *ConnectorVersion) cols() []string {
 		"version",
 		"namespace",
 		"state",
-		"type",
 		"hash",
 		"encrypted_definition",
 		"labels",
@@ -145,7 +143,6 @@ func (cv *ConnectorVersion) fields() []any {
 		&cv.Version,
 		&cv.Namespace,
 		&cv.State,
-		&cv.Type,
 		&cv.Hash,
 		&cv.EncryptedDefinition,
 		&cv.Labels,
@@ -161,7 +158,6 @@ func (cv *ConnectorVersion) values() []any {
 		cv.Version,
 		cv.Namespace,
 		cv.State,
-		cv.Type,
 		cv.Hash,
 		cv.EncryptedDefinition,
 		cv.Labels,
@@ -181,10 +177,6 @@ func (cv *ConnectorVersion) GetNamespace() string {
 
 func (cv *ConnectorVersion) GetVersion() uint64 {
 	return cv.Version
-}
-
-func (cv *ConnectorVersion) GetType() string {
-	return cv.Type
 }
 
 func (cv *ConnectorVersion) Validate() error {
@@ -208,10 +200,6 @@ func (cv *ConnectorVersion) Validate() error {
 
 	if cv.Hash == "" {
 		result = multierror.Append(result, errors.New("hash is required"))
-	}
-
-	if cv.Type == "" {
-		result = multierror.Append(result, errors.New("type is required"))
 	}
 
 	if cv.EncryptedDefinition == "" {
@@ -367,7 +355,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 
 			result, err := sqb.Update(ConnectorVersionsTable).
 				Set("state", cv.State).
-				Set("type", cv.Type).
+				Set("labels", cv.Labels).
 				Set("encrypted_definition", cv.EncryptedDefinition).
 				Set("updated_at", apctx.GetClock(ctx).Now()).
 				Where(sq.Eq{"id": cv.Id, "version": cv.Version}).
@@ -445,59 +433,61 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 	})
 }
 
-func (s *service) GetConnectorVersionForTypeAndVersion(ctx context.Context, typ string, version uint64) (*ConnectorVersion, error) {
+// GetConnectorVersionForLabels finds the newest connector version matching the label selector.
+func (s *service) GetConnectorVersionForLabels(ctx context.Context, labelSelector string) (*ConnectorVersion, error) {
+	selector, err := ParseLabelSelector(labelSelector)
+	if err != nil {
+		return nil, err
+	}
+
 	var result ConnectorVersion
-	err := sq.
-		Select(result.cols()...).
+	q := sq.Select(result.cols()...).
 		From(ConnectorVersionsTable).
-		Where(sq.Eq{
-			"type":       typ,
-			"version":    version,
-			"deleted_at": nil,
-		}).
-		OrderBy("created_at DESC").
+		Where(sq.Eq{"deleted_at": nil})
+
+	q = selector.ApplyToSqlBuilder(q, "labels")
+
+	err = q.OrderBy("created_at DESC", "version DESC").
 		Limit(1).
 		RunWith(s.db).
 		QueryRow().
 		Scan(result.fields()...)
 
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-
 		return nil, err
 	}
-
 	return &result, nil
 }
 
-func (s *service) GetConnectorVersionForType(ctx context.Context, typ string) (*ConnectorVersion, error) {
-
-	// This should probably be removed. Not clear when this would be needed.
+// GetConnectorVersionForLabelsAndVersion finds a connector version by labels + specific version.
+func (s *service) GetConnectorVersionForLabelsAndVersion(ctx context.Context, labelSelector string, version uint64) (*ConnectorVersion, error) {
+	selector, err := ParseLabelSelector(labelSelector)
+	if err != nil {
+		return nil, err
+	}
 
 	var result ConnectorVersion
-	err := sq.
-		Select(result.cols()...).
+	q := sq.Select(result.cols()...).
 		From(ConnectorVersionsTable).
-		Where(sq.Eq{
-			"type":       typ,
-			"deleted_at": nil,
-		}).
-		OrderBy("created_at DESC", "version DESC").
+		Where(sq.Eq{"version": version, "deleted_at": nil})
+
+	q = selector.ApplyToSqlBuilder(q, "labels")
+
+	err = q.OrderBy("created_at DESC").
 		Limit(1).
 		RunWith(s.db).
 		QueryRow().
 		Scan(result.fields()...)
 
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrNotFound
+	}
 	if err != nil {
-		if errors.Is(err, sql.ErrNoRows) {
-			return nil, ErrNotFound
-		}
-
 		return nil, err
 	}
-
 	return &result, nil
 }
 
@@ -589,7 +579,6 @@ const (
 	ConnectorVersionOrderByState     ConnectorVersionOrderByField = "state"
 	ConnectorVersionOrderByCreatedAt ConnectorVersionOrderByField = "created_at"
 	ConnectorVersionOrderByUpdatedAt ConnectorVersionOrderByField = "updated_at"
-	ConnectorVersionOrderByType      ConnectorVersionOrderByField = "type"
 )
 
 func IsValidConnectorVersionOrderByField[T string | ConnectorVersionOrderByField](field T) bool {
@@ -598,8 +587,7 @@ func IsValidConnectorVersionOrderByField[T string | ConnectorVersionOrderByField
 		ConnectorVersionOrderByVersion,
 		ConnectorVersionOrderByState,
 		ConnectorVersionOrderByCreatedAt,
-		ConnectorVersionOrderByUpdatedAt,
-		ConnectorVersionOrderByType:
+		ConnectorVersionOrderByUpdatedAt:
 		return true
 	default:
 		return false
@@ -614,7 +602,6 @@ type ListConnectorVersionsExecutor interface {
 type ListConnectorVersionsBuilder interface {
 	ListConnectorVersionsExecutor
 	Limit(int32) ListConnectorVersionsBuilder
-	ForType(string) ListConnectorVersionsBuilder
 	ForId(uuid.UUID) ListConnectorVersionsBuilder
 	ForVersion(uint64) ListConnectorVersionsBuilder
 	ForState(ConnectorVersionState) ListConnectorVersionsBuilder
@@ -632,7 +619,6 @@ type listConnectorVersionsFilters struct {
 	Offset            uint64                        `json:"offset"`
 	StatesVal         []ConnectorVersionState       `json:"states,omitempty"`
 	NamespaceMatchers []string                      `json:"namespace_matchers,omitempty"`
-	TypeVal           []string                      `json:"types,omitempty"`
 	IdsVal            []uuid.UUID                   `json:"ids,omitempty"`
 	VersionsVal       []uint64                      `json:"versions,omitempty"`
 	OrderByFieldVal   *ConnectorVersionOrderByField `json:"order_by_field"`
@@ -679,11 +665,6 @@ func (l *listConnectorVersionsFilters) ForNamespaceMatchers(matchers []string) L
 		}
 	}
 	l.NamespaceMatchers = matchers
-	return l
-}
-
-func (l *listConnectorVersionsFilters) ForType(t string) ListConnectorVersionsBuilder {
-	l.TypeVal = []string{t}
 	return l
 }
 
@@ -745,10 +726,6 @@ func (l *listConnectorVersionsFilters) applyRestrictions(ctx context.Context) sq
 
 	if l.LimitVal <= 0 {
 		l.LimitVal = 100
-	}
-
-	if len(l.TypeVal) > 0 {
-		q = q.Where(sq.Eq{"type": l.TypeVal})
 	}
 
 	if len(l.IdsVal) > 0 {

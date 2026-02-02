@@ -54,10 +54,6 @@ func (cv *ConnectorVersion) GetState() database.ConnectorVersionState {
 	return cv.ConnectorVersion.State
 }
 
-func (cv *ConnectorVersion) GetType() string {
-	return cv.ConnectorVersion.Type
-}
-
 func (cv *ConnectorVersion) GetHash() string {
 	return cv.ConnectorVersion.Hash
 }

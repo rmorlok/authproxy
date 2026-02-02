@@ -218,8 +218,16 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
             </Typography>
           </Box>
           <Box>
-            <Typography variant="subtitle2" color="text.secondary">Type</Typography>
-            <Typography variant="body1">{conn.connector.type}</Typography>
+            <Typography variant="subtitle2" color="text.secondary">Labels</Typography>
+            {conn.connector.labels && Object.keys(conn.connector.labels).length > 0 ? (
+              <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{ mt: 0.5 }}>
+                {Object.entries(conn.connector.labels).map(([key, value]) => (
+                  <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined" />
+                ))}
+              </Stack>
+            ) : (
+              <Typography variant="body2" color="text.secondary">No labels</Typography>
+            )}
           </Box>
           <Box>
             <Typography variant="subtitle2" color="text.secondary">Version</Typography>

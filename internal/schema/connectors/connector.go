@@ -14,13 +14,8 @@ import (
 type Connector struct {
 	// Id is the global id for this connector. This does not change version to version. In the config file, this can
 	// be omitted if there is only one instance of a particular type of connector. If there are multiple connectors that
-	// share the same type, the ids would need to be explicitly defined.
+	// share the same identifying labels, the ids would need to be explicitly defined.
 	Id uuid.UUID `json:"id" yaml:"id"`
-
-	// Type is the logical type of the connector. Multiple connectors can implement the same type. This might represent
-	// two different ways of connecting to the same 3rd party system (e.g. via API key and OAuth) where the types of auth
-	// don't have an impact on the capabilities of the connector.
-	Type string `json:"type" yaml:"type"`
 
 	// Version is the logical version of the connector. When auth materially changes, such as adding new scopes,
 	// changing client ids/secrets, adding configuration settings, etc. the logical version of the connector must change
@@ -91,10 +86,6 @@ func (c *Connector) Clone() *Connector {
 func (c *Connector) Validate(vc *common.ValidationContext) error {
 	result := &multierror.Error{}
 
-	if c.Type == "" {
-		result = multierror.Append(result, vc.NewErrorfForField("type", "connector must have type"))
-	}
-
 	if c.State != "" {
 		if c.State != "draft" && c.State != "primary" {
 			result = multierror.Append(result, vc.NewErrorfForField("state", "connector state must be either draft or primary"))
@@ -114,6 +105,20 @@ func (c *Connector) Validate(vc *common.ValidationContext) error {
 	}
 
 	return result.ErrorOrNil()
+}
+
+// GetIdentifyingLabelValues returns the values for the specified identifying labels.
+func (c *Connector) GetIdentifyingLabelValues(identifyingLabels []string) map[string]string {
+	result := make(map[string]string)
+	if c == nil || c.Labels == nil {
+		return result
+	}
+	for _, key := range identifyingLabels {
+		if v, ok := c.Labels[key]; ok {
+			result[key] = v
+		}
+	}
+	return result
 }
 
 // Hash computes a semantic hash of the connector data. It does not account for data that is not stored in the

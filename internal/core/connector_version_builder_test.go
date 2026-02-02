@@ -52,7 +52,7 @@ func TestVersionBuilder_WithConfig(t *testing.T) {
 	c := &cschema.Connector{
 		Id:          connectorID,
 		Version:     1,
-		Type:        "test-connector",
+		Labels:      map[string]string{"type": "test-connector"},
 		DisplayName: "Test Connector",
 		Description: "A test connector",
 	}
@@ -69,7 +69,6 @@ func TestVersionBuilder_WithConfig(t *testing.T) {
 	cv := &ConnectorVersion{}
 	builder.versionSetters[0](cv)
 	assert.Equal(t, uint64(1), cv.Version)
-	assert.Equal(t, "test-connector", cv.Type)
 	assert.Equal(t, connectorID, cv.Id)
 }
 
@@ -106,41 +105,6 @@ func TestVersionBuilder_WithId(t *testing.T) {
 	c := &cschema.Connector{}
 	builder.configSetters[0](c)
 	assert.Equal(t, connectorID, c.Id)
-}
-
-func TestVersionBuilder_WithType(t *testing.T) {
-	// Setup
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	mockEncrypt := encryptmock.NewMockE(ctrl)
-	s := &service{
-		encrypt: mockEncrypt,
-		logger:  aplog.NewNoopLogger(),
-	}
-
-	builder := newConnectorVersionBuilder(s)
-
-	// Create a test type
-	connectorType := "test-connector"
-
-	// Test
-	result := builder.WithType(connectorType)
-
-	// Verify
-	assert.Equal(t, builder, result, "WithType should return the builder for chaining")
-	assert.NotEmpty(t, builder.versionSetters)
-	assert.NotEmpty(t, builder.configSetters)
-
-	// Test the version setter function
-	cv := &ConnectorVersion{}
-	builder.versionSetters[0](cv)
-	assert.Equal(t, connectorType, cv.Type)
-
-	// Test the config setter function
-	c := &cschema.Connector{}
-	builder.configSetters[0](c)
-	assert.Equal(t, connectorType, c.Type)
 }
 
 func TestVersionBuilder_WithVersion(t *testing.T) {
@@ -196,7 +160,7 @@ func TestVersionBuilder_Build_Success(t *testing.T) {
 	c := &cschema.Connector{
 		Id:          connectorID,
 		Version:     1,
-		Type:        "test-connector",
+		Labels:      map[string]string{"type": "test-connector"},
 		DisplayName: "Test Connector",
 		Description: "A test connector",
 	}
@@ -216,7 +180,6 @@ func TestVersionBuilder_Build_Success(t *testing.T) {
 	assert.NotNil(t, cv)
 	assert.Equal(t, connectorID, cv.Id)
 	assert.Equal(t, uint64(1), cv.Version)
-	assert.Equal(t, "test-connector", cv.Type)
 	assert.Equal(t, c.Hash(), cv.Hash)
 	assert.Equal(t, "encrypted-data", cv.EncryptedDefinition)
 }
@@ -261,7 +224,7 @@ func TestVersionBuilder_Build_EncryptError(t *testing.T) {
 	c := &cschema.Connector{
 		Id:          connectorID,
 		Version:     1,
-		Type:        "test-connector",
+		Labels:      map[string]string{"type": "test-connector"},
 		DisplayName: "Test Connector",
 		Description: "A test connector",
 	}
