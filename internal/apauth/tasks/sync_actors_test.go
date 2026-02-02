@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
@@ -19,6 +20,7 @@ import (
 
 func TestSyncActorsList(t *testing.T) {
 	var db database.DB
+	var redis apredis.Client
 	var enc encrypt.E
 	var ctx context.Context
 	now := time.Date(2024, time.January, 1, 12, 0, 0, 0, time.UTC)
@@ -27,6 +29,7 @@ func TestSyncActorsList(t *testing.T) {
 	setup := func(t *testing.T, actors *sconfig.ConfiguredActors) config.C {
 		var cfg config.C
 		cfg, db = database.MustApplyBlankTestDbConfig(t.Name(), nil)
+		cfg, redis = apredis.MustApplyTestConfig(cfg)
 		cfg, enc = encrypt.NewTestEncryptService(cfg, db)
 		ctx = apctx.NewBuilderBackground().WithClock(clk).Build()
 
@@ -66,7 +69,7 @@ func TestSyncActorsList(t *testing.T) {
 		}
 
 		cfg := setup(t, actors)
-		svc := NewService(cfg, db, enc, cfg.GetRootLogger())
+		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
 
 		err := svc.SyncActorList(ctx)
 		require.NoError(t, err)
@@ -93,7 +96,7 @@ func TestSyncActorsList(t *testing.T) {
 		}
 
 		cfg := setup(t, actors)
-		svc := NewService(cfg, db, enc, cfg.GetRootLogger())
+		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
 
 		// Initial sync
 		err := svc.SyncActorList(ctx)
@@ -136,7 +139,7 @@ func TestSyncActorsList(t *testing.T) {
 		}
 
 		cfg := setup(t, actors)
-		svc := NewService(cfg, db, enc, cfg.GetRootLogger())
+		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
 
 		err := svc.SyncActorList(ctx)
 		require.NoError(t, err)
@@ -168,7 +171,7 @@ func TestSyncActorsList(t *testing.T) {
 		}
 
 		cfg := setup(t, actors)
-		svc := NewService(cfg, db, enc, cfg.GetRootLogger())
+		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
 
 		// Should not error, just skip
 		err := svc.SyncActorList(ctx)
@@ -177,7 +180,7 @@ func TestSyncActorsList(t *testing.T) {
 
 	t.Run("handles nil actors", func(t *testing.T) {
 		cfg := setup(t, nil)
-		svc := NewService(cfg, db, enc, cfg.GetRootLogger())
+		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
 
 		err := svc.SyncActorList(ctx)
 		require.NoError(t, err)
@@ -186,6 +189,7 @@ func TestSyncActorsList(t *testing.T) {
 
 func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 	var db database.DB
+	var redis apredis.Client
 	var enc encrypt.E
 	var ctx context.Context
 	now := time.Date(2024, time.January, 1, 12, 0, 0, 0, time.UTC)
@@ -194,6 +198,7 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 	setup := func(t *testing.T, actors *sconfig.ConfiguredActors) config.C {
 		var cfg config.C
 		cfg, db = database.MustApplyBlankTestDbConfig(t.Name(), nil)
+		cfg, redis = apredis.MustApplyTestConfig(cfg)
 		cfg, enc = encrypt.NewTestEncryptService(cfg, db)
 		ctx = apctx.NewBuilderBackground().WithClock(clk).Build()
 
@@ -213,7 +218,7 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 		}
 
 		cfg := setup(t, actors)
-		svc := NewService(cfg, db, enc, cfg.GetRootLogger())
+		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
 
 		err := svc.SyncConfiguredActorsExternalSource(ctx)
 		require.NoError(t, err)
@@ -240,7 +245,7 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 		}
 
 		cfg := setup(t, actors)
-		svc := NewService(cfg, db, enc, cfg.GetRootLogger())
+		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
 
 		// Initial sync
 		err := svc.SyncConfiguredActorsExternalSource(ctx)
@@ -281,7 +286,7 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 		}
 
 		cfg := setup(t, actors)
-		svc := NewService(cfg, db, enc, cfg.GetRootLogger())
+		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
 
 		// Create an actor that was synced from config-list (different source)
 		_, err := db.UpsertActor(ctx, &configuredActorData{
@@ -310,7 +315,7 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 		}
 
 		cfg := setup(t, actors)
-		svc := NewService(cfg, db, enc, cfg.GetRootLogger())
+		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
 
 		err := svc.SyncConfiguredActorsExternalSource(ctx)
 		require.NoError(t, err)
@@ -351,7 +356,7 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 		}
 
 		cfg := setup(t, actors)
-		svc := NewService(cfg, db, enc, cfg.GetRootLogger())
+		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
 
 		// Should not error, just skip
 		err := svc.SyncConfiguredActorsExternalSource(ctx)
@@ -364,9 +369,57 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 
 	t.Run("handles nil actors", func(t *testing.T) {
 		cfg := setup(t, nil)
-		svc := NewService(cfg, db, enc, cfg.GetRootLogger())
+		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
 
 		err := svc.SyncConfiguredActorsExternalSource(ctx)
+		require.NoError(t, err)
+	})
+
+	t.Run("skips sync when lock already held", func(t *testing.T) {
+		actors := &sconfig.ConfiguredActors{
+			InnerVal: &sconfig.ConfiguredActorsExternalSource{
+				KeysPath: tu.TestDataPath("admin_user_keys"),
+			},
+		}
+
+		cfg := setup(t, actors)
+
+		// Acquire the lock manually before sync
+		m := apredis.NewMutex(
+			redis,
+			MutexKeySyncActorsExternalSource,
+			apredis.MutexOptionLockFor(30*time.Second),
+		)
+		err := m.Lock(ctx)
+		require.NoError(t, err)
+		defer m.Unlock(ctx)
+
+		// Now try to sync - it should skip because lock is held
+		svc := NewService(cfg, db, redis, enc, cfg.GetRootLogger())
+		err = svc.SyncConfiguredActorsExternalSource(ctx)
+		require.NoError(t, err) // Should not error, just skip
+
+		// Verify no actors were created (sync was skipped)
+		_, err = db.GetActorByExternalId(ctx, "root", "bobdole")
+		require.ErrorIs(t, err, database.ErrNotFound)
+	})
+
+	t.Run("works without redis", func(t *testing.T) {
+		actors := &sconfig.ConfiguredActors{
+			InnerVal: &sconfig.ConfiguredActorsExternalSource{
+				KeysPath: tu.TestDataPath("admin_user_keys"),
+			},
+		}
+
+		cfg := setup(t, actors)
+
+		// Create service without Redis - should still work
+		svc := NewService(cfg, db, nil, enc, cfg.GetRootLogger())
+		err := svc.SyncConfiguredActorsExternalSource(ctx)
+		require.NoError(t, err)
+
+		// Verify actors were created
+		_, err = db.GetActorByExternalId(ctx, "root", "bobdole")
 		require.NoError(t, err)
 	})
 }

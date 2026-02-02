@@ -135,6 +135,7 @@ func Serve(cfg config.C) {
 	adminSyncTaskHandler := authSync.NewTaskHandler(
 		cfg,
 		dm.GetDatabase(),
+		dm.GetRedisClient(),
 		dm.GetEncryptService(),
 		logger,
 	)

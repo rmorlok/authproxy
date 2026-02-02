@@ -4,6 +4,7 @@ import (
 	"log/slog"
 
 	"github.com/hibiken/asynq"
+	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
@@ -19,6 +20,7 @@ type TaskRegistrar interface {
 type taskHandler struct {
 	cfg     config.C
 	db      database.DB
+	redis   apredis.Client
 	encrypt encrypt.E
 	logger  *slog.Logger
 }
@@ -27,12 +29,14 @@ type taskHandler struct {
 func NewTaskHandler(
 	cfg config.C,
 	db database.DB,
+	redis apredis.Client,
 	encrypt encrypt.E,
 	logger *slog.Logger,
 ) TaskRegistrar {
 	return &taskHandler{
 		cfg:     cfg,
 		db:      db,
+		redis:   redis,
 		encrypt: encrypt,
 		logger:  logger,
 	}

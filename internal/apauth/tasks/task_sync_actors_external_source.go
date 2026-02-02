@@ -22,7 +22,7 @@ func NewSyncActorsExternalSourceTask() *asynq.Task {
 func (th *taskHandler) syncConfiguredActorsExternalSource(ctx context.Context, task *asynq.Task) error {
 	th.logger.Info("starting configured actors external source sync task")
 
-	svc := NewService(th.cfg, th.db, th.encrypt, th.logger)
+	svc := NewService(th.cfg, th.db, th.redis, th.encrypt, th.logger)
 	if err := svc.SyncConfiguredActorsExternalSource(ctx); err != nil {
 		th.logger.Error("configured actors external source sync failed", "error", err)
 		return err

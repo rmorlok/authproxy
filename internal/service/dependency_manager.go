@@ -259,6 +259,7 @@ func (dm *DependencyManager) AutoMigratePredefinedActors() {
 		svc := tasks.NewService(
 			dm.GetConfig(),
 			dm.GetDatabase(),
+			dm.GetRedisClient(),
 			dm.GetEncryptService(),
 			dm.GetLogger(),
 		)
