@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -28,6 +29,7 @@ func (s *service) SyncActorList(ctx context.Context) error {
 }
 
 // SyncConfiguredActorsExternalSource synchronizes actors from ConfiguredActorsExternalSource configuration to the database.
+// This function uses a distributed lock to prevent concurrent syncs across multiple workers.
 func (s *service) SyncConfiguredActorsExternalSource(ctx context.Context) error {
 	actors := s.cfg.GetRoot().SystemAuth.Actors
 	if actors == nil {
@@ -39,6 +41,30 @@ func (s *service) SyncConfiguredActorsExternalSource(ctx context.Context) error 
 	if _, ok := actors.InnerVal.(*sconfig.ConfiguredActorsExternalSource); !ok {
 		s.logger.Debug("actors is not an external source type, skipping external source sync")
 		return nil
+	}
+
+	// Only acquire lock if Redis is available
+	if s.redis != nil {
+		m := apredis.NewMutex(
+			s.redis,
+			MutexKeySyncActorsExternalSource,
+			apredis.MutexOptionLockFor(defaultSyncLockDuration),
+			apredis.MutexOptionNoRetry(),
+			apredis.MutexOptionDetailedLockMetadata(),
+		)
+
+		if err := m.Lock(ctx); err != nil {
+			if apredis.MutexIsErrNotObtained(err) {
+				s.logger.Info("another sync is in progress, skipping this run")
+				return nil
+			}
+			return errors.Wrap(err, "failed to acquire sync lock")
+		}
+		defer func() {
+			if err := m.Unlock(ctx); err != nil {
+				s.logger.Warn("failed to release sync lock", "error", err)
+			}
+		}()
 	}
 
 	return s.syncConfiguredActors(ctx, actors.All(), LabelValuePublicKeyDir)

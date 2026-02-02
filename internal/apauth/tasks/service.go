@@ -3,7 +3,9 @@ package tasks
 import (
 	"context"
 	"log/slog"
+	"time"
 
+	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
@@ -20,6 +22,13 @@ const (
 	// LabelValuePublicKeyDir indicates the actor was synced from a directory containing
 	// public keys for the actors, named by the actor external id
 	LabelValuePublicKeyDir = "public-key-dir"
+
+	// MutexKeySyncActorsExternalSource is the Redis key used for distributed locking
+	// during external source actor sync
+	MutexKeySyncActorsExternalSource = "actor_sync:external_source"
+
+	// Default lock duration for external source sync
+	defaultSyncLockDuration = 2 * time.Minute
 )
 
 // Service handles synchronization of configured actors from configuration to the database.
@@ -36,6 +45,7 @@ type Service interface {
 type service struct {
 	cfg     config.C
 	db      database.DB
+	redis   apredis.Client
 	encrypt encrypt.E
 	logger  *slog.Logger
 }
@@ -44,12 +54,14 @@ type service struct {
 func NewService(
 	cfg config.C,
 	db database.DB,
+	redis apredis.Client,
 	encrypt encrypt.E,
 	logger *slog.Logger,
 ) Service {
 	return &service{
 		cfg:     cfg,
 		db:      db,
+		redis:   redis,
 		encrypt: encrypt,
 		logger:  logger,
 	}
