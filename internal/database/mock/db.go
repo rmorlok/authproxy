@@ -309,6 +309,21 @@ func (mr *MockDBMockRecorder) DeleteActor(ctx, id interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteActor", reflect.TypeOf((*MockDB)(nil).DeleteActor), ctx, id)
 }
 
+// DeleteActorLabels mocks base method.
+func (m *MockDB) DeleteActorLabels(ctx context.Context, id uuid.UUID, keys []string) (*database.Actor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteActorLabels", ctx, id, keys)
+	ret0, _ := ret[0].(*database.Actor)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteActorLabels indicates an expected call of DeleteActorLabels.
+func (mr *MockDBMockRecorder) DeleteActorLabels(ctx, id, keys interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteActorLabels", reflect.TypeOf((*MockDB)(nil).DeleteActorLabels), ctx, id, keys)
+}
+
 // DeleteAllOAuth2TokensForConnection mocks base method.
 func (m *MockDB) DeleteAllOAuth2TokensForConnection(ctx context.Context, connectionId uuid.UUID) error {
 	m.ctrl.T.Helper()
@@ -788,6 +803,21 @@ func (m *MockDB) Ping(ctx context.Context) bool {
 func (mr *MockDBMockRecorder) Ping(ctx interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockDB)(nil).Ping), ctx)
+}
+
+// PutActorLabels mocks base method.
+func (m *MockDB) PutActorLabels(ctx context.Context, id uuid.UUID, labels map[string]string) (*database.Actor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutActorLabels", ctx, id, labels)
+	ret0, _ := ret[0].(*database.Actor)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PutActorLabels indicates an expected call of PutActorLabels.
+func (mr *MockDBMockRecorder) PutActorLabels(ctx, id, labels interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutActorLabels", reflect.TypeOf((*MockDB)(nil).PutActorLabels), ctx, id, labels)
 }
 
 // SetConnectionState mocks base method.

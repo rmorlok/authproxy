@@ -1054,4 +1054,432 @@ func TestActorsRoutes(t *testing.T) {
 			require.Equal(t, "tenant1", resp.Labels["tenant"])
 		})
 	})
+
+	t.Run("get labels", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		// Create an actor with labels
+		a := createActor(t, tu.Db, "labels-actor", "root")
+		_, err := tu.Db.UpsertActor(context.Background(), &database.Actor{
+			Id:         a.Id,
+			ExternalId: a.ExternalId,
+			Namespace:  a.Namespace,
+			Labels:     database.Labels{"env": "prod", "team": "backend"},
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+a.Id.String()+"/labels", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("bad uuid", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/not-a-uuid/labels", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+uuid.New().String()+"/labels", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("success", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+a.Id.String()+"/labels", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp map[string]string
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "prod", resp["env"])
+			require.Equal(t, "backend", resp["team"])
+		})
+
+		t.Run("success - empty labels", func(t *testing.T) {
+			actorNoLabels := createActor(t, tu.Db, "no-labels-actor", "root")
+
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+actorNoLabels.Id.String()+"/labels", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp map[string]string
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Empty(t, resp)
+		})
+	})
+
+	t.Run("get label", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		// Create an actor with labels
+		a := createActor(t, tu.Db, "get-label-actor", "root")
+		_, err := tu.Db.UpsertActor(context.Background(), &database.Actor{
+			Id:         a.Id,
+			ExternalId: a.ExternalId,
+			Namespace:  a.Namespace,
+			Labels:     database.Labels{"env": "staging"},
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+a.Id.String()+"/labels/env", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("bad uuid", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/not-a-uuid/labels/env", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("actor not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+uuid.New().String()+"/labels/env", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("label not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+a.Id.String()+"/labels/nonexistent", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("success", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+a.Id.String()+"/labels/env", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ActorLabelJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "env", resp.Key)
+			require.Equal(t, "staging", resp.Value)
+		})
+	})
+
+	t.Run("put label", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		a := createActor(t, tu.Db, "put-label-actor", "root")
+		otherId := uuid.New()
+
+		t.Run("unauthorized", func(t *testing.T) {
+			body := `{"value": "production"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPut, "/actors/"+a.Id.String()+"/labels/env", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
+			body := `{"value": "production"}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/actors/"+a.Id.String()+"/labels/env",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingleWithResourceIds("root.**", "actors", "update", otherId.String()),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("bad uuid", func(t *testing.T) {
+			body := `{"value": "production"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPut, "/actors/not-a-uuid/labels/env", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("actor not found", func(t *testing.T) {
+			body := `{"value": "production"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPut, "/actors/"+uuid.New().String()+"/labels/env", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("bad request - invalid JSON", func(t *testing.T) {
+			body := `{invalid json}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPut, "/actors/"+a.Id.String()+"/labels/env", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("success - add new label", func(t *testing.T) {
+			body := `{"value": "production"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPut, "/actors/"+a.Id.String()+"/labels/env", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ActorLabelJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "env", resp.Key)
+			require.Equal(t, "production", resp.Value)
+
+			// Verify in database
+			updatedActor, err := tu.Db.GetActor(context.Background(), a.Id)
+			require.NoError(t, err)
+			require.Equal(t, "production", updatedActor.Labels["env"])
+		})
+
+		t.Run("success - update existing label", func(t *testing.T) {
+			// First set a label
+			actorWithLabel := createActor(t, tu.Db, "update-existing-label", "root")
+			_, err := tu.Db.UpsertActor(context.Background(), &database.Actor{
+				Id:         actorWithLabel.Id,
+				ExternalId: actorWithLabel.ExternalId,
+				Namespace:  actorWithLabel.Namespace,
+				Labels:     database.Labels{"version": "v1"},
+			})
+			require.NoError(t, err)
+
+			// Update the label
+			body := `{"value": "v2"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPut, "/actors/"+actorWithLabel.Id.String()+"/labels/version", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ActorLabelJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "version", resp.Key)
+			require.Equal(t, "v2", resp.Value)
+
+			// Verify in database
+			updatedActor, err := tu.Db.GetActor(context.Background(), actorWithLabel.Id)
+			require.NoError(t, err)
+			require.Equal(t, "v2", updatedActor.Labels["version"])
+		})
+
+		t.Run("success - preserves other labels", func(t *testing.T) {
+			// First set multiple labels
+			actorMultiLabel := createActor(t, tu.Db, "multi-label-actor", "root")
+			_, err := tu.Db.UpsertActor(context.Background(), &database.Actor{
+				Id:         actorMultiLabel.Id,
+				ExternalId: actorMultiLabel.ExternalId,
+				Namespace:  actorMultiLabel.Namespace,
+				Labels:     database.Labels{"env": "dev", "team": "platform"},
+			})
+			require.NoError(t, err)
+
+			// Update one label
+			body := `{"value": "staging"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPut, "/actors/"+actorMultiLabel.Id.String()+"/labels/env", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			// Verify both labels in database
+			updatedActor, err := tu.Db.GetActor(context.Background(), actorMultiLabel.Id)
+			require.NoError(t, err)
+			require.Equal(t, "staging", updatedActor.Labels["env"])
+			require.Equal(t, "platform", updatedActor.Labels["team"])
+		})
+	})
+
+	t.Run("delete label", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		// Create an actor with labels
+		a := createActor(t, tu.Db, "delete-label-actor", "root")
+		_, err := tu.Db.UpsertActor(context.Background(), &database.Actor{
+			Id:         a.Id,
+			ExternalId: a.ExternalId,
+			Namespace:  a.Namespace,
+			Labels:     database.Labels{"env": "prod", "team": "backend"},
+		})
+		require.NoError(t, err)
+
+		otherId := uuid.New()
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodDelete, "/actors/"+a.Id.String()+"/labels/env", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodDelete,
+				"/actors/"+a.Id.String()+"/labels/env",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingleWithResourceIds("root.**", "actors", "update", otherId.String()),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("bad uuid", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodDelete, "/actors/not-a-uuid/labels/env", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("actor not found returns 204", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodDelete, "/actors/"+uuid.New().String()+"/labels/env", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNoContent, w.Code)
+		})
+
+		t.Run("label not found returns 204", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodDelete, "/actors/"+a.Id.String()+"/labels/nonexistent", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNoContent, w.Code)
+		})
+
+		t.Run("success - delete label", func(t *testing.T) {
+			// Create actor with label to delete
+			actorToDelete := createActor(t, tu.Db, "actor-delete-one-label", "root")
+			_, err := tu.Db.UpsertActor(context.Background(), &database.Actor{
+				Id:         actorToDelete.Id,
+				ExternalId: actorToDelete.ExternalId,
+				Namespace:  actorToDelete.Namespace,
+				Labels:     database.Labels{"to-delete": "value", "to-keep": "value2"},
+			})
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodDelete, "/actors/"+actorToDelete.Id.String()+"/labels/to-delete", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNoContent, w.Code)
+
+			// Verify the label is deleted but other labels remain
+			updatedActor, err := tu.Db.GetActor(context.Background(), actorToDelete.Id)
+			require.NoError(t, err)
+			_, exists := updatedActor.Labels["to-delete"]
+			require.False(t, exists)
+			require.Equal(t, "value2", updatedActor.Labels["to-keep"])
+		})
+
+		t.Run("success - delete is idempotent", func(t *testing.T) {
+			actorIdempotent := createActor(t, tu.Db, "actor-idempotent-delete", "root")
+			_, err := tu.Db.UpsertActor(context.Background(), &database.Actor{
+				Id:         actorIdempotent.Id,
+				ExternalId: actorIdempotent.ExternalId,
+				Namespace:  actorIdempotent.Namespace,
+				Labels:     database.Labels{"label": "value"},
+			})
+			require.NoError(t, err)
+
+			// Delete the label twice
+			for i := 0; i < 2; i++ {
+				w := httptest.NewRecorder()
+				req, err := http.NewRequest(http.MethodDelete, "/actors/"+actorIdempotent.Id.String()+"/labels/label", nil)
+				require.NoError(t, err)
+				req = authenticate(t, tu, req)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNoContent, w.Code)
+			}
+
+			// Verify the label is deleted
+			updatedActor, err := tu.Db.GetActor(context.Background(), actorIdempotent.Id)
+			require.NoError(t, err)
+			_, exists := updatedActor.Labels["label"]
+			require.False(t, exists)
+		})
+	})
 }
