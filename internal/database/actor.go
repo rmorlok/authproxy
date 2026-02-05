@@ -322,7 +322,7 @@ func (s *service) CreateActor(ctx context.Context, a *Actor) error {
 		}
 
 		if count > 0 {
-			return errors.New("actor already exists")
+			return errors.Wrap(ErrDuplicate, "actor already exists")
 		}
 
 		err = s.sq.
@@ -339,7 +339,7 @@ func (s *service) CreateActor(ctx context.Context, a *Actor) error {
 		}
 
 		if count == 0 {
-			return errors.New("actor namespace does not exist")
+			return errors.Wrap(ErrNamespaceDoesNotExist, "actor namespace does not exist")
 		}
 
 		cpy := *a
@@ -774,4 +774,161 @@ func (s *service) ListActorsFromCursor(ctx context.Context, cursor string) (List
 	}
 
 	return b.FromCursor(ctx, cursor)
+}
+
+// PutActorLabels adds or updates the specified labels on an actor within a single transaction.
+// Existing labels not in the provided map are preserved.
+func (s *service) PutActorLabels(ctx context.Context, id uuid.UUID, labels map[string]string) (*Actor, error) {
+	if id == uuid.Nil {
+		return nil, errors.New("actor id is required")
+	}
+
+	if len(labels) == 0 {
+		// No labels to add, just return the current actor
+		return s.GetActor(ctx, id)
+	}
+
+	// Validate label keys and values
+	for k, v := range labels {
+		if err := ValidateLabelKey(k); err != nil {
+			return nil, errors.Wrapf(err, "invalid label key '%s'", k)
+		}
+		if err := ValidateLabelValue(v); err != nil {
+			return nil, errors.Wrapf(err, "invalid label value for key '%s'", k)
+		}
+	}
+
+	var result *Actor
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		// Get the current actor within the transaction
+		var actor Actor
+		err := s.sq.
+			Select(actor.cols()...).
+			From(ActorTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).
+			QueryRow().
+			Scan(actor.fields()...)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		// Merge the new labels with existing labels
+		if actor.Labels == nil {
+			actor.Labels = make(Labels)
+		}
+		for k, v := range labels {
+			actor.Labels[k] = v
+		}
+
+		// Update the actor
+		now := apctx.GetClock(ctx).Now()
+		actor.UpdatedAt = now
+
+		dbResult, err := s.sq.
+			Update(ActorTable).
+			Set("labels", actor.Labels).
+			Set("updated_at", actor.UpdatedAt).
+			Where(sq.Eq{"id": id}).
+			RunWith(tx).
+			Exec()
+		if err != nil {
+			return errors.Wrap(err, "failed to update actor labels")
+		}
+
+		affected, err := dbResult.RowsAffected()
+		if err != nil {
+			return errors.Wrap(err, "failed to update actor labels")
+		}
+
+		if affected == 0 {
+			return errors.New("failed to update actor labels; no rows updated")
+		}
+
+		result = &actor
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// DeleteActorLabels removes the specified label keys from an actor within a single transaction.
+// Keys that don't exist are ignored.
+func (s *service) DeleteActorLabels(ctx context.Context, id uuid.UUID, keys []string) (*Actor, error) {
+	if id == uuid.Nil {
+		return nil, errors.New("actor id is required")
+	}
+
+	if len(keys) == 0 {
+		// No labels to delete, just return the current actor
+		return s.GetActor(ctx, id)
+	}
+
+	var result *Actor
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		// Get the current actor within the transaction
+		var actor Actor
+		err := s.sq.
+			Select(actor.cols()...).
+			From(ActorTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).
+			QueryRow().
+			Scan(actor.fields()...)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		// Delete the specified labels
+		if actor.Labels != nil {
+			for _, k := range keys {
+				delete(actor.Labels, k)
+			}
+		}
+
+		// Update the actor
+		now := apctx.GetClock(ctx).Now()
+		actor.UpdatedAt = now
+
+		dbResult, err := s.sq.
+			Update(ActorTable).
+			Set("labels", actor.Labels).
+			Set("updated_at", actor.UpdatedAt).
+			Where(sq.Eq{"id": id}).
+			RunWith(tx).
+			Exec()
+		if err != nil {
+			return errors.Wrap(err, "failed to delete actor labels")
+		}
+
+		affected, err := dbResult.RowsAffected()
+		if err != nil {
+			return errors.Wrap(err, "failed to delete actor labels")
+		}
+
+		if affected == 0 {
+			return errors.New("failed to delete actor labels; no rows updated")
+		}
+
+		result = &actor
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
 }

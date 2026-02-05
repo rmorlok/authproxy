@@ -895,4 +895,290 @@ func TestActor(t *testing.T) {
 			require.Nil(t, retrieved.EncryptedKey)
 		})
 	})
+
+	t.Run("PutActorLabels", func(t *testing.T) {
+		t.Run("add labels to actor without labels", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:         uuid.New(),
+				Namespace:  "root",
+				ExternalId: "put-labels-1",
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.PutActorLabels(ctx, actor.Id, map[string]string{
+				"env":  "prod",
+				"team": "backend",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "prod", updated.Labels["env"])
+			require.Equal(t, "backend", updated.Labels["team"])
+
+			// Verify in database
+			retrieved, err := db.GetActor(ctx, actor.Id)
+			require.NoError(t, err)
+			require.Equal(t, "prod", retrieved.Labels["env"])
+			require.Equal(t, "backend", retrieved.Labels["team"])
+		})
+
+		t.Run("add labels to actor with existing labels", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:         uuid.New(),
+				Namespace:  "root",
+				ExternalId: "put-labels-2",
+				Labels:     Labels{"existing": "value"},
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.PutActorLabels(ctx, actor.Id, map[string]string{
+				"new": "label",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "value", updated.Labels["existing"])
+			require.Equal(t, "label", updated.Labels["new"])
+		})
+
+		t.Run("update existing label", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:         uuid.New(),
+				Namespace:  "root",
+				ExternalId: "put-labels-3",
+				Labels:     Labels{"env": "dev"},
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.PutActorLabels(ctx, actor.Id, map[string]string{
+				"env": "prod",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "prod", updated.Labels["env"])
+		})
+
+		t.Run("multiple labels at once", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:         uuid.New(),
+				Namespace:  "root",
+				ExternalId: "put-labels-4",
+				Labels:     Labels{"keep": "this"},
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.PutActorLabels(ctx, actor.Id, map[string]string{
+				"label1": "value1",
+				"label2": "value2",
+				"label3": "value3",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "this", updated.Labels["keep"])
+			require.Equal(t, "value1", updated.Labels["label1"])
+			require.Equal(t, "value2", updated.Labels["label2"])
+			require.Equal(t, "value3", updated.Labels["label3"])
+		})
+
+		t.Run("empty labels map returns current actor", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:         uuid.New(),
+				Namespace:  "root",
+				ExternalId: "put-labels-5",
+				Labels:     Labels{"existing": "value"},
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.PutActorLabels(ctx, actor.Id, map[string]string{})
+			require.NoError(t, err)
+			require.Equal(t, "value", updated.Labels["existing"])
+		})
+
+		t.Run("actor not found", func(t *testing.T) {
+			setup(t)
+
+			_, err := db.PutActorLabels(ctx, uuid.New(), map[string]string{"key": "value"})
+			require.ErrorIs(t, err, ErrNotFound)
+		})
+
+		t.Run("nil id returns error", func(t *testing.T) {
+			setup(t)
+
+			_, err := db.PutActorLabels(ctx, uuid.Nil, map[string]string{"key": "value"})
+			require.Error(t, err)
+		})
+
+		t.Run("invalid label key returns error", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:         uuid.New(),
+				Namespace:  "root",
+				ExternalId: "put-labels-6",
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			_, err := db.PutActorLabels(ctx, actor.Id, map[string]string{
+				"": "empty key",
+			})
+			require.Error(t, err)
+		})
+
+		t.Run("updates timestamp", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:         uuid.New(),
+				Namespace:  "root",
+				ExternalId: "put-labels-7",
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			originalActor, _ := db.GetActor(ctx, actor.Id)
+			originalUpdatedAt := originalActor.UpdatedAt
+
+			// Advance the clock
+			clk.Step(time.Hour)
+
+			updated, err := db.PutActorLabels(ctx, actor.Id, map[string]string{"new": "label"})
+			require.NoError(t, err)
+			require.True(t, updated.UpdatedAt.After(originalUpdatedAt))
+		})
+	})
+
+	t.Run("DeleteActorLabels", func(t *testing.T) {
+		t.Run("delete single label", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:         uuid.New(),
+				Namespace:  "root",
+				ExternalId: "delete-labels-1",
+				Labels:     Labels{"env": "prod", "team": "backend"},
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.DeleteActorLabels(ctx, actor.Id, []string{"env"})
+			require.NoError(t, err)
+			_, exists := updated.Labels["env"]
+			require.False(t, exists)
+			require.Equal(t, "backend", updated.Labels["team"])
+
+			// Verify in database
+			retrieved, err := db.GetActor(ctx, actor.Id)
+			require.NoError(t, err)
+			_, exists = retrieved.Labels["env"]
+			require.False(t, exists)
+			require.Equal(t, "backend", retrieved.Labels["team"])
+		})
+
+		t.Run("delete multiple labels", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:         uuid.New(),
+				Namespace:  "root",
+				ExternalId: "delete-labels-2",
+				Labels:     Labels{"a": "1", "b": "2", "c": "3", "d": "4"},
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.DeleteActorLabels(ctx, actor.Id, []string{"a", "c"})
+			require.NoError(t, err)
+			require.Len(t, updated.Labels, 2)
+			_, existsA := updated.Labels["a"]
+			_, existsC := updated.Labels["c"]
+			require.False(t, existsA)
+			require.False(t, existsC)
+			require.Equal(t, "2", updated.Labels["b"])
+			require.Equal(t, "4", updated.Labels["d"])
+		})
+
+		t.Run("delete non-existent label is no-op", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:         uuid.New(),
+				Namespace:  "root",
+				ExternalId: "delete-labels-3",
+				Labels:     Labels{"existing": "value"},
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.DeleteActorLabels(ctx, actor.Id, []string{"nonexistent"})
+			require.NoError(t, err)
+			require.Equal(t, "value", updated.Labels["existing"])
+		})
+
+		t.Run("delete from actor without labels", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:         uuid.New(),
+				Namespace:  "root",
+				ExternalId: "delete-labels-4",
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.DeleteActorLabels(ctx, actor.Id, []string{"any"})
+			require.NoError(t, err)
+			require.Empty(t, updated.Labels)
+		})
+
+		t.Run("empty keys slice returns current actor", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:         uuid.New(),
+				Namespace:  "root",
+				ExternalId: "delete-labels-5",
+				Labels:     Labels{"existing": "value"},
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.DeleteActorLabels(ctx, actor.Id, []string{})
+			require.NoError(t, err)
+			require.Equal(t, "value", updated.Labels["existing"])
+		})
+
+		t.Run("actor not found", func(t *testing.T) {
+			setup(t)
+
+			_, err := db.DeleteActorLabels(ctx, uuid.New(), []string{"key"})
+			require.ErrorIs(t, err, ErrNotFound)
+		})
+
+		t.Run("nil id returns error", func(t *testing.T) {
+			setup(t)
+
+			_, err := db.DeleteActorLabels(ctx, uuid.Nil, []string{"key"})
+			require.Error(t, err)
+		})
+
+		t.Run("updates timestamp", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:         uuid.New(),
+				Namespace:  "root",
+				ExternalId: "delete-labels-6",
+				Labels:     Labels{"to-delete": "value"},
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			originalActor, _ := db.GetActor(ctx, actor.Id)
+			originalUpdatedAt := originalActor.UpdatedAt
+
+			// Advance the clock
+			clk.Step(time.Hour)
+
+			updated, err := db.DeleteActorLabels(ctx, actor.Id, []string{"to-delete"})
+			require.NoError(t, err)
+			require.True(t, updated.UpdatedAt.After(originalUpdatedAt))
+		})
+	})
 }

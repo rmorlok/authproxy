@@ -38,6 +38,25 @@ type ActorJson struct {
 	UpdatedAt  time.Time         `json:"updated_at"`
 }
 
+type CreateActorRequestJson struct {
+	ExternalId string            `json:"external_id"`
+	Namespace  string            `json:"namespace"`
+	Labels     map[string]string `json:"labels,omitempty"`
+}
+
+type UpdateActorRequestJson struct {
+	Labels map[string]string `json:"labels"`
+}
+
+type PutActorLabelRequestJson struct {
+	Value string `json:"value"`
+}
+
+type ActorLabelJson struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 func DatabaseActorToJson(a *database.Actor) ActorJson {
 	return ActorJson{
 		Id:         a.Id,
@@ -424,6 +443,747 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 	gctx.Status(http.StatusNoContent)
 }
 
+func (r *ActorsRoutes) create(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	var req CreateActorRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid request body").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Validate external_id is not empty
+	if req.ExternalId == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("external_id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Validate namespace path
+	if err := database.ValidateNamespacePath(req.Namespace); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid namespace '%s': %s", req.Namespace, err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Validate labels if provided
+	if req.Labels != nil {
+		if err := database.Labels(req.Labels).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid labels: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
+	// Validate authorization for the namespace
+	if err := val.ValidateNamespace(req.Namespace); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusForbidden().
+			WithPublicErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Check if actor already exists with the same external_id in the namespace
+	existingActor, err := r.db.GetActorByExternalId(ctx, req.Namespace, req.ExternalId)
+	if err == nil && existingActor != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatus(http.StatusConflict).
+			WithResponseMsgf("actor with external_id '%s' already exists in namespace '%s'", req.ExternalId, req.Namespace).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if err != nil && !errors.Is(err, database.ErrNotFound) {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Create the actor
+	actor := &database.Actor{
+		Id:         uuid.New(),
+		Namespace:  req.Namespace,
+		ExternalId: req.ExternalId,
+		Labels:     req.Labels,
+	}
+
+	if err := r.db.CreateActor(ctx, actor); err != nil {
+		// Handle specific error cases
+		if errors.Is(err, database.ErrNamespaceDoesNotExist) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithResponseMsgf("namespace '%s' does not exist", req.Namespace).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		if errors.Is(err, database.ErrDuplicate) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatus(http.StatusConflict).
+				WithResponseMsgf("actor with external_id '%s' already exists in namespace '%s'", req.ExternalId, req.Namespace).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Fetch the created actor to get the timestamps
+	createdActor, err := r.db.GetActor(ctx, actor.Id)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusCreated, DatabaseActorToJson(createdActor))
+}
+
+func (r *ActorsRoutes) update(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := uuid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	var req UpdateActorRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid request body").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Validate labels if provided
+	if req.Labels != nil {
+		if err := database.Labels(req.Labels).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid labels: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
+	// Get the existing actor
+	existingActor, err := r.db.GetActor(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("actor not found").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if existingActor == nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsg("actor not found").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Validate authorization for the actor's namespace
+	if httpErr := val.ValidateHttpStatusError(existingActor); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if req.Labels != nil {
+		existingActor.Labels = req.Labels
+	}
+
+	// Use UpsertActor to update
+	updatedActor, err := r.db.UpsertActor(ctx, existingActor)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, DatabaseActorToJson(updatedActor))
+}
+
+func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	externalId := gctx.Param("external_id")
+	if externalId == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("external_id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	ra := auth.MustGetAuthFromGinContext(gctx)
+	namespace := ra.GetActor().GetNamespace()
+	if gctx.Query("namespace") != "" {
+		namespace = gctx.Query("namespace")
+	}
+
+	var req UpdateActorRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid request body").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Validate labels if provided
+	if req.Labels != nil {
+		if err := database.Labels(req.Labels).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid labels: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
+	// Get the existing actor
+	existingActor, err := r.db.GetActorByExternalId(ctx, namespace, externalId)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("actor not found").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if existingActor == nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsg("actor not found").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Validate authorization for the actor's namespace
+	if httpErr := val.ValidateHttpStatusError(existingActor); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if req.Labels != nil {
+		existingActor.Labels = req.Labels
+	}
+
+	// Use UpsertActor to update
+	updatedActor, err := r.db.UpsertActor(ctx, existingActor)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, DatabaseActorToJson(updatedActor))
+}
+
+func (r *ActorsRoutes) getLabels(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := uuid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	actor, err := r.db.GetActor(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("actor not found").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if actor == nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsg("actor not found").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	labels := actor.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+
+	gctx.PureJSON(http.StatusOK, labels)
+}
+
+func (r *ActorsRoutes) getLabel(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := uuid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	labelKey := gctx.Param("label")
+	if labelKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("label key is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	actor, err := r.db.GetActor(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("actor not found").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if actor == nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsg("actor not found").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	labels := actor.GetLabels()
+	value, exists := labels[labelKey]
+	if !exists {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsgf("label '%s' not found", labelKey).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, ActorLabelJson{
+		Key:   labelKey,
+		Value: value,
+	})
+}
+
+func (r *ActorsRoutes) putLabel(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := uuid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	labelKey := gctx.Param("label")
+	if labelKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("label key is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Validate label key
+	if err := database.ValidateLabelKey(labelKey); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid label key: %s", err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	var req PutActorLabelRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid request body").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Validate label value
+	if err := database.ValidateLabelValue(req.Value); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid label value: %s", err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Get the existing actor for authorization check
+	actor, err := r.db.GetActor(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("actor not found").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if actor == nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsg("actor not found").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	// Use transactional PutActorLabels to update
+	updatedActor, err := r.db.PutActorLabels(ctx, id, map[string]string{labelKey: req.Value})
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("actor not found").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, ActorLabelJson{
+		Key:   labelKey,
+		Value: updatedActor.Labels[labelKey],
+	})
+}
+
+func (r *ActorsRoutes) deleteLabel(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := uuid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	labelKey := gctx.Param("label")
+	if labelKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("label key is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Get the existing actor for authorization check
+	actor, err := r.db.GetActor(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			// Actor doesn't exist, return 204 (idempotent delete)
+			gctx.Status(http.StatusNoContent)
+			val.MarkValidated()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if actor == nil {
+		// Actor doesn't exist, return 204 (idempotent delete)
+		gctx.Status(http.StatusNoContent)
+		val.MarkValidated()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	// Use transactional DeleteActorLabels to delete
+	_, err = r.db.DeleteActorLabels(ctx, id, []string{labelKey})
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			// Actor was deleted between the check and the update, return 204
+			gctx.Status(http.StatusNoContent)
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.Status(http.StatusNoContent)
+}
+
 func (r *ActorsRoutes) Register(g gin.IRouter) {
 	g.GET(
 		"/actors",
@@ -432,6 +1192,14 @@ func (r *ActorsRoutes) Register(g gin.IRouter) {
 			ForVerb("list").
 			Build(),
 		r.list,
+	)
+	g.POST(
+		"/actors",
+		r.auth.NewRequiredBuilder().
+			ForResource("actors").
+			ForVerb("create").
+			Build(),
+		r.create,
 	)
 	g.GET(
 		"/actors/external-id/:external_id",
@@ -455,6 +1223,17 @@ func (r *ActorsRoutes) Register(g gin.IRouter) {
 			Build(),
 		r.deleteByExternalId,
 	)
+	g.PATCH(
+		"/actors/external-id/:external_id",
+		r.auth.NewRequiredBuilder().
+			ForResource("actors").
+			ForIdField("external_id").
+			ForIdExtractor(func(obj interface{}) string { return obj.(*database.Actor).ExternalId }).
+			ForNamespaceQueryParam("namespace").
+			ForVerb("update").
+			Build(),
+		r.updateByExternalId,
+	)
 	g.GET(
 		"/actors/:id",
 		r.auth.NewRequiredBuilder().
@@ -472,6 +1251,51 @@ func (r *ActorsRoutes) Register(g gin.IRouter) {
 			ForVerb("delete").
 			Build(),
 		r.delete,
+	)
+	g.PATCH(
+		"/actors/:id",
+		r.auth.NewRequiredBuilder().
+			ForResource("actors").
+			ForIdField("id").
+			ForVerb("update").
+			Build(),
+		r.update,
+	)
+	g.GET(
+		"/actors/:id/labels",
+		r.auth.NewRequiredBuilder().
+			ForResource("actors").
+			ForIdField("id").
+			ForVerb("get").
+			Build(),
+		r.getLabels,
+	)
+	g.GET(
+		"/actors/:id/labels/:label",
+		r.auth.NewRequiredBuilder().
+			ForResource("actors").
+			ForIdField("id").
+			ForVerb("get").
+			Build(),
+		r.getLabel,
+	)
+	g.PUT(
+		"/actors/:id/labels/:label",
+		r.auth.NewRequiredBuilder().
+			ForResource("actors").
+			ForIdField("id").
+			ForVerb("update").
+			Build(),
+		r.putLabel,
+	)
+	g.DELETE(
+		"/actors/:id/labels/:label",
+		r.auth.NewRequiredBuilder().
+			ForResource("actors").
+			ForIdField("id").
+			ForVerb("update").
+			Build(),
+		r.deleteLabel,
 	)
 }
 

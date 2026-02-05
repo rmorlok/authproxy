@@ -60,6 +60,8 @@ type DB interface {
 	CreateActor(ctx context.Context, actor *Actor) error
 	UpsertActor(ctx context.Context, actor IActorData) (*Actor, error)
 	DeleteActor(ctx context.Context, id uuid.UUID) error
+	PutActorLabels(ctx context.Context, id uuid.UUID, labels map[string]string) (*Actor, error)
+	DeleteActorLabels(ctx context.Context, id uuid.UUID, keys []string) (*Actor, error)
 	ListActorsBuilder() ListActorsBuilder
 	ListActorsFromCursor(ctx context.Context, cursor string) (ListActorsExecutor, error)
 
