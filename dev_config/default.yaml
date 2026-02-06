@@ -48,7 +48,7 @@ system_auth:
         verbs:
           - "*"
   global_aes_key:
-    env_var_base64: GLOBAL_AES_KEY
+    path: ./dev_config/keys/global_aes.key
 
 error_pages:
   internal_error: https://example.com
