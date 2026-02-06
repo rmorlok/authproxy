@@ -2,9 +2,10 @@ package config
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"log/slog"
 	"os"
+
+	"gopkg.in/yaml.v3"
 )
 
 type LoggingConfigType string

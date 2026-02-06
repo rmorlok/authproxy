@@ -2,8 +2,9 @@ package worker
 
 import (
 	"fmt"
-	"github.com/hibiken/asynq"
 	"log/slog"
+
+	"github.com/hibiken/asynq"
 )
 
 type asyncLogger struct {

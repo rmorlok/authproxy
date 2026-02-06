@@ -2,9 +2,10 @@ package jwt
 
 import (
 	"fmt"
-	"github.com/go-resty/resty/v2"
 	"net/http"
 	"net/url"
+
+	"github.com/go-resty/resty/v2"
 )
 
 type Signer interface {

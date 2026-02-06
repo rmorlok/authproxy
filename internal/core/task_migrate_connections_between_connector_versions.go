@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/aplog"
 )

@@ -13,8 +13,11 @@ import (
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
+	_ "github.com/rmorlok/authproxy/internal/docs"
 	common_routes "github.com/rmorlok/authproxy/internal/routes"
 	"github.com/rmorlok/authproxy/internal/service"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpHealthChecker *http.Server, err error) {
@@ -37,6 +40,9 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		logger.Info("Enabling CORS")
 		server.Use(cors.New(*corsConfig))
 	}
+
+	// Swagger documentation endpoint
+	server.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	var healthChecker *gin.Engine
 	if service.Port() != service.HealthCheckPort() {

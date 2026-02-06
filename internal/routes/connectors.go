@@ -124,6 +124,19 @@ type ConnectorsRoutes struct {
 	authService auth.A
 }
 
+// @Summary		Get connector
+// @Description	Get a specific connector by its UUID
+// @Tags			connectors
+// @Accept			json
+// @Produce		json
+// @Param			id	path		string	true	"Connector UUID"
+// @Success		200	{object}	SwaggerConnectorJson
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		404	{object}	ErrorResponse
+// @Failure		500	{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connectors/{id} [get]
 func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -196,6 +209,23 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, ConnectorToJson(c))
 }
 
+// @Summary		List connectors
+// @Description	List connectors with optional filtering and pagination
+// @Tags			connectors
+// @Accept			json
+// @Produce		json
+// @Param			cursor			query		string	false	"Pagination cursor"
+// @Param			limit			query		integer	false	"Maximum number of results to return"
+// @Param			state			query		string	false	"Filter by connector state"
+// @Param			namespace		query		string	false	"Filter by namespace"
+// @Param			label_selector	query		string	false	"Filter by label selector"
+// @Param			order_by		query		string	false	"Order by field (e.g., 'created_at:asc')"
+// @Success		200				{object}	SwaggerListConnectorsResponse
+// @Failure		400				{object}	ErrorResponse
+// @Failure		401				{object}	ErrorResponse
+// @Failure		500				{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connectors [get]
 func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -291,6 +321,20 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 	})
 }
 
+// @Summary		Get connector version
+// @Description	Get a specific version of a connector
+// @Tags			connectors
+// @Accept			json
+// @Produce		json
+// @Param			id		path		string	true	"Connector UUID"
+// @Param			version	path		integer	true	"Version number"
+// @Success		200		{object}	SwaggerConnectorVersionJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connectors/{id}/versions/{version} [get]
 func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -391,6 +435,24 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, ConnectorVersionToJson(cv))
 }
 
+// @Summary		List connector versions
+// @Description	List all versions of a specific connector
+// @Tags			connectors
+// @Accept			json
+// @Produce		json
+// @Param			id				path		string	true	"Connector UUID"
+// @Param			cursor			query		string	false	"Pagination cursor"
+// @Param			limit			query		integer	false	"Maximum number of results to return"
+// @Param			state			query		string	false	"Filter by version state"
+// @Param			namespace		query		string	false	"Filter by namespace"
+// @Param			label_selector	query		string	false	"Filter by label selector"
+// @Param			order_by		query		string	false	"Order by field (e.g., 'version:desc')"
+// @Success		200				{object}	SwaggerListConnectorVersionsResponse
+// @Failure		400				{object}	ErrorResponse
+// @Failure		401				{object}	ErrorResponse
+// @Failure		500				{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connectors/{id}/versions [get]
 func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)

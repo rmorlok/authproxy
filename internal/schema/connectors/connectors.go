@@ -61,8 +61,8 @@ func (c *Connectors) Validate(vc *common.ValidationContext) error {
 	identifyingLabels := c.GetIdentifyingLabels()
 
 	// Track by identifying label values (JSON-serialized) instead of Type
-	identifyingLabelCounts := make(map[string]int)         // serialized labels -> count
-	identifyingLabelHasUuidCount := make(map[string]int)   // serialized labels -> count with uuid
+	identifyingLabelCounts := make(map[string]int)          // serialized labels -> count
+	identifyingLabelHasUuidCount := make(map[string]int)    // serialized labels -> count with uuid
 	identifyingLabelHasVersionCount := make(map[string]int) // serialized labels -> count with version
 	identifyingLabelNoUuidVersionCount := make(map[string]map[uint64]int)
 

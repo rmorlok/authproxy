@@ -9,12 +9,13 @@ import (
 	"crypto/x509/pkix"
 	"encoding/pem"
 	"fmt"
-	"github.com/mitchellh/go-homedir"
 	"math/big"
 	"net"
 	"os"
 	"path/filepath"
 	"time"
+
+	"github.com/mitchellh/go-homedir"
 )
 
 type TlsConfigSelfSignedAutogen struct {

@@ -1,8 +1,9 @@
 package jwt
 
 import (
-	"github.com/golang-jwt/jwt/v5"
 	"strings"
+
+	"github.com/golang-jwt/jwt/v5"
 )
 
 func IsTokenExpiredError(err error) bool {

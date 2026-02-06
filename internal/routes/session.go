@@ -52,6 +52,18 @@ type InitiateSuccessResponse struct {
 	ActorId uuid.UUID `json:"actor_id"`
 }
 
+//	@Summary		Initiate session
+//	@Description	Initiate or establish a session with the server. If successful, returns actor info. If not authenticated, returns a redirect URL for authentication.
+//	@Tags			session
+//	@Accept			json
+//	@Produce		json
+//	@Param			request	body		InitiateParams	true	"Session initiation parameters"
+//	@Success		200		{object}	InitiateSuccessResponse
+//	@Failure		401		{object}	InitiateFailureResponse
+//	@Failure		400		{object}	ErrorResponse
+//	@Failure		500		{object}	ErrorResponse
+//	@Router			/session/_initiate [post]
+//
 // initiate is called when the marketplace portal loads to attempt to establish a session with the server. The session
 // might already exist, or the app might have been provided with a nonce JWT to exchange for a session, which would
 // have been provided as the normal auth header.
@@ -110,6 +122,15 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 	})
 }
 
+//	@Summary		Terminate session
+//	@Description	Explicitly terminate the current session. Used when navigating away from the SPA.
+//	@Tags			session
+//	@Accept			json
+//	@Produce		json
+//	@Success		200	{object}	map[string]interface{}
+//	@Failure		500	{object}	ErrorResponse
+//	@Router			/session/_terminate [post]
+//
 // terminate is called to explicitly terminate the gin session. This is called by the SPA in unload situations
 // where it expects to be navigating away from the SPA so that sessions are more quickly cleaned up.
 func (r *SessionRoutes) terminate(gctx *gin.Context) {

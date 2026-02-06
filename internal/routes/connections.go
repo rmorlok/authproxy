@@ -32,6 +32,18 @@ type ConnectionsRoutes struct {
 	oauthf  oauth2.Factory
 }
 
+// @Summary		Initiate connection
+// @Description	Initiate a new connection to an external service through a connector
+// @Tags			connections
+// @Accept			json
+// @Produce		json
+// @Param			request	body		InitiateConnectionRequest	true	"Connection initiation request"
+// @Success		200		{object}	InitiateConnectionRedirect
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/_initiate [post]
 func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -100,6 +112,23 @@ type ListConnectionResponseJson struct {
 	Cursor string           `json:"cursor,omitempty"`
 }
 
+// @Summary		List connections
+// @Description	List connections with optional filtering and pagination
+// @Tags			connections
+// @Accept			json
+// @Produce		json
+// @Param			cursor			query		string	false	"Pagination cursor"
+// @Param			limit			query		integer	false	"Maximum number of results to return"
+// @Param			state			query		string	false	"Filter by connection state"
+// @Param			namespace		query		string	false	"Filter by namespace"
+// @Param			label_selector	query		string	false	"Filter by label selector"
+// @Param			order_by		query		string	false	"Order by field (e.g., 'created_at:asc')"
+// @Success		200				{object}	SwaggerListConnectionResponse
+// @Failure		400				{object}	ErrorResponse
+// @Failure		401				{object}	ErrorResponse
+// @Failure		500				{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections [get]
 func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -197,6 +226,19 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 	})
 }
 
+// @Summary		Get connection
+// @Description	Get a specific connection by its UUID
+// @Tags			connections
+// @Accept			json
+// @Produce		json
+// @Param			id	path		string	true	"Connection UUID"
+// @Success		200	{object}	SwaggerConnectionJson
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		404	{object}	ErrorResponse
+// @Failure		500	{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id} [get]
 func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -268,6 +310,19 @@ type DisconnectResponseJson struct {
 	Connection ConnectionJson `json:"connection"`
 }
 
+// @Summary		Disconnect connection
+// @Description	Disconnect an existing connection and revoke its credentials
+// @Tags			connections
+// @Accept			json
+// @Produce		json
+// @Param			id	path		string	true	"Connection UUID"
+// @Success		200	{object}	SwaggerDisconnectResponse
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		403	{object}	ErrorResponse
+// @Failure		500	{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/_disconnect [post]
 func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -353,6 +408,21 @@ type ForceStateRequestJson struct {
 	State database.ConnectionState `json:"state"`
 }
 
+// @Summary		Force connection state
+// @Description	Force a connection to a specific state (admin operation)
+// @Tags			connections
+// @Accept			json
+// @Produce		json
+// @Param			id		path		string					true	"Connection UUID"
+// @Param			request	body		SwaggerForceStateRequest	true	"New state"
+// @Success		200		{object}	SwaggerConnectionJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/_force_state [put]
 func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
