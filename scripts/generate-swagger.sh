@@ -32,9 +32,9 @@ go run github.com/swaggo/swag/cmd/swag init \
     --instanceName Api \
     --dir ./
 
-mv internal/service/api/swagger/api_docs.go internal/service/api/swagger/docs.go
-mv internal/service/api/swagger/api_swagger.json internal/service/api/swagger/docs.json
-mv internal/service/api/swagger/api_swagger.yaml internal/service/api/swagger/docs.yaml
+mv internal/service/api/swagger/Api_docs.go internal/service/api/swagger/docs.go
+mv internal/service/api/swagger/Api_swagger.json internal/service/api/swagger/docs.json
+mv internal/service/api/swagger/Api_swagger.yaml internal/service/api/swagger/docs.yaml
 
 go run github.com/swaggo/swag/cmd/swag init \
     -g internal/service/admin_api/swagger/definition.go \
