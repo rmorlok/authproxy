@@ -28,6 +28,8 @@ type ClaimsBuilder interface {
 	WithActorExternalId(id string) ClaimsBuilder
 	WithNamespace(namespace string) ClaimsBuilder
 	WithActor(actor core.IActorData) ClaimsBuilder
+	WithLabels(labels map[string]string) ClaimsBuilder
+	WithLabel(key, value string) ClaimsBuilder
 	WithNonce() ClaimsBuilder
 	BuildCtx(context.Context) (*AuthProxyClaims, error)
 	Build() (*AuthProxyClaims, error)
@@ -43,6 +45,7 @@ type claimsBuilder struct {
 	externalId *string
 	namespace  *string
 	actor      *core.Actor
+	labels     map[string]string
 	selfSigned bool
 	nonce      *uuid.UUID
 }
@@ -106,6 +109,19 @@ func (b *claimsBuilder) WithActor(actor core.IActorData) ClaimsBuilder {
 	return b
 }
 
+func (b *claimsBuilder) WithLabels(labels map[string]string) ClaimsBuilder {
+	b.labels = labels
+	return b
+}
+
+func (b *claimsBuilder) WithLabel(key, value string) ClaimsBuilder {
+	if b.labels == nil {
+		b.labels = make(map[string]string)
+	}
+	b.labels[key] = value
+	return b
+}
+
 func (b *claimsBuilder) WithNonce() ClaimsBuilder {
 	u := uuid.New()
 	b.nonce = &u
@@ -132,6 +148,21 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 
 		if b.externalId != nil {
 			b.actor.ExternalId = *b.externalId
+		}
+
+		if len(b.labels) > 0 {
+			if b.actor.Labels == nil {
+				b.actor.Labels = make(map[string]string)
+			}
+			for k, v := range b.labels {
+				b.actor.Labels[k] = v
+			}
+		}
+	}
+
+	if b.actor == nil && len(b.labels) > 0 {
+		b.actor = &core.Actor{
+			Labels: b.labels,
 		}
 	}
 

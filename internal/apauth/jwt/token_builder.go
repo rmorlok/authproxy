@@ -38,7 +38,10 @@ type TokenBuilder interface {
 	WithExpiresInCtx(ctx context.Context, expiresIn time.Duration) TokenBuilder
 	WithSelfSigned() TokenBuilder
 	WithActorExternalId(id string) TokenBuilder
+	WithNamespace(namespace string) TokenBuilder
 	WithActor(actor core.IActorData) TokenBuilder
+	WithLabels(labels map[string]string) TokenBuilder
+	WithLabel(key, value string) TokenBuilder
 	WithNonce() TokenBuilder
 
 	WithConfigKey(ctx context.Context, cfgKey *config.Key) (TokenBuilder, error)
@@ -121,8 +124,23 @@ func (tb *tokenBuilder) WithActorExternalId(id string) TokenBuilder {
 	return tb
 }
 
+func (tb *tokenBuilder) WithNamespace(namespace string) TokenBuilder {
+	tb.jwtBuilder.WithNamespace(namespace)
+	return tb
+}
+
 func (tb *tokenBuilder) WithActor(actor core.IActorData) TokenBuilder {
 	tb.jwtBuilder.WithActor(actor)
+	return tb
+}
+
+func (tb *tokenBuilder) WithLabels(labels map[string]string) TokenBuilder {
+	tb.jwtBuilder.WithLabels(labels)
+	return tb
+}
+
+func (tb *tokenBuilder) WithLabel(key, value string) TokenBuilder {
+	tb.jwtBuilder.WithLabel(key, value)
 	return tb
 }
 
