@@ -98,6 +98,20 @@ func TaskInfoToJson(encryptedId string, ti *asynq.TaskInfo) *TaskInfoJson {
 	}
 }
 
+// @Summary		Get task status
+// @Description	Get the status of a background task by its encrypted task info
+// @Tags			tasks
+// @Accept			json
+// @Produce		json
+// @Param			encryptedTaskInfo	path		string	true	"Encrypted task info token"
+// @Success		200					{object}	TaskInfoJson
+// @Failure		400					{object}	ErrorResponse
+// @Failure		401					{object}	ErrorResponse
+// @Failure		403					{object}	ErrorResponse
+// @Failure		404					{object}	ErrorResponse
+// @Failure		500					{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/tasks/{encryptedTaskInfo} [get]
 func (r *TaskRoutes) get(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 

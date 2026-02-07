@@ -1,9 +1,10 @@
 package config
 
 import (
-	"github.com/lmittmann/tint"
 	"log/slog"
 	"time"
+
+	"github.com/lmittmann/tint"
 )
 
 type LoggingConfigTint struct {

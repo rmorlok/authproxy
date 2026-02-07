@@ -3,6 +3,7 @@ package admin_api
 import (
 	"context"
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -15,6 +16,10 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	common_routes "github.com/rmorlok/authproxy/internal/routes"
 	"github.com/rmorlok/authproxy/internal/service"
+	_ "github.com/rmorlok/authproxy/internal/service/api/swagger"
+	api_swagger "github.com/rmorlok/authproxy/internal/service/api/swagger"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpHealthChecker *http.Server, err error) {
@@ -37,6 +42,20 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		logger.Info("Enabling CORS")
 		server.Use(cors.New(*corsConfig))
 	}
+
+	// Swagger documentation endpoint
+	swaggerHost := service.GetBaseUrl()
+	swaggerHost = strings.TrimPrefix(swaggerHost, "https://")
+	swaggerHost = strings.TrimPrefix(swaggerHost, "http://")
+	api_swagger.SwaggerInfoApi.Host = swaggerHost
+	api_swagger.SwaggerInfoApi.InfoInstanceName = "api"
+	server.GET("/swagger", func(c *gin.Context) {
+		c.Redirect(http.StatusFound, "/swagger/index.html")
+	})
+	server.GET("/swagger/*any", ginSwagger.WrapHandler(
+		swaggerFiles.Handler,
+		ginSwagger.InstanceName("Api"),
+	))
 
 	var healthChecker *gin.Engine
 	if service.Port() != service.HealthCheckPort() {

@@ -131,6 +131,19 @@ type ListRequestsResponseJson struct {
 	Total  *int64                     `json:"total,omitempty"`
 }
 
+// @Summary		Get request log entry
+// @Description	Get a specific request log entry by its UUID
+// @Tags			request-log
+// @Accept			json
+// @Produce		json
+// @Param			id	path		string	true	"Request log entry UUID"
+// @Success		200	{object}	SwaggerRequestLogEntry
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		404	{object}	ErrorResponse
+// @Failure		500	{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/request-log/{id} [get]
 func (r *RequestLogRoutes) get(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -198,6 +211,33 @@ func (r *RequestLogRoutes) get(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, entry)
 }
 
+// @Summary		List request log entries
+// @Description	List request log entries with optional filtering and pagination
+// @Tags			request-log
+// @Accept			json
+// @Produce		json
+// @Param			cursor				query		string	false	"Pagination cursor"
+// @Param			limit				query		integer	false	"Maximum number of results to return"
+// @Param			order_by			query		string	false	"Order by field (e.g., 'timestamp:desc')"
+// @Param			namespace			query		string	false	"Filter by namespace"
+// @Param			request_type		query		string	false	"Filter by request type"
+// @Param			correlation_id		query		string	false	"Filter by correlation ID"
+// @Param			connection_id		query		string	false	"Filter by connection UUID"
+// @Param			connector_type		query		string	false	"Filter by connector type"
+// @Param			connector_id		query		string	false	"Filter by connector UUID"
+// @Param			connector_version	query		integer	false	"Filter by connector version"
+// @Param			method				query		string	false	"Filter by HTTP method"
+// @Param			status_code			query		integer	false	"Filter by exact status code"
+// @Param			status_code_range	query		string	false	"Filter by status code range (e.g., '200-299')"
+// @Param			timestamp_range		query		string	false	"Filter by timestamp range"
+// @Param			path				query		string	false	"Filter by exact path"
+// @Param			path_regex			query		string	false	"Filter by path regex"
+// @Success		200					{object}	SwaggerListRequestsResponse
+// @Failure		400					{object}	ErrorResponse
+// @Failure		401					{object}	ErrorResponse
+// @Failure		500					{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/request-log [get]
 func (r *RequestLogRoutes) list(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)

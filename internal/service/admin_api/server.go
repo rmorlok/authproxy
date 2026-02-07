@@ -2,6 +2,7 @@ package admin_api
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -13,6 +14,9 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	common_routes "github.com/rmorlok/authproxy/internal/routes"
 	"github.com/rmorlok/authproxy/internal/service"
+	admin_api_swagger "github.com/rmorlok/authproxy/internal/service/admin_api/swagger"
+	swaggerFiles "github.com/swaggo/files"
+	ginSwagger "github.com/swaggo/gin-swagger"
 )
 
 func GetCorsConfig(cfg config.C) *cors.Config {
@@ -58,6 +62,20 @@ func GetGinServer(
 		logger.Info("Enabling CORS")
 		server.Use(cors.New(*corsConfig))
 	}
+
+	// Swagger documentation endpoint
+	swaggerHost := service.GetBaseUrl()
+	swaggerHost = strings.TrimPrefix(swaggerHost, "https://")
+	swaggerHost = strings.TrimPrefix(swaggerHost, "http://")
+	admin_api_swagger.SwaggerInfoadmin_api.Host = swaggerHost
+	admin_api_swagger.SwaggerInfoadmin_api.InfoInstanceName = "admin_api"
+	server.GET("/swagger", func(c *gin.Context) {
+		c.Redirect(http.StatusFound, "/swagger/index.html")
+	})
+	server.GET("/swagger/*any", ginSwagger.WrapHandler(
+		swaggerFiles.Handler,
+		ginSwagger.InstanceName("admin_api"),
+	))
 
 	var healthChecker *gin.Engine
 	if service.Port() != service.HealthCheckPort() {

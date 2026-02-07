@@ -2,10 +2,11 @@ package config
 
 import (
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"net/http"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 // ServicePublicStaticContentConfig is a configuration to have the public service serve static content in addition

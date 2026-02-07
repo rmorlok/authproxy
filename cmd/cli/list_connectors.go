@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/go-resty/resty/v2"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/cmd/cli/config"

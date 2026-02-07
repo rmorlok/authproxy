@@ -2,10 +2,11 @@ package test_utils
 
 import (
 	"fmt"
+	"net/http"
+
 	mock "gopkg.in/h2non/gentleman-mock.v2"
 	"gopkg.in/h2non/gentleman.v2"
 	"gopkg.in/h2non/gock.v1"
-	"net/http"
 )
 
 func MockGentlemenGetResponse(domain string, path string, setup func(*gock.Request)) *gentleman.Response {

@@ -2,9 +2,10 @@ package config
 
 import (
 	"crypto/tls"
-	"github.com/rmorlok/authproxy/internal/util"
 	"net/http"
 	"time"
+
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 type ServiceId string

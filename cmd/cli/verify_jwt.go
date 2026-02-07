@@ -2,11 +2,12 @@ package main
 
 import (
 	"fmt"
+	"os"
+	"strings"
+
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/spf13/cobra"
-	"os"
-	"strings"
 )
 
 func cmdVerifyJwt() *cobra.Command {

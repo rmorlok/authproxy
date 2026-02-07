@@ -61,6 +61,19 @@ type NamespacesRoutes struct {
 	authService auth.A
 }
 
+// @Summary		Get namespace
+// @Description	Get a specific namespace by its path
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path	path		string	true	"Namespace path"
+// @Success		200		{object}	SwaggerNamespaceJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path} [get]
 func (r *NamespacesRoutes) get(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -107,6 +120,19 @@ func (r *NamespacesRoutes) get(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, NamespaceToJson(ns))
 }
 
+// @Summary		Create namespace
+// @Description	Create a new namespace
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			request	body		CreateNamespaceRequestJson	true	"Namespace creation request"
+// @Success		200		{object}	SwaggerNamespaceJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		409		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces [post]
 func (r *NamespacesRoutes) create(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -179,6 +205,24 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, NamespaceToJson(ns))
 }
 
+// @Summary		List namespaces
+// @Description	List namespaces with optional filtering and pagination
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			cursor			query		string	false	"Pagination cursor"
+// @Param			limit			query		integer	false	"Maximum number of results to return"
+// @Param			state			query		string	false	"Filter by namespace state"
+// @Param			children_of		query		string	false	"Filter to children of a parent namespace"
+// @Param			namespace		query		string	false	"Filter by namespace path pattern"
+// @Param			label_selector	query		string	false	"Filter by label selector"
+// @Param			order_by		query		string	false	"Order by field (e.g., 'path:asc')"
+// @Success		200				{object}	SwaggerListNamespacesResponse
+// @Failure		400				{object}	ErrorResponse
+// @Failure		401				{object}	ErrorResponse
+// @Failure		500				{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces [get]
 func (r *NamespacesRoutes) list(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)

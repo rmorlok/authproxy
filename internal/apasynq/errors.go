@@ -2,6 +2,7 @@ package apasynq
 
 import (
 	"errors"
+
 	"github.com/hibiken/asynq"
 )
 

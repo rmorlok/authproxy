@@ -29,6 +29,21 @@ type ConnectionsProxyRoutes struct {
 	logger  *slog.Logger
 }
 
+// @Summary		Proxy request through connection
+// @Description	Proxy an HTTP request through an authenticated connection to the external service
+// @Tags			proxy
+// @Accept			json
+// @Produce		json
+// @Param			id		path		string			true	"Connection UUID"
+// @Param			request	body		ProxyRequest	true	"Proxy request payload"
+// @Success		200		{object}	ProxyResponse
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/_proxy [post]
 func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	ra := auth.GetAuthFromGinContext(gctx)

@@ -3,9 +3,6 @@ package api_common
 import (
 	"context"
 	"fmt"
-	"github.com/gin-gonic/gin"
-	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/internal/schema/config"
 	"log"
 	"log/slog"
 	"net/http"
@@ -13,6 +10,10 @@ import (
 	"os/signal"
 	"syscall"
 	"time"
+
+	"github.com/gin-gonic/gin"
+	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 func GinForService(service config.Service) *gin.Engine {

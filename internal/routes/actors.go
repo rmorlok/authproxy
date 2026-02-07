@@ -82,6 +82,23 @@ type ListActorsResponseJson struct {
 	Cursor string      `json:"cursor,omitempty"`
 }
 
+// @Summary		List actors
+// @Description	List actors with optional filtering and pagination
+// @Tags			actors
+// @Accept			json
+// @Produce		json
+// @Param			cursor			query		string	false	"Pagination cursor"
+// @Param			limit			query		integer	false	"Maximum number of results to return"
+// @Param			external_id		query		string	false	"Filter by external ID"
+// @Param			namespace		query		string	false	"Filter by namespace"
+// @Param			label_selector	query		string	false	"Filter by label selector"
+// @Param			order_by		query		string	false	"Order by field (e.g., 'created_at:asc')"
+// @Success		200				{object}	ListActorsResponseJson
+// @Failure		400				{object}	ErrorResponse
+// @Failure		401				{object}	ErrorResponse
+// @Failure		500				{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/actors [get]
 func (r *ActorsRoutes) list(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 	ctx := gctx.Request.Context()
@@ -177,6 +194,19 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 	})
 }
 
+// @Summary		Get actor by UUID
+// @Description	Get a specific actor by its UUID
+// @Tags			actors
+// @Accept			json
+// @Produce		json
+// @Param			id	path		string	true	"Actor UUID"
+// @Success		200	{object}	ActorJson
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		404	{object}	ErrorResponse
+// @Failure		500	{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/actors/{id} [get]
 func (r *ActorsRoutes) get(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 	ctx := gctx.Request.Context()
@@ -243,6 +273,20 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, DatabaseActorToJson(a))
 }
 
+// @Summary		Get actor by external ID
+// @Description	Get a specific actor by its external ID within a namespace
+// @Tags			actors
+// @Accept			json
+// @Produce		json
+// @Param			external_id	path		string	true	"External ID of the actor"
+// @Param			namespace	query		string	false	"Namespace (defaults to authenticated actor's namespace)"
+// @Success		200			{object}	ActorJson
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		404			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/actors/external-id/{external_id} [get]
 func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -303,6 +347,19 @@ func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, DatabaseActorToJson(a))
 }
 
+// @Summary		Delete actor by UUID
+// @Description	Delete a specific actor by its UUID
+// @Tags			actors
+// @Accept			json
+// @Produce		json
+// @Param			id	path	string	true	"Actor UUID"
+// @Success		204	"No Content"
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		403	{object}	ErrorResponse
+// @Failure		500	{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/actors/{id} [delete]
 func (r *ActorsRoutes) delete(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -376,6 +433,20 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 	gctx.Status(http.StatusNoContent)
 }
 
+// @Summary		Delete actor by external ID
+// @Description	Delete a specific actor by its external ID within a namespace
+// @Tags			actors
+// @Accept			json
+// @Produce		json
+// @Param			external_id	path	string	true	"External ID of the actor"
+// @Param			namespace	query	string	false	"Namespace (defaults to authenticated actor's namespace)"
+// @Success		204			"No Content"
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		403			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/actors/external-id/{external_id} [delete]
 func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -443,6 +514,20 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 	gctx.Status(http.StatusNoContent)
 }
 
+// @Summary		Create actor
+// @Description	Create a new actor in a namespace
+// @Tags			actors
+// @Accept			json
+// @Produce		json
+// @Param			request	body		CreateActorRequestJson	true	"Actor creation request"
+// @Success		201		{object}	ActorJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		409		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/actors [post]
 func (r *ActorsRoutes) create(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -583,6 +668,21 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusCreated, DatabaseActorToJson(createdActor))
 }
 
+// @Summary		Update actor by UUID
+// @Description	Update a specific actor by its UUID
+// @Tags			actors
+// @Accept			json
+// @Produce		json
+// @Param			id		path		string					true	"Actor UUID"
+// @Param			request	body		UpdateActorRequestJson	true	"Actor update request"
+// @Success		200		{object}	ActorJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/actors/{id} [patch]
 func (r *ActorsRoutes) update(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -692,6 +792,22 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, DatabaseActorToJson(updatedActor))
 }
 
+// @Summary		Update actor by external ID
+// @Description	Update a specific actor by its external ID within a namespace
+// @Tags			actors
+// @Accept			json
+// @Produce		json
+// @Param			external_id	path		string					true	"External ID of the actor"
+// @Param			namespace	query		string					false	"Namespace (defaults to authenticated actor's namespace)"
+// @Param			request		body		UpdateActorRequestJson	true	"Actor update request"
+// @Success		200			{object}	ActorJson
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		403			{object}	ErrorResponse
+// @Failure		404			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/actors/external-id/{external_id} [patch]
 func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -796,6 +912,19 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, DatabaseActorToJson(updatedActor))
 }
 
+// @Summary		Get all labels for an actor
+// @Description	Get all labels associated with a specific actor
+// @Tags			actors
+// @Accept			json
+// @Produce		json
+// @Param			id	path		string	true	"Actor UUID"
+// @Success		200	{object}	map[string]string
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		404	{object}	ErrorResponse
+// @Failure		500	{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/actors/{id}/labels [get]
 func (r *ActorsRoutes) getLabels(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -866,6 +995,20 @@ func (r *ActorsRoutes) getLabels(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, labels)
 }
 
+// @Summary		Get a specific label for an actor
+// @Description	Get a specific label value by key for an actor
+// @Tags			actors
+// @Accept			json
+// @Produce		json
+// @Param			id		path		string	true	"Actor UUID"
+// @Param			label	path		string	true	"Label key"
+// @Success		200		{object}	ActorLabelJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/actors/{id}/labels/{label} [get]
 func (r *ActorsRoutes) getLabel(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -957,6 +1100,22 @@ func (r *ActorsRoutes) getLabel(gctx *gin.Context) {
 	})
 }
 
+// @Summary		Set a label for an actor
+// @Description	Set or update a specific label value by key for an actor
+// @Tags			actors
+// @Accept			json
+// @Produce		json
+// @Param			id		path		string						true	"Actor UUID"
+// @Param			label	path		string						true	"Label key"
+// @Param			request	body		PutActorLabelRequestJson	true	"Label value"
+// @Success		200		{object}	ActorLabelJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/actors/{id}/labels/{label} [put]
 func (r *ActorsRoutes) putLabel(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -1095,6 +1254,20 @@ func (r *ActorsRoutes) putLabel(gctx *gin.Context) {
 	})
 }
 
+// @Summary		Delete a label from an actor
+// @Description	Delete a specific label by key from an actor
+// @Tags			actors
+// @Accept			json
+// @Produce		json
+// @Param			id		path	string	true	"Actor UUID"
+// @Param			label	path	string	true	"Label key"
+// @Success		204		"No Content"
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/actors/{id}/labels/{label} [delete]
 func (r *ActorsRoutes) deleteLabel(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)

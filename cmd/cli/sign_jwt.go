@@ -2,6 +2,7 @@ package main
 
 import (
 	"fmt"
+
 	"github.com/rmorlok/authproxy/cmd/cli/config"
 	"github.com/spf13/cobra"
 )
