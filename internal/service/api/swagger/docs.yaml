@@ -117,6 +117,13 @@ definitions:
           $ref: '#/definitions/routes.ActorJson'
         type: array
     type: object
+  routes.NamespaceLabelJson:
+    properties:
+      key:
+        type: string
+      value:
+        type: string
+    type: object
   routes.ProxyRequest:
     description: Request to proxy an HTTP request through a connection
     properties:
@@ -162,6 +169,11 @@ definitions:
         type: integer
     type: object
   routes.PutActorLabelRequestJson:
+    properties:
+      value:
+        type: string
+    type: object
+  routes.PutNamespaceLabelRequestJson:
     properties:
       value:
         type: string
@@ -459,6 +471,13 @@ definitions:
     - TaskStateUnknown
     - TaskStateActive
   routes.UpdateActorRequestJson:
+    properties:
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
+  routes.UpdateNamespaceRequestJson:
     properties:
       labels:
         additionalProperties:
@@ -1605,6 +1624,229 @@ paths:
       security:
       - BearerAuth: []
       summary: Get namespace
+      tags:
+      - namespaces
+    patch:
+      consumes:
+      - application/json
+      description: Update a namespace's labels
+      parameters:
+      - description: Namespace path
+        in: path
+        name: path
+        required: true
+        type: string
+      - description: Namespace update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.UpdateNamespaceRequestJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerNamespaceJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update namespace
+      tags:
+      - namespaces
+  /namespaces/{path}/labels:
+    get:
+      consumes:
+      - application/json
+      description: Get all labels associated with a specific namespace
+      parameters:
+      - description: Namespace path
+        in: path
+        name: path
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all labels for a namespace
+      tags:
+      - namespaces
+  /namespaces/{path}/labels/{label}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific label by key from a namespace
+      parameters:
+      - description: Namespace path
+        in: path
+        name: path
+        required: true
+        type: string
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a label from a namespace
+      tags:
+      - namespaces
+    get:
+      consumes:
+      - application/json
+      description: Get a specific label value by key for a namespace
+      parameters:
+      - description: Namespace path
+        in: path
+        name: path
+        required: true
+        type: string
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.NamespaceLabelJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a specific label for a namespace
+      tags:
+      - namespaces
+    put:
+      consumes:
+      - application/json
+      description: Set or update a specific label value by key for a namespace
+      parameters:
+      - description: Namespace path
+        in: path
+        name: path
+        required: true
+        type: string
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      - description: Label value
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.PutNamespaceLabelRequestJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.NamespaceLabelJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set a label for a namespace
       tags:
       - namespaces
   /request-log:

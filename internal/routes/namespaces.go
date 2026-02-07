@@ -335,6 +335,20 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 	})
 }
 
+// @Summary		Update namespace
+// @Description	Update a namespace's labels
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path	path		string						true	"Namespace path"
+// @Param			request	body		UpdateNamespaceRequestJson	true	"Namespace update request"
+// @Success		200		{object}	SwaggerNamespaceJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path} [patch]
 func (r *NamespacesRoutes) update(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -433,6 +447,19 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, NamespaceToJson(ns))
 }
 
+// @Summary		Get all labels for a namespace
+// @Description	Get all labels associated with a specific namespace
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path	path		string	true	"Namespace path"
+// @Success		200		{object}	map[string]string
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path}/labels [get]
 func (r *NamespacesRoutes) getLabels(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -484,6 +511,20 @@ func (r *NamespacesRoutes) getLabels(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, labels)
 }
 
+// @Summary		Get a specific label for a namespace
+// @Description	Get a specific label value by key for a namespace
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path	path		string	true	"Namespace path"
+// @Param			label	path		string	true	"Label key"
+// @Success		200		{object}	NamespaceLabelJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path}/labels/{label} [get]
 func (r *NamespacesRoutes) getLabel(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -556,6 +597,22 @@ func (r *NamespacesRoutes) getLabel(gctx *gin.Context) {
 	})
 }
 
+// @Summary		Set a label for a namespace
+// @Description	Set or update a specific label value by key for a namespace
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path	path		string							true	"Namespace path"
+// @Param			label	path		string							true	"Label key"
+// @Param			request	body		PutNamespaceLabelRequestJson	true	"Label value"
+// @Success		200		{object}	NamespaceLabelJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path}/labels/{label} [put]
 func (r *NamespacesRoutes) putLabel(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -676,6 +733,20 @@ func (r *NamespacesRoutes) putLabel(gctx *gin.Context) {
 	})
 }
 
+// @Summary		Delete a label from a namespace
+// @Description	Delete a specific label by key from a namespace
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path	path	string	true	"Namespace path"
+// @Param			label	path	string	true	"Label key"
+// @Success		204		"No Content"
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path}/labels/{label} [delete]
 func (r *NamespacesRoutes) deleteLabel(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
