@@ -2,6 +2,41 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/config/schema.json",
   "$defs": {
+    "AdminUser": {
+      "type": "object",
+      "properties": {
+        "username": { "type": "string" },
+        "email": { "type": "string" },
+        "key": { "$ref": "#/$defs/Key" },
+        "permissions": {
+          "type": "array",
+          "items": { "$ref": "../auth/schema.json#/$defs/Permission" }
+        }
+      },
+      "required": ["username", "key"],
+      "additionalProperties": false
+    },
+    "AdminUsers": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/AdminUser" }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "keys_path": { "type": "string" },
+            "permissions": {
+              "type": "array",
+              "items": { "$ref": "../auth/schema.json#/$defs/Permission" }
+            },
+            "sync_cron_schedule": { "type": "string" }
+          },
+          "required": ["keys_path"],
+          "additionalProperties": false
+        }
+      ]
+    },
     "Connectors": {
       "properties": {
         "auto_migrate": {
@@ -15,6 +50,12 @@
             "$ref": "../connectors/schema.json"
           },
           "type": "array"
+        },
+        "identifying_labels": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
         }
       },
       "additionalProperties": false,
@@ -68,6 +109,24 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "DatabaseSqlite": {
+      "type": "object",
+      "properties": {
+        "provider": { "const": "sqlite" },
+        "path": { "type": "string" },
+        "auto_migrate": { "type": "boolean" },
+        "auto_migration_lock_duration": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        }
+      },
+      "required": ["provider", "path"],
+      "additionalProperties": false
+    },
+    "Database": {
+      "oneOf": [
+        { "$ref": "#/$defs/DatabaseSqlite" }
+      ]
+    },
     "DevSettings": {
       "properties": {
         "enabled": {
@@ -94,7 +153,9 @@
         "internal_error": {
           "type": "string"
         },
-        "template": true
+        "template": {
+          "$ref": "../common/schema.json#/$defs/StringValue"
+        }
       },
       "additionalProperties": false,
       "type": "object"
@@ -138,9 +199,62 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "LoggingConfigNone": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "none" }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "LoggingConfigText": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "text" },
+        "to": { "type": "string" },
+        "level": { "type": "string" },
+        "source": { "type": "boolean" }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "LoggingConfigJson": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "json" },
+        "to": { "type": "string" },
+        "level": { "type": "string" },
+        "source": { "type": "boolean" }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "LoggingConfigTint": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "tint" },
+        "to": { "type": "string" },
+        "level": { "type": "string" },
+        "source": { "type": "boolean" },
+        "no_color": { "type": "boolean" },
+        "time_format": { "type": "string" }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "LoggingConfig": {
+      "oneOf": [
+        { "$ref": "#/$defs/LoggingConfigNone" },
+        { "$ref": "#/$defs/LoggingConfigText" },
+        { "$ref": "#/$defs/LoggingConfigJson" },
+        { "$ref": "#/$defs/LoggingConfigTint" }
+      ]
+    },
     "Marketplace": {
       "properties": {
-        "base_url": true
+        "base_url": {
+          "$ref": "../common/schema.json#/$defs/StringValue"
+        }
       },
       "additionalProperties": false,
       "type": "object"
@@ -166,10 +280,42 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "RedisReal": {
+      "type": "object",
+      "properties": {
+        "provider": { "const": "redis" },
+        "network": { "type": "string" },
+        "address": { "type": "string" },
+        "protocol": { "type": "integer" },
+        "username": { "$ref": "../common/schema.json#/$defs/StringValue" },
+        "password": { "$ref": "../common/schema.json#/$defs/StringValue" },
+        "db": { "type": "integer" }
+      },
+      "required": ["address"],
+      "additionalProperties": false
+    },
+    "RedisMiniredis": {
+      "type": "object",
+      "properties": {
+        "provider": { "const": "miniredis" }
+      },
+      "required": ["provider"],
+      "additionalProperties": false
+    },
+    "Redis": {
+      "oneOf": [
+        { "$ref": "#/$defs/RedisReal" },
+        { "$ref": "#/$defs/RedisMiniredis" }
+      ]
+    },
     "ServiceAdminApi": {
       "properties": {
-        "health_check_port": true,
-        "port": true,
+        "health_check_port": {
+          "$ref": "../common/schema.json#/$defs/StringValueNumber"
+        },
+        "port": {
+          "$ref": "../common/schema.json#/$defs/StringValueNumber"
+        },
         "domain": {
           "type": "string"
         },
@@ -179,7 +325,9 @@
         "cors": {
           "$ref": "#/$defs/CorsConfig"
         },
-        "tls": true,
+        "tls": {
+          "$ref": "#/$defs/TlsConfig"
+        },
         "ui": {
           "$ref": "#/$defs/ServiceAdminUi"
         },
@@ -204,7 +352,9 @@
         "enabled": {
           "type": "boolean"
         },
-        "base_url": true,
+        "base_url": {
+          "$ref": "../common/schema.json#/$defs/StringValue"
+        },
         "initiate_session_url": {
           "type": "string"
         }
@@ -214,8 +364,12 @@
     },
     "ServiceApi": {
       "properties": {
-        "health_check_port": true,
-        "port": true,
+        "health_check_port": {
+          "$ref": "../common/schema.json#/$defs/StringValueNumber"
+        },
+        "port": {
+          "$ref": "../common/schema.json#/$defs/StringValueNumber"
+        },
         "domain": {
           "type": "string"
         },
@@ -225,16 +379,20 @@
         "cors": {
           "$ref": "#/$defs/CorsConfig"
         },
-        "tls": true
+        "tls": {
+          "$ref": "#/$defs/TlsConfig"
+        }
       },
       "additionalProperties": false,
       "type": "object"
     },
     "ServicePublic": {
       "properties": {
-        "health_check_port": true,
+        "health_check_port": {
+          "$ref": "../common/schema.json#/$defs/StringValueNumber"
+        },
         "port": {
-          "type": "integer"
+          "$ref": "../common/schema.json#/$defs/StringValueNumber"
         },
         "domain": {
           "type": "string"
@@ -245,7 +403,9 @@
         "cors": {
           "$ref": "#/$defs/CorsConfig"
         },
-        "tls": true,
+        "tls": {
+          "$ref": "#/$defs/TlsConfig"
+        },
         "session_timeout": {
           "$ref": "../common/schema.json#/$defs/HumanDuration"
         },
@@ -295,13 +455,12 @@
           "description": "The interval at which the the system will sync the list of cron tasks. Cron tasks are both global and connection specific. If not set, the default is every 5 minutes."
         }
       },
-      "required": ["health_check_port"],
       "additionalProperties": false,
       "type": "object"
     },
     "SystemAuth": {
       "properties": {
-        "jwt_signing_key": true,
+        "jwt_signing_key": { "$ref": "#/$defs/Key" },
         "jwt_issuer": {
           "type": "string"
         },
@@ -311,11 +470,158 @@
         "disable_xsrf": {
           "type": "boolean"
         },
-        "actors": true,
-        "global_aes_key": true
+        "actors": { "$ref": "#/$defs/ConfiguredActors" },
+        "global_aes_key": { "$ref": "#/$defs/KeyData" }
       },
       "additionalProperties": false,
       "type": "object"
+    },
+    "Key": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "public_key": { "$ref": "#/$defs/KeyData" },
+            "private_key": { "$ref": "#/$defs/KeyData" }
+          },
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "shared_key": { "$ref": "#/$defs/KeyData" }
+          },
+          "required": ["shared_key"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "KeyData": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "value": { "type": "string" }
+          },
+          "required": ["value"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "base64": { "type": "string" }
+          },
+          "required": ["base64"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "env_var": { "type": "string" }
+          },
+          "required": ["env_var"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "env_var_base64": { "type": "string" }
+          },
+          "required": ["env_var_base64"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" }
+          },
+          "required": ["path"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "num_bytes": { "type": "integer" }
+          },
+          "required": ["num_bytes"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TlsConfig": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "cert": { "$ref": "#/$defs/KeyData" },
+            "key": { "$ref": "#/$defs/KeyData" }
+          },
+          "required": ["cert", "key"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "accept_tos": { "type": "boolean" },
+            "cache_dir": { "type": "string" },
+            "email": { "type": "string" },
+            "host_whitelist": {
+              "type": "array",
+              "items": { "type": "string" }
+            },
+            "renew_before": {
+              "$ref": "../common/schema.json#/$defs/HumanDuration"
+            }
+          },
+          "required": ["accept_tos"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "auto_gen_path": { "type": "string" }
+          },
+          "required": ["auto_gen_path"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ConfiguredActor": {
+      "type": "object",
+      "properties": {
+        "external_id": { "type": "string" },
+        "key": { "$ref": "#/$defs/Key" },
+        "permissions": {
+          "type": "array",
+          "items": { "$ref": "../auth/schema.json#/$defs/Permission" }
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "required": ["external_id", "key"]
+    },
+    "ConfiguredActors": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ConfiguredActor" }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "keys_path": { "type": "string" },
+            "permissions": {
+              "type": "array",
+              "items": { "$ref": "../auth/schema.json#/$defs/Permission" }
+            },
+            "sync_cron_schedule": { "type": "string" }
+          },
+          "required": ["keys_path"],
+          "additionalProperties": false
+        }
+      ]
     }
   },
   "properties": {
@@ -340,9 +646,15 @@
     "system_auth": {
       "$ref": "#/$defs/SystemAuth"
     },
-    "database": true,
-    "logging": true,
-    "redis": true,
+    "database": {
+      "$ref": "#/$defs/Database"
+    },
+    "logging": {
+      "$ref": "#/$defs/LoggingConfig"
+    },
+    "redis": {
+      "$ref": "#/$defs/Redis"
+    },
     "oauth": {
       "$ref": "#/$defs/OAuth"
     },

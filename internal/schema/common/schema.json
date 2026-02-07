@@ -4,7 +4,7 @@
   "$defs": {
     "HumanByteSize": {
       "type": "string",
-      "pattern": "(?i)^[0-9]+\\s?(b|kb|mb|gb|pb|eb|kib|mib|gib|tib|pib|eib)$",
+      "pattern": "(?i)^[0-9]+\\s?(b|kb|mb|gb|tb|pb|eb|kib|mib|gib|tib|pib|eib)$",
       "description": "A human-readable byte size string, e.g., '2mb'. For kb, mb, etc it will use base 10 parsing (1kb = 1000 bytes). For bases 2 parsing using IEC (2kib = 1024 bytes)."
     },
     "HumanDuration": {

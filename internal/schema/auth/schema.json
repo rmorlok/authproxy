@@ -4,8 +4,50 @@
   "$defs": {
     "NamespacePath": {
       "type": "string",
-      "pattern": "^root(?:.[a-zA-Z0-9_]+[a-zA-Z0-9_\\-]*)*$",
-      "description": "The fully qualified path to the namespace a resource lives within. For example, 'root/prod/some-feature'. Must begin with 'root'."
+      "pattern": "^root(?:\\.[a-zA-Z0-9_]+[a-zA-Z0-9_\\-]*)*$",
+      "description": "The fully qualified path to the namespace a resource lives within. For example, 'root.prod.some-feature'. Must begin with 'root'."
+    },
+    "NamespaceMatcher": {
+      "type": "string",
+      "pattern": "^root(?:\\.[A-Za-z0-9_][A-Za-z0-9_-]*)*(?:\\.\\*\\*)?$",
+      "description": "A matcher for a namespace. Supports wildcards like 'root.prod.**' or 'root.**'."
+    },
+    "Permission": {
+      "type": "object",
+      "properties": {
+        "namespace": {
+          "$ref": "#/$defs/NamespaceMatcher",
+          "description": "The namespace pattern this permission applies to."
+        },
+        "resources": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The types of resources this permission applies to. May include an asterisk (*) to match all resource types."
+        },
+        "resource_ids": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The specific IDs of resources this permission applies to. If empty, applies to all resources of the specified types in the namespace."
+        },
+        "verbs": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The actions permitted on the specified resources."
+        }
+      },
+      "required": [
+        "namespace",
+        "resources",
+        "verbs"
+      ],
+      "additionalProperties": false,
+      "description": "A permission defining access to resources in a namespace."
     }
   }
 }

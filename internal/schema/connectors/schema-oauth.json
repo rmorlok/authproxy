@@ -24,6 +24,9 @@
         },
         "query_overrides": {
           "type": "object"
+        },
+        "template": {
+          "type": "string"
         }
       },
       "required": ["endpoint"],
@@ -49,6 +52,9 @@
         },
         "refresh_time_before_expiry": {
           "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "auth_in_body": {
+          "type": "boolean"
         }
       },
       "required": ["endpoint"],
@@ -113,6 +119,15 @@
       "type": "array",
       "items": {
         "$ref": "#/$defs/Scope"
+      }
+    },
+    "scope_separator": {
+      "type": "string"
+    },
+    "default_scopes": {
+      "type": "array",
+      "items": {
+        "type": "string"
       }
     }
   },
