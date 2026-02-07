@@ -1,0 +1,64 @@
+# schema: https://json.schemastore.org/github-workflow.json
+name: Swagger Documentation
+
+on:
+  push:
+    branches: [ "main" ]
+    paths:
+      - '**/*.go'
+      - 'scripts/generate-swagger.sh'
+      - '.github/workflows/swagger.yml'
+  pull_request:
+    branches: [ "main" ]
+    paths:
+      - '**/*.go'
+      - 'scripts/generate-swagger.sh'
+      - '.github/workflows/swagger.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  swagger:
+    runs-on: ubuntu-latest
+    steps:
+    - uses: actions/checkout@v4
+      with:
+        # Use a token with write access for pushing commits
+        token: ${{ secrets.GITHUB_TOKEN }}
+        ref: ${{ github.head_ref || github.ref }}
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+
+    - name: Generate Swagger documentation
+      run: ./scripts/generate-swagger.sh
+
+    - name: Check for changes
+      id: check
+      run: |
+        if git diff --quiet -- 'internal/service/api/swagger/' 'internal/service/admin_api/swagger/'; then
+          echo "changed=false" >> "$GITHUB_OUTPUT"
+          echo "Swagger documentation is up-to-date."
+        else
+          echo "changed=true" >> "$GITHUB_OUTPUT"
+          echo "Swagger documentation is out-of-date."
+          git diff --stat -- 'internal/service/api/swagger/' 'internal/service/admin_api/swagger/'
+        fi
+
+    - name: Commit updated Swagger documentation
+      if: steps.check.outputs.changed == 'true' && github.event_name == 'push'
+      run: |
+        git config user.name "github-actions[bot]"
+        git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+        git add internal/service/api/swagger/ internal/service/admin_api/swagger/
+        git commit -m "chore: regenerate swagger documentation"
+        git push
+
+    - name: Fail PR if Swagger is out-of-date
+      if: steps.check.outputs.changed == 'true' && github.event_name == 'pull_request'
+      run: |
+        echo "::error::Swagger documentation is out-of-date. Run ./scripts/generate-swagger.sh and commit the changes."
+        exit 1
