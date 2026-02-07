@@ -200,4 +200,64 @@ func TestClaimsBuilder(t *testing.T) {
 			require.Error(t, err)
 		})
 	})
+	t.Run("labels", func(t *testing.T) {
+		t.Run("with individual labels", func(t *testing.T) {
+			now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			cb := NewClaimsBuilder()
+
+			cb.WithServiceId(config.ServiceIdPublic).
+				WithActorExternalId("bob-dole").
+				WithNamespace("root.child").
+				WithLabel("foo", "bar").
+				WithLabel("baz", "qux").
+				WithExpiresIn(10 * time.Minute)
+
+			claims, err := cb.BuildCtx(ctx)
+			require.NoError(t, err)
+
+			require.NotNil(t, claims.Actor)
+			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Labels)
+		})
+		t.Run("with map of labels", func(t *testing.T) {
+			now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			cb := NewClaimsBuilder()
+
+			cb.WithServiceId(config.ServiceIdPublic).
+				WithActorExternalId("bob-dole").
+				WithNamespace("root.child").
+				WithLabels(map[string]string{"foo": "bar", "baz": "qux"}).
+				WithExpiresIn(10 * time.Minute)
+
+			claims, err := cb.BuildCtx(ctx)
+			require.NoError(t, err)
+
+			require.NotNil(t, claims.Actor)
+			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Labels)
+		})
+		t.Run("merge labels with actor", func(t *testing.T) {
+			now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			cb := NewClaimsBuilder()
+
+			cb.WithServiceId(config.ServiceIdPublic).
+				WithActor(&core.Actor{
+					ExternalId: "bob-dole",
+					Namespace:  "root.child",
+					Labels:     map[string]string{"foo": "bar"},
+				}).
+				WithLabel("baz", "qux").
+				WithExpiresIn(10 * time.Minute)
+
+			claims, err := cb.BuildCtx(ctx)
+			require.NoError(t, err)
+
+			require.NotNil(t, claims.Actor)
+			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Labels)
+		})
+	})
 }
