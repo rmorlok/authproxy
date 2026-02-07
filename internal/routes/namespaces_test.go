@@ -492,4 +492,679 @@ func TestNamespaces(t *testing.T) {
 			require.Equal(t, "test-label", resp.Items[0].Labels["env"])
 		})
 	})
+
+	t.Run("update namespace", func(t *testing.T) {
+		tu, done := setup(t, context.Background(), nil)
+		defer done()
+
+		err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+			Path:  "root.patchns",
+			State: database.NamespaceStateActive,
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			body := `{"labels": {"env": "prod"}}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPatch, "/namespaces/root.patchns", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden with wrong verb", func(t *testing.T) {
+			body := `{"labels": {"env": "prod"}}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				"/namespaces/root.patchns",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "namespaces", "get"), // Wrong verb
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("namespace not found", func(t *testing.T) {
+			body := `{"labels": {"env": "prod"}}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				"/namespaces/root.nonexistent",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("bad request - invalid JSON", func(t *testing.T) {
+			body := `{invalid json}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				"/namespaces/root.patchns",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("success - update labels", func(t *testing.T) {
+			body := `{"labels": {"env": "production", "team": "backend"}}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				"/namespaces/root.patchns",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp NamespaceJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "root.patchns", resp.Path)
+			require.Equal(t, "production", resp.Labels["env"])
+			require.Equal(t, "backend", resp.Labels["team"])
+
+			// Verify in database
+			ns, err := tu.Db.GetNamespace(context.Background(), "root.patchns")
+			require.NoError(t, err)
+			require.Equal(t, "production", ns.Labels["env"])
+			require.Equal(t, "backend", ns.Labels["team"])
+		})
+
+		t.Run("success - clear labels", func(t *testing.T) {
+			err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+				Path:   "root.clearlabels",
+				State:  database.NamespaceStateActive,
+				Labels: database.Labels{"old": "value"},
+			})
+			require.NoError(t, err)
+
+			body := `{"labels": {}}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				"/namespaces/root.clearlabels",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp NamespaceJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Empty(t, resp.Labels)
+
+			// Verify in database
+			ns, err := tu.Db.GetNamespace(context.Background(), "root.clearlabels")
+			require.NoError(t, err)
+			require.Empty(t, ns.Labels)
+		})
+
+		t.Run("success - labels unchanged when not provided", func(t *testing.T) {
+			err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+				Path:   "root.unchangedlabels",
+				State:  database.NamespaceStateActive,
+				Labels: database.Labels{"old": "value"},
+			})
+			require.NoError(t, err)
+
+			body := `{}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				"/namespaces/root.unchangedlabels",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp NamespaceJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, map[string]string{"old": "value"}, resp.Labels)
+
+			// Verify in database
+			ns, err := tu.Db.GetNamespace(context.Background(), "root.unchangedlabels")
+			require.NoError(t, err)
+			require.Equal(t, database.Labels{"old": "value"}, ns.Labels)
+		})
+
+		t.Run("success - replaces labels entirely", func(t *testing.T) {
+			err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+				Path:   "root.replacelabels",
+				State:  database.NamespaceStateActive,
+				Labels: database.Labels{"old-key": "old-value", "another": "label"},
+			})
+			require.NoError(t, err)
+
+			body := `{"labels": {"new-key": "new-value"}}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				"/namespaces/root.replacelabels",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp NamespaceJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Len(t, resp.Labels, 1)
+			require.Equal(t, "new-value", resp.Labels["new-key"])
+
+			// Verify old labels are gone
+			ns, err := tu.Db.GetNamespace(context.Background(), "root.replacelabels")
+			require.NoError(t, err)
+			require.Len(t, ns.Labels, 1)
+			require.Equal(t, "new-value", ns.Labels["new-key"])
+			_, exists := ns.Labels["old-key"]
+			require.False(t, exists)
+		})
+	})
+
+	t.Run("get labels", func(t *testing.T) {
+		tu, done := setup(t, context.Background(), nil)
+		defer done()
+
+		// Create a namespace with labels
+		err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+			Path:   "root.labeled",
+			State:  database.NamespaceStateActive,
+			Labels: database.Labels{"env": "prod", "team": "backend"},
+		})
+		require.NoError(t, err)
+
+		// Create a namespace without labels
+		err = tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+			Path:  "root.nolabels",
+			State: database.NamespaceStateActive,
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/namespaces/root.labeled/labels", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/namespaces/root.nonexistent/labels",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("success", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/namespaces/root.labeled/labels",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp map[string]string
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "prod", resp["env"])
+			require.Equal(t, "backend", resp["team"])
+		})
+
+		t.Run("success - empty labels", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/namespaces/root.nolabels/labels",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp map[string]string
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Empty(t, resp)
+		})
+	})
+
+	t.Run("get label", func(t *testing.T) {
+		tu, done := setup(t, context.Background(), nil)
+		defer done()
+
+		// Create a namespace with labels
+		err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+			Path:   "root.labeled",
+			State:  database.NamespaceStateActive,
+			Labels: database.Labels{"env": "staging"},
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/namespaces/root.labeled/labels/env", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("namespace not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/namespaces/root.nonexistent/labels/env",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("label not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/namespaces/root.labeled/labels/nonexistent",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("success", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/namespaces/root.labeled/labels/env",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp NamespaceLabelJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "env", resp.Key)
+			require.Equal(t, "staging", resp.Value)
+		})
+	})
+
+	t.Run("put label", func(t *testing.T) {
+		tu, done := setup(t, context.Background(), nil)
+		defer done()
+
+		err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+			Path:  "root.putlabel",
+			State: database.NamespaceStateActive,
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			body := `{"value": "production"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPut, "/namespaces/root.putlabel/labels/env", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden with wrong verb", func(t *testing.T) {
+			body := `{"value": "production"}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/namespaces/root.putlabel/labels/env",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "namespaces", "get"), // Wrong verb
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("namespace not found", func(t *testing.T) {
+			body := `{"value": "production"}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/namespaces/root.nonexistent/labels/env",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("bad request - invalid JSON", func(t *testing.T) {
+			body := `{invalid json}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/namespaces/root.putlabel/labels/env",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("success - add new label", func(t *testing.T) {
+			body := `{"value": "production"}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/namespaces/root.putlabel/labels/env",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp NamespaceLabelJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "env", resp.Key)
+			require.Equal(t, "production", resp.Value)
+
+			// Verify in database
+			ns, err := tu.Db.GetNamespace(context.Background(), "root.putlabel")
+			require.NoError(t, err)
+			require.Equal(t, "production", ns.Labels["env"])
+		})
+
+		t.Run("success - update existing label", func(t *testing.T) {
+			err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+				Path:   "root.updatelabel",
+				State:  database.NamespaceStateActive,
+				Labels: database.Labels{"version": "v1"},
+			})
+			require.NoError(t, err)
+
+			body := `{"value": "v2"}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/namespaces/root.updatelabel/labels/version",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp NamespaceLabelJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "version", resp.Key)
+			require.Equal(t, "v2", resp.Value)
+
+			// Verify in database
+			ns, err := tu.Db.GetNamespace(context.Background(), "root.updatelabel")
+			require.NoError(t, err)
+			require.Equal(t, "v2", ns.Labels["version"])
+		})
+
+		t.Run("success - preserves other labels", func(t *testing.T) {
+			err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+				Path:   "root.preservelabels",
+				State:  database.NamespaceStateActive,
+				Labels: database.Labels{"env": "dev", "team": "platform"},
+			})
+			require.NoError(t, err)
+
+			body := `{"value": "staging"}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/namespaces/root.preservelabels/labels/env",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			// Verify both labels in database
+			ns, err := tu.Db.GetNamespace(context.Background(), "root.preservelabels")
+			require.NoError(t, err)
+			require.Equal(t, "staging", ns.Labels["env"])
+			require.Equal(t, "platform", ns.Labels["team"])
+		})
+	})
+
+	t.Run("delete label", func(t *testing.T) {
+		tu, done := setup(t, context.Background(), nil)
+		defer done()
+
+		// Create a namespace with labels
+		err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+			Path:   "root.deletelabel",
+			State:  database.NamespaceStateActive,
+			Labels: database.Labels{"env": "prod", "team": "backend"},
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodDelete, "/namespaces/root.deletelabel/labels/env", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden with wrong verb", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodDelete,
+				"/namespaces/root.deletelabel/labels/env",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "namespaces", "get"), // Wrong verb
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("namespace not found returns 204", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodDelete,
+				"/namespaces/root.nonexistent/labels/env",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNoContent, w.Code)
+		})
+
+		t.Run("label not found returns 204", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodDelete,
+				"/namespaces/root.deletelabel/labels/nonexistent",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNoContent, w.Code)
+		})
+
+		t.Run("success - delete label", func(t *testing.T) {
+			err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+				Path:   "root.deleteone",
+				State:  database.NamespaceStateActive,
+				Labels: database.Labels{"to-delete": "value", "to-keep": "value2"},
+			})
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodDelete,
+				"/namespaces/root.deleteone/labels/to-delete",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNoContent, w.Code)
+
+			// Verify the label is deleted but other labels remain
+			ns, err := tu.Db.GetNamespace(context.Background(), "root.deleteone")
+			require.NoError(t, err)
+			_, exists := ns.Labels["to-delete"]
+			require.False(t, exists)
+			require.Equal(t, "value2", ns.Labels["to-keep"])
+		})
+
+		t.Run("success - delete is idempotent", func(t *testing.T) {
+			err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+				Path:   "root.idempotent",
+				State:  database.NamespaceStateActive,
+				Labels: database.Labels{"label": "value"},
+			})
+			require.NoError(t, err)
+
+			// Delete the label twice
+			for i := 0; i < 2; i++ {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodDelete,
+					"/namespaces/root.idempotent/labels/label",
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNoContent, w.Code)
+			}
+
+			// Verify the label is deleted
+			ns, err := tu.Db.GetNamespace(context.Background(), "root.idempotent")
+			require.NoError(t, err)
+			_, exists := ns.Labels["label"]
+			require.False(t, exists)
+		})
+	})
 }

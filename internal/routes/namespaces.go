@@ -30,6 +30,19 @@ type CreateNamespaceRequestJson struct {
 	Labels map[string]string `json:"labels"`
 }
 
+type UpdateNamespaceRequestJson struct {
+	Labels map[string]string `json:"labels"`
+}
+
+type PutNamespaceLabelRequestJson struct {
+	Value string `json:"value"`
+}
+
+type NamespaceLabelJson struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 func NamespaceToJson(ns coreIface.Namespace) NamespaceJson {
 	return NamespaceJson{
 		Path:      ns.GetPath(),
@@ -322,6 +335,490 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 	})
 }
 
+// @Summary		Update namespace
+// @Description	Update a namespace's labels
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path	path		string						true	"Namespace path"
+// @Param			request	body		UpdateNamespaceRequestJson	true	"Namespace update request"
+// @Success		200		{object}	SwaggerNamespaceJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path} [patch]
+func (r *NamespacesRoutes) update(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	path := gctx.Param("path")
+
+	if path == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("path is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	var req UpdateNamespaceRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid request body").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Validate labels if provided
+	if req.Labels != nil {
+		if err := database.Labels(req.Labels).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid labels: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
+	// Get the existing namespace for authorization check
+	ns, err := r.core.GetNamespace(ctx, path)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("namespace '%s' not found", path).
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	// Only update labels if provided in the request
+	if req.Labels != nil {
+		ns, err = r.core.UpdateNamespaceLabels(ctx, path, req.Labels)
+		if err != nil {
+			if errors.Is(err, core.ErrNotFound) {
+				api_common.NewHttpStatusErrorBuilder().
+					WithStatusNotFound().
+					WithResponseMsgf("namespace '%s' not found", path).
+					WithInternalErr(err).
+					BuildStatusError().
+					WriteGinResponse(r.cfg, gctx)
+				val.MarkErrorReturn()
+				return
+			}
+
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusInternalServerError().
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
+	gctx.PureJSON(http.StatusOK, NamespaceToJson(ns))
+}
+
+// @Summary		Get all labels for a namespace
+// @Description	Get all labels associated with a specific namespace
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path	path		string	true	"Namespace path"
+// @Success		200		{object}	map[string]string
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path}/labels [get]
+func (r *NamespacesRoutes) getLabels(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	path := gctx.Param("path")
+
+	if path == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("path is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	ns, err := r.core.GetNamespace(ctx, path)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("namespace '%s' not found", path).
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	labels := ns.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+
+	gctx.PureJSON(http.StatusOK, labels)
+}
+
+// @Summary		Get a specific label for a namespace
+// @Description	Get a specific label value by key for a namespace
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path	path		string	true	"Namespace path"
+// @Param			label	path		string	true	"Label key"
+// @Success		200		{object}	NamespaceLabelJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path}/labels/{label} [get]
+func (r *NamespacesRoutes) getLabel(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	path := gctx.Param("path")
+
+	if path == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("path is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	labelKey := gctx.Param("label")
+	if labelKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("label key is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	ns, err := r.core.GetNamespace(ctx, path)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("namespace '%s' not found", path).
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	labels := ns.GetLabels()
+	value, exists := labels[labelKey]
+	if !exists {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsgf("label '%s' not found", labelKey).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, NamespaceLabelJson{
+		Key:   labelKey,
+		Value: value,
+	})
+}
+
+// @Summary		Set a label for a namespace
+// @Description	Set or update a specific label value by key for a namespace
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path	path		string							true	"Namespace path"
+// @Param			label	path		string							true	"Label key"
+// @Param			request	body		PutNamespaceLabelRequestJson	true	"Label value"
+// @Success		200		{object}	NamespaceLabelJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path}/labels/{label} [put]
+func (r *NamespacesRoutes) putLabel(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	path := gctx.Param("path")
+
+	if path == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("path is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	labelKey := gctx.Param("label")
+	if labelKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("label key is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Validate label key
+	if err := database.ValidateLabelKey(labelKey); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid label key: %s", err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	var req PutNamespaceLabelRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid request body").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Validate label value
+	if err := database.ValidateLabelValue(req.Value); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid label value: %s", err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Get the existing namespace for authorization check
+	ns, err := r.core.GetNamespace(ctx, path)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("namespace '%s' not found", path).
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	// Use transactional PutNamespaceLabels to update
+	updatedNs, err := r.core.PutNamespaceLabels(ctx, path, map[string]string{labelKey: req.Value})
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("namespace '%s' not found", path).
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, NamespaceLabelJson{
+		Key:   labelKey,
+		Value: updatedNs.GetLabels()[labelKey],
+	})
+}
+
+// @Summary		Delete a label from a namespace
+// @Description	Delete a specific label by key from a namespace
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path	path	string	true	"Namespace path"
+// @Param			label	path	string	true	"Label key"
+// @Success		204		"No Content"
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path}/labels/{label} [delete]
+func (r *NamespacesRoutes) deleteLabel(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	path := gctx.Param("path")
+
+	if path == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("path is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	labelKey := gctx.Param("label")
+	if labelKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("label key is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Get the existing namespace for authorization check
+	ns, err := r.core.GetNamespace(ctx, path)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			// Namespace doesn't exist, return 204 (idempotent delete)
+			gctx.Status(http.StatusNoContent)
+			val.MarkValidated()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	// Use transactional DeleteNamespaceLabels to delete
+	_, err = r.core.DeleteNamespaceLabels(ctx, path, []string{labelKey})
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			// Namespace was deleted between the check and the update, return 204
+			gctx.Status(http.StatusNoContent)
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.Status(http.StatusNoContent)
+}
+
 func (r *NamespacesRoutes) Register(g gin.IRouter) {
 	g.GET(
 		"/namespaces",
@@ -350,6 +847,56 @@ func (r *NamespacesRoutes) Register(g gin.IRouter) {
 			ForVerb("get").
 			Build(),
 		r.get,
+	)
+	g.PATCH(
+		"/namespaces/:path",
+		r.authService.NewRequiredBuilder().
+			ForResource("namespaces").
+			ForIdField("path").
+			ForIdExtractor(func(ns interface{}) string { return ns.(coreIface.Namespace).GetPath() }).
+			ForVerb("update").
+			Build(),
+		r.update,
+	)
+	g.GET(
+		"/namespaces/:path/labels",
+		r.authService.NewRequiredBuilder().
+			ForResource("namespaces").
+			ForIdField("path").
+			ForIdExtractor(func(ns interface{}) string { return ns.(coreIface.Namespace).GetPath() }).
+			ForVerb("get").
+			Build(),
+		r.getLabels,
+	)
+	g.GET(
+		"/namespaces/:path/labels/:label",
+		r.authService.NewRequiredBuilder().
+			ForResource("namespaces").
+			ForIdField("path").
+			ForIdExtractor(func(ns interface{}) string { return ns.(coreIface.Namespace).GetPath() }).
+			ForVerb("get").
+			Build(),
+		r.getLabel,
+	)
+	g.PUT(
+		"/namespaces/:path/labels/:label",
+		r.authService.NewRequiredBuilder().
+			ForResource("namespaces").
+			ForIdField("path").
+			ForIdExtractor(func(ns interface{}) string { return ns.(coreIface.Namespace).GetPath() }).
+			ForVerb("update").
+			Build(),
+		r.putLabel,
+	)
+	g.DELETE(
+		"/namespaces/:path/labels/:label",
+		r.authService.NewRequiredBuilder().
+			ForResource("namespaces").
+			ForIdField("path").
+			ForIdExtractor(func(ns interface{}) string { return ns.(coreIface.Namespace).GetPath() }).
+			ForVerb("update").
+			Build(),
+		r.deleteLabel,
 	)
 }
 

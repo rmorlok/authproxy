@@ -93,6 +93,15 @@ type C interface {
 	// CreateNamespace creates a new namespace.
 	CreateNamespace(ctx context.Context, path string, labels map[string]string) (Namespace, error)
 
+	// UpdateNamespaceLabels replaces all labels on a namespace.
+	UpdateNamespaceLabels(ctx context.Context, path string, labels map[string]string) (Namespace, error)
+
+	// PutNamespaceLabels adds or updates the specified labels on a namespace.
+	PutNamespaceLabels(ctx context.Context, path string, labels map[string]string) (Namespace, error)
+
+	// DeleteNamespaceLabels removes the specified label keys from a namespace.
+	DeleteNamespaceLabels(ctx context.Context, path string, keys []string) (Namespace, error)
+
 	// EnsureNamespaceAncestorPath ensures that the specified namespace path exists in the database.
 	EnsureNamespaceAncestorPath(ctx context.Context, targetNamespace string, labels map[string]string) (Namespace, error)
 

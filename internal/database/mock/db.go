@@ -380,6 +380,21 @@ func (mr *MockDBMockRecorder) DeleteNamespace(ctx, path interface{}) *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNamespace", reflect.TypeOf((*MockDB)(nil).DeleteNamespace), ctx, path)
 }
 
+// DeleteNamespaceLabels mocks base method.
+func (m *MockDB) DeleteNamespaceLabels(ctx context.Context, path string, keys []string) (*database.Namespace, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteNamespaceLabels", ctx, path, keys)
+	ret0, _ := ret[0].(*database.Namespace)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteNamespaceLabels indicates an expected call of DeleteNamespaceLabels.
+func (mr *MockDBMockRecorder) DeleteNamespaceLabels(ctx, path, keys interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNamespaceLabels", reflect.TypeOf((*MockDB)(nil).DeleteNamespaceLabels), ctx, path, keys)
+}
+
 // DeleteOAuth2Token mocks base method.
 func (m *MockDB) DeleteOAuth2Token(ctx context.Context, tokenId uuid.UUID) error {
 	m.ctrl.T.Helper()
@@ -820,6 +835,21 @@ func (mr *MockDBMockRecorder) PutActorLabels(ctx, id, labels interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutActorLabels", reflect.TypeOf((*MockDB)(nil).PutActorLabels), ctx, id, labels)
 }
 
+// PutNamespaceLabels mocks base method.
+func (m *MockDB) PutNamespaceLabels(ctx context.Context, path string, labels map[string]string) (*database.Namespace, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutNamespaceLabels", ctx, path, labels)
+	ret0, _ := ret[0].(*database.Namespace)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PutNamespaceLabels indicates an expected call of PutNamespaceLabels.
+func (mr *MockDBMockRecorder) PutNamespaceLabels(ctx, path, labels interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutNamespaceLabels", reflect.TypeOf((*MockDB)(nil).PutNamespaceLabels), ctx, path, labels)
+}
+
 // SetConnectionState mocks base method.
 func (m *MockDB) SetConnectionState(ctx context.Context, id uuid.UUID, state database.ConnectionState) error {
 	m.ctrl.T.Helper()
@@ -846,6 +876,21 @@ func (m *MockDB) SetNamespaceState(ctx context.Context, path string, state datab
 func (mr *MockDBMockRecorder) SetNamespaceState(ctx, path, state interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNamespaceState", reflect.TypeOf((*MockDB)(nil).SetNamespaceState), ctx, path, state)
+}
+
+// UpdateNamespaceLabels mocks base method.
+func (m *MockDB) UpdateNamespaceLabels(ctx context.Context, path string, labels map[string]string) (*database.Namespace, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateNamespaceLabels", ctx, path, labels)
+	ret0, _ := ret[0].(*database.Namespace)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateNamespaceLabels indicates an expected call of UpdateNamespaceLabels.
+func (mr *MockDBMockRecorder) UpdateNamespaceLabels(ctx, path, labels interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateNamespaceLabels", reflect.TypeOf((*MockDB)(nil).UpdateNamespaceLabels), ctx, path, labels)
 }
 
 // UpsertActor mocks base method.

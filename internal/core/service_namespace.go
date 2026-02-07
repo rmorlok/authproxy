@@ -59,6 +59,45 @@ func (s *service) GetNamespace(ctx context.Context, path string) (iface.Namespac
 	return wrapNamespace(*ns, s), nil
 }
 
+func (s *service) UpdateNamespaceLabels(ctx context.Context, path string, labels map[string]string) (iface.Namespace, error) {
+	ns, err := s.db.UpdateNamespaceLabels(ctx, path, labels)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+
+		return nil, err
+	}
+
+	return wrapNamespace(*ns, s), nil
+}
+
+func (s *service) PutNamespaceLabels(ctx context.Context, path string, labels map[string]string) (iface.Namespace, error) {
+	ns, err := s.db.PutNamespaceLabels(ctx, path, labels)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+
+		return nil, err
+	}
+
+	return wrapNamespace(*ns, s), nil
+}
+
+func (s *service) DeleteNamespaceLabels(ctx context.Context, path string, keys []string) (iface.Namespace, error) {
+	ns, err := s.db.DeleteNamespaceLabels(ctx, path, keys)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+
+		return nil, err
+	}
+
+	return wrapNamespace(*ns, s), nil
+}
+
 func (s *service) CreateNamespace(ctx context.Context, path string, labels map[string]string) (iface.Namespace, error) {
 	ns := &database.Namespace{
 		Path:   path,
