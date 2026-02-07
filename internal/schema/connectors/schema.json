@@ -72,8 +72,11 @@
         "url": {
           "type": "string"
         },
-        "header": {
-          "type": "object"
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
         },
         "body_raw": {
           "type": "string"
@@ -120,6 +123,12 @@
     },
     "description": {
       "type": "string"
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
     },
     "auth": {
       "oneOf": [
