@@ -2,6 +2,7 @@ package admin_api
 
 import (
 	"net/http"
+	"strings"
 	"sync"
 	"time"
 
@@ -11,9 +12,9 @@ import (
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/config"
-	_ "github.com/rmorlok/authproxy/internal/docs"
 	common_routes "github.com/rmorlok/authproxy/internal/routes"
 	"github.com/rmorlok/authproxy/internal/service"
+	admin_api_swagger "github.com/rmorlok/authproxy/internal/service/admin_api/swagger"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
 )
@@ -63,6 +64,14 @@ func GetGinServer(
 	}
 
 	// Swagger documentation endpoint
+	swaggerHost := service.GetBaseUrl()
+	swaggerHost = strings.TrimPrefix(swaggerHost, "https://")
+	swaggerHost = strings.TrimPrefix(swaggerHost, "http://")
+	admin_api_swagger.SwaggerInfoadmin_api.Host = swaggerHost
+	admin_api_swagger.SwaggerInfoadmin_api.InfoInstanceName = "admin_api"
+	server.GET("/swagger", func(c *gin.Context) {
+		c.Redirect(http.StatusFound, "/swagger/index.html")
+	})
 	server.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
 	var healthChecker *gin.Engine

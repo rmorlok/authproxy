@@ -1,0 +1,1848 @@
+basePath: /api/v1
+definitions:
+  routes.ActorJson:
+    properties:
+      created_at:
+        type: string
+      external_id:
+        type: string
+      id:
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      namespace:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  routes.ActorLabelJson:
+    properties:
+      key:
+        type: string
+      value:
+        type: string
+    type: object
+  routes.CreateActorRequestJson:
+    properties:
+      external_id:
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      namespace:
+        type: string
+    type: object
+  routes.CreateNamespaceRequestJson:
+    properties:
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      path:
+        type: string
+    type: object
+  routes.ErrorResponse:
+    description: Standardized error response
+    properties:
+      error:
+        description: Error message
+        example: Bad Request
+        type: string
+      stack_trace:
+        description: Stack trace (only in debug mode)
+        type: string
+    type: object
+  routes.InitiateConnectionRedirect:
+    description: Redirect response for connection initiation
+    properties:
+      id:
+        description: Connection UUID
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      redirect_url:
+        description: URL to redirect the user to
+        example: https://oauth.provider.com/authorize?...
+        type: string
+      type:
+        description: Response type (always "redirect")
+        example: redirect
+        type: string
+    type: object
+  routes.InitiateConnectionRequest:
+    description: Request to initiate a connection
+    properties:
+      connector_id:
+        description: ID of the connector to initiate the connection for
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      connector_version:
+        description: Version of the connector (optional, defaults to primary version)
+        example: 1
+        type: integer
+      into_namespace:
+        description: Namespace to create the connection in (optional, defaults to
+          connector namespace)
+        example: acme
+        type: string
+      return_to_url:
+        description: URL to return to after the connection is completed
+        example: https://example.com/callback
+        type: string
+    type: object
+  routes.InitiateFailureResponse:
+    properties:
+      redirect_url:
+        type: string
+    type: object
+  routes.InitiateParams:
+    properties:
+      return_to_url:
+        type: string
+    type: object
+  routes.InitiateSuccessResponse:
+    properties:
+      actor_id:
+        description: This should include any configuration the SPA needs
+        type: string
+    type: object
+  routes.ListActorsResponseJson:
+    properties:
+      cursor:
+        type: string
+      items:
+        items:
+          $ref: '#/definitions/routes.ActorJson'
+        type: array
+    type: object
+  routes.ProxyRequest:
+    description: Request to proxy an HTTP request through a connection
+    properties:
+      body_json:
+        description: JSON body (alternative to body_raw)
+      body_raw:
+        description: Raw body bytes (base64 encoded if binary)
+        items:
+          type: integer
+        type: array
+      headers:
+        additionalProperties:
+          type: string
+        description: HTTP headers
+        type: object
+      method:
+        description: HTTP method
+        example: GET
+        type: string
+      url:
+        description: Target URL to proxy to
+        example: https://api.example.com/v1/users
+        type: string
+    type: object
+  routes.ProxyResponse:
+    description: Response from a proxied HTTP request
+    properties:
+      body_json:
+        description: JSON response body (if content-type is application/json)
+      body_raw:
+        description: Raw response body bytes
+        items:
+          type: integer
+        type: array
+      headers:
+        additionalProperties:
+          type: string
+        description: Response headers
+        type: object
+      status_code:
+        description: HTTP status code
+        example: 200
+        type: integer
+    type: object
+  routes.PutActorLabelRequestJson:
+    properties:
+      value:
+        type: string
+    type: object
+  routes.SwaggerConnectionJson:
+    description: Connection to an external service
+    properties:
+      connector:
+        allOf:
+        - $ref: '#/definitions/routes.SwaggerConnectorJson'
+        description: Connector information
+      created_at:
+        description: Creation timestamp
+        type: string
+      id:
+        description: Connection UUID
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        description: Labels assigned to the connection
+        type: object
+      namespace:
+        description: Namespace path
+        example: acme
+        type: string
+      state:
+        description: Connection state (pending, connected, disconnecting, disconnected,
+          error)
+        example: connected
+        type: string
+      updated_at:
+        description: Last update timestamp
+        type: string
+    type: object
+  routes.SwaggerConnectorJson:
+    description: Connector definition for external service integration
+    properties:
+      created_at:
+        description: Creation timestamp
+        type: string
+      description:
+        description: Full description
+        example: Salesforce CRM integration
+        type: string
+      display_name:
+        description: Display name
+        example: Salesforce
+        type: string
+      highlight:
+        description: Short highlight text
+        example: CRM platform
+        type: string
+      id:
+        description: Connector UUID
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        description: Labels assigned to the connector
+        type: object
+      logo:
+        description: Logo URL
+        example: https://example.com/logo.png
+        type: string
+      namespace:
+        description: Namespace path
+        example: acme
+        type: string
+      state:
+        description: State (draft, active, deprecated, archived)
+        example: active
+        type: string
+      updated_at:
+        description: Last update timestamp
+        type: string
+      version:
+        description: Connector version number
+        example: 1
+        type: integer
+    type: object
+  routes.SwaggerConnectorVersionJson:
+    description: Detailed connector version information
+    properties:
+      created_at:
+        description: Creation timestamp
+        type: string
+      definition:
+        description: Connector definition (full schema)
+      id:
+        description: Connector UUID
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        description: Labels assigned to the connector
+        type: object
+      namespace:
+        description: Namespace path
+        example: acme
+        type: string
+      state:
+        description: State (draft, active, deprecated, archived)
+        example: active
+        type: string
+      updated_at:
+        description: Last update timestamp
+        type: string
+      version:
+        description: Connector version number
+        example: 1
+        type: integer
+    type: object
+  routes.SwaggerDisconnectResponse:
+    description: Response for disconnect operation
+    properties:
+      connection:
+        allOf:
+        - $ref: '#/definitions/routes.SwaggerConnectionJson'
+        description: Connection being disconnected
+      task_id:
+        description: Task ID for tracking the disconnect operation
+        type: string
+    type: object
+  routes.SwaggerForceStateRequest:
+    description: Request to force a connection state
+    properties:
+      state:
+        description: Target state (pending, connected, disconnecting, disconnected,
+          error)
+        example: connected
+        type: string
+    type: object
+  routes.SwaggerListConnectionResponse:
+    description: Paginated list of connections
+    properties:
+      cursor:
+        description: Pagination cursor for next page
+        type: string
+      items:
+        description: List of connections
+        items:
+          $ref: '#/definitions/routes.SwaggerConnectionJson'
+        type: array
+    type: object
+  routes.SwaggerListConnectorVersionsResponse:
+    description: Paginated list of connector versions
+    properties:
+      cursor:
+        description: Pagination cursor for next page
+        type: string
+      items:
+        description: List of connector versions
+        items:
+          $ref: '#/definitions/routes.SwaggerConnectorVersionJson'
+        type: array
+    type: object
+  routes.SwaggerListConnectorsResponse:
+    description: Paginated list of connectors
+    properties:
+      cursor:
+        description: Pagination cursor for next page
+        type: string
+      items:
+        description: List of connectors
+        items:
+          $ref: '#/definitions/routes.SwaggerConnectorJson'
+        type: array
+    type: object
+  routes.SwaggerListNamespacesResponse:
+    description: Paginated list of namespaces
+    properties:
+      cursor:
+        description: Pagination cursor for next page
+        type: string
+      items:
+        description: List of namespaces
+        items:
+          $ref: '#/definitions/routes.SwaggerNamespaceJson'
+        type: array
+    type: object
+  routes.SwaggerListRequestsResponse:
+    description: Paginated list of request log entries
+    properties:
+      cursor:
+        description: Pagination cursor for next page
+        type: string
+      items:
+        description: List of request log entries
+        items:
+          $ref: '#/definitions/routes.SwaggerRequestLogEntry'
+        type: array
+      total:
+        description: Total count of matching records (if requested)
+        type: integer
+    type: object
+  routes.SwaggerNamespaceJson:
+    description: Namespace for organizing resources
+    properties:
+      created_at:
+        description: Creation timestamp
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        description: Labels assigned to the namespace
+        type: object
+      path:
+        description: Namespace path (e.g., "acme" or "acme/sales")
+        example: acme
+        type: string
+      state:
+        description: Namespace state (active, suspended)
+        example: active
+        type: string
+      updated_at:
+        description: Last update timestamp
+        type: string
+    type: object
+  routes.SwaggerRequestLogEntry:
+    description: HTTP request log entry
+    properties:
+      connection_id:
+        description: Connection UUID
+        type: string
+      connector_id:
+        description: Connector UUID
+        type: string
+      connector_version:
+        description: Connector version
+        type: integer
+      correlation_id:
+        description: Correlation ID for tracing
+        type: string
+      duration:
+        description: Duration in milliseconds
+        example: 150
+        type: integer
+      host:
+        description: Target host
+        example: api.example.com
+        type: string
+      method:
+        description: HTTP method
+        example: GET
+        type: string
+      namespace:
+        description: Namespace of the connection
+        example: acme
+        type: string
+      path:
+        description: Request path
+        example: /v1/users
+        type: string
+      request_id:
+        description: Request UUID
+        example: 550e8400-e29b-41d4-a716-446655440000
+        type: string
+      response_status_code:
+        description: HTTP response status code
+        example: 200
+        type: integer
+      scheme:
+        description: URL scheme
+        example: https
+        type: string
+      timestamp:
+        description: Request timestamp
+        type: string
+      type:
+        description: Request type (proxy, oauth, probe)
+        example: proxy
+        type: string
+    type: object
+  routes.TaskInfoJson:
+    properties:
+      id:
+        type: string
+      state:
+        $ref: '#/definitions/routes.TaskState'
+      type:
+        type: string
+      updated_at:
+        type: string
+    type: object
+  routes.TaskState:
+    enum:
+    - unknown
+    - active
+    type: string
+    x-enum-varnames:
+    - TaskStateUnknown
+    - TaskStateActive
+  routes.UpdateActorRequestJson:
+    properties:
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
+host: localhost:8082
+info:
+  contact: {}
+  description: AuthProxy is an open-source, embeddable integration platform-as-a-service
+    (iPaaS). It manages the connection lifecycle to 3rd party systems, allowing applications
+    to call those systems through an authenticating proxy.
+  title: AuthProxy API
+  version: "1.0"
+paths:
+  /actors:
+    get:
+      consumes:
+      - application/json
+      description: List actors with optional filtering and pagination
+      parameters:
+      - description: Pagination cursor
+        in: query
+        name: cursor
+        type: string
+      - description: Maximum number of results to return
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by external ID
+        in: query
+        name: external_id
+        type: string
+      - description: Filter by namespace
+        in: query
+        name: namespace
+        type: string
+      - description: Filter by label selector
+        in: query
+        name: label_selector
+        type: string
+      - description: Order by field (e.g., 'created_at:asc')
+        in: query
+        name: order_by
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.ListActorsResponseJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List actors
+      tags:
+      - actors
+    post:
+      consumes:
+      - application/json
+      description: Create a new actor in a namespace
+      parameters:
+      - description: Actor creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.CreateActorRequestJson'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/routes.ActorJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create actor
+      tags:
+      - actors
+  /actors/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific actor by its UUID
+      parameters:
+      - description: Actor UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete actor by UUID
+      tags:
+      - actors
+    get:
+      consumes:
+      - application/json
+      description: Get a specific actor by its UUID
+      parameters:
+      - description: Actor UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.ActorJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get actor by UUID
+      tags:
+      - actors
+    patch:
+      consumes:
+      - application/json
+      description: Update a specific actor by its UUID
+      parameters:
+      - description: Actor UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Actor update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.UpdateActorRequestJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.ActorJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update actor by UUID
+      tags:
+      - actors
+  /actors/{id}/labels:
+    get:
+      consumes:
+      - application/json
+      description: Get all labels associated with a specific actor
+      parameters:
+      - description: Actor UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all labels for an actor
+      tags:
+      - actors
+  /actors/{id}/labels/{label}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific label by key from an actor
+      parameters:
+      - description: Actor UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a label from an actor
+      tags:
+      - actors
+    get:
+      consumes:
+      - application/json
+      description: Get a specific label value by key for an actor
+      parameters:
+      - description: Actor UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.ActorLabelJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a specific label for an actor
+      tags:
+      - actors
+    put:
+      consumes:
+      - application/json
+      description: Set or update a specific label value by key for an actor
+      parameters:
+      - description: Actor UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      - description: Label value
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.PutActorLabelRequestJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.ActorLabelJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set a label for an actor
+      tags:
+      - actors
+  /actors/external-id/{external_id}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific actor by its external ID within a namespace
+      parameters:
+      - description: External ID of the actor
+        in: path
+        name: external_id
+        required: true
+        type: string
+      - description: Namespace (defaults to authenticated actor's namespace)
+        in: query
+        name: namespace
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete actor by external ID
+      tags:
+      - actors
+    get:
+      consumes:
+      - application/json
+      description: Get a specific actor by its external ID within a namespace
+      parameters:
+      - description: External ID of the actor
+        in: path
+        name: external_id
+        required: true
+        type: string
+      - description: Namespace (defaults to authenticated actor's namespace)
+        in: query
+        name: namespace
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.ActorJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get actor by external ID
+      tags:
+      - actors
+    patch:
+      consumes:
+      - application/json
+      description: Update a specific actor by its external ID within a namespace
+      parameters:
+      - description: External ID of the actor
+        in: path
+        name: external_id
+        required: true
+        type: string
+      - description: Namespace (defaults to authenticated actor's namespace)
+        in: query
+        name: namespace
+        type: string
+      - description: Actor update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.UpdateActorRequestJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.ActorJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update actor by external ID
+      tags:
+      - actors
+  /connections:
+    get:
+      consumes:
+      - application/json
+      description: List connections with optional filtering and pagination
+      parameters:
+      - description: Pagination cursor
+        in: query
+        name: cursor
+        type: string
+      - description: Maximum number of results to return
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by connection state
+        in: query
+        name: state
+        type: string
+      - description: Filter by namespace
+        in: query
+        name: namespace
+        type: string
+      - description: Filter by label selector
+        in: query
+        name: label_selector
+        type: string
+      - description: Order by field (e.g., 'created_at:asc')
+        in: query
+        name: order_by
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerListConnectionResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List connections
+      tags:
+      - connections
+  /connections/_initiate:
+    post:
+      consumes:
+      - application/json
+      description: Initiate a new connection to an external service through a connector
+      parameters:
+      - description: Connection initiation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.InitiateConnectionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.InitiateConnectionRedirect'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Initiate connection
+      tags:
+      - connections
+  /connections/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get a specific connection by its UUID
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerConnectionJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get connection
+      tags:
+      - connections
+  /connections/{id}/_disconnect:
+    post:
+      consumes:
+      - application/json
+      description: Disconnect an existing connection and revoke its credentials
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerDisconnectResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Disconnect connection
+      tags:
+      - connections
+  /connections/{id}/_force_state:
+    put:
+      consumes:
+      - application/json
+      description: Force a connection to a specific state (admin operation)
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: New state
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.SwaggerForceStateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerConnectionJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Force connection state
+      tags:
+      - connections
+  /connections/{id}/_proxy:
+    post:
+      consumes:
+      - application/json
+      description: Proxy an HTTP request through an authenticated connection to the
+        external service
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Proxy request payload
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.ProxyRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.ProxyResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Proxy request through connection
+      tags:
+      - proxy
+  /connectors:
+    get:
+      consumes:
+      - application/json
+      description: List connectors with optional filtering and pagination
+      parameters:
+      - description: Pagination cursor
+        in: query
+        name: cursor
+        type: string
+      - description: Maximum number of results to return
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by connector state
+        in: query
+        name: state
+        type: string
+      - description: Filter by namespace
+        in: query
+        name: namespace
+        type: string
+      - description: Filter by label selector
+        in: query
+        name: label_selector
+        type: string
+      - description: Order by field (e.g., 'created_at:asc')
+        in: query
+        name: order_by
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerListConnectorsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List connectors
+      tags:
+      - connectors
+  /connectors/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get a specific connector by its UUID
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerConnectorJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get connector
+      tags:
+      - connectors
+  /connectors/{id}/versions:
+    get:
+      consumes:
+      - application/json
+      description: List all versions of a specific connector
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Pagination cursor
+        in: query
+        name: cursor
+        type: string
+      - description: Maximum number of results to return
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by version state
+        in: query
+        name: state
+        type: string
+      - description: Filter by namespace
+        in: query
+        name: namespace
+        type: string
+      - description: Filter by label selector
+        in: query
+        name: label_selector
+        type: string
+      - description: Order by field (e.g., 'version:desc')
+        in: query
+        name: order_by
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerListConnectorVersionsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List connector versions
+      tags:
+      - connectors
+  /connectors/{id}/versions/{version}:
+    get:
+      consumes:
+      - application/json
+      description: Get a specific version of a connector
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Version number
+        in: path
+        name: version
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerConnectorVersionJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get connector version
+      tags:
+      - connectors
+  /namespaces:
+    get:
+      consumes:
+      - application/json
+      description: List namespaces with optional filtering and pagination
+      parameters:
+      - description: Pagination cursor
+        in: query
+        name: cursor
+        type: string
+      - description: Maximum number of results to return
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by namespace state
+        in: query
+        name: state
+        type: string
+      - description: Filter to children of a parent namespace
+        in: query
+        name: children_of
+        type: string
+      - description: Filter by namespace path pattern
+        in: query
+        name: namespace
+        type: string
+      - description: Filter by label selector
+        in: query
+        name: label_selector
+        type: string
+      - description: Order by field (e.g., 'path:asc')
+        in: query
+        name: order_by
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerListNamespacesResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List namespaces
+      tags:
+      - namespaces
+    post:
+      consumes:
+      - application/json
+      description: Create a new namespace
+      parameters:
+      - description: Namespace creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.CreateNamespaceRequestJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerNamespaceJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create namespace
+      tags:
+      - namespaces
+  /namespaces/{path}:
+    get:
+      consumes:
+      - application/json
+      description: Get a specific namespace by its path
+      parameters:
+      - description: Namespace path
+        in: path
+        name: path
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerNamespaceJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get namespace
+      tags:
+      - namespaces
+  /request-log:
+    get:
+      consumes:
+      - application/json
+      description: List request log entries with optional filtering and pagination
+      parameters:
+      - description: Pagination cursor
+        in: query
+        name: cursor
+        type: string
+      - description: Maximum number of results to return
+        in: query
+        name: limit
+        type: integer
+      - description: Order by field (e.g., 'timestamp:desc')
+        in: query
+        name: order_by
+        type: string
+      - description: Filter by namespace
+        in: query
+        name: namespace
+        type: string
+      - description: Filter by request type
+        in: query
+        name: request_type
+        type: string
+      - description: Filter by correlation ID
+        in: query
+        name: correlation_id
+        type: string
+      - description: Filter by connection UUID
+        in: query
+        name: connection_id
+        type: string
+      - description: Filter by connector type
+        in: query
+        name: connector_type
+        type: string
+      - description: Filter by connector UUID
+        in: query
+        name: connector_id
+        type: string
+      - description: Filter by connector version
+        in: query
+        name: connector_version
+        type: integer
+      - description: Filter by HTTP method
+        in: query
+        name: method
+        type: string
+      - description: Filter by exact status code
+        in: query
+        name: status_code
+        type: integer
+      - description: Filter by status code range (e.g., '200-299')
+        in: query
+        name: status_code_range
+        type: string
+      - description: Filter by timestamp range
+        in: query
+        name: timestamp_range
+        type: string
+      - description: Filter by exact path
+        in: query
+        name: path
+        type: string
+      - description: Filter by path regex
+        in: query
+        name: path_regex
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerListRequestsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List request log entries
+      tags:
+      - request-log
+  /request-log/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get a specific request log entry by its UUID
+      parameters:
+      - description: Request log entry UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerRequestLogEntry'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get request log entry
+      tags:
+      - request-log
+  /session/_initiate:
+    post:
+      consumes:
+      - application/json
+      description: Initiate or establish a session with the server. If successful,
+        returns actor info. If not authenticated, returns a redirect URL for authentication.
+      parameters:
+      - description: Session initiation parameters
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.InitiateParams'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.InitiateSuccessResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.InitiateFailureResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      summary: Initiate session
+      tags:
+      - session
+  /session/_terminate:
+    post:
+      consumes:
+      - application/json
+      description: Explicitly terminate the current session. Used when navigating
+        away from the SPA.
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties: true
+            type: object
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      summary: Terminate session
+      tags:
+      - session
+  /tasks/{encryptedTaskInfo}:
+    get:
+      consumes:
+      - application/json
+      description: Get the status of a background task by its encrypted task info
+      parameters:
+      - description: Encrypted task info token
+        in: path
+        name: encryptedTaskInfo
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.TaskInfoJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get task status
+      tags:
+      - tasks
+securityDefinitions:
+  BearerAuth:
+    description: 'JWT Bearer token (format: Bearer <token>)'
+    in: header
+    name: Authorization
+    type: apiKey
+swagger: "2.0"
