@@ -94,7 +94,9 @@
         "internal_error": {
           "type": "string"
         },
-        "template": true
+        "template": {
+          "type": "string"
+        }
       },
       "additionalProperties": false,
       "type": "object"
@@ -102,6 +104,9 @@
     "HostApplication": {
       "properties": {
         "initiate_session_url": {
+          "type": "string"
+        },
+        "base_url": {
           "type": "string"
         }
       },
@@ -140,7 +145,9 @@
     },
     "Marketplace": {
       "properties": {
-        "base_url": true
+        "base_url": {
+          "type": "string"
+        }
       },
       "additionalProperties": false,
       "type": "object"
@@ -168,8 +175,12 @@
     },
     "ServiceAdminApi": {
       "properties": {
-        "health_check_port": true,
-        "port": true,
+        "health_check_port": {
+          "type": "integer"
+        },
+        "port": {
+          "type": "integer"
+        },
         "domain": {
           "type": "string"
         },
@@ -179,7 +190,9 @@
         "cors": {
           "$ref": "#/$defs/CorsConfig"
         },
-        "tls": true,
+        "tls": {
+          "$ref": "#/$defs/TlsConfig"
+        },
         "ui": {
           "$ref": "#/$defs/ServiceAdminUi"
         },
@@ -204,7 +217,9 @@
         "enabled": {
           "type": "boolean"
         },
-        "base_url": true,
+        "base_url": {
+          "type": "string"
+        },
         "initiate_session_url": {
           "type": "string"
         }
@@ -214,25 +229,9 @@
     },
     "ServiceApi": {
       "properties": {
-        "health_check_port": true,
-        "port": true,
-        "domain": {
-          "type": "string"
+        "health_check_port": {
+          "type": "integer"
         },
-        "https": {
-          "type": "boolean"
-        },
-        "cors": {
-          "$ref": "#/$defs/CorsConfig"
-        },
-        "tls": true
-      },
-      "additionalProperties": false,
-      "type": "object"
-    },
-    "ServicePublic": {
-      "properties": {
-        "health_check_port": true,
         "port": {
           "type": "integer"
         },
@@ -245,7 +244,33 @@
         "cors": {
           "$ref": "#/$defs/CorsConfig"
         },
-        "tls": true,
+        "tls": {
+          "$ref": "#/$defs/TlsConfig"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "ServicePublic": {
+      "properties": {
+        "health_check_port": {
+          "type": "integer"
+        },
+        "port": {
+          "type": "integer"
+        },
+        "domain": {
+          "type": "string"
+        },
+        "https": {
+          "type": "boolean"
+        },
+        "cors": {
+          "$ref": "#/$defs/CorsConfig"
+        },
+        "tls": {
+          "$ref": "#/$defs/TlsConfig"
+        },
         "session_timeout": {
           "$ref": "../common/schema.json#/$defs/HumanDuration"
         },
@@ -301,21 +326,153 @@
     },
     "SystemAuth": {
       "properties": {
-        "jwt_signing_key": true,
+        "jwt_signing_key": { "$ref": "#/$defs/Key" },
         "jwt_issuer": {
           "type": "string"
         },
         "jwt_token_duration": {
-          "type": "integer"
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
         },
         "disable_xsrf": {
           "type": "boolean"
         },
-        "actors": true,
-        "global_aes_key": true
+        "actors": { "$ref": "#/$defs/ConfiguredActors" },
+        "global_aes_key": { "$ref": "#/$defs/Key" }
       },
       "additionalProperties": false,
       "type": "object"
+    },
+    "Key": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "public_key": { "$ref": "#/$defs/KeyData" },
+            "private_key": { "$ref": "#/$defs/KeyData" }
+          },
+          "additionalProperties": true
+        },
+        {
+          "type": "object",
+          "properties": {
+            "shared_key": { "$ref": "#/$defs/KeyData" }
+          },
+          "required": ["shared_key"],
+          "additionalProperties": true
+        }
+      ]
+    },
+    "KeyData": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "value": { "type": "string" }
+          },
+          "required": ["value"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "base64": { "type": "string" }
+          },
+          "required": ["base64"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "env_var": { "type": "string" }
+          },
+          "required": ["env_var"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "env_var_base64": { "type": "string" }
+          },
+          "required": ["env_var_base64"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "path": { "type": "string" }
+          },
+          "required": ["path"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "TlsConfig": {
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "cert": { "$ref": "#/$defs/KeyData" },
+            "key": { "$ref": "#/$defs/KeyData" }
+          },
+          "required": ["cert", "key"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "accept_tos": { "type": "boolean" },
+            "cache_dir": { "type": "string" },
+            "email": { "type": "string" }
+          },
+          "required": ["accept_tos"],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "auto_gen_path": { "type": "string" }
+          },
+          "required": ["auto_gen_path"],
+          "additionalProperties": false
+        }
+      ]
+    },
+    "ConfiguredActor": {
+      "type": "object",
+      "properties": {
+        "external_id": { "type": "string" },
+        "key": { "$ref": "#/$defs/Key" },
+        "permissions": {
+          "type": "array",
+          "items": { "$ref": "../auth/schema.json#/$defs/Permission" }
+        },
+        "labels": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "required": ["external_id", "key"]
+    },
+    "ConfiguredActors": {
+      "oneOf": [
+        {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ConfiguredActor" }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "keys_path": { "type": "string" },
+            "permissions": {
+              "type": "array",
+              "items": { "$ref": "../auth/schema.json#/$defs/Permission" }
+            },
+            "sync_cron_schedule": { "type": "string" }
+          },
+          "required": ["keys_path"],
+          "additionalProperties": false
+        }
+      ]
     }
   },
   "properties": {
@@ -340,9 +497,15 @@
     "system_auth": {
       "$ref": "#/$defs/SystemAuth"
     },
-    "database": true,
-    "logging": true,
-    "redis": true,
+    "database": {
+      "type": "object"
+    },
+    "logging": {
+      "type": "object"
+    },
+    "redis": {
+      "type": "object"
+    },
     "oauth": {
       "$ref": "#/$defs/OAuth"
     },
