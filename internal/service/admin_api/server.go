@@ -72,7 +72,10 @@ func GetGinServer(
 	server.GET("/swagger", func(c *gin.Context) {
 		c.Redirect(http.StatusFound, "/swagger/index.html")
 	})
-	server.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
+	server.GET("/swagger/*any", ginSwagger.WrapHandler(
+		swaggerFiles.Handler,
+		ginSwagger.InstanceName("admin_api"),
+	))
 
 	var healthChecker *gin.Engine
 	if service.Port() != service.HealthCheckPort() {

@@ -44,17 +44,19 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 	}
 
 	// Swagger documentation endpoint
-	if false {
-		swaggerHost := service.GetBaseUrl()
-		swaggerHost = strings.TrimPrefix(swaggerHost, "https://")
-		swaggerHost = strings.TrimPrefix(swaggerHost, "http://")
-		api_swagger.SwaggerInfoApi.Host = swaggerHost
-		api_swagger.SwaggerInfoApi.InfoInstanceName = "api"
-		server.GET("/swagger", func(c *gin.Context) {
-			c.Redirect(http.StatusFound, "/swagger/index.html")
-		})
-		server.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
-	}
+	swaggerHost := service.GetBaseUrl()
+	swaggerHost = strings.TrimPrefix(swaggerHost, "https://")
+	swaggerHost = strings.TrimPrefix(swaggerHost, "http://")
+	api_swagger.SwaggerInfoApi.Host = swaggerHost
+	api_swagger.SwaggerInfoApi.InfoInstanceName = "api"
+	server.GET("/swagger", func(c *gin.Context) {
+		c.Redirect(http.StatusFound, "/swagger/index.html")
+	})
+	server.GET("/swagger/*any", ginSwagger.WrapHandler(
+		swaggerFiles.Handler,
+		ginSwagger.InstanceName("Api"),
+	))
+
 	var healthChecker *gin.Engine
 	if service.Port() != service.HealthCheckPort() {
 		healthChecker = api_common.GinForService(service)
