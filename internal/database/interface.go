@@ -48,6 +48,9 @@ type DB interface {
 	EnsureNamespaceByPath(ctx context.Context, path string) error
 	DeleteNamespace(ctx context.Context, path string) error
 	SetNamespaceState(ctx context.Context, path string, state NamespaceState) error
+	UpdateNamespaceLabels(ctx context.Context, path string, labels map[string]string) (*Namespace, error)
+	PutNamespaceLabels(ctx context.Context, path string, labels map[string]string) (*Namespace, error)
+	DeleteNamespaceLabels(ctx context.Context, path string, keys []string) (*Namespace, error)
 	ListNamespacesBuilder() ListNamespacesBuilder
 	ListNamespacesFromCursor(ctx context.Context, cursor string) (ListNamespacesExecutor, error)
 

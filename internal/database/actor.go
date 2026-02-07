@@ -789,13 +789,8 @@ func (s *service) PutActorLabels(ctx context.Context, id uuid.UUID, labels map[s
 	}
 
 	// Validate label keys and values
-	for k, v := range labels {
-		if err := ValidateLabelKey(k); err != nil {
-			return nil, errors.Wrapf(err, "invalid label key '%s'", k)
-		}
-		if err := ValidateLabelValue(v); err != nil {
-			return nil, errors.Wrapf(err, "invalid label value for key '%s'", k)
-		}
+	if err := ValidateLabels(labels); err != nil {
+		return nil, errors.Wrap(err, "invalid labels")
 	}
 
 	var result *Actor

@@ -634,6 +634,198 @@ func (l *listNamespacesFilters) Enumerate(ctx context.Context, callback func(pag
 	return err
 }
 
+// UpdateNamespaceLabels replaces all labels on a namespace within a single transaction.
+// Unlike PutNamespaceLabels, this does a full replacement rather than a merge.
+func (s *service) UpdateNamespaceLabels(ctx context.Context, path string, labels map[string]string) (*Namespace, error) {
+	if path == "" {
+		return nil, errors.New("namespace path is required")
+	}
+
+	if labels != nil {
+		if err := ValidateLabels(labels); err != nil {
+			return nil, errors.Wrap(err, "invalid labels")
+		}
+	}
+
+	var result *Namespace
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		// Get the current namespace within the transaction
+		ns, err := s.getNamespaceByPath(ctx, tx, path)
+		if err != nil {
+			return err
+		}
+
+		// Replace labels entirely
+		ns.Labels = labels
+
+		// Update the namespace
+		now := apctx.GetClock(ctx).Now()
+		ns.UpdatedAt = now
+
+		dbResult, err := s.sq.
+			Update(NamespacesTable).
+			Set("labels", ns.Labels).
+			Set("updated_at", ns.UpdatedAt).
+			Where(sq.Eq{"path": path, "deleted_at": nil}).
+			RunWith(tx).
+			Exec()
+		if err != nil {
+			return errors.Wrap(err, "failed to update namespace labels")
+		}
+
+		affected, err := dbResult.RowsAffected()
+		if err != nil {
+			return errors.Wrap(err, "failed to update namespace labels")
+		}
+
+		if affected == 0 {
+			return errors.New("failed to update namespace labels; no rows updated")
+		}
+
+		result = ns
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// PutNamespaceLabels adds or updates the specified labels on a namespace within a single transaction.
+// Existing labels not in the provided map are preserved.
+func (s *service) PutNamespaceLabels(ctx context.Context, path string, labels map[string]string) (*Namespace, error) {
+	if path == "" {
+		return nil, errors.New("namespace path is required")
+	}
+
+	if len(labels) == 0 {
+		// No labels to add, just return the current namespace
+		return s.GetNamespace(ctx, path)
+	}
+
+	// Validate label keys and values
+	if err := ValidateLabels(labels); err != nil {
+		return nil, errors.Wrap(err, "invalid labels")
+	}
+
+	var result *Namespace
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		// Get the current namespace within the transaction
+		ns, err := s.getNamespaceByPath(ctx, tx, path)
+		if err != nil {
+			return err
+		}
+
+		// Merge the new labels with existing labels
+		if ns.Labels == nil {
+			ns.Labels = make(Labels)
+		}
+		for k, v := range labels {
+			ns.Labels[k] = v
+		}
+
+		// Update the namespace
+		now := apctx.GetClock(ctx).Now()
+		ns.UpdatedAt = now
+
+		dbResult, err := s.sq.
+			Update(NamespacesTable).
+			Set("labels", ns.Labels).
+			Set("updated_at", ns.UpdatedAt).
+			Where(sq.Eq{"path": path, "deleted_at": nil}).
+			RunWith(tx).
+			Exec()
+		if err != nil {
+			return errors.Wrap(err, "failed to update namespace labels")
+		}
+
+		affected, err := dbResult.RowsAffected()
+		if err != nil {
+			return errors.Wrap(err, "failed to update namespace labels")
+		}
+
+		if affected == 0 {
+			return errors.New("failed to update namespace labels; no rows updated")
+		}
+
+		result = ns
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// DeleteNamespaceLabels removes the specified label keys from a namespace within a single transaction.
+// Keys that don't exist are ignored.
+func (s *service) DeleteNamespaceLabels(ctx context.Context, path string, keys []string) (*Namespace, error) {
+	if path == "" {
+		return nil, errors.New("namespace path is required")
+	}
+
+	if len(keys) == 0 {
+		// No labels to delete, just return the current namespace
+		return s.GetNamespace(ctx, path)
+	}
+
+	var result *Namespace
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		// Get the current namespace within the transaction
+		ns, err := s.getNamespaceByPath(ctx, tx, path)
+		if err != nil {
+			return err
+		}
+
+		// Delete the specified labels
+		if ns.Labels != nil {
+			for _, k := range keys {
+				delete(ns.Labels, k)
+			}
+		}
+
+		// Update the namespace
+		now := apctx.GetClock(ctx).Now()
+		ns.UpdatedAt = now
+
+		dbResult, err := s.sq.
+			Update(NamespacesTable).
+			Set("labels", ns.Labels).
+			Set("updated_at", ns.UpdatedAt).
+			Where(sq.Eq{"path": path, "deleted_at": nil}).
+			RunWith(tx).
+			Exec()
+		if err != nil {
+			return errors.Wrap(err, "failed to delete namespace labels")
+		}
+
+		affected, err := dbResult.RowsAffected()
+		if err != nil {
+			return errors.Wrap(err, "failed to delete namespace labels")
+		}
+
+		if affected == 0 {
+			return errors.New("failed to delete namespace labels; no rows updated")
+		}
+
+		result = ns
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
 func (s *service) ListNamespacesBuilder() ListNamespacesBuilder {
 	return &listNamespacesFilters{
 		s:        s,

@@ -76,7 +76,7 @@ func TestLabels(t *testing.T) {
 	t.Run("ValidateLabelValue", func(t *testing.T) {
 		t.Run("valid values", func(t *testing.T) {
 			validValues := []string{
-				"",  // empty is valid
+				"", // empty is valid
 				"a",
 				"A",
 				"0",
@@ -122,6 +122,39 @@ func TestLabels(t *testing.T) {
 					require.Error(t, err, "value %q should be invalid: %s", tc.value, tc.reason)
 				})
 			}
+		})
+	})
+
+	t.Run("ValidateLabels", func(t *testing.T) {
+		t.Run("valid labels", func(t *testing.T) {
+			labels := Labels{
+				"app":                      "myapp",
+				"version":                  "v1.2.3",
+				"app.kubernetes.io/name":   "myapp",
+				"example.com/my-component": "frontend",
+				"empty-value":              "",
+			}
+			require.NoError(t, ValidateLabels(labels))
+		})
+		t.Run("invalid value", func(t *testing.T) {
+			labels := Labels{
+				"app":                      "**bad**",
+				"version":                  "v1.2.3",
+				"app.kubernetes.io/name":   "myapp",
+				"example.com/my-component": "frontend",
+				"empty-value":              "",
+			}
+			require.Error(t, ValidateLabels(labels))
+		})
+		t.Run("invalid key", func(t *testing.T) {
+			labels := Labels{
+				"-bad":                     "myapp",
+				"version":                  "v1.2.3",
+				"app.kubernetes.io/name":   "myapp",
+				"example.com/my-component": "frontend",
+				"empty-value":              "",
+			}
+			require.Error(t, ValidateLabels(labels))
 		})
 	})
 

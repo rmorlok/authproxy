@@ -605,6 +605,471 @@ INSERT INTO namespaces
 			})
 		}
 	})
+	t.Run("UpdateNamespaceLabels", func(t *testing.T) {
+		t.Run("set labels on namespace without labels", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:  "root.updlabels1",
+				State: NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			updated, err := db.UpdateNamespaceLabels(ctx, "root.updlabels1", map[string]string{
+				"env":  "prod",
+				"team": "backend",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "prod", updated.Labels["env"])
+			require.Equal(t, "backend", updated.Labels["team"])
+
+			// Verify in database
+			retrieved, err := db.GetNamespace(ctx, "root.updlabels1")
+			require.NoError(t, err)
+			require.Equal(t, "prod", retrieved.Labels["env"])
+			require.Equal(t, "backend", retrieved.Labels["team"])
+		})
+
+		t.Run("replaces all existing labels", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:   "root.updlabels2",
+				State:  NamespaceStateActive,
+				Labels: Labels{"old": "value", "also-old": "value2"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.UpdateNamespaceLabels(ctx, "root.updlabels2", map[string]string{
+				"new": "label",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "label", updated.Labels["new"])
+			_, existsOld := updated.Labels["old"]
+			require.False(t, existsOld)
+			_, existsAlsoOld := updated.Labels["also-old"]
+			require.False(t, existsAlsoOld)
+
+			// Verify in database
+			retrieved, err := db.GetNamespace(ctx, "root.updlabels2")
+			require.NoError(t, err)
+			require.Len(t, retrieved.Labels, 1)
+			require.Equal(t, "label", retrieved.Labels["new"])
+		})
+
+		t.Run("clear labels with empty map", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:   "root.updlabels3",
+				State:  NamespaceStateActive,
+				Labels: Labels{"old": "value"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.UpdateNamespaceLabels(ctx, "root.updlabels3", map[string]string{})
+			require.NoError(t, err)
+			require.Empty(t, updated.Labels)
+
+			// Verify in database
+			retrieved, err := db.GetNamespace(ctx, "root.updlabels3")
+			require.NoError(t, err)
+			require.Empty(t, retrieved.Labels)
+		})
+
+		t.Run("nil labels clears labels", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:   "root.updlabels4",
+				State:  NamespaceStateActive,
+				Labels: Labels{"old": "value"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.UpdateNamespaceLabels(ctx, "root.updlabels4", nil)
+			require.NoError(t, err)
+			require.Nil(t, updated.Labels)
+		})
+
+		t.Run("namespace not found", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			_, err := db.UpdateNamespaceLabels(ctx, "root.nonexistent", map[string]string{"key": "value"})
+			require.ErrorIs(t, err, ErrNotFound)
+		})
+
+		t.Run("empty path returns error", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			_, err := db.UpdateNamespaceLabels(ctx, "", map[string]string{"key": "value"})
+			require.Error(t, err)
+		})
+
+		t.Run("invalid label key returns error", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:  "root.updlabels5",
+				State: NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			_, err = db.UpdateNamespaceLabels(ctx, "root.updlabels5", map[string]string{
+				"": "empty key",
+			})
+			require.Error(t, err)
+		})
+
+		t.Run("updates timestamp", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			clk := clock.NewFakeClock(now)
+			ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:  "root.updlabels6",
+				State: NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			original, err := db.GetNamespace(ctx, "root.updlabels6")
+			require.NoError(t, err)
+			originalUpdatedAt := original.UpdatedAt
+
+			clk.Step(time.Hour)
+
+			updated, err := db.UpdateNamespaceLabels(ctx, "root.updlabels6", map[string]string{"new": "label"})
+			require.NoError(t, err)
+			require.True(t, updated.UpdatedAt.After(originalUpdatedAt))
+		})
+	})
+
+	t.Run("PutNamespaceLabels", func(t *testing.T) {
+		t.Run("add labels to namespace without labels", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:  "root.putlabels1",
+				State: NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			updated, err := db.PutNamespaceLabels(ctx, "root.putlabels1", map[string]string{
+				"env":  "prod",
+				"team": "backend",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "prod", updated.Labels["env"])
+			require.Equal(t, "backend", updated.Labels["team"])
+
+			// Verify in database
+			retrieved, err := db.GetNamespace(ctx, "root.putlabels1")
+			require.NoError(t, err)
+			require.Equal(t, "prod", retrieved.Labels["env"])
+			require.Equal(t, "backend", retrieved.Labels["team"])
+		})
+
+		t.Run("add labels to namespace with existing labels", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:   "root.putlabels2",
+				State:  NamespaceStateActive,
+				Labels: Labels{"existing": "value"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.PutNamespaceLabels(ctx, "root.putlabels2", map[string]string{
+				"new": "label",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "value", updated.Labels["existing"])
+			require.Equal(t, "label", updated.Labels["new"])
+		})
+
+		t.Run("update existing label", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:   "root.putlabels3",
+				State:  NamespaceStateActive,
+				Labels: Labels{"env": "dev"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.PutNamespaceLabels(ctx, "root.putlabels3", map[string]string{
+				"env": "prod",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "prod", updated.Labels["env"])
+		})
+
+		t.Run("multiple labels at once", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:   "root.putlabels4",
+				State:  NamespaceStateActive,
+				Labels: Labels{"keep": "this"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.PutNamespaceLabels(ctx, "root.putlabels4", map[string]string{
+				"label1": "value1",
+				"label2": "value2",
+				"label3": "value3",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "this", updated.Labels["keep"])
+			require.Equal(t, "value1", updated.Labels["label1"])
+			require.Equal(t, "value2", updated.Labels["label2"])
+			require.Equal(t, "value3", updated.Labels["label3"])
+		})
+
+		t.Run("empty labels map returns current namespace", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:   "root.putlabels5",
+				State:  NamespaceStateActive,
+				Labels: Labels{"existing": "value"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.PutNamespaceLabels(ctx, "root.putlabels5", map[string]string{})
+			require.NoError(t, err)
+			require.Equal(t, "value", updated.Labels["existing"])
+		})
+
+		t.Run("namespace not found", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			_, err := db.PutNamespaceLabels(ctx, "root.nonexistent", map[string]string{"key": "value"})
+			require.ErrorIs(t, err, ErrNotFound)
+		})
+
+		t.Run("empty path returns error", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			_, err := db.PutNamespaceLabels(ctx, "", map[string]string{"key": "value"})
+			require.Error(t, err)
+		})
+
+		t.Run("invalid label key returns error", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:  "root.putlabels6",
+				State: NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			_, err = db.PutNamespaceLabels(ctx, "root.putlabels6", map[string]string{
+				"": "empty key",
+			})
+			require.Error(t, err)
+		})
+
+		t.Run("updates timestamp", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			clk := clock.NewFakeClock(now)
+			ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:  "root.putlabels7",
+				State: NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			original, err := db.GetNamespace(ctx, "root.putlabels7")
+			require.NoError(t, err)
+			originalUpdatedAt := original.UpdatedAt
+
+			// Advance the clock
+			clk.Step(time.Hour)
+
+			updated, err := db.PutNamespaceLabels(ctx, "root.putlabels7", map[string]string{"new": "label"})
+			require.NoError(t, err)
+			require.True(t, updated.UpdatedAt.After(originalUpdatedAt))
+		})
+	})
+
+	t.Run("DeleteNamespaceLabels", func(t *testing.T) {
+		t.Run("delete single label", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:   "root.dellabels1",
+				State:  NamespaceStateActive,
+				Labels: Labels{"env": "prod", "team": "backend"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.DeleteNamespaceLabels(ctx, "root.dellabels1", []string{"env"})
+			require.NoError(t, err)
+			_, exists := updated.Labels["env"]
+			require.False(t, exists)
+			require.Equal(t, "backend", updated.Labels["team"])
+
+			// Verify in database
+			retrieved, err := db.GetNamespace(ctx, "root.dellabels1")
+			require.NoError(t, err)
+			_, exists = retrieved.Labels["env"]
+			require.False(t, exists)
+			require.Equal(t, "backend", retrieved.Labels["team"])
+		})
+
+		t.Run("delete multiple labels", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:   "root.dellabels2",
+				State:  NamespaceStateActive,
+				Labels: Labels{"a": "1", "b": "2", "c": "3", "d": "4"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.DeleteNamespaceLabels(ctx, "root.dellabels2", []string{"a", "c"})
+			require.NoError(t, err)
+			require.Len(t, updated.Labels, 2)
+			_, existsA := updated.Labels["a"]
+			_, existsC := updated.Labels["c"]
+			require.False(t, existsA)
+			require.False(t, existsC)
+			require.Equal(t, "2", updated.Labels["b"])
+			require.Equal(t, "4", updated.Labels["d"])
+		})
+
+		t.Run("delete non-existent label is no-op", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:   "root.dellabels3",
+				State:  NamespaceStateActive,
+				Labels: Labels{"existing": "value"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.DeleteNamespaceLabels(ctx, "root.dellabels3", []string{"nonexistent"})
+			require.NoError(t, err)
+			require.Equal(t, "value", updated.Labels["existing"])
+		})
+
+		t.Run("delete from namespace without labels", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:  "root.dellabels4",
+				State: NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			updated, err := db.DeleteNamespaceLabels(ctx, "root.dellabels4", []string{"any"})
+			require.NoError(t, err)
+			require.Empty(t, updated.Labels)
+		})
+
+		t.Run("empty keys slice returns current namespace", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:   "root.dellabels5",
+				State:  NamespaceStateActive,
+				Labels: Labels{"existing": "value"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.DeleteNamespaceLabels(ctx, "root.dellabels5", []string{})
+			require.NoError(t, err)
+			require.Equal(t, "value", updated.Labels["existing"])
+		})
+
+		t.Run("namespace not found", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			_, err := db.DeleteNamespaceLabels(ctx, "root.nonexistent", []string{"key"})
+			require.ErrorIs(t, err, ErrNotFound)
+		})
+
+		t.Run("empty path returns error", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			_, err := db.DeleteNamespaceLabels(ctx, "", []string{"key"})
+			require.Error(t, err)
+		})
+
+		t.Run("updates timestamp", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			clk := clock.NewFakeClock(now)
+			ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:   "root.dellabels6",
+				State:  NamespaceStateActive,
+				Labels: Labels{"to-delete": "value"},
+			})
+			require.NoError(t, err)
+
+			original, err := db.GetNamespace(ctx, "root.dellabels6")
+			require.NoError(t, err)
+			originalUpdatedAt := original.UpdatedAt
+
+			// Advance the clock
+			clk.Step(time.Hour)
+
+			updated, err := db.DeleteNamespaceLabels(ctx, "root.dellabels6", []string{"to-delete"})
+			require.NoError(t, err)
+			require.True(t, updated.UpdatedAt.After(originalUpdatedAt))
+		})
+	})
+
 	t.Run("Labels", func(t *testing.T) {
 		_, db, _ := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
 		now := time.Date(2023, 10, 15, 12, 0, 0, 0, time.UTC)

@@ -144,6 +144,21 @@ func ValidateLabelValue(value string) error {
 	return nil
 }
 
+// ValidateLabels validates all labels in a map according to Kubernetes restrictions.
+func ValidateLabels(labels map[string]string) error {
+	var result *multierror.Error
+	for key, value := range labels {
+		if err := ValidateLabelKey(key); err != nil {
+			result = multierror.Append(result, errors.Wrapf(err, "invalid label key %q", key))
+		}
+		if err := ValidateLabelValue(value); err != nil {
+			result = multierror.Append(result, errors.Wrapf(err, "invalid label value for key %q", key))
+		}
+	}
+
+	return result.ErrorOrNil()
+}
+
 // Validate validates all labels according to Kubernetes restrictions.
 func (l Labels) Validate() error {
 	if l == nil {
