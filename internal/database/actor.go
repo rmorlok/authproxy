@@ -784,11 +784,9 @@ func (s *service) PutActorLabels(ctx context.Context, id uuid.UUID, labels map[s
 	}
 
 	if len(labels) == 0 {
-		// No labels to add, just return the current actor
 		return s.GetActor(ctx, id)
 	}
 
-	// Validate label keys and values
 	if err := ValidateLabels(labels); err != nil {
 		return nil, errors.Wrap(err, "invalid labels")
 	}
@@ -796,7 +794,6 @@ func (s *service) PutActorLabels(ctx context.Context, id uuid.UUID, labels map[s
 	var result *Actor
 
 	err := s.transaction(func(tx *sql.Tx) error {
-		// Get the current actor within the transaction
 		var actor Actor
 		err := s.sq.
 			Select(actor.cols()...).
@@ -812,38 +809,13 @@ func (s *service) PutActorLabels(ctx context.Context, id uuid.UUID, labels map[s
 			return err
 		}
 
-		// Merge the new labels with existing labels
-		if actor.Labels == nil {
-			actor.Labels = make(Labels)
-		}
-		for k, v := range labels {
-			actor.Labels[k] = v
+		mergedLabels, now, err := s.putLabelsInTableTx(ctx, tx, ActorTable, sq.Eq{"id": id, "deleted_at": nil}, labels)
+		if err != nil {
+			return err
 		}
 
-		// Update the actor
-		now := apctx.GetClock(ctx).Now()
+		actor.Labels = mergedLabels
 		actor.UpdatedAt = now
-
-		dbResult, err := s.sq.
-			Update(ActorTable).
-			Set("labels", actor.Labels).
-			Set("updated_at", actor.UpdatedAt).
-			Where(sq.Eq{"id": id}).
-			RunWith(tx).
-			Exec()
-		if err != nil {
-			return errors.Wrap(err, "failed to update actor labels")
-		}
-
-		affected, err := dbResult.RowsAffected()
-		if err != nil {
-			return errors.Wrap(err, "failed to update actor labels")
-		}
-
-		if affected == 0 {
-			return errors.New("failed to update actor labels; no rows updated")
-		}
-
 		result = &actor
 		return nil
 	})
@@ -863,14 +835,12 @@ func (s *service) DeleteActorLabels(ctx context.Context, id uuid.UUID, keys []st
 	}
 
 	if len(keys) == 0 {
-		// No labels to delete, just return the current actor
 		return s.GetActor(ctx, id)
 	}
 
 	var result *Actor
 
 	err := s.transaction(func(tx *sql.Tx) error {
-		// Get the current actor within the transaction
 		var actor Actor
 		err := s.sq.
 			Select(actor.cols()...).
@@ -886,37 +856,13 @@ func (s *service) DeleteActorLabels(ctx context.Context, id uuid.UUID, keys []st
 			return err
 		}
 
-		// Delete the specified labels
-		if actor.Labels != nil {
-			for _, k := range keys {
-				delete(actor.Labels, k)
-			}
+		remainingLabels, now, err := s.deleteLabelsInTableTx(ctx, tx, ActorTable, sq.Eq{"id": id, "deleted_at": nil}, keys)
+		if err != nil {
+			return err
 		}
 
-		// Update the actor
-		now := apctx.GetClock(ctx).Now()
+		actor.Labels = remainingLabels
 		actor.UpdatedAt = now
-
-		dbResult, err := s.sq.
-			Update(ActorTable).
-			Set("labels", actor.Labels).
-			Set("updated_at", actor.UpdatedAt).
-			Where(sq.Eq{"id": id}).
-			RunWith(tx).
-			Exec()
-		if err != nil {
-			return errors.Wrap(err, "failed to delete actor labels")
-		}
-
-		affected, err := dbResult.RowsAffected()
-		if err != nil {
-			return errors.Wrap(err, "failed to delete actor labels")
-		}
-
-		if affected == 0 {
-			return errors.New("failed to delete actor labels; no rows updated")
-		}
-
 		result = &actor
 		return nil
 	})

@@ -503,6 +503,156 @@ func (l *listConnectionsFilters) Enumerate(ctx context.Context, callback func(pa
 	return err
 }
 
+// UpdateConnectionLabels replaces all labels on a connection within a single transaction.
+// Unlike PutConnectionLabels, this does a full replacement rather than a merge.
+func (s *service) UpdateConnectionLabels(ctx context.Context, id uuid.UUID, labels map[string]string) (*Connection, error) {
+	if id == uuid.Nil {
+		return nil, errors.New("connection id is required")
+	}
+
+	if labels != nil {
+		if err := ValidateLabels(labels); err != nil {
+			return nil, errors.Wrap(err, "invalid labels")
+		}
+	}
+
+	var result *Connection
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		// Get the current connection within the transaction
+		var conn Connection
+		err := s.sq.
+			Select(conn.cols()...).
+			From(ConnectionsTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).
+			QueryRow().
+			Scan(conn.fields()...)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		now, err := s.updateLabelsInTableTx(ctx, tx, ConnectionsTable, sq.Eq{"id": id, "deleted_at": nil}, Labels(labels))
+		if err != nil {
+			return err
+		}
+
+		conn.Labels = labels
+		conn.UpdatedAt = now
+		result = &conn
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// PutConnectionLabels adds or updates the specified labels on a connection within a single transaction.
+// Existing labels not in the provided map are preserved.
+func (s *service) PutConnectionLabels(ctx context.Context, id uuid.UUID, labels map[string]string) (*Connection, error) {
+	if id == uuid.Nil {
+		return nil, errors.New("connection id is required")
+	}
+
+	if len(labels) == 0 {
+		return s.GetConnection(ctx, id)
+	}
+
+	if err := ValidateLabels(labels); err != nil {
+		return nil, errors.Wrap(err, "invalid labels")
+	}
+
+	var result *Connection
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		// Get the current connection within the transaction
+		var conn Connection
+		err := s.sq.
+			Select(conn.cols()...).
+			From(ConnectionsTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).
+			QueryRow().
+			Scan(conn.fields()...)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		mergedLabels, now, err := s.putLabelsInTableTx(ctx, tx, ConnectionsTable, sq.Eq{"id": id, "deleted_at": nil}, labels)
+		if err != nil {
+			return err
+		}
+
+		conn.Labels = mergedLabels
+		conn.UpdatedAt = now
+		result = &conn
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// DeleteConnectionLabels removes the specified label keys from a connection within a single transaction.
+// Keys that don't exist are ignored.
+func (s *service) DeleteConnectionLabels(ctx context.Context, id uuid.UUID, keys []string) (*Connection, error) {
+	if id == uuid.Nil {
+		return nil, errors.New("connection id is required")
+	}
+
+	if len(keys) == 0 {
+		return s.GetConnection(ctx, id)
+	}
+
+	var result *Connection
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		// Get the current connection within the transaction
+		var conn Connection
+		err := s.sq.
+			Select(conn.cols()...).
+			From(ConnectionsTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).
+			QueryRow().
+			Scan(conn.fields()...)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		remainingLabels, now, err := s.deleteLabelsInTableTx(ctx, tx, ConnectionsTable, sq.Eq{"id": id, "deleted_at": nil}, keys)
+		if err != nil {
+			return err
+		}
+
+		conn.Labels = remainingLabels
+		conn.UpdatedAt = now
+		result = &conn
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
 func (s *service) ListConnectionsBuilder() ListConnectionsBuilder {
 	return &listConnectionsFilters{
 		s:        s,

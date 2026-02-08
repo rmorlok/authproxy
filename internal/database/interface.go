@@ -93,6 +93,9 @@ type DB interface {
 	CreateConnection(ctx context.Context, c *Connection) error
 	DeleteConnection(ctx context.Context, id uuid.UUID) error
 	SetConnectionState(ctx context.Context, id uuid.UUID, state ConnectionState) error
+	UpdateConnectionLabels(ctx context.Context, id uuid.UUID, labels map[string]string) (*Connection, error)
+	PutConnectionLabels(ctx context.Context, id uuid.UUID, labels map[string]string) (*Connection, error)
+	DeleteConnectionLabels(ctx context.Context, id uuid.UUID, keys []string) (*Connection, error)
 	ListConnectionsBuilder() ListConnectionsBuilder
 	ListConnectionsFromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error)
 

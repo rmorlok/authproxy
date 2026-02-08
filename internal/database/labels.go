@@ -1,14 +1,19 @@
 package database
 
 import (
+	"context"
+	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"regexp"
 	"strings"
+	"time"
 
+	sq "github.com/Masterminds/squirrel"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apctx"
 )
 
 // Kubernetes-style label restrictions
@@ -207,4 +212,131 @@ func (l Labels) Copy() Labels {
 		copy[k] = v
 	}
 	return copy
+}
+
+// putLabelsInTableTx merges labels into an existing row's labels within a transaction.
+// Reads current labels, merges new ones, writes back with updated timestamp.
+// Returns the merged labels and the new updated_at time.
+func (s *service) putLabelsInTableTx(ctx context.Context, tx *sql.Tx, table string, where sq.Eq, newLabels map[string]string) (Labels, time.Time, error) {
+	var currentLabels Labels
+	err := s.sq.
+		Select("labels").
+		From(table).
+		Where(where).
+		RunWith(tx).
+		QueryRow().
+		Scan(&currentLabels)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, time.Time{}, ErrNotFound
+		}
+		return nil, time.Time{}, err
+	}
+
+	if currentLabels == nil {
+		currentLabels = make(Labels)
+	}
+	for k, v := range newLabels {
+		currentLabels[k] = v
+	}
+
+	now := apctx.GetClock(ctx).Now()
+	dbResult, err := s.sq.
+		Update(table).
+		Set("labels", currentLabels).
+		Set("updated_at", now).
+		Where(where).
+		RunWith(tx).
+		Exec()
+	if err != nil {
+		return nil, time.Time{}, errors.Wrapf(err, "failed to put labels in %s", table)
+	}
+
+	affected, err := dbResult.RowsAffected()
+	if err != nil {
+		return nil, time.Time{}, errors.Wrapf(err, "failed to put labels in %s", table)
+	}
+
+	if affected == 0 {
+		return nil, time.Time{}, fmt.Errorf("failed to put labels in %s; no rows updated", table)
+	}
+
+	return currentLabels, now, nil
+}
+
+// deleteLabelsInTableTx removes label keys from an existing row's labels within a transaction.
+// Reads current labels, deletes specified keys, writes back with updated timestamp.
+// Returns the remaining labels and the new updated_at time.
+func (s *service) deleteLabelsInTableTx(ctx context.Context, tx *sql.Tx, table string, where sq.Eq, keys []string) (Labels, time.Time, error) {
+	var currentLabels Labels
+	err := s.sq.
+		Select("labels").
+		From(table).
+		Where(where).
+		RunWith(tx).
+		QueryRow().
+		Scan(&currentLabels)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, time.Time{}, ErrNotFound
+		}
+		return nil, time.Time{}, err
+	}
+
+	if currentLabels != nil {
+		for _, k := range keys {
+			delete(currentLabels, k)
+		}
+	}
+
+	now := apctx.GetClock(ctx).Now()
+	dbResult, err := s.sq.
+		Update(table).
+		Set("labels", currentLabels).
+		Set("updated_at", now).
+		Where(where).
+		RunWith(tx).
+		Exec()
+	if err != nil {
+		return nil, time.Time{}, errors.Wrapf(err, "failed to delete labels in %s", table)
+	}
+
+	affected, err := dbResult.RowsAffected()
+	if err != nil {
+		return nil, time.Time{}, errors.Wrapf(err, "failed to delete labels in %s", table)
+	}
+
+	if affected == 0 {
+		return nil, time.Time{}, fmt.Errorf("failed to delete labels in %s; no rows updated", table)
+	}
+
+	return currentLabels, now, nil
+}
+
+// updateLabelsInTableTx replaces all labels on an existing row within a transaction.
+// Writes the provided labels and updated timestamp.
+// Returns the new updated_at time.
+func (s *service) updateLabelsInTableTx(ctx context.Context, tx *sql.Tx, table string, where sq.Eq, labels Labels) (time.Time, error) {
+	now := apctx.GetClock(ctx).Now()
+	dbResult, err := s.sq.
+		Update(table).
+		Set("labels", labels).
+		Set("updated_at", now).
+		Where(where).
+		RunWith(tx).
+		Exec()
+	if err != nil {
+		return time.Time{}, errors.Wrapf(err, "failed to update labels in %s", table)
+	}
+
+	affected, err := dbResult.RowsAffected()
+	if err != nil {
+		return time.Time{}, errors.Wrapf(err, "failed to update labels in %s", table)
+	}
+
+	if affected == 0 {
+		return time.Time{}, ErrNotFound
+	}
+
+	return now, nil
 }

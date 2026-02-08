@@ -434,6 +434,166 @@ func TestConnections(t *testing.T) {
 		}
 	})
 
+	t.Run("put connection labels", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig("put_connection_labels", nil)
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		connectorId := uuid.New()
+		u := uuid.New()
+		err := db.CreateConnection(ctx, &Connection{
+			Id:               u,
+			Namespace:        "root.some-namespace",
+			ConnectorId:      connectorId,
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+			Labels:           Labels{"existing": "value"},
+		})
+		assert.NoError(t, err)
+
+		t.Run("merge with existing", func(t *testing.T) {
+			newNow := time.Date(1955, time.November, 6, 6, 29, 0, 0, time.UTC)
+			ctx2 := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(newNow)).Build()
+
+			c, err := db.PutConnectionLabels(ctx2, u, map[string]string{"new": "label"})
+			assert.NoError(t, err)
+			assert.NotNil(t, c)
+			assert.Equal(t, "value", c.Labels["existing"])
+			assert.Equal(t, "label", c.Labels["new"])
+			assert.Equal(t, newNow, c.UpdatedAt)
+		})
+
+		t.Run("add new label", func(t *testing.T) {
+			c, err := db.PutConnectionLabels(ctx, u, map[string]string{"another": "one"})
+			assert.NoError(t, err)
+			assert.NotNil(t, c)
+			assert.Equal(t, "one", c.Labels["another"])
+			assert.Equal(t, "value", c.Labels["existing"])
+			assert.Equal(t, "label", c.Labels["new"])
+		})
+
+		t.Run("no-op for empty", func(t *testing.T) {
+			c, err := db.PutConnectionLabels(ctx, u, map[string]string{})
+			assert.NoError(t, err)
+			assert.NotNil(t, c)
+			assert.Equal(t, u, c.Id)
+		})
+
+		t.Run("not found", func(t *testing.T) {
+			c, err := db.PutConnectionLabels(ctx, uuid.New(), map[string]string{"key": "val"})
+			assert.ErrorIs(t, err, ErrNotFound)
+			assert.Nil(t, c)
+		})
+	})
+
+	t.Run("delete connection labels", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig("delete_connection_labels", nil)
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		connectorId := uuid.New()
+		u := uuid.New()
+		err := db.CreateConnection(ctx, &Connection{
+			Id:               u,
+			Namespace:        "root.some-namespace",
+			ConnectorId:      connectorId,
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+			Labels:           Labels{"env": "prod", "team": "backend", "version": "v1"},
+		})
+		assert.NoError(t, err)
+
+		t.Run("delete existing key", func(t *testing.T) {
+			newNow := time.Date(1955, time.November, 6, 6, 29, 0, 0, time.UTC)
+			ctx2 := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(newNow)).Build()
+
+			c, err := db.DeleteConnectionLabels(ctx2, u, []string{"version"})
+			assert.NoError(t, err)
+			assert.NotNil(t, c)
+			assert.Equal(t, "prod", c.Labels["env"])
+			assert.Equal(t, "backend", c.Labels["team"])
+			_, exists := c.Labels["version"]
+			assert.False(t, exists)
+			assert.Equal(t, newNow, c.UpdatedAt)
+		})
+
+		t.Run("ignore missing keys", func(t *testing.T) {
+			c, err := db.DeleteConnectionLabels(ctx, u, []string{"nonexistent"})
+			assert.NoError(t, err)
+			assert.NotNil(t, c)
+			assert.Equal(t, "prod", c.Labels["env"])
+			assert.Equal(t, "backend", c.Labels["team"])
+		})
+
+		t.Run("no-op for empty", func(t *testing.T) {
+			c, err := db.DeleteConnectionLabels(ctx, u, []string{})
+			assert.NoError(t, err)
+			assert.NotNil(t, c)
+			assert.Equal(t, u, c.Id)
+		})
+
+		t.Run("not found", func(t *testing.T) {
+			c, err := db.DeleteConnectionLabels(ctx, uuid.New(), []string{"env"})
+			assert.ErrorIs(t, err, ErrNotFound)
+			assert.Nil(t, c)
+		})
+	})
+
+	t.Run("update connection labels", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig("update_connection_labels", nil)
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		connectorId := uuid.New()
+		u := uuid.New()
+		err := db.CreateConnection(ctx, &Connection{
+			Id:               u,
+			Namespace:        "root.some-namespace",
+			ConnectorId:      connectorId,
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+			Labels:           Labels{"old": "value", "other": "data"},
+		})
+		assert.NoError(t, err)
+
+		t.Run("replace all", func(t *testing.T) {
+			newNow := time.Date(1955, time.November, 6, 6, 29, 0, 0, time.UTC)
+			ctx2 := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(newNow)).Build()
+
+			c, err := db.UpdateConnectionLabels(ctx2, u, map[string]string{"new": "labels"})
+			assert.NoError(t, err)
+			assert.NotNil(t, c)
+			assert.Equal(t, map[string]string{"new": "labels"}, map[string]string(c.Labels))
+			_, exists := c.Labels["old"]
+			assert.False(t, exists)
+			assert.Equal(t, newNow, c.UpdatedAt)
+		})
+
+		t.Run("clear with empty", func(t *testing.T) {
+			c, err := db.UpdateConnectionLabels(ctx, u, map[string]string{})
+			assert.NoError(t, err)
+			assert.NotNil(t, c)
+			assert.Empty(t, c.Labels)
+		})
+
+		t.Run("clear with nil", func(t *testing.T) {
+			// First put some labels back
+			_, err := db.PutConnectionLabels(ctx, u, map[string]string{"temp": "val"})
+			assert.NoError(t, err)
+
+			c, err := db.UpdateConnectionLabels(ctx, u, nil)
+			assert.NoError(t, err)
+			assert.NotNil(t, c)
+			assert.Nil(t, c.Labels)
+		})
+
+		t.Run("not found", func(t *testing.T) {
+			c, err := db.UpdateConnectionLabels(ctx, uuid.New(), map[string]string{"key": "val"})
+			assert.ErrorIs(t, err, ErrNotFound)
+			assert.Nil(t, c)
+		})
+	})
+
 	t.Run("enumerate connections", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig("enumerate_connections", nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)

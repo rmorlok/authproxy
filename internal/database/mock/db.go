@@ -352,6 +352,21 @@ func (mr *MockDBMockRecorder) DeleteConnection(ctx, id interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteConnection", reflect.TypeOf((*MockDB)(nil).DeleteConnection), ctx, id)
 }
 
+// DeleteConnectionLabels mocks base method.
+func (m *MockDB) DeleteConnectionLabels(ctx context.Context, id uuid.UUID, keys []string) (*database.Connection, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteConnectionLabels", ctx, id, keys)
+	ret0, _ := ret[0].(*database.Connection)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteConnectionLabels indicates an expected call of DeleteConnectionLabels.
+func (mr *MockDBMockRecorder) DeleteConnectionLabels(ctx, id, keys interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteConnectionLabels", reflect.TypeOf((*MockDB)(nil).DeleteConnectionLabels), ctx, id, keys)
+}
+
 // DeleteExpiredNonces mocks base method.
 func (m *MockDB) DeleteExpiredNonces(ctx context.Context) error {
 	m.ctrl.T.Helper()
@@ -835,6 +850,21 @@ func (mr *MockDBMockRecorder) PutActorLabels(ctx, id, labels interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutActorLabels", reflect.TypeOf((*MockDB)(nil).PutActorLabels), ctx, id, labels)
 }
 
+// PutConnectionLabels mocks base method.
+func (m *MockDB) PutConnectionLabels(ctx context.Context, id uuid.UUID, labels map[string]string) (*database.Connection, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutConnectionLabels", ctx, id, labels)
+	ret0, _ := ret[0].(*database.Connection)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PutConnectionLabels indicates an expected call of PutConnectionLabels.
+func (mr *MockDBMockRecorder) PutConnectionLabels(ctx, id, labels interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutConnectionLabels", reflect.TypeOf((*MockDB)(nil).PutConnectionLabels), ctx, id, labels)
+}
+
 // PutNamespaceLabels mocks base method.
 func (m *MockDB) PutNamespaceLabels(ctx context.Context, path string, labels map[string]string) (*database.Namespace, error) {
 	m.ctrl.T.Helper()
@@ -876,6 +906,21 @@ func (m *MockDB) SetNamespaceState(ctx context.Context, path string, state datab
 func (mr *MockDBMockRecorder) SetNamespaceState(ctx, path, state interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNamespaceState", reflect.TypeOf((*MockDB)(nil).SetNamespaceState), ctx, path, state)
+}
+
+// UpdateConnectionLabels mocks base method.
+func (m *MockDB) UpdateConnectionLabels(ctx context.Context, id uuid.UUID, labels map[string]string) (*database.Connection, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateConnectionLabels", ctx, id, labels)
+	ret0, _ := ret[0].(*database.Connection)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateConnectionLabels indicates an expected call of UpdateConnectionLabels.
+func (mr *MockDBMockRecorder) UpdateConnectionLabels(ctx, id, labels interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateConnectionLabels", reflect.TypeOf((*MockDB)(nil).UpdateConnectionLabels), ctx, id, labels)
 }
 
 // UpdateNamespaceLabels mocks base method.
