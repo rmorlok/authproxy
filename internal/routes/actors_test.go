@@ -42,7 +42,7 @@ func TestActorsRoutes(t *testing.T) {
 		}
 
 		// Real DB for actors to simplify pagination/cursor behavior
-		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 		// Real redis config (in-memory test) for httpf factory
 		cfg, rds := apredis.MustApplyTestConfig(cfg)
 		// Auth service bound to this DB

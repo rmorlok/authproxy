@@ -31,12 +31,11 @@ type AuthTestUtil struct {
 }
 
 func TestAuthService(t *testing.T, serviceId sconfig.ServiceId, cfg config.C) (config.C, A, *AuthTestUtil) {
-	testName := "unknown"
-	if t != nil {
-		testName = t.Name()
+	if t == nil {
+		panic("testing.T is required")
 	}
 
-	cfg, db := database.MustApplyBlankTestDbConfig(testName, cfg)
+	cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 	return TestAuthServiceWithDb(serviceId, cfg, db)
 }
 

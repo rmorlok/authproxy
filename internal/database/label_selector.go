@@ -7,6 +7,7 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 type LabelOperator string
@@ -132,18 +133,34 @@ func (s LabelSelector) String() string {
 	return strings.Join(parts, ",")
 }
 
-func (s LabelSelector) ApplyToSqlBuilder(q sq.SelectBuilder, labelsColumn string) sq.SelectBuilder {
+func (s LabelSelector) ApplyToSqlBuilderWithProvider(q sq.SelectBuilder, labelsColumn string, provider config.DatabaseProvider) sq.SelectBuilder {
 	for _, r := range s {
 		switch r.Operator {
 		case LabelOperatorEqual:
-			q = q.Where(sq.Expr(fmt.Sprintf("json_extract(%s, '$.' || ?) = ?", labelsColumn), r.Key, r.Value))
+			if provider == config.DatabaseProviderPostgres {
+				q = q.Where(sq.Expr(fmt.Sprintf("(%s::jsonb ->> ?) = ?", labelsColumn), r.Key, r.Value))
+			} else {
+				q = q.Where(sq.Expr(fmt.Sprintf("json_extract(%s, '$.' || ?) = ?", labelsColumn), r.Key, r.Value))
+			}
 		case LabelOperatorNotEqual:
 			// For inequality, we need to handle the case where the key doesn't exist
-			q = q.Where(sq.Expr(fmt.Sprintf("(json_extract(%s, '$.' || ?) IS NULL OR json_extract(%s, '$.' || ?) != ?)", labelsColumn, labelsColumn), r.Key, r.Key, r.Value))
+			if provider == config.DatabaseProviderPostgres {
+				q = q.Where(sq.Expr(fmt.Sprintf("((%s::jsonb ? ?) IS FALSE OR (%s::jsonb ->> ?) != ?)", labelsColumn, labelsColumn), r.Key, r.Key, r.Value))
+			} else {
+				q = q.Where(sq.Expr(fmt.Sprintf("(json_extract(%s, '$.' || ?) IS NULL OR json_extract(%s, '$.' || ?) != ?)", labelsColumn, labelsColumn), r.Key, r.Key, r.Value))
+			}
 		case LabelOperatorExists:
-			q = q.Where(sq.Expr(fmt.Sprintf("json_extract(%s, '$.' || ?) IS NOT NULL", labelsColumn), r.Key))
+			if provider == config.DatabaseProviderPostgres {
+				q = q.Where(sq.Expr(fmt.Sprintf("(%s::jsonb ? ?)", labelsColumn), r.Key))
+			} else {
+				q = q.Where(sq.Expr(fmt.Sprintf("json_extract(%s, '$.' || ?) IS NOT NULL", labelsColumn), r.Key))
+			}
 		case LabelOperatorNotExists:
-			q = q.Where(sq.Expr(fmt.Sprintf("json_extract(%s, '$.' || ?) IS NULL", labelsColumn), r.Key))
+			if provider == config.DatabaseProviderPostgres {
+				q = q.Where(sq.Expr(fmt.Sprintf("NOT (%s::jsonb ? ?)", labelsColumn), r.Key))
+			} else {
+				q = q.Where(sq.Expr(fmt.Sprintf("json_extract(%s, '$.' || ?) IS NULL", labelsColumn), r.Key))
+			}
 		}
 	}
 	return q

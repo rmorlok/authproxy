@@ -244,7 +244,7 @@ cvc.versions as total_versions
 			return pagination.PageResult[Connector]{Error: err}
 		}
 
-		q = selector.ApplyToSqlBuilder(q, "rr.labels")
+		q = selector.ApplyToSqlBuilderWithProvider(q, "rr.labels", l.s.cfg.GetProvider())
 	}
 
 	if !l.IncludeDeletedVal {

@@ -11,7 +11,8 @@ import (
 type DatabaseProvider string
 
 const (
-	DatabaseProviderSqlite DatabaseProvider = "sqlite"
+	DatabaseProviderSqlite   DatabaseProvider = "sqlite"
+	DatabaseProviderPostgres DatabaseProvider = "postgres"
 )
 
 type Database interface {
@@ -57,6 +58,9 @@ fieldLoop:
 			switch DatabaseProvider(valueNode.Value) {
 			case DatabaseProviderSqlite:
 				database = &DatabaseSqlite{Provider: DatabaseProviderSqlite}
+				break fieldLoop
+			case DatabaseProviderPostgres:
+				database = &DatabasePostgres{Provider: DatabaseProviderPostgres}
 				break fieldLoop
 			default:
 				return nil, fmt.Errorf("unknown database provider %v", valueNode.Value)

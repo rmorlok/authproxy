@@ -31,7 +31,7 @@ func TestRequestLogRoutes(t *testing.T) {
 
 	setup := func(t *testing.T, cfg config.C) *TestSetup {
 		ctrl := gomock.NewController(t)
-		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
 
 		rlr := mock.NewMockLogRetriever(ctrl)

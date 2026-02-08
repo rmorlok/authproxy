@@ -15,7 +15,7 @@ import (
 
 func TestConnectorVersions(t *testing.T) {
 	t.Run("basic", func(t *testing.T) {
-		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -112,7 +112,7 @@ INSERT INTO connector_versions
 	})
 
 	t.Run("ForNamespaceMatchers", func(t *testing.T) {
-		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -187,7 +187,7 @@ INSERT INTO connector_versions
 	t.Run("UpsertConnectorVersion", func(t *testing.T) {
 		t.Run("creates a new connector version", func(t *testing.T) {
 			// Setup
-			_, db, rawDb := MustApplyBlankTestDbConfigRaw("create_connector_version", nil)
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -223,7 +223,7 @@ INSERT INTO connector_versions
 
 		t.Run("refuses to create active and archived versions", func(t *testing.T) {
 			// Setup
-			_, db, rawDb := MustApplyBlankTestDbConfigRaw("create_connector_version", nil)
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -252,7 +252,7 @@ INSERT INTO connector_versions
 
 		t.Run("updates an existing draft version", func(t *testing.T) {
 			// Setup
-			_, db, rawDb := MustApplyBlankTestDbConfigRaw("create_connector_version", nil)
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -287,7 +287,7 @@ INSERT INTO connector_versions
 
 		t.Run("refuses to change namespace for draft version", func(t *testing.T) {
 			// Setup
-			_, db, rawDb := MustApplyBlankTestDbConfigRaw("create_connector_version", nil)
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -326,7 +326,7 @@ INSERT INTO connector_versions
 
 		t.Run("creates multiple versions of the same connector", func(t *testing.T) {
 			// Setup
-			_, db := MustApplyBlankTestDbConfig("create_connector_version_multiple", nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -378,7 +378,7 @@ INSERT INTO connector_versions
 
 		t.Run("creates a primary connector version", func(t *testing.T) {
 			// Setup
-			_, db := MustApplyBlankTestDbConfig("create_connector_version_primary", nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -410,7 +410,7 @@ INSERT INTO connector_versions
 			// This test simulates what UpsertConnectorVersion does when setting a new primary version
 
 			// Setup
-			_, db := MustApplyBlankTestDbConfig("create_connector_version_multiple_primary", nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -467,7 +467,7 @@ INSERT INTO connector_versions
 			// This test simulates what UpsertConnectorVersion does when setting a new primary version
 
 			// Setup
-			_, db := MustApplyBlankTestDbConfig("create_connector_version_multiple_primary", nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 

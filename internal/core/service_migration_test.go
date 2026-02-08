@@ -46,7 +46,7 @@ func TestMigration(t *testing.T) {
 			},
 		})
 
-		cfg, db, rawDb = database.MustApplyBlankTestDbConfigRaw(t.Name(), cfg)
+		cfg, db, rawDb = database.MustApplyBlankTestDbConfigRaw(t, cfg)
 		cfg, r = apredis2.MustApplyTestConfig(cfg)
 		e := encrypt.NewEncryptService(cfg, db)
 		logger := slog.Default()

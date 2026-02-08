@@ -15,6 +15,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -267,7 +268,7 @@ func (s *service) GetActor(ctx context.Context, id uuid.UUID) (*Actor, error) {
 
 func (s *service) GetActorByExternalId(ctx context.Context, namespace, externalId string) (*Actor, error) {
 	var result Actor
-	err := sq.
+	err := s.sq.
 		Select(result.cols()...).
 		From(ActorTable).
 		Where(sq.Eq{
@@ -654,7 +655,7 @@ func (l *listActorsFilters) applyRestrictions(ctx context.Context) sq.SelectBuil
 		if err != nil {
 			l.addError(err)
 		} else {
-			q = selector.ApplyToSqlBuilder(q, "labels")
+			q = selector.ApplyToSqlBuilderWithProvider(q, "labels", l.s.cfg.GetProvider())
 		}
 	}
 
@@ -675,17 +676,25 @@ func (l *listActorsFilters) applyRestrictions(ctx context.Context) sq.SelectBuil
 
 	// Filter by label existence (key exists in labels JSON)
 	if l.LabelExistsKey != nil {
-		// Use json_extract to check if the key exists in the labels JSON
-		// Use bracket notation for keys with special characters like slashes and dots
-		jsonPath := fmt.Sprintf("$.\"%s\"", *l.LabelExistsKey)
-		q = q.Where(sq.Expr("json_extract(labels, ?) IS NOT NULL", jsonPath))
+		if l.s.cfg.GetProvider() == sconfig.DatabaseProviderPostgres {
+			q = q.Where(sq.Expr("(labels::jsonb ? ?)", *l.LabelExistsKey))
+		} else {
+			// Use json_extract to check if the key exists in the labels JSON
+			// Use bracket notation for keys with special characters like slashes and dots
+			jsonPath := fmt.Sprintf("$.\"%s\"", *l.LabelExistsKey)
+			q = q.Where(sq.Expr("json_extract(labels, ?) IS NOT NULL", jsonPath))
+		}
 	}
 
 	// Filter by label key-value equality
 	if l.LabelEqualsKey != nil && l.LabelEqualsValue != nil {
-		// Use bracket notation for keys with special characters like slashes and dots
-		jsonPath := fmt.Sprintf("$.\"%s\"", *l.LabelEqualsKey)
-		q = q.Where(sq.Expr("json_extract(labels, ?) = ?", jsonPath, *l.LabelEqualsValue))
+		if l.s.cfg.GetProvider() == sconfig.DatabaseProviderPostgres {
+			q = q.Where(sq.Expr("(labels::jsonb ->> ?) = ?", *l.LabelEqualsKey, *l.LabelEqualsValue))
+		} else {
+			// Use bracket notation for keys with special characters like slashes and dots
+			jsonPath := fmt.Sprintf("$.\"%s\"", *l.LabelEqualsKey)
+			q = q.Where(sq.Expr("json_extract(labels, ?) = ?", jsonPath, *l.LabelEqualsValue))
+		}
 	}
 
 	if l.OrderByFieldVal != nil {

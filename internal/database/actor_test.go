@@ -22,7 +22,7 @@ func TestActor(t *testing.T) {
 	clk := clock.NewFakeClock(now)
 
 	setup := func(t *testing.T) {
-		_, db = MustApplyBlankTestDbConfig(t.Name(), nil)
+		_, db = MustApplyBlankTestDbConfig(t, nil)
 		ctx = apctx.NewBuilderBackground().WithClock(clk).Build()
 	}
 
@@ -742,7 +742,7 @@ func TestActor(t *testing.T) {
 		})
 
 		t.Run("Filtering", func(t *testing.T) {
-			_, db, _ := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+			_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
 			now := time.Date(2023, 10, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 

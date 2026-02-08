@@ -55,7 +55,7 @@ func TestConnections(t *testing.T) {
 				},
 			},
 		})
-		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 		cfg, rds := apredis.MustApplyTestConfig(cfg)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
 		h := httpf2.CreateFactory(cfg, rds, aplog.NewNoopLogger())

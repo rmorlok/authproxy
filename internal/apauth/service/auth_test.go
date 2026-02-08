@@ -41,7 +41,7 @@ type route struct {
 }
 
 type TestGinServerBuilder struct {
-	testName                          string
+	t                                 testing.TB
 	pingCounter                       int
 	service                           sconfig.ServiceId
 	cfg                               config.C
@@ -56,8 +56,8 @@ type TestGinServerBuilder struct {
 	defaultValidators                 []AuthValidator
 }
 
-func NewTestGinServerBuilder(testName string) *TestGinServerBuilder {
-	return &TestGinServerBuilder{testName: testName}
+func NewTestGinServerBuilder(t testing.TB) *TestGinServerBuilder {
+	return &TestGinServerBuilder{t: t}
 }
 
 func (b *TestGinServerBuilder) WithDefaultValidator(v AuthValidator) *TestGinServerBuilder {
@@ -203,7 +203,7 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 	}
 
 	if b.db == nil {
-		b.cfg, b.db = database.MustApplyBlankTestDbConfig(b.testName, b.cfg)
+		b.cfg, b.db = database.MustApplyBlankTestDbConfig(b.t, b.cfg)
 	}
 
 	if b.r == nil {
@@ -457,7 +457,7 @@ func TestAuth(t *testing.T) {
 	ctx := context.Background()
 	t.Run("unauthenticated", func(t *testing.T) {
 		t.Run("open route", func(t *testing.T) {
-			ts := NewTestGinServerBuilder(t.Name()).
+			ts := NewTestGinServerBuilder(t).
 				WithGetPingOpenRoute("/ping").
 				Build()
 
@@ -467,7 +467,7 @@ func TestAuth(t *testing.T) {
 			require.Equal(t, 1, ts.GetPingCount())
 		})
 		t.Run("optional auth route", func(t *testing.T) {
-			ts := NewTestGinServerBuilder(t.Name()).
+			ts := NewTestGinServerBuilder(t).
 				WithGetPingOptionalAuthRoute("/ping").
 				Build()
 
@@ -477,7 +477,7 @@ func TestAuth(t *testing.T) {
 			require.Equal(t, 1, ts.GetPingCount())
 		})
 		t.Run("optional xsrf not required auth route", func(t *testing.T) {
-			ts := NewTestGinServerBuilder(t.Name()).
+			ts := NewTestGinServerBuilder(t).
 				WithGetPingOptionalXsrfNotRequiredAuthRoute("/ping").
 				Build()
 
@@ -487,7 +487,7 @@ func TestAuth(t *testing.T) {
 			require.Equal(t, 1, ts.GetPingCount())
 		})
 		t.Run("required auth route", func(t *testing.T) {
-			ts := NewTestGinServerBuilder(t.Name()).
+			ts := NewTestGinServerBuilder(t).
 				WithGetPingRequiredAuthRoute("/ping").
 				Build()
 
@@ -500,7 +500,7 @@ func TestAuth(t *testing.T) {
 	t.Run("jwt query param auth", func(t *testing.T) {
 		t.Run("normal actor", func(t *testing.T) {
 			t.Run("open route", func(t *testing.T) {
-				ts := NewTestGinServerBuilder(t.Name()).
+				ts := NewTestGinServerBuilder(t).
 					WithGetPingOpenRoute("/ping").
 					Build()
 
@@ -516,7 +516,7 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, 1, ts.GetPingCount())
 			})
 			t.Run("optional auth route", func(t *testing.T) {
-				ts := NewTestGinServerBuilder(t.Name()).
+				ts := NewTestGinServerBuilder(t).
 					WithGetPingOptionalAuthRoute("/ping").
 					Build()
 
@@ -533,7 +533,7 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, 1, ts.GetPingCount())
 			})
 			t.Run("optional auth route with default validator", func(t *testing.T) {
-				ts := NewTestGinServerBuilder(t.Name()).
+				ts := NewTestGinServerBuilder(t).
 					WithGetPingOptionalAuthRoute("/ping").
 					WithDefaultValidator(actorIsBobDole).
 					Build()
@@ -563,7 +563,7 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, 1, ts.GetPingCount()) // Not incremented
 			})
 			t.Run("optional auth route with validator", func(t *testing.T) {
-				ts := NewTestGinServerBuilder(t.Name()).
+				ts := NewTestGinServerBuilder(t).
 					WithGetPingOptionalAuthRoute("/ping", actorIsBobDole).
 					Build()
 
@@ -592,7 +592,7 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, 1, ts.GetPingCount()) // Not incremented
 			})
 			t.Run("required auth route", func(t *testing.T) {
-				ts := NewTestGinServerBuilder(t.Name()).
+				ts := NewTestGinServerBuilder(t).
 					WithGetPingRequiredAuthRoute("/ping").
 					Build()
 
@@ -608,7 +608,7 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, 1, ts.GetPingCount())
 			})
 			t.Run("required auth route with default validator", func(t *testing.T) {
-				ts := NewTestGinServerBuilder(t.Name()).
+				ts := NewTestGinServerBuilder(t).
 					WithGetPingRequiredAuthRoute("/ping").
 					WithDefaultValidator(actorIsBobDole).
 					Build()
@@ -638,7 +638,7 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, 1, ts.GetPingCount()) // Not incremented
 			})
 			t.Run("required auth route with validator", func(t *testing.T) {
-				ts := NewTestGinServerBuilder(t.Name()).
+				ts := NewTestGinServerBuilder(t).
 					WithGetPingRequiredAuthRoute("/ping", actorIsBobDole).
 					Build()
 
@@ -669,7 +669,7 @@ func TestAuth(t *testing.T) {
 		})
 		t.Run("admin actor", func(t *testing.T) {
 			t.Run("open route", func(t *testing.T) {
-				ts := NewTestGinServerBuilder(t.Name()).
+				ts := NewTestGinServerBuilder(t).
 					WithGetPingOpenRoute("/ping").
 					Build()
 
@@ -685,7 +685,7 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, 1, ts.GetPingCount())
 			})
 			t.Run("optional auth route", func(t *testing.T) {
-				ts := NewTestGinServerBuilder(t.Name()).
+				ts := NewTestGinServerBuilder(t).
 					WithGetPingOptionalAuthRoute("/ping").
 					Build()
 
@@ -702,7 +702,7 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, 1, ts.GetPingCount())
 			})
 			t.Run("required auth route", func(t *testing.T) {
-				ts := NewTestGinServerBuilder(t.Name()).
+				ts := NewTestGinServerBuilder(t).
 					WithGetPingRequiredAuthRoute("/ping").
 					Build()
 
@@ -718,7 +718,7 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, 1, ts.GetPingCount())
 			})
 			t.Run("required auth route invalid admin", func(t *testing.T) {
-				ts := NewTestGinServerBuilder(t.Name()).
+				ts := NewTestGinServerBuilder(t).
 					WithGetPingRequiredAuthRoute("/ping").
 					Build()
 
@@ -733,7 +733,7 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, 0, ts.GetPingCount())
 			})
 			t.Run("required auth route uninitialized admin", func(t *testing.T) {
-				ts := NewTestGinServerBuilder(t.Name()).
+				ts := NewTestGinServerBuilder(t).
 					WithGetPingRequiredAuthRoute("/ping").
 					Build()
 
@@ -753,7 +753,7 @@ func TestAuth(t *testing.T) {
 	})
 	t.Run("jwt header auth", func(t *testing.T) {
 		t.Run("open route", func(t *testing.T) {
-			ts := NewTestGinServerBuilder(t.Name()).
+			ts := NewTestGinServerBuilder(t).
 				WithGetPingOpenRoute("/ping").
 				Build()
 
@@ -769,7 +769,7 @@ func TestAuth(t *testing.T) {
 			require.Equal(t, 1, ts.GetPingCount())
 		})
 		t.Run("optional auth route", func(t *testing.T) {
-			ts := NewTestGinServerBuilder(t.Name()).
+			ts := NewTestGinServerBuilder(t).
 				WithGetPingOptionalAuthRoute("/ping").
 				Build()
 
@@ -786,7 +786,7 @@ func TestAuth(t *testing.T) {
 			require.Equal(t, 1, ts.GetPingCount())
 		})
 		t.Run("optional xsrf not required auth route", func(t *testing.T) {
-			ts := NewTestGinServerBuilder(t.Name()).
+			ts := NewTestGinServerBuilder(t).
 				WithGetPingOptionalXsrfNotRequiredAuthRoute("/ping").
 				Build()
 
@@ -803,7 +803,7 @@ func TestAuth(t *testing.T) {
 			require.Equal(t, 1, ts.GetPingCount())
 		})
 		t.Run("required auth route", func(t *testing.T) {
-			ts := NewTestGinServerBuilder(t.Name()).
+			ts := NewTestGinServerBuilder(t).
 				WithGetPingRequiredAuthRoute("/ping").
 				Build()
 
@@ -822,7 +822,7 @@ func TestAuth(t *testing.T) {
 	t.Run("invalid jwt", func(t *testing.T) {
 		t.Run("invalid audience", func(t *testing.T) {
 			t.Run("open route", func(t *testing.T) {
-				ts := NewTestGinServerBuilder(t.Name()).
+				ts := NewTestGinServerBuilder(t).
 					WithGetPingOpenRoute("/ping").
 					Build()
 
@@ -837,7 +837,7 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, 1, ts.GetPingCount())
 			})
 			t.Run("optional auth route", func(t *testing.T) {
-				ts := NewTestGinServerBuilder(t.Name()).
+				ts := NewTestGinServerBuilder(t).
 					WithGetPingOptionalAuthRoute("/ping").
 					Build()
 
@@ -853,7 +853,7 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, 0, ts.GetPingCount())
 			})
 			t.Run("optional xsrf not required auth route", func(t *testing.T) {
-				ts := NewTestGinServerBuilder(t.Name()).
+				ts := NewTestGinServerBuilder(t).
 					WithGetPingOptionalXsrfNotRequiredAuthRoute("/ping").
 					Build()
 
@@ -869,7 +869,7 @@ func TestAuth(t *testing.T) {
 				require.Equal(t, 0, ts.GetPingCount())
 			})
 			t.Run("required auth route", func(t *testing.T) {
-				ts := NewTestGinServerBuilder(t.Name()).
+				ts := NewTestGinServerBuilder(t).
 					WithGetPingRequiredAuthRoute("/ping").
 					Build()
 
@@ -887,7 +887,7 @@ func TestAuth(t *testing.T) {
 	})
 	t.Run("session", func(t *testing.T) {
 		setup := func(t *testing.T) TestSetup {
-			return NewTestGinServerBuilder(t.Name()).
+			return NewTestGinServerBuilder(t).
 				WithRequiredAuthRoute(http.MethodGet, "/initiate-session", func(gctx *gin.Context, auth A) {
 					ra := GetAuthFromGinContext(gctx)
 					err := auth.EstablishGinSession(gctx, ra)
@@ -1003,7 +1003,7 @@ func TestAuth(t *testing.T) {
 	})
 	t.Run("session initiate via post", func(t *testing.T) {
 		setup := func(t *testing.T) TestSetup {
-			return NewTestGinServerBuilder(t.Name()).
+			return NewTestGinServerBuilder(t).
 				WithOptionalXsrfNotRequiredAuthRoute(http.MethodPost, "/initiate-session", func(gctx *gin.Context, auth A) {
 					ra := GetAuthFromGinContext(gctx)
 					if ra.IsAuthenticated() {

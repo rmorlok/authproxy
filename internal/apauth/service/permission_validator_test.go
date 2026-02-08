@@ -542,7 +542,7 @@ func TestValidatorOnRoutes(t *testing.T) {
 			},
 		})
 
-		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 		cfg, auth, authUtil := TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
 
 		r := gin.New() // No recovery middleware to allow panics through

@@ -55,7 +55,7 @@ func TestOAuth2Token_IsAccessTokenExpired(t *testing.T) {
 
 func TestOAuth2Tokens(t *testing.T) {
 	t.Run("round trip", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -87,7 +87,7 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.Equal(t, "encryptedAccessToken", tok2.EncryptedAccessToken)
 	})
 	t.Run("no tokens", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -110,7 +110,7 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.Nil(t, tok)
 	})
 	t.Run("replaces previous when tagging previous", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -159,7 +159,7 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.Equal(t, "encryptedAccessToken2", tok2.EncryptedAccessToken)
 	})
 	t.Run("replaces previous when not tagging previous", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -208,7 +208,7 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.Equal(t, "encryptedAccessToken2", tok2.EncryptedAccessToken)
 	})
 	t.Run("delete token", func(t *testing.T) {
-		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -257,7 +257,7 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.NotNil(t, tok4)
 	})
 	t.Run("delete all tokens for connection", func(t *testing.T) {
-		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -513,7 +513,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 
 		for _, tc := range testCases {
 			t.Run(tc.name, func(t *testing.T) {
-				_, db := MustApplyBlankTestDbConfig("enumerate_tokens_test", nil)
+				_, db := MustApplyBlankTestDbConfig(t, nil)
 				err := db.Migrate(ctx)
 				require.NoError(t, err)
 

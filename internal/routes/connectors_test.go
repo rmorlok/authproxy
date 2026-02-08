@@ -66,7 +66,7 @@ func TestConnectors(t *testing.T) {
 
 		ctrl := gomock.NewController(t)
 		ac := asynqmock.NewMockClient(ctrl)
-		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
 		rs := mock.NewMockClient(ctrl)

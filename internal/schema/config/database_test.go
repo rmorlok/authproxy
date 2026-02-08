@@ -1,9 +1,9 @@
 package config
 
 import (
-	"github.com/rmorlok/authproxy/internal/schema/common"
-	"github.com/stretchr/testify/require"
 	"testing"
+
+	"github.com/stretchr/testify/require"
 )
 
 func TestDatabase(t *testing.T) {
@@ -22,17 +22,32 @@ func TestDatabase(t *testing.T) {
 				Path:     "./some/path.db",
 			}, db)
 		})
-	})
-
-	t.Run("yaml gen", func(t *testing.T) {
-		t.Run("oauth2", func(t *testing.T) {
-			data := &DatabaseSqlite{
-				Provider: DatabaseProviderSqlite,
-				Path:     "./some/path.db",
-			}
-			assert.Equal(`provider: sqlite
-path: ./some/path.db
-`, common.MustMarshalToYamlString(data))
+		t.Run("postgres", func(t *testing.T) {
+			data := `
+      provider: postgres
+      host: localhost
+      port: 5432
+      user: test
+      password: secret
+      database: authproxy
+      sslmode: disable
+      params:
+        application_name: authproxy-tests
+`
+			db, err := UnmarshallYamlDatabaseString(data)
+			assert.NoError(err)
+			assert.Equal(&DatabasePostgres{
+				Provider: DatabaseProviderPostgres,
+				Host:     "localhost",
+				Port:     5432,
+				User:     "test",
+				Password: "secret",
+				Database: "authproxy",
+				SSLMode:  "disable",
+				Params: map[string]string{
+					"application_name": "authproxy-tests",
+				},
+			}, db)
 		})
 	})
 }

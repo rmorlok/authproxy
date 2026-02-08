@@ -21,7 +21,7 @@ func TestService(t *testing.T) {
 				GlobalAESKey: nil,
 			},
 		})
-		_, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+		_, db := database.MustApplyBlankTestDbConfig(t, cfg)
 		s := NewEncryptService(nil, db)
 		_, err := s.EncryptGlobal(context.Background(), someBytes)
 		require.Error(t, err)
@@ -35,7 +35,7 @@ func TestService(t *testing.T) {
 				},
 			},
 		})
-		_, db = database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+		_, db = database.MustApplyBlankTestDbConfig(t, cfg)
 		s = NewEncryptService(cfg, db)
 		_, err = s.EncryptGlobal(context.Background(), someBytes)
 		require.Error(t, err)
@@ -46,7 +46,7 @@ func TestService(t *testing.T) {
 			GlobalAESKey: sconfig.NewKeyDataRandomBytes(),
 		},
 	})
-	cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+	cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 	s := NewEncryptService(cfg, db)
 
 	connection := database.Connection{

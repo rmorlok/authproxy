@@ -35,7 +35,7 @@ func TestFakeService(t *testing.T) {
 					FakeEncryptionSkipBase64: !doBase64,
 				},
 			})
-			cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+			cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 			s := NewEncryptService(cfg, db)
 
 			connection := database.Connection{
