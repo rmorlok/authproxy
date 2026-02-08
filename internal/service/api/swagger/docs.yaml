@@ -210,6 +210,18 @@ definitions:
         description: Last update timestamp
         type: string
     type: object
+  routes.SwaggerConnectionLabelJson:
+    description: Connection label key-value pair
+    properties:
+      key:
+        description: Label key
+        example: env
+        type: string
+      value:
+        description: Label value
+        example: production
+        type: string
+    type: object
   routes.SwaggerConnectorJson:
     description: Connector definition for external service integration
     properties:
@@ -396,6 +408,14 @@ definitions:
         description: Last update timestamp
         type: string
     type: object
+  routes.SwaggerPutConnectionLabelRequest:
+    description: Request to set a label value
+    properties:
+      value:
+        description: Label value
+        example: production
+        type: string
+    type: object
   routes.SwaggerRequestLogEntry:
     description: HTTP request log entry
     properties:
@@ -450,6 +470,15 @@ definitions:
         description: Request type (proxy, oauth, probe)
         example: proxy
         type: string
+    type: object
+  routes.SwaggerUpdateConnectionRequest:
+    description: Request to update a connection's labels
+    properties:
+      labels:
+        additionalProperties:
+          type: string
+        description: Labels to set on the connection (replaces all existing labels)
+        type: object
     type: object
   routes.TaskInfoJson:
     properties:
@@ -1156,6 +1185,54 @@ paths:
       summary: Get connection
       tags:
       - connections
+    patch:
+      consumes:
+      - application/json
+      description: Update a connection's labels
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Connection update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.SwaggerUpdateConnectionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerConnectionJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update connection
+      tags:
+      - connections
   /connections/{id}/_disconnect:
     post:
       consumes:
@@ -1294,6 +1371,185 @@ paths:
       summary: Proxy request through connection
       tags:
       - proxy
+  /connections/{id}/labels:
+    get:
+      consumes:
+      - application/json
+      description: Get all labels associated with a specific connection
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all labels for a connection
+      tags:
+      - connections
+  /connections/{id}/labels/{label}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific label by key from a connection
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a label from a connection
+      tags:
+      - connections
+    get:
+      consumes:
+      - application/json
+      description: Get a specific label value by key for a connection
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerConnectionLabelJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a specific label for a connection
+      tags:
+      - connections
+    put:
+      consumes:
+      - application/json
+      description: Set or update a specific label value by key for a connection
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      - description: Label value
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.SwaggerPutConnectionLabelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerConnectionLabelJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set a label for a connection
+      tags:
+      - connections
   /connectors:
     get:
       consumes:

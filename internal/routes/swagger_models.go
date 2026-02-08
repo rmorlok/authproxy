@@ -261,3 +261,29 @@ type SwaggerForceStateRequest struct {
 	// Target state (pending, connected, disconnecting, disconnected, error)
 	State string `json:"state" example:"connected"`
 }
+
+// SwaggerUpdateConnectionRequest is the request to update a connection
+//
+//	@Description	Request to update a connection's labels
+type SwaggerUpdateConnectionRequest struct {
+	// Labels to set on the connection (replaces all existing labels)
+	Labels map[string]string `json:"labels,omitempty"`
+}
+
+// SwaggerPutConnectionLabelRequest is the request to set a single label on a connection
+//
+//	@Description	Request to set a label value
+type SwaggerPutConnectionLabelRequest struct {
+	// Label value
+	Value string `json:"value" example:"production"`
+}
+
+// SwaggerConnectionLabelJson is a single label key-value pair
+//
+//	@Description	Connection label key-value pair
+type SwaggerConnectionLabelJson struct {
+	// Label key
+	Key string `json:"key" example:"env"`
+	// Label value
+	Value string `json:"value" example:"production"`
+}

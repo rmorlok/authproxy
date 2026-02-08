@@ -517,6 +517,575 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, ConnectionToJson(c))
 }
 
+type UpdateConnectionRequestJson struct {
+	Labels map[string]string `json:"labels"`
+}
+
+type PutConnectionLabelRequestJson struct {
+	Value string `json:"value"`
+}
+
+type ConnectionLabelJson struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+// @Summary		Update connection
+// @Description	Update a connection's labels
+// @Tags			connections
+// @Accept			json
+// @Produce		json
+// @Param			id		path		string							true	"Connection UUID"
+// @Param			request	body		SwaggerUpdateConnectionRequest	true	"Connection update request"
+// @Success		200		{object}	SwaggerConnectionJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id} [patch]
+func (r *ConnectionsRoutes) update(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := uuid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	var req UpdateConnectionRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid request body").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if req.Labels != nil {
+		if err := database.Labels(req.Labels).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid labels: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
+	c, err := r.core.GetConnection(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("connection not found").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if req.Labels != nil {
+		_, err = r.db.UpdateConnectionLabels(ctx, id, req.Labels)
+		if err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusInternalServerError().
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		// Re-fetch connection to get updated state with connector info
+		c, err = r.core.GetConnection(ctx, id)
+		if err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusInternalServerError().
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
+	gctx.PureJSON(http.StatusOK, ConnectionToJson(c))
+}
+
+// @Summary		Get all labels for a connection
+// @Description	Get all labels associated with a specific connection
+// @Tags			connections
+// @Accept			json
+// @Produce		json
+// @Param			id	path		string	true	"Connection UUID"
+// @Success		200	{object}	map[string]string
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		404	{object}	ErrorResponse
+// @Failure		500	{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/labels [get]
+func (r *ConnectionsRoutes) getLabels(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := uuid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	c, err := r.core.GetConnection(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("connection not found").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if c == nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsg("connection not found").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	labels := c.GetLabels()
+	if labels == nil {
+		labels = make(map[string]string)
+	}
+
+	gctx.PureJSON(http.StatusOK, labels)
+}
+
+// @Summary		Get a specific label for a connection
+// @Description	Get a specific label value by key for a connection
+// @Tags			connections
+// @Accept			json
+// @Produce		json
+// @Param			id		path		string	true	"Connection UUID"
+// @Param			label	path		string	true	"Label key"
+// @Success		200		{object}	SwaggerConnectionLabelJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/labels/{label} [get]
+func (r *ConnectionsRoutes) getLabel(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := uuid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	labelKey := gctx.Param("label")
+	if labelKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("label key is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	c, err := r.core.GetConnection(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("connection not found").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if c == nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsg("connection not found").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	labels := c.GetLabels()
+	value, exists := labels[labelKey]
+	if !exists {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsgf("label '%s' not found", labelKey).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, ConnectionLabelJson{
+		Key:   labelKey,
+		Value: value,
+	})
+}
+
+// @Summary		Set a label for a connection
+// @Description	Set or update a specific label value by key for a connection
+// @Tags			connections
+// @Accept			json
+// @Produce		json
+// @Param			id		path		string								true	"Connection UUID"
+// @Param			label	path		string								true	"Label key"
+// @Param			request	body		SwaggerPutConnectionLabelRequest	true	"Label value"
+// @Success		200		{object}	SwaggerConnectionLabelJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/labels/{label} [put]
+func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := uuid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	labelKey := gctx.Param("label")
+	if labelKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("label key is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if err := database.ValidateLabelKey(labelKey); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid label key: %s", err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	var req PutConnectionLabelRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid request body").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if err := database.ValidateLabelValue(req.Value); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid label value: %s", err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	c, err := r.core.GetConnection(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("connection not found").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if c == nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsg("connection not found").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	updatedConn, err := r.db.PutConnectionLabels(ctx, id, map[string]string{labelKey: req.Value})
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("connection not found").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, ConnectionLabelJson{
+		Key:   labelKey,
+		Value: updatedConn.Labels[labelKey],
+	})
+}
+
+// @Summary		Delete a label from a connection
+// @Description	Delete a specific label by key from a connection
+// @Tags			connections
+// @Accept			json
+// @Produce		json
+// @Param			id		path	string	true	"Connection UUID"
+// @Param			label	path	string	true	"Label key"
+// @Success		204		"No Content"
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/labels/{label} [delete]
+func (r *ConnectionsRoutes) deleteLabel(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := uuid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	labelKey := gctx.Param("label")
+	if labelKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("label key is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	c, err := r.core.GetConnection(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			gctx.Status(http.StatusNoContent)
+			val.MarkValidated()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if c == nil {
+		gctx.Status(http.StatusNoContent)
+		val.MarkValidated()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	_, err = r.db.DeleteConnectionLabels(ctx, id, []string{labelKey})
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			gctx.Status(http.StatusNoContent)
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.Status(http.StatusNoContent)
+}
+
 func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 	g.POST(
 		"/connections/_initiate",
@@ -560,6 +1129,51 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 			ForIdField("id").
 			Build(),
 		r.forceState,
+	)
+	g.PATCH(
+		"/connections/:id",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("update").
+			ForIdField("id").
+			Build(),
+		r.update,
+	)
+	g.GET(
+		"/connections/:id/labels",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("get").
+			ForIdField("id").
+			Build(),
+		r.getLabels,
+	)
+	g.GET(
+		"/connections/:id/labels/:label",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("get").
+			ForIdField("id").
+			Build(),
+		r.getLabel,
+	)
+	g.PUT(
+		"/connections/:id/labels/:label",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("update").
+			ForIdField("id").
+			Build(),
+		r.putLabel,
+	)
+	g.DELETE(
+		"/connections/:id/labels/:label",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("update").
+			ForIdField("id").
+			Build(),
+		r.deleteLabel,
 	)
 }
 
