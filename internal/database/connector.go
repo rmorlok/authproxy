@@ -7,6 +7,7 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -194,14 +195,18 @@ func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageRe
     `, ConnectorVersionsTable)
 
 	// Compute the aggregate state for the connector across all versions
+	aggregateStatesExpr := "json_group_array(distinct state)"
+	if l.s.cfg.GetProvider() == sconfig.DatabaseProviderPostgres {
+		aggregateStatesExpr = "json_agg(distinct state)"
+	}
 	connectorVersionCountsCTE := fmt.Sprintf(`
         SELECT
             id,
-            json_group_array(distinct state) as states,
+            %s as states,
             count(*) as versions
         FROM %s
         GROUP BY id
-    `, ConnectorVersionsTable)
+    `, aggregateStatesExpr, ConnectorVersionsTable)
 
 	q := l.s.sq.Select(`
 rr.id as id,

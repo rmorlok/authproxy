@@ -404,7 +404,7 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 			Select(existingActor.cols()...).
 			From(ActorTable).
 			Where(lookupCond).
-			RunWith(s.db).
+			RunWith(tx).
 			QueryRow().
 			Scan(existingActor.fields()...)
 		if err != nil {

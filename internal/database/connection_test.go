@@ -435,7 +435,7 @@ func TestConnections(t *testing.T) {
 	})
 
 	t.Run("put connection labels", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig("put_connection_labels", nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -487,7 +487,7 @@ func TestConnections(t *testing.T) {
 	})
 
 	t.Run("delete connection labels", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig("delete_connection_labels", nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -540,7 +540,7 @@ func TestConnections(t *testing.T) {
 	})
 
 	t.Run("update connection labels", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig("update_connection_labels", nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 

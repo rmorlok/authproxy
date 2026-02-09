@@ -14,6 +14,7 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
+	"github.com/joho/godotenv"
 	"github.com/peterldowns/pgtestdb"
 	"github.com/peterldowns/pgtestdb/migrators/golangmigrator"
 	"github.com/rmorlok/authproxy/internal/config"
@@ -51,6 +52,10 @@ func MustApplyBlankTestDbConfig(t testing.TB, cfg config.C) (config.C, DB) {
 
 func MustApplyBlankTestDbConfigRaw(t testing.TB, cfg config.C) (config.C, DB, *sql.DB) {
 	t.Helper()
+
+	// Optionally load the dotenv file as to force tests into postgres using environment variables while debugging
+	_ = godotenv.Load()
+	
 	if cfg == nil {
 		cfg = config.FromRoot(&sconfig.Root{})
 	}
