@@ -134,30 +134,34 @@ func (s LabelSelector) String() string {
 }
 
 func (s LabelSelector) ApplyToSqlBuilderWithProvider(q sq.SelectBuilder, labelsColumn string, provider config.DatabaseProvider) sq.SelectBuilder {
+	labelsExpr := labelsColumn
+	if provider == config.DatabaseProviderPostgres {
+		labelsExpr = fmt.Sprintf("NULLIF(%s, '')::jsonb", labelsColumn)
+	}
 	for _, r := range s {
 		switch r.Operator {
 		case LabelOperatorEqual:
 			if provider == config.DatabaseProviderPostgres {
-				q = q.Where(sq.Expr(fmt.Sprintf("(%s::jsonb ->> ?) = ?", labelsColumn), r.Key, r.Value))
+				q = q.Where(sq.Expr(fmt.Sprintf("(%s ->> ?) = ?", labelsExpr), r.Key, r.Value))
 			} else {
 				q = q.Where(sq.Expr(fmt.Sprintf("json_extract(%s, '$.' || ?) = ?", labelsColumn), r.Key, r.Value))
 			}
 		case LabelOperatorNotEqual:
 			// For inequality, we need to handle the case where the key doesn't exist
 			if provider == config.DatabaseProviderPostgres {
-				q = q.Where(sq.Expr(fmt.Sprintf("((%s::jsonb ? ?) IS FALSE OR (%s::jsonb ->> ?) != ?)", labelsColumn, labelsColumn), r.Key, r.Key, r.Value))
+				q = q.Where(sq.Expr(fmt.Sprintf("(NOT jsonb_exists(%s, ?) OR (%s ->> ?) != ?)", labelsExpr, labelsExpr), r.Key, r.Key, r.Value))
 			} else {
 				q = q.Where(sq.Expr(fmt.Sprintf("(json_extract(%s, '$.' || ?) IS NULL OR json_extract(%s, '$.' || ?) != ?)", labelsColumn, labelsColumn), r.Key, r.Key, r.Value))
 			}
 		case LabelOperatorExists:
 			if provider == config.DatabaseProviderPostgres {
-				q = q.Where(sq.Expr(fmt.Sprintf("(%s::jsonb ? ?)", labelsColumn), r.Key))
+				q = q.Where(sq.Expr(fmt.Sprintf("jsonb_exists(%s, ?)", labelsExpr), r.Key))
 			} else {
 				q = q.Where(sq.Expr(fmt.Sprintf("json_extract(%s, '$.' || ?) IS NOT NULL", labelsColumn), r.Key))
 			}
 		case LabelOperatorNotExists:
 			if provider == config.DatabaseProviderPostgres {
-				q = q.Where(sq.Expr(fmt.Sprintf("NOT (%s::jsonb ? ?)", labelsColumn), r.Key))
+				q = q.Where(sq.Expr(fmt.Sprintf("NOT jsonb_exists(%s, ?)", labelsExpr), r.Key))
 			} else {
 				q = q.Where(sq.Expr(fmt.Sprintf("json_extract(%s, '$.' || ?) IS NULL", labelsColumn), r.Key))
 			}

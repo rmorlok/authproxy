@@ -3,6 +3,7 @@ package routes
 import (
 	"encoding/json"
 	"errors"
+	"github.com/rmorlok/authproxy/internal/api_common"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -37,7 +38,7 @@ func TestRequestLogRoutes(t *testing.T) {
 		rlr := mock.NewMockLogRetriever(ctrl)
 		rl := NewRequestLogRoutes(cfg, auth, rlr)
 
-		r := gin.New()
+		r := api_common.GinForTest(nil)
 		rl.Register(r)
 
 		return &TestSetup{

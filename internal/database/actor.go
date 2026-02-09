@@ -15,7 +15,6 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
-	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -536,8 +535,6 @@ type ListActorsBuilder interface {
 	ForExternalId(externalId string) ListActorsBuilder
 	ForNamespaceMatcher(matcher string) ListActorsBuilder
 	ForNamespaceMatchers(matchers []string) ListActorsBuilder
-	ForLabelExists(key string) ListActorsBuilder
-	ForLabelEquals(key, value string) ListActorsBuilder
 	Limit(int32) ListActorsBuilder
 	OrderBy(ActorOrderByField, pagination.OrderBy) ListActorsBuilder
 	IncludeDeleted() ListActorsBuilder
@@ -553,9 +550,6 @@ type listActorsFilters struct {
 	IncludeDeletedVal bool                `json:"include_deleted,omitempty"`
 	ExternalIdVal     *string             `json:"external_id,omitempty"`
 	NamespaceMatchers []string            `json:"namespace_matchers,omitempty"`
-	LabelExistsKey    *string             `json:"label_exists_key,omitempty"`
-	LabelEqualsKey    *string             `json:"label_equals_key,omitempty"`
-	LabelEqualsValue  *string             `json:"label_equals_value,omitempty"`
 	LabelSelectorVal  *string             `json:"label_selector,omitempty"`
 	Errors            *multierror.Error   `json:"-"`
 }
@@ -611,26 +605,6 @@ func (l *listActorsFilters) ForLabelSelector(selector string) ListActorsBuilder 
 	return l
 }
 
-func (l *listActorsFilters) ForLabelExists(key string) ListActorsBuilder {
-	if err := ValidateLabelKey(key); err != nil {
-		return l.addError(err)
-	}
-	l.LabelExistsKey = &key
-	return l
-}
-
-func (l *listActorsFilters) ForLabelEquals(key, value string) ListActorsBuilder {
-	if err := ValidateLabelKey(key); err != nil {
-		return l.addError(err)
-	}
-	if err := ValidateLabelValue(value); err != nil {
-		return l.addError(err)
-	}
-	l.LabelEqualsKey = &key
-	l.LabelEqualsValue = &value
-	return l
-}
-
 func (l *listActorsFilters) FromCursor(ctx context.Context, cursor string) (ListActorsExecutor, error) {
 	s := l.s
 	parsed, err := pagination.ParseCursor[listActorsFilters](ctx, s.secretKey, cursor)
@@ -672,29 +646,6 @@ func (l *listActorsFilters) applyRestrictions(ctx context.Context) sq.SelectBuil
 
 	if len(l.NamespaceMatchers) > 0 {
 		q = restrictToNamespaceMatchers(q, "namespace", l.NamespaceMatchers)
-	}
-
-	// Filter by label existence (key exists in labels JSON)
-	if l.LabelExistsKey != nil {
-		if l.s.cfg.GetProvider() == sconfig.DatabaseProviderPostgres {
-			q = q.Where(sq.Expr("(labels::jsonb ? ?)", *l.LabelExistsKey))
-		} else {
-			// Use json_extract to check if the key exists in the labels JSON
-			// Use bracket notation for keys with special characters like slashes and dots
-			jsonPath := fmt.Sprintf("$.\"%s\"", *l.LabelExistsKey)
-			q = q.Where(sq.Expr("json_extract(labels, ?) IS NOT NULL", jsonPath))
-		}
-	}
-
-	// Filter by label key-value equality
-	if l.LabelEqualsKey != nil && l.LabelEqualsValue != nil {
-		if l.s.cfg.GetProvider() == sconfig.DatabaseProviderPostgres {
-			q = q.Where(sq.Expr("(labels::jsonb ->> ?) = ?", *l.LabelEqualsKey, *l.LabelEqualsValue))
-		} else {
-			// Use bracket notation for keys with special characters like slashes and dots
-			jsonPath := fmt.Sprintf("$.\"%s\"", *l.LabelEqualsKey)
-			q = q.Where(sq.Expr("json_extract(labels, ?) = ?", jsonPath, *l.LabelEqualsValue))
-		}
 	}
 
 	if l.OrderByFieldVal != nil {

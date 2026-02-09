@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/rmorlok/authproxy/internal/api_common"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -47,7 +48,7 @@ func TestTasks(t *testing.T) {
 
 		tr := NewTaskRoutes(cfg, auth, e, mockInspector)
 
-		r := gin.New()
+		r := api_common.GinForTest(nil)
 		tr.Register(r)
 
 		return &TestSetup{

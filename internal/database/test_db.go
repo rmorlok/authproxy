@@ -55,7 +55,7 @@ func MustApplyBlankTestDbConfigRaw(t testing.TB, cfg config.C) (config.C, DB, *s
 
 	// Optionally load the dotenv file as to force tests into postgres using environment variables while debugging
 	_ = godotenv.Load()
-	
+
 	if cfg == nil {
 		cfg = config.FromRoot(&sconfig.Root{})
 	}
@@ -146,7 +146,7 @@ func mustApplyBlankPostgresTestDbConfig(t testing.TB, cfg config.C) (config.C, D
 	root := cfg.GetRoot()
 
 	postgresTestLimiter <- struct{}{}
-	t.Cleanup(func() { <-postgresTestLimiter })
+	defer func() { <-postgresTestLimiter }()
 
 	adminConfig := pgtestdb.Config{
 		DriverName: "pgx",

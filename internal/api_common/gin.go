@@ -16,7 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
-func GinForService(service config.Service) *gin.Engine {
+func GinForService(service config.Service, logger *slog.Logger) *gin.Engine {
 	logFormatter := func(param gin.LogFormatterParams) string {
 		var statusColor, methodColor, resetColor string
 		if param.IsOutputColor() {
@@ -40,9 +40,58 @@ func GinForService(service config.Service) *gin.Engine {
 	}
 
 	engine := gin.New()
-	engine.Use(gin.LoggerWithFormatter(logFormatter), gin.Recovery())
+	engine.Use(gin.LoggerWithFormatter(logFormatter), gin.Recovery(), ErrorLoggingMiddleware(logger))
 
 	return engine
+}
+
+// GinForTest returns a gin engine configured for tests with error logging enabled.
+func GinForTest(logger *slog.Logger) *gin.Engine {
+	engine := gin.New()
+	engine.Use(gin.Recovery(), ErrorLoggingMiddleware(logger))
+	return engine
+}
+
+// ErrorLoggingMiddleware logs any request that results in a 500+ response.
+// It attempts to include any internal errors attached to the gin context.
+func ErrorLoggingMiddleware(logger *slog.Logger) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		c.Next()
+
+		status := c.Writer.Status()
+		if status < http.StatusInternalServerError {
+			return
+		}
+
+		if logger == nil {
+			if len(c.Errors) == 0 {
+				log.Printf("request failed with 5xx status=%d method=%s path=%s", status, c.Request.Method, c.Request.URL.Path)
+				return
+			}
+			for _, err := range c.Errors {
+				log.Printf("request failed with 5xx status=%d method=%s path=%s error=%v", status, c.Request.Method, c.Request.URL.Path, err.Err)
+			}
+			return
+		}
+
+		if len(c.Errors) == 0 {
+			logger.Error("request failed with 5xx",
+				"status", status,
+				"method", c.Request.Method,
+				"path", c.Request.URL.Path,
+			)
+			return
+		}
+
+		for _, err := range c.Errors {
+			logger.Error("request failed with 5xx",
+				"status", status,
+				"method", c.Request.Method,
+				"path", c.Request.URL.Path,
+				"error", err.Err,
+			)
+		}
+	}
 }
 
 // RunServer Runs a HTTP server and handles termination signals automatically.

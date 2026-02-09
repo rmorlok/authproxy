@@ -67,6 +67,7 @@ func (e *HttpStatusError) toErrorResponse(cfg Debuggable) *ErrorResponse {
 func (e *HttpStatusError) WriteGinResponse(cfg Debuggable, gctx *gin.Context) {
 	if e.InternalErr != nil {
 		AddGinDebugHeaderError(cfg, gctx, e.InternalErr)
+		_ = gctx.Error(e.InternalErr)
 	}
 
 	errorResponse := e.toErrorResponse(cfg)

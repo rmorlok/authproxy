@@ -1,11 +1,11 @@
 package routes
 
 import (
+	"github.com/rmorlok/authproxy/internal/api_common"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-
-	"github.com/gin-gonic/gin"
+	
 	"github.com/rmorlok/authproxy/internal/config"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/assert"
@@ -30,7 +30,7 @@ func TestErrorRoutes(t *testing.T) {
 	errorRoutes := NewErrorRoutes(cfg)
 
 	// Create a Gin router and register the routes
-	router := gin.New()
+	router := api_common.GinForTest(nil)
 	errorRoutes.Register(router)
 
 	t.Run("default error", func(t *testing.T) {

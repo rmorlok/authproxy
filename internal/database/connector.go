@@ -263,9 +263,15 @@ cvc.versions as total_versions
 		q = q.OrderBy(fmt.Sprintf("%s %s", *l.OrderByFieldVal, l.OrderByVal.String()))
 	}
 
+	sqlStr, sqlArgs, sqlErr := q.ToSql()
 	rows, err := q.RunWith(l.s.db).Query()
 
 	if err != nil {
+		if sqlErr == nil {
+			l.s.logger.Error("list connectors query failed", "sql", sqlStr, "args", sqlArgs, "error", err)
+		} else {
+			l.s.logger.Error("list connectors query failed", "error", err, "sql_error", sqlErr)
+		}
 		return pagination.PageResult[Connector]{Error: err}
 	}
 

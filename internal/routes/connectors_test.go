@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"github.com/rmorlok/authproxy/internal/api_common"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -76,7 +77,7 @@ func TestConnectors(t *testing.T) {
 
 		cr := NewConnectorsRoutes(cfg, auth, c)
 
-		r := gin.New()
+		r := api_common.GinForTest(nil)
 		cr.Register(r)
 
 		return &TestSetup{

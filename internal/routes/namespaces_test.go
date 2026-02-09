@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/rmorlok/authproxy/internal/api_common"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -55,7 +56,7 @@ func TestNamespaces(t *testing.T) {
 		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		assert.NoError(t, c.Migrate(ctx))
 		nr := NewNamespacesRoutes(cfg, auth, c)
-		r := gin.New()
+		r := api_common.GinForTest(nil)
 		nr.Register(r)
 
 		return &TestSetup{

@@ -55,7 +55,7 @@ func (s *service) hasNonceBeenUsed(ctx context.Context, tx sq.BaseRunner, nonce 
 		Where(sq.Or{
 			sq.Eq{"id": nonce},
 		}).
-		RunWith(s.db).
+		RunWith(tx).
 		QueryRow().
 		Scan(&count)
 	if err != nil {
