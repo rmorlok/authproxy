@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"log/slog"
+	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -24,6 +25,21 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+func displayNameExpr(cfg config.C) string {
+	if cfg.GetRoot().Database.GetProvider() == cfgschema.DatabaseProviderPostgres {
+		return "NULLIF(encrypted_definition, '')::jsonb ->> 'display_name'"
+	}
+	return "json_extract(encrypted_definition, '$.display_name')"
+}
+
+func withDisplayNameExpr(cfg config.C, query string) string {
+	return strings.ReplaceAll(query, "DISPLAY_NAME_EXPR", displayNameExpr(cfg))
+}
+
+func assertSqlWithDisplayName[T any](t *testing.T, rawDb *sql.DB, cfg config.C, query string, expected []T) {
+	test_utils.AssertSql[T](t, rawDb, withDisplayNameExpr(cfg, query), expected)
+}
 
 func TestMigration(t *testing.T) {
 	var cfg config.C
@@ -78,7 +94,7 @@ func TestMigration(t *testing.T) {
 				State   string
 			}
 
-			test_utils.AssertSql(t, rawDb, `
+			assertSqlWithDisplayName(t, rawDb, cfg, `
 			SELECT id, version, state FROM connector_versions;
 		`, []connectorResult{})
 		})
@@ -103,7 +119,7 @@ func TestMigration(t *testing.T) {
 					State   string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
+				assertSqlWithDisplayName(t, rawDb, cfg, `
 			SELECT id, version, state FROM connector_versions;
 		`, []connectorResult{
 					{
@@ -138,7 +154,7 @@ func TestMigration(t *testing.T) {
 					State   string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
+				assertSqlWithDisplayName(t, rawDb, cfg, `
 			SELECT id, version, state FROM connector_versions ORDER BY id;
 		`, []connectorResult{
 					{
@@ -178,7 +194,7 @@ func TestMigration(t *testing.T) {
 					State   string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
+				assertSqlWithDisplayName(t, rawDb, cfg, `
 			SELECT id, version, state FROM connector_versions ORDER BY id;
 		`, []connectorResult{
 					{
@@ -216,7 +232,7 @@ func TestMigration(t *testing.T) {
 					State   string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
+				assertSqlWithDisplayName(t, rawDb, cfg, `
 			SELECT id, version, state FROM connector_versions;
 		`, []connectorResult{
 					{
@@ -254,8 +270,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "00000000-0000-0000-0000-000000000001",
@@ -305,8 +321,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "00000000-0000-0000-0000-000000000001",
@@ -353,8 +369,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "00000000-0000-0000-0000-000000000001",
@@ -404,8 +420,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "00000000-0000-0000-0000-000000000001",
@@ -454,8 +470,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "00000000-0000-0000-0000-000000000001",
@@ -493,8 +509,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 
@@ -529,8 +545,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "00000000-0000-0000-0000-000000000001",
@@ -546,7 +562,7 @@ func TestMigration(t *testing.T) {
 			t.Run("single initial", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:   uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:     uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Labels: map[string]string{"type": "fake"},
 					},
 				})
@@ -561,7 +577,7 @@ func TestMigration(t *testing.T) {
 					State   string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
+				assertSqlWithDisplayName(t, rawDb, cfg, `
 			SELECT id, version, state FROM connector_versions;
 		`, []connectorResult{
 					{
@@ -575,11 +591,11 @@ func TestMigration(t *testing.T) {
 			t.Run("double initial same type", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:   uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:     uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Labels: map[string]string{"type": "fake"},
 					},
 					{
-						Id:   uuid.MustParse("00000000-0000-0000-0000-000000000002"),
+						Id:     uuid.MustParse("00000000-0000-0000-0000-000000000002"),
 						Labels: map[string]string{"type": "fake"},
 					},
 				})
@@ -594,7 +610,7 @@ func TestMigration(t *testing.T) {
 					State   string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
+				assertSqlWithDisplayName(t, rawDb, cfg, `
 			SELECT id, version, state FROM connector_versions ORDER BY id;
 		`, []connectorResult{
 					{
@@ -613,7 +629,7 @@ func TestMigration(t *testing.T) {
 			t.Run("unchanged from initial", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:   uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:     uuid.MustParse("00000000-0000-0000-0000-000000000001"),
 						Labels: map[string]string{"type": "fake"},
 					},
 				})
@@ -631,7 +647,7 @@ func TestMigration(t *testing.T) {
 					State   string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
+				assertSqlWithDisplayName(t, rawDb, cfg, `
 			SELECT id, version, state FROM connector_versions;
 		`, []connectorResult{
 					{
@@ -667,8 +683,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "00000000-0000-0000-0000-000000000001",
@@ -715,8 +731,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "00000000-0000-0000-0000-000000000001",
@@ -761,8 +777,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "00000000-0000-0000-0000-000000000001",
@@ -809,8 +825,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "00000000-0000-0000-0000-000000000001",
@@ -858,8 +874,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 
@@ -892,8 +908,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Id:          "00000000-0000-0000-0000-000000000001",
@@ -922,7 +938,7 @@ func TestMigration(t *testing.T) {
 					State   string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
+				assertSqlWithDisplayName(t, rawDb, cfg, `
 			SELECT version, state FROM connector_versions;
 		`, []connectorResult{
 					{
@@ -951,7 +967,7 @@ func TestMigration(t *testing.T) {
 					State   string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
+				assertSqlWithDisplayName(t, rawDb, cfg, `
 			SELECT version, state FROM connector_versions;
 		`, []connectorResult{
 					{
@@ -984,8 +1000,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Version:     1,
@@ -1026,8 +1042,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Version:     1,
@@ -1070,8 +1086,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Version:     1,
@@ -1114,8 +1130,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 
@@ -1145,8 +1161,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
 						Version:     1,
@@ -1185,8 +1201,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 
@@ -1219,8 +1235,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 
@@ -1253,8 +1269,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 
@@ -1285,8 +1301,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 
@@ -1316,8 +1332,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 
@@ -1383,8 +1399,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 
@@ -1447,8 +1463,8 @@ func TestMigration(t *testing.T) {
 					DisplayName string
 				}
 
-				test_utils.AssertSql(t, rawDb, `
-			SELECT id, version, state, json_extract(encrypted_definition, '$.display_name') as display_name FROM connector_versions ORDER BY version;
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{})
 			})
 		})
