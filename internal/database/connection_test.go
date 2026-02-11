@@ -34,8 +34,8 @@ func TestConnections(t *testing.T) {
 		assert.NotNil(t, c)
 		assert.Equal(t, c.Id, u)
 		assert.Equal(t, c.State, ConnectionStateCreated)
-		assert.Equal(t, now, c.CreatedAt)
-		assert.Equal(t, now, c.UpdatedAt)
+		assert.True(t, c.CreatedAt.Equal(now))
+		assert.True(t, c.UpdatedAt.Equal(now))
 	})
 	t.Run("round trip with labels", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig(t, nil)

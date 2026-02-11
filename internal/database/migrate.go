@@ -31,6 +31,12 @@ func (s *service) Migrate(ctx context.Context) error {
 	if err != nil {
 		return errors.Wrap(err, "failed setup database migrations")
 	}
+	defer func() {
+		sourceErr, dbErr := m.Close()
+		if sourceErr != nil || dbErr != nil {
+			s.logger.Warn("failed to close migrator", "source_err", sourceErr, "db_err", dbErr)
+		}
+	}()
 
 	err = m.Up()
 	if err != nil {
