@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"github.com/rmorlok/authproxy/internal/api_common"
 	"net/http"
 	"net/http/httptest"
 	"net/url"
@@ -42,7 +43,7 @@ func TestActorsRoutes(t *testing.T) {
 		}
 
 		// Real DB for actors to simplify pagination/cursor behavior
-		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 		// Real redis config (in-memory test) for httpf factory
 		cfg, rds := apredis.MustApplyTestConfig(cfg)
 		// Auth service bound to this DB
@@ -53,7 +54,7 @@ func TestActorsRoutes(t *testing.T) {
 
 		// Build routes
 		ar := NewActorsRoutes(cfg, auth, db, rds, h, e, test_utils.NewTestLogger())
-		r := gin.New()
+		r := api_common.GinForTest(nil)
 		ar.Register(r)
 
 		// gomock controller (only for redis mock if we needed, but kept for parity)

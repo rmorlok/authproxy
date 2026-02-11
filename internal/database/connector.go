@@ -7,6 +7,7 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
+	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -194,14 +195,18 @@ func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageRe
     `, ConnectorVersionsTable)
 
 	// Compute the aggregate state for the connector across all versions
+	aggregateStatesExpr := "json_group_array(distinct state)"
+	if l.s.cfg.GetProvider() == sconfig.DatabaseProviderPostgres {
+		aggregateStatesExpr = "json_agg(distinct state)"
+	}
 	connectorVersionCountsCTE := fmt.Sprintf(`
         SELECT
             id,
-            json_group_array(distinct state) as states,
+            %s as states,
             count(*) as versions
         FROM %s
         GROUP BY id
-    `, ConnectorVersionsTable)
+    `, aggregateStatesExpr, ConnectorVersionsTable)
 
 	q := l.s.sq.Select(`
 rr.id as id,
@@ -209,7 +214,7 @@ rr.namespace as namespace,
 rr.labels as labels,
 rr.version as version,
 rr.state as state,
-COALESCE(rr.encrypted_definition, "") as encrypted_definition,
+COALESCE(rr.encrypted_definition, '') as encrypted_definition,
 rr.created_at as created_at,
 rr.updated_at as updated_at,
 rr.deleted_at as deleted_at,
@@ -244,7 +249,7 @@ cvc.versions as total_versions
 			return pagination.PageResult[Connector]{Error: err}
 		}
 
-		q = selector.ApplyToSqlBuilder(q, "rr.labels")
+		q = selector.ApplyToSqlBuilderWithProvider(q, "rr.labels", l.s.cfg.GetProvider())
 	}
 
 	if !l.IncludeDeletedVal {
@@ -258,9 +263,15 @@ cvc.versions as total_versions
 		q = q.OrderBy(fmt.Sprintf("%s %s", *l.OrderByFieldVal, l.OrderByVal.String()))
 	}
 
+	sqlStr, sqlArgs, sqlErr := q.ToSql()
 	rows, err := q.RunWith(l.s.db).Query()
 
 	if err != nil {
+		if sqlErr == nil {
+			l.s.logger.Error("list connectors query failed", "sql", sqlStr, "args", sqlArgs, "error", err)
+		} else {
+			l.s.logger.Error("list connectors query failed", "error", err, "sql_error", sqlErr)
+		}
 		return pagination.PageResult[Connector]{Error: err}
 	}
 

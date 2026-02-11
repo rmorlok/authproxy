@@ -7,6 +7,7 @@ import (
 	"reflect"
 	"regexp"
 	"strings"
+	"time"
 )
 
 // SQLQuerier is an interface that defines the Query method used by AssertSql.
@@ -87,9 +88,72 @@ func AssertSql[T any](t TestingT, db SQLQuerier, query string, expected []T, arg
 
 	// Compare rows one by one
 	for i := range expected {
-		if !reflect.DeepEqual(actual[i], expected[i]) {
+		got := normalizeTimes(actual[i])
+		want := normalizeTimes(expected[i])
+		if !reflect.DeepEqual(got, want) {
 			t.Errorf("Row %d mismatch:\nGot:      %+v\nExpected: %+v", i, actual[i], expected[i])
 		}
+	}
+}
+
+func normalizeTimes(v any) any {
+	return normalizeTimesValue(reflect.ValueOf(v)).Interface()
+}
+
+func normalizeTimesValue(v reflect.Value) reflect.Value {
+	if !v.IsValid() {
+		return v
+	}
+
+	switch v.Kind() {
+	case reflect.Pointer:
+		if v.IsNil() {
+			return v
+		}
+		elem := normalizeTimesValue(v.Elem())
+		out := reflect.New(elem.Type())
+		out.Elem().Set(elem)
+		return out
+	case reflect.Struct:
+		// Handle time.Time
+		if v.Type() == reflect.TypeOf(time.Time{}) {
+			tm := v.Interface().(time.Time)
+			return reflect.ValueOf(tm.UTC())
+		}
+		// Handle sql.NullTime
+		if v.Type() == reflect.TypeOf(sql.NullTime{}) {
+			nt := v.Interface().(sql.NullTime)
+			if nt.Valid {
+				nt.Time = nt.Time.UTC()
+			}
+			return reflect.ValueOf(nt)
+		}
+		out := reflect.New(v.Type()).Elem()
+		for i := 0; i < v.NumField(); i++ {
+			if out.Field(i).CanSet() {
+				out.Field(i).Set(normalizeTimesValue(v.Field(i)))
+			} else {
+				out.Field(i).Set(v.Field(i))
+			}
+		}
+		return out
+	case reflect.Slice:
+		if v.IsNil() {
+			return v
+		}
+		out := reflect.MakeSlice(v.Type(), v.Len(), v.Cap())
+		for i := 0; i < v.Len(); i++ {
+			out.Index(i).Set(normalizeTimesValue(v.Index(i)))
+		}
+		return out
+	case reflect.Array:
+		out := reflect.New(v.Type()).Elem()
+		for i := 0; i < v.Len(); i++ {
+			out.Index(i).Set(normalizeTimesValue(v.Index(i)))
+		}
+		return out
+	default:
+		return v
 	}
 }
 

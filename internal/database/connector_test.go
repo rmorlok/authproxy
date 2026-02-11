@@ -13,7 +13,7 @@ import (
 
 func TestConnectors(t *testing.T) {
 	t.Run("basic", func(t *testing.T) {
-		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -53,7 +53,7 @@ INSERT INTO connector_versions
 	})
 
 	t.Run("ForNamespaceMatchers", func(t *testing.T) {
-		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 

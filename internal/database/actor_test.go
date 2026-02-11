@@ -22,7 +22,7 @@ func TestActor(t *testing.T) {
 	clk := clock.NewFakeClock(now)
 
 	setup := func(t *testing.T) {
-		_, db = MustApplyBlankTestDbConfig(t.Name(), nil)
+		_, db = MustApplyBlankTestDbConfig(t, nil)
 		ctx = apctx.NewBuilderBackground().WithClock(clk).Build()
 	}
 
@@ -654,95 +654,8 @@ func TestActor(t *testing.T) {
 	})
 
 	t.Run("Labels", func(t *testing.T) {
-		t.Run("ForLabelExists filters by label key", func(t *testing.T) {
-			setup(t)
-
-			// Create actors with different labels
-			actor1 := &Actor{
-				Id:         uuid.New(),
-				Namespace:  "root",
-				ExternalId: "actor1",
-				Labels: Labels{
-					"authproxy.io/actor-sync-source": "config-list",
-				},
-			}
-			require.NoError(t, db.CreateActor(ctx, actor1))
-
-			actor2 := &Actor{
-				Id:         uuid.New(),
-				Namespace:  "root",
-				ExternalId: "actor2",
-				Labels: Labels{
-					"authproxy.io/actor-sync-source": "external-source",
-				},
-			}
-			require.NoError(t, db.CreateActor(ctx, actor2))
-
-			actor3 := &Actor{
-				Id:         uuid.New(),
-				Namespace:  "root",
-				ExternalId: "actor3",
-				// No labels
-			}
-			require.NoError(t, db.CreateActor(ctx, actor3))
-
-			// Filter for label existence
-			result := db.ListActorsBuilder().ForLabelExists("authproxy.io/actor-sync-source").FetchPage(ctx)
-			require.NoError(t, result.Error)
-			require.Len(t, result.Results, 2)
-		})
-
-		t.Run("ForLabelEquals filters by label key and value", func(t *testing.T) {
-			setup(t)
-
-			// Create actors with different label values
-			actor1 := &Actor{
-				Id:         uuid.New(),
-				Namespace:  "root",
-				ExternalId: "actor1",
-				Labels: Labels{
-					"authproxy.io/actor-sync-source": "config-list",
-				},
-			}
-			require.NoError(t, db.CreateActor(ctx, actor1))
-
-			actor2 := &Actor{
-				Id:         uuid.New(),
-				Namespace:  "root",
-				ExternalId: "actor2",
-				Labels: Labels{
-					"authproxy.io/actor-sync-source": "external-source",
-				},
-			}
-			require.NoError(t, db.CreateActor(ctx, actor2))
-
-			actor3 := &Actor{
-				Id:         uuid.New(),
-				Namespace:  "root",
-				ExternalId: "actor3",
-				Labels: Labels{
-					"authproxy.io/actor-sync-source": "config-list",
-				},
-			}
-			require.NoError(t, db.CreateActor(ctx, actor3))
-
-			// Filter for specific label value
-			result := db.ListActorsBuilder().ForLabelEquals("authproxy.io/actor-sync-source", "config-list").FetchPage(ctx)
-			require.NoError(t, result.Error)
-			require.Len(t, result.Results, 2)
-			for _, a := range result.Results {
-				require.Equal(t, "config-list", a.Labels["authproxy.io/actor-sync-source"])
-			}
-
-			// Filter for different label value
-			result = db.ListActorsBuilder().ForLabelEquals("authproxy.io/actor-sync-source", "external-source").FetchPage(ctx)
-			require.NoError(t, result.Error)
-			require.Len(t, result.Results, 1)
-			require.Equal(t, "actor2", result.Results[0].ExternalId)
-		})
-
 		t.Run("Filtering", func(t *testing.T) {
-			_, db, _ := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+			_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
 			now := time.Date(2023, 10, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 

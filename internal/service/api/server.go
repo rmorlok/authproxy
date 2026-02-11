@@ -35,7 +35,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		dm.GetLogger(),
 	)
 
-	server := api_common.GinForService(service)
+	server := api_common.GinForService(service, logger)
 
 	corsConfig := root.Api.CorsVal.ToGinCorsConfig(nil)
 	if corsConfig != nil {
@@ -59,7 +59,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 
 	var healthChecker *gin.Engine
 	if service.Port() != service.HealthCheckPort() {
-		healthChecker = api_common.GinForService(service)
+		healthChecker = api_common.GinForService(service, logger)
 	} else {
 		healthChecker = server
 	}

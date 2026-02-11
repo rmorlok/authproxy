@@ -11,7 +11,7 @@ import (
 
 func TestNonces(t *testing.T) {
 	t.Run("nonce round trip", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig("nonce_round_trip", nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -42,7 +42,7 @@ func TestNonces(t *testing.T) {
 	})
 
 	t.Run("nonce expiration", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig("nonce_expiration", nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		fc := clock.NewFakeClock(now)
 		ctx := apctx.NewBuilderBackground().WithClock(fc).Build()

@@ -318,7 +318,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 	}
 
 	return s.transaction(func(tx *sql.Tx) error {
-		sqb := sq.StatementBuilder.RunWith(tx)
+		sqb := s.sq.RunWith(tx)
 
 		existingNamespace, _, err := sqlh.ScanWithDefault(sqb.
 			Select("namespace").
@@ -441,11 +441,11 @@ func (s *service) GetConnectorVersionForLabels(ctx context.Context, labelSelecto
 	}
 
 	var result ConnectorVersion
-	q := sq.Select(result.cols()...).
+	q := s.sq.Select(result.cols()...).
 		From(ConnectorVersionsTable).
 		Where(sq.Eq{"deleted_at": nil})
 
-	q = selector.ApplyToSqlBuilder(q, "labels")
+	q = selector.ApplyToSqlBuilderWithProvider(q, "labels", s.cfg.GetProvider())
 
 	err = q.OrderBy("created_at DESC", "version DESC").
 		Limit(1).
@@ -470,11 +470,11 @@ func (s *service) GetConnectorVersionForLabelsAndVersion(ctx context.Context, la
 	}
 
 	var result ConnectorVersion
-	q := sq.Select(result.cols()...).
+	q := s.sq.Select(result.cols()...).
 		From(ConnectorVersionsTable).
 		Where(sq.Eq{"version": version, "deleted_at": nil})
 
-	q = selector.ApplyToSqlBuilder(q, "labels")
+	q = selector.ApplyToSqlBuilderWithProvider(q, "labels", s.cfg.GetProvider())
 
 	err = q.OrderBy("created_at DESC").
 		Limit(1).
@@ -493,7 +493,7 @@ func (s *service) GetConnectorVersionForLabelsAndVersion(ctx context.Context, la
 
 func (s *service) GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state ConnectorVersionState) (*ConnectorVersion, error) {
 	var result ConnectorVersion
-	err := sq.
+	err := s.sq.
 		Select(result.cols()...).
 		From(ConnectorVersionsTable).
 		Where(sq.Eq{
@@ -520,7 +520,7 @@ func (s *service) GetConnectorVersionForState(ctx context.Context, id uuid.UUID,
 
 func (s *service) NewestConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error) {
 	var result ConnectorVersion
-	err := sq.
+	err := s.sq.
 		Select(result.cols()...).
 		From(ConnectorVersionsTable).
 		Where(sq.Eq{
@@ -546,7 +546,7 @@ func (s *service) NewestConnectorVersionForId(ctx context.Context, id uuid.UUID)
 
 func (s *service) NewestPublishedConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error) {
 	var result ConnectorVersion
-	err := sq.
+	err := s.sq.
 		Select(result.cols()...).
 		From(ConnectorVersionsTable).
 		Where(sq.Eq{
@@ -720,7 +720,7 @@ func (l *listConnectorVersionsFilters) applyRestrictions(ctx context.Context) sq
 		if err != nil {
 			l.addError(err)
 		} else {
-			q = selector.ApplyToSqlBuilder(q, "labels")
+			q = selector.ApplyToSqlBuilderWithProvider(q, "labels", l.s.cfg.GetProvider())
 		}
 	}
 

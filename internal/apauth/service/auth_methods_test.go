@@ -385,7 +385,7 @@ func TestAuth_Parse(t *testing.T) {
 		// Set up database and encrypt service for self-signed tests
 		var testDb database.DB
 		var enc encrypt.E
-		cfg, testDb = database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+		cfg, testDb = database.MustApplyBlankTestDbConfig(t, cfg)
 		cfg, enc = encrypt.NewTestEncryptService(cfg, testDb)
 
 		ctx := context.Background()
@@ -454,7 +454,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 
 	setup := func(t *testing.T) {
 		cfg := config.FromRoot(&testConfigPublicPrivateKey)
-		cfg, db = database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+		cfg, db = database.MustApplyBlankTestDbConfig(t, cfg)
 		a = NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), db, nil, nil, test_utils.NewTestLogger())
 		raw = a.(*service)
 	}
@@ -726,7 +726,7 @@ func TestAuth_ActorPermissionsSync(t *testing.T) {
 
 	setup := func(t *testing.T) {
 		cfg := config.FromRoot(&actorConfig)
-		cfg, db = database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+		cfg, db = database.MustApplyBlankTestDbConfig(t, cfg)
 		a = NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), db, nil, nil, test_utils.NewTestLogger())
 		raw = a.(*service)
 	}

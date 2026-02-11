@@ -3,6 +3,7 @@ package routes
 import (
 	"encoding/json"
 	"errors"
+	"github.com/rmorlok/authproxy/internal/api_common"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -31,13 +32,13 @@ func TestRequestLogRoutes(t *testing.T) {
 
 	setup := func(t *testing.T, cfg config.C) *TestSetup {
 		ctrl := gomock.NewController(t)
-		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
 
 		rlr := mock.NewMockLogRetriever(ctrl)
 		rl := NewRequestLogRoutes(cfg, auth, rlr)
 
-		r := gin.New()
+		r := api_common.GinForTest(nil)
 		rl.Register(r)
 
 		return &TestSetup{

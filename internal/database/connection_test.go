@@ -15,7 +15,7 @@ import (
 
 func TestConnections(t *testing.T) {
 	t.Run("round trip", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig("connection_round_trip", nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -34,11 +34,11 @@ func TestConnections(t *testing.T) {
 		assert.NotNil(t, c)
 		assert.Equal(t, c.Id, u)
 		assert.Equal(t, c.State, ConnectionStateCreated)
-		assert.Equal(t, now, c.CreatedAt)
-		assert.Equal(t, now, c.UpdatedAt)
+		assert.True(t, c.CreatedAt.Equal(now))
+		assert.True(t, c.UpdatedAt.Equal(now))
 	})
 	t.Run("round trip with labels", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig("connection_round_trip_with_labels", nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -64,7 +64,7 @@ func TestConnections(t *testing.T) {
 		assert.Equal(t, labels, c.Labels)
 	})
 	t.Run("delete connection", func(t *testing.T) {
-		_, db, rawDb := MustApplyBlankTestDbConfigRaw("delete_connection", nil)
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		defer rawDb.Close()
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
@@ -127,7 +127,7 @@ func TestConnections(t *testing.T) {
 		})
 	})
 	t.Run("set connection state", func(t *testing.T) {
-		_, db, rawDb := MustApplyBlankTestDbConfigRaw("set_connection_state", nil)
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		defer rawDb.Close()
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
@@ -195,7 +195,7 @@ func TestConnections(t *testing.T) {
 	})
 
 	t.Run("list connections", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig("connection_round_trip", nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		c := clock.NewFakeClock(now)
 		ctx := apctx.NewBuilderBackground().WithClock(c).Build()
@@ -348,7 +348,7 @@ func TestConnections(t *testing.T) {
 	})
 
 	t.Run("filter by label selector", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig("connection_label_filtering", nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		ctx := apctx.NewBuilderBackground().Build()
 
 		// Create some connections with different labels
@@ -435,7 +435,7 @@ func TestConnections(t *testing.T) {
 	})
 
 	t.Run("put connection labels", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig("put_connection_labels", nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -487,7 +487,7 @@ func TestConnections(t *testing.T) {
 	})
 
 	t.Run("delete connection labels", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig("delete_connection_labels", nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -540,7 +540,7 @@ func TestConnections(t *testing.T) {
 	})
 
 	t.Run("update connection labels", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig("update_connection_labels", nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -595,7 +595,7 @@ func TestConnections(t *testing.T) {
 	})
 
 	t.Run("enumerate connections", func(t *testing.T) {
-		_, db := MustApplyBlankTestDbConfig("enumerate_connections", nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		c := clock.NewFakeClock(now)
 		ctx := apctx.NewBuilderBackground().WithClock(c).Build()

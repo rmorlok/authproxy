@@ -28,7 +28,7 @@ func TestSyncActorsList(t *testing.T) {
 
 	setup := func(t *testing.T, actors *sconfig.ConfiguredActors) config.C {
 		var cfg config.C
-		cfg, db = database.MustApplyBlankTestDbConfig(t.Name(), nil)
+		cfg, db = database.MustApplyBlankTestDbConfig(t, nil)
 		cfg, redis = apredis.MustApplyTestConfig(cfg)
 		cfg, enc = encrypt.NewTestEncryptService(cfg, db)
 		ctx = apctx.NewBuilderBackground().WithClock(clk).Build()
@@ -197,7 +197,7 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 
 	setup := func(t *testing.T, actors *sconfig.ConfiguredActors) config.C {
 		var cfg config.C
-		cfg, db = database.MustApplyBlankTestDbConfig(t.Name(), nil)
+		cfg, db = database.MustApplyBlankTestDbConfig(t, nil)
 		cfg, redis = apredis.MustApplyTestConfig(cfg)
 		cfg, enc = encrypt.NewTestEncryptService(cfg, db)
 		ctx = apctx.NewBuilderBackground().WithClock(clk).Build()

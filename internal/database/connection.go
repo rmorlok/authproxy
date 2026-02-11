@@ -408,7 +408,7 @@ func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) sq.Selec
 		if err != nil {
 			l.addError(err)
 		} else {
-			q = selector.ApplyToSqlBuilder(q, "labels")
+			q = selector.ApplyToSqlBuilderWithProvider(q, "labels", l.s.cfg.GetProvider())
 		}
 	}
 

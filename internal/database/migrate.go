@@ -6,6 +6,7 @@ import (
 	"fmt"
 
 	"github.com/golang-migrate/migrate/v4"
+	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/pkg/errors"
@@ -23,13 +24,19 @@ func (s *service) Migrate(ctx context.Context) error {
 
 	d, err := iofs.New(migrationsFs, fmt.Sprintf("migrations/%s", s.cfg.GetProvider()))
 	if err != nil {
-		return errors.Wrapf(err, "failed to load databse migrations for '%s'", s.cfg.GetProvider())
+		return errors.Wrapf(err, "failed to load database migrations for '%s'", s.cfg.GetProvider())
 	}
 
 	m, err := migrate.NewWithSourceInstance("iofs", d, s.cfg.GetUri())
 	if err != nil {
 		return errors.Wrap(err, "failed setup database migrations")
 	}
+	defer func() {
+		sourceErr, dbErr := m.Close()
+		if sourceErr != nil || dbErr != nil {
+			s.logger.Warn("failed to close migrator", "source_err", sourceErr, "db_err", dbErr)
+		}
+	}()
 
 	err = m.Up()
 	if err != nil {

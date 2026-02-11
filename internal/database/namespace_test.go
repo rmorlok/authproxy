@@ -49,7 +49,7 @@ func TestNamespaces(t *testing.T) {
 		}
 	})
 	t.Run("basic", func(t *testing.T) {
-		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -173,7 +173,7 @@ INSERT INTO namespaces
 	t.Run("CreateNamespace", func(t *testing.T) {
 		t.Run("creates a new namespace", func(t *testing.T) {
 			// Setup
-			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -198,7 +198,7 @@ INSERT INTO namespaces
 
 		t.Run("creates a child namespace", func(t *testing.T) {
 			// Setup
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -219,7 +219,7 @@ INSERT INTO namespaces
 
 		t.Run("refuses to create a namespace with invalid name", func(t *testing.T) {
 			// Setup
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -239,7 +239,7 @@ INSERT INTO namespaces
 
 		t.Run("refuses to create an un-rooted namespace", func(t *testing.T) {
 			// Setup
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -259,7 +259,7 @@ INSERT INTO namespaces
 
 		t.Run("refuses to create a namespace where parent doesn't exist", func(t *testing.T) {
 			// Setup
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -279,7 +279,7 @@ INSERT INTO namespaces
 
 		t.Run("refuses to create a namespace where parent is deleted", func(t *testing.T) {
 			// Setup
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -310,7 +310,7 @@ INSERT INTO namespaces
 	})
 	t.Run("GetNamespace", func(t *testing.T) {
 		// Setup
-		_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -321,7 +321,7 @@ INSERT INTO namespaces
 	})
 	t.Run("DeleteNamespace", func(t *testing.T) {
 		// Setup
-		_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -338,7 +338,7 @@ INSERT INTO namespaces
 	})
 	t.Run("SetNamespaceState", func(t *testing.T) {
 		// Setup
-		_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -400,7 +400,7 @@ INSERT INTO namespaces
 		require.Error(t, err)
 	})
 	t.Run("ForNamespaceMatchers", func(t *testing.T) {
-		_, db, rawDb := MustApplyBlankTestDbConfigRaw("namespace_matchers", nil)
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -516,7 +516,7 @@ INSERT INTO namespaces
 	})
 	t.Run("EnsureNamespaceByPath", func(t *testing.T) {
 		t.Run("does not duplicate namespaces", func(t *testing.T) {
-			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -579,7 +579,7 @@ INSERT INTO namespaces
 		for _, test := range tests {
 			t.Run(test.name, func(t *testing.T) {
 				// Setup
-				_, service, rawDb := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+				_, service, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 				now := time.Date(2023, 10, 15, 12, 0, 0, 0, time.UTC)
 				ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -607,7 +607,7 @@ INSERT INTO namespaces
 	})
 	t.Run("UpdateNamespaceLabels", func(t *testing.T) {
 		t.Run("set labels on namespace without labels", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -633,7 +633,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("replaces all existing labels", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -662,7 +662,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("clear labels with empty map", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -684,7 +684,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("nil labels clears labels", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -701,7 +701,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("namespace not found", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -710,7 +710,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("empty path returns error", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -719,7 +719,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("invalid label key returns error", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -736,7 +736,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("updates timestamp", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			clk := clock.NewFakeClock(now)
 			ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
@@ -761,7 +761,7 @@ INSERT INTO namespaces
 
 	t.Run("PutNamespaceLabels", func(t *testing.T) {
 		t.Run("add labels to namespace without labels", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -787,7 +787,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("add labels to namespace with existing labels", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -807,7 +807,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("update existing label", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -826,7 +826,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("multiple labels at once", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -850,7 +850,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("empty labels map returns current namespace", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -867,7 +867,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("namespace not found", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -876,7 +876,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("empty path returns error", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -885,7 +885,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("invalid label key returns error", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -902,7 +902,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("updates timestamp", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			clk := clock.NewFakeClock(now)
 			ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
@@ -928,7 +928,7 @@ INSERT INTO namespaces
 
 	t.Run("DeleteNamespaceLabels", func(t *testing.T) {
 		t.Run("delete single label", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -954,7 +954,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("delete multiple labels", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -977,7 +977,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("delete non-existent label is no-op", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -994,7 +994,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("delete from namespace without labels", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -1010,7 +1010,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("empty keys slice returns current namespace", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -1027,7 +1027,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("namespace not found", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -1036,7 +1036,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("empty path returns error", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -1045,7 +1045,7 @@ INSERT INTO namespaces
 		})
 
 		t.Run("updates timestamp", func(t *testing.T) {
-			_, db := MustApplyBlankTestDbConfig(t.Name(), nil)
+			_, db := MustApplyBlankTestDbConfig(t, nil)
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			clk := clock.NewFakeClock(now)
 			ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
@@ -1071,7 +1071,7 @@ INSERT INTO namespaces
 	})
 
 	t.Run("Labels", func(t *testing.T) {
-		_, db, _ := MustApplyBlankTestDbConfigRaw(t.Name(), nil)
+		_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(2023, 10, 15, 12, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 

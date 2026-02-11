@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"github.com/rmorlok/authproxy/internal/api_common"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -40,14 +41,14 @@ func TestTasks(t *testing.T) {
 
 		ctrl := gomock.NewController(t)
 		mockInspector := mock.NewMockInspector(ctrl)
-		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 		// Use fake encryption service with doBase64Encode set to false
 		e := encrypt.NewFakeEncryptService(false)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
 
 		tr := NewTaskRoutes(cfg, auth, e, mockInspector)
 
-		r := gin.New()
+		r := api_common.GinForTest(nil)
 		tr.Register(r)
 
 		return &TestSetup{

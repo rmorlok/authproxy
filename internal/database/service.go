@@ -8,6 +8,7 @@ import (
 	"os"
 
 	sq "github.com/Masterminds/squirrel"
+	_ "github.com/jackc/pgx/v5/stdlib"
 	_ "github.com/mattn/go-sqlite3"
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
@@ -23,6 +24,8 @@ func NewConnectionForRoot(root *config.Root, logger *slog.Logger) (DB, error) {
 	switch dbConfig.(type) {
 	case *config.DatabaseSqlite:
 		return NewSqliteConnection(dbConfig.(*config.DatabaseSqlite), secretKey, logger)
+	case *config.DatabasePostgres:
+		return NewPostgresConnection(dbConfig.(*config.DatabasePostgres), secretKey, logger)
 	default:
 		return nil, errors.New("database type not supported")
 	}
@@ -61,6 +64,30 @@ func NewSqliteConnection(dbConfig *config.DatabaseSqlite, secretKey config.KeyDa
 
 	if err := db.Ping(); err != nil {
 		return nil, errors.Wrapf(err, "failed to ping sqlite database '%s'", dbConfig.GetDsn())
+	}
+
+	return &service{
+		cfg:       dbConfig,
+		sq:        sq.StatementBuilder.PlaceholderFormat(dbConfig.GetPlaceholderFormat()),
+		db:        db,
+		secretKey: secretKey,
+		logger:    l,
+	}, nil
+}
+
+// NewPostgresConnection creates a new database connection to a Postgres database.
+//
+// Parameters:
+// - dbConfig: the configuration for the Postgres database
+// - secretKey: the AES key used to secure cursors
+func NewPostgresConnection(dbConfig *config.DatabasePostgres, secretKey config.KeyDataType, l *slog.Logger) (DB, error) {
+	db, err := sql.Open("pgx", dbConfig.GetDsn())
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to open postgres database '%s'", dbConfig.GetDsn())
+	}
+
+	if err := db.Ping(); err != nil {
+		return nil, errors.Wrapf(err, "failed to ping postgres database '%s'", dbConfig.GetDsn())
 	}
 
 	return &service{

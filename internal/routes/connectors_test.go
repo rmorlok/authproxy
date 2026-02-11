@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"encoding/json"
+	"github.com/rmorlok/authproxy/internal/api_common"
 	"net/http"
 	"net/http/httptest"
 	"testing"
@@ -66,7 +67,7 @@ func TestConnectors(t *testing.T) {
 
 		ctrl := gomock.NewController(t)
 		ac := asynqmock.NewMockClient(ctrl)
-		cfg, db := database.MustApplyBlankTestDbConfig(t.Name(), cfg)
+		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
 		rs := mock.NewMockClient(ctrl)
@@ -76,7 +77,7 @@ func TestConnectors(t *testing.T) {
 
 		cr := NewConnectorsRoutes(cfg, auth, c)
 
-		r := gin.New()
+		r := api_common.GinForTest(nil)
 		cr.Register(r)
 
 		return &TestSetup{

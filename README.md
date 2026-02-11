@@ -20,6 +20,26 @@ Start redis (requires search module):
 docker run --name redis-server -p 6379:6379 --network authproxy -d redis/redis-stack-server:latest
 ```
 
+Start Postgres (for local development and tests):
+
+```bash
+docker run --name postgres-server -p 5432:5432 --network authproxy -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=authproxy -d postgres:16
+```
+
+Configure Postgres in `dev_config/default.yaml`:
+
+```yaml
+database:
+  provider: postgres
+  auto_migrate: true
+  host: localhost
+  port: 5432
+  user: postgres
+  password: postgres
+  database: authproxy
+  sslmode: disable
+```
+
 Start the AuthProxy backend
 
 ```bash
@@ -30,6 +50,27 @@ Run the client to proxy authenticated calls to the backend:
 
 ```bash
 go run ./cmd/cli raw-proxy --enableLoginRedirect=true --proxyTo=api
+```
+
+### Testing
+
+Run tests with SQLite (default):
+
+```bash
+go test -v ./...
+```
+
+Run tests with Postgres:
+
+```bash
+AUTH_PROXY_TEST_DATABASE_PROVIDER=postgres \
+POSTGRES_TEST_HOST=localhost \
+POSTGRES_TEST_PORT=5432 \
+POSTGRES_TEST_USER=postgres \
+POSTGRES_TEST_PASSWORD=postgres \
+POSTGRES_TEST_DATABASE=postgres \
+POSTGRES_TEST_OPTIONS=sslmode=disable \
+go test -v ./...
 ```
 
 # UI
