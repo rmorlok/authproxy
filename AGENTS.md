@@ -1,4 +1,4 @@
-# CLAUDE.md
+# README.md
 
 This file provides guidance to coding agents when working with code in this repository.
 
@@ -56,9 +56,9 @@ go run ./cmd/server routes --config=./dev_config/default.yaml
 
 **Setup:**
 ```bash
-npm install -g corepack
-yarn set version 4.11.0
-yarn
+volta install node
+volta install yarn
+yarn install
 ```
 
 **Run Marketplace UI:**
