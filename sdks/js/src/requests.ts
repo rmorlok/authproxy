@@ -95,17 +95,11 @@ export interface ListRequestsParams {
     path_regex?: string; // Changed to string to match Go's format
 }
 
-export interface ListRequestsResponse {
-    items: RequestEntryRecord[];
-    cursor?: string;
-    total?: number;
-}
-
 /**
  * Get a list of requests
  */
 export const listRequests = (params: ListRequestsParams) => {
-    return client.get<ListRequestsResponse>('/api/v1/request-log', {params});
+    return client.get<ListResponse<RequestEntryRecord>>('/api/v1/request-log', {params});
 };
 
 /**
