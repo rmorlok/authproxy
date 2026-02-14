@@ -302,6 +302,33 @@ definitions:
         example: 1
         type: integer
     type: object
+  routes.SwaggerCreateConnectorRequest:
+    description: Request to create a new connector
+    properties:
+      definition:
+        description: Connector definition (full schema)
+      labels:
+        additionalProperties:
+          type: string
+        description: Labels to set on the connector
+        type: object
+      namespace:
+        description: Namespace path for the connector
+        example: acme
+        type: string
+    type: object
+  routes.SwaggerCreateConnectorVersionRequest:
+    description: Request to create a new draft connector version
+    properties:
+      definition:
+        description: Connector definition (optional - nil copies from latest version)
+      labels:
+        additionalProperties:
+          type: string
+        description: Labels to set on the new version (optional - nil copies from
+          latest)
+        type: object
+    type: object
   routes.SwaggerDisconnectResponse:
     description: Response for disconnect operation
     properties:
@@ -478,6 +505,17 @@ definitions:
         additionalProperties:
           type: string
         description: Labels to set on the connection (replaces all existing labels)
+        type: object
+    type: object
+  routes.SwaggerUpdateConnectorRequest:
+    description: Request to update a connector or connector version
+    properties:
+      definition:
+        description: Connector definition (full schema, optional - nil keeps existing)
+      labels:
+        additionalProperties:
+          type: string
+        description: Labels to set on the connector (optional - nil keeps existing)
         type: object
     type: object
   routes.TaskInfoJson:
@@ -1604,6 +1642,45 @@ paths:
       summary: List connectors
       tags:
       - connectors
+    post:
+      consumes:
+      - application/json
+      description: Create a new connector with version 1 in draft state
+      parameters:
+      - description: Connector creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.SwaggerCreateConnectorRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/routes.SwaggerConnectorVersionJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create connector
+      tags:
+      - connectors
   /connectors/{id}:
     get:
       consumes:
@@ -1641,6 +1718,54 @@ paths:
       security:
       - BearerAuth: []
       summary: Get connector
+      tags:
+      - connectors
+    patch:
+      consumes:
+      - application/json
+      description: Update an existing connector's draft version, creating one if needed
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Connector update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.SwaggerUpdateConnectorRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerConnectorVersionJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update connector
       tags:
       - connectors
   /connectors/{id}/versions:
@@ -1702,6 +1827,57 @@ paths:
       summary: List connector versions
       tags:
       - connectors
+    post:
+      consumes:
+      - application/json
+      description: Create a new draft version for an existing connector
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Version creation request
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/routes.SwaggerCreateConnectorVersionRequest'
+      produces:
+      - application/json
+      responses:
+        "201":
+          description: Created
+          schema:
+            $ref: '#/definitions/routes.SwaggerConnectorVersionJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create connector version
+      tags:
+      - connectors
   /connectors/{id}/versions/{version}:
     get:
       consumes:
@@ -1744,6 +1920,63 @@ paths:
       security:
       - BearerAuth: []
       summary: Get connector version
+      tags:
+      - connectors
+    patch:
+      consumes:
+      - application/json
+      description: Update a specific draft version of a connector
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Version number
+        in: path
+        name: version
+        required: true
+        type: integer
+      - description: Version update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.SwaggerUpdateConnectorRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerConnectorVersionJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update connector version
       tags:
       - connectors
   /namespaces:
