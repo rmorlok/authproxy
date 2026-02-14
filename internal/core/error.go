@@ -6,3 +6,5 @@ import (
 
 var ErrNotFound = iface.ErrNotFound
 var ErrConnectionNotFound = iface.ErrConnectionNotFound
+var ErrDraftAlreadyExists = iface.ErrDraftAlreadyExists
+var ErrNotDraft = iface.ErrNotDraft
