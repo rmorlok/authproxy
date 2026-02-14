@@ -3,14 +3,24 @@ import { ListResponse } from './common';
 
 // Actor models
 
+export interface UpdateActorRequest {
+    labels?: Record<string, string>;
+}
+
+export interface PutActorLabelRequest {
+  value: string;
+}
+
+export interface ActorLabel {
+  key: string;
+  value: string;
+}
+
 export interface Actor {
   id: string;
   namespace: string;
   labels?: Record<string, string>;
   external_id: string;
-  email: string;
-  admin: boolean;
-  super_admin: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -18,10 +28,7 @@ export interface Actor {
 export interface CreateActorRequest {
     namespace: string;
     external_id: string;
-    email: string;
     labels?: Record<string, string>;
-    admin?: boolean;
-    super_admin?: boolean;
 }
 
 /**
@@ -29,9 +36,6 @@ export interface CreateActorRequest {
  */
 export interface ListActorsParams {
   external_id?: string;
-  email?: string;
-  admin?: boolean;
-  super_admin?: boolean;
   namespace?: string;
   label_selector?: string;
   cursor?: string;
@@ -90,6 +94,54 @@ export const deleteActorByExternalId = (externalId: string) => {
   return client.delete(`/api/v1/actors/external-id/${externalId}`);
 };
 
+/**
+ * Update an actor by ID (uuid)
+ */
+export const updateActor = (id: string, request: UpdateActorRequest) => {
+  return client.patch<Actor>(`/api/v1/actors/${id}`, request);
+};
+
+/**
+ * Update an actor by external ID
+ */
+export const updateActorByExternalId = (
+  externalId: string,
+  namespace: string | undefined,
+  request: UpdateActorRequest
+) => {
+  return client.patch<Actor>(`/api/v1/actors/external-id/${externalId}`, request, {
+    params: { namespace },
+  });
+};
+
+/**
+ * Get all labels for a specific actor by ID (uuid)
+ */
+export const getActorLabels = (id: string) => {
+  return client.get<Record<string, string>>(`/api/v1/actors/${id}/labels`);
+};
+
+/**
+ * Get a specific label for an actor by ID (uuid) and label key
+ */
+export const getActorLabel = (id: string, labelKey: string) => {
+  return client.get<ActorLabel>(`/api/v1/actors/${id}/labels/${labelKey}`);
+};
+
+/**
+ * Set a specific label for an actor by ID (uuid) and label key
+ */
+export const putActorLabel = (id: string, labelKey: string, value: string) => {
+  return client.put<ActorLabel>(`/api/v1/actors/${id}/labels/${labelKey}`, { value });
+};
+
+/**
+ * Delete a specific label for an actor by ID (uuid) and label key
+ */
+export const deleteActorLabel = (id: string, labelKey: string) => {
+  return client.delete(`/api/v1/actors/${id}/labels/${labelKey}`);
+};
+
 export const actors = {
   list: listActors,
   create: createActor,
@@ -98,4 +150,10 @@ export const actors = {
   getByMe: getMe,
   deleteById: deleteActorById,
   deleteByExternalId: deleteActorByExternalId,
+  update: updateActor,
+  updateByExternalId: updateActorByExternalId,
+  getLabels: getActorLabels,
+  getLabel: getActorLabel,
+  putLabel: putActorLabel,
+  deleteLabel: deleteActorLabel,
 };

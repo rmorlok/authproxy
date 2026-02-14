@@ -11,6 +11,19 @@ export enum ConnectionState {
     DISCONNECTED = 'disconnected',
 }
 
+export interface UpdateConnectionRequest {
+    labels?: Record<string, string>;
+}
+
+export interface PutConnectionLabelRequest {
+    value: string;
+}
+
+export interface ConnectionLabel {
+    key: string;
+    value: string;
+}
+
 export interface Connection {
     id: string;
     namespace: string;
@@ -58,8 +71,7 @@ export interface ForceConnectionStateRequest {
     state: ConnectionState;
 }
 
-export interface ForceConnectionStateResponse extends Connection {
-}
+export type ForceConnectionStateResponse = Connection;
 
 /**
  * Parameters used for listing connections.
@@ -127,10 +139,50 @@ export const forceConnectionState = (id: string, state: ConnectionState) => {
     );
 };
 
+/**
+ * Update a connection's labels
+ */
+export const updateConnection = (id: string, request: UpdateConnectionRequest) => {
+    return client.patch<Connection>(`/api/v1/connections/${id}`, request);
+};
+
+/**
+ * Get all labels for a specific connection by ID (uuid)
+ */
+export const getConnectionLabels = (id: string) => {
+    return client.get<Record<string, string>>(`/api/v1/connections/${id}/labels`);
+};
+
+/**
+ * Get a specific label for a connection by ID (uuid) and label key
+ */
+export const getConnectionLabel = (id: string, labelKey: string) => {
+    return client.get<ConnectionLabel>(`/api/v1/connections/${id}/labels/${labelKey}`);
+};
+
+/**
+ * Set a specific label for a connection by ID (uuid) and label key
+ */
+export const putConnectionLabel = (id: string, labelKey: string, value: string) => {
+    return client.put<ConnectionLabel>(`/api/v1/connections/${id}/labels/${labelKey}`, { value });
+};
+
+/**
+ * Delete a specific label for a connection by ID (uuid) and label key
+ */
+export const deleteConnectionLabel = (id: string, labelKey: string) => {
+    return client.delete(`/api/v1/connections/${id}/labels/${labelKey}`);
+};
+
 export const connections = {
     list: listConnections,
     get: getConnection,
     initiate: initiateConnection,
     disconnect: disconnectConnection,
     force_state: forceConnectionState,
+    update: updateConnection,
+    getLabels: getConnectionLabels,
+    getLabel: getConnectionLabel,
+    putLabel: putConnectionLabel,
+    deleteLabel: deleteConnectionLabel,
 };
