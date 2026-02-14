@@ -1062,4 +1062,532 @@ func TestConnectors(t *testing.T) {
 			require.Equal(t, "Updated Draft", resp.Definition.DisplayName)
 		})
 	})
+
+	t.Run("labels", func(t *testing.T) {
+		connectorId := uuid.MustParse("10000000-0000-0000-0000-000000000001")
+
+		t.Run("get labels", func(t *testing.T) {
+			t.Run("unauthorized", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("/connectors/%s/labels", connectorId), nil)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusUnauthorized, w.Code)
+			})
+
+			t.Run("bad uuid", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors/bad-uuid/labels",
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusBadRequest, w.Code)
+			})
+
+			t.Run("not found", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors/99999999-0000-0000-0000-000000000099/labels",
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNotFound, w.Code)
+			})
+
+			t.Run("valid", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/labels", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "get"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp map[string]string
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Equal(t, "test-connector", resp["type"])
+			})
+		})
+
+		t.Run("get label", func(t *testing.T) {
+			t.Run("valid", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/labels/type", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "get"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp ConnectorLabelJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Equal(t, "type", resp.Key)
+				require.Equal(t, "test-connector", resp.Value)
+			})
+
+			t.Run("label not found", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/labels/nonexistent", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "get"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNotFound, w.Code)
+			})
+		})
+
+		t.Run("put label", func(t *testing.T) {
+			t.Run("bad uuid", func(t *testing.T) {
+				tu := setup(t, nil)
+				body := PutConnectorLabelRequestJson{Value: "val"}
+				jsonBody, _ := json.Marshal(body)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPut,
+					"/connectors/bad-uuid/labels/env",
+					bytes.NewReader(jsonBody),
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				req.Header.Set("Content-Type", "application/json")
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusBadRequest, w.Code)
+			})
+
+			t.Run("invalid key", func(t *testing.T) {
+				tu := setup(t, nil)
+				body := PutConnectorLabelRequestJson{Value: "val"}
+				jsonBody, _ := json.Marshal(body)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPut,
+					fmt.Sprintf("/connectors/%s/labels/!!invalid!!", connectorId),
+					bytes.NewReader(jsonBody),
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				req.Header.Set("Content-Type", "application/json")
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusBadRequest, w.Code)
+			})
+
+			t.Run("not found", func(t *testing.T) {
+				tu := setup(t, nil)
+				body := PutConnectorLabelRequestJson{Value: "val"}
+				jsonBody, _ := json.Marshal(body)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPut,
+					"/connectors/99999999-0000-0000-0000-000000000099/labels/env",
+					bytes.NewReader(jsonBody),
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				req.Header.Set("Content-Type", "application/json")
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNotFound, w.Code)
+			})
+
+			t.Run("valid - creates draft and sets label", func(t *testing.T) {
+				tu := setup(t, nil)
+				body := PutConnectorLabelRequestJson{Value: "production"}
+				jsonBody, _ := json.Marshal(body)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPut,
+					fmt.Sprintf("/connectors/%s/labels/env", connectorId),
+					bytes.NewReader(jsonBody),
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				req.Header.Set("Content-Type", "application/json")
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp ConnectorLabelJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Equal(t, "env", resp.Key)
+				require.Equal(t, "production", resp.Value)
+
+				// Verify the draft version has both the new label and existing labels
+				w = httptest.NewRecorder()
+				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/versions/2", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var versionResp ConnectorVersionJson
+				err = json.Unmarshal(w.Body.Bytes(), &versionResp)
+				require.NoError(t, err)
+				require.Equal(t, "production", versionResp.Labels["env"])
+				require.Equal(t, "test-connector", versionResp.Labels["type"])
+			})
+		})
+
+		t.Run("delete label", func(t *testing.T) {
+			t.Run("not found returns 204", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodDelete,
+					"/connectors/99999999-0000-0000-0000-000000000099/labels/env",
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNoContent, w.Code)
+			})
+
+			t.Run("valid - creates draft and removes label", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodDelete,
+					fmt.Sprintf("/connectors/%s/labels/type", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNoContent, w.Code)
+
+				// Verify the draft version no longer has the label
+				w = httptest.NewRecorder()
+				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/versions/2", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var versionResp ConnectorVersionJson
+				err = json.Unmarshal(w.Body.Bytes(), &versionResp)
+				require.NoError(t, err)
+				_, exists := versionResp.Labels["type"]
+				require.False(t, exists)
+			})
+		})
+	})
+
+	t.Run("version labels", func(t *testing.T) {
+		connectorId := uuid.MustParse("10000000-0000-0000-0000-000000000001")
+
+		t.Run("get version labels", func(t *testing.T) {
+			t.Run("version not found", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/versions/999/labels", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNotFound, w.Code)
+			})
+
+			t.Run("valid", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/versions/1/labels", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp map[string]string
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Equal(t, "test-connector", resp["type"])
+			})
+		})
+
+		t.Run("get version label", func(t *testing.T) {
+			t.Run("valid", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/versions/1/labels/type", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp ConnectorLabelJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Equal(t, "type", resp.Key)
+				require.Equal(t, "test-connector", resp.Value)
+			})
+
+			t.Run("label not found", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/versions/1/labels/nonexistent", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNotFound, w.Code)
+			})
+		})
+
+		t.Run("put version label", func(t *testing.T) {
+			t.Run("conflict - not a draft", func(t *testing.T) {
+				tu := setup(t, nil)
+				body := PutConnectorLabelRequestJson{Value: "val"}
+				jsonBody, _ := json.Marshal(body)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPut,
+					fmt.Sprintf("/connectors/%s/versions/1/labels/env", connectorId),
+					bytes.NewReader(jsonBody),
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				req.Header.Set("Content-Type", "application/json")
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusConflict, w.Code)
+			})
+
+			t.Run("valid - on draft version", func(t *testing.T) {
+				tu := setup(t, nil)
+
+				// First create a draft version
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPost,
+					fmt.Sprintf("/connectors/%s/versions", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusCreated, w.Code)
+
+				var createResp ConnectorVersionJson
+				err = json.Unmarshal(w.Body.Bytes(), &createResp)
+				require.NoError(t, err)
+				draftVersion := createResp.Version
+
+				// Put a label on the draft version
+				body := PutConnectorLabelRequestJson{Value: "staging"}
+				jsonBody, _ := json.Marshal(body)
+				w = httptest.NewRecorder()
+				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPut,
+					fmt.Sprintf("/connectors/%s/versions/%d/labels/env", connectorId, draftVersion),
+					bytes.NewReader(jsonBody),
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				req.Header.Set("Content-Type", "application/json")
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp ConnectorLabelJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Equal(t, "env", resp.Key)
+				require.Equal(t, "staging", resp.Value)
+			})
+		})
+
+		t.Run("delete version label", func(t *testing.T) {
+			t.Run("conflict - not a draft", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodDelete,
+					fmt.Sprintf("/connectors/%s/versions/1/labels/type", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusConflict, w.Code)
+			})
+
+			t.Run("not found returns 204", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodDelete,
+					"/connectors/99999999-0000-0000-0000-000000000099/versions/999/labels/env",
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNoContent, w.Code)
+			})
+
+			t.Run("valid - on draft version", func(t *testing.T) {
+				tu := setup(t, nil)
+
+				// First create a draft version
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPost,
+					fmt.Sprintf("/connectors/%s/versions", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusCreated, w.Code)
+
+				var createResp ConnectorVersionJson
+				err = json.Unmarshal(w.Body.Bytes(), &createResp)
+				require.NoError(t, err)
+				draftVersion := createResp.Version
+
+				// Delete a label from the draft version
+				w = httptest.NewRecorder()
+				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodDelete,
+					fmt.Sprintf("/connectors/%s/versions/%d/labels/type", connectorId, draftVersion),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNoContent, w.Code)
+
+				// Verify the label is gone
+				w = httptest.NewRecorder()
+				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/versions/%d/labels", connectorId, draftVersion),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var labels map[string]string
+				err = json.Unmarshal(w.Body.Bytes(), &labels)
+				require.NoError(t, err)
+				_, exists := labels["type"]
+				require.False(t, exists)
+			})
+		})
+	})
 }
