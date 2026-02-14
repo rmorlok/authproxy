@@ -254,6 +254,38 @@ type SwaggerListRequestsResponse struct {
 	Total *int64 `json:"total,omitempty"`
 }
 
+// SwaggerCreateConnectorRequest is the request to create a new connector
+//
+//	@Description	Request to create a new connector
+type SwaggerCreateConnectorRequest struct {
+	// Namespace path for the connector
+	Namespace string `json:"namespace" example:"acme"`
+	// Connector definition (full schema)
+	Definition interface{} `json:"definition"`
+	// Labels to set on the connector
+	Labels map[string]string `json:"labels,omitempty"`
+}
+
+// SwaggerUpdateConnectorRequest is the request to update a connector or connector version
+//
+//	@Description	Request to update a connector or connector version
+type SwaggerUpdateConnectorRequest struct {
+	// Connector definition (full schema, optional - nil keeps existing)
+	Definition interface{} `json:"definition,omitempty"`
+	// Labels to set on the connector (optional - nil keeps existing)
+	Labels *map[string]string `json:"labels,omitempty"`
+}
+
+// SwaggerCreateConnectorVersionRequest is the request to create a new connector version
+//
+//	@Description	Request to create a new draft connector version
+type SwaggerCreateConnectorVersionRequest struct {
+	// Connector definition (optional - nil copies from latest version)
+	Definition interface{} `json:"definition,omitempty"`
+	// Labels to set on the new version (optional - nil copies from latest)
+	Labels *map[string]string `json:"labels,omitempty"`
+}
+
 // SwaggerForceStateRequest is the request to force a connection state
 //
 //	@Description	Request to force a connection state

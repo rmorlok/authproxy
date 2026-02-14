@@ -1,21 +1,23 @@
 package routes
 
 import (
+	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
+	"github.com/pkg/errors"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/core"
 	connIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
-
-	"net/http"
 )
 
 type ConnectorJson struct {
@@ -116,6 +118,25 @@ type ListConnectorVersionsRequestQueryParams struct {
 type ListConnectorVersionsResponseJson struct {
 	Items  []ConnectorVersionJson `json:"items"`
 	Cursor string                 `json:"cursor,omitempty"`
+}
+
+// CreateConnectorRequestJson is the request body for POST /connectors
+type CreateConnectorRequestJson struct {
+	Namespace  string            `json:"namespace"`
+	Definition cschema.Connector `json:"definition"`
+	Labels     map[string]string `json:"labels,omitempty"`
+}
+
+// UpdateConnectorRequestJson is the request body for PATCH /connectors/:id and PATCH /connectors/:id/versions/:version
+type UpdateConnectorRequestJson struct {
+	Definition *cschema.Connector `json:"definition,omitempty"`
+	Labels     *map[string]string `json:"labels,omitempty"`
+}
+
+// CreateConnectorVersionRequestJson is the request body for POST /connectors/:id/versions
+type CreateConnectorVersionRequestJson struct {
+	Definition *cschema.Connector `json:"definition,omitempty"`
+	Labels     *map[string]string `json:"labels,omitempty"`
 }
 
 type ConnectorsRoutes struct {
@@ -597,6 +618,574 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 	})
 }
 
+// @Summary		Create connector
+// @Description	Create a new connector with version 1 in draft state
+// @Tags			connectors
+// @Accept			json
+// @Produce		json
+// @Param			request	body		SwaggerCreateConnectorRequest	true	"Connector creation request"
+// @Success		201		{object}	SwaggerConnectorVersionJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connectors [post]
+func (r *ConnectorsRoutes) createConnector(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	var req CreateConnectorRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg(err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if err := database.ValidateNamespacePath(req.Namespace); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid namespace '%s': %s", req.Namespace, err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if err := database.Labels(req.Labels).Validate(); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid labels: %s", err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if err := req.Definition.Validate(&common.ValidationContext{}); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid connector definition: %s", err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if err := val.ValidateNamespace(req.Namespace); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusForbidden().
+			WithPublicErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	result, err := r.connectors.CreateConnectorVersion(ctx, req.Namespace, &req.Definition, req.Labels)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			DefaultStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusCreated, ConnectorVersionToJson(result))
+}
+
+// @Summary		Update connector
+// @Description	Update an existing connector's draft version, creating one if needed
+// @Tags			connectors
+// @Accept			json
+// @Produce		json
+// @Param			id		path		string							true	"Connector UUID"
+// @Param			request	body		SwaggerUpdateConnectorRequest	true	"Connector update request"
+// @Success		200		{object}	SwaggerConnectorVersionJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connectors/{id} [patch]
+func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	connectorIdStr := gctx.Param("id")
+	if connectorIdStr == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	connectorId, err := uuid.Parse(connectorIdStr)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if connectorId == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	var req UpdateConnectorRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg(err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if req.Labels != nil {
+		if err := database.Labels(*req.Labels).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid labels: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
+	draft, err := r.connectors.GetOrCreateDraftConnectorVersion(ctx, connectorId)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("connector '%s' not found", connectorId).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+		api_common.NewHttpStatusErrorBuilder().
+			DefaultStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(draft); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	var def *cschema.Connector
+	if req.Definition != nil {
+		def = req.Definition
+	} else {
+		def = draft.GetDefinition()
+	}
+
+	if err := def.Validate(&common.ValidationContext{}); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid connector definition: %s", err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	var labels map[string]string
+	if req.Labels != nil {
+		labels = *req.Labels
+	} else {
+		labels = draft.GetLabels()
+	}
+
+	result, err := r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, draft.GetVersion(), def, labels)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			DefaultStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, ConnectorVersionToJson(result))
+}
+
+// @Summary		Create connector version
+// @Description	Create a new draft version for an existing connector
+// @Tags			connectors
+// @Accept			json
+// @Produce		json
+// @Param			id		path		string									true	"Connector UUID"
+// @Param			request	body		SwaggerCreateConnectorVersionRequest	false	"Version creation request"
+// @Success		201		{object}	SwaggerConnectorVersionJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		409		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connectors/{id}/versions [post]
+func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	connectorIdStr := gctx.Param("id")
+	if connectorIdStr == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	connectorId, err := uuid.Parse(connectorIdStr)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if connectorId == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Verify the connector exists and check auth
+	connectorResult := r.connectors.
+		ListConnectorsBuilder().
+		ForId(connectorId).
+		Limit(1).
+		FetchPage(ctx)
+
+	if connectorResult.Error != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(connectorResult.Error).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if len(connectorResult.Results) == 0 {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsgf("connector '%s' not found", connectorId).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	connector := connectorResult.Results[0]
+	if httpErr := val.ValidateHttpStatusError(connector); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	var req CreateConnectorVersionRequestJson
+	// Support a blank post to create a new draft version of the connector
+	if gctx.Request.ContentLength > 0 {
+		if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsg(err.Error()).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
+	if req.Definition != nil {
+		if err := req.Definition.Validate(&common.ValidationContext{}); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid connector definition: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
+	var labels map[string]string
+	if req.Labels != nil {
+		labels = *req.Labels
+		if err := database.Labels(labels).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid labels: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
+	result, err := r.connectors.CreateDraftConnectorVersion(ctx, connectorId, req.Definition, labels)
+	if err != nil {
+		if errors.Is(err, core.ErrDraftAlreadyExists) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatus(http.StatusConflict).
+				WithResponseMsg("a draft version already exists for this connector").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("connector '%s' not found", connectorId).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+		api_common.NewHttpStatusErrorBuilder().
+			DefaultStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusCreated, ConnectorVersionToJson(result))
+}
+
+// @Summary		Update connector version
+// @Description	Update a specific draft version of a connector
+// @Tags			connectors
+// @Accept			json
+// @Produce		json
+// @Param			id		path		string							true	"Connector UUID"
+// @Param			version	path		integer							true	"Version number"
+// @Param			request	body		SwaggerUpdateConnectorRequest	true	"Version update request"
+// @Success		200		{object}	SwaggerConnectorVersionJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		409		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connectors/{id}/versions/{version} [patch]
+func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	connectorIdStr := gctx.Param("id")
+	if connectorIdStr == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	connectorId, err := uuid.Parse(connectorIdStr)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if connectorId == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	versionStr := gctx.Param("version")
+	if versionStr == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("version is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	version, err := strconv.ParseUint(versionStr, 10, 64)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("failed to parse version as an integer").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	var req UpdateConnectorRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg(err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if req.Labels != nil {
+		if err := database.Labels(*req.Labels).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid labels: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
+	existing, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("connector version '%s:%d' not found", connectorId, version).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+		api_common.NewHttpStatusErrorBuilder().
+			DefaultStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(existing); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if existing.GetState() != database.ConnectorVersionStateDraft {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatus(http.StatusConflict).
+			WithResponseMsgf("connector version '%s:%d' is not a draft", connectorId, version).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	var def *cschema.Connector
+	if req.Definition != nil {
+		def = req.Definition
+	} else {
+		def = existing.GetDefinition()
+	}
+
+	if err := def.Validate(&common.ValidationContext{}); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid connector definition: %s", err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	var labels map[string]string
+	if req.Labels != nil {
+		labels = *req.Labels
+	} else {
+		labels = existing.GetLabels()
+	}
+
+	result, err := r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, version, def, labels)
+	if err != nil {
+		if errors.Is(err, core.ErrNotDraft) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatus(http.StatusConflict).
+				WithResponseMsgf("connector version '%s:%d' is not a draft", connectorId, version).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+		api_common.NewHttpStatusErrorBuilder().
+			DefaultStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, ConnectorVersionToJson(result))
+}
+
 func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 	g.GET(
 		"/connectors",
@@ -631,6 +1220,37 @@ func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 			ForVerb("list/versions").
 			Build(),
 		r.getVersion,
+	)
+	g.POST("/connectors",
+		r.authService.NewRequiredBuilder().
+			ForResource("connectors").
+			ForVerb("create").
+			Build(),
+		r.createConnector,
+	)
+	g.PATCH("/connectors/:id",
+		r.authService.NewRequiredBuilder().
+			ForResource("connectors").
+			ForIdField("id").
+			ForVerb("update").
+			Build(),
+		r.updateConnector,
+	)
+	g.POST("/connectors/:id/versions",
+		r.authService.NewRequiredBuilder().
+			ForResource("connectors").
+			ForIdField("id").
+			ForVerb("create").
+			Build(),
+		r.createVersion,
+	)
+	g.PATCH("/connectors/:id/versions/:version",
+		r.authService.NewRequiredBuilder().
+			ForResource("connectors").
+			ForIdField("id").
+			ForVerb("update").
+			Build(),
+		r.updateVersion,
 	)
 }
 

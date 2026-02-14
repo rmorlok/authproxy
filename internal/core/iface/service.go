@@ -6,6 +6,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/database"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/rmorlok/authproxy/internal/tasks"
 )
 
@@ -56,6 +57,20 @@ type C interface {
 
 	// ListConnectorVersionsFromCursor continues listing connector versions from a cursor to support pagination.
 	ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error)
+
+	// CreateConnectorVersion creates a new connector with version 1 in draft state.
+	CreateConnectorVersion(ctx context.Context, namespace string, definition *cschema.Connector, labels map[string]string) (ConnectorVersion, error)
+
+	// CreateDraftConnectorVersion creates a new draft version for an existing connector.
+	// Returns ErrDraftAlreadyExists if a draft version already exists.
+	CreateDraftConnectorVersion(ctx context.Context, id uuid.UUID, definition *cschema.Connector, labels map[string]string) (ConnectorVersion, error)
+
+	// UpdateDraftConnectorVersion updates an existing draft version.
+	// Returns ErrNotDraft if the version is not in draft state.
+	UpdateDraftConnectorVersion(ctx context.Context, id uuid.UUID, version uint64, definition *cschema.Connector, labels map[string]string) (ConnectorVersion, error)
+
+	// GetOrCreateDraftConnectorVersion returns the existing draft version, or creates a new one by cloning the latest version.
+	GetOrCreateDraftConnectorVersion(ctx context.Context, id uuid.UUID) (ConnectorVersion, error)
 
 	/*
 	 *
