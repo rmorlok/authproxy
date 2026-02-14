@@ -319,3 +319,21 @@ type SwaggerConnectionLabelJson struct {
 	// Label value
 	Value string `json:"value" example:"production"`
 }
+
+// SwaggerPutConnectorLabelRequest is the request to set a single label on a connector
+//
+//	@Description	Request to set a connector label value
+type SwaggerPutConnectorLabelRequest struct {
+	// Label value
+	Value string `json:"value" example:"production"`
+}
+
+// SwaggerConnectorLabelJson is a single connector label key-value pair
+//
+//	@Description	Connector label key-value pair
+type SwaggerConnectorLabelJson struct {
+	// Label key
+	Key string `json:"key" example:"env"`
+	// Label value
+	Value string `json:"value" example:"production"`
+}

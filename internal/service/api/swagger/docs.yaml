@@ -269,6 +269,18 @@ definitions:
         example: 1
         type: integer
     type: object
+  routes.SwaggerConnectorLabelJson:
+    description: Connector label key-value pair
+    properties:
+      key:
+        description: Label key
+        example: env
+        type: string
+      value:
+        description: Label value
+        example: production
+        type: string
+    type: object
   routes.SwaggerConnectorVersionJson:
     description: Detailed connector version information
     properties:
@@ -437,6 +449,14 @@ definitions:
     type: object
   routes.SwaggerPutConnectionLabelRequest:
     description: Request to set a label value
+    properties:
+      value:
+        description: Label value
+        example: production
+        type: string
+    type: object
+  routes.SwaggerPutConnectorLabelRequest:
+    description: Request to set a connector label value
     properties:
       value:
         description: Label value
@@ -1768,6 +1788,188 @@ paths:
       summary: Update connector
       tags:
       - connectors
+  /connectors/{id}/labels:
+    get:
+      consumes:
+      - application/json
+      description: Get all labels associated with the primary version of a connector
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all labels for a connector
+      tags:
+      - connectors
+  /connectors/{id}/labels/{label}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific label from a connector's draft version, creating
+        one if needed
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a label from a connector
+      tags:
+      - connectors
+    get:
+      consumes:
+      - application/json
+      description: Get a specific label value by key for the primary version of a
+        connector
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerConnectorLabelJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a specific label for a connector
+      tags:
+      - connectors
+    put:
+      consumes:
+      - application/json
+      description: Set or update a specific label on a connector's draft version,
+        creating one if needed
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      - description: Label value
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.SwaggerPutConnectorLabelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerConnectorLabelJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set a label for a connector
+      tags:
+      - connectors
   /connectors/{id}/versions:
     get:
       consumes:
@@ -1977,6 +2179,214 @@ paths:
       security:
       - BearerAuth: []
       summary: Update connector version
+      tags:
+      - connectors
+  /connectors/{id}/versions/{version}/labels:
+    get:
+      consumes:
+      - application/json
+      description: Get all labels associated with a specific version of a connector
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Version number
+        in: path
+        name: version
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all labels for a connector version
+      tags:
+      - connectors
+  /connectors/{id}/versions/{version}/labels/{label}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific label from a specific draft version of a connector
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Version number
+        in: path
+        name: version
+        required: true
+        type: integer
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a label from a connector version
+      tags:
+      - connectors
+    get:
+      consumes:
+      - application/json
+      description: Get a specific label value by key for a specific version of a connector
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Version number
+        in: path
+        name: version
+        required: true
+        type: integer
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerConnectorLabelJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a specific label for a connector version
+      tags:
+      - connectors
+    put:
+      consumes:
+      - application/json
+      description: Set or update a specific label on a specific draft version of a
+        connector
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Version number
+        in: path
+        name: version
+        required: true
+        type: integer
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      - description: Label value
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.SwaggerPutConnectorLabelRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerConnectorLabelJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set a label for a connector version
       tags:
       - connectors
   /namespaces:
