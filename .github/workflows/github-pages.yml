@@ -29,9 +29,6 @@ jobs:
       - name: Setup Volta
         uses: volta-cli/action@v4
 
-      - name: Enable corepack
-        run: corepack enable
-
       - name: Install dependencies
         run: yarn install --immutable
 

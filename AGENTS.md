@@ -216,6 +216,26 @@ Actors represent users or entities that own connections. They have email, extern
 ### Namespaces
 Logical grouping for connectors and connections, allowing multi-tenancy.
 
+## Investigating CI/CD Failures
+
+When a GitHub Actions workflow is failing, use the `gh` CLI to investigate:
+
+```bash
+# List recent runs for a specific workflow
+gh run list --workflow=<workflow-file>.yml --limit=5
+
+# View failed step logs for a specific run
+gh run view <run-id> --log-failed
+
+# View full logs for a run
+gh run view <run-id> --log
+
+# List all workflows
+gh workflow list
+```
+
+When investigating, check the failed step output carefully for the root cause. Common issues include version mismatches, missing dependencies, or configuration errors.
+
 ## Testing Notes
 
 - Use `internal/test_utils` for common test helpers
