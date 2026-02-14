@@ -89,10 +89,10 @@ export interface ListRequestsParams {
     connector_version?: number;
     method?: string;
     status_code?: number;
-    status_code_range?: number;
+    status_code_range?: string; // Changed to string to match Go's format (e.g., "200-299")
     timestamp_range?: string;
     path?: string;
-    path_regex?: number;
+    path_regex?: string; // Changed to string to match Go's format
 }
 
 /**
