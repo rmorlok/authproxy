@@ -8,6 +8,27 @@ proxy and stay focussed on the business logic of your product.
 
 ## Running Locally
 
+### Prerequisites
+
+Install the following on MacOS:
+
+```bash
+brew install go
+brew install gh
+brew install volta
+brew install jq
+```
+
+Install Docker Desktop separately from their website.
+
+Setup Javascript/Typescript dependencies:
+
+```bash
+volta install node
+volta install yarn
+yarn install
+```
+
 Create a network for the asynq system to interact with redis:
 
 ```bash
@@ -74,16 +95,6 @@ go test -v ./...
 ```
 
 # UI
-
-## Setup
-
-Make sure you have [nvm](https://github.com/nvm-sh/nvm) installed. From the repository root:
-
-```bash
-npm install -g corepack
-yarn set version 4.11.0
-yarn
-```
 
 ## Marketplace UI
 
