@@ -11,3 +11,4 @@ export * from './namespaces';
 export * from './requests';
 export * from './session';
 export * from './tasks';
+export * from './taskMonitoring';
