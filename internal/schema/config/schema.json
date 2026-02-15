@@ -122,9 +122,55 @@
       "required": ["provider", "path"],
       "additionalProperties": false
     },
+    "DatabasePostgres": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "const": "postgres"
+        },
+        "host": {
+          "$ref": "../common/schema.json#/$defs/StringValue"
+        },
+        "port": {
+          "$ref": "../common/schema.json#/$defs/IntegerValue"
+        },
+        "user": {
+          "$ref": "../common/schema.json#/$defs/StringValue"
+        },
+        "password": {
+          "$ref": "../common/schema.json#/$defs/StringValue"
+        },
+        "database": {
+          "$ref": "../common/schema.json#/$defs/StringValue"
+        },
+        "sslmode": {
+          "$ref": "../common/schema.json#/$defs/StringValue"
+        },
+        "params": {
+          "type": "object",
+          "properties": {
+            "attributes": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "auto_migrate": {
+          "type": "boolean"
+        },
+        "auto_migration_lock_duration": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        }
+      },
+      "required": ["provider", "host"],
+      "additionalProperties": false
+    },
     "Database": {
       "oneOf": [
-        { "$ref": "#/$defs/DatabaseSqlite" }
+        { "$ref": "#/$defs/DatabaseSqlite" },
+        { "$ref": "#/$defs/DatabasePostgres" }
       ]
     },
     "DevSettings": {
@@ -311,10 +357,10 @@
     "ServiceAdminApi": {
       "properties": {
         "health_check_port": {
-          "$ref": "../common/schema.json#/$defs/StringValueNumber"
+          "$ref": "../common/schema.json#/$defs/IntegerValue"
         },
         "port": {
-          "$ref": "../common/schema.json#/$defs/StringValueNumber"
+          "$ref": "../common/schema.json#/$defs/IntegerValue"
         },
         "domain": {
           "type": "string"
@@ -365,10 +411,10 @@
     "ServiceApi": {
       "properties": {
         "health_check_port": {
-          "$ref": "../common/schema.json#/$defs/StringValueNumber"
+          "$ref": "../common/schema.json#/$defs/IntegerValue"
         },
         "port": {
-          "$ref": "../common/schema.json#/$defs/StringValueNumber"
+          "$ref": "../common/schema.json#/$defs/IntegerValue"
         },
         "domain": {
           "type": "string"
@@ -389,10 +435,10 @@
     "ServicePublic": {
       "properties": {
         "health_check_port": {
-          "$ref": "../common/schema.json#/$defs/StringValueNumber"
+          "$ref": "../common/schema.json#/$defs/IntegerValue"
         },
         "port": {
-          "$ref": "../common/schema.json#/$defs/StringValueNumber"
+          "$ref": "../common/schema.json#/$defs/IntegerValue"
         },
         "domain": {
           "type": "string"
@@ -443,7 +489,7 @@
     "ServiceWorker": {
       "properties": {
         "health_check_port": {
-          "$ref": "../common/schema.json#/$defs/StringValueNumber",
+          "$ref": "../common/schema.json#/$defs/IntegerValue",
           "description": "The port on which the worker will listen for health checks."
         },
         "concurrency": {

@@ -13,6 +13,9 @@ type (
 	Image                   = common.Image
 	ImageBase64             = common.ImageBase64
 	ImagePublicUrl          = common.ImagePublicUrl
+	IntegerValue            = common.IntegerValue
+	IntegerValueDirect      = common.IntegerValueDirect
+	IntegerValueEnvVar      = common.IntegerValueEnvVar
 	StringValue             = common.StringValue
 	StringValueBase64       = common.StringValueBase64
 	StringValueDirect       = common.StringValueDirect

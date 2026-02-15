@@ -3,6 +3,7 @@ package config
 import (
 	"testing"
 
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/stretchr/testify/require"
 )
 
@@ -38,12 +39,12 @@ func TestDatabase(t *testing.T) {
 			assert.NoError(err)
 			assert.Equal(&DatabasePostgres{
 				Provider: DatabaseProviderPostgres,
-				Host:     "localhost",
-				Port:     5432,
-				User:     "test",
-				Password: "secret",
-				Database: "authproxy",
-				SSLMode:  "disable",
+				Host:     common.NewStringValueDirectInline("localhost"),
+				Port:     common.NewIntegerValueDirectInline(5432),
+				User:     common.NewStringValueDirectInline("test"),
+				Password: common.NewStringValueDirectInline("secret"),
+				Database: common.NewStringValueDirectInline("authproxy"),
+				SSLMode:  common.NewStringValueDirectInline("disable"),
 				Params: map[string]string{
 					"application_name": "authproxy-tests",
 				},

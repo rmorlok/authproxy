@@ -18,6 +18,7 @@ import (
 	"github.com/peterldowns/pgtestdb"
 	"github.com/peterldowns/pgtestdb/migrators/golangmigrator"
 	"github.com/rmorlok/authproxy/internal/config"
+	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 )
@@ -201,12 +202,12 @@ func mustApplyBlankPostgresTestDbConfig(t testing.TB, cfg config.C) (config.C, D
 
 	root.Database = &sconfig.DatabasePostgres{
 		Provider: sconfig.DatabaseProviderPostgres,
-		Host:     testDbConfig.Host,
-		Port:     port,
-		User:     testDbConfig.User,
-		Password: testDbConfig.Password,
-		Database: testDbConfig.Database,
-		SSLMode:  sslMode,
+		Host:     scommon.NewStringValueDirectInline(testDbConfig.Host),
+		Port:     scommon.NewIntegerValueDirectInline(int64(port)),
+		User:     scommon.NewStringValueDirectInline(testDbConfig.User),
+		Password: scommon.NewStringValueDirectInline(testDbConfig.Password),
+		Database: scommon.NewStringValueDirectInline(testDbConfig.Database),
+		SSLMode:  scommon.NewStringValueDirectInline(sslMode),
 		Params:   params,
 	}
 
