@@ -11,6 +11,7 @@ import ConnectionDetail from "./pages/ConnectionDetail";
 import ConnectorVersionDetail from "./pages/ConnectorVersionDetail";
 import ActorsPage from "./pages/Actors";
 import TasksPage from "./pages/Tasks";
+import TaskQueueDetailPage from "./pages/TaskQueueDetail";
 import AboutPage from "./pages/About";
 import * as React from "react";
 
@@ -110,6 +111,24 @@ export const router = createBrowserRouter([
                 path: 'tasks',
                 element: <TasksPage />,
                 handle: { title: 'Tasks' }
+            },
+            {
+                path: 'tasks/queues/:queue',
+                element: <TaskQueueDetailPage />,
+                handle: [
+                    {
+                        title: 'Tasks',
+                        path: (_params: Params<string>) => `/tasks`,
+                    },
+                    {
+                        title: 'Queues',
+                        path: (_params: Params<string>) => `/tasks`,
+                    },
+                    {
+                        attr: 'queue',
+                        path: (params: Params<string>) => `/tasks/queues/${params.queue}`,
+                    },
+                ],
             },
             {
                 path: 'about',
