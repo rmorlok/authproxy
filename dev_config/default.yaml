@@ -24,7 +24,7 @@ admin_api:
 worker:
   health_check_port:
     env_var: HEALTH_CHECK_PORT
-    default: "8083"
+    default: 8083
   cron_sync_interval: 1m
 
 host_application:
@@ -54,10 +54,14 @@ error_pages:
   internal_error: https://example.com
 
 database:
-  provider: sqlite
+  provider: postgres
   auto_migrate: true
-  auto_migration_lock_duration: 30s
-  path: ./tmp/dev.db
+  host: localhost
+  port: 5432
+  user: postgres
+  password: postgres
+  database: authproxy
+  sslmode: disable
 
 logging:
   type: tint

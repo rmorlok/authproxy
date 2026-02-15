@@ -499,7 +499,7 @@ func TestSchema(t *testing.T) {
 			},
 		},
 		{
-			Name: "StringValueNumber",
+			Name: "IntegerValue",
 			Schema: `
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -509,7 +509,7 @@ func TestSchema(t *testing.T) {
   "required": ["test"],
   "properties": {
 	"test": {
-		"$ref": "./schema.json#/$defs/StringValueNumber"
+		"$ref": "./schema.json#/$defs/IntegerValue"
     }
   }
 }`,
@@ -542,32 +542,17 @@ func TestSchema(t *testing.T) {
 				{
 					Name:  "value",
 					Valid: true,
-					Data:  `{"test": {"value": "some string"}}`,
-				},
-				{
-					Name:  "value - doesn't coerce number to string",
-					Valid: false,
 					Data:  `{"test": {"value": 8080}}`,
 				},
 				{
-					Name:  "value - doesn't coerce bool to string",
+					Name:  "value - bool",
 					Valid: false,
 					Data:  `{"test": {"value": true}}`,
 				},
 				{
 					Name:  "value - other attributes",
 					Valid: false,
-					Data:  `{"test": {"value": "some string", "other": "value"}}`,
-				},
-				{
-					Name:  "base64",
-					Valid: true,
-					Data:  `{"test": {"base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="}}`,
-				},
-				{
-					Name:  "base64 - other attributes",
-					Valid: false,
-					Data:  `{"test": {"base64": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=", "other": "value"}}`,
+					Data:  `{"test": {"value": 99, "other": "value"}}`,
 				},
 				{
 					Name:  "env var",
@@ -577,15 +562,15 @@ func TestSchema(t *testing.T) {
 				{
 					Name:  "env var - default",
 					Valid: true,
+					Data:  `{"test": {"env_var": "SOME_ENV_VAR", "default": 1985}}`,
+				},
+				{
+					Name:  "env var - default with string",
+					Valid: false,
 					Data:  `{"test": {"env_var": "SOME_ENV_VAR", "default": "some string"}}`,
 				},
 				{
-					Name:  "env var - default - doesn't coerce number to string",
-					Valid: false,
-					Data:  `{"test": {"env_var": "SOME_ENV_VAR", "default": 8080}}`,
-				},
-				{
-					Name:  "env var - default - doesn't coerce bool to string",
+					Name:  "env var - default bool",
 					Valid: false,
 					Data:  `{"test": {"env_var": "SOME_ENV_VAR", "default": true}}`,
 				},
@@ -593,31 +578,6 @@ func TestSchema(t *testing.T) {
 					Name:  "env var - other attributes",
 					Valid: false,
 					Data:  `{"test": {"env_var": "SOME_ENV_VAR", "default": "some string", "other": "value"}}`,
-				},
-				{
-					Name:  "env var base64",
-					Valid: true,
-					Data:  `{"test": {"env_var_base64": "SOME_ENV_VAR"}}`,
-				},
-				{
-					Name:  "env var base64 - default",
-					Valid: true,
-					Data:  `{"test": {"env_var_base64": "SOME_ENV_VAR", "default": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII="}}`,
-				},
-				{
-					Name:  "env var base64 - other attributes",
-					Valid: false,
-					Data:  `{"test": {"env_var_base64": "SOME_ENV_VAR", "default": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=", "other": "value"}}`,
-				},
-				{
-					Name:  "file",
-					Valid: true,
-					Data:  `{"test": {"path": "/path/to/file"}}`,
-				},
-				{
-					Name:  "file - other attributes",
-					Valid: false,
-					Data:  `{"test": {"path": "/path/to/file", "other": "value"}}`,
 				},
 			},
 		},

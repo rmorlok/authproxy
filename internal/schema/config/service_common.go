@@ -5,13 +5,12 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
-	"strconv"
 
 	"gopkg.in/yaml.v3"
 )
 
 type ServiceCommon struct {
-	HealthCheckPortVal *StringValue `json:"health_check_port,omitempty" yaml:"health_check_port,omitempty"`
+	HealthCheckPortVal *IntegerValue `json:"health_check_port,omitempty" yaml:"health_check_port,omitempty"`
 }
 
 func (s *ServiceCommon) healthCheckPort() *uint64 {
@@ -19,14 +18,9 @@ func (s *ServiceCommon) healthCheckPort() *uint64 {
 		return nil
 	}
 
-	portS, err := s.HealthCheckPortVal.GetValue(context.Background())
+	port, err := s.HealthCheckPortVal.GetUint64Value(context.Background())
 	if err != nil {
 		panic("failed to obtain health check port from admin api config")
-	}
-
-	port, err := strconv.ParseUint(portS, 10, 64)
-	if err != nil {
-		panic(fmt.Sprintf("failed to parse health check port '%s' from admin api config", portS))
 	}
 
 	return &port
@@ -34,11 +28,11 @@ func (s *ServiceCommon) healthCheckPort() *uint64 {
 
 type ServiceHttp struct {
 	ServiceCommon `json:",inline" yaml:",inline"`
-	PortVal       *StringValue `json:"port" yaml:"port"`
-	DomainVal     string       `json:"domain" yaml:"domain"`
-	IsHttpsVal    bool         `json:"https" yaml:"https"`
-	CorsVal       *CorsConfig  `json:"cors,omitempty" yaml:"cors,omitempty"`
-	TlsVal        TlsConfig    `json:"tls,omitempty" yaml:"tls,omitempty"`
+	PortVal       *IntegerValue `json:"port" yaml:"port"`
+	DomainVal     string        `json:"domain" yaml:"domain"`
+	IsHttpsVal    bool          `json:"https" yaml:"https"`
+	CorsVal       *CorsConfig   `json:"cors,omitempty" yaml:"cors,omitempty"`
+	TlsVal        TlsConfig     `json:"tls,omitempty" yaml:"tls,omitempty"`
 }
 
 func httpServiceUnmarshalYAML(value *yaml.Node) (ServiceHttp, error) {
@@ -88,14 +82,9 @@ func httpServiceUnmarshalYAML(value *yaml.Node) (ServiceHttp, error) {
 }
 
 func (s *ServiceHttp) Port() uint64 {
-	portS, err := s.PortVal.GetValue(context.Background())
+	port, err := s.PortVal.GetUint64Value(context.Background())
 	if err != nil {
 		panic("failed to obtain port from admin api config")
-	}
-
-	port, err := strconv.ParseUint(portS, 10, 64)
-	if err != nil {
-		panic(fmt.Sprintf("failed to parse port '%s' from admin api config", portS))
 	}
 
 	return port
@@ -106,14 +95,9 @@ func (s *ServiceHttp) HealthCheckPort() uint64 {
 		return s.Port()
 	}
 
-	portS, err := s.HealthCheckPortVal.GetValue(context.Background())
+	port, err := s.HealthCheckPortVal.GetUint64Value(context.Background())
 	if err != nil {
 		panic("failed to obtain health check port from admin api config")
-	}
-
-	port, err := strconv.ParseUint(portS, 10, 64)
-	if err != nil {
-		panic(fmt.Sprintf("failed to parse health check port '%s' from admin api config", portS))
 	}
 
 	return port

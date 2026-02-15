@@ -160,7 +160,7 @@ func (b *TestGinServerBuilder) Build() TestSetup {
 		b.cfg = config.FromRoot(&sconfig.Root{
 			Public: sconfig.ServicePublic{
 				ServiceHttp: sconfig.ServiceHttp{
-					PortVal:    &sconfig.StringValue{InnerVal: &sconfig.StringValueDirect{Value: "8080"}},
+					PortVal:    &sconfig.IntegerValue{InnerVal: &sconfig.IntegerValueDirect{Value: 8080}},
 					DomainVal:  "example.com",
 					IsHttpsVal: false,
 				},

@@ -311,7 +311,7 @@ func TestAuth_Parse(t *testing.T) {
 			},
 			AdminApi: sconfig.ServiceAdminApi{
 				ServiceHttp: sconfig.ServiceHttp{
-					PortVal: &sconfig.StringValue{&sconfig.StringValueDirect{Value: "8080"}},
+					PortVal: &sconfig.IntegerValue{&sconfig.IntegerValueDirect{Value: 8080}},
 				},
 			},
 		})
@@ -377,7 +377,7 @@ func TestAuth_Parse(t *testing.T) {
 			},
 			AdminApi: sconfig.ServiceAdminApi{
 				ServiceHttp: sconfig.ServiceHttp{
-					PortVal: &sconfig.StringValue{&sconfig.StringValueDirect{Value: "8080"}},
+					PortVal: &sconfig.IntegerValue{&sconfig.IntegerValueDirect{Value: 8080}},
 				},
 			},
 		})
@@ -715,7 +715,7 @@ func TestAuth_ActorPermissionsSync(t *testing.T) {
 		},
 		AdminApi: sconfig.ServiceAdminApi{
 			ServiceHttp: sconfig.ServiceHttp{
-				PortVal: &sconfig.StringValue{&sconfig.StringValueDirect{Value: "8080"}},
+				PortVal: &sconfig.IntegerValue{&sconfig.IntegerValueDirect{Value: 8080}},
 			},
 		},
 	}
@@ -1006,7 +1006,7 @@ var testConfigPublicPrivateKey = sconfig.Root{
 	},
 	AdminApi: sconfig.ServiceAdminApi{
 		ServiceHttp: sconfig.ServiceHttp{
-			PortVal: &sconfig.StringValue{&sconfig.StringValueDirect{Value: "8080"}},
+			PortVal: &sconfig.IntegerValue{&sconfig.IntegerValueDirect{Value: 8080}},
 		},
 	},
 }
@@ -1032,7 +1032,7 @@ var testConfigSecretKey = sconfig.Root{
 	},
 	AdminApi: sconfig.ServiceAdminApi{
 		ServiceHttp: sconfig.ServiceHttp{
-			PortVal: &sconfig.StringValue{&sconfig.StringValueDirect{Value: "8080"}},
+			PortVal: &sconfig.IntegerValue{&sconfig.IntegerValueDirect{Value: 8080}},
 		},
 	},
 }

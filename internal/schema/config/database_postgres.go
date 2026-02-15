@@ -1,6 +1,7 @@
 package config
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"sort"
@@ -8,16 +9,17 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 type DatabasePostgres struct {
 	Provider                  DatabaseProvider  `json:"provider" yaml:"provider"`
-	Host                      string            `json:"host" yaml:"host"`
-	Port                      int               `json:"port,omitempty" yaml:"port,omitempty"`
-	User                      string            `json:"user" yaml:"user"`
-	Password                  string            `json:"password,omitempty" yaml:"password,omitempty"`
-	Database                  string            `json:"database" yaml:"database"`
-	SSLMode                   string            `json:"sslmode,omitempty" yaml:"sslmode,omitempty"`
+	Host                      *StringValue      `json:"host" yaml:"host"`
+	Port                      *IntegerValue     `json:"port,omitempty" yaml:"port,omitempty"`
+	User                      *StringValue      `json:"user" yaml:"user"`
+	Password                  *StringValue      `json:"password,omitempty" yaml:"password,omitempty"`
+	Database                  *StringValue      `json:"database" yaml:"database"`
+	SSLMode                   *StringValue      `json:"sslmode,omitempty" yaml:"sslmode,omitempty"`
 	Params                    map[string]string `json:"params,omitempty" yaml:"params,omitempty"`
 	AutoMigrate               bool              `json:"auto_migrate,omitempty" yaml:"auto_migrate,omitempty"`
 	AutoMigrationLockDuration *HumanDuration    `json:"auto_migration_lock_duration,omitempty" yaml:"auto_migration_lock_duration,omitempty"`
@@ -53,35 +55,50 @@ func (d *DatabasePostgres) GetPlaceholderFormat() sq.PlaceholderFormat {
 }
 
 func (d *DatabasePostgres) buildUrl() *url.URL {
+	ctx := context.Background()
+
 	u := &url.URL{
 		Scheme: "postgres",
-		Path:   d.Database,
 	}
 
-	if d.User != "" {
-		if d.Password != "" {
-			u.User = url.UserPassword(d.User, d.Password)
+	if d.Database != nil {
+		u.Path = util.Must(d.Database.GetValue(ctx))
+	}
+
+	user := ""
+	if d.User != nil {
+		user = util.Must(d.User.GetValue(ctx))
+	}
+
+	password := ""
+	if d.Password != nil {
+		password = util.Must(d.Password.GetValue(ctx))
+	}
+
+	if user != "" {
+		if password != "" {
+			u.User = url.UserPassword(user, password)
 		} else {
-			u.User = url.User(d.User)
+			u.User = url.User(user)
 		}
 	}
 
-	host := d.Host
-	if host == "" {
-		host = "localhost"
+	host := "localhost"
+	if d.Host != nil {
+		host = util.Must(d.Host.GetValue(ctx))
 	}
 
-	port := d.Port
-	if port == 0 {
-		port = 5432
+	port := uint64(5432)
+	if d.Port != nil {
+		port = util.Must(d.Port.GetUint64Value(ctx))
 	}
 
 	u.Host = fmt.Sprintf("%s:%d", host, port)
 
 	params := url.Values{}
-	sslmode := d.SSLMode
-	if sslmode == "" {
-		sslmode = "disable"
+	sslmode := "disable"
+	if d.SSLMode != nil {
+		sslmode = util.Must(d.SSLMode.GetValue(ctx))
 	}
 	params.Set("sslmode", sslmode)
 

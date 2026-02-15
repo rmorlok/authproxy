@@ -1,11 +1,12 @@
 package routes
 
 import (
-	"github.com/rmorlok/authproxy/internal/api_common"
 	"net/http"
 	"net/http/httptest"
 	"testing"
-	
+
+	"github.com/rmorlok/authproxy/internal/api_common"
+
 	"github.com/rmorlok/authproxy/internal/config"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/assert"
@@ -18,7 +19,7 @@ func TestErrorRoutes(t *testing.T) {
 		ErrorPages: sconfig.ErrorPages{},
 		Public: sconfig.ServicePublic{
 			ServiceHttp: sconfig.ServiceHttp{
-				PortVal:    &sconfig.StringValue{&sconfig.StringValueDirect{Value: "8080"}},
+				PortVal:    &sconfig.IntegerValue{&sconfig.IntegerValueDirect{Value: 8080}},
 				DomainVal:  "localhost",
 				IsHttpsVal: false,
 			},

@@ -176,16 +176,49 @@
       ],
       "description": "A string value used in configuration that can be expressed in on of several ways."
     },
-    "StringValueNumber": {
-      "oneOf": [
-        { "$ref": "#/$defs/StringValueInlineNumber" },
-        { "$ref": "#/$defs/StringValueDirect" },
-        { "$ref": "#/$defs/StringValueBase64" },
-        { "$ref": "#/$defs/StringValueEnvVar" },
-        { "$ref": "#/$defs/StringValueEnvVarBase64" },
-        { "$ref": "#/$defs/StringValueFile" }
+    "IntegerValueInline": {
+      "type": "number",
+      "description": "A integer value used in configuration"
+    },
+    "IntegerValueDirect": {
+      "properties": {
+        "value": {
+          "type": "number",
+          "description": "A integer value used in configuration."
+        }
+      },
+      "type": "object",
+      "required": [
+        "value"
       ],
-      "description": "A number value used in configuration that can be expressed in on of several ways. When taken from other sources, the string value is parsed as a number."
+      "additionalProperties": false,
+      "description": "A integer value used in configuration"
+    },
+    "IntegerValueEnvVar": {
+      "properties": {
+        "env_var": {
+          "type": "string",
+          "description": "An environment variable from which the value will be read."
+        },
+        "default": {
+          "type": "integer",
+          "description": "An optional, default value to use if the environment variable is not set."
+        }
+      },
+      "type": "object",
+      "required": [
+        "env_var"
+      ],
+      "additionalProperties": false,
+      "description": "A integer value used in configuration"
+    },
+    "IntegerValue": {
+      "oneOf": [
+        { "$ref": "#/$defs/IntegerValueInline" },
+        { "$ref": "#/$defs/IntegerValueDirect" },
+        { "$ref": "#/$defs/IntegerValueEnvVar" }
+      ],
+      "description": "A integer value used in configuration that can be expressed in on of several ways."
     },
     "StringValueBool": {
       "oneOf": [
