@@ -27,6 +27,9 @@ worker:
     default: 8083
   cron_sync_interval: 1m
 
+tasks:
+  default_retention: 24h
+  
 host_application:
   initiate_session_url: http://127.0.0.1:8888/login-redirect
 
