@@ -326,6 +326,27 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "Tasks": {
+      "properties": {
+        "initiate_to_redirect_ttl": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "round_trip_ttl": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "refresh_tokens_in_background": {
+          "type": "boolean"
+        },
+        "refresh_tokens_time_before_expiry": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "refresh_tokens_cron_schedule": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "RedisReal": {
       "type": "object",
       "properties": {
