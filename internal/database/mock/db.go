@@ -880,6 +880,20 @@ func (mr *MockDBMockRecorder) PutNamespaceLabels(ctx, path, labels interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutNamespaceLabels", reflect.TypeOf((*MockDB)(nil).PutNamespaceLabels), ctx, path, labels)
 }
 
+// SetConnectorVersionState mocks base method.
+func (m *MockDB) SetConnectorVersionState(ctx context.Context, id uuid.UUID, version uint64, state database.ConnectorVersionState) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetConnectorVersionState", ctx, id, version, state)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetConnectorVersionState indicates an expected call of SetConnectorVersionState.
+func (mr *MockDBMockRecorder) SetConnectorVersionState(ctx, id, version, state interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectorVersionState", reflect.TypeOf((*MockDB)(nil).SetConnectorVersionState), ctx, id, version, state)
+}
+
 // SetConnectionState mocks base method.
 func (m *MockDB) SetConnectionState(ctx context.Context, id uuid.UUID, state database.ConnectionState) error {
 	m.ctrl.T.Helper()

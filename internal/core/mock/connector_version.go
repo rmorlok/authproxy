@@ -1,6 +1,7 @@
 package mock
 
 import (
+	"context"
 	"fmt"
 	"time"
 
@@ -61,6 +62,11 @@ func (m *ConnectorVersion) GetLabels() map[string]string {
 
 func (m *ConnectorVersion) GetDefinition() *cschema.Connector {
 	return m.Definition
+}
+
+func (m *ConnectorVersion) SetState(_ context.Context, state database.ConnectorVersionState) error {
+	m.State = state
+	return nil
 }
 
 var _ iface.ConnectorVersion = (*ConnectorVersion)(nil)

@@ -1590,4 +1590,96 @@ func TestConnectors(t *testing.T) {
 			})
 		})
 	})
+
+	t.Run("force connector version state", func(t *testing.T) {
+		connectorId := "10000000-0000-0000-0000-000000000001"
+
+		t.Run("unauthorized", func(t *testing.T) {
+			tu := setup(t, nil)
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(
+				http.MethodPut,
+				fmt.Sprintf("/connectors/%s/versions/1/_force_state", connectorId),
+				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: database.ConnectorVersionStateArchived}),
+			)
+			require.NoError(t, err)
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("invalid uuid", func(t *testing.T) {
+			tu := setup(t, nil)
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/connectors/bad-uuid/versions/1/_force_state",
+				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: database.ConnectorVersionStateArchived}),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("not found", func(t *testing.T) {
+			tu := setup(t, nil)
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				fmt.Sprintf("/connectors/%s/versions/99/_force_state", connectorId),
+				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: database.ConnectorVersionStateArchived}),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("valid state change", func(t *testing.T) {
+			tu := setup(t, nil)
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				fmt.Sprintf("/connectors/%s/versions/1/_force_state", connectorId),
+				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: database.ConnectorVersionStateArchived}),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connectors", "force_state"),
+			)
+			require.NoError(t, err)
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ConnectorVersionJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Equal(t, database.ConnectorVersionStateArchived, resp.State)
+		})
+
+		t.Run("already in desired state", func(t *testing.T) {
+			tu := setup(t, nil)
+			// The connector starts in primary state
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				fmt.Sprintf("/connectors/%s/versions/1/_force_state", connectorId),
+				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: database.ConnectorVersionStatePrimary}),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ConnectorVersionJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Equal(t, database.ConnectorVersionStatePrimary, resp.State)
+		})
+	})
 }

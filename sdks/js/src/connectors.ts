@@ -88,9 +88,27 @@ export const getConnectorVersion = (id: string, version: number) => {
     return client.get<ConnectorVersion>(`/api/v1/connectors/${id}/versions/${version}`);
 };
 
+export interface ForceConnectorVersionStateRequest {
+    state: ConnectorVersionState;
+}
+
+export type ForceConnectorVersionStateResponse = ConnectorVersion;
+
+/**
+ * Force a connector version into a specific state (admin operation)
+ */
+export const forceConnectorVersionState = (id: string, version: number, state: ConnectorVersionState) => {
+    const request: ForceConnectorVersionStateRequest = { state };
+    return client.put<ForceConnectorVersionStateResponse>(
+        `/api/v1/connectors/${id}/versions/${version}/_force_state`,
+        request
+    );
+};
+
 export const connectors = {
     list: listConnectors,
     get: getConnector,
     listVersions: listConnectorVersions,
     getVersion: getConnectorVersion,
+    force_version_state: forceConnectorVersionState,
 };

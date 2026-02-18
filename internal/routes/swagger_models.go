@@ -294,6 +294,14 @@ type SwaggerForceStateRequest struct {
 	State string `json:"state" example:"connected"`
 }
 
+// SwaggerForceConnectorVersionStateRequest is the request to force a connector version state
+//
+//	@Description	Request to force a connector version state
+type SwaggerForceConnectorVersionStateRequest struct {
+	// Target state (draft, primary, active, archived)
+	State string `json:"state" example:"primary"`
+}
+
 // SwaggerUpdateConnectionRequest is the request to update a connection
 //
 //	@Description	Request to update a connection's labels
