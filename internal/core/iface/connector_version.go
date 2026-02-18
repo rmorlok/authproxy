@@ -1,6 +1,7 @@
 package iface
 
 import (
+	"context"
 	"time"
 
 	"github.com/google/uuid"
@@ -18,4 +19,5 @@ type ConnectorVersion interface {
 	GetUpdatedAt() time.Time
 	GetLabels() map[string]string
 	GetDefinition() *cschema.Connector
+	SetState(ctx context.Context, state database.ConnectorVersionState) error
 }

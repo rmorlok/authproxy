@@ -433,6 +433,77 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 	})
 }
 
+func (s *service) SetConnectorVersionState(ctx context.Context, id uuid.UUID, version uint64, state ConnectorVersionState) error {
+	if id == uuid.Nil {
+		return errors.New("connector version id is required")
+	}
+
+	if !IsValidConnectorVersionState(state) {
+		return errors.New("invalid connector version state")
+	}
+
+	return s.transaction(func(tx *sql.Tx) error {
+		sqb := s.sq.RunWith(tx)
+		now := apctx.GetClock(ctx).Now()
+
+		// Update the target version's state
+		dbResult, err := sqb.
+			Update(ConnectorVersionsTable).
+			Set("updated_at", now).
+			Set("state", state).
+			Where(sq.Eq{"id": id, "version": version}).
+			Exec()
+		if err != nil {
+			return errors.Wrap(err, "failed to set connector version state")
+		}
+
+		affected, err := dbResult.RowsAffected()
+		if err != nil {
+			return errors.Wrap(err, "failed to set connector version state")
+		}
+
+		if affected == 0 {
+			return ErrNotFound
+		}
+
+		if affected > 1 {
+			return errors.Wrap(ErrViolation, "multiple connector versions had state updated")
+		}
+
+		if state == ConnectorVersionStatePrimary {
+			// Ensure only one primary: transition any other primary version to active
+			_, err := sqb.Update(ConnectorVersionsTable).
+				Set("state", ConnectorVersionStateActive).
+				Set("updated_at", now).
+				Where(sq.And{
+					sq.Eq{"id": id, "state": ConnectorVersionStatePrimary},
+					sq.NotEq{"version": version},
+				}).
+				Exec()
+			if err != nil {
+				return errors.Wrap(err, "failed to demote existing primary connector version")
+			}
+		}
+
+		if state == ConnectorVersionStateDraft {
+			// Ensure only one draft: transition any other draft version to archived
+			_, err := sqb.Update(ConnectorVersionsTable).
+				Set("state", ConnectorVersionStateArchived).
+				Set("updated_at", now).
+				Where(sq.And{
+					sq.Eq{"id": id, "state": ConnectorVersionStateDraft},
+					sq.NotEq{"version": version},
+				}).
+				Exec()
+			if err != nil {
+				return errors.Wrap(err, "failed to archive existing draft connector version")
+			}
+		}
+
+		return nil
+	})
+}
+
 // GetConnectorVersionForLabels finds the newest connector version matching the label selector.
 func (s *service) GetConnectorVersionForLabels(ctx context.Context, labelSelector string) (*ConnectorVersion, error) {
 	selector, err := ParseLabelSelector(labelSelector)

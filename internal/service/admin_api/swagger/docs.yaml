@@ -352,6 +352,14 @@ definitions:
         description: Task ID for tracking the disconnect operation
         type: string
     type: object
+  routes.SwaggerForceConnectorVersionStateRequest:
+    description: Request to force a connector version state
+    properties:
+      state:
+        description: Target state (draft, primary, active, archived)
+        example: primary
+        type: string
+    type: object
   routes.SwaggerForceStateRequest:
     description: Request to force a connection state
     properties:
@@ -2179,6 +2187,60 @@ paths:
       security:
       - BearerAuth: []
       summary: Update connector version
+      tags:
+      - connectors
+  /connectors/{id}/versions/{version}/_force_state:
+    put:
+      consumes:
+      - application/json
+      description: Force a connector version to a specific state (admin operation)
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Version number
+        in: path
+        name: version
+        required: true
+        type: integer
+      - description: New state
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.SwaggerForceConnectorVersionStateRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerConnectorVersionJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Force connector version state
       tags:
       - connectors
   /connectors/{id}/versions/{version}/labels:

@@ -520,4 +520,127 @@ INSERT INTO connector_versions
 			require.Nil(t, savedCV1)
 		})
 	})
+
+	t.Run("SetConnectorVersionState", func(t *testing.T) {
+		t.Run("sets state successfully", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			connectorID := uuid.New()
+			cv := &ConnectorVersion{
+				Id:                  connectorID,
+				Version:             1,
+				Namespace:           sconfig.RootNamespace,
+				State:               ConnectorVersionStateDraft,
+				Labels:              Labels{"type": "test_connector"},
+				Hash:                "test_hash",
+				EncryptedDefinition: "test_encrypted_definition",
+			}
+
+			err := db.UpsertConnectorVersion(ctx, cv)
+			require.NoError(t, err)
+
+			err = db.SetConnectorVersionState(ctx, connectorID, 1, ConnectorVersionStatePrimary)
+			require.NoError(t, err)
+
+			saved, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			require.NoError(t, err)
+			assert.Equal(t, ConnectorVersionStatePrimary, saved.State)
+		})
+
+		t.Run("returns not found for nonexistent version", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.SetConnectorVersionState(ctx, uuid.New(), 1, ConnectorVersionStatePrimary)
+			require.ErrorIs(t, err, ErrNotFound)
+		})
+
+		t.Run("rejects invalid state", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.SetConnectorVersionState(ctx, uuid.New(), 1, ConnectorVersionState("invalid"))
+			require.Error(t, err)
+		})
+
+		t.Run("demotes existing primary to active when forcing new primary", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			connectorID := uuid.New()
+
+			// Create v1 as primary
+			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
+				State: ConnectorVersionStatePrimary, Labels: Labels{"type": "t"},
+				Hash: "h1", EncryptedDefinition: "e1",
+			})
+			require.NoError(t, err)
+
+			// Create v2 as draft
+			err = db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+				Id: connectorID, Version: 2, Namespace: sconfig.RootNamespace,
+				State: ConnectorVersionStateDraft, Labels: Labels{"type": "t"},
+				Hash: "h2", EncryptedDefinition: "e2",
+			})
+			require.NoError(t, err)
+
+			// Force v2 to primary
+			err = db.SetConnectorVersionState(ctx, connectorID, 2, ConnectorVersionStatePrimary)
+			require.NoError(t, err)
+
+			// v2 should be primary
+			v2, err := db.GetConnectorVersion(ctx, connectorID, 2)
+			require.NoError(t, err)
+			assert.Equal(t, ConnectorVersionStatePrimary, v2.State)
+
+			// v1 should have been demoted to active
+			v1, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			require.NoError(t, err)
+			assert.Equal(t, ConnectorVersionStateActive, v1.State)
+		})
+
+		t.Run("archives existing draft when forcing new draft", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			connectorID := uuid.New()
+
+			// Create v1 as primary
+			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
+				State: ConnectorVersionStatePrimary, Labels: Labels{"type": "t"},
+				Hash: "h1", EncryptedDefinition: "e1",
+			})
+			require.NoError(t, err)
+
+			// Create v2 as draft
+			err = db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+				Id: connectorID, Version: 2, Namespace: sconfig.RootNamespace,
+				State: ConnectorVersionStateDraft, Labels: Labels{"type": "t"},
+				Hash: "h2", EncryptedDefinition: "e2",
+			})
+			require.NoError(t, err)
+
+			// Force v1 to draft
+			err = db.SetConnectorVersionState(ctx, connectorID, 1, ConnectorVersionStateDraft)
+			require.NoError(t, err)
+
+			// v1 should be draft
+			v1, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			require.NoError(t, err)
+			assert.Equal(t, ConnectorVersionStateDraft, v1.State)
+
+			// v2 should have been archived
+			v2, err := db.GetConnectorVersion(ctx, connectorID, 2)
+			require.NoError(t, err)
+			assert.Equal(t, ConnectorVersionStateArchived, v2.State)
+		})
+	})
 }

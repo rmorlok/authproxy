@@ -80,6 +80,7 @@ type DB interface {
 	NewestConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error)
 	NewestPublishedConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error)
 	UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersion) error
+	SetConnectorVersionState(ctx context.Context, id uuid.UUID, version uint64, state ConnectorVersionState) error
 	ListConnectorVersionsBuilder() ListConnectorVersionsBuilder
 	ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error)
 	ListConnectorsBuilder() ListConnectorsBuilder

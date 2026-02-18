@@ -1,4 +1,4 @@
-import React, {useEffect, useState} from 'react';
+import React, {useEffect, useMemo, useState} from 'react';
 import Box from '@mui/material/Box';
 import { useTheme } from '@mui/material/styles';
 import Typography from '@mui/material/Typography';
@@ -7,9 +7,22 @@ import Alert from '@mui/material/Alert';
 import Stack from '@mui/material/Stack';
 import Avatar from '@mui/material/Avatar';
 import Chip from '@mui/material/Chip';
+import IconButton from '@mui/material/IconButton';
+import Menu from '@mui/material/Menu';
+import MenuItem from '@mui/material/MenuItem';
+import Dialog from '@mui/material/Dialog';
+import DialogTitle from '@mui/material/DialogTitle';
+import DialogContent from '@mui/material/DialogContent';
+import DialogActions from '@mui/material/DialogActions';
+import Button from '@mui/material/Button';
+import FormControl from '@mui/material/FormControl';
+import InputLabel from '@mui/material/InputLabel';
+import Select from '@mui/material/Select';
+import FormHelperText from '@mui/material/FormHelperText';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
-import {connectors, ConnectorVersion} from '@authproxy/api';
+import {connectors, ConnectorVersion, ConnectorVersionState} from '@authproxy/api';
 import YAML from 'yaml';
 import {StateChip} from "./StateChip";
 import CodeMirror from "@uiw/react-codemirror";
@@ -47,6 +60,30 @@ export default function ConnectorVersionDetail(
     const [viewMode, setViewMode] = useState<'json' | 'yaml' | 'visual'>('yaml');
     const [definitionFormatted, setDefinitionFormatted] = React.useState("");
     const [langMode, setLangMode] = React.useState(yamlMode);
+
+    // Force state UI
+    const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
+    const [forceStateOpen, setForceStateOpen] = useState(false);
+    const [selectedState, setSelectedState] = useState<ConnectorVersionState | ''>('');
+    const [actionLoading, setActionLoading] = useState(false);
+    const [actionError, setActionError] = useState<string | null>(null);
+
+    const stateOptions = useMemo(() => Object.values(ConnectorVersionState), []);
+
+    const fetchConnectorVersion = () => {
+        if (!connectorId || !version) return;
+        setLoading(true);
+        setError(null);
+        connectors.getVersion(connectorId, version)
+            .then(res => {
+                setCv(res.data);
+            })
+            .catch(err => {
+                const msg = err?.response?.data?.error || err.message || 'Failed to load connector';
+                setError(msg);
+            })
+            .finally(() => setLoading(false));
+    };
 
     useEffect(() => {
         if (!cv?.definition) {
@@ -87,6 +124,32 @@ export default function ConnectorVersionDetail(
     if (loading) return (<Box sx={{display: 'flex', justifyContent: 'center', p: 4}}><CircularProgress/></Box>);
     if (error) return (<Alert severity="error">{error}</Alert>);
     if (!cv) return null;
+
+    const openMenu = (e: React.MouseEvent<HTMLButtonElement>) => setMenuAnchorEl(e.currentTarget);
+    const closeMenu = () => setMenuAnchorEl(null);
+
+    const onClickForceState = () => {
+        setActionError(null);
+        setSelectedState(cv.state as ConnectorVersionState);
+        closeMenu();
+        setForceStateOpen(true);
+    };
+
+    const onSubmitForceState = async () => {
+        if (!cv || !selectedState) return;
+        setActionError(null);
+        setActionLoading(true);
+        try {
+            await connectors.force_version_state(cv.id, cv.version, selectedState as ConnectorVersionState);
+            setForceStateOpen(false);
+            fetchConnectorVersion();
+        } catch (err: any) {
+            const msg = err?.response?.data?.error || err.message || 'Failed to force state';
+            setActionError(msg);
+        } finally {
+            setActionLoading(false);
+        }
+    };
 
     function preformattedRendering() {
         if(!cv) {
@@ -143,7 +206,15 @@ export default function ConnectorVersionDetail(
                     <Avatar alt={cv.definition.display_name} src={getLogoUrlFromDefinition(cv)} sx={{width: 40, height: 40}}/>}
                 <Typography variant="h5">{cv.definition.display_name || cv.labels?.type || 'Unnamed Connector'}</Typography>
                 <StateChip state={cv.state}/>
+                <IconButton aria-label="actions" onClick={openMenu} size="small">
+                    <MoreVertIcon/>
+                </IconButton>
+                <Menu anchorEl={menuAnchorEl} open={Boolean(menuAnchorEl)} onClose={closeMenu}>
+                    <MenuItem onClick={onClickForceState}>Force state…</MenuItem>
+                </Menu>
             </Stack>
+
+            {actionError && <Alert severity="error">{actionError}</Alert>}
 
             <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
                 <Box>
@@ -183,6 +254,33 @@ export default function ConnectorVersionDetail(
                 </ToggleButtonGroup>
             </Box>
             {viewMode === 'visual' ? visualRendering() : preformattedRendering()}
+
+            {/* Force state dialog */}
+            <Dialog open={forceStateOpen} onClose={() => !actionLoading && setForceStateOpen(false)} fullWidth maxWidth="sm">
+                <DialogTitle>Force connector version state</DialogTitle>
+                <DialogContent>
+                    <FormControl fullWidth sx={{mt: 2}}>
+                        <InputLabel id="force-cv-state-label">State</InputLabel>
+                        <Select
+                            native
+                            labelId="force-cv-state-label"
+                            label="State"
+                            value={selectedState || ''}
+                            onChange={(e) => setSelectedState((e.target as HTMLSelectElement).value as ConnectorVersionState)}
+                        >
+                            <option aria-label="None" value="" />
+                            {stateOptions.map(s => (
+                                <option key={s} value={s}>{s}</option>
+                            ))}
+                        </Select>
+                        <FormHelperText>Select the state to force for this connector version.</FormHelperText>
+                    </FormControl>
+                </DialogContent>
+                <DialogActions>
+                    <Button onClick={() => setForceStateOpen(false)} disabled={actionLoading}>Cancel</Button>
+                    <Button onClick={onSubmitForceState} variant="contained" disabled={!selectedState || actionLoading}>Apply</Button>
+                </DialogActions>
+            </Dialog>
         </Stack>
     );
 }

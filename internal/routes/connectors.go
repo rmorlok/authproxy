@@ -2193,6 +2193,161 @@ func (r *ConnectorsRoutes) deleteVersionLabel(gctx *gin.Context) {
 	gctx.Status(http.StatusNoContent)
 }
 
+type ForceConnectorVersionStateRequestJson struct {
+	State database.ConnectorVersionState `json:"state"`
+}
+
+// @Summary		Force connector version state
+// @Description	Force a connector version to a specific state (admin operation)
+// @Tags			connectors
+// @Accept			json
+// @Produce		json
+// @Param			id		path		string								true	"Connector UUID"
+// @Param			version	path		integer								true	"Version number"
+// @Param			request	body		SwaggerForceConnectorVersionStateRequest	true	"New state"
+// @Success		200		{object}	SwaggerConnectorVersionJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connectors/{id}/versions/{version}/_force_state [put]
+func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	connectorIdStr := gctx.Param("id")
+	if connectorIdStr == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	connectorId, err := uuid.Parse(connectorIdStr)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("failed to parse id as UUID").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if connectorId == uuid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	versionStr := gctx.Param("version")
+	if versionStr == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("version is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	version, err := strconv.ParseUint(versionStr, 10, 64)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("failed to parse version as an integer").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	req := ForceConnectorVersionStateRequestJson{}
+	err = gctx.BindJSON(&req)
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if req.State == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("state is required").
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if !database.IsValidConnectorVersionState(req.State) {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsgf("invalid connector version state '%s'", req.State).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	cv, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("connector version '%s:%d' not found", connectorId, version).
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(cv); httpErr != nil {
+		httpErr.WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
+	if cv.GetState() == req.State {
+		gctx.PureJSON(http.StatusOK, ConnectorVersionToJson(cv))
+		return
+	}
+
+	err = cv.SetState(ctx, req.State)
+	if err != nil {
+		api_common.HttpStatusErrorBuilderFromError(err).
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, ConnectorVersionToJson(cv))
+}
+
 func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 	g.GET(
 		"/connectors",
@@ -2258,6 +2413,14 @@ func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 			ForVerb("update").
 			Build(),
 		r.updateVersion,
+	)
+	g.PUT("/connectors/:id/versions/:version/_force_state",
+		r.authService.NewRequiredBuilder().
+			ForResource("connectors").
+			ForIdField("id").
+			ForVerb("force_state").
+			Build(),
+		r.forceVersionState,
 	)
 	g.GET("/connectors/:id/labels",
 		r.authService.NewRequiredBuilder().
