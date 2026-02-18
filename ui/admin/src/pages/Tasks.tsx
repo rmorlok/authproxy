@@ -33,7 +33,7 @@ export default function Tasks() {
         try {
             const resp = await listQueues();
             if (resp.status === 200) {
-                setQueues(resp.data);
+                setQueues(resp.data.items);
             }
         } catch {
             setError('Failed to load queues');
@@ -46,8 +46,8 @@ export default function Tasks() {
                 listServers(),
                 listSchedulerEntries(),
             ]);
-            if (serversResp.status === 200) setServers(serversResp.data);
-            if (schedulerResp.status === 200) setSchedulerEntries(schedulerResp.data);
+            if (serversResp.status === 200) setServers(serversResp.data.items);
+            if (schedulerResp.status === 200) setSchedulerEntries(schedulerResp.data.items);
         } catch {
             // ignore
         }

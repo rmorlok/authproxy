@@ -13,6 +13,7 @@ import (
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 type TaskMonitoringRoutes struct {
@@ -218,6 +219,50 @@ type BulkActionResponseJson struct {
 	AffectedCount int `json:"affected_count"`
 }
 
+type ListQueuesResponseJson struct {
+	Items []*QueueInfoJson `json:"items"`
+}
+
+type ListMonitoringTasksResponseJson struct {
+	Items  []*MonitoringTaskInfoJson `json:"items"`
+	Cursor string                    `json:"cursor,omitempty"`
+}
+
+type ListServersResponseJson struct {
+	Items []*ServerInfoJson `json:"items"`
+}
+
+type ListSchedulerEntriesResponseJson struct {
+	Items []*SchedulerEntryJson `json:"items"`
+}
+
+type taskListCursor struct {
+	Page     int    `json:"page"`
+	PageSize int    `json:"page_size"`
+	Queue    string `json:"queue"`
+	State    string `json:"state"`
+}
+
+// getTaskCountForState returns the total count of tasks for a given state from QueueInfo
+func getTaskCountForState(qi *asynq.QueueInfo, state string) int {
+	switch state {
+	case "pending":
+		return qi.Pending
+	case "active":
+		return qi.Active
+	case "scheduled":
+		return qi.Scheduled
+	case "retry":
+		return qi.Retry
+	case "archived":
+		return qi.Archived
+	case "completed":
+		return qi.Completed
+	default:
+		return 0
+	}
+}
+
 // Handlers
 
 func (r *TaskMonitoringRoutes) listQueues(gctx *gin.Context) {
@@ -235,7 +280,7 @@ func (r *TaskMonitoringRoutes) listQueues(gctx *gin.Context) {
 		return
 	}
 
-	result := make([]*QueueInfoJson, 0, len(queues))
+	items := make([]*QueueInfoJson, 0, len(queues))
 	for _, q := range queues {
 		qi, err := r.inspector.GetQueueInfo(q)
 		if err != nil {
@@ -247,10 +292,10 @@ func (r *TaskMonitoringRoutes) listQueues(gctx *gin.Context) {
 				WriteGinResponse(r.cfg, gctx)
 			return
 		}
-		result = append(result, queueInfoToJson(qi))
+		items = append(items, queueInfoToJson(qi))
 	}
 
-	gctx.PureJSON(http.StatusOK, result)
+	gctx.PureJSON(http.StatusOK, ListQueuesResponseJson{Items: items})
 }
 
 func (r *TaskMonitoringRoutes) getQueueInfo(gctx *gin.Context) {
@@ -329,6 +374,7 @@ func (r *TaskMonitoringRoutes) getQueueHistory(gctx *gin.Context) {
 }
 
 func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 	val.MarkValidated()
 
@@ -344,16 +390,41 @@ func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
 		return
 	}
 
+	switch state {
+	case "pending", "active", "scheduled", "retry", "archived", "completed":
+		// valid
+	default:
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsgf("invalid state: %s", state).
+			BuildStatusError().
+			WriteGinResponse(r.cfg, gctx)
+		return
+	}
+
 	page := 1
 	pageSize := 30
-	if p := gctx.Query("page"); p != "" {
-		if v, err := strconv.Atoi(p); err == nil && v > 0 {
-			page = v
+	cursorStr := gctx.Query("cursor")
+
+	if cursorStr != "" {
+		parsed, err := pagination.ParseCursor[taskListCursor](ctx, r.cfg.GetGlobalKey(), cursorStr)
+		if err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithResponseMsg("invalid cursor").
+				BuildStatusError().
+				WriteGinResponse(r.cfg, gctx)
+			return
 		}
-	}
-	if ps := gctx.Query("page_size"); ps != "" {
-		if v, err := strconv.Atoi(ps); err == nil && v > 0 {
-			pageSize = v
+		page = parsed.Page
+		pageSize = parsed.PageSize
+		queue = parsed.Queue
+		state = parsed.State
+	} else {
+		if l := gctx.Query("limit"); l != "" {
+			if v, err := strconv.Atoi(l); err == nil && v > 0 {
+				pageSize = v
+			}
 		}
 	}
 
@@ -375,13 +446,6 @@ func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
 		tasks, err = r.inspector.ListArchivedTasks(queue, opts...)
 	case "completed":
 		tasks, err = r.inspector.ListCompletedTasks(queue, opts...)
-	default:
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsgf("invalid state: %s", state).
-			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
-		return
 	}
 
 	if err != nil {
@@ -394,12 +458,31 @@ func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
 		return
 	}
 
-	result := make([]*MonitoringTaskInfoJson, 0, len(tasks))
+	items := make([]*MonitoringTaskInfoJson, 0, len(tasks))
 	for _, t := range tasks {
-		result = append(result, taskInfoToJson(t))
+		items = append(items, taskInfoToJson(t))
 	}
 
-	gctx.PureJSON(http.StatusOK, result)
+	// Determine if there are more pages by checking total count from queue info
+	var cursor string
+	qi, qiErr := r.inspector.GetQueueInfo(queue)
+	if qiErr == nil {
+		total := getTaskCountForState(qi, state)
+		if page*pageSize < total {
+			nextCursor := taskListCursor{
+				Page:     page + 1,
+				PageSize: pageSize,
+				Queue:    queue,
+				State:    state,
+			}
+			cursor, _ = pagination.MakeCursor(ctx, r.cfg.GetGlobalKey(), &nextCursor)
+		}
+	}
+
+	gctx.PureJSON(http.StatusOK, ListMonitoringTasksResponseJson{
+		Items:  items,
+		Cursor: cursor,
+	})
 }
 
 func (r *TaskMonitoringRoutes) getTask(gctx *gin.Context) {
@@ -447,12 +530,12 @@ func (r *TaskMonitoringRoutes) listServers(gctx *gin.Context) {
 		return
 	}
 
-	result := make([]*ServerInfoJson, 0, len(servers))
+	items := make([]*ServerInfoJson, 0, len(servers))
 	for _, s := range servers {
-		result = append(result, serverInfoToJson(s))
+		items = append(items, serverInfoToJson(s))
 	}
 
-	gctx.PureJSON(http.StatusOK, result)
+	gctx.PureJSON(http.StatusOK, ListServersResponseJson{Items: items})
 }
 
 func (r *TaskMonitoringRoutes) listSchedulerEntries(gctx *gin.Context) {
@@ -470,12 +553,12 @@ func (r *TaskMonitoringRoutes) listSchedulerEntries(gctx *gin.Context) {
 		return
 	}
 
-	result := make([]*SchedulerEntryJson, 0, len(entries))
+	items := make([]*SchedulerEntryJson, 0, len(entries))
 	for _, e := range entries {
-		result = append(result, schedulerEntryToJson(e))
+		items = append(items, schedulerEntryToJson(e))
 	}
 
-	gctx.PureJSON(http.StatusOK, result)
+	gctx.PureJSON(http.StatusOK, ListSchedulerEntriesResponseJson{Items: items})
 }
 
 func (r *TaskMonitoringRoutes) runTask(gctx *gin.Context) {

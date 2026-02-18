@@ -1,4 +1,5 @@
 import { client } from './client';
+import { ListResponse } from './common';
 
 // Queue info
 export interface QueueInfo {
@@ -85,8 +86,8 @@ export interface BulkActionResponse {
 
 // Query params
 export interface ListTasksParams {
-  page?: number;
-  page_size?: number;
+  cursor?: string;
+  limit?: number;
 }
 
 export interface HistoryParams {
@@ -99,7 +100,7 @@ export type MonitoringTaskState = 'pending' | 'active' | 'scheduled' | 'retry' |
  * List all queues with their info
  */
 export const listQueues = () => {
-  return client.get<QueueInfo[]>('/api/v1/task-monitoring/queues');
+  return client.get<ListResponse<QueueInfo>>('/api/v1/task-monitoring/queues');
 };
 
 /**
@@ -127,7 +128,7 @@ export const listTasksByState = (
   state: MonitoringTaskState,
   params?: ListTasksParams
 ) => {
-  return client.get<MonitoringTaskInfo[]>(
+  return client.get<ListResponse<MonitoringTaskInfo>>(
     `/api/v1/task-monitoring/queues/${queue}/tasks/${state}`,
     { params }
   );
@@ -146,14 +147,14 @@ export const getTaskInfo = (queue: string, state: MonitoringTaskState, taskId: s
  * List connected servers
  */
 export const listServers = () => {
-  return client.get<ServerInfo[]>('/api/v1/task-monitoring/servers');
+  return client.get<ListResponse<ServerInfo>>('/api/v1/task-monitoring/servers');
 };
 
 /**
  * List scheduler entries
  */
 export const listSchedulerEntries = () => {
-  return client.get<SchedulerEntry[]>('/api/v1/task-monitoring/scheduler-entries');
+  return client.get<ListResponse<SchedulerEntry>>('/api/v1/task-monitoring/scheduler-entries');
 };
 
 /**

@@ -42,6 +42,8 @@ import {
     DailyStats,
     MonitoringTaskInfo,
     MonitoringTaskState,
+    ListResponse,
+    ListTasksParams,
 } from '@authproxy/api';
 
 const TASK_STATES: MonitoringTaskState[] = ['pending', 'active', 'scheduled', 'retry', 'archived', 'completed'];
@@ -80,6 +82,12 @@ export default function TaskQueueDetail() {
     const [tasks, setTasks] = useState<MonitoringTaskInfo[]>([]);
     const [tasksLoading, setTasksLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [hasNextPage, setHasNextPage] = useState(false);
+    const [rowCount, setRowCount] = useState(-1);
+
+    // Cursor cache for sequential page fetching
+    const responsesCacheRef = useRef<ListResponse<MonitoringTaskInfo>[]>([]);
+    const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
     const currentState = TASK_STATES[tabIndex] || 'pending';
 
@@ -107,20 +115,80 @@ export default function TaskQueueDetail() {
         }
     }, [queue]);
 
-    const fetchTasks = useCallback(async () => {
+    const resetPagination = useCallback(() => {
+        responsesCacheRef.current = [];
+        pageRequestCacheRef.current = new Set();
+        setHasNextPage(false);
+        setRowCount(-1);
+        setPage(1);
+    }, [setPage]);
+
+    const fetchPage = useCallback(async (targetPageOneBased: number) => {
         if (!queue) return;
+
+        const targetPageZeroBased = targetPageOneBased - 1;
         setTasksLoading(true);
+        setHasNextPage(false);
+        setError(null);
+
         try {
-            const resp = await listTasksByState(queue, currentState, {page, page_size: pageSize});
-            if (resp.status === 200) {
-                setTasks(resp.data);
+            // If we have it cached, use it
+            const cached = responsesCacheRef.current[targetPageZeroBased];
+            if (cached) {
+                setTasks(cached.items);
+                setTasksLoading(false);
+                setHasNextPage(!!cached.cursor);
+                return;
+            }
+
+            // Advance sequentially from the last known cursor
+            while (responsesCacheRef.current.length <= targetPageZeroBased && (
+                responsesCacheRef.current.length === 0 ||
+                !!responsesCacheRef.current[responsesCacheRef.current.length - 1].cursor
+            )) {
+                const thisPage = responsesCacheRef.current.length;
+
+                // Avoid duplicate requests for the same page
+                if (pageRequestCacheRef.current.has(thisPage)) {
+                    break;
+                }
+                pageRequestCacheRef.current.add(thisPage);
+
+                const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
+
+                const params: ListTasksParams = prevResp?.cursor
+                    ? {cursor: prevResp.cursor}
+                    : {limit: pageSize};
+
+                const resp = await listTasksByState(queue, currentState, params);
+
+                if (resp.status !== 200) {
+                    setError('Failed to fetch tasks from server');
+                    return;
+                }
+
+                responsesCacheRef.current[thisPage] = resp.data;
+            }
+
+            const data = responsesCacheRef.current[targetPageZeroBased];
+            setTasks(data?.items || []);
+
+            const hnp = !!data?.cursor;
+            setHasNextPage(hnp);
+
+            if (!hnp) {
+                setRowCount(
+                    responsesCacheRef.current
+                        .map((v) => v.items.length)
+                        .reduce((acc, val) => acc + val, 0)
+                );
             }
         } catch {
             setError('Failed to load tasks');
         } finally {
             setTasksLoading(false);
         }
-    }, [queue, currentState, page, pageSize]);
+    }, [queue, currentState, pageSize]);
 
     // Initial load
     useEffect(() => {
@@ -128,14 +196,27 @@ export default function TaskQueueDetail() {
         fetchHistory();
     }, [queue]);
 
-    // Fetch tasks on state/page changes
+    // Reset cache and fetch first page when state or pageSize changes
     useEffect(() => {
-        fetchTasks();
-    }, [fetchTasks]);
+        resetPagination();
+        fetchPage(1);
+    }, [currentState, pageSize]);
 
-    // Auto-refresh
+    // Fetch page when page changes
+    useEffect(() => {
+        fetchPage(page);
+    }, [page]);
+
+    // Auto-refresh: invalidate cache and re-fetch current page
     const autoRefreshRef = useRef(autoRefresh);
     autoRefreshRef.current = autoRefresh;
+
+    const refreshTasks = useCallback(() => {
+        responsesCacheRef.current = [];
+        pageRequestCacheRef.current = new Set();
+        setRowCount(-1);
+        fetchPage(page);
+    }, [fetchPage, page]);
 
     useEffect(() => {
         if (!autoRefresh) return;
@@ -144,31 +225,31 @@ export default function TaskQueueDetail() {
             if (document.visibilityState === 'hidden') return;
             if (!autoRefreshRef.current) return;
             fetchQueueInfo();
-            fetchTasks();
+            refreshTasks();
         }, 5000);
 
         return () => clearInterval(interval);
-    }, [autoRefresh, fetchQueueInfo, fetchTasks]);
+    }, [autoRefresh, fetchQueueInfo, refreshTasks]);
 
-    // Action handlers
+    // Action handlers - invalidate cache and re-fetch after mutations
     const handleRunTask = async (q: string, taskId: string) => {
         await runTask(q, taskId);
-        fetchTasks();
+        refreshTasks();
         fetchQueueInfo();
     };
     const handleArchiveTask = async (q: string, taskId: string) => {
         await archiveTask(q, taskId);
-        fetchTasks();
+        refreshTasks();
         fetchQueueInfo();
     };
     const handleCancelTask = async (q: string, taskId: string) => {
         await cancelTask(q, taskId);
-        fetchTasks();
+        refreshTasks();
         fetchQueueInfo();
     };
     const handleDeleteTask = async (q: string, taskId: string) => {
         await deleteTask(q, taskId);
-        fetchTasks();
+        refreshTasks();
         fetchQueueInfo();
     };
     const handlePauseQueue = async () => {
@@ -184,25 +265,25 @@ export default function TaskQueueDetail() {
     const handleRunAllArchived = async () => {
         if (!queue) return;
         await runAllArchivedTasks(queue);
-        fetchTasks();
+        refreshTasks();
         fetchQueueInfo();
     };
     const handleRunAllRetry = async () => {
         if (!queue) return;
         await runAllRetryTasks(queue);
-        fetchTasks();
+        refreshTasks();
         fetchQueueInfo();
     };
     const handleDeleteAllArchived = async () => {
         if (!queue) return;
         await deleteAllArchivedTasks(queue);
-        fetchTasks();
+        refreshTasks();
         fetchQueueInfo();
     };
     const handleDeleteAllCompleted = async () => {
         if (!queue) return;
         await deleteAllCompletedTasks(queue);
-        fetchTasks();
+        refreshTasks();
         fetchQueueInfo();
     };
 
@@ -464,12 +545,13 @@ export default function TaskQueueDetail() {
                         loading={tasksLoading}
                         paginationMode="server"
                         paginationModel={{page: page - 1, pageSize}}
+                        paginationMeta={{hasNextPage}}
                         onPaginationModelChange={(model) => {
                             if (model.pageSize !== pageSize) setPageSize(model.pageSize);
                             if (model.page !== page - 1) setPage(model.page + 1);
                         }}
                         pageSizeOptions={[10, 30, 50, 100]}
-                        rowCount={-1}
+                        rowCount={rowCount}
                         hideFooterSelectedRowCount
                         density="compact"
                         disableColumnResize

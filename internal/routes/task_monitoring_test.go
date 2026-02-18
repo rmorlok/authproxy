@@ -111,13 +111,13 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp []*QueueInfoJson
+			var resp ListQueuesResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Len(t, resp, 1)
-			require.Equal(t, "default", resp[0].Queue)
-			require.Equal(t, 5, resp[0].Pending)
-			require.Equal(t, 2, resp[0].Active)
+			require.Len(t, resp.Items, 1)
+			require.Equal(t, "default", resp.Items[0].Queue)
+			require.Equal(t, 5, resp.Items[0].Pending)
+			require.Equal(t, 2, resp.Items[0].Active)
 		})
 
 		t.Run("inspector error", func(t *testing.T) {
@@ -281,17 +281,71 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 					},
 				}, nil)
 
+			tu.MockInspector.EXPECT().
+				GetQueueInfo("default").
+				Return(&asynq.QueueInfo{
+					Queue:     "default",
+					Pending:   1,
+					Timestamp: time.Now().UTC(),
+				}, nil)
+
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp []*MonitoringTaskInfoJson
+			var resp ListMonitoringTasksResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Len(t, resp, 1)
-			require.Equal(t, "task-1", resp[0].ID)
-			require.Equal(t, "email:send", resp[0].Type)
-			require.Equal(t, "pending", resp[0].State)
-			require.Equal(t, `{"to":"user@example.com"}`, resp[0].Payload)
+			require.Len(t, resp.Items, 1)
+			require.Equal(t, "task-1", resp.Items[0].ID)
+			require.Equal(t, "email:send", resp.Items[0].Type)
+			require.Equal(t, "pending", resp.Items[0].State)
+			require.Equal(t, `{"to":"user@example.com"}`, resp.Items[0].Payload)
+			require.Empty(t, resp.Cursor, "cursor should be empty when no more pages")
+		})
+
+		t.Run("pending tasks with more pages", func(t *testing.T) {
+			tu := setup(t, nil)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/task-monitoring/queues/default/tasks/pending?limit=1",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "task_monitoring", "list"),
+			)
+			require.NoError(t, err)
+
+			tu.MockInspector.EXPECT().
+				ListPendingTasks("default", gomock.Any(), gomock.Any()).
+				Return([]*asynq.TaskInfo{
+					{
+						ID:       "task-1",
+						Queue:    "default",
+						Type:     "email:send",
+						Payload:  []byte(`{}`),
+						State:    asynq.TaskStatePending,
+						MaxRetry: 3,
+					},
+				}, nil)
+
+			tu.MockInspector.EXPECT().
+				GetQueueInfo("default").
+				Return(&asynq.QueueInfo{
+					Queue:     "default",
+					Pending:   5,
+					Timestamp: time.Now().UTC(),
+				}, nil)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ListMonitoringTasksResponseJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Len(t, resp.Items, 1)
+			require.NotEmpty(t, resp.Cursor, "cursor should be present when more pages exist")
 		})
 
 		t.Run("invalid state", func(t *testing.T) {
@@ -413,13 +467,13 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp []*ServerInfoJson
+			var resp ListServersResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Len(t, resp, 1)
-			require.Equal(t, "server-1", resp[0].ID)
-			require.Equal(t, 10, resp[0].Concurrency)
-			require.Len(t, resp[0].ActiveWorkers, 1)
+			require.Len(t, resp.Items, 1)
+			require.Equal(t, "server-1", resp.Items[0].ID)
+			require.Equal(t, 10, resp.Items[0].Concurrency)
+			require.Len(t, resp.Items[0].ActiveWorkers, 1)
 		})
 	})
 
@@ -453,13 +507,13 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp []*SchedulerEntryJson
+			var resp ListSchedulerEntriesResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Len(t, resp, 1)
-			require.Equal(t, "entry-1", resp[0].ID)
-			require.Equal(t, "*/5 * * * *", resp[0].Spec)
-			require.Equal(t, "probe:check", resp[0].TaskType)
+			require.Len(t, resp.Items, 1)
+			require.Equal(t, "entry-1", resp.Items[0].ID)
+			require.Equal(t, "*/5 * * * *", resp.Items[0].Spec)
+			require.Equal(t, "probe:check", resp.Items[0].TaskType)
 		})
 	})
 
