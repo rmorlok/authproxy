@@ -326,6 +326,15 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "Tasks": {
+      "properties": {
+        "default_retention": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        }
+      },
+      "additionalProperties": false,
+      "type": "object"
+    },
     "RedisReal": {
       "type": "object",
       "properties": {
@@ -712,6 +721,9 @@
     },
     "http_logging": {
       "$ref": "#/$defs/HttpLogging"
+    },
+    "tasks": {
+      "$ref": "#/$defs/Tasks"
     },
     "dev_settings": {
       "$ref": "#/$defs/DevSettings"

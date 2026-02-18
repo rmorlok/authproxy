@@ -132,6 +132,11 @@ func GetGinServer(
 		dm.GetEncryptService(),
 		logger,
 	)
+	routesTaskMonitoring := common_routes.NewTaskMonitoringRoutes(
+		dm.GetConfig(),
+		authService,
+		dm.GetAsyncInspector(),
+	)
 
 	api := server.Group("/api/v1")
 
@@ -140,6 +145,7 @@ func GetGinServer(
 	routesNamespaces.Register(api)
 	routesRequestLog.Register(api)
 	routesActors.Register(api)
+	routesTaskMonitoring.Register(api)
 
 	if service.SupportsSession() && service.SupportsUi() {
 		routesSession := common_routes.NewSessionRoutes(

@@ -25,6 +25,7 @@ type Root struct {
 	ErrorPages      ErrorPages      `json:"error_pages,omitempty" yaml:"error_pages,omitempty"`
 	Connectors      *Connectors     `json:"connectors" yaml:"connectors"`
 	HttpLogging     *HttpLogging    `json:"http_logging,omitempty" yaml:"http_logging,omitempty"`
+	Tasks           *Tasks          `json:"tasks,omitempty" yaml:"tasks,omitempty"`
 	DevSettings     *DevSettings    `json:"dev_settings,omitempty" yaml:"dev_settings,omitempty"`
 }
 

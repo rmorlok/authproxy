@@ -7,6 +7,7 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apasynq"
 	"github.com/rmorlok/authproxy/internal/apauth/tasks"
 	authSync "github.com/rmorlok/authproxy/internal/apauth/tasks"
 	"github.com/rmorlok/authproxy/internal/aplog"
@@ -31,7 +32,7 @@ type DependencyManager struct {
 	httpf          httpf.F
 	logRetriever   request_log.LogRetriever
 	e              encrypt.E
-	asynqClient    *asynq.Client
+	asynqClient    apasynq.Client
 	asynqInspector *asynq.Inspector
 	c              coreIface.C
 }
@@ -159,9 +160,27 @@ func (dm *DependencyManager) GetEncryptService() encrypt.E {
 	return dm.e
 }
 
-func (dm *DependencyManager) GetAsyncClient() *asynq.Client {
+func (dm *DependencyManager) GetAsyncDefaultOptions() []asynq.Option {
+	root := dm.GetConfigRoot()
+	if root == nil || root.Tasks == nil {
+		return nil
+	}
+
+	opts := []asynq.Option{}
+
+	if root.Tasks.DefaultRetention != nil {
+		opts = append(opts, asynq.Retention(root.Tasks.DefaultRetention.Duration))
+	}
+
+	return opts
+}
+
+func (dm *DependencyManager) GetAsyncClient() apasynq.Client {
 	if dm.asynqClient == nil {
-		dm.asynqClient = asynq.NewClientFromRedisClient(dm.GetRedisClient())
+		dm.asynqClient = apasynq.WrapClientWithDefaultOptions(
+			asynq.NewClientFromRedisClient(dm.GetRedisClient()),
+			dm.GetAsyncDefaultOptions(),
+		)
 	}
 
 	return dm.asynqClient
