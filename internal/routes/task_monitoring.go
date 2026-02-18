@@ -236,6 +236,10 @@ type ListSchedulerEntriesResponseJson struct {
 	Items []*SchedulerEntryJson `json:"items"`
 }
 
+type ListQueueHistoryResponseJson struct {
+	Items []*DailyStatsJson `json:"items"`
+}
+
 type taskListCursor struct {
 	Page     int    `json:"page"`
 	PageSize int    `json:"page_size"`
@@ -370,7 +374,7 @@ func (r *TaskMonitoringRoutes) getQueueHistory(gctx *gin.Context) {
 		result = append(result, dailyStatsToJson(s))
 	}
 
-	gctx.PureJSON(http.StatusOK, result)
+	gctx.PureJSON(http.StatusOK, ListQueueHistoryResponseJson{Items: result})
 }
 
 func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {

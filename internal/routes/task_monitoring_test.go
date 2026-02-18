@@ -203,12 +203,12 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp []*DailyStatsJson
+			var resp ListQueueHistoryResponseJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Len(t, resp, 1)
-			require.Equal(t, 100, resp[0].Processed)
-			require.Equal(t, 5, resp[0].Failed)
+			require.Len(t, resp.Items, 1)
+			require.Equal(t, 100, resp.Items[0].Processed)
+			require.Equal(t, 5, resp.Items[0].Failed)
 		})
 
 		t.Run("custom days", func(t *testing.T) {

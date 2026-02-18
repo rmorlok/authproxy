@@ -108,7 +108,7 @@ export default function TaskQueueDetail() {
         try {
             const resp = await getQueueHistory(queue, {days: 30});
             if (resp.status === 200) {
-                setHistory(resp.data);
+                setHistory(resp.data.items);
             }
         } catch {
             // ignore

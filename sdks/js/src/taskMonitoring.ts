@@ -114,7 +114,7 @@ export const getQueueInfo = (queue: string) => {
  * Get daily stats history for a queue
  */
 export const getQueueHistory = (queue: string, params?: HistoryParams) => {
-  return client.get<DailyStats[]>(
+  return client.get<ListResponse<DailyStats>>(
     `/api/v1/task-monitoring/queues/${queue}/history`,
     { params }
   );
