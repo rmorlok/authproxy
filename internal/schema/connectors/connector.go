@@ -47,6 +47,10 @@ type Connector struct {
 	// Description is a longer description of the connector. This is displayed to the user in the marketplace portal.
 	Description string `json:"description" yaml:"description"`
 
+	// StatusPageUrl is a URL to the status page for the external service this connector integrates with.
+	// This helps users track 3rd party outages that may affect their connections.
+	StatusPageUrl string `json:"status_page_url,omitempty" yaml:"status_page_url,omitempty"`
+
 	// Auth is how this connector authenticates. Possible values are of type OAuth2 or APIKey. See individual
 	// documentation for each struct for more details.
 	Auth *Auth `json:"auth" yaml:"auth"`

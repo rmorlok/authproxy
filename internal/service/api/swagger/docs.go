@@ -4166,6 +4166,11 @@ const docTemplateApi = `{
                     "type": "string",
                     "example": "active"
                 },
+                "status_page_url": {
+                    "description": "Status page URL for tracking 3rd party outages",
+                    "type": "string",
+                    "example": "https://status.salesforce.com"
+                },
                 "updated_at": {
                     "description": "Last update timestamp",
                     "type": "string"

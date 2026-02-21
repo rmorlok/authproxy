@@ -110,6 +110,8 @@ type SwaggerConnectorJson struct {
 	Highlight string `json:"highlight,omitempty" example:"CRM platform"`
 	// Full description
 	Description string `json:"description" example:"Salesforce CRM integration"`
+	// Status page URL for tracking 3rd party outages
+	StatusPageUrl string `json:"status_page_url,omitempty" example:"https://status.salesforce.com"`
 	// Logo URL
 	Logo string `json:"logo,omitempty" example:"https://example.com/logo.png"`
 	// Labels assigned to the connector

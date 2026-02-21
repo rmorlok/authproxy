@@ -25,10 +25,11 @@ type ConnectorJson struct {
 	Version     uint64                         `json:"version"`
 	Namespace   string                         `json:"namespace"`
 	State       database.ConnectorVersionState `json:"state"`
-	DisplayName string                         `json:"display_name"`
-	Highlight   string                         `json:"highlight,omitempty"`
-	Description string                         `json:"description"`
-	Logo        string                         `json:"logo"`
+	DisplayName   string                         `json:"display_name"`
+	Highlight     string                         `json:"highlight,omitempty"`
+	Description   string                         `json:"description"`
+	StatusPageUrl string                         `json:"status_page_url,omitempty"`
+	Logo          string                         `json:"logo"`
 	Labels      map[string]string              `json:"labels,omitempty"`
 	CreatedAt   time.Time                      `json:"created_at"`
 	UpdatedAt   time.Time                      `json:"updated_at"`
@@ -52,17 +53,18 @@ func ConnectorVersionToConnectorJson(cv connIface.ConnectorVersion) ConnectorJso
 	}
 
 	return ConnectorJson{
-		Id:          cv.GetId(),
-		Version:     cv.GetVersion(),
-		Namespace:   cv.GetNamespace(),
-		State:       cv.GetState(),
-		Highlight:   def.Highlight,
-		DisplayName: def.DisplayName,
-		Description: def.Description,
-		Logo:        logo,
-		Labels:      cv.GetLabels(),
-		CreatedAt:   cv.GetCreatedAt(),
-		UpdatedAt:   cv.GetUpdatedAt(),
+		Id:            cv.GetId(),
+		Version:       cv.GetVersion(),
+		Namespace:     cv.GetNamespace(),
+		State:         cv.GetState(),
+		Highlight:     def.Highlight,
+		DisplayName:   def.DisplayName,
+		Description:   def.Description,
+		StatusPageUrl: def.StatusPageUrl,
+		Logo:          logo,
+		Labels:        cv.GetLabels(),
+		CreatedAt:     cv.GetCreatedAt(),
+		UpdatedAt:     cv.GetUpdatedAt(),
 	}
 }
 
