@@ -50,7 +50,7 @@ func TestActorsRoutes(t *testing.T) {
 		cfg, auth, authUtil := authService.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
 		// Test encrypt service and http factory
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
-		h := httpf.CreateFactory(cfg, rds, test_utils.NewTestLogger())
+		h := httpf.CreateFactory(cfg, rds, nil, test_utils.NewTestLogger())
 
 		// Build routes
 		ar := NewActorsRoutes(cfg, auth, db, rds, h, e, test_utils.NewTestLogger())

@@ -20,7 +20,7 @@ type RequestInfo struct {
 	ConnectionId     uuid.UUID
 }
 
-func (r *RequestInfo) setRedisRecordFields(er *EntryRecord) {
+func (r *RequestInfo) setRedisRecordFields(er *LogRecord) {
 	t := r.Type
 	if t == "" {
 		t = RequestTypeGlobal

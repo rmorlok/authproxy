@@ -23,18 +23,19 @@ import (
 )
 
 type DependencyManager struct {
-	serviceId      string
-	cfg            config.C
-	logBuilder     aplog.Builder
-	logger         *slog.Logger
-	r              apredis.Client
-	db             database.DB
-	httpf          httpf.F
-	logRetriever   request_log.LogRetriever
-	e              encrypt.E
-	asynqClient    apasynq.Client
-	asynqInspector *asynq.Inspector
-	c              coreIface.C
+	serviceId        string
+	cfg              config.C
+	logBuilder       aplog.Builder
+	logger           *slog.Logger
+	r                apredis.Client
+	db               database.DB
+	httpf            httpf.F
+	logRetriever     request_log.LogRetriever
+	entryRecordStore request_log.EntryRecordStore
+	e                encrypt.E
+	asynqClient      apasynq.Client
+	asynqInspector   *asynq.Inspector
+	c                coreIface.C
 }
 
 func NewDependencyManager(serviceId string, cfg config.C) *DependencyManager {
@@ -127,9 +128,26 @@ func (dm *DependencyManager) AutoMigrateDatabase() {
 	}
 }
 
+func (dm *DependencyManager) GetEntryRecordStore() request_log.EntryRecordStore {
+	if dm.entryRecordStore == nil {
+		dm.entryRecordStore = request_log.NewEntryRecordStore(
+			dm.GetConfigRoot().HttpLogging,
+			dm.GetRedisClient(),
+			dm.GetLogger(),
+		)
+	}
+
+	return dm.entryRecordStore
+}
+
 func (dm *DependencyManager) GetHttpf() httpf.F {
 	if dm.httpf == nil {
-		dm.httpf = httpf.CreateFactory(dm.GetConfig(), dm.GetRedisClient(), dm.GetLogger())
+		dm.httpf = httpf.CreateFactory(
+			dm.GetConfig(),
+			dm.GetRedisClient(),
+			dm.GetEntryRecordStore(),
+			dm.GetLogger(),
+		)
 	}
 
 	return dm.httpf
@@ -137,7 +155,13 @@ func (dm *DependencyManager) GetHttpf() httpf.F {
 
 func (dm *DependencyManager) GetRequestLogRetriever() request_log.LogRetriever {
 	if dm.logRetriever == nil {
-		dm.logRetriever = request_log.NewRetrievalService(dm.GetRedisClient(), dm.GetConfig().GetGlobalKey())
+		retriever := request_log.NewEntryRecordRetriever(
+			dm.GetConfigRoot().HttpLogging,
+			dm.GetRedisClient(),
+			dm.GetConfig().GetGlobalKey(),
+			dm.GetLogger(),
+		)
+		dm.logRetriever = request_log.NewRetrievalServiceWithProvider(dm.GetRedisClient(), retriever)
 	}
 
 	return dm.logRetriever
@@ -145,7 +169,8 @@ func (dm *DependencyManager) GetRequestLogRetriever() request_log.LogRetriever {
 
 func (dm *DependencyManager) AutoMigrateLogRetriever() {
 	if dm.GetConfigRoot().HttpLogging.GetAutoMigrate() {
-		err := request_log.Migrate(context.Background(), dm.GetRedisClient(), dm.GetLogger())
+		store := dm.GetEntryRecordStore()
+		err := store.Migrate(context.Background())
 		if err != nil {
 			panic(err)
 		}

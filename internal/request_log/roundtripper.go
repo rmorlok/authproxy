@@ -7,10 +7,24 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apredis"
 )
 
+type Roundtripper struct {
+	ss                    *StorageService
+	requestInfo           RequestInfo
+	expiration            time.Duration
+	recordFullRequest     bool
+	fullRequestExpiration time.Duration
+	maxFullRequestSize    uint64        // The largest full request size to store
+	maxFullResponseSize   uint64        // The largest full response size to store
+	maxResponseWait       time.Duration // The longest amount of time to wait for the full response to be consumed before logging
+	transport             http.RoundTripper
+	persistEntry          func(log *FullLog) error // So test can override
+}
+
 // RoundTrip implements the http.RoundTripper interface
-func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
+func (t *Roundtripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	ctx := req.Context()
 	var responseBodyReader *io.PipeReader
 	var requestBodyBuf *bytes.Buffer
