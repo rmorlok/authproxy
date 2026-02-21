@@ -115,9 +115,9 @@ func mustApplyBlankSqliteTestDbConfig(t testing.TB, cfg config.C) (config.C, DB,
 		t.Fatalf("failed to create sqlite test database: %v", err)
 	}
 
-	root.Database = &sconfig.DatabaseSqlite{
+	root.Database = &sconfig.Database{InnerVal: &sconfig.DatabaseSqlite{
 		Path: tempFilePath,
-	}
+	}}
 
 	db, err := NewConnectionForRoot(root, root.GetRootLogger())
 	if err != nil {
@@ -200,7 +200,7 @@ func mustApplyBlankPostgresTestDbConfig(t testing.TB, cfg config.C) (config.C, D
 		}
 	}
 
-	root.Database = &sconfig.DatabasePostgres{
+	root.Database = &sconfig.Database{InnerVal: &sconfig.DatabasePostgres{
 		Provider: sconfig.DatabaseProviderPostgres,
 		Host:     scommon.NewStringValueDirectInline(testDbConfig.Host),
 		Port:     scommon.NewIntegerValueDirectInline(int64(port)),
@@ -209,7 +209,7 @@ func mustApplyBlankPostgresTestDbConfig(t testing.TB, cfg config.C) (config.C, D
 		Database: scommon.NewStringValueDirectInline(testDbConfig.Database),
 		SSLMode:  scommon.NewStringValueDirectInline(sslMode),
 		Params:   params,
-	}
+	}}
 
 	db := &service{
 		cfg:       root.Database,

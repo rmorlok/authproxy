@@ -18,14 +18,13 @@ import (
 // NewConnectionForRoot creates a new database connection from the specified configuration. The type of the database
 // returned will be determined by the configuration. Same as NewConnection.
 func NewConnectionForRoot(root *config.Root, logger *slog.Logger) (DB, error) {
-	dbConfig := root.Database
 	secretKey := root.SystemAuth.GlobalAESKey
 
-	switch dbConfig.(type) {
+	switch v := root.Database.InnerVal.(type) {
 	case *config.DatabaseSqlite:
-		return NewSqliteConnection(dbConfig.(*config.DatabaseSqlite), secretKey, logger)
+		return NewSqliteConnection(v, secretKey, logger)
 	case *config.DatabasePostgres:
-		return NewPostgresConnection(dbConfig.(*config.DatabasePostgres), secretKey, logger)
+		return NewPostgresConnection(v, secretKey, logger)
 	default:
 		return nil, errors.New("database type not supported")
 	}
@@ -100,7 +99,7 @@ func NewPostgresConnection(dbConfig *config.DatabasePostgres, secretKey config.K
 }
 
 type service struct {
-	cfg       config.Database
+	cfg       config.DatabaseImpl
 	sq        sq.StatementBuilderType
 	db        *sql.DB
 	secretKey config.KeyDataType // the AES key used to secure cursors

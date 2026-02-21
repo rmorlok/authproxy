@@ -1,11 +1,9 @@
 package config
 
 import (
-	"fmt"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"gopkg.in/yaml.v3"
 )
 
 type DatabaseProvider string
@@ -15,7 +13,8 @@ const (
 	DatabaseProviderPostgres DatabaseProvider = "postgres"
 )
 
-type Database interface {
+// DatabaseImpl is the interface implemented by concrete database configurations.
+type DatabaseImpl interface {
 	GetProvider() DatabaseProvider
 	GetAutoMigrate() bool
 	GetAutoMigrationLockDuration() time.Duration
@@ -24,58 +23,51 @@ type Database interface {
 	GetPlaceholderFormat() sq.PlaceholderFormat
 }
 
-func UnmarshallYamlDatabaseString(data string) (Database, error) {
-	return UnmarshallYamlDatabase([]byte(data))
+// Database is the holder for a DatabaseImpl instance.
+type Database struct {
+	InnerVal DatabaseImpl `json:"-" yaml:"-"`
 }
 
-func UnmarshallYamlDatabase(data []byte) (Database, error) {
-	var rootNode yaml.Node
-
-	if err := yaml.Unmarshal(data, &rootNode); err != nil {
-		return nil, err
+func (d *Database) GetProvider() DatabaseProvider {
+	if d == nil || d.InnerVal == nil {
+		return ""
 	}
-
-	return databaseUnmarshalYAML(rootNode.Content[0])
+	return d.InnerVal.GetProvider()
 }
 
-// databaseUnmarshalYAML handles unmarshalling from YAML while allowing us to make decisions
-// about how the data is unmarshalled based on the concrete type being represented
-func databaseUnmarshalYAML(value *yaml.Node) (Database, error) {
-	// Ensure the node is a mapping node
-	if value.Kind != yaml.MappingNode {
-		return nil, fmt.Errorf("database expected a mapping node, got %s", KindToString(value.Kind))
+func (d *Database) GetAutoMigrate() bool {
+	if d == nil || d.InnerVal == nil {
+		return false
 	}
-
-	var database Database
-
-fieldLoop:
-	for i := 0; i < len(value.Content); i += 2 {
-		keyNode := value.Content[i]
-		valueNode := value.Content[i+1]
-
-		switch keyNode.Value {
-		case "provider":
-			switch DatabaseProvider(valueNode.Value) {
-			case DatabaseProviderSqlite:
-				database = &DatabaseSqlite{Provider: DatabaseProviderSqlite}
-				break fieldLoop
-			case DatabaseProviderPostgres:
-				database = &DatabasePostgres{Provider: DatabaseProviderPostgres}
-				break fieldLoop
-			default:
-				return nil, fmt.Errorf("unknown database provider %v", valueNode.Value)
-			}
-
-		}
-	}
-
-	if database == nil {
-		return nil, fmt.Errorf("invalid structure for database; missing provider field")
-	}
-
-	if err := value.Decode(database); err != nil {
-		return nil, err
-	}
-
-	return database, nil
+	return d.InnerVal.GetAutoMigrate()
 }
+
+func (d *Database) GetAutoMigrationLockDuration() time.Duration {
+	if d == nil || d.InnerVal == nil {
+		return 2 * time.Minute
+	}
+	return d.InnerVal.GetAutoMigrationLockDuration()
+}
+
+func (d *Database) GetUri() string {
+	if d == nil || d.InnerVal == nil {
+		return ""
+	}
+	return d.InnerVal.GetUri()
+}
+
+func (d *Database) GetDsn() string {
+	if d == nil || d.InnerVal == nil {
+		return ""
+	}
+	return d.InnerVal.GetDsn()
+}
+
+func (d *Database) GetPlaceholderFormat() sq.PlaceholderFormat {
+	if d == nil || d.InnerVal == nil {
+		return sq.Question
+	}
+	return d.InnerVal.GetPlaceholderFormat()
+}
+
+var _ DatabaseImpl = (*Database)(nil)

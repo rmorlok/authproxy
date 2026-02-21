@@ -32,7 +32,7 @@ func MustApplyTestConfig(cfg config.C) (config.C, Client) {
 	redisCfg := &sconfig.RedisMiniredis{
 		Provider: sconfig.RedisProviderMiniredis,
 	}
-	root.Redis = redisCfg
+	root.Redis = &sconfig.Redis{InnerVal: redisCfg}
 	if root.SystemAuth.GlobalAESKey == nil {
 		root.SystemAuth.GlobalAESKey = &sconfig.KeyData{InnerVal: &sconfig.KeyDataRandomBytes{}}
 	}
