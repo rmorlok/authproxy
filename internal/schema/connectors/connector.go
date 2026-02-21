@@ -51,6 +51,18 @@ type Connector struct {
 	// This helps users track 3rd party outages that may affect their connections.
 	StatusPageUrl string `json:"status_page_url,omitempty" yaml:"status_page_url,omitempty"`
 
+	// MarketplaceUrl is a URL to the marketplace listing for this connector's external service.
+	// For example, this could link to the app's listing in the service's app marketplace.
+	MarketplaceUrl string `json:"marketplace_url,omitempty" yaml:"marketplace_url,omitempty"`
+
+	// DeveloperConsoleUrl is a URL to the developer console for this connector's external service.
+	// This is where developers manage their app's configuration, API keys, etc.
+	DeveloperConsoleUrl string `json:"developer_console_url,omitempty" yaml:"developer_console_url,omitempty"`
+
+	// OAuthClientUrl is a URL to the OAuth client management page for this connector's external service.
+	// This is typically a sub-page of the developer console where the OAuth client credentials are managed.
+	OAuthClientUrl string `json:"oauth_client_url,omitempty" yaml:"oauth_client_url,omitempty"`
+
 	// Auth is how this connector authenticates. Possible values are of type OAuth2 or APIKey. See individual
 	// documentation for each struct for more details.
 	Auth *Auth `json:"auth" yaml:"auth"`

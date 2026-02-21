@@ -20,6 +20,8 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import FormHelperText from '@mui/material/FormHelperText';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
+import MuiLink from '@mui/material/Link';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import {connectors, ConnectorVersion, ConnectorVersionState} from '@authproxy/api';
@@ -215,6 +217,31 @@ export default function ConnectorVersionDetail(
             </Stack>
 
             {actionError && <Alert severity="error">{actionError}</Alert>}
+
+            {(cv.definition.status_page_url || cv.definition.marketplace_url || cv.definition.developer_console_url || cv.definition.oauth_client_url) && (
+                <Stack direction="row" spacing={2} flexWrap="wrap">
+                    {cv.definition.status_page_url && (
+                        <MuiLink href={cv.definition.status_page_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                            Status Page <OpenInNewIcon fontSize="inherit" />
+                        </MuiLink>
+                    )}
+                    {cv.definition.marketplace_url && (
+                        <MuiLink href={cv.definition.marketplace_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                            Marketplace <OpenInNewIcon fontSize="inherit" />
+                        </MuiLink>
+                    )}
+                    {cv.definition.developer_console_url && (
+                        <MuiLink href={cv.definition.developer_console_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                            Developer Console <OpenInNewIcon fontSize="inherit" />
+                        </MuiLink>
+                    )}
+                    {cv.definition.oauth_client_url && (
+                        <MuiLink href={cv.definition.oauth_client_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+                            OAuth Client <OpenInNewIcon fontSize="inherit" />
+                        </MuiLink>
+                    )}
+                </Stack>
+            )}
 
             <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
                 <Box>

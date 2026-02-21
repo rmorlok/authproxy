@@ -28,8 +28,8 @@ type ConnectorJson struct {
 	DisplayName   string                         `json:"display_name"`
 	Highlight     string                         `json:"highlight,omitempty"`
 	Description   string                         `json:"description"`
-	StatusPageUrl string                         `json:"status_page_url,omitempty"`
-	Logo          string                         `json:"logo"`
+	StatusPageUrl string `json:"status_page_url,omitempty"`
+	Logo          string `json:"logo"`
 	Labels      map[string]string              `json:"labels,omitempty"`
 	CreatedAt   time.Time                      `json:"created_at"`
 	UpdatedAt   time.Time                      `json:"updated_at"`
