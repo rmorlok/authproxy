@@ -83,7 +83,6 @@ func TestDatabasePostgres_Validate(t *testing.T) {
 		db := &DatabasePostgres{
 			Provider: DatabaseProviderPostgres,
 			Host:     common.NewStringValueDirectInline("localhost"),
-			User:     common.NewStringValueDirectInline("test"),
 			Database: common.NewStringValueDirectInline("authproxy"),
 		}
 		assert.NoError(t, db.Validate(vc))
@@ -111,17 +110,6 @@ func TestDatabasePostgres_Validate(t *testing.T) {
 		assert.Contains(t, err.Error(), "host must be specified")
 	})
 
-	t.Run("missing user", func(t *testing.T) {
-		db := &DatabasePostgres{
-			Provider: DatabaseProviderPostgres,
-			Host:     common.NewStringValueDirectInline("localhost"),
-			Database: common.NewStringValueDirectInline("authproxy"),
-		}
-		err := db.Validate(vc)
-		assert.Error(t, err)
-		assert.Contains(t, err.Error(), "user must be specified")
-	})
-
 	t.Run("missing database", func(t *testing.T) {
 		db := &DatabasePostgres{
 			Provider: DatabaseProviderPostgres,
@@ -140,7 +128,6 @@ func TestDatabasePostgres_Validate(t *testing.T) {
 		err := db.Validate(vc)
 		assert.Error(t, err)
 		assert.Contains(t, err.Error(), "host must be specified")
-		assert.Contains(t, err.Error(), "user must be specified")
 		assert.Contains(t, err.Error(), "database must be specified")
 	})
 

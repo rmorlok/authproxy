@@ -18,7 +18,7 @@ type DatabasePostgres struct {
 	Provider                  DatabaseProvider  `json:"provider" yaml:"provider"`
 	Host                      *StringValue      `json:"host" yaml:"host"`
 	Port                      *IntegerValue     `json:"port,omitempty" yaml:"port,omitempty"`
-	User                      *StringValue      `json:"user" yaml:"user"`
+	User                      *StringValue      `json:"user,omitempty" yaml:"user,omitempty"`
 	Password                  *StringValue      `json:"password,omitempty" yaml:"password,omitempty"`
 	Database                  *StringValue      `json:"database" yaml:"database"`
 	SSLMode                   *StringValue      `json:"sslmode,omitempty" yaml:"sslmode,omitempty"`
@@ -127,10 +127,6 @@ func (d *DatabasePostgres) Validate(vc *common.ValidationContext) error {
 
 	if d.Host == nil {
 		result = multierror.Append(result, vc.NewErrorForField("host", "host must be specified"))
-	}
-
-	if d.User == nil {
-		result = multierror.Append(result, vc.NewErrorForField("user", "user must be specified"))
 	}
 
 	if d.Database == nil {
