@@ -28,8 +28,11 @@ type ConnectorJson struct {
 	DisplayName   string                         `json:"display_name"`
 	Highlight     string                         `json:"highlight,omitempty"`
 	Description   string                         `json:"description"`
-	StatusPageUrl string                         `json:"status_page_url,omitempty"`
-	Logo          string                         `json:"logo"`
+	StatusPageUrl       string                         `json:"status_page_url,omitempty"`
+	MarketplaceUrl      string                         `json:"marketplace_url,omitempty"`
+	DeveloperConsoleUrl string                         `json:"developer_console_url,omitempty"`
+	OAuthClientUrl      string                         `json:"oauth_client_url,omitempty"`
+	Logo                string                         `json:"logo"`
 	Labels      map[string]string              `json:"labels,omitempty"`
 	CreatedAt   time.Time                      `json:"created_at"`
 	UpdatedAt   time.Time                      `json:"updated_at"`
@@ -60,8 +63,11 @@ func ConnectorVersionToConnectorJson(cv connIface.ConnectorVersion) ConnectorJso
 		Highlight:     def.Highlight,
 		DisplayName:   def.DisplayName,
 		Description:   def.Description,
-		StatusPageUrl: def.StatusPageUrl,
-		Logo:          logo,
+		StatusPageUrl:       def.StatusPageUrl,
+		MarketplaceUrl:      def.MarketplaceUrl,
+		DeveloperConsoleUrl: def.DeveloperConsoleUrl,
+		OAuthClientUrl:      def.OAuthClientUrl,
+		Logo:                logo,
 		Labels:        cv.GetLabels(),
 		CreatedAt:     cv.GetCreatedAt(),
 		UpdatedAt:     cv.GetUpdatedAt(),
