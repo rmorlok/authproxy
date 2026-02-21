@@ -636,6 +636,59 @@ func TestConnectors(t *testing.T) {
 		})
 	})
 
+	t.Run("create connector with status page url", func(t *testing.T) {
+		tu := setup(t, nil)
+		body := CreateConnectorRequestJson{
+			Namespace: "root",
+			Definition: cschema.Connector{
+				DisplayName:   "Salesforce",
+				Description:   "Salesforce CRM integration",
+				StatusPageUrl: "https://status.salesforce.com",
+			},
+			Labels: map[string]string{"type": "salesforce"},
+		}
+		jsonBody, _ := json.Marshal(body)
+		w := httptest.NewRecorder()
+		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodPost,
+			"/connectors",
+			bytes.NewReader(jsonBody),
+			"root",
+			"some-actor",
+			aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusCreated, w.Code)
+
+		var createResp ConnectorVersionJson
+		err = json.Unmarshal(w.Body.Bytes(), &createResp)
+		require.NoError(t, err)
+		require.Equal(t, "https://status.salesforce.com", createResp.Definition.StatusPageUrl)
+
+		// Verify it comes back in the connector list response too
+		w = httptest.NewRecorder()
+		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodGet,
+			fmt.Sprintf("/connectors/%s/versions/%d", createResp.Id, createResp.Version),
+			nil,
+			"root",
+			"some-actor",
+			aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		var getResp ConnectorVersionJson
+		err = json.Unmarshal(w.Body.Bytes(), &getResp)
+		require.NoError(t, err)
+		require.Equal(t, "https://status.salesforce.com", getResp.Definition.StatusPageUrl)
+	})
+
 	t.Run("update connector", func(t *testing.T) {
 		connectorId := uuid.MustParse("10000000-0000-0000-0000-000000000001")
 
