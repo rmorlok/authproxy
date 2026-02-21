@@ -37,6 +37,9 @@ fieldLoop:
 			case DatabaseProviderPostgres:
 				database = &DatabasePostgres{Provider: DatabaseProviderPostgres}
 				break fieldLoop
+			case DatabaseProviderClickhouse:
+				database = &DatabaseClickhouse{Provider: DatabaseProviderClickhouse}
+				break fieldLoop
 			default:
 				return fmt.Errorf("unknown database provider %v", valueNode.Value)
 			}

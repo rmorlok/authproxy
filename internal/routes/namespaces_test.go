@@ -48,7 +48,7 @@ func TestNamespaces(t *testing.T) {
 		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 		cfg, rds := apredis.MustApplyTestConfig(cfg)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
-		h := httpf2.CreateFactory(cfg, rds, aplog.NewNoopLogger())
+		h := httpf2.CreateFactory(cfg, rds, nil, aplog.NewNoopLogger())
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
 		ctrl := gomock.NewController(t)
 		ac := asynqmock.NewMockClient(ctrl)

@@ -12,8 +12,9 @@ import (
 )
 
 type redisLogRetriever struct {
-	r         apredis.Client     `json:"-"`
-	cursorKey config.KeyDataType `json:"-"`
+	r                apredis.Client           `json:"-"`
+	cursorKey        config.KeyDataType       `json:"-"`
+	recordRetriever  EntryRecordRetriever
 }
 
 func (r *redisLogRetriever) GetFullLog(ctx context.Context, id uuid.UUID) (*Entry, error) {
@@ -29,7 +30,17 @@ func (r *redisLogRetriever) GetFullLog(ctx context.Context, id uuid.UUID) (*Entr
 	}
 
 	entryRecordData, err := entryRecordCmd.Result()
-	if errors.Is(err, redis.Nil) {
+	if errors.Is(err, redis.Nil) || (err == nil && len(entryRecordData) == 0) {
+		// Try the record retriever as fallback
+		if r.recordRetriever != nil {
+			er, rerr := r.recordRetriever.GetRecord(ctx, id)
+			if rerr != nil {
+				return nil, ErrNotFound
+			}
+			entry := NewEntryFromRecord(er)
+			entry.Full = false
+			return entry, nil
+		}
 		return nil, ErrNotFound
 	} else if err != nil {
 		return nil, errors.Wrap(err, "failed to retrieve entry record")
@@ -63,27 +74,44 @@ func (r *redisLogRetriever) GetFullLog(ctx context.Context, id uuid.UUID) (*Entr
 }
 
 func (r *redisLogRetriever) NewListRequestsBuilder() ListRequestBuilder {
-	return &listRequestsFilters{
-		r:         r.r,
-		cursorKey: r.cursorKey,
-		LimitVal:  100,
+	if r.recordRetriever != nil {
+		return r.recordRetriever.NewListRequestsBuilder()
+	}
+	return &redisListRequestsBuilder{
+		ListFilters: ListFilters{LimitVal: 100},
+		r:           r.r,
+		cursorKey:   r.cursorKey,
 	}
 }
 
 func (r *redisLogRetriever) ListRequestsFromCursor(ctx context.Context, cursor string) (ListRequestExecutor, error) {
-	b := &listRequestsFilters{
-		r:         r.r,
-		cursorKey: r.cursorKey,
-		LimitVal:  100,
+	if r.recordRetriever != nil {
+		return r.recordRetriever.ListRequestsFromCursor(ctx, cursor)
+	}
+	b := &redisListRequestsBuilder{
+		ListFilters: ListFilters{LimitVal: 100},
+		r:           r.r,
+		cursorKey:   r.cursorKey,
 	}
 
 	return b.FromCursor(ctx, cursor)
 }
 
+// NewRetrievalService creates a LogRetriever backed by Redis.
+// Deprecated: Use NewRetrievalServiceWithProvider instead.
 func NewRetrievalService(r apredis.Client, cursorKey config.KeyDataType) LogRetriever {
 	return &redisLogRetriever{
 		r:         r,
 		cursorKey: cursorKey,
+	}
+}
+
+// NewRetrievalServiceWithProvider creates a LogRetriever with a pluggable EntryRecordRetriever
+// for metadata queries. Redis is still used for full request JSON retrieval.
+func NewRetrievalServiceWithProvider(r apredis.Client, retriever EntryRecordRetriever) LogRetriever {
+	return &redisLogRetriever{
+		r:               r,
+		recordRetriever: retriever,
 	}
 }
 

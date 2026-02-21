@@ -19,6 +19,10 @@ func (d *DatabaseSqlite) GetProvider() DatabaseProvider {
 	return DatabaseProviderSqlite
 }
 
+func (d *DatabaseSqlite) GetDriver() string {
+	return "sqlite3"
+}
+
 func (d *DatabaseSqlite) GetAutoMigrate() bool {
 	return d.AutoMigrate
 }

@@ -8,14 +8,14 @@ import (
 	"github.com/pkg/errors"
 )
 
-// EntryRecord represents a record of an HTTP request as is stored in the request log in redis. This
+// LogRecord represents a record of an HTTP request as is stored in the request log. This
 // data is redacted to avoid containing sensitive information like information in headers. For a given
-// record in redis, the full request may be stored as well, which would correspond to the data in the
+// record, the full request may be stored as well, which would correspond to the data in the
 // Entry struct.
 //
 // JSON tagging on this struct is used so the same data structure can be passed directly to endpoint
 // responses. It is not use for internal storage.
-type EntryRecord struct {
+type LogRecord struct {
 	Namespace           string              `json:"namespace"`
 	Type                RequestType         `json:"type"`
 	RequestId           uuid.UUID           `json:"request_id"`
@@ -42,15 +42,15 @@ type EntryRecord struct {
 	FullRequestRecorded bool                `json:"full_request_recorded,omitempty"`
 }
 
-func (e *EntryRecord) GetId() uuid.UUID {
+func (e *LogRecord) GetId() uuid.UUID {
 	return e.RequestId
 }
 
-func (e *EntryRecord) GetNamespace() string {
+func (e *LogRecord) GetNamespace() string {
 	return e.Namespace
 }
 
-func (e *EntryRecord) setRedisRecordFields(vals map[string]string) {
+func (e *LogRecord) setRedisRecordFields(vals map[string]string) {
 	vals[fieldNamespace] = e.Namespace
 	vals[fieldType] = string(e.Type)
 	vals[fieldRequestId] = e.RequestId.String()
@@ -101,13 +101,13 @@ func (e *EntryRecord) setRedisRecordFields(vals map[string]string) {
 
 // EntryRecordFromRedisFields creates an EntryRecord from the redis fields. Note that the fields are a string/string
 // map because that is what comes back from the go-redis client for RESP2 protocol.
-func EntryRecordFromRedisFields(vals map[string]string) (*EntryRecord, error) {
+func EntryRecordFromRedisFields(vals map[string]string) (*LogRecord, error) {
 	if vals == nil {
 		return nil, nil
 	}
 
 	var err error
-	er := &EntryRecord{}
+	er := &LogRecord{}
 	er.Namespace = vals[fieldNamespace]
 	er.Type = RequestType(vals[fieldType])
 

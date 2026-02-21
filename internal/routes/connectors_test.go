@@ -74,7 +74,7 @@ func TestConnectors(t *testing.T) {
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
 		rs := mock.NewMockClient(ctrl)
-		h := httpf2.CreateFactory(cfg, rs, aplog.NewNoopLogger())
+		h := httpf2.CreateFactory(cfg, rs, nil, aplog.NewNoopLogger())
 		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		require.NoError(t, c.Migrate(context.Background()))
 

@@ -14,10 +14,11 @@ import (
 )
 
 type clientFactory struct {
-	cfg         config.C
-	r           apredis.Client
-	logger      *slog.Logger
-	requestInfo request_log.RequestInfo
+	cfg              config.C
+	r                apredis.Client
+	entryRecordStore request_log.EntryRecordStore
+	logger           *slog.Logger
+	requestInfo      request_log.RequestInfo
 
 	// Cached at the object level
 
@@ -25,11 +26,12 @@ type clientFactory struct {
 	topLevelOnce sync.Once
 }
 
-func CreateFactory(cfg config.C, r apredis.Client, logger *slog.Logger) F {
+func CreateFactory(cfg config.C, r apredis.Client, entryRecordStore request_log.EntryRecordStore, logger *slog.Logger) F {
 	return &clientFactory{
-		cfg:    cfg,
-		r:      r,
-		logger: logger,
+		cfg:              cfg,
+		r:                r,
+		entryRecordStore: entryRecordStore,
+		logger:           logger,
 		requestInfo: request_log.RequestInfo{
 			Namespace: sconfig.RootNamespace,
 			Type:      request_log.RequestTypeGlobal,
@@ -39,10 +41,11 @@ func CreateFactory(cfg config.C, r apredis.Client, logger *slog.Logger) F {
 
 func (f *clientFactory) ForRequestInfo(ri request_log.RequestInfo) F {
 	return &clientFactory{
-		cfg:         f.cfg,
-		r:           f.r,
-		logger:      f.logger,
-		requestInfo: ri,
+		cfg:              f.cfg,
+		r:                f.r,
+		entryRecordStore: f.entryRecordStore,
+		logger:           f.logger,
+		requestInfo:      ri,
 	}
 }
 
@@ -92,8 +95,9 @@ func (f *clientFactory) New() *gentleman.Client {
 			maxResponseWait := root.HttpLogging.GetMaxResponseWait()
 			fullRequestExpiration := root.HttpLogging.GetFullRequestRetention()
 
-			l := request_log.NewRedisLogger(
+			l := request_log.NewLogger(
 				f.r,
+				f.entryRecordStore,
 				f.logger,
 				f.requestInfo,
 				expiration,
@@ -105,7 +109,7 @@ func (f *clientFactory) New() *gentleman.Client {
 				http.DefaultTransport,
 			)
 
-			// Add the Redis transport plugin
+			// Add the transport plugin
 			f.toplevel.Use(transport.Set(l))
 		}
 	})

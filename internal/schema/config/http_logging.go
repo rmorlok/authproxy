@@ -1,6 +1,8 @@
 package config
 
-import "time"
+import (
+	"time"
+)
 
 type FullRequestRecording string
 
@@ -38,6 +40,16 @@ type HttpLogging struct {
 
 	// FullRequestRetention is how long the full request logs should be retained. If unset, defaults to 30 days.
 	FullRequestRetention *HumanDuration `json:"full_request_retention,omitempty" yaml:"full_request_retention,omitempty"`
+
+	// FlushInterval is how often buffered records are flushed the database. Defaults to 5s.
+	FlushInterval *HumanDuration `json:"flush_interval,omitempty" yaml:"flush_interval,omitempty"`
+
+	// FlushBatchSize is the number of records that triggers a flush. Defaults to 1000.
+	FlushBatchSize *int `json:"flush_batch_size,omitempty" yaml:"flush_batch_size,omitempty"`
+
+	// Database is the database provider for HTTP logging metadata. This can be the same database as the main
+	// database but would be a data warehouse in production.
+	Database *Database `json:"-" yaml:"-"`
 }
 
 func (d *HttpLogging) IsEnabled() bool {
@@ -120,6 +132,22 @@ func (d *HttpLogging) GetMaxResponseSize() uint64 {
 	}
 
 	return d.MaxResponseSize.Value()
+}
+
+func (d *HttpLogging) GetFlushInterval() time.Duration {
+	if d.FlushInterval == nil {
+		return 5 * time.Second
+	}
+
+	return d.FlushInterval.Duration
+}
+
+func (d *HttpLogging) GetFlushBatchSize() int {
+	if d.FlushBatchSize == nil {
+		return 1000
+	}
+
+	return *d.FlushBatchSize
 }
 
 func (d *HttpLogging) GetMaxResponseWait() time.Duration {

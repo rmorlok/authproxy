@@ -8,36 +8,23 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apredis"
+	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
-type redisLogger struct {
-	r                     apredis.Client
-	logger                *slog.Logger
-	requestInfo           RequestInfo
-	expiration            time.Duration
-	recordFullRequest     bool
-	fullRequestExpiration time.Duration
-	maxFullRequestSize    uint64        // The largest full request size to store
-	maxFullResponseSize   uint64        // The largest full response size to store
-	maxResponseWait       time.Duration // The longest amount of time to wait for the full response to be consumed before logging
-	transport             http.RoundTripper
-	persistEntry          func(*Entry) error // So test can override
+type StorageService struct {
+	r         apredis.Client
+	logger    *slog.Logger
+	logWriter LogWriter
 }
 
-func NewRedisLogger(
-	r apredis.Client,
+// NewStorageService that will store the log records and the full request/response.
+func NewStorageService(
+	cfg *config.HttpLogging,
 	logger *slog.Logger,
-	requestInfo RequestInfo,
-	expiration time.Duration,
-	recordFullRequest bool,
-	fullRequestExpiration time.Duration,
-	maxFullRequestSize uint64,
-	maxFullResponseSize uint64,
-	maxResponseWait time.Duration,
-	transport http.RoundTripper,
-) Logger {
-	l := &redisLogger{
+) *StorageService {
+	l := &StorageService{
 		r:                     r,
+		logWriter:             recordStore,
 		logger:                logger,
 		requestInfo:           requestInfo,
 		expiration:            expiration,
@@ -50,62 +37,72 @@ func NewRedisLogger(
 	}
 
 	// Apply default behavior
-	l.persistEntry = l.storeEntryInRedis
+	l.persistEntry = l.storeEntry
 
 	return l
 }
 
-// storeEntryInRedis stores the log entry in Redis. Note that this method logs errors as well as returns them because
-// errors will be ignored where this is called.
-func (t *redisLogger) storeEntryInRedis(
+// NewRedisLogger creates a new Logger backed entirely by Redis.
+// Deprecated: Use NewLogger with a Redis EntryRecordStore instead.
+func NewRedisLogger(
+	r apredis.Client,
+	logger *slog.Logger,
+	requestInfo RequestInfo,
+	expiration time.Duration,
+	recordFullRequest bool,
+	fullRequestExpiration time.Duration,
+	maxFullRequestSize uint64,
+	maxFullResponseSize uint64,
+	maxResponseWait time.Duration,
+	transport http.RoundTripper,
+) Logger {
+	store := NewRedisEntryRecordStore(r, logger)
+	return NewLogger(
+		r,
+		store,
+		logger,
+		requestInfo,
+		expiration,
+		recordFullRequest,
+		fullRequestExpiration,
+		maxFullRequestSize,
+		maxFullResponseSize,
+		maxResponseWait,
+		transport,
+	)
+}
+
+// storeEntry persists the entry: metadata via EntryRecordStore, full JSON in Redis.
+func (t *redisLogger) storeEntry(
 	entry *Entry,
 ) error {
-	// Get the Redis client
-	client := t.r
-	pipeline := client.Pipeline()
-
 	er := EntryRecord{}
 	t.requestInfo.setRedisRecordFields(&er)
 	entry.setRedisRecordFields(&er)
 
-	vals := make(map[string]string)
-	er.setRedisRecordFields(vals)
-
-	// Store the entry
-	err := pipeline.HSet(context.Background(), redisLogKey(entry.Id), vals).Err()
-	if err != nil {
-		t.logger.Error("error storing HTTP log entry in Redis", "error", err, "entry_id", entry.Id.String())
+	// Store the entry record metadata via the provider
+	if err := t.recordStore.StoreRecord(context.Background(), &er); err != nil {
+		t.logger.Error("error storing entry record", "error", err, "entry_id", entry.Id.String())
 		return err
 	}
 
-	err = pipeline.Expire(context.Background(), redisLogKey(entry.Id), t.expiration).Err()
+	// Set expiration on the Redis hash key (for TTL-based cleanup)
+	err := t.r.Expire(context.Background(), redisLogKey(entry.Id), t.expiration).Err()
 	if err != nil {
 		t.logger.Error("error setting expiry for log entry in Redis", "error", err, "entry_id", entry.Id.String())
-		return err
+		// Don't return error here - the record was stored, just TTL failed
 	}
 
+	// Store full request JSON in Redis if recording
 	if t.recordFullRequest {
 		jsonData, err := json.Marshal(entry)
 		if err != nil {
 			t.logger.Error("error serializing entry to JSON", "error", err, "entry_id", entry.Id.String())
 		} else {
-			err = pipeline.Set(context.Background(), redisFullLogKey(entry.Id), jsonData, t.fullRequestExpiration).Err()
+			err = t.r.Set(context.Background(), redisFullLogKey(entry.Id), jsonData, t.fullRequestExpiration).Err()
 			if err != nil {
 				t.logger.Error("error storing full HTTP log entry in Redis", "error", err, "entry_id", entry.Id.String())
 			}
-		}
-	}
-
-	cmdErr, err := pipeline.Exec(context.Background())
-	if err != nil {
-		t.logger.Error("error storing HTTP log entry in Redis", "error", err, "entry_id", entry.Id.String())
-		return err
-	}
-
-	for _, cmd := range cmdErr {
-		if cmd.Err() != nil {
-			t.logger.Error("error storing HTTP log entry in Redis", "error", cmd.Err(), "entry_id", entry.Id.String())
-			return err
 		}
 	}
 

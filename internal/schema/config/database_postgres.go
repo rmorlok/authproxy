@@ -31,6 +31,10 @@ func (d *DatabasePostgres) GetProvider() DatabaseProvider {
 	return DatabaseProviderPostgres
 }
 
+func (d *DatabasePostgres) GetDriver() string {
+	return "postgres"
+}
+
 func (d *DatabasePostgres) GetAutoMigrate() bool {
 	return d.AutoMigrate
 }
