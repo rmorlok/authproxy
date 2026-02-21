@@ -4123,11 +4123,6 @@
                     "type": "string",
                     "example": "Salesforce CRM integration"
                 },
-                "developer_console_url": {
-                    "description": "Developer console URL for managing the app",
-                    "type": "string",
-                    "example": "https://developer.salesforce.com/"
-                },
                 "display_name": {
                     "description": "Display name",
                     "type": "string",
@@ -4155,20 +4150,10 @@
                     "type": "string",
                     "example": "https://example.com/logo.png"
                 },
-                "marketplace_url": {
-                    "description": "Marketplace listing URL for the external service",
-                    "type": "string",
-                    "example": "https://appexchange.salesforce.com/appxListingDetail?listingId=a0N300000016bQREAY"
-                },
                 "namespace": {
                     "description": "Namespace path",
                     "type": "string",
                     "example": "acme"
-                },
-                "oauth_client_url": {
-                    "description": "OAuth client management URL",
-                    "type": "string",
-                    "example": "https://login.salesforce.com/app/mgmt/forceconnectedapps/forceAppEdit.apexp"
                 },
                 "state": {
                     "description": "State (draft, active, deprecated, archived)",

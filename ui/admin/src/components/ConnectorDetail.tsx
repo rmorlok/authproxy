@@ -106,29 +106,10 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
         <Alert severity="info">{conn.highlight}</Alert>
       )}
 
-      {(conn.status_page_url || conn.marketplace_url || conn.developer_console_url || conn.oauth_client_url) && (
-        <Stack direction="row" spacing={2} flexWrap="wrap" sx={{ mt: 1 }}>
-          {conn.status_page_url && (
-            <MuiLink href={conn.status_page_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-              Status Page <OpenInNewIcon fontSize="inherit" />
-            </MuiLink>
-          )}
-          {conn.marketplace_url && (
-            <MuiLink href={conn.marketplace_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-              Marketplace <OpenInNewIcon fontSize="inherit" />
-            </MuiLink>
-          )}
-          {conn.developer_console_url && (
-            <MuiLink href={conn.developer_console_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-              Developer Console <OpenInNewIcon fontSize="inherit" />
-            </MuiLink>
-          )}
-          {conn.oauth_client_url && (
-            <MuiLink href={conn.oauth_client_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
-              OAuth Client <OpenInNewIcon fontSize="inherit" />
-            </MuiLink>
-          )}
-        </Stack>
+      {conn.status_page_url && (
+        <MuiLink href={conn.status_page_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+          Status Page <OpenInNewIcon fontSize="inherit" />
+        </MuiLink>
       )}
 
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>

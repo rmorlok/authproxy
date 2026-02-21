@@ -112,12 +112,6 @@ type SwaggerConnectorJson struct {
 	Description string `json:"description" example:"Salesforce CRM integration"`
 	// Status page URL for tracking 3rd party outages
 	StatusPageUrl string `json:"status_page_url,omitempty" example:"https://status.salesforce.com"`
-	// Marketplace listing URL for the external service
-	MarketplaceUrl string `json:"marketplace_url,omitempty" example:"https://appexchange.salesforce.com/appxListingDetail?listingId=a0N300000016bQREAY"`
-	// Developer console URL for managing the app
-	DeveloperConsoleUrl string `json:"developer_console_url,omitempty" example:"https://developer.salesforce.com/"`
-	// OAuth client management URL
-	OAuthClientUrl string `json:"oauth_client_url,omitempty" example:"https://login.salesforce.com/app/mgmt/forceconnectedapps/forceAppEdit.apexp"`
 	// Logo URL
 	Logo string `json:"logo,omitempty" example:"https://example.com/logo.png"`
 	// Labels assigned to the connector
