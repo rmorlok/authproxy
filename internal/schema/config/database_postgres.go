@@ -9,6 +9,8 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/hashicorp/go-multierror"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
@@ -16,7 +18,7 @@ type DatabasePostgres struct {
 	Provider                  DatabaseProvider  `json:"provider" yaml:"provider"`
 	Host                      *StringValue      `json:"host" yaml:"host"`
 	Port                      *IntegerValue     `json:"port,omitempty" yaml:"port,omitempty"`
-	User                      *StringValue      `json:"user" yaml:"user"`
+	User                      *StringValue      `json:"user,omitempty" yaml:"user,omitempty"`
 	Password                  *StringValue      `json:"password,omitempty" yaml:"password,omitempty"`
 	Database                  *StringValue      `json:"database" yaml:"database"`
 	SSLMode                   *StringValue      `json:"sslmode,omitempty" yaml:"sslmode,omitempty"`
@@ -118,4 +120,28 @@ func (d *DatabasePostgres) buildUrl() *url.URL {
 
 	u.RawQuery = strings.TrimPrefix(params.Encode(), "&")
 	return u
+}
+
+func (d *DatabasePostgres) Validate(vc *common.ValidationContext) error {
+	result := &multierror.Error{}
+
+	if d.Host == nil {
+		result = multierror.Append(result, vc.NewErrorForField("host", "host must be specified"))
+	}
+
+	if d.Database == nil {
+		result = multierror.Append(result, vc.NewErrorForField("database", "database must be specified"))
+	}
+
+	if d.Port != nil {
+		ctx := context.Background()
+		port, err := d.Port.GetUint64Value(ctx)
+		if err != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("port", "invalid port value: %v", err))
+		} else if port == 0 || port > 65535 {
+			result = multierror.Append(result, vc.NewErrorfForField("port", "port must be between 1 and 65535, got %d", port))
+		}
+	}
+
+	return result.ErrorOrNil()
 }
