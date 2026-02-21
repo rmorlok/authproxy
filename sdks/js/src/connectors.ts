@@ -21,6 +21,10 @@ export interface Connector {
     display_name: string;
     description: string;
     highlight?: string;
+    status_page_url?: string;
+    marketplace_url?: string;
+    developer_console_url?: string;
+    oauth_client_url?: string;
     logo: string;
     labels?: Record<string, string>;
     created_at: string;

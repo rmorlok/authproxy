@@ -232,6 +232,10 @@ definitions:
         description: Full description
         example: Salesforce CRM integration
         type: string
+      developer_console_url:
+        description: Developer console URL for managing the app
+        example: https://developer.salesforce.com/
+        type: string
       display_name:
         description: Display name
         example: Salesforce
@@ -253,9 +257,17 @@ definitions:
         description: Logo URL
         example: https://example.com/logo.png
         type: string
+      marketplace_url:
+        description: Marketplace listing URL for the external service
+        example: https://appexchange.salesforce.com/appxListingDetail?listingId=a0N300000016bQREAY
+        type: string
       namespace:
         description: Namespace path
         example: acme
+        type: string
+      oauth_client_url:
+        description: OAuth client management URL
+        example: https://login.salesforce.com/app/mgmt/forceconnectedapps/forceAppEdit.apexp
         type: string
       state:
         description: State (draft, active, deprecated, archived)

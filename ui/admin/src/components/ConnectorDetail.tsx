@@ -8,6 +8,8 @@ import Avatar from '@mui/material/Avatar';
 import Button from '@mui/material/Button';
 import Chip from '@mui/material/Chip';
 import Drawer from '@mui/material/Drawer';
+import MuiLink from '@mui/material/Link';
+import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import dayjs from 'dayjs';
 import {Connector, connectors, ConnectorVersion} from '@authproxy/api';
 import {Link, useNavigate} from 'react-router-dom';
@@ -102,6 +104,31 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
 
       {conn.highlight && (
         <Alert severity="info">{conn.highlight}</Alert>
+      )}
+
+      {(conn.status_page_url || conn.marketplace_url || conn.developer_console_url || conn.oauth_client_url) && (
+        <Stack direction="row" spacing={2} flexWrap="wrap" sx={{ mt: 1 }}>
+          {conn.status_page_url && (
+            <MuiLink href={conn.status_page_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+              Status Page <OpenInNewIcon fontSize="inherit" />
+            </MuiLink>
+          )}
+          {conn.marketplace_url && (
+            <MuiLink href={conn.marketplace_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+              Marketplace <OpenInNewIcon fontSize="inherit" />
+            </MuiLink>
+          )}
+          {conn.developer_console_url && (
+            <MuiLink href={conn.developer_console_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+              Developer Console <OpenInNewIcon fontSize="inherit" />
+            </MuiLink>
+          )}
+          {conn.oauth_client_url && (
+            <MuiLink href={conn.oauth_client_url} target="_blank" rel="noopener noreferrer" underline="hover" sx={{ display: 'inline-flex', alignItems: 'center', gap: 0.5 }}>
+              OAuth Client <OpenInNewIcon fontSize="inherit" />
+            </MuiLink>
+          )}
+        </Stack>
       )}
 
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
