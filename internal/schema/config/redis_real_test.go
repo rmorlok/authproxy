@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestRedisReal(t *testing.T) {
@@ -17,14 +18,14 @@ address: localhost:6379
 network: tcp
 protocol: 2
 `
-			redis, err := UnmarshallYamlRedisString(data)
-			assert.NoError(err)
-			assert.Equal(&RedisReal{
+			var redis Redis
+			assert.NoError(yaml.Unmarshal([]byte(data), &redis))
+			assert.Equal(Redis{InnerVal: &RedisReal{
 				Provider: RedisProviderRedis,
 				Address:  "localhost:6379",
 				Network:  "tcp",
 				Protocol: 2,
-			}, redis)
+			}}, redis)
 		})
 		t.Run("username password straight value", func(t *testing.T) {
 			data := `
@@ -35,17 +36,16 @@ protocol: 2
 username: bobdole
 password: secret
 `
-			expected := &RedisReal{
+			var redis Redis
+			assert.NoError(yaml.Unmarshal([]byte(data), &redis))
+			assert.Equal(Redis{InnerVal: &RedisReal{
 				Provider: RedisProviderRedis,
 				Address:  "localhost:6379",
 				Network:  "tcp",
 				Protocol: 2,
 				Username: NewStringValueDirectInline("bobdole"),
 				Password: NewStringValueDirectInline("secret"),
-			}
-			redis, err := UnmarshallYamlRedisString(data)
-			assert.NoError(err)
-			assert.Equal(expected, redis)
+			}}, redis)
 		})
 		t.Run("username password env var", func(t *testing.T) {
 			data := `
@@ -58,9 +58,9 @@ username:
 password:
   env_var: REDIS_PASSWORD
 `
-			redis, err := UnmarshallYamlRedisString(data)
-			assert.NoError(err)
-			assert.Equal(&RedisReal{
+			var redis Redis
+			assert.NoError(yaml.Unmarshal([]byte(data), &redis))
+			assert.Equal(Redis{InnerVal: &RedisReal{
 				Provider: RedisProviderRedis,
 				Address:  "localhost:6379",
 				Network:  "tcp",
@@ -71,7 +71,17 @@ password:
 				Password: &StringValue{&StringValueEnvVar{
 					EnvVar: "REDIS_PASSWORD",
 				}},
-			}, redis)
+			}}, redis)
+		})
+		t.Run("miniredis", func(t *testing.T) {
+			data := `
+provider: miniredis
+`
+			var redis Redis
+			assert.NoError(yaml.Unmarshal([]byte(data), &redis))
+			assert.Equal(Redis{InnerVal: &RedisMiniredis{
+				Provider: RedisProviderMiniredis,
+			}}, redis)
 		})
 	})
 }

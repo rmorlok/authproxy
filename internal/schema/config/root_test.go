@@ -6,6 +6,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestRootFullConfig(t *testing.T) {
@@ -102,7 +103,7 @@ connectors:
 		}),
 	}
 
-	root, err := UnmarshallYamlRootString(data)
-	assert.NoError(err)
-	assert.Equal(expected, root)
+	var root Root
+	assert.NoError(yaml.Unmarshal([]byte(data), &root))
+	assert.Equal(*expected, root)
 }

@@ -5,6 +5,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/stretchr/testify/require"
+	"gopkg.in/yaml.v3"
 )
 
 func TestDatabase(t *testing.T) {
@@ -16,12 +17,12 @@ func TestDatabase(t *testing.T) {
       provider: sqlite
       path: ./some/path.db
 `
-			db, err := UnmarshallYamlDatabaseString(data)
-			assert.NoError(err)
-			assert.Equal(&DatabaseSqlite{
+			var db Database
+			assert.NoError(yaml.Unmarshal([]byte(data), &db))
+			assert.Equal(Database{InnerVal: &DatabaseSqlite{
 				Provider: DatabaseProviderSqlite,
 				Path:     "./some/path.db",
-			}, db)
+			}}, db)
 		})
 		t.Run("postgres", func(t *testing.T) {
 			data := `
@@ -35,9 +36,9 @@ func TestDatabase(t *testing.T) {
       params:
         application_name: authproxy-tests
 `
-			db, err := UnmarshallYamlDatabaseString(data)
-			assert.NoError(err)
-			assert.Equal(&DatabasePostgres{
+			var db Database
+			assert.NoError(yaml.Unmarshal([]byte(data), &db))
+			assert.Equal(Database{InnerVal: &DatabasePostgres{
 				Provider: DatabaseProviderPostgres,
 				Host:     common.NewStringValueDirectInline("localhost"),
 				Port:     common.NewIntegerValueDirectInline(5432),
@@ -48,7 +49,7 @@ func TestDatabase(t *testing.T) {
 				Params: map[string]string{
 					"application_name": "authproxy-tests",
 				},
-			}, db)
+			}}, db)
 		})
 	})
 }

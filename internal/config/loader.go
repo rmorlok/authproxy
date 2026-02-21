@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
+	"gopkg.in/yaml.v3"
 )
 
 func LoadConfig(path string) (C, error) {
@@ -35,12 +36,12 @@ func LoadConfig(path string) (C, error) {
 		return nil, errors.Wrap(err, "config schema validation failed")
 	}
 
-	root, err := sconfig.UnmarshallYamlRoot(content)
-	if err != nil {
+	var root sconfig.Root
+	if err := yaml.Unmarshal(content, &root); err != nil {
 		return nil, err
 	}
 
-	return &config{root: root}, nil
+	return &config{root: &root}, nil
 }
 
 func FromRoot(root *sconfig.Root) C {
