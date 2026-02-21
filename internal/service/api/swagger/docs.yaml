@@ -261,6 +261,10 @@ definitions:
         description: State (draft, active, deprecated, archived)
         example: active
         type: string
+      status_page_url:
+        description: Status page URL for tracking 3rd party outages
+        example: https://status.salesforce.com
+        type: string
       updated_at:
         description: Last update timestamp
         type: string
