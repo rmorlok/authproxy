@@ -4,6 +4,7 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
 type DatabaseProvider string
@@ -21,6 +22,7 @@ type DatabaseImpl interface {
 	GetUri() string
 	GetDsn() string
 	GetPlaceholderFormat() sq.PlaceholderFormat
+	Validate(vc *common.ValidationContext) error
 }
 
 // Database is the holder for a DatabaseImpl instance.
@@ -68,6 +70,14 @@ func (d *Database) GetPlaceholderFormat() sq.PlaceholderFormat {
 		return sq.Question
 	}
 	return d.InnerVal.GetPlaceholderFormat()
+}
+
+func (d *Database) Validate(vc *common.ValidationContext) error {
+	if d == nil || d.InnerVal == nil {
+		return vc.NewError("database must be specified")
+	}
+
+	return d.InnerVal.Validate(vc)
 }
 
 var _ DatabaseImpl = (*Database)(nil)

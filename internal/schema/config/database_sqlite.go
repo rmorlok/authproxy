@@ -5,6 +5,7 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
 type DatabaseSqlite struct {
@@ -41,4 +42,12 @@ func (d *DatabaseSqlite) GetDsn() string {
 
 func (d *DatabaseSqlite) GetPlaceholderFormat() sq.PlaceholderFormat {
 	return sq.Question
+}
+
+func (d *DatabaseSqlite) Validate(vc *common.ValidationContext) error {
+	if d.Path == "" {
+		return vc.NewErrorForField("path", "path must be specified")
+	}
+
+	return nil
 }
