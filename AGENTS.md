@@ -17,6 +17,19 @@ docker network create authproxy
 
 # Start Redis (required - includes search module)
 docker run --name redis-server -p 6379:6379 --network authproxy -d redis/redis-stack-server:latest
+
+# Start MinIO (required for request log storage)
+# Note: port 9002 is used for the S3 API to avoid conflicts with other services (e.g. ClickHouse uses 9000)
+docker run --name minio -p 9002:9000 -p 9001:9001 \
+  -e MINIO_ROOT_USER=minioadmin \
+  -e MINIO_ROOT_PASSWORD=minioadmin \
+  --network authproxy \
+  -d minio/minio server /data --console-address ":9001"
+
+# Create the bucket (run once)
+docker run --rm --network authproxy \
+  -e MC_HOST_minio=http://minioadmin:minioadmin@minio:9000 \
+  minio/mc mb minio/authproxy-request-logs
 ```
 
 **Run Server:**

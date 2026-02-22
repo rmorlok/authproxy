@@ -38,6 +38,10 @@ type HttpLogging struct {
 
 	// FullRequestRetention is how long the full request logs should be retained. If unset, defaults to 30 days.
 	FullRequestRetention *HumanDuration `json:"full_request_retention,omitempty" yaml:"full_request_retention,omitempty"`
+
+	// BlobStorage configures the blob storage backend used for storing full request/response logs.
+	// If not configured, full request logging will use an in-memory store (not suitable for production).
+	BlobStorage *BlobStorage `json:"blob_storage,omitempty" yaml:"blob_storage,omitempty"`
 }
 
 func (d *HttpLogging) IsEnabled() bool {

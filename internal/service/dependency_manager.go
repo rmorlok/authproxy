@@ -8,6 +8,7 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apasynq"
+	"github.com/rmorlok/authproxy/internal/apblob"
 	"github.com/rmorlok/authproxy/internal/apauth/tasks"
 	authSync "github.com/rmorlok/authproxy/internal/apauth/tasks"
 	"github.com/rmorlok/authproxy/internal/aplog"
@@ -28,6 +29,7 @@ type DependencyManager struct {
 	logBuilder     aplog.Builder
 	logger         *slog.Logger
 	r              apredis.Client
+	blob           apblob.Client
 	db             database.DB
 	httpf          httpf.F
 	logRetriever   request_log.LogRetriever
@@ -90,6 +92,23 @@ func (dm *DependencyManager) GetRedisClient() apredis.Client {
 	return dm.r
 }
 
+func (dm *DependencyManager) GetBlobClient() apblob.Client {
+	if dm.blob == nil {
+		var blobCfg *sconfig.BlobStorage
+		if dm.GetConfigRoot().HttpLogging != nil {
+			blobCfg = dm.GetConfigRoot().HttpLogging.BlobStorage
+		}
+
+		var err error
+		dm.blob, err = apblob.NewFromConfig(context.Background(), blobCfg)
+		if err != nil {
+			panic(err)
+		}
+	}
+
+	return dm.blob
+}
+
 func (dm *DependencyManager) GetDatabase() database.DB {
 	if dm.db == nil {
 		var err error
@@ -129,7 +148,7 @@ func (dm *DependencyManager) AutoMigrateDatabase() {
 
 func (dm *DependencyManager) GetHttpf() httpf.F {
 	if dm.httpf == nil {
-		dm.httpf = httpf.CreateFactory(dm.GetConfig(), dm.GetRedisClient(), dm.GetLogger())
+		dm.httpf = httpf.CreateFactory(dm.GetConfig(), dm.GetRedisClient(), dm.GetBlobClient(), dm.GetLogger())
 	}
 
 	return dm.httpf
@@ -137,7 +156,7 @@ func (dm *DependencyManager) GetHttpf() httpf.F {
 
 func (dm *DependencyManager) GetRequestLogRetriever() request_log.LogRetriever {
 	if dm.logRetriever == nil {
-		dm.logRetriever = request_log.NewRetrievalService(dm.GetRedisClient(), dm.GetConfig().GetGlobalKey())
+		dm.logRetriever = request_log.NewRetrievalService(dm.GetRedisClient(), dm.GetBlobClient(), dm.GetConfig().GetGlobalKey())
 	}
 
 	return dm.logRetriever

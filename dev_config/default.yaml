@@ -54,7 +54,7 @@ system_auth:
     path: ./dev_config/keys/global_aes.key
 
 error_pages:
-  internal_error: https://example.com
+  internal_error: https://example.com/500.html
 
 database:
   provider: postgres
@@ -74,6 +74,21 @@ http_logging:
   enabled: true
   full_request_recording: always
   # full_request_recording: never
+  blob_storage:
+    provider: s3
+    endpoint: http://localhost:9002
+    region: us-east-1
+    bucket: authproxy-request-logs
+    credentials:
+      type: access_key
+      access_key_id:
+        env_var: MINIO_ACCESS_KEY
+        default: minioadmin
+      secret_access_key:
+        env_var: MINIO_SECRET_KEY
+        default: minioadmin
+    force_path_style: true
+    prefix: "rlf/"
 
 #redis:
 #  provider: miniredis

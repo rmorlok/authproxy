@@ -42,10 +42,6 @@ func redisLogKey(requestId uuid.UUID) string {
 	return fmt.Sprintf("rl:%s", requestId.String())
 }
 
-func redisFullLogKey(requestId uuid.UUID) string {
-	return fmt.Sprintf("rlf:%s", requestId.String())
-}
-
 // MigrateMutexKeyName is the key that can be used when locking to perform a migration in redis.
 const MigrateMutexKeyName = "request-log-migrate-lock"
 
