@@ -30,10 +30,8 @@ func (s *service) keyForToken(ctx context.Context, claims *jwt2.AuthProxyClaims)
 	}
 
 	// Check actor cache first, then fall back to database
-	var actor *database.Actor
-	if cache := getActorCache(ctx); cache != nil {
-		actor = cache.GetByExternalId(claims.GetNamespace(), claims.Subject)
-	}
+	cache := getActorCache(ctx)
+	actor := cache.GetByExternalId(claims.GetNamespace(), claims.Subject)
 	if actor == nil {
 		var err error
 		actor, err = s.db.GetActorByExternalId(ctx, claims.GetNamespace(), claims.Subject)
@@ -44,9 +42,7 @@ func (s *service) keyForToken(ctx context.Context, claims *jwt2.AuthProxyClaims)
 			}
 			return nil, errors.Wrap(err, "failed to get actor")
 		}
-		if cache := getActorCache(ctx); cache != nil {
-			cache.Put(actor)
-		}
+		cache.Put(actor)
 	}
 
 	if actor.EncryptedKey == nil {
@@ -83,10 +79,8 @@ func (s *service) keyForSelfSignedToken(ctx context.Context, claims *jwt2.AuthPr
 	}
 
 	// Check actor cache first, then fall back to database
-	var actor *database.Actor
-	if cache := getActorCache(ctx); cache != nil {
-		actor = cache.GetByExternalId(claims.GetNamespace(), claims.Subject)
-	}
+	cache := getActorCache(ctx)
+	actor := cache.GetByExternalId(claims.GetNamespace(), claims.Subject)
 	if actor == nil {
 		var err error
 		actor, err = s.db.GetActorByExternalId(ctx, claims.GetNamespace(), claims.Subject)
@@ -101,9 +95,7 @@ func (s *service) keyForSelfSignedToken(ctx context.Context, claims *jwt2.AuthPr
 			}
 			return nil, errors.Wrap(err, "failed to get actor")
 		}
-		if cache := getActorCache(ctx); cache != nil {
-			cache.Put(actor)
-		}
+		cache.Put(actor)
 	}
 
 	if actor.EncryptedKey == nil {
@@ -369,14 +361,13 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 			}
 		}
 
+		cache := getActorCache(ctx)
 		var actor *database.Actor
 		if claims.Actor == nil {
 			// This implies that the subject of the claim is the external id of the actor, and the actor must already
 			// exist in the database. If the actor does not exist, the claim is invalid.
 			// Check the cache first to avoid a redundant DB lookup (the actor may have been loaded during key selection).
-			if cache := getActorCache(ctx); cache != nil {
-				actor = cache.GetByExternalId(claims.GetNamespace(), claims.Subject)
-			}
+			actor = cache.GetByExternalId(claims.GetNamespace(), claims.Subject)
 			if actor == nil {
 				actor, err = s.db.GetActorByExternalId(ctx, claims.GetNamespace(), claims.Subject)
 				if err != nil {
@@ -393,9 +384,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 						WithInternalErr(errors.Wrap(err, "failed to get actor")).
 						Build()
 				}
-				if cache := getActorCache(ctx); cache != nil {
-					cache.Put(actor)
-				}
+				cache.Put(actor)
 			}
 		} else {
 			// The actor was specified in the JWT. This means that we can upsert an actor, either creating it or making
@@ -408,9 +397,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 					WithInternalErr(errors.Wrap(err, "failed to upsert actor")).
 					Build()
 			}
-			if cache := getActorCache(ctx); cache != nil {
-				cache.Put(actor)
-			}
+			cache.Put(actor)
 		}
 
 		ra = core.NewAuthenticatedRequestAuth(actor)

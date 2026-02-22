@@ -143,3 +143,28 @@ func TestGetActorCache_NilWhenMissing(t *testing.T) {
 	ctx := context.Background()
 	require.Nil(t, getActorCache(ctx))
 }
+
+func TestActorCache_NilReceiver_Put(t *testing.T) {
+	t.Parallel()
+	var c *actorCache
+	// Should not panic
+	c.Put(&database.Actor{
+		Id:         uuid.New(),
+		Namespace:  "root",
+		ExternalId: "alice",
+	})
+}
+
+func TestActorCache_NilReceiver_GetByExternalId(t *testing.T) {
+	t.Parallel()
+	var c *actorCache
+	got := c.GetByExternalId("root", "alice")
+	require.Nil(t, got)
+}
+
+func TestActorCache_NilReceiver_GetById(t *testing.T) {
+	t.Parallel()
+	var c *actorCache
+	got := c.GetById(uuid.New())
+	require.Nil(t, got)
+}
