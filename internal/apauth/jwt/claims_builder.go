@@ -24,7 +24,8 @@ type ClaimsBuilder interface {
 	WithExpiration(expiration time.Time) ClaimsBuilder
 	WithExpiresIn(expiresIn time.Duration) ClaimsBuilder
 	WithExpiresInCtx(ctx context.Context, expiresIn time.Duration) ClaimsBuilder
-	WithSelfSigned() ClaimsBuilder
+	WithSystemSigned() ClaimsBuilder
+	WithActorSigned() ClaimsBuilder
 	WithActorExternalId(id string) ClaimsBuilder
 	WithNamespace(namespace string) ClaimsBuilder
 	WithActor(actor core.IActorData) ClaimsBuilder
@@ -46,7 +47,8 @@ type claimsBuilder struct {
 	namespace  *string
 	actor      *core.Actor
 	labels     map[string]string
-	selfSigned bool
+	systemSigned bool
+	actorSigned  bool
 	nonce      *uuid.UUID
 }
 
@@ -89,8 +91,13 @@ func (b *claimsBuilder) WithExpiresInCtx(ctx context.Context, expiresIn time.Dur
 	return b
 }
 
-func (b *claimsBuilder) WithSelfSigned() ClaimsBuilder {
-	b.selfSigned = true
+func (b *claimsBuilder) WithSystemSigned() ClaimsBuilder {
+	b.systemSigned = true
+	return b
+}
+
+func (b *claimsBuilder) WithActorSigned() ClaimsBuilder {
+	b.actorSigned = true
 	return b
 }
 
@@ -176,8 +183,9 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 			IssuedAt: &jwt.NumericDate{apctx.GetClock(ctx).Now()},
 			ID:       apctx.GetUuidGenerator(ctx).NewString(),
 		},
-		Actor:      b.actor,
-		SelfSigned: b.selfSigned,
+		Actor:        b.actor,
+		SystemSigned: b.systemSigned,
+		ActorSigned:  b.actorSigned,
 	}
 
 	if b.namespace != nil {

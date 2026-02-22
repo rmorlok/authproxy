@@ -88,7 +88,7 @@ func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 	t.Run("via token builder", func(t *testing.T) {
 		// Clone
 		copiedClaims := deepcopy.Copy(&claims).(*jwt2.AuthProxyClaims)
-		copiedClaims.SelfSigned = true
+		copiedClaims.SystemSigned = true
 
 		tb := jwt2.NewJwtTokenBuilder().WithSecretKey(util.Must(cfg.GetRoot().SystemAuth.GlobalAESKey.GetData(testContext)))
 		tok, err := tb.WithClaims(copiedClaims).TokenCtx(testContext)
@@ -374,6 +374,11 @@ func TestAuth_Parse(t *testing.T) {
 						},
 					},
 				},
+				GlobalAESKey: &sconfig.KeyData{
+					InnerVal: &sconfig.KeyDataBase64Val{
+						Base64: "tOqE5HtiujnwB7pXt6lQLH8/gCh6TmMq9uSLFtJxZtU=",
+					},
+				},
 			},
 			AdminApi: sconfig.ServiceAdminApi{
 				ServiceHttp: sconfig.ServiceHttp{
@@ -411,7 +416,28 @@ func TestAuth_Parse(t *testing.T) {
 			token, err := jwt2.NewJwtTokenBuilder().
 				WithActorExternalId("bobdole").
 				WithPrivateKeyPath(pathToTestData("admin_user_keys/bobdole")).
-				WithSelfSigned().
+				WithActorSigned().
+				WithAudience(string(sconfig.ServiceIdAdminApi)).
+				TokenCtx(testContext)
+			require.NoError(t, err)
+
+			claims, err := actorSrv.Parse(testContext, token)
+			require.NoError(t, err)
+			require.Equal(t, "bobdole", claims.Subject)
+		})
+
+		t.Run("system-signed for actor with asymmetric key", func(t *testing.T) {
+			// This covers the scenario where a service mints a system-signed token
+			// (using GlobalAESKey) for an actor that also has an asymmetric key stored
+			// in the database. The parser should use GlobalAESKey for system-signed tokens,
+			// not the actor's asymmetric key.
+			globalAESKeyData, err := cfg.GetRoot().SystemAuth.GlobalAESKey.GetData(testContext)
+			require.NoError(t, err)
+
+			token, err := jwt2.NewJwtTokenBuilder().
+				WithActorExternalId("bobdole").
+				WithSecretKey(globalAESKeyData).
+				WithSystemSigned().
 				WithAudience(string(sconfig.ServiceIdAdminApi)).
 				TokenCtx(testContext)
 			require.NoError(t, err)
@@ -425,7 +451,7 @@ func TestAuth_Parse(t *testing.T) {
 			token, err := jwt2.NewJwtTokenBuilder().
 				WithActorExternalId("billclinton").
 				WithPrivateKeyPath(pathToTestData("admin_user_keys/billclinton")).
-				WithSelfSigned().
+				WithActorSigned().
 				TokenCtx(testContext)
 			require.NoError(t, err)
 
@@ -437,7 +463,7 @@ func TestAuth_Parse(t *testing.T) {
 			token, err := jwt2.NewJwtTokenBuilder().
 				WithActorExternalId("bobdole").
 				WithPrivateKeyPath(pathToTestData("admin_user_keys/billclinton")).
-				WithSelfSigned().
+				WithActorSigned().
 				TokenCtx(testContext)
 			require.NoError(t, err)
 

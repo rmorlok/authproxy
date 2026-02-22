@@ -26,7 +26,7 @@ func (o *oAuth2Connection) getPublicRedirectUrl(ctx context.Context, stateId uui
 		WithActor(actor).
 		WithExpiresInCtx(ctx, o.cfg.GetRoot().Oauth.GetInitiateToRedirectTtlOrDefault()).
 		WithServiceId(config.ServiceIdPublic).
-		WithSelfSigned().
+		WithSystemSigned().
 		WithSecretConfigKeyData(ctx, o.cfg.GetRoot().SystemAuth.GlobalAESKey)
 
 	if err != nil {

@@ -36,7 +36,8 @@ type TokenBuilder interface {
 	WithExpiration(expiration time.Time) TokenBuilder
 	WithExpiresIn(expiresIn time.Duration) TokenBuilder
 	WithExpiresInCtx(ctx context.Context, expiresIn time.Duration) TokenBuilder
-	WithSelfSigned() TokenBuilder
+	WithSystemSigned() TokenBuilder
+	WithActorSigned() TokenBuilder
 	WithActorExternalId(id string) TokenBuilder
 	WithNamespace(namespace string) TokenBuilder
 	WithActor(actor core.IActorData) TokenBuilder
@@ -114,8 +115,13 @@ func (tb *tokenBuilder) WithExpiresInCtx(ctx context.Context, expiresIn time.Dur
 	return tb
 }
 
-func (tb *tokenBuilder) WithSelfSigned() TokenBuilder {
-	tb.jwtBuilder.WithSelfSigned()
+func (tb *tokenBuilder) WithSystemSigned() TokenBuilder {
+	tb.jwtBuilder.WithSystemSigned()
+	return tb
+}
+
+func (tb *tokenBuilder) WithActorSigned() TokenBuilder {
+	tb.jwtBuilder.WithActorSigned()
 	return tb
 }
 
