@@ -200,9 +200,14 @@ func (s *service) establishAuthFromSession(
 		}
 	}
 
-	actor, err := s.db.GetActor(ctx, sess.ActorId)
-	if err != nil {
-		return core.NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to get actor from database")
+	cache := getActorCache(ctx)
+	actor := cache.GetById(sess.ActorId)
+	if actor == nil {
+		actor, err = s.db.GetActor(ctx, sess.ActorId)
+		if err != nil {
+			return core.NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to get actor from database")
+		}
+		cache.Put(actor)
 	}
 
 	err = s.extendSession(ctx, sess, w)

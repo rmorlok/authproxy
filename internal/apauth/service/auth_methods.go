@@ -29,14 +29,20 @@ func (s *service) keyForToken(ctx context.Context, claims *jwt2.AuthProxyClaims)
 		return s.config.GetRoot().SystemAuth.JwtSigningKey, nil
 	}
 
-	// Look up actor from database to check for self-signing key
-	actor, err := s.db.GetActorByExternalId(ctx, claims.GetNamespace(), claims.Subject)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			// Actor does not exist. Fall back to JWT signing key
-			return s.config.GetRoot().SystemAuth.JwtSigningKey, nil
+	// Check actor cache first, then fall back to database
+	cache := getActorCache(ctx)
+	actor := cache.GetByExternalId(claims.GetNamespace(), claims.Subject)
+	if actor == nil {
+		var err error
+		actor, err = s.db.GetActorByExternalId(ctx, claims.GetNamespace(), claims.Subject)
+		if err != nil {
+			if errors.Is(err, database.ErrNotFound) {
+				// Actor does not exist. Fall back to JWT signing key
+				return s.config.GetRoot().SystemAuth.JwtSigningKey, nil
+			}
+			return nil, errors.Wrap(err, "failed to get actor")
 		}
-		return nil, errors.Wrap(err, "failed to get actor")
+		cache.Put(actor)
 	}
 
 	if actor.EncryptedKey == nil {
@@ -72,18 +78,24 @@ func (s *service) keyForSelfSignedToken(ctx context.Context, claims *jwt2.AuthPr
 		}, nil
 	}
 
-	// Look up actor from database to check for self-signing key
-	actor, err := s.db.GetActorByExternalId(ctx, claims.GetNamespace(), claims.Subject)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			// Actor does not exist. Fall back to GlobalAESKey
-			return &config.Key{
-				InnerVal: &config.KeyShared{
-					SharedKey: s.config.GetRoot().SystemAuth.GlobalAESKey,
-				},
-			}, nil
+	// Check actor cache first, then fall back to database
+	cache := getActorCache(ctx)
+	actor := cache.GetByExternalId(claims.GetNamespace(), claims.Subject)
+	if actor == nil {
+		var err error
+		actor, err = s.db.GetActorByExternalId(ctx, claims.GetNamespace(), claims.Subject)
+		if err != nil {
+			if errors.Is(err, database.ErrNotFound) {
+				// Actor does not exist. Fall back to GlobalAESKey
+				return &config.Key{
+					InnerVal: &config.KeyShared{
+						SharedKey: s.config.GetRoot().SystemAuth.GlobalAESKey,
+					},
+				}, nil
+			}
+			return nil, errors.Wrap(err, "failed to get actor")
 		}
-		return nil, errors.Wrap(err, "failed to get actor")
+		cache.Put(actor)
 	}
 
 	if actor.EncryptedKey == nil {
@@ -274,6 +286,9 @@ func getJwtTokenFromHeader(r *http.Request) (token string, hasValue bool, err er
 // When establishing auth, a JWT always takes precedence over a session. If the session and JWT differ, the session will
 // be terminated and the caller must decide to start a new session explicitly.
 func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXsrf bool, r *http.Request, w http.ResponseWriter) (*core.RequestAuth, error) {
+	// Initialize per-request actor cache to avoid redundant DB lookups
+	ctx = withActorCache(ctx)
+
 	var err error
 	var claims *jwt2.AuthProxyClaims
 	var ra = core.NewUnauthenticatedRequestAuth()
@@ -346,24 +361,30 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 			}
 		}
 
+		cache := getActorCache(ctx)
 		var actor *database.Actor
 		if claims.Actor == nil {
 			// This implies that the subject of the claim is the external id of the actor, and the actor must already
 			// exist in the database. If the actor does not exist, the claim is invalid.
-			actor, err = s.db.GetActorByExternalId(ctx, claims.GetNamespace(), claims.Subject)
-			if err != nil {
-				if errors.Is(err, database.ErrNotFound) {
+			// Check the cache first to avoid a redundant DB lookup (the actor may have been loaded during key selection).
+			actor = cache.GetByExternalId(claims.GetNamespace(), claims.Subject)
+			if actor == nil {
+				actor, err = s.db.GetActorByExternalId(ctx, claims.GetNamespace(), claims.Subject)
+				if err != nil {
+					if errors.Is(err, database.ErrNotFound) {
+						return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
+							WithStatusUnauthorized().
+							WithResponseMsg("actor does not exist").
+							WithInternalErr(errors.Errorf("actor '%s' not found", claims.Subject)).
+							Build()
+					}
 					return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
-						WithStatusUnauthorized().
-						WithResponseMsg("actor does not exist").
-						WithInternalErr(errors.Errorf("actor '%s' not found", claims.Subject)).
+						WithStatusInternalServerError().
+						WithResponseMsg("database error").
+						WithInternalErr(errors.Wrap(err, "failed to get actor")).
 						Build()
 				}
-				return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
-					WithStatusInternalServerError().
-					WithResponseMsg("database error").
-					WithInternalErr(errors.Wrap(err, "failed to get actor")).
-					Build()
+				cache.Put(actor)
 			}
 		} else {
 			// The actor was specified in the JWT. This means that we can upsert an actor, either creating it or making
@@ -376,6 +397,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 					WithInternalErr(errors.Wrap(err, "failed to upsert actor")).
 					Build()
 			}
+			cache.Put(actor)
 		}
 
 		ra = core.NewAuthenticatedRequestAuth(actor)
