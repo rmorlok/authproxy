@@ -13,6 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
@@ -200,9 +201,18 @@ func (s *service) establishAuthFromSession(
 		}
 	}
 
-	actor, err := s.db.GetActor(ctx, sess.ActorId)
-	if err != nil {
-		return core.NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to get actor from database")
+	var actor *database.Actor
+	if cache := getActorCache(ctx); cache != nil {
+		actor = cache.GetById(sess.ActorId)
+	}
+	if actor == nil {
+		actor, err = s.db.GetActor(ctx, sess.ActorId)
+		if err != nil {
+			return core.NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to get actor from database")
+		}
+		if cache := getActorCache(ctx); cache != nil {
+			cache.Put(actor)
+		}
 	}
 
 	err = s.extendSession(ctx, sess, w)

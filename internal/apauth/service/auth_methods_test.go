@@ -814,6 +814,51 @@ func TestAuth_ActorPermissionsSync(t *testing.T) {
 	})
 }
 
+func TestAuth_ActorCacheReducesDbCalls(t *testing.T) {
+	// When claims.Actor is nil, the auth flow calls GetActorByExternalId in keyForToken
+	// (during JWT verification) and again in establishAuthFromRequest (to build RequestAuth).
+	// With the actor cache, the second call should be served from cache, so the DB should
+	// only be queried once.
+	t.Parallel()
+
+	cfg := config.FromRoot(&testConfigPublicPrivateKey)
+	ctrl := gomock.NewController(t)
+	mockDb := mock.NewMockDB(ctrl)
+
+	actorId := uuid.New()
+	actor := &database.Actor{
+		Id:         actorId,
+		Namespace:  "root",
+		ExternalId: "id1",
+	}
+
+	// The critical assertion: GetActorByExternalId should only be called once,
+	// not twice, because the second lookup hits the cache.
+	mockDb.
+		EXPECT().
+		GetActorByExternalId(gomock.Any(), "root", "id1").
+		Return(actor, nil).
+		Times(1)
+
+	authService := NewService(cfg, cfg.MustGetService(sconfig.ServiceIdAdminApi).(sconfig.HttpService), mockDb, nil, nil, test_utils.NewTestLogger())
+	raw := authService.(*service)
+
+	claims := *testClaims()
+	claims.Actor = nil // Force actor lookup from database
+
+	tok, err := authService.Token(testContext, &claims)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Add(JwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
+	w := httptest.NewRecorder()
+	ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
+	require.NoError(t, err)
+	require.True(t, ra.IsAuthenticated())
+	require.Equal(t, "id1", ra.MustGetActor().ExternalId)
+	require.Equal(t, actorId, ra.MustGetActor().Id)
+}
+
 func TestAuth_Nonce(t *testing.T) {
 	now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 	ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
