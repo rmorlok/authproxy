@@ -167,6 +167,7 @@ func (j *Resolver) ResolveBuilder() (jwt.TokenBuilder, error) {
 
 	b := jwt.NewJwtTokenBuilder().
 		WithActorExternalId(actorId).
+		WithActorSigned().
 		WithServiceIds(serviceIds)
 
 	if privateKeyPath != "" {

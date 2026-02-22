@@ -65,10 +65,10 @@ func (s *service) keyForToken(ctx context.Context, claims *jwt2.AuthProxyClaims)
 	return &key, nil
 }
 
-// keyForSelfSignedToken returns the key for verifying a self-signed token.
+// keyForActorSignedToken returns the key for verifying an actor-signed token.
 // For actors with their own key, returns the actor's key.
-// For service-minted tokens, returns GlobalAESKey.
-func (s *service) keyForSelfSignedToken(ctx context.Context, claims *jwt2.AuthProxyClaims) (*config.Key, error) {
+// Falls back to GlobalAESKey if no key is found.
+func (s *service) keyForActorSignedToken(ctx context.Context, claims *jwt2.AuthProxyClaims) (*config.Key, error) {
 	// If no database or encrypt service, fall back to GlobalAESKey
 	if s.db == nil || s.encrypt == nil {
 		return &config.Key{
@@ -128,7 +128,7 @@ func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (stri
 	claimsClone := *claims
 	claimsClone.Issuer = string(s.service.GetId())
 	claimsClone.IssuedAt = jwt.NewNumericDate(apctx.GetClock(ctx).Now())
-	claimsClone.SelfSigned = true
+	claimsClone.SystemSigned = true
 
 	audiences, err := claimsClone.GetAudience()
 	if err != nil {
@@ -148,7 +148,7 @@ func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (stri
 		NewJwtTokenBuilder().
 		WithClaims(&claimsClone).
 		WithSecretKey(data).
-		WithSelfSigned().
+		WithSystemSigned().
 		TokenCtx(ctx)
 }
 
@@ -156,20 +156,25 @@ func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (stri
 func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProxyClaims, error) {
 	claims, err := jwt2.NewJwtTokenParserBuilder().
 		WithKeySelector(func(ctx context.Context, unverified *jwt2.AuthProxyClaims) (kd config.KeyDataType, isShared bool, err error) {
-			// For self-signed tokens, check if actor has their own key
-			if unverified.SelfSigned {
-				// Try to get actor's key from database
-				key, err := s.keyForSelfSignedToken(ctx, unverified)
+			if unverified.SystemSigned {
+				// System-signed tokens are minted internally by services
+				// (e.g. OAuth redirect tokens, inter-service tokens) using GlobalAESKey.
+				return s.config.GetRoot().SystemAuth.GlobalAESKey, true, nil
+			}
+
+			if unverified.ActorSigned {
+				// Actor-signed tokens are minted externally (e.g. CLI) using
+				// the actor's private key. Look up the actor's public key to verify.
+				key, err := s.keyForActorSignedToken(ctx, unverified)
 				if err != nil {
 					return nil, false, errors.Wrap(err, "failed to get key")
 				}
 
-				// If actor has their own asymmetric key, use it
 				if pk, ok := key.InnerVal.(*config.KeyPublicPrivate); ok {
 					return pk.PublicKey, false, nil
 				}
 
-				// Otherwise, use GlobalAESKey for service-minted tokens
+				// Fall back to GlobalAESKey if no asymmetric key found
 				return s.config.GetRoot().SystemAuth.GlobalAESKey, true, nil
 			}
 
