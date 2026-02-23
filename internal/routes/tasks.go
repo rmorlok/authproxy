@@ -121,7 +121,7 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 			WithStatusUnauthorized().
 			WithResponseMsg("unauthorized").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -131,7 +131,7 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 	}
 
 	ti, err := tasks.FromSecureEncryptedString(ctx, r.encrypt, encryptedTaskInfo)
@@ -141,7 +141,7 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("invalid task info").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -151,7 +151,7 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 			WithStatusNotFound().
 			WithResponseMsg("connection not found").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -160,7 +160,7 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithResponseMsg("invalid task info: bad type").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -169,7 +169,7 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithResponseMsg("invalid task info: data missing").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -178,7 +178,7 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 			WithStatusForbidden().
 			WithResponseMsg("not authorized to view task").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -189,7 +189,7 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 				WithStatusNotFound().
 				WithResponseMsg("task not found").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			return
 		}
 
@@ -198,7 +198,7 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to load task").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 

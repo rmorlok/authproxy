@@ -1,10 +1,12 @@
 package api_common
 
 import (
+	"context"
 	"fmt"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rmorlok/authproxy/internal/apctx"
 )
 
 const (
@@ -17,22 +19,22 @@ func PrintRoutes(g *gin.Engine) {
 	}
 }
 
-func AddGinDebugHeader(cfg Debuggable, gctx *gin.Context, debugMessage string) {
-	if cfg != nil && cfg.IsDebugMode() {
+func AddGinDebugHeader(gctx *gin.Context, debugMessage string) {
+	if apctx.IsDebugMode(gctx.Request.Context()) {
 		gctx.Header(DebugHeader, debugMessage)
 	}
 }
 
-func AddDebugHeader(cfg Debuggable, w http.ResponseWriter, debugMessage string) {
-	if cfg != nil && cfg.IsDebugMode() {
+func AddDebugHeader(ctx context.Context, w http.ResponseWriter, debugMessage string) {
+	if apctx.IsDebugMode(ctx) {
 		w.Header().Set(DebugHeader, debugMessage)
 	}
 }
 
-func AddGinDebugHeaderError(cfg Debuggable, gctx *gin.Context, err error) {
-	AddGinDebugHeader(cfg, gctx, err.Error())
+func AddGinDebugHeaderError(gctx *gin.Context, err error) {
+	AddGinDebugHeader(gctx, err.Error())
 }
 
-func AddDebugHeaderError(cfg Debuggable, w http.ResponseWriter, err error) {
-	AddDebugHeader(cfg, w, err.Error())
+func AddDebugHeaderError(ctx context.Context, w http.ResponseWriter, err error) {
+	AddDebugHeader(ctx, w, err.Error())
 }

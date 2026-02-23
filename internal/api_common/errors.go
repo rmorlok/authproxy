@@ -1,13 +1,16 @@
 package api_common
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apctx"
 )
 
 // HttpStatusError is an error that allows inner code to drive final HTTP errors. Has two tracks for error messages:
@@ -50,12 +53,12 @@ type ErrorResponse struct {
 	StackTrace string `json:"stack_trace,omitempty"`
 }
 
-func (e *HttpStatusError) toErrorResponse(cfg Debuggable) *ErrorResponse {
+func (e *HttpStatusError) toErrorResponse(ctx context.Context) *ErrorResponse {
 	resp := &ErrorResponse{
 		Error: e.ResponseMsgOrDefault(),
 	}
 
-	if cfg != nil && cfg.IsDebugMode() {
+	if apctx.IsDebugMode(ctx) {
 		if e.InternalErr != nil {
 			resp.StackTrace = fmt.Sprintf("%+v", e.InternalErr)
 		}
@@ -64,23 +67,44 @@ func (e *HttpStatusError) toErrorResponse(cfg Debuggable) *ErrorResponse {
 	return resp
 }
 
-func (e *HttpStatusError) WriteGinResponse(cfg Debuggable, gctx *gin.Context) {
+func (e *HttpStatusError) logError(logger *slog.Logger) {
+	if logger == nil {
+		logger = slog.Default()
+	}
+
+	responseMsg := e.ResponseMsgOrDefault()
+	if e.Status >= http.StatusInternalServerError {
+		logger.Error("api error", "status", e.Status, "response_msg", responseMsg, "error", e.InternalErr)
+	} else if e.Status == http.StatusUnauthorized {
+		// No logging
+	} else if e.Status >= http.StatusBadRequest {
+		logger.Warn("api error", "status", e.Status, "response_msg", responseMsg, "error", e.InternalErr)
+	}
+}
+
+func (e *HttpStatusError) WriteGinResponse(logger *slog.Logger, gctx *gin.Context) {
+	e.logError(logger)
+
+	ctx := gctx.Request.Context()
+
 	if e.InternalErr != nil {
-		AddGinDebugHeaderError(cfg, gctx, e.InternalErr)
+		AddGinDebugHeaderError(gctx, e.InternalErr)
 		_ = gctx.Error(e.InternalErr)
 	}
 
-	errorResponse := e.toErrorResponse(cfg)
+	errorResponse := e.toErrorResponse(ctx)
 	gctx.Header("Content-Type", "application/json")
 	gctx.PureJSON(e.Status, errorResponse)
 }
 
-func (e *HttpStatusError) WriteResponse(cfg Debuggable, w http.ResponseWriter) {
+func (e *HttpStatusError) WriteResponse(ctx context.Context, logger *slog.Logger, w http.ResponseWriter) {
+	e.logError(logger)
+
 	if e.InternalErr != nil {
-		AddDebugHeaderError(cfg, w, e.InternalErr)
+		AddDebugHeaderError(ctx, w, e.InternalErr)
 	}
 
-	errorResponse := e.toErrorResponse(cfg)
+	errorResponse := e.toErrorResponse(ctx)
 
 	response, _ := json.Marshal(errorResponse)
 	w.Header().Set("Content-Type", "application/json")

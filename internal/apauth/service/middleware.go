@@ -68,7 +68,7 @@ func (j *service) auth(requireAuth bool, requireSessionXsrf bool, abort func()) 
 				// a JWT will just result in you requesting this endpoint without authentication, but passing a bad
 				// JWT will result in some sort of error -- unauthorized or otherwise.
 				httpStatusErr := api_common.AsHttpStatusError(err)
-				httpStatusErr.WriteResponse(j.config, w)
+				httpStatusErr.WriteResponse(r.Context(), nil, w)
 				abort()
 				return
 			}
@@ -77,7 +77,7 @@ func (j *service) auth(requireAuth bool, requireSessionXsrf bool, abort func()) 
 				api_common.NewHttpStatusErrorBuilder().
 					WithStatusUnauthorized().
 					BuildStatusError().
-					WriteResponse(j.config, w)
+					WriteResponse(r.Context(), nil, w)
 				abort()
 				return
 			}

@@ -895,7 +895,7 @@ func TestAuth(t *testing.T) {
 						api_common.NewHttpStatusErrorBuilder().
 							WithInternalErr(err).
 							BuildStatusError().
-							WriteGinResponse(api_common.NewMockDebuggable(true), gctx)
+							WriteGinResponse(nil, gctx)
 						return
 					}
 
@@ -908,7 +908,7 @@ func TestAuth(t *testing.T) {
 						api_common.NewHttpStatusErrorBuilder().
 							WithInternalErr(err).
 							BuildStatusError().
-							WriteGinResponse(api_common.NewMockDebuggable(true), gctx)
+							WriteGinResponse(nil, gctx)
 						return
 					}
 
@@ -1012,7 +1012,7 @@ func TestAuth(t *testing.T) {
 							api_common.NewHttpStatusErrorBuilder().
 								WithInternalErr(err).
 								BuildStatusError().
-								WriteGinResponse(api_common.NewMockDebuggable(true), gctx)
+								WriteGinResponse(nil, gctx)
 							return
 						}
 
@@ -1029,7 +1029,7 @@ func TestAuth(t *testing.T) {
 							api_common.NewHttpStatusErrorBuilder().
 								WithInternalErr(err).
 								BuildStatusError().
-								WriteGinResponse(api_common.NewMockDebuggable(true), gctx)
+								WriteGinResponse(nil, gctx)
 							return
 						}
 

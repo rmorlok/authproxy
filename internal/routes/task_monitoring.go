@@ -280,7 +280,7 @@ func (r *TaskMonitoringRoutes) listQueues(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to list queues").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -293,7 +293,7 @@ func (r *TaskMonitoringRoutes) listQueues(gctx *gin.Context) {
 				WithInternalErr(err).
 				WithResponseMsgf("failed to get queue info for %s", q).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			return
 		}
 		items = append(items, queueInfoToJson(qi))
@@ -312,7 +312,7 @@ func (r *TaskMonitoringRoutes) getQueueInfo(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("queue is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -323,7 +323,7 @@ func (r *TaskMonitoringRoutes) getQueueInfo(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to get queue info").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -340,7 +340,7 @@ func (r *TaskMonitoringRoutes) getQueueHistory(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("queue is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -352,7 +352,7 @@ func (r *TaskMonitoringRoutes) getQueueHistory(gctx *gin.Context) {
 				WithStatusBadRequest().
 				WithResponseMsg("invalid days parameter").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			return
 		}
 		days = d
@@ -365,7 +365,7 @@ func (r *TaskMonitoringRoutes) getQueueHistory(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to get queue history").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -390,7 +390,7 @@ func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("queue and state are required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -402,7 +402,7 @@ func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsgf("invalid state: %s", state).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -417,7 +417,7 @@ func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
 				WithStatusBadRequest().
 				WithResponseMsg("invalid cursor").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			return
 		}
 		page = parsed.Page
@@ -458,7 +458,7 @@ func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to list tasks").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -501,7 +501,7 @@ func (r *TaskMonitoringRoutes) getTask(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("queue and task_id are required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -512,7 +512,7 @@ func (r *TaskMonitoringRoutes) getTask(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to get task info").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -530,7 +530,7 @@ func (r *TaskMonitoringRoutes) listServers(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to list servers").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -553,7 +553,7 @@ func (r *TaskMonitoringRoutes) listSchedulerEntries(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to list scheduler entries").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -578,7 +578,7 @@ func (r *TaskMonitoringRoutes) runTask(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to run task").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -598,7 +598,7 @@ func (r *TaskMonitoringRoutes) archiveTask(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to archive task").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -617,7 +617,7 @@ func (r *TaskMonitoringRoutes) cancelTask(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to cancel task").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -637,7 +637,7 @@ func (r *TaskMonitoringRoutes) deleteTask(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to delete task").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -656,7 +656,7 @@ func (r *TaskMonitoringRoutes) pauseQueue(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to pause queue").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -675,7 +675,7 @@ func (r *TaskMonitoringRoutes) unpauseQueue(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to unpause queue").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -695,7 +695,7 @@ func (r *TaskMonitoringRoutes) runAllArchivedTasks(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to run all archived tasks").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -715,7 +715,7 @@ func (r *TaskMonitoringRoutes) runAllRetryTasks(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to run all retry tasks").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -735,7 +735,7 @@ func (r *TaskMonitoringRoutes) deleteAllArchivedTasks(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to delete all archived tasks").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -755,7 +755,7 @@ func (r *TaskMonitoringRoutes) deleteAllCompletedTasks(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to delete all completed tasks").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		return
 	}
 

@@ -80,7 +80,7 @@ func (j *service) requiredWithPostValidation(validators []AuthValidator, postVal
 				api_common.NewHttpStatusErrorBuilder().
 					WithStatusUnauthorized().
 					BuildStatusError().
-					WriteResponse(j.config, w)
+					WriteResponse(r.Context(), nil, w)
 				c.Abort()
 				return
 			}
@@ -92,7 +92,7 @@ func (j *service) requiredWithPostValidation(validators []AuthValidator, postVal
 					WithStatusForbidden().
 					WithResponseMsg(reason).
 					BuildStatusError().
-					WriteResponse(j.config, w)
+					WriteResponse(r.Context(), nil, w)
 				c.Abort()
 				return
 			}
@@ -123,7 +123,7 @@ func (j *service) Optional(validators ...AuthValidator) gin.HandlerFunc {
 						WithStatusForbidden().
 						WithResponseMsg(reason).
 						BuildStatusError().
-						WriteResponse(j.config, w)
+						WriteResponse(r.Context(), nil, w)
 					c.Abort()
 					return
 				}
@@ -151,7 +151,7 @@ func (j *service) OptionalXsrfNotRequired(validators ...AuthValidator) gin.Handl
 						WithStatusForbidden().
 						WithResponseMsg(reason).
 						BuildStatusError().
-						WriteResponse(j.config, w)
+						WriteResponse(r.Context(), nil, w)
 					c.Abort()
 					return
 				}

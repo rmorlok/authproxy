@@ -30,7 +30,7 @@ func Serve(cfg config.C) {
 	}
 
 	workerConfig := cfg.GetRoot().Worker
-	router := api_common.GinForService(&workerConfig, logger)
+	router := api_common.GinForService(&workerConfig, logger, cfg.IsDebugMode())
 
 	router.GET("/ping", func(c *gin.Context) {
 		c.PureJSON(http.StatusOK, gin.H{

@@ -13,10 +13,11 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
-func GinForService(service config.Service, logger *slog.Logger) *gin.Engine {
+func GinForService(service config.Service, logger *slog.Logger, debugMode bool) *gin.Engine {
 	logFormatter := func(param gin.LogFormatterParams) string {
 		var statusColor, methodColor, resetColor string
 		if param.IsOutputColor() {
@@ -40,7 +41,7 @@ func GinForService(service config.Service, logger *slog.Logger) *gin.Engine {
 	}
 
 	engine := gin.New()
-	engine.Use(gin.LoggerWithFormatter(logFormatter), gin.Recovery(), ErrorLoggingMiddleware(logger))
+	engine.Use(DebugModeMiddleware(debugMode), gin.LoggerWithFormatter(logFormatter), gin.Recovery(), ErrorLoggingMiddleware(logger))
 
 	return engine
 }
@@ -50,6 +51,15 @@ func GinForTest(logger *slog.Logger) *gin.Engine {
 	engine := gin.New()
 	engine.Use(gin.Recovery(), ErrorLoggingMiddleware(logger))
 	return engine
+}
+
+// DebugModeMiddleware sets the debug mode flag on the request context.
+func DebugModeMiddleware(debugMode bool) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		ctx := apctx.WithDebugMode(c.Request.Context(), debugMode)
+		c.Request = c.Request.WithContext(ctx)
+		c.Next()
+	}
 }
 
 // ErrorLoggingMiddleware logs any request that results in a 500+ response.

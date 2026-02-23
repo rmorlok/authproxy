@@ -1,50 +1,51 @@
 package api_common
 
 import (
+	"context"
 	"errors"
-	"github.com/gin-gonic/gin"
 	"net/http"
 	"net/http/httptest"
 	"testing"
+
+	"github.com/gin-gonic/gin"
+	"github.com/rmorlok/authproxy/internal/apctx"
 )
 
 func TestAddGinDebugHeader(t *testing.T) {
 	tests := []struct {
 		name          string
-		cfg           Debuggable
+		debug         bool
 		expectedValue string
 		debugMessage  string
-		isDebugMode   bool
 	}{
 		{
 			name:          "DebugModeEnabled",
-			cfg:           &mockDebuggable{debug: true},
+			debug:         true,
 			debugMessage:  "Test Message",
 			expectedValue: "Test Message",
-			isDebugMode:   true,
 		},
 		{
 			name:          "DebugModeDisabled",
-			cfg:           &mockDebuggable{debug: false},
+			debug:         false,
 			debugMessage:  "Test Message",
 			expectedValue: "",
-			isDebugMode:   false,
 		},
 		{
-			name:          "NilConfig",
-			cfg:           nil,
+			name:          "DefaultContext",
+			debug:         false,
 			debugMessage:  "Test Message",
 			expectedValue: "",
-			isDebugMode:   false,
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := apctx.WithDebugMode(context.Background(), tt.debug)
 			gin.SetMode(gin.ReleaseMode)
 			r := gin.Default()
 			r.GET("/", func(c *gin.Context) {
-				AddGinDebugHeader(tt.cfg, c, tt.debugMessage)
+				c.Request = c.Request.WithContext(ctx)
+				AddGinDebugHeader(c, tt.debugMessage)
 				c.Status(http.StatusOK)
 			})
 
@@ -63,25 +64,25 @@ func TestAddGinDebugHeader(t *testing.T) {
 func TestAddDebugHeader(t *testing.T) {
 	tests := []struct {
 		name          string
-		cfg           Debuggable
+		debug         bool
 		debugMessage  string
 		expectedValue string
 	}{
 		{
 			name:          "DebugModeEnabled",
-			cfg:           &mockDebuggable{debug: true},
+			debug:         true,
 			debugMessage:  "Debug Info",
 			expectedValue: "Debug Info",
 		},
 		{
 			name:          "DebugModeDisabled",
-			cfg:           &mockDebuggable{debug: false},
+			debug:         false,
 			debugMessage:  "Debug Info",
 			expectedValue: "",
 		},
 		{
-			name:          "NilConfig",
-			cfg:           nil,
+			name:          "DefaultContext",
+			debug:         false,
 			debugMessage:  "Debug Info",
 			expectedValue: "",
 		},
@@ -89,8 +90,9 @@ func TestAddDebugHeader(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
+			ctx := apctx.WithDebugMode(context.Background(), tt.debug)
 			w := httptest.NewRecorder()
-			AddDebugHeader(tt.cfg, w, tt.debugMessage)
+			AddDebugHeader(ctx, w, tt.debugMessage)
 			result := w.Header().Get(DebugHeader)
 
 			if result != tt.expectedValue {
@@ -102,11 +104,12 @@ func TestAddDebugHeader(t *testing.T) {
 
 func TestAddGinDebugHeaderError(t *testing.T) {
 	testErr := errors.New("Sample Error")
-	mockCfg := &mockDebuggable{debug: true}
+	ctx := apctx.WithDebugMode(context.Background(), true)
 	gin.SetMode(gin.ReleaseMode)
 	r := gin.Default()
 	r.GET("/", func(c *gin.Context) {
-		AddGinDebugHeaderError(mockCfg, c, testErr)
+		c.Request = c.Request.WithContext(ctx)
+		AddGinDebugHeaderError(c, testErr)
 		c.Status(http.StatusOK)
 	})
 
@@ -122,10 +125,10 @@ func TestAddGinDebugHeaderError(t *testing.T) {
 
 func TestAddDebugHeaderError(t *testing.T) {
 	testErr := errors.New("Another Error")
-	mockCfg := &mockDebuggable{debug: true}
+	ctx := apctx.WithDebugMode(context.Background(), true)
 	w := httptest.NewRecorder()
 
-	AddDebugHeaderError(mockCfg, w, testErr)
+	AddDebugHeaderError(ctx, w, testErr)
 	result := w.Header().Get(DebugHeader)
 
 	if result != testErr.Error() {

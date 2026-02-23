@@ -54,7 +54,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -66,7 +66,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -142,7 +142,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg(err.Error()).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -156,7 +156,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 				WithStatusBadRequest().
 				WithInternalErr(err).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -185,7 +185,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 					WithInternalErr(err).
 					WithResponseMsg(err.Error()).
 					BuildStatusError().
-					WriteGinResponse(r.cfg, gctx)
+					WriteGinResponse(nil, gctx)
 				val.MarkErrorReturn()
 				return
 			}
@@ -195,7 +195,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 					WithStatusBadRequest().
 					WithResponseMsgf("invalid sort field '%s'", field).
 					BuildStatusError().
-					WriteGinResponse(r.cfg, gctx)
+					WriteGinResponse(nil, gctx)
 				val.MarkErrorReturn()
 				return
 			}
@@ -213,7 +213,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(result.Error).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -250,7 +250,7 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -261,7 +261,7 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -273,7 +273,7 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 				WithStatusNotFound().
 				WithResponseMsg("connection not found").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -282,7 +282,7 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -292,13 +292,13 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 			WithStatusNotFound().
 			WithResponseMsg("connection not found").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -334,7 +334,7 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -345,7 +345,7 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -356,13 +356,13 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -372,7 +372,7 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -387,7 +387,7 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -434,7 +434,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -445,7 +445,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -457,7 +457,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -467,7 +467,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("state is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -479,7 +479,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 				WithStatusNotFound().
 				WithResponseMsg("connection not found").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -488,13 +488,13 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -509,7 +509,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -556,7 +556,7 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -566,7 +566,7 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -578,7 +578,7 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("invalid request body").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -590,7 +590,7 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 				WithInternalErr(err).
 				WithResponseMsgf("invalid labels: %s", err.Error()).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -603,7 +603,7 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 				WithStatusNotFound().
 				WithResponseMsg("connection not found").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -612,13 +612,13 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -629,7 +629,7 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 				WithStatusInternalServerError().
 				WithInternalErr(err).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -641,7 +641,7 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 				WithStatusInternalServerError().
 				WithInternalErr(err).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -674,7 +674,7 @@ func (r *ConnectionsRoutes) getLabels(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -684,7 +684,7 @@ func (r *ConnectionsRoutes) getLabels(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -696,7 +696,7 @@ func (r *ConnectionsRoutes) getLabels(gctx *gin.Context) {
 				WithStatusNotFound().
 				WithResponseMsg("connection not found").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -705,7 +705,7 @@ func (r *ConnectionsRoutes) getLabels(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -715,13 +715,13 @@ func (r *ConnectionsRoutes) getLabels(gctx *gin.Context) {
 			WithStatusNotFound().
 			WithResponseMsg("connection not found").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -758,7 +758,7 @@ func (r *ConnectionsRoutes) getLabel(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -768,7 +768,7 @@ func (r *ConnectionsRoutes) getLabel(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -779,7 +779,7 @@ func (r *ConnectionsRoutes) getLabel(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("label key is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -791,7 +791,7 @@ func (r *ConnectionsRoutes) getLabel(gctx *gin.Context) {
 				WithStatusNotFound().
 				WithResponseMsg("connection not found").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -800,7 +800,7 @@ func (r *ConnectionsRoutes) getLabel(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -810,13 +810,13 @@ func (r *ConnectionsRoutes) getLabel(gctx *gin.Context) {
 			WithStatusNotFound().
 			WithResponseMsg("connection not found").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -827,7 +827,7 @@ func (r *ConnectionsRoutes) getLabel(gctx *gin.Context) {
 			WithStatusNotFound().
 			WithResponseMsgf("label '%s' not found", labelKey).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -865,7 +865,7 @@ func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -875,7 +875,7 @@ func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -886,7 +886,7 @@ func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("label key is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -897,7 +897,7 @@ func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsgf("invalid label key: %s", err.Error()).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -909,7 +909,7 @@ func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("invalid request body").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -920,7 +920,7 @@ func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsgf("invalid label value: %s", err.Error()).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -932,7 +932,7 @@ func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) {
 				WithStatusNotFound().
 				WithResponseMsg("connection not found").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -941,7 +941,7 @@ func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -951,13 +951,13 @@ func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) {
 			WithStatusNotFound().
 			WithResponseMsg("connection not found").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -968,7 +968,7 @@ func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) {
 				WithStatusNotFound().
 				WithResponseMsg("connection not found").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -977,7 +977,7 @@ func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1013,7 +1013,7 @@ func (r *ConnectionsRoutes) deleteLabel(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1023,7 +1023,7 @@ func (r *ConnectionsRoutes) deleteLabel(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1034,7 +1034,7 @@ func (r *ConnectionsRoutes) deleteLabel(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("label key is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1051,7 +1051,7 @@ func (r *ConnectionsRoutes) deleteLabel(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1063,7 +1063,7 @@ func (r *ConnectionsRoutes) deleteLabel(gctx *gin.Context) {
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -1078,7 +1078,7 @@ func (r *ConnectionsRoutes) deleteLabel(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
