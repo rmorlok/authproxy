@@ -155,7 +155,7 @@ func (r *RequestLogRoutes) get(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -166,7 +166,7 @@ func (r *RequestLogRoutes) get(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -176,7 +176,7 @@ func (r *RequestLogRoutes) get(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -189,7 +189,7 @@ func (r *RequestLogRoutes) get(gctx *gin.Context) {
 				WithStatusNotFound().
 				WithResponseMsg("request log not found").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -198,13 +198,13 @@ func (r *RequestLogRoutes) get(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(entry); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -251,7 +251,7 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg(err.Error()).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -266,7 +266,7 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 				WithInternalErr(err).
 				WithResponseMsg("failed to list requests from cursor").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -279,7 +279,7 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 		if err != nil {
 			api_common.HttpStatusErrorBuilderFromError(err).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -296,7 +296,7 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 					WithInternalErr(err).
 					WithResponseMsg("invalid order by").
 					BuildStatusError().
-					WriteGinResponse(r.cfg, gctx)
+					WriteGinResponse(nil, gctx)
 				val.MarkErrorReturn()
 				return
 			}
@@ -306,7 +306,7 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 					WithStatusBadRequest().
 					WithResponseMsg("invalid order by field").
 					BuildStatusError().
-					WriteGinResponse(r.cfg, gctx)
+					WriteGinResponse(nil, gctx)
 				val.MarkErrorReturn()
 				return
 			}
@@ -323,7 +323,7 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 			DefaultStatusBadRequest().
 			DefaultResponseMsg("failed to list requests").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}

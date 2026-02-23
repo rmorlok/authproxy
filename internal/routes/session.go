@@ -86,14 +86,14 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		return
 	}
 
 	ra := auth.GetAuthFromGinContext(gctx)
 	if !ra.IsAuthenticated() {
 		logger.Debug("request was not authenticated, returning redirect url")
-		api_common.AddGinDebugHeader(r.cfg, gctx, "auth not present on context")
+		api_common.AddGinDebugHeader(gctx, "auth not present on context")
 		gctx.PureJSON(http.StatusUnauthorized, InitiateFailureResponse{
 			RedirectUrl: r.sessionInitiateUrlGenerator.GetInitiateSessionUrl(req.ReturnToUrl),
 		})
@@ -110,7 +110,7 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 				WithStatusInternalServerError().
 				WithInternalErr(errors.Wrap(err, "failed to establish gin session")).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(r.logger, gctx)
 			return
 		}
 	}
@@ -144,7 +144,7 @@ func (r *SessionRoutes) terminate(gctx *gin.Context) {
 	ra := auth.GetAuthFromGinContext(gctx)
 	if !ra.IsAuthenticated() {
 		logger.Debug("request was already unauthenticated; ignoring")
-		api_common.AddGinDebugHeader(r.cfg, gctx, "auth not present on context")
+		api_common.AddGinDebugHeader(gctx, "auth not present on context")
 		gctx.PureJSON(http.StatusOK, gin.H{})
 		return
 	}
@@ -156,7 +156,7 @@ func (r *SessionRoutes) terminate(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(errors.Wrap(err, "failed to end gin session")).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		return
 	}
 

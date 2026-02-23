@@ -55,7 +55,7 @@ func GetGinServer(
 		logger,
 	)
 
-	server := api_common.GinForService(service, logger)
+	server := api_common.GinForService(service, logger, dm.GetConfig().IsDebugMode())
 
 	corsConfig := GetCorsConfig(dm.GetConfig())
 	if corsConfig != nil {
@@ -79,7 +79,7 @@ func GetGinServer(
 
 	var healthChecker *gin.Engine
 	if service.Port() != service.HealthCheckPort() {
-		healthChecker = api_common.GinForService(service, logger)
+		healthChecker = api_common.GinForService(service, logger, dm.GetConfig().IsDebugMode())
 	} else {
 		healthChecker = server
 	}
@@ -194,7 +194,7 @@ func Serve(cfg config.C) {
 		logger.Info("running service", "addr", server.Addr)
 		err := api_common.RunServer(server, logger)
 		if err != nil {
-			logger.Error(err.Error())
+			logger.Error(err.Error(), "error", err)
 		}
 	}()
 
@@ -205,7 +205,7 @@ func Serve(cfg config.C) {
 			logger.Info("running health checker", "addr", healthChecker.Addr)
 			err := api_common.RunServer(healthChecker, logger)
 			if err != nil {
-				logger.Error(err.Error())
+				logger.Error(err.Error(), "error", err)
 			}
 		}()
 	}

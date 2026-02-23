@@ -23,6 +23,7 @@ type Builder interface {
 	WithUuidGenerator(generator UuidGenerator) Builder
 	WithFixedUuidGenerator(u uuid.UUID) Builder
 	WithCorrelationID(correlationID string) Builder
+	WithDebugMode(debug bool) Builder
 	Build() context.Context
 }
 
@@ -58,6 +59,11 @@ func (b *builder) WithFixedUuidGenerator(u uuid.UUID) Builder {
 // WithCorrelationID sets a correlation ID on the context.
 func (b *builder) WithCorrelationID(correlationId string) Builder {
 	return &builder{WithCorrelationID(b.ctx, correlationId)}
+}
+
+// WithDebugMode sets the debug mode flag on the context.
+func (b *builder) WithDebugMode(debug bool) Builder {
+	return &builder{WithDebugMode(b.ctx, debug)}
 }
 
 // Build returns the context.

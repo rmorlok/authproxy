@@ -98,7 +98,7 @@ func (r *NamespacesRoutes) get(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("path is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -111,7 +111,7 @@ func (r *NamespacesRoutes) get(gctx *gin.Context) {
 				WithResponseMsgf("namespace '%s' not found", path).
 				WithInternalErr(err).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -120,13 +120,13 @@ func (r *NamespacesRoutes) get(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -156,7 +156,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -167,7 +167,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsgf("invalid namespace path '%s': %s", req.Path, err.Error()).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -179,7 +179,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 			WithStatus(http.StatusConflict).
 			WithResponseMsgf("namespace '%s' already exists", req.Path).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -189,7 +189,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 			DefaultStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -199,7 +199,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithPublicErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -210,7 +210,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 			DefaultStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -247,7 +247,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg(err.Error()).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -263,7 +263,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 				WithInternalErr(err).
 				WithResponseMsg("failed to list namespaces from cursor").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -296,7 +296,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 					WithInternalErr(err).
 					WithResponseMsg(err.Error()).
 					BuildStatusError().
-					WriteGinResponse(r.cfg, gctx)
+					WriteGinResponse(nil, gctx)
 				val.MarkErrorReturn()
 				return
 			}
@@ -306,7 +306,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 					WithStatusBadRequest().
 					WithResponseMsgf("invalid sort field '%s'", field).
 					BuildStatusError().
-					WriteGinResponse(r.cfg, gctx)
+					WriteGinResponse(nil, gctx)
 				val.MarkErrorReturn()
 				return
 			}
@@ -324,7 +324,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 			DefaultStatusInternalServerError().
 			WithInternalErr(result.Error).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -360,7 +360,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("path is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -372,7 +372,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("invalid request body").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -385,7 +385,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 				WithInternalErr(err).
 				WithResponseMsgf("invalid labels: %s", err.Error()).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -400,7 +400,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 				WithResponseMsgf("namespace '%s' not found", path).
 				WithInternalErr(err).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -409,13 +409,13 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -429,7 +429,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 					WithResponseMsgf("namespace '%s' not found", path).
 					WithInternalErr(err).
 					BuildStatusError().
-					WriteGinResponse(r.cfg, gctx)
+					WriteGinResponse(nil, gctx)
 				val.MarkErrorReturn()
 				return
 			}
@@ -438,7 +438,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 				WithStatusInternalServerError().
 				WithInternalErr(err).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -471,7 +471,7 @@ func (r *NamespacesRoutes) getLabels(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("path is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -484,7 +484,7 @@ func (r *NamespacesRoutes) getLabels(gctx *gin.Context) {
 				WithResponseMsgf("namespace '%s' not found", path).
 				WithInternalErr(err).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -493,13 +493,13 @@ func (r *NamespacesRoutes) getLabels(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -536,7 +536,7 @@ func (r *NamespacesRoutes) getLabel(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("path is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -547,7 +547,7 @@ func (r *NamespacesRoutes) getLabel(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("label key is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -560,7 +560,7 @@ func (r *NamespacesRoutes) getLabel(gctx *gin.Context) {
 				WithResponseMsgf("namespace '%s' not found", path).
 				WithInternalErr(err).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -569,13 +569,13 @@ func (r *NamespacesRoutes) getLabel(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -586,7 +586,7 @@ func (r *NamespacesRoutes) getLabel(gctx *gin.Context) {
 			WithStatusNotFound().
 			WithResponseMsgf("label '%s' not found", labelKey).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -624,7 +624,7 @@ func (r *NamespacesRoutes) putLabel(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("path is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -635,7 +635,7 @@ func (r *NamespacesRoutes) putLabel(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("label key is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -647,7 +647,7 @@ func (r *NamespacesRoutes) putLabel(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsgf("invalid label key: %s", err.Error()).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -659,7 +659,7 @@ func (r *NamespacesRoutes) putLabel(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("invalid request body").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -671,7 +671,7 @@ func (r *NamespacesRoutes) putLabel(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsgf("invalid label value: %s", err.Error()).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -685,7 +685,7 @@ func (r *NamespacesRoutes) putLabel(gctx *gin.Context) {
 				WithResponseMsgf("namespace '%s' not found", path).
 				WithInternalErr(err).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -694,13 +694,13 @@ func (r *NamespacesRoutes) putLabel(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -713,7 +713,7 @@ func (r *NamespacesRoutes) putLabel(gctx *gin.Context) {
 				WithResponseMsgf("namespace '%s' not found", path).
 				WithInternalErr(err).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(nil, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -722,7 +722,7 @@ func (r *NamespacesRoutes) putLabel(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -758,7 +758,7 @@ func (r *NamespacesRoutes) deleteLabel(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("path is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -769,7 +769,7 @@ func (r *NamespacesRoutes) deleteLabel(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("label key is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -788,13 +788,13 @@ func (r *NamespacesRoutes) deleteLabel(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(nil, gctx)
 		return
 	}
 
@@ -811,7 +811,7 @@ func (r *NamespacesRoutes) deleteLabel(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}

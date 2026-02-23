@@ -112,7 +112,7 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg(err.Error()).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -126,7 +126,7 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 				WithStatusBadRequest().
 				WithInternalErr(err).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(r.logger, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -155,7 +155,7 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 					WithInternalErr(err).
 					WithResponseMsg(err.Error()).
 					BuildStatusError().
-					WriteGinResponse(r.cfg, gctx)
+					WriteGinResponse(r.logger, gctx)
 				val.MarkErrorReturn()
 				return
 			}
@@ -165,7 +165,7 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 					WithStatusBadRequest().
 					WithResponseMsgf("invalid sort field '%s'", field).
 					BuildStatusError().
-					WriteGinResponse(r.cfg, gctx)
+					WriteGinResponse(r.logger, gctx)
 				val.MarkErrorReturn()
 				return
 			}
@@ -183,7 +183,7 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(result.Error).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -218,7 +218,7 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -229,7 +229,7 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -241,7 +241,7 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 				WithStatusNotFound().
 				WithResponseMsg("actor not found").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(r.logger, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -250,7 +250,7 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -260,13 +260,13 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 			WithStatusNotFound().
 			WithResponseMsg("actor not found").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(a); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(r.logger, gctx)
 		return
 	}
 
@@ -297,7 +297,7 @@ func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("external_id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -315,7 +315,7 @@ func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 				WithStatusNotFound().
 				WithResponseMsg("actor not found").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(r.logger, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -324,7 +324,7 @@ func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -334,13 +334,13 @@ func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 			WithStatusNotFound().
 			WithResponseMsg("actor not found").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(a); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(r.logger, gctx)
 		return
 	}
 
@@ -371,7 +371,7 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -382,7 +382,7 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -400,7 +400,7 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -413,7 +413,7 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 	}
 
 	if httpErr := val.ValidateHttpStatusError(a); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(r.logger, gctx)
 		return
 	}
 
@@ -425,7 +425,7 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -457,7 +457,7 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("external_id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -481,7 +481,7 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -494,7 +494,7 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 	}
 
 	if httpErr := val.ValidateHttpStatusError(a); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(r.logger, gctx)
 		return
 	}
 
@@ -506,7 +506,7 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -539,7 +539,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("invalid request body").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -550,7 +550,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("external_id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -562,7 +562,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsgf("invalid namespace '%s': %s", req.Namespace, err.Error()).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -575,7 +575,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 				WithInternalErr(err).
 				WithResponseMsgf("invalid labels: %s", err.Error()).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(r.logger, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -587,7 +587,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 			WithStatusForbidden().
 			WithPublicErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -599,7 +599,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 			WithStatus(http.StatusConflict).
 			WithResponseMsgf("actor with external_id '%s' already exists in namespace '%s'", req.ExternalId, req.Namespace).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -609,7 +609,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -629,7 +629,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 				WithStatusBadRequest().
 				WithResponseMsgf("namespace '%s' does not exist", req.Namespace).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(r.logger, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -639,7 +639,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 				WithStatus(http.StatusConflict).
 				WithResponseMsgf("actor with external_id '%s' already exists in namespace '%s'", req.ExternalId, req.Namespace).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(r.logger, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -648,7 +648,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -660,7 +660,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -694,7 +694,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -704,7 +704,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -716,7 +716,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("invalid request body").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -729,7 +729,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 				WithInternalErr(err).
 				WithResponseMsgf("invalid labels: %s", err.Error()).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(r.logger, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -743,7 +743,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 				WithStatusNotFound().
 				WithResponseMsg("actor not found").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(r.logger, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -752,7 +752,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -762,14 +762,14 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 			WithStatusNotFound().
 			WithResponseMsg("actor not found").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	// Validate authorization for the actor's namespace
 	if httpErr := val.ValidateHttpStatusError(existingActor); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(r.logger, gctx)
 		return
 	}
 
@@ -784,7 +784,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -818,7 +818,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("external_id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -836,7 +836,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("invalid request body").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -849,7 +849,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 				WithInternalErr(err).
 				WithResponseMsgf("invalid labels: %s", err.Error()).
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(r.logger, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -863,7 +863,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 				WithStatusNotFound().
 				WithResponseMsg("actor not found").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(r.logger, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -872,7 +872,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -882,14 +882,14 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 			WithStatusNotFound().
 			WithResponseMsg("actor not found").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	// Validate authorization for the actor's namespace
 	if httpErr := val.ValidateHttpStatusError(existingActor); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(r.logger, gctx)
 		return
 	}
 
@@ -904,7 +904,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -936,7 +936,7 @@ func (r *ActorsRoutes) getLabels(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -946,7 +946,7 @@ func (r *ActorsRoutes) getLabels(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -958,7 +958,7 @@ func (r *ActorsRoutes) getLabels(gctx *gin.Context) {
 				WithStatusNotFound().
 				WithResponseMsg("actor not found").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(r.logger, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -967,7 +967,7 @@ func (r *ActorsRoutes) getLabels(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -977,13 +977,13 @@ func (r *ActorsRoutes) getLabels(gctx *gin.Context) {
 			WithStatusNotFound().
 			WithResponseMsg("actor not found").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(r.logger, gctx)
 		return
 	}
 
@@ -1020,7 +1020,7 @@ func (r *ActorsRoutes) getLabel(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1030,7 +1030,7 @@ func (r *ActorsRoutes) getLabel(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1041,7 +1041,7 @@ func (r *ActorsRoutes) getLabel(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("label key is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1053,7 +1053,7 @@ func (r *ActorsRoutes) getLabel(gctx *gin.Context) {
 				WithStatusNotFound().
 				WithResponseMsg("actor not found").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(r.logger, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -1062,7 +1062,7 @@ func (r *ActorsRoutes) getLabel(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1072,13 +1072,13 @@ func (r *ActorsRoutes) getLabel(gctx *gin.Context) {
 			WithStatusNotFound().
 			WithResponseMsg("actor not found").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(r.logger, gctx)
 		return
 	}
 
@@ -1089,7 +1089,7 @@ func (r *ActorsRoutes) getLabel(gctx *gin.Context) {
 			WithStatusNotFound().
 			WithResponseMsgf("label '%s' not found", labelKey).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1127,7 +1127,7 @@ func (r *ActorsRoutes) putLabel(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1137,7 +1137,7 @@ func (r *ActorsRoutes) putLabel(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1148,7 +1148,7 @@ func (r *ActorsRoutes) putLabel(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("label key is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1160,7 +1160,7 @@ func (r *ActorsRoutes) putLabel(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsgf("invalid label key: %s", err.Error()).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1172,7 +1172,7 @@ func (r *ActorsRoutes) putLabel(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("invalid request body").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1184,7 +1184,7 @@ func (r *ActorsRoutes) putLabel(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsgf("invalid label value: %s", err.Error()).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1197,7 +1197,7 @@ func (r *ActorsRoutes) putLabel(gctx *gin.Context) {
 				WithStatusNotFound().
 				WithResponseMsg("actor not found").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(r.logger, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -1206,7 +1206,7 @@ func (r *ActorsRoutes) putLabel(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1216,13 +1216,13 @@ func (r *ActorsRoutes) putLabel(gctx *gin.Context) {
 			WithStatusNotFound().
 			WithResponseMsg("actor not found").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(r.logger, gctx)
 		return
 	}
 
@@ -1234,7 +1234,7 @@ func (r *ActorsRoutes) putLabel(gctx *gin.Context) {
 				WithStatusNotFound().
 				WithResponseMsg("actor not found").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(r.logger, gctx)
 			val.MarkErrorReturn()
 			return
 		}
@@ -1243,7 +1243,7 @@ func (r *ActorsRoutes) putLabel(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1279,7 +1279,7 @@ func (r *ActorsRoutes) deleteLabel(gctx *gin.Context) {
 			WithInternalErr(err).
 			WithResponseMsg("failed to parse id as UUID").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1289,7 +1289,7 @@ func (r *ActorsRoutes) deleteLabel(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1300,7 +1300,7 @@ func (r *ActorsRoutes) deleteLabel(gctx *gin.Context) {
 			WithStatusBadRequest().
 			WithResponseMsg("label key is required").
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1319,7 +1319,7 @@ func (r *ActorsRoutes) deleteLabel(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1332,7 +1332,7 @@ func (r *ActorsRoutes) deleteLabel(gctx *gin.Context) {
 	}
 
 	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
-		httpErr.WriteGinResponse(r.cfg, gctx)
+		httpErr.WriteGinResponse(r.logger, gctx)
 		return
 	}
 
@@ -1349,7 +1349,7 @@ func (r *ActorsRoutes) deleteLabel(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}

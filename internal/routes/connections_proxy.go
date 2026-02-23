@@ -51,7 +51,7 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusUnauthorized().
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		return
 	}
 
@@ -63,7 +63,7 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 			WithResponseMsg("invalid connection id").
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		return
 	}
 
@@ -73,7 +73,7 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 			WithResponseMsg("connection id is required").
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		return
 	}
 
@@ -86,7 +86,7 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 				WithStatusNotFound().
 				WithResponseMsg("connection not found").
 				BuildStatusError().
-				WriteGinResponse(r.cfg, gctx)
+				WriteGinResponse(r.logger, gctx)
 			return
 		}
 
@@ -94,7 +94,7 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 			WithStatusInternalServerError().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		return
 	}
 
@@ -105,7 +105,7 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 			WithResponseMsg("invalid proxy request payload").
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		return
 	}
 
@@ -114,7 +114,7 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 		api_common.NewHttpStatusErrorBuilder().
 			WithInternalErr(validateErr).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		return
 	}
 
@@ -123,7 +123,7 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 		api_common.NewHttpStatusErrorBuilder().
 			WithInternalErr(err).
 			BuildStatusError().
-			WriteGinResponse(r.cfg, gctx)
+			WriteGinResponse(r.logger, gctx)
 		return
 	}
 

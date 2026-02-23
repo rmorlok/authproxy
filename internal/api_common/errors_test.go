@@ -1,6 +1,7 @@
 package api_common
 
 import (
+	"context"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -9,6 +10,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/stretchr/testify/require"
 )
 
@@ -79,11 +81,12 @@ func TestHttpStatusError_WriteGinResponse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := &mockDebuggable{debug: tt.debug}
+			ctx := apctx.WithDebugMode(context.Background(), tt.debug)
 			rec := httptest.NewRecorder()
 			gctx, _ := gin.CreateTestContext(rec)
+			gctx.Request = httptest.NewRequest("GET", "/", nil).WithContext(ctx)
 
-			tt.err.WriteGinResponse(cfg, gctx)
+			tt.err.WriteGinResponse(nil, gctx)
 
 			if rec.Code != tt.expectedStatus {
 				t.Errorf("expected status %d, got %d", tt.expectedStatus, rec.Code)
@@ -127,10 +130,10 @@ func TestHttpStatusError_WriteResponse(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cfg := &mockDebuggable{debug: tt.debug}
+			ctx := apctx.WithDebugMode(context.Background(), tt.debug)
 			rec := httptest.NewRecorder()
 
-			tt.err.WriteResponse(cfg, rec)
+			tt.err.WriteResponse(ctx, nil, rec)
 
 			if rec.Code != tt.expectedStatus {
 				t.Errorf("expected status %d, got %d", tt.expectedStatus, rec.Code)
