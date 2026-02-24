@@ -279,6 +279,55 @@ func TestErrorRoundTrip_StoresError(t *testing.T) {
 	}
 }
 
+func TestNamespacePopulatedInRedis(t *testing.T) {
+	r := newTestRedis(t)
+	logger := newNoopLogger()
+
+	ft := &fakeTransport{status: 200, respBody: "ok", readReqBody: true}
+
+	l := NewRedisLogger(
+		r,
+		logger,
+		RequestInfo{
+			Type:      RequestTypeProxy,
+			Namespace: "root.myns",
+		},
+		10*time.Minute,
+		true, // recordFullRequest so we can also check the JSON entry
+		5*time.Minute,
+		1024,
+		1024,
+		60*time.Second,
+		ft,
+	)
+
+	req, _ := http.NewRequest("GET", "http://example.com/test", nil)
+	resp, err := l.RoundTrip(req)
+	require.NoError(t, err)
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+
+	// Wait for the summary hash
+	keys, err := waitForKey(t, r, "rl:*", 500*time.Millisecond)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(keys))
+
+	vals, err := r.HGetAll(context.Background(), keys[0]).Result()
+	require.NoError(t, err)
+	require.Equal(t, "root.myns", vals[fieldNamespace], "namespace should be populated in Redis hash")
+
+	// Also verify the full JSON entry has the namespace
+	fullKeys, err := waitForKey(t, r, "rlf:*", 500*time.Millisecond)
+	require.NoError(t, err)
+	require.Equal(t, 1, len(fullKeys))
+
+	data, err := r.Get(context.Background(), fullKeys[0]).Bytes()
+	require.NoError(t, err)
+	var e Entry
+	require.NoError(t, json.Unmarshal(data, &e))
+	require.Equal(t, "root.myns", e.Namespace, "namespace should be populated in full JSON entry")
+}
+
 // RoundTripperFunc is an adapter to allow the use of ordinary functions as http.RoundTripper.
 type RoundTripperFunc func(*http.Request) (*http.Response, error)
 
