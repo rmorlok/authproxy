@@ -1,0 +1,11 @@
+.git
+.github
+.idea
+.claude
+.env
+node_modules
+tmp
+ui/
+sdks/
+*.test
+*.out

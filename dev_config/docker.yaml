@@ -1,0 +1,122 @@
+# Docker-specific configuration
+# Used when running the server via docker compose --profile server up
+
+public:
+  port: 8080
+  cookie:
+    same_site: none
+  tls:
+    auto_gen_path: /app/dev_config/keys/tls/
+
+api:
+  port: 8081
+
+admin_api:
+  port: 8082
+  ui:
+    enabled: true
+    base_url: http://localhost:5174
+    initiate_session_url: http://host.docker.internal:8888/login-redirect
+  cookie:
+    same_site: none
+  tls:
+    auto_gen_path: /app/dev_config/keys/tls/
+
+worker:
+  health_check_port:
+    env_var: HEALTH_CHECK_PORT
+    default: 8083
+  cron_sync_interval: 1m
+
+tasks:
+  default_retention: 24h
+
+host_application:
+  initiate_session_url: http://host.docker.internal:8888/login-redirect
+
+marketplace:
+  base_url: http://localhost:5173
+
+system_auth:
+  jwt_signing_key:
+    public_key:
+      path: /app/dev_config/keys/system.pub
+    private_key:
+      path: /app/dev_config/keys/system
+  actors:
+    keys_path: /app/dev_config/keys/admin
+    permissions:
+      - namespace: root.**
+        resources:
+          - "*"
+        verbs:
+          - "*"
+  global_aes_key:
+    path: /app/dev_config/keys/global_aes.key
+
+error_pages:
+  internal_error: https://example.com
+
+database:
+  provider: postgres
+  auto_migrate: true
+  host: postgres
+  port: 5432
+  user: postgres
+  password: postgres
+  database: authproxy
+  sslmode: disable
+
+logging:
+  type: tint
+  level: debug
+
+http_logging:
+  enabled: true
+  full_request_recording: always
+
+redis:
+  provider: redis
+  address: redis:6379
+
+oauth:
+  round_trip_ttl: 60m
+
+connectors:
+  auto_migrate: true
+  auto_migration_lock_duration: 30s
+  identifying_labels:
+    - type
+    - env
+  load_from_list:
+  #
+  # Root
+  #
+  - labels:
+      type: google-drive
+      env: prod
+    display_name: Google Drive
+    logo:
+      public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/1024px-Google_Drive_icon_%282020%29.svg.png?20221103153031
+    highlight: |
+      Have the agent track your work in Google Drive.
+    description: |
+      This integration connects Google Drive to Acme app.
+    auth:
+      type: OAuth2
+      client_id:
+        env_var: GOOGLE_CLIENT_ID
+      client_secret:
+        env_var: GOOGLE_CLIENT_SECRET
+      authorization:
+        endpoint: https://accounts.google.com/o/oauth2/v2/auth
+        query_overrides:
+          prompt: consent
+      token:
+        endpoint: https://oauth2.googleapis.com/token
+      revocation:
+        endpoint: https://oauth2.googleapis.com/revoke
+      scopes:
+        - id: https://www.googleapis.com/auth/drive.readonly
+          reason: |
+            We need to be able to view the files
