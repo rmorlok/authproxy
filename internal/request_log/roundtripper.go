@@ -68,6 +68,7 @@ func (t *redisLogger) RoundTrip(req *http.Request) (*http.Response, error) {
 	// Create a log entry
 	entry := &Entry{
 		Id:            id,
+		Namespace:     t.requestInfo.Namespace,
 		CorrelationID: apctx.CorrelationID(ctx),
 		Timestamp:     startTime,
 		Full:          t.recordFullRequest,
