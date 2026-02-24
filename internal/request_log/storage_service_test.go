@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apblob"
 	apredis2 "github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -79,11 +80,13 @@ func getTTL(t *testing.T, r apredis.Client, key string) time.Duration {
 func TestStoreSummaryOnly_NoFullLog(t *testing.T) {
 	r := newTestRedis(t)
 	logger := newNoopLogger()
+	blob := apblob.NewMemoryClient()
 
 	ft := &fakeTransport{status: 200, respBody: "ok", readReqBody: true}
 
 	l := NewRedisLogger(
 		r,
+		blob,
 		logger,
 		RequestInfo{Type: RequestTypeProxy},
 		10*time.Minute, // summary expiration
@@ -107,9 +110,8 @@ func TestStoreSummaryOnly_NoFullLog(t *testing.T) {
 	require.Equal(t, 1, len(keys))
 	summaryKey := keys[0]
 
-	// No full log expected
-	fullKeys, _ := r.Keys(context.Background(), "rlf:*").Result()
-	require.Equal(t, 0, len(fullKeys))
+	// No full log expected in blob storage
+	require.Equal(t, 0, len(blob.Keys()))
 
 	vals, err := r.HGetAll(context.Background(), summaryKey).Result()
 	require.NoError(t, err)
@@ -131,11 +133,13 @@ func TestStoreSummaryOnly_NoFullLog(t *testing.T) {
 func TestStoreFullRequestAndResponse_JSONStored(t *testing.T) {
 	r := newTestRedis(t)
 	logger := newNoopLogger()
+	blob := apblob.NewMemoryClient()
 
 	ft := &fakeTransport{status: 201, respBody: "respdata", readReqBody: true}
 
 	l := NewRedisLogger(
 		r,
+		blob,
 		logger,
 		RequestInfo{Type: RequestTypeGlobal},
 		2*time.Minute, // summary expiration
@@ -162,22 +166,17 @@ func TestStoreFullRequestAndResponse_JSONStored(t *testing.T) {
 	require.Equal(t, 1, len(keys))
 	summaryKey := keys[0]
 
-	// Full entry must exist
-	fullKeys, err := waitForKey(t, r, "rlf:*", 500*time.Millisecond)
-	require.NoError(t, err)
-	require.Equal(t, 1, len(fullKeys))
-	fullKey := fullKeys[0]
-
-	// Validate TTLs
+	// Validate summary TTL
 	ttlSummary := getTTL(t, r, summaryKey)
 	require.GreaterOrEqual(t, ttlSummary, 90*time.Second)
 	require.LessOrEqual(t, ttlSummary, 2*time.Minute)
-	ttlFull := getTTL(t, r, fullKey)
-	require.GreaterOrEqual(t, ttlFull, 30*time.Second)
-	require.LessOrEqual(t, ttlFull, 1*time.Minute)
 
-	// Validate full entry content
-	data, err := r.Get(context.Background(), fullKey).Bytes()
+	// Full entry must exist in blob storage
+	blobKeys := blob.Keys()
+	require.Equal(t, 1, len(blobKeys))
+
+	// Validate full entry content from blob storage
+	data, err := blob.Get(context.Background(), blobKeys[0])
 	require.NoError(t, err)
 	var e Entry
 	require.NoError(t, json.Unmarshal(data, &e))
@@ -191,10 +190,12 @@ func TestStoreFullRequestAndResponse_JSONStored(t *testing.T) {
 func TestDirectStore_WritesKeys(t *testing.T) {
 	r := newTestRedis(t)
 	logger := newNoopLogger()
+	blob := apblob.NewMemoryClient()
 
 	ft := &fakeTransport{status: 200, respBody: "ok", readReqBody: false}
 	ll := NewRedisLogger(
 		r,
+		blob,
 		logger,
 		RequestInfo{Type: RequestTypePublic},
 		1*time.Minute,
@@ -245,6 +246,7 @@ func TestDirectStore_WritesKeys(t *testing.T) {
 func TestErrorRoundTrip_StoresError(t *testing.T) {
 	r := newTestRedis(t)
 	logger := newNoopLogger()
+	blob := apblob.NewMemoryClient()
 
 	// Transport that returns error
 	errTransport := RoundTripperFunc(func(req *http.Request) (*http.Response, error) {
@@ -253,6 +255,7 @@ func TestErrorRoundTrip_StoresError(t *testing.T) {
 
 	l := NewRedisLogger(
 		r,
+		blob,
 		logger,
 		RequestInfo{Type: RequestTypeOAuth},
 		3*time.Minute,
@@ -282,11 +285,13 @@ func TestErrorRoundTrip_StoresError(t *testing.T) {
 func TestNamespacePopulatedInRedis(t *testing.T) {
 	r := newTestRedis(t)
 	logger := newNoopLogger()
+	blob := apblob.NewMemoryClient()
 
 	ft := &fakeTransport{status: 200, respBody: "ok", readReqBody: true}
 
 	l := NewRedisLogger(
 		r,
+		blob,
 		logger,
 		RequestInfo{
 			Type:      RequestTypeProxy,
@@ -316,12 +321,11 @@ func TestNamespacePopulatedInRedis(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, "root.myns", vals[fieldNamespace], "namespace should be populated in Redis hash")
 
-	// Also verify the full JSON entry has the namespace
-	fullKeys, err := waitForKey(t, r, "rlf:*", 500*time.Millisecond)
-	require.NoError(t, err)
-	require.Equal(t, 1, len(fullKeys))
+	// Also verify the full JSON entry has the namespace in blob storage
+	blobKeys := blob.Keys()
+	require.Equal(t, 1, len(blobKeys))
 
-	data, err := r.Get(context.Background(), fullKeys[0]).Bytes()
+	data, err := blob.Get(context.Background(), blobKeys[0])
 	require.NoError(t, err)
 	var e Entry
 	require.NoError(t, json.Unmarshal(data, &e))

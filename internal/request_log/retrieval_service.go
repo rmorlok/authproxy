@@ -6,60 +6,54 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
-	"github.com/redis/go-redis/v9"
+	"github.com/rmorlok/authproxy/internal/apblob"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 type redisLogRetriever struct {
 	r         apredis.Client     `json:"-"`
+	blob      apblob.Client      `json:"-"`
 	cursorKey config.KeyDataType `json:"-"`
 }
 
 func (r *redisLogRetriever) GetFullLog(ctx context.Context, id uuid.UUID) (*Entry, error) {
 	client := r.r
-	pipeline := client.Pipeline()
 
-	entryRecordCmd := pipeline.HGetAll(ctx, redisLogKey(id))
-	fullResultCmd := pipeline.Get(ctx, redisFullLogKey(id))
-
-	_, err := pipeline.Exec(ctx)
-	if err != nil && !errors.Is(err, redis.Nil) {
-		return nil, err
-	}
-
-	entryRecordData, err := entryRecordCmd.Result()
-	if errors.Is(err, redis.Nil) {
-		return nil, ErrNotFound
-	} else if err != nil {
+	entryRecordData, err := client.HGetAll(ctx, redisLogKey(id)).Result()
+	if err != nil {
 		return nil, errors.Wrap(err, "failed to retrieve entry record")
 	}
-
-	data, err := fullResultCmd.Result()
-
-	if err == nil {
-		// Full data available
-		var entry Entry
-		if err := json.Unmarshal([]byte(data), &entry); err != nil {
-			return nil, errors.Wrap(err, "failed to unmarshal full log entry")
-		}
-
-		return &entry, nil
-	} else if errors.Is(err, redis.Nil) {
-		// Full data not available, extract what we can from entry record
-		er, err := EntryRecordFromRedisFields(entryRecordData)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to parse entry record from redis data")
-		}
-
-		entry := NewEntryFromRecord(er)
-		// Even if we previously think we have stored data, at this point we know we don't have the full request/response
-		entry.Full = false
-
-		return entry, nil
+	if len(entryRecordData) == 0 {
+		return nil, ErrNotFound
 	}
 
-	return nil, errors.Wrap(err, "failed to retrieve full log entry")
+	// Try to get full log from blob storage
+	if r.blob != nil {
+		blobKey := id.String() + ".json"
+		data, err := r.blob.Get(ctx, blobKey)
+		if err == nil {
+			var entry Entry
+			if err := json.Unmarshal(data, &entry); err != nil {
+				return nil, errors.Wrap(err, "failed to unmarshal full log entry")
+			}
+			return &entry, nil
+		} else if !errors.Is(err, apblob.ErrBlobNotFound) {
+			return nil, errors.Wrap(err, "failed to retrieve full log entry from blob storage")
+		}
+	}
+
+	// Full data not available, extract what we can from entry record
+	er, err := EntryRecordFromRedisFields(entryRecordData)
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to parse entry record from redis data")
+	}
+
+	entry := NewEntryFromRecord(er)
+	// Even if we previously think we have stored data, at this point we know we don't have the full request/response
+	entry.Full = false
+
+	return entry, nil
 }
 
 func (r *redisLogRetriever) NewListRequestsBuilder() ListRequestBuilder {
@@ -80,9 +74,10 @@ func (r *redisLogRetriever) ListRequestsFromCursor(ctx context.Context, cursor s
 	return b.FromCursor(ctx, cursor)
 }
 
-func NewRetrievalService(r apredis.Client, cursorKey config.KeyDataType) LogRetriever {
+func NewRetrievalService(r apredis.Client, blob apblob.Client, cursorKey config.KeyDataType) LogRetriever {
 	return &redisLogRetriever{
 		r:         r,
+		blob:      blob,
 		cursorKey: cursorKey,
 	}
 }
