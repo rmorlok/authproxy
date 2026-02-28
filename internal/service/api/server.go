@@ -169,6 +169,8 @@ func Serve(cfg config.C) {
 
 	dm.AutoMigrateAll()
 
+	defer dm.GetEncryptService().Shutdown()
+
 	server, healthChecker, err := GetGinServer(dm)
 	if err != nil {
 		panic(err)

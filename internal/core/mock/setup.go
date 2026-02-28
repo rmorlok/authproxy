@@ -6,10 +6,11 @@ import (
 	"fmt"
 
 	"github.com/golang/mock/gomock"
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	mockE "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
@@ -43,7 +44,10 @@ func MockConnectorRetrival(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.
 
 	clock := apctx.GetClock(ctx)
 	hash := fmt.Sprintf("%s-hash", c.Id.String())
-	encryptedDefinition := fmt.Sprintf("%s-encrypted-definition", c.Id.String())
+	encryptedDefinition := encfield.EncryptedField{
+		ID:   "ekv_mock",
+		Data: fmt.Sprintf("%s-encrypted-definition", c.Id.String()),
+	}
 
 	dbMock.
 		EXPECT().
@@ -67,12 +71,8 @@ func MockConnectorRetrival(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.
 
 	e.
 		EXPECT().
-		DecryptStringForConnector(
+		DecryptString(
 			gomock.Any(),
-			ConnectorVersionMatcher{
-				ExpectedId:      c.Id,
-				ExpectedVersion: c.Version,
-			},
 			encryptedDefinition).
 		Return(string(connJson), nil).
 		AnyTimes()

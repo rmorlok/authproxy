@@ -1,3 +1,4 @@
+drop table if exists encryption_keys;
 drop table if exists used_nonces;
 drop table if exists oauth2_tokens;
 drop table if exists namespaces;

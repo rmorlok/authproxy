@@ -17,6 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/service"
 )
 
@@ -79,6 +80,7 @@ func Serve(cfg config.C) {
 	})
 
 	dm.AutoMigrateAll()
+	defer dm.GetEncryptService().Shutdown()
 
 	ctx := context.Background()
 
@@ -122,6 +124,15 @@ func Serve(cfg config.C) {
 	)
 	adminSyncTaskHandler.RegisterTasks(mux)
 
+	encryptTaskHandler := encrypt.NewEncryptServiceTaskHandler(
+		dm.GetConfig(),
+		dm.GetDatabase(),
+		dm.GetEncryptService(),
+		dm.GetRedisClient(),
+		logger,
+	)
+	encryptTaskHandler.RegisterTasks(mux)
+
 	dbTaskHandler := dbTasks.NewTaskHandler(
 		cfg,
 		dm.GetDatabase(),
@@ -151,6 +162,7 @@ func Serve(cfg config.C) {
 		addRegistrar(oauth2TaskHandler).
 		addRegistrar(dm.GetCoreService()).
 		addRegistrar(adminSyncTaskHandler).
+		addRegistrar(encryptTaskHandler).
 		addRegistrar(dbTaskHandler)
 
 	wg.Add(1)

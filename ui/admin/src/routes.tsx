@@ -10,8 +10,11 @@ import ConnectorDetail from "./pages/ConnectorDetail";
 import ConnectionDetail from "./pages/ConnectionDetail";
 import ConnectorVersionDetail from "./pages/ConnectorVersionDetail";
 import ActorsPage from "./pages/Actors";
+import EncryptionKeysPage from "./pages/EncryptionKeys";
+import EncryptionKeyDetail from "./pages/EncryptionKeyDetail";
 import TasksPage from "./pages/Tasks";
 import TaskQueueDetailPage from "./pages/TaskQueueDetail";
+import NamespaceDetailPage from "./pages/NamespaceDetail";
 import AboutPage from "./pages/About";
 import * as React from "react";
 
@@ -101,6 +104,30 @@ export const router = createBrowserRouter([
             {
                 path: 'requests/:id',
                 element: <RequestDetail />,
+            },
+            {
+                path: 'encryption-keys',
+                element: (<ListParent><EncryptionKeysPage /></ListParent>),
+                handle: { title: 'Encryption Keys' },
+            },
+            {
+                path: 'encryption-keys/:id',
+                element: <EncryptionKeyDetail />,
+                handle: [
+                    {
+                        title: 'Encryption Keys',
+                        path: (_params: Params<string>) => `/encryption-keys`,
+                    },
+                    {
+                        attr: 'id',
+                        path: (params: Params<string>) => `/encryption-keys/${params.id}`,
+                    },
+                ],
+            },
+            {
+                path: 'namespace',
+                element: <NamespaceDetailPage />,
+                handle: { title: 'Namespace' }
             },
             {
                 path: 'actors',

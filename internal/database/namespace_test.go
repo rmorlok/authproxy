@@ -2,10 +2,14 @@ package database
 
 import (
 	"fmt"
+	"net/http"
 	"testing"
 	"time"
 
+	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apid"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -1070,6 +1074,261 @@ INSERT INTO namespaces
 		})
 	})
 
+	t.Run("CreateNamespaceWithEncryptionKeyId", func(t *testing.T) {
+		t.Run("round-trips encryption key id through create and get", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			ekId := apid.New(apid.PrefixEncryptionKey)
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:            "root.roundtrip",
+				State:           NamespaceStateActive,
+				EncryptionKeyId: &ekId,
+			})
+			require.NoError(t, err)
+
+			retrieved, err := db.GetNamespace(ctx, "root.roundtrip")
+			require.NoError(t, err)
+			require.NotNil(t, retrieved.EncryptionKeyId)
+			require.Equal(t, ekId, *retrieved.EncryptionKeyId)
+		})
+
+		t.Run("nil encryption key id round-trips as nil", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:  "root.nilkey",
+				State: NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			retrieved, err := db.GetNamespace(ctx, "root.nilkey")
+			require.NoError(t, err)
+			require.Nil(t, retrieved.EncryptionKeyId)
+		})
+	})
+
+	t.Run("EnumerateNamespaceEncryptionTargets", func(t *testing.T) {
+		t.Run("returns all non-deleted namespaces with encryption fields", func(t *testing.T) {
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			_, err := rawDb.Exec(`DELETE FROM namespaces`)
+			require.NoError(t, err)
+
+			ekId1 := apid.New(apid.PrefixEncryptionKey)
+			ekId2 := apid.New(apid.PrefixEncryptionKey)
+			ekvId1 := apid.New(apid.PrefixEncryptionKeyVersion)
+
+			_, err = rawDb.Exec(fmt.Sprintf(`
+INSERT INTO namespaces
+(path, depth, state, encryption_key_id, target_encryption_key_version_id, created_at, updated_at, deleted_at) VALUES
+('root',           0, 'active', NULL,  NULL,  '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
+('root.ns1',       1, 'active', '%s',  NULL,  '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
+('root.ns2',       1, 'active', '%s',  '%s',  '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
+('root.ns3',       1, 'active', NULL,  NULL,  '2023-10-04 00:00:00', '2023-10-04 00:00:00', '2023-10-05 00:00:00')
+`, ekId1, ekId2, ekvId1))
+			require.NoError(t, err)
+
+			var collected []NamespaceEncryptionTarget
+			err = db.EnumerateNamespaceEncryptionTargets(ctx,
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, bool, error) {
+					collected = append(collected, targets...)
+					return nil, false, nil
+				},
+			)
+			require.NoError(t, err)
+
+			// Should exclude deleted namespace (root.ns3)
+			require.Len(t, collected, 3)
+
+			// Results ordered by depth, then path
+			require.Equal(t, "root", collected[0].Path)
+			require.Equal(t, uint64(0), collected[0].Depth)
+			require.Nil(t, collected[0].EncryptionKeyId)
+			require.Nil(t, collected[0].TargetEncryptionKeyVersionId)
+
+			require.Equal(t, "root.ns1", collected[1].Path)
+			require.Equal(t, uint64(1), collected[1].Depth)
+			require.NotNil(t, collected[1].EncryptionKeyId)
+			require.Equal(t, ekId1, *collected[1].EncryptionKeyId)
+			require.Nil(t, collected[1].TargetEncryptionKeyVersionId)
+
+			require.Equal(t, "root.ns2", collected[2].Path)
+			require.Equal(t, uint64(1), collected[2].Depth)
+			require.NotNil(t, collected[2].EncryptionKeyId)
+			require.Equal(t, ekId2, *collected[2].EncryptionKeyId)
+			require.NotNil(t, collected[2].TargetEncryptionKeyVersionId)
+			require.Equal(t, ekvId1, *collected[2].TargetEncryptionKeyVersionId)
+		})
+
+		t.Run("callback can update target encryption key version", func(t *testing.T) {
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			clk := clock.NewFakeClock(now)
+			ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
+
+			_, err := rawDb.Exec(`DELETE FROM namespaces`)
+			require.NoError(t, err)
+
+			ekId := apid.New(apid.PrefixEncryptionKey)
+			newEkvId := apid.New(apid.PrefixEncryptionKeyVersion)
+
+			_, err = rawDb.Exec(fmt.Sprintf(`
+INSERT INTO namespaces
+(path, depth, state, encryption_key_id, created_at, updated_at, deleted_at) VALUES
+('root',       0, 'active', NULL, '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
+('root.ns1',   1, 'active', '%s', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null)
+`, ekId))
+			require.NoError(t, err)
+
+			err = db.EnumerateNamespaceEncryptionTargets(ctx,
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, bool, error) {
+					var updates []NamespaceTargetEncryptionKeyVersionUpdate
+					for _, t := range targets {
+						if t.EncryptionKeyId != nil {
+							updates = append(updates, NamespaceTargetEncryptionKeyVersionUpdate{
+								Path:                         t.Path,
+								TargetEncryptionKeyVersionId: newEkvId,
+							})
+						}
+					}
+					return updates, false, nil
+				},
+			)
+			require.NoError(t, err)
+
+			// Verify the update was persisted
+			var targetEkvId *apid.ID
+			var targetUpdatedAt *time.Time
+			var updatedAt time.Time
+			err = rawDb.QueryRow(
+				`SELECT target_encryption_key_version_id, target_encryption_key_version_updated_at, updated_at FROM namespaces WHERE path = 'root.ns1'`,
+			).Scan(&targetEkvId, &targetUpdatedAt, &updatedAt)
+			require.NoError(t, err)
+			require.NotNil(t, targetEkvId)
+			require.Equal(t, newEkvId, *targetEkvId)
+			require.NotNil(t, targetUpdatedAt)
+			require.True(t, now.Equal(*targetUpdatedAt), "targetUpdatedAt should match the clock time")
+			require.True(t, now.Equal(updatedAt), "updatedAt should match the clock time")
+
+			// Verify namespace without encryption key was NOT updated
+			var rootTargetEkvId *apid.ID
+			err = rawDb.QueryRow(
+				`SELECT target_encryption_key_version_id FROM namespaces WHERE path = 'root'`,
+			).Scan(&rootTargetEkvId)
+			require.NoError(t, err)
+			require.Nil(t, rootTargetEkvId)
+		})
+
+		t.Run("callback can stop early", func(t *testing.T) {
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			_, err := rawDb.Exec(`DELETE FROM namespaces`)
+			require.NoError(t, err)
+
+			_, err = rawDb.Exec(`
+INSERT INTO namespaces
+(path, depth, state, created_at, updated_at, deleted_at) VALUES
+('root',       0, 'active', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
+('root.ns1',   1, 'active', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
+('root.ns2',   1, 'active', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null)
+`)
+			require.NoError(t, err)
+
+			callCount := 0
+			err = db.EnumerateNamespaceEncryptionTargets(ctx,
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, bool, error) {
+					callCount++
+					return nil, true, nil // stop immediately
+				},
+			)
+			require.NoError(t, err)
+			require.Equal(t, 1, callCount)
+		})
+
+		t.Run("callback error is propagated", func(t *testing.T) {
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			_, err := rawDb.Exec(`DELETE FROM namespaces`)
+			require.NoError(t, err)
+
+			_, err = rawDb.Exec(`
+INSERT INTO namespaces
+(path, depth, state, created_at, updated_at, deleted_at) VALUES
+('root', 0, 'active', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null)
+`)
+			require.NoError(t, err)
+
+			expectedErr := fmt.Errorf("test error")
+			err = db.EnumerateNamespaceEncryptionTargets(ctx,
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, bool, error) {
+					return nil, false, expectedErr
+				},
+			)
+			require.ErrorIs(t, err, expectedErr)
+		})
+
+		t.Run("empty database returns no results", func(t *testing.T) {
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			_, err := rawDb.Exec(`DELETE FROM namespaces`)
+			require.NoError(t, err)
+
+			callCount := 0
+			err = db.EnumerateNamespaceEncryptionTargets(ctx,
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, bool, error) {
+					callCount++
+					require.Empty(t, targets)
+					require.True(t, lastPage)
+					return nil, false, nil
+				},
+			)
+			require.NoError(t, err)
+			require.Equal(t, 1, callCount)
+		})
+
+		t.Run("lastPage flag is correct", func(t *testing.T) {
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			_, err := rawDb.Exec(`DELETE FROM namespaces`)
+			require.NoError(t, err)
+
+			// Insert exactly 3 namespaces; since page size is 100, all should fit in one page
+			_, err = rawDb.Exec(`
+INSERT INTO namespaces
+(path, depth, state, created_at, updated_at, deleted_at) VALUES
+('root',       0, 'active', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
+('root.ns1',   1, 'active', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
+('root.ns2',   1, 'active', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null)
+`)
+			require.NoError(t, err)
+
+			var lastPageValues []bool
+			err = db.EnumerateNamespaceEncryptionTargets(ctx,
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, bool, error) {
+					lastPageValues = append(lastPageValues, lastPage)
+					return nil, false, nil
+				},
+			)
+			require.NoError(t, err)
+			require.Len(t, lastPageValues, 1)
+			require.True(t, lastPageValues[0])
+		})
+	})
+
 	t.Run("Labels", func(t *testing.T) {
 		_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(2023, 10, 15, 12, 0, 0, 0, time.UTC)
@@ -1106,5 +1365,111 @@ INSERT INTO namespaces
 			require.Len(t, pr.Results, 1)
 			require.Equal(t, "root.n2", pr.Results[0].Path)
 		})
+	})
+}
+
+func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
+	_, db := MustApplyBlankTestDbConfig(t, nil)
+	now := time.Date(2024, time.January, 10, 12, 0, 0, 0, time.UTC)
+	ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+	// Create namespace hierarchy: root -> root.parent -> root.parent.child -> root.parent.child.grandchild
+	for _, path := range []string{"root.parent", "root.parent.child", "root.parent.child.grandchild", "root.sibling"} {
+		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+			Path:  path,
+			State: NamespaceStateActive,
+		}))
+	}
+
+	// Create encryption keys in various namespaces
+	ekRoot := &EncryptionKey{
+		Id:        apid.New(apid.PrefixEncryptionKey),
+		Namespace: "root",
+		State:     EncryptionKeyStateActive,
+	}
+	ekParent := &EncryptionKey{
+		Id:        apid.New(apid.PrefixEncryptionKey),
+		Namespace: "root.parent",
+		State:     EncryptionKeyStateActive,
+	}
+	ekChild := &EncryptionKey{
+		Id:        apid.New(apid.PrefixEncryptionKey),
+		Namespace: "root.parent.child",
+		State:     EncryptionKeyStateActive,
+	}
+	ekGrandchild := &EncryptionKey{
+		Id:        apid.New(apid.PrefixEncryptionKey),
+		Namespace: "root.parent.child.grandchild",
+		State:     EncryptionKeyStateActive,
+	}
+	ekSibling := &EncryptionKey{
+		Id:        apid.New(apid.PrefixEncryptionKey),
+		Namespace: "root.sibling",
+		State:     EncryptionKeyStateActive,
+	}
+
+	for _, ek := range []*EncryptionKey{ekRoot, ekParent, ekChild, ekGrandchild, ekSibling} {
+		require.NoError(t, db.CreateEncryptionKey(ctx, ek))
+	}
+
+	t.Run("valid: key in ancestor namespace", func(t *testing.T) {
+		// ekRoot is ancestor of root.parent.child
+		ns, err := db.SetNamespaceEncryptionKeyId(ctx, "root.parent.child", &ekRoot.Id)
+		require.NoError(t, err)
+		require.NotNil(t, ns)
+		require.NotNil(t, ns.EncryptionKeyId)
+		require.Equal(t, ekRoot.Id, *ns.EncryptionKeyId)
+
+		// ekParent is also an ancestor of root.parent.child
+		ns, err = db.SetNamespaceEncryptionKeyId(ctx, "root.parent.child", &ekParent.Id)
+		require.NoError(t, err)
+		require.NotNil(t, ns)
+		require.NotNil(t, ns.EncryptionKeyId)
+		require.Equal(t, ekParent.Id, *ns.EncryptionKeyId)
+	})
+
+	t.Run("rejected: key in same namespace", func(t *testing.T) {
+		_, err := db.SetNamespaceEncryptionKeyId(ctx, "root.parent.child", &ekChild.Id)
+		require.Error(t, err)
+		var httpErr *api_common.HttpStatusError
+		require.True(t, errors.As(err, &httpErr))
+		require.Equal(t, http.StatusBadRequest, httpErr.Status)
+	})
+
+	t.Run("rejected: key in descendant namespace", func(t *testing.T) {
+		_, err := db.SetNamespaceEncryptionKeyId(ctx, "root.parent.child", &ekGrandchild.Id)
+		require.Error(t, err)
+		var httpErr *api_common.HttpStatusError
+		require.True(t, errors.As(err, &httpErr))
+		require.Equal(t, http.StatusBadRequest, httpErr.Status)
+	})
+
+	t.Run("rejected: key in sibling namespace", func(t *testing.T) {
+		_, err := db.SetNamespaceEncryptionKeyId(ctx, "root.parent.child", &ekSibling.Id)
+		require.Error(t, err)
+		var httpErr *api_common.HttpStatusError
+		require.True(t, errors.As(err, &httpErr))
+		require.Equal(t, http.StatusBadRequest, httpErr.Status)
+	})
+
+	t.Run("rejected: key on root namespace", func(t *testing.T) {
+		_, err := db.SetNamespaceEncryptionKeyId(ctx, "root", &ekRoot.Id)
+		require.Error(t, err)
+		var httpErr *api_common.HttpStatusError
+		require.True(t, errors.As(err, &httpErr))
+		require.Equal(t, http.StatusBadRequest, httpErr.Status)
+		require.Contains(t, httpErr.ResponseMsg, "root namespace")
+	})
+
+	t.Run("clear encryption key succeeds", func(t *testing.T) {
+		// First set a valid key
+		_, err := db.SetNamespaceEncryptionKeyId(ctx, "root.parent.child", &ekRoot.Id)
+		require.NoError(t, err)
+
+		// Clear it
+		ns, err := db.SetNamespaceEncryptionKeyId(ctx, "root.parent.child", nil)
+		require.NoError(t, err)
+		require.NotNil(t, ns)
+		require.Nil(t, ns.EncryptionKeyId)
 	})
 }

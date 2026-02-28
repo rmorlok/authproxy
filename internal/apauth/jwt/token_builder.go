@@ -160,25 +160,21 @@ func (tb *tokenBuilder) WithConfigKey(ctx context.Context, cfgKey *config.Key) (
 
 	if pp, ok := cfgKey.InnerVal.(*config.KeyPublicPrivate); ok {
 		if pp.PrivateKey != nil {
-			if pp.PrivateKey.HasData(ctx) {
-				data, err := pp.PrivateKey.GetData(ctx)
-				if err != nil {
-					return us, err
-				}
-				us = us.WithPrivateKey(data)
+			ver, err := pp.PrivateKey.GetCurrentVersion(ctx)
+			if err != nil {
+				return us, err
 			}
+			us = us.WithPrivateKey(ver.Data)
 		}
 	}
 
 	if ks, ok := cfgKey.InnerVal.(*config.KeyShared); ok {
 		if ks.SharedKey != nil {
-			if ks.SharedKey.HasData(ctx) {
-				data, err := ks.SharedKey.GetData(ctx)
-				if err != nil {
-					return us, err
-				}
-				us = us.WithSecretKey(data)
+			ver, err := ks.SharedKey.GetCurrentVersion(ctx)
+			if err != nil {
+				return us, err
 			}
+			us = us.WithSecretKey(ver.Data)
 		}
 	}
 
@@ -192,13 +188,11 @@ func (tb *tokenBuilder) MustWithConfigKey(ctx context.Context, cfgKey *config.Ke
 func (tb *tokenBuilder) WithSecretConfigKeyData(ctx context.Context, cfgKeyData config.KeyDataType) (TokenBuilder, error) {
 	var us TokenBuilder = tb
 
-	if cfgKeyData.HasData(ctx) {
-		data, err := cfgKeyData.GetData(ctx)
-		if err != nil {
-			return us, err
-		}
-		us = us.WithSecretKey(data)
+	ver, err := cfgKeyData.GetCurrentVersion(ctx)
+	if err != nil {
+		return us, err
 	}
+	us = us.WithSecretKey(ver.Data)
 
 	return us, nil
 }

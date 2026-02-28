@@ -10,6 +10,7 @@ import (
 	mockCore "github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	mockEncrypt "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	mockH "github.com/rmorlok/authproxy/internal/httpf/mock"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
@@ -74,8 +75,8 @@ func TestRevokeRefreshToken(t *testing.T) {
 		MockOAuthTokenForConnection(context.Background(), db, encrypt, database.OAuth2Token{
 			Id:                    tokenId,
 			ConnectionId:          connectionId,
-			EncryptedAccessToken:  "some-access-token",
-			EncryptedRefreshToken: "some-refresh-token",
+			EncryptedAccessToken:  encfield.EncryptedField{ID: "ekv_test", Data: "some-access-token"},
+			EncryptedRefreshToken: encfield.EncryptedField{ID: "ekv_test", Data: "some-refresh-token"},
 		})
 
 		db.

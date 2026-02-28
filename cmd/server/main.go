@@ -1,6 +1,7 @@
 package main
 
 import (
+	"fmt"
 	"os"
 	"strings"
 	"sync"
@@ -11,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/service"
 	"github.com/rmorlok/authproxy/internal/service/admin_api"
 	api "github.com/rmorlok/authproxy/internal/service/api"
@@ -136,6 +138,23 @@ func cmdServe() *cobra.Command {
 	return cmd
 }
 
+func cmdReencrypt() *cobra.Command {
+	return &cobra.Command{
+		Use:   "reencrypt",
+		Short: "Enqueue a background task to re-encrypt all data with the primary key",
+		RunE: func(cmd *cobra.Command, args []string) error {
+			dm := service.NewDependencyManager("reencrypt", cfg)
+			task := encrypt.NewReencryptAllTask()
+			info, err := dm.GetAsyncClient().Enqueue(task)
+			if err != nil {
+				return errors.Wrap(err, "failed to enqueue reencrypt task")
+			}
+			fmt.Printf("Re-encryption task enqueued: id=%s queue=%s\n", info.ID, info.Queue)
+			return nil
+		},
+	}
+}
+
 func main() {
 	// Optionally load environment variables from a .env file.
 	_ = godotenv.Load()
@@ -151,5 +170,6 @@ func main() {
 
 	rootCmd.AddCommand(cmdRoutes())
 	rootCmd.AddCommand(cmdServe())
+	rootCmd.AddCommand(cmdReencrypt())
 	rootCmd.Execute()
 }

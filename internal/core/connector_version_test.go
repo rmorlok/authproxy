@@ -1,19 +1,29 @@
 package core
 
 import (
+	"context"
 	"encoding/json"
 	"testing"
 
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
-	coreMock "github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	encryptmock "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/assert"
 )
+
+type namespaceHolder struct {
+	namespace string
+}
+
+func (n *namespaceHolder) GetNamespace() string {
+	return n.namespace
+}
 
 func TestWrapConnectorVersion(t *testing.T) {
 	// Setup
@@ -33,7 +43,7 @@ func TestWrapConnectorVersion(t *testing.T) {
 		Labels:              map[string]string{"type": "test-connector"},
 		State:               database.ConnectorVersionStateDraft,
 		Hash:                "some-hash",
-		EncryptedDefinition: "encrypted-data",
+		EncryptedDefinition: encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-data"},
 	}
 
 	// Test
@@ -63,7 +73,7 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 		Labels:              map[string]string{"type": "test-connector"},
 		State:               database.ConnectorVersionStateDraft,
 		Hash:                "some-hash",
-		EncryptedDefinition: "encrypted-data",
+		EncryptedDefinition: encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-data"},
 	}
 
 	cv := wrapConnectorVersion(dbConnectorVersion, s)
@@ -78,7 +88,7 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 
 	// Set up expectations for the encrypt service
 	mockEncrypt.EXPECT().
-		DecryptStringForConnector(gomock.Any(), cv, "encrypted-data").
+		DecryptString(gomock.Any(), encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-data"}).
 		Return(string(defJSON), nil)
 
 	// Test
@@ -111,7 +121,7 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 		Labels:              map[string]string{"type": "test-connector"},
 		State:               database.ConnectorVersionStateDraft,
 		Hash:                "some-hash",
-		EncryptedDefinition: "encrypted-data",
+		EncryptedDefinition: encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-data"},
 	}
 
 	cv := wrapConnectorVersion(dbConnectorVersion, s)
@@ -127,15 +137,13 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 	expectedHash := def.Hash()
 
 	// Set up expectations for the encrypt service
+	newEncryptedDef := encfield.EncryptedField{ID: "ekv_test", Data: "new-encrypted-data"}
 	mockEncrypt.EXPECT().
-		EncryptStringForConnector(
+		EncryptStringForEntity(
 			gomock.Any(),
-			coreMock.ConnectorVersionMatcher{
-				ExpectedId:      cv.ConnectorVersion.Id,
-				ExpectedVersion: cv.ConnectorVersion.Version,
-			},
+			gomock.Any(),
 			gomock.Any()).
-		Return("new-encrypted-data", nil)
+		Return(newEncryptedDef, nil)
 
 	// Test
 	err := cv.setDefinition(def)
@@ -143,7 +151,7 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 	// Verify
 	assert.NoError(t, err)
 	assert.Equal(t, expectedHash, cv.Hash)
-	assert.Equal(t, "new-encrypted-data", cv.EncryptedDefinition)
+	assert.Equal(t, newEncryptedDef, cv.EncryptedDefinition)
 	assert.Equal(t, def, cv.def)
 }
 
@@ -162,7 +170,7 @@ func NewTestConnectorVersion(c cschema.Connector) *ConnectorVersion {
 	if c.State != "" {
 		state = database.ConnectorVersionState(c.State)
 	}
-	encryptedDefinition, err := json.Marshal(c)
+	encryptedDefinition, err := e.EncryptStringForEntity(context.Background(), &namespaceHolder{namespace: "root"}, string(util.Must(json.Marshal(c))))
 	if err != nil {
 		panic(err)
 	}
@@ -173,7 +181,7 @@ func NewTestConnectorVersion(c cschema.Connector) *ConnectorVersion {
 		Labels:              map[string]string{"type": "test-connector"},
 		State:               state,
 		Hash:                "some-hash",
-		EncryptedDefinition: string(encryptedDefinition),
+		EncryptedDefinition: encryptedDefinition,
 	}
 
 	return wrapConnectorVersion(dbConnectorVersion, &service{encrypt: e, logger: aplog.NewNoopLogger()})

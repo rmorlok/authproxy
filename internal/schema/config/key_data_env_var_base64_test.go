@@ -9,7 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
-func TestKeyDataEnvBase64Var_GetData(t *testing.T) {
+func TestKeyDataEnvBase64Var_GetCurrentVersion(t *testing.T) {
 	tests := []struct {
 		name          string
 		envVar        string
@@ -57,43 +57,45 @@ func TestKeyDataEnvBase64Var_GetData(t *testing.T) {
 			defer os.Unsetenv(tt.envVar)
 
 			kev := KeyDataEnvBase64Var{EnvVar: tt.envVar}
-			data, err := kev.GetData(context.Background())
+			ver, err := kev.GetCurrentVersion(context.Background())
 
 			if tt.expectedError {
 				assert.Error(t, err)
 			} else {
 				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedValue, ver.Data)
+				assert.Equal(t, ProviderTypeEnvVarBase64, ver.Provider)
+				assert.Equal(t, tt.envVar, ver.ProviderID)
+				assert.True(t, ver.IsCurrent)
 			}
-
-			assert.Equal(t, tt.expectedValue, data)
 		})
 	}
 }
 
-func TestKeyDataEnvBase64Var_HasData(t *testing.T) {
+func TestKeyDataEnvBase64Var_GetCurrentVersion_HasData(t *testing.T) {
 	tests := []struct {
-		name     string
-		envVar   string
-		envValue string
-		expected bool
+		name        string
+		envVar      string
+		envValue    string
+		expectError bool
 	}{
 		{
-			name:     "environment variable set with value",
-			envVar:   "TEST_ENV",
-			envValue: "some_value",
-			expected: true,
+			name:        "environment variable set with value",
+			envVar:      "TEST_ENV",
+			envValue:    "some_value",
+			expectError: true, // "some_value" is not valid base64, but has data
 		},
 		{
-			name:     "environment variable set with empty value",
-			envVar:   "TEST_ENV",
-			envValue: "",
-			expected: false,
+			name:        "environment variable set with empty value",
+			envVar:      "TEST_ENV",
+			envValue:    "",
+			expectError: true,
 		},
 		{
-			name:     "environment variable not set",
-			envVar:   "UNSET_ENV",
-			envValue: "",
-			expected: false,
+			name:        "environment variable not set",
+			envVar:      "UNSET_ENV",
+			envValue:    "",
+			expectError: true,
 		},
 	}
 
@@ -107,7 +109,12 @@ func TestKeyDataEnvBase64Var_HasData(t *testing.T) {
 			defer os.Unsetenv(tt.envVar)
 
 			kev := KeyDataEnvBase64Var{EnvVar: tt.envVar}
-			assert.Equal(t, tt.expected, kev.HasData(context.Background()))
+			_, err := kev.GetCurrentVersion(context.Background())
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+			}
 		})
 	}
 }

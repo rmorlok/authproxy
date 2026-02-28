@@ -1,5 +1,7 @@
 basePath: /api/v1
 definitions:
+  github_com_rmorlok_authproxy_internal_schema_config.KeyData:
+    type: object
   routes.ActorJson:
     properties:
       created_at:
@@ -35,6 +37,17 @@ definitions:
       namespace:
         type: string
     type: object
+  routes.CreateEncryptionKeyRequestJson:
+    properties:
+      key_data:
+        $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_config.KeyData'
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      namespace:
+        type: string
+    type: object
   routes.CreateNamespaceRequestJson:
     properties:
       labels:
@@ -42,6 +55,13 @@ definitions:
           type: string
         type: object
       path:
+        type: string
+    type: object
+  routes.EncryptionKeyLabelJson:
+    properties:
+      key:
+        type: string
+      value:
         type: string
     type: object
   routes.ErrorResponse:
@@ -169,6 +189,11 @@ definitions:
         type: integer
     type: object
   routes.PutActorLabelRequestJson:
+    properties:
+      value:
+        type: string
+    type: object
+  routes.PutEncryptionKeyLabelRequestJson:
     properties:
       value:
         type: string
@@ -356,6 +381,33 @@ definitions:
         description: Task ID for tracking the disconnect operation
         type: string
     type: object
+  routes.SwaggerEncryptionKeyJson:
+    description: Encryption key configuration
+    properties:
+      created_at:
+        description: Creation timestamp
+        type: string
+      id:
+        description: Encryption key ID
+        example: ek_test550e8400abcde
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        description: Labels assigned to the encryption key
+        type: object
+      namespace:
+        description: Namespace path
+        example: acme
+        type: string
+      state:
+        description: State (active, disabled)
+        example: active
+        type: string
+      updated_at:
+        description: Last update timestamp
+        type: string
+    type: object
   routes.SwaggerForceConnectorVersionStateRequest:
     description: Request to force a connector version state
     properties:
@@ -407,6 +459,18 @@ definitions:
         description: List of connectors
         items:
           $ref: '#/definitions/routes.SwaggerConnectorJson'
+        type: array
+    type: object
+  routes.SwaggerListEncryptionKeysResponse:
+    description: Paginated list of encryption keys
+    properties:
+      cursor:
+        description: Pagination cursor for next page
+        type: string
+      items:
+        description: List of encryption keys
+        items:
+          $ref: '#/definitions/routes.SwaggerEncryptionKeyJson'
         type: array
     type: object
   routes.SwaggerListNamespacesResponse:
@@ -575,6 +639,15 @@ definitions:
         additionalProperties:
           type: string
         type: object
+    type: object
+  routes.UpdateEncryptionKeyRequestJson:
+    properties:
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      state:
+        type: string
     type: object
   routes.UpdateNamespaceRequestJson:
     properties:
@@ -2455,6 +2528,381 @@ paths:
       summary: Set a label for a connector version
       tags:
       - connectors
+  /encryption-keys:
+    get:
+      consumes:
+      - application/json
+      description: List encryption keys with optional filtering and pagination
+      parameters:
+      - description: Pagination cursor
+        in: query
+        name: cursor
+        type: string
+      - description: Maximum number of results to return
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by state
+        in: query
+        name: state
+        type: string
+      - description: Filter by namespace
+        in: query
+        name: namespace
+        type: string
+      - description: Filter by label selector
+        in: query
+        name: label_selector
+        type: string
+      - description: Order by field (e.g., 'state:asc')
+        in: query
+        name: order_by
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerListEncryptionKeysResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List encryption keys
+      tags:
+      - encryption_keys
+    post:
+      consumes:
+      - application/json
+      description: Create a new encryption key
+      parameters:
+      - description: Encryption key creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.CreateEncryptionKeyRequestJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerEncryptionKeyJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create encryption key
+      tags:
+      - encryption_keys
+  /encryption-keys/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Soft delete an encryption key
+      parameters:
+      - description: Encryption key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete encryption key
+      tags:
+      - encryption_keys
+    get:
+      consumes:
+      - application/json
+      description: Get a specific encryption key by ID
+      parameters:
+      - description: Encryption key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerEncryptionKeyJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get encryption key
+      tags:
+      - encryption_keys
+    patch:
+      consumes:
+      - application/json
+      description: Update an encryption key's properties
+      parameters:
+      - description: Encryption key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.UpdateEncryptionKeyRequestJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerEncryptionKeyJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update encryption key
+      tags:
+      - encryption_keys
+  /encryption-keys/{id}/labels:
+    get:
+      consumes:
+      - application/json
+      description: Get all labels associated with a specific encryption key
+      parameters:
+      - description: Encryption key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all labels for an encryption key
+      tags:
+      - encryption_keys
+  /encryption-keys/{id}/labels/{label}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific label by key from an encryption key
+      parameters:
+      - description: Encryption key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a label from an encryption key
+      tags:
+      - encryption_keys
+    get:
+      consumes:
+      - application/json
+      description: Get a specific label value by key for an encryption key
+      parameters:
+      - description: Encryption key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.EncryptionKeyLabelJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a specific label for an encryption key
+      tags:
+      - encryption_keys
+    put:
+      consumes:
+      - application/json
+      description: Set or update a specific label value by key for an encryption key
+      parameters:
+      - description: Encryption key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      - description: Label value
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.PutEncryptionKeyLabelRequestJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.EncryptionKeyLabelJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set a label for an encryption key
+      tags:
+      - encryption_keys
   /namespaces:
     get:
       consumes:

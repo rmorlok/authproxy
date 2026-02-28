@@ -5,6 +5,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
@@ -31,7 +32,7 @@ type IActorData interface {
 // labels for tracking the source of admin syncs, or encrypted keys for admin authentication.
 type IActorDataExtended interface {
 	IActorData
-	GetEncryptedKey() *string
+	GetEncryptedKey() *encfield.EncryptedField
 }
 
 //go:generate mockgen -source=./interface.go -destination=./mock/db.go -package=mock
@@ -48,11 +49,16 @@ type DB interface {
 	EnsureNamespaceByPath(ctx context.Context, path string) error
 	DeleteNamespace(ctx context.Context, path string) error
 	SetNamespaceState(ctx context.Context, path string, state NamespaceState) error
+	SetNamespaceEncryptionKeyId(ctx context.Context, path string, ekId *apid.ID) (*Namespace, error)
 	UpdateNamespaceLabels(ctx context.Context, path string, labels map[string]string) (*Namespace, error)
 	PutNamespaceLabels(ctx context.Context, path string, labels map[string]string) (*Namespace, error)
 	DeleteNamespaceLabels(ctx context.Context, path string, keys []string) (*Namespace, error)
 	ListNamespacesBuilder() ListNamespacesBuilder
 	ListNamespacesFromCursor(ctx context.Context, cursor string) (ListNamespacesExecutor, error)
+	EnumerateNamespaceEncryptionTargets(
+		ctx context.Context,
+		callback func(targets []NamespaceEncryptionTarget, lastPage bool) (updates []NamespaceTargetEncryptionKeyVersionUpdate, stop bool, err error),
+	) error
 
 	/*
 	 *  Actors
@@ -108,8 +114,8 @@ type DB interface {
 		ctx context.Context,
 		connectionId apid.ID,
 		refreshedFrom *apid.ID,
-		encryptedRefreshToken string,
-		encryptedAccessToken string,
+		encryptedRefreshToken encfield.EncryptedField,
+		encryptedAccessToken encfield.EncryptedField,
 		accessTokenExpiresAt *time.Time,
 		scopes string,
 	) (*OAuth2Token, error)
@@ -124,6 +130,71 @@ type DB interface {
 		duration time.Duration,
 		callback func(tokens []*OAuth2TokenWithConnection, lastPage bool) (stop bool, err error),
 	) error
+
+	/*
+	 * Encryption Keys
+	 */
+
+	GetEncryptionKey(ctx context.Context, id apid.ID) (*EncryptionKey, error)
+	CreateEncryptionKey(ctx context.Context, ek *EncryptionKey) error
+	UpdateEncryptionKey(ctx context.Context, id apid.ID, updates map[string]interface{}) (*EncryptionKey, error)
+	DeleteEncryptionKey(ctx context.Context, id apid.ID) error
+	SetEncryptionKeyState(ctx context.Context, id apid.ID, state EncryptionKeyState) error
+	UpdateEncryptionKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (*EncryptionKey, error)
+	PutEncryptionKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (*EncryptionKey, error)
+	DeleteEncryptionKeyLabels(ctx context.Context, id apid.ID, keys []string) (*EncryptionKey, error)
+	ListEncryptionKeysBuilder() ListEncryptionKeysBuilder
+	ListEncryptionKeysFromCursor(ctx context.Context, cursor string) (ListEncryptionKeysExecutor, error)
+
+	// EnumerateEncryptionKeysInDependencyOrder loads all non-deleted encryption keys and walks them
+	// in breadth-first order starting from the root key (the one with nil EncryptedKeyData).
+	// The callback receives one depth-level of keys at a time, with depth 0 being the root.
+	// Returns a slice of orphaned keys whose parent encryption key version could not be resolved.
+	EnumerateEncryptionKeysInDependencyOrder(
+		ctx context.Context,
+		callback func(keys []*EncryptionKey, depth int) (stop bool, err error),
+	) ([]*EncryptionKey, error)
+
+	/*
+	 * Encryption Key Versions
+	 */
+
+	CreateEncryptionKeyVersion(ctx context.Context, ekv *EncryptionKeyVersion) error
+	GetEncryptionKeyVersion(ctx context.Context, id apid.ID) (*EncryptionKeyVersion, error)
+	GetCurrentEncryptionKeyVersionForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) (*EncryptionKeyVersion, error)
+	ListEncryptionKeyVersionsForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) ([]*EncryptionKeyVersion, error)
+	GetMaxOrderedVersionForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) (int64, error)
+	ClearCurrentFlagForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) error
+	GetCurrentEncryptionKeyVersionForNamespace(ctx context.Context, namespacePath string) (*EncryptionKeyVersion, error)
+	ListEncryptionKeyVersionsForNamespace(ctx context.Context, namespacePath string) ([]*EncryptionKeyVersion, error)
+	GetMaxOrderedVersionForNamespace(ctx context.Context, namespacePath string) (int64, error)
+	ClearCurrentFlagForNamespace(ctx context.Context, namespacePath string) error
+	DeleteEncryptionKeyVersion(ctx context.Context, id apid.ID) error
+	DeleteEncryptionKeyVersionsForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) error
+	SetEncryptionKeyVersionCurrentFlag(ctx context.Context, id apid.ID, isCurrent bool) error
+
+	// EnumerateEncryptionKeyVersionsForKey enumerates all non-deleted encryption key versions for a
+	// specified key in batches.
+	EnumerateEncryptionKeyVersionsForKey(
+		ctx context.Context,
+		ekId apid.ID,
+		callback func(ekvs []*EncryptionKeyVersion, lastPage bool) (stop bool, err error),
+	) error
+
+	/*
+	 * Re-encryption
+	 */
+
+	// EnumerateFieldsRequiringReEncryption walks all registered encrypted fields across all tables,
+	// finding rows whose encrypted field EKV ID does not match the namespace's target EKV ID.
+	EnumerateFieldsRequiringReEncryption(
+		ctx context.Context,
+		callback func(targets []ReEncryptionTarget, lastPage bool) (stop bool, err error),
+	) error
+
+	// BatchUpdateReEncryptedFields updates encrypted field values after re-encryption,
+	// setting the new value and updating encrypted_at.
+	BatchUpdateReEncryptedFields(ctx context.Context, updates []ReEncryptedFieldUpdate) error
 
 	/*
 	 *  Purge

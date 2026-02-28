@@ -30,7 +30,7 @@ func GetCorsConfig(cfg config.C) *cors.Config {
 		// If adm in ui is configured as an external service, allow CORS to that host
 		baseConfig = &cors.Config{
 			AllowOrigins:     []string{uiBaseUrl},
-			AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "HEAD"},
+			AllowMethods:     []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD"},
 			AllowHeaders:     []string{"Origin", "Authorization", "Content-Type", "Cookie", "X-Xsrf-Token"},
 			ExposeHeaders:    []string{"Cache-Control", "Content-Language", "Content-Length", "Content-Type", "Expires", "Last-Modified", "Pragma", "X-Xsrf-Token"},
 			AllowCredentials: true,
@@ -147,6 +147,11 @@ func GetGinServer(
 		dm.GetEncryptService(),
 		logger,
 	)
+	routesEncryptionKeys := common_routes.NewEncryptionKeysRoutes(
+		dm.GetConfig(),
+		authService,
+		dm.GetCoreService(),
+	)
 	routesTaskMonitoring := common_routes.NewTaskMonitoringRoutes(
 		dm.GetConfig(),
 		authService,
@@ -158,6 +163,7 @@ func GetGinServer(
 	routesConnectors.Register(api)
 	routesConnections.Register(api)
 	routesNamespaces.Register(api)
+	routesEncryptionKeys.Register(api)
 	routesRequestLog.Register(api)
 	routesActors.Register(api)
 	routesTaskMonitoring.Register(api)
@@ -196,6 +202,8 @@ func Serve(cfg config.C) {
 	defer dm.GetRedisClient().Close()
 
 	dm.AutoMigrateAll()
+
+	defer dm.GetEncryptService().Shutdown()
 
 	server, healthChecker, err := GetGinServer(dm)
 	if err != nil {

@@ -9,11 +9,12 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -107,6 +108,15 @@ func IsValidConnectorVersionState[T string | ConnectorVersionState](state T) boo
 	}
 }
 
+func init() {
+	RegisterEncryptedField(EncryptedFieldRegistration{
+		Table:          ConnectorVersionsTable,
+		PrimaryKeyCols: []string{"id", "version"},
+		EncryptedCols:  []string{"encrypted_definition"},
+		NamespaceCol:   "namespace",
+	})
+}
+
 const ConnectorVersionsTable = "connector_versions"
 
 type ConnectorVersion struct {
@@ -115,10 +125,11 @@ type ConnectorVersion struct {
 	Namespace           string
 	State               ConnectorVersionState
 	Hash                string
-	EncryptedDefinition string
+	EncryptedDefinition encfield.EncryptedField
 	Labels              Labels
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
+	EncryptedAt         *time.Time
 	DeletedAt           *time.Time
 }
 
@@ -133,6 +144,7 @@ func (cv *ConnectorVersion) cols() []string {
 		"labels",
 		"created_at",
 		"updated_at",
+		"encrypted_at",
 		"deleted_at",
 	}
 }
@@ -148,6 +160,7 @@ func (cv *ConnectorVersion) fields() []any {
 		&cv.Labels,
 		&cv.CreatedAt,
 		&cv.UpdatedAt,
+		&cv.EncryptedAt,
 		&cv.DeletedAt,
 	}
 }
@@ -163,6 +176,7 @@ func (cv *ConnectorVersion) values() []any {
 		cv.Labels,
 		cv.CreatedAt,
 		cv.UpdatedAt,
+		cv.EncryptedAt,
 		cv.DeletedAt,
 	}
 }
@@ -206,7 +220,7 @@ func (cv *ConnectorVersion) Validate() error {
 		result = multierror.Append(result, errors.New("hash is required"))
 	}
 
-	if cv.EncryptedDefinition == "" {
+	if cv.EncryptedDefinition.IsZero() {
 		result = multierror.Append(result, errors.New("encrypted definition is required"))
 	}
 

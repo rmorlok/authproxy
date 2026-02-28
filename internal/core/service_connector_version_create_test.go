@@ -11,6 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/stretchr/testify/require"
 )
@@ -31,8 +32,8 @@ func TestCreateConnectorVersion(t *testing.T) {
 
 		// Build step encrypts the definition
 		e.EXPECT().
-			EncryptStringForConnector(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("encrypted-def", nil)
+			EncryptStringForEntity(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-def"}, nil)
 
 		// Upsert is called
 		db.EXPECT().
@@ -69,8 +70,8 @@ func TestCreateConnectorVersion(t *testing.T) {
 		}
 
 		e.EXPECT().
-			EncryptStringForConnector(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("encrypted-def", nil)
+			EncryptStringForEntity(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-def"}, nil)
 
 		db.EXPECT().
 			UpsertConnectorVersion(gomock.Any(), gomock.Any()).
@@ -108,8 +109,8 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 
 		// Build encrypts
 		e.EXPECT().
-			EncryptStringForConnector(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("encrypted-def", nil)
+			EncryptStringForEntity(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-def"}, nil)
 
 		// Upsert
 		db.EXPECT().
@@ -143,7 +144,7 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 
 		id := apid.MustParse("cxr_testdddddddddddd")
 		ctx := context.Background()
-		encryptedDef := "latest-encrypted-def"
+		encryptedDef := encfield.EncryptedField{ID: "ekv_test", Data: "latest-encrypted-def"}
 
 		// No existing draft
 		db.EXPECT().
@@ -172,13 +173,13 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 		// Decrypt latest definition
 		latestDefJson, _ := json.Marshal(latestDef)
 		e.EXPECT().
-			DecryptStringForConnector(gomock.Any(), gomock.Any(), encryptedDef).
+			DecryptString(gomock.Any(), encryptedDef).
 			Return(string(latestDefJson), nil)
 
 		// Build encrypts the new version
 		e.EXPECT().
-			EncryptStringForConnector(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("new-encrypted-def", nil)
+			EncryptStringForEntity(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(encfield.EncryptedField{ID: "ekv_test", Data: "new-encrypted-def"}, nil)
 
 		// Upsert
 		db.EXPECT().
@@ -301,8 +302,8 @@ func TestCreateDraftConnectorVersion(t *testing.T) {
 			}, nil)
 
 		e.EXPECT().
-			EncryptStringForConnector(gomock.Any(), gomock.Any(), gomock.Any()).
-			Return("encrypted", nil)
+			EncryptStringForEntity(gomock.Any(), gomock.Any(), gomock.Any()).
+			Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted"}, nil)
 
 		db.EXPECT().
 			UpsertConnectorVersion(gomock.Any(), gomock.Any()).

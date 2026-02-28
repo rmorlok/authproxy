@@ -46,7 +46,7 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 		return token, nil
 	}
 
-	if token.EncryptedRefreshToken == "" {
+	if token.EncryptedRefreshToken.IsZero() {
 		return nil, fmt.Errorf("token does not have refresh token")
 	}
 
@@ -60,7 +60,7 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 		return nil, err
 	}
 
-	refreshToken, err := o.encrypt.DecryptStringForConnection(ctx, o.connection, token.EncryptedRefreshToken)
+	refreshToken, err := o.encrypt.DecryptString(ctx, token.EncryptedRefreshToken)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (o *oAuth2Connection) ProxyRequest(ctx context.Context, reqType httpf.Reque
 		return nil, err
 	}
 
-	accessToken, err := o.encrypt.DecryptStringForConnection(ctx, o.connection, token.EncryptedAccessToken)
+	accessToken, err := o.encrypt.DecryptString(ctx, token.EncryptedAccessToken)
 	if err != nil {
 		return nil, err
 	}

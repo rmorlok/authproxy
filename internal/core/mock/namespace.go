@@ -5,16 +5,18 @@ import (
 
 	"time"
 
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 )
 
 type Namespace struct {
-	Path      string
-	State     database.NamespaceState
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	Labels    map[string]string
+	Path            string
+	State           database.NamespaceState
+	EncryptionKeyId *apid.ID
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	Labels          map[string]string
 }
 
 func (m *Namespace) GetPath() string {
@@ -31,6 +33,10 @@ func (m *Namespace) GetCreatedAt() time.Time {
 
 func (m *Namespace) GetUpdatedAt() time.Time {
 	return m.UpdatedAt
+}
+
+func (m *Namespace) GetEncryptionKeyId() *apid.ID {
+	return m.EncryptionKeyId
 }
 
 func (m *Namespace) GetLabels() map[string]string {

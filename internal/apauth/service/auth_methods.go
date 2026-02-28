@@ -51,7 +51,7 @@ func (s *service) keyForToken(ctx context.Context, claims *jwt2.AuthProxyClaims)
 	}
 
 	// Decrypt the key JSON
-	decrypted, err := s.encrypt.DecryptStringGlobal(ctx, *actor.EncryptedKey)
+	decrypted, err := s.encrypt.DecryptString(ctx, *actor.EncryptedKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decrypt actor key")
 	}
@@ -108,7 +108,7 @@ func (s *service) keyForActorSignedToken(ctx context.Context, claims *jwt2.AuthP
 	}
 
 	// Decrypt the key JSON
-	decrypted, err := s.encrypt.DecryptStringGlobal(ctx, *actor.EncryptedKey)
+	decrypted, err := s.encrypt.DecryptString(ctx, *actor.EncryptedKey)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to decrypt actor key")
 	}
@@ -139,7 +139,7 @@ func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (stri
 		return "", errors.New("some service ids in aud are invalid")
 	}
 
-	data, err := s.config.GetRoot().SystemAuth.GlobalAESKey.GetData(ctx)
+	ver, err := s.config.GetRoot().SystemAuth.GlobalAESKey.GetCurrentVersion(ctx)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get global aes key")
 	}
@@ -147,7 +147,7 @@ func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (stri
 	return jwt2.
 		NewJwtTokenBuilder().
 		WithClaims(&claimsClone).
-		WithSecretKey(data).
+		WithSecretKey(ver.Data).
 		WithSystemSigned().
 		TokenCtx(ctx)
 }
