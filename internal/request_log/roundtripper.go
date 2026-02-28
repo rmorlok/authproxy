@@ -208,9 +208,17 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			t.logger.Error("timed out waiting for response body to be read; full_log will not have accurate size", "entry_id", full_log.Id.String(), "correlation_id", full_log.CorrelationID, "max_wait", cc.maxResponseWait.String())
 		}
 
-		err := t.fullStore.Store(ctx, full_log)
-		if err != nil {
-			t.logger.Error("error storing HTTP log full_log in Redis", "error", err, "entry_id", full_log.Id.String(), "correlation_id", full_log.CorrelationID)
+		record := full_log.ToRecord()
+		SetLogRecordFieldsFromRequestInfo(record, t.requestInfo)
+
+		if err := t.store.StoreRecord(ctx, record); err != nil {
+			t.logger.Error("error storing HTTP log record", "error", err, "entry_id", full_log.Id.String(), "correlation_id", full_log.CorrelationID)
+		}
+
+		if t.fullStore != nil {
+			if err := t.fullStore.Store(ctx, full_log); err != nil {
+				t.logger.Error("error storing full HTTP log in blob storage", "error", err, "entry_id", full_log.Id.String(), "correlation_id", full_log.CorrelationID)
+			}
 		}
 	}()
 

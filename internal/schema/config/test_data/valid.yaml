@@ -58,7 +58,6 @@ logging:
   level: debug
 
 http_logging:
-  enabled: true
   full_request_recording: always
   # full_request_recording: never
 

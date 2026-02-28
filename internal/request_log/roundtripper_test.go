@@ -15,11 +15,82 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
-func TestRedisLogger_RoundTrip(t *testing.T) {
+// mockRecordStore captures StoreRecord calls for test assertions.
+type mockRecordStore struct {
+	mu      sync.Mutex
+	records []*LogRecord
+	err     error
+}
+
+func (m *mockRecordStore) StoreRecord(_ context.Context, record *LogRecord) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.records = append(m.records, record)
+	return m.err
+}
+
+func (m *mockRecordStore) StoreRecords(_ context.Context, records []*LogRecord) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.records = append(m.records, records...)
+	return m.err
+}
+
+func (m *mockRecordStore) getRecords() []*LogRecord {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	result := make([]*LogRecord, len(m.records))
+	copy(result, m.records)
+	return result
+}
+
+// mockFullStore captures Store calls for test assertions.
+type mockFullStore struct {
+	mu   sync.Mutex
+	logs []*FullLog
+	err  error
+	done chan struct{}
+}
+
+func newMockFullStore() *mockFullStore {
+	return &mockFullStore{done: make(chan struct{}, 10)}
+}
+
+func (m *mockFullStore) Store(_ context.Context, log *FullLog) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.logs = append(m.logs, log)
+	m.done <- struct{}{}
+	return m.err
+}
+
+func (m *mockFullStore) GetFullLog(_ context.Context, _ string, _ uuid.UUID) (*FullLog, error) {
+	return nil, nil
+}
+
+func (m *mockFullStore) getLogs() []*FullLog {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	result := make([]*FullLog, len(m.logs))
+	copy(result, m.logs)
+	return result
+}
+
+func (m *mockFullStore) waitForStore(t *testing.T, timeout time.Duration) {
+	t.Helper()
+	select {
+	case <-m.done:
+	case <-time.After(timeout):
+		t.Fatal("timed out waiting for store call")
+	}
+}
+
+func TestRoundTripper_RoundTrip(t *testing.T) {
 	mockTransport := &mockRoundTripper{}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
@@ -258,26 +329,23 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 			mockTransport.reset()
 			mockTransport.response = test.response
 			mockTransport.err = test.roundTripErr
-			var result *FullLog
-			wg := sync.WaitGroup{}
-			wg.Add(1)
+			store := &mockRecordStore{}
+			fullStore := newMockFullStore()
 
-			rLogger := &redisLogger{
-				r:                     nil, // We are overriding the persistFullLog method, so we don't need a redis client
-				blob:                  nil, // We are overriding the persistFullLog method, so we don't need a blob client
-				logger:                logger,
-				recordFullRequest:     test.recordFullRequest,
-				maxFullRequestSize:    test.maxFullRequestSize,
-				maxFullResponseSize:   test.maxFullResponseSize,
-				transport:             mockTransport,
-				expiration:            time.Minute,
-				fullRequestExpiration: time.Minute,
-				maxResponseWait:       5 * 60 * time.Second, // This is to make tests run really long if things aren't working
-				persistFullLog: func(e *FullLog) error {
-					defer wg.Done()
-					result = e
-					return nil
+			rt := &RoundTripper{
+				store:     store,
+				fullStore: fullStore,
+				logger:    logger,
+				captureConfig: captureConfig{
+					recordFullRequest:   test.recordFullRequest,
+					maxFullRequestSize:  test.maxFullRequestSize,
+					maxFullResponseSize: test.maxFullResponseSize,
+					expiration:          time.Minute,
+					fullRequestExpiration: time.Minute,
+					maxResponseWait:     5 * 60 * time.Second,
 				},
+				requestInfo: httpf.RequestInfo{},
+				transport:   mockTransport,
 			}
 
 			ctx := apctx.
@@ -288,15 +356,15 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 				Build()
 
 			req := test.request.WithContext(ctx)
-			resp, err := rLogger.RoundTrip(req)
+			resp, err := rt.RoundTrip(req)
 
 			if resp != nil && resp.Body != nil {
 				io.ReadAll(resp.Body) // Simulate response being consumed
 				resp.Body.Close()
 			}
 
-			start := time.Now()
-			wg.Wait()
+			// Wait for the async goroutine to store the full log
+			fullStore.waitForStore(t, 5*time.Second)
 
 			if test.roundTripErr != nil {
 				if err == nil || err.Error() != test.roundTripErr.Error() {
@@ -304,24 +372,25 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 				}
 			}
 
-			if result == nil {
-				t.Fatal("persistFullLog not invoked")
-			}
-
-			if time.Since(start) > time.Second {
-				t.Fatalf("persistFullLog took too long: %v; this likely implies a deadlock that was broken by the max request timeout", time.Since(start))
-			}
+			logs := fullStore.getLogs()
+			require.Len(t, logs, 1, "expected exactly one full log stored")
+			result := logs[0]
 
 			// We freeze time so duration is zero
 			test.expectedFullLog.MillisecondDuration = 0
 
 			require.Equal(t, test.response, resp)
 			require.Equal(t, test.expectedFullLog, result)
+
+			// Verify that a record was also stored
+			records := store.getRecords()
+			require.Len(t, records, 1, "expected exactly one record stored")
+			require.Equal(t, test.expectedFullLog.Id, records[0].RequestId)
 		})
 	}
 }
 
-func TestRedisLogger_RoundTrip_TimesOutAtConfiguredValue(t *testing.T) {
+func TestRoundTripper_RoundTrip_TimesOutAtConfiguredValue(t *testing.T) {
 	request := &http.Request{
 		Method:     "GET",
 		URL:        util.Must(url.Parse("http://example.com/path?q=1")),
@@ -380,26 +449,23 @@ func TestRedisLogger_RoundTrip_TimesOutAtConfiguredValue(t *testing.T) {
 	mockTransport := &mockRoundTripper{}
 	mockTransport.response = response
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	var result *FullLog
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+	store := &mockRecordStore{}
+	fullStore := newMockFullStore()
 
-	rLogger := &redisLogger{
-		r:                     nil, // We are overriding the persistFullLog method, so we don't need a redis client
-		blob:                  nil, // We are overriding the persistFullLog method, so we don't need a blob client
-		logger:                logger,
-		recordFullRequest:     false,
-		maxFullRequestSize:    0,
-		maxFullResponseSize:   0,
-		transport:             mockTransport,
-		expiration:            time.Minute,
-		fullRequestExpiration: time.Minute,
-		maxResponseWait:       250 * time.Millisecond,
-		persistFullLog: func(e *FullLog) error {
-			defer wg.Done()
-			result = e
-			return nil
+	rt := &RoundTripper{
+		store:     store,
+		fullStore: fullStore,
+		logger:    logger,
+		captureConfig: captureConfig{
+			recordFullRequest:     false,
+			maxFullRequestSize:    0,
+			maxFullResponseSize:   0,
+			expiration:            time.Minute,
+			fullRequestExpiration: time.Minute,
+			maxResponseWait:       250 * time.Millisecond,
 		},
+		requestInfo: httpf.RequestInfo{},
+		transport:   mockTransport,
 	}
 
 	ctx := apctx.
@@ -410,24 +476,18 @@ func TestRedisLogger_RoundTrip_TimesOutAtConfiguredValue(t *testing.T) {
 		Build()
 
 	req := request.WithContext(ctx)
-	resp, _ := rLogger.RoundTrip(req)
+	resp, _ := rt.RoundTrip(req)
 
 	if resp != nil && resp.Body != nil {
 		// Do not consume the body to force a timeout
-		// io.ReadAll(resp.Body)
-		// resp.Body.Close()
 	}
 
-	start := time.Now()
-	wg.Wait()
+	// Wait for the async goroutine to store
+	fullStore.waitForStore(t, 5*time.Second)
 
-	if result == nil {
-		t.Fatal("persistFullLog not invoked")
-	}
-
-	if time.Since(start) > time.Second {
-		t.Fatalf("persistFullLog took too long: %v; this likely implies a deadlock that was broken by the max request timeout", time.Since(start))
-	}
+	logs := fullStore.getLogs()
+	require.Len(t, logs, 1)
+	result := logs[0]
 
 	// We freeze time so duration is zero
 	expectedFullLog.MillisecondDuration = 0
@@ -436,7 +496,7 @@ func TestRedisLogger_RoundTrip_TimesOutAtConfiguredValue(t *testing.T) {
 	require.Equal(t, expectedFullLog, result)
 }
 
-func TestRedisLogger_RoundTrip_TimesOutAtAtContextCancel(t *testing.T) {
+func TestRoundTripper_RoundTrip_TimesOutAtContextCancel(t *testing.T) {
 	request := &http.Request{
 		Method:     "GET",
 		URL:        util.Must(url.Parse("http://example.com/path?q=1")),
@@ -495,26 +555,23 @@ func TestRedisLogger_RoundTrip_TimesOutAtAtContextCancel(t *testing.T) {
 	mockTransport := &mockRoundTripper{}
 	mockTransport.response = response
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	var result *FullLog
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+	store := &mockRecordStore{}
+	fullStore := newMockFullStore()
 
-	rLogger := &redisLogger{
-		r:                     nil, // We are overriding the persistFullLog method, so we don't need a redis client
-		blob:                  nil, // We are overriding the persistFullLog method, so we don't need a blob client
-		logger:                logger,
-		recordFullRequest:     false,
-		maxFullRequestSize:    0,
-		maxFullResponseSize:   0,
-		transport:             mockTransport,
-		expiration:            time.Minute,
-		fullRequestExpiration: time.Minute,
-		maxResponseWait:       2 * time.Hour, // Really long so it will wait
-		persistFullLog: func(e *FullLog) error {
-			defer wg.Done()
-			result = e
-			return nil
+	rt := &RoundTripper{
+		store:     store,
+		fullStore: fullStore,
+		logger:    logger,
+		captureConfig: captureConfig{
+			recordFullRequest:     false,
+			maxFullRequestSize:    0,
+			maxFullResponseSize:   0,
+			expiration:            time.Minute,
+			fullRequestExpiration: time.Minute,
+			maxResponseWait:       2 * time.Hour, // Really long so it will wait
 		},
+		requestInfo: httpf.RequestInfo{},
+		transport:   mockTransport,
 	}
 
 	ctx := apctx.
@@ -526,25 +583,20 @@ func TestRedisLogger_RoundTrip_TimesOutAtAtContextCancel(t *testing.T) {
 	ctx, cancel := context.WithCancel(ctx)
 
 	req := request.WithContext(ctx)
-	resp, _ := rLogger.RoundTrip(req)
+	resp, _ := rt.RoundTrip(req)
 
 	if resp != nil && resp.Body != nil {
 		// Do not consume the body to force a timeout
-		// io.ReadAll(resp.Body)
-		// resp.Body.Close()
 	}
 
-	start := time.Now()
 	cancel()
-	wg.Wait()
 
-	if result == nil {
-		t.Fatal("persistFullLog not invoked")
-	}
+	// Wait for the async goroutine to store
+	fullStore.waitForStore(t, 5*time.Second)
 
-	if time.Since(start) > time.Second {
-		t.Fatalf("persistFullLog took too long: %v; this likely implies a deadlock that was broken by the max request timeout", time.Since(start))
-	}
+	logs := fullStore.getLogs()
+	require.Len(t, logs, 1)
+	result := logs[0]
 
 	// We freeze time so duration is zero
 	expectedFullLog.MillisecondDuration = 0

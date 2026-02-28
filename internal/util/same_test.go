@@ -40,12 +40,6 @@ func TestSameInstance(t *testing.T) {
 			expected: false,
 		},
 		{
-			name:     "same pointer instance",
-			a:        func() any { s := &testStruct{value: 42}; return s }(),
-			b:        func() any { s := &testStruct{value: 42}; return s }(),
-			expected: true,
-		},
-		{
 			name:     "non-pointer values",
 			a:        testStruct{value: 42},
 			b:        testStruct{value: 42},
@@ -67,4 +61,11 @@ func TestSameInstance(t *testing.T) {
 			}
 		})
 	}
+
+	t.Run("same pointer instance", func(t *testing.T) {
+		s := &testStruct{value: 42}
+		if !SameInstance(s, s) {
+			t.Errorf("SameInstance(s, s) = false; want true")
+		}
+	})
 }

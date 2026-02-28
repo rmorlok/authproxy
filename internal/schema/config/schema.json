@@ -202,9 +202,9 @@
         }
       },
       "oneOf": [
-        { "required": ["provider", "addresses", "database"], "not": { "required": ["address", "address_list"] } },
-        { "required": ["provider", "address", "database"], "not": { "required": ["addresses","address_list"] } },
-        { "required": ["provider", "address_list", "database"], "not": { "required": ["addresses", "address"] } }
+        { "required": ["provider", "addresses"], "not": { "required": ["address", "address_list"] } },
+        { "required": ["provider", "address"], "not": { "required": ["addresses","address_list"] } },
+        { "required": ["provider", "address_list"], "not": { "required": ["addresses", "address"] } }
       ],
       "additionalProperties": false
     },
@@ -285,6 +285,12 @@
         },
         "full_request_retention": {
           "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "flush_interval": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "flush_batch_size": {
+          "type": "integer"
         },
         "database": {
           "$ref": "#/$defs/DatabaseOrWarehouse"

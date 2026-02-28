@@ -15,6 +15,7 @@ import (
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/request_log"
 	"github.com/rmorlok/authproxy/internal/request_log/mock"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
@@ -89,7 +90,7 @@ func TestRequestLogRoutes(t *testing.T) {
 			require.NoError(t, err)
 
 			b := mock.MockListRequestBuilderExecutor{
-				ReturnResults: pagination.PageResult[*request_log.EntryRecord]{},
+				ReturnResults: pagination.PageResult[*request_log.LogRecord]{},
 			}
 
 			tu.MockRetriever.EXPECT().
@@ -119,11 +120,11 @@ func TestRequestLogRoutes(t *testing.T) {
 
 			id := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
 			b := mock.MockListRequestBuilderExecutor{
-				ReturnResults: pagination.PageResult[*request_log.EntryRecord]{
-					Results: []*request_log.EntryRecord{
+				ReturnResults: pagination.PageResult[*request_log.LogRecord]{
+					Results: []*request_log.LogRecord{
 						{
 							Namespace:          "root",
-							Type:               request_log.RequestTypeProxy,
+							Type:               httpf.RequestTypeProxy,
 							RequestId:          id,
 							Method:             "GET",
 							Path:               "/api/test",
@@ -161,11 +162,11 @@ func TestRequestLogRoutes(t *testing.T) {
 
 			id := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
 			b := mock.MockListRequestBuilderExecutor{
-				ReturnResults: pagination.PageResult[*request_log.EntryRecord]{
-					Results: []*request_log.EntryRecord{
+				ReturnResults: pagination.PageResult[*request_log.LogRecord]{
+					Results: []*request_log.LogRecord{
 						{
 							Namespace:          "root",
-							Type:               request_log.RequestTypeProxy,
+							Type:               httpf.RequestTypeProxy,
 							RequestId:          id,
 							Method:             "GET",
 							Path:               "/api/test",
@@ -204,11 +205,11 @@ func TestRequestLogRoutes(t *testing.T) {
 
 			id := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
 			b := mock.MockListRequestBuilderExecutor{
-				ReturnResults: pagination.PageResult[*request_log.EntryRecord]{
-					Results: []*request_log.EntryRecord{
+				ReturnResults: pagination.PageResult[*request_log.LogRecord]{
+					Results: []*request_log.LogRecord{
 						{
 							Namespace:          "root",
-							Type:               request_log.RequestTypeProxy,
+							Type:               httpf.RequestTypeProxy,
 							RequestId:          id,
 							Method:             "GET",
 							Path:               "/api/test",
@@ -299,7 +300,7 @@ func TestRequestLogRoutes(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			entry := &request_log.Entry{
+			entry := &request_log.FullLog{
 				Id:        testId,
 				Namespace: "root",
 				Timestamp: time.Now().UTC(),
@@ -361,7 +362,7 @@ func TestRequestLogRoutes(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			entry := &request_log.Entry{
+			entry := &request_log.FullLog{
 				Id:        testId,
 				Namespace: "root",
 				Timestamp: time.Now().UTC(),
