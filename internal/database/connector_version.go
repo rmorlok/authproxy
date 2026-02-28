@@ -646,6 +646,73 @@ func (s *service) NewestPublishedConnectorVersionForId(ctx context.Context, id a
 	return &result, nil
 }
 
+func (s *service) EnumerateConnectorVersions(
+	ctx context.Context,
+	callback func(cvs []*ConnectorVersion, lastPage bool) (stop bool, err error),
+) error {
+	const pageSize = 100
+	offset := uint64(0)
+
+	for {
+		rows, err := s.sq.
+			Select(util.ToPtr(ConnectorVersion{}).cols()...).
+			From(ConnectorVersionsTable).
+			Where(sq.Eq{"deleted_at": nil}).
+			OrderBy("id", "version").
+			Limit(pageSize + 1).
+			Offset(offset).
+			RunWith(s.db).
+			Query()
+		if err != nil {
+			return err
+		}
+
+		var results []*ConnectorVersion
+		for rows.Next() {
+			var r ConnectorVersion
+			if err := rows.Scan(r.fields()...); err != nil {
+				rows.Close()
+				return err
+			}
+			results = append(results, &r)
+		}
+		rows.Close()
+
+		lastPage := len(results) <= pageSize
+		if len(results) > pageSize {
+			results = results[:pageSize]
+		}
+
+		stop, err := callback(results, lastPage)
+		if err != nil {
+			return err
+		}
+
+		if stop || lastPage {
+			break
+		}
+
+		offset += pageSize
+	}
+
+	return nil
+}
+
+func (s *service) BatchUpdateConnectorVersionEncryptedDefinition(ctx context.Context, updates []ConnectorVersionEncryptedDefinitionUpdate) error {
+	for _, u := range updates {
+		_, err := s.sq.
+			Update(ConnectorVersionsTable).
+			Set("encrypted_definition", u.EncryptedDefinition).
+			Where(sq.Eq{"id": u.Id, "version": u.Version}).
+			RunWith(s.db).
+			Exec()
+		if err != nil {
+			return errors.Wrapf(err, "failed to update connector version %s v%d", u.Id, u.Version)
+		}
+	}
+	return nil
+}
+
 type ConnectorVersionOrderByField string
 
 const (

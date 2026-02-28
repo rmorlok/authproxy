@@ -1,6 +1,7 @@
 package config
 
 import (
+	"fmt"
 	"time"
 )
 
@@ -11,6 +12,33 @@ type SystemAuth struct {
 	DisableXSRF         bool              `json:"disable_xsrf" yaml:"disable_xsrf"`
 	Actors              *ConfiguredActors `json:"actors" yaml:"actors"`
 	GlobalAESKey        *KeyData          `json:"global_aes_key" yaml:"global_aes_key"`
+	GlobalAESKeys       []*KeyData        `json:"global_aes_keys" yaml:"global_aes_keys"`
+}
+
+// ValidateGlobalAESKeys checks that only one of GlobalAESKey or GlobalAESKeys is set.
+func (sa *SystemAuth) ValidateGlobalAESKeys() error {
+	hasKey := sa.GlobalAESKey != nil
+	hasKeys := len(sa.GlobalAESKeys) > 0
+
+	if hasKey && hasKeys {
+		return fmt.Errorf("only one of global_aes_key or global_aes_keys may be set, not both")
+	}
+
+	return nil
+}
+
+// GetGlobalAESKeys normalizes both GlobalAESKey and GlobalAESKeys into a single list.
+// The primary key (used for encryption) is always the first element.
+func (sa *SystemAuth) GetGlobalAESKeys() []*KeyData {
+	if len(sa.GlobalAESKeys) > 0 {
+		return sa.GlobalAESKeys
+	}
+
+	if sa.GlobalAESKey != nil {
+		return []*KeyData{sa.GlobalAESKey}
+	}
+
+	return nil
 }
 
 func (sa *SystemAuth) JwtIssuer() string {

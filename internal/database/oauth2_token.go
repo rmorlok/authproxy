@@ -282,6 +282,74 @@ func (s *service) InsertOAuth2Token(
 	return newToken, nil
 }
 
+func (s *service) EnumerateOAuth2Tokens(
+	ctx context.Context,
+	callback func(tokens []*OAuth2Token, lastPage bool) (stop bool, err error),
+) error {
+	const pageSize = 100
+	offset := uint64(0)
+
+	for {
+		rows, err := s.sq.
+			Select(util.ToPtr(OAuth2Token{}).cols()...).
+			From(OAuth2TokensTable).
+			Where(sq.Eq{"deleted_at": nil}).
+			OrderBy("id").
+			Limit(pageSize + 1).
+			Offset(offset).
+			RunWith(s.db).
+			Query()
+		if err != nil {
+			return err
+		}
+
+		var results []*OAuth2Token
+		for rows.Next() {
+			var r OAuth2Token
+			if err := rows.Scan(r.fields()...); err != nil {
+				rows.Close()
+				return err
+			}
+			results = append(results, &r)
+		}
+		rows.Close()
+
+		lastPage := len(results) <= pageSize
+		if len(results) > pageSize {
+			results = results[:pageSize]
+		}
+
+		stop, err := callback(results, lastPage)
+		if err != nil {
+			return err
+		}
+
+		if stop || lastPage {
+			break
+		}
+
+		offset += pageSize
+	}
+
+	return nil
+}
+
+func (s *service) BatchUpdateOAuth2TokenEncryptedFields(ctx context.Context, updates []OAuth2TokenEncryptedFieldsUpdate) error {
+	for _, u := range updates {
+		_, err := s.sq.
+			Update(OAuth2TokensTable).
+			Set("encrypted_access_token", u.EncryptedAccessToken).
+			Set("encrypted_refresh_token", u.EncryptedRefreshToken).
+			Where(sq.Eq{"id": u.Id}).
+			RunWith(s.db).
+			Exec()
+		if err != nil {
+			return errors.Wrapf(err, "failed to update oauth2 token %s", u.Id)
+		}
+	}
+	return nil
+}
+
 type OAuth2TokenWithConnection struct {
 	Token      OAuth2Token
 	Connection Connection

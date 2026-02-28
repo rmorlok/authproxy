@@ -359,3 +359,17 @@ func (mr *MockEMockRecorder) EncryptStringGlobal(ctx, data interface{}) *gomock.
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EncryptStringGlobal", reflect.TypeOf((*MockE)(nil).EncryptStringGlobal), ctx, data)
 }
+
+// IsEncryptedWithPrimaryKey mocks base method.
+func (m *MockE) IsEncryptedWithPrimaryKey(base64Str string) bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "IsEncryptedWithPrimaryKey", base64Str)
+	ret0, _ := ret[0].(bool)
+	return ret0
+}
+
+// IsEncryptedWithPrimaryKey indicates an expected call of IsEncryptedWithPrimaryKey.
+func (mr *MockEMockRecorder) IsEncryptedWithPrimaryKey(base64Str interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsEncryptedWithPrimaryKey", reflect.TypeOf((*MockE)(nil).IsEncryptedWithPrimaryKey), base64Str)
+}

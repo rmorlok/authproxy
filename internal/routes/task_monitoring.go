@@ -411,7 +411,7 @@ func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
 	cursorStr := gctx.Query("cursor")
 
 	if cursorStr != "" {
-		parsed, err := pagination.ParseCursor[taskListCursor](ctx, r.cfg.GetGlobalKey(), cursorStr)
+		parsed, err := pagination.ParseCursorMultiKey[taskListCursor](ctx, r.cfg.GetGlobalKeys(), cursorStr)
 		if err != nil {
 			api_common.NewHttpStatusErrorBuilder().
 				WithStatusBadRequest().
@@ -479,7 +479,7 @@ func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
 				Queue:    queue,
 				State:    state,
 			}
-			cursor, _ = pagination.MakeCursor(ctx, r.cfg.GetGlobalKey(), &nextCursor)
+			cursor, _ = pagination.MakeCursorMultiKey(ctx, r.cfg.GetGlobalKeys(), &nextCursor)
 		}
 	}
 

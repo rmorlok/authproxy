@@ -33,4 +33,9 @@ type E interface {
 	DecryptStringForConnection(ctx context.Context, connection Connection, base64 string) (string, error)
 	DecryptForConnector(ctx context.Context, connection ConnectorVersion, data []byte) ([]byte, error)
 	DecryptStringForConnector(ctx context.Context, connection ConnectorVersion, base64 string) (string, error)
+
+	// IsEncryptedWithPrimaryKey checks whether a string-encrypted value was encrypted with the
+	// primary (index 0) key. Values with "v1:0:" prefix are considered primary-key encrypted.
+	// Legacy values (no prefix) return false.
+	IsEncryptedWithPrimaryKey(base64Str string) bool
 }

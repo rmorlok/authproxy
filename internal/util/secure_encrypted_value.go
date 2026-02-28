@@ -8,6 +8,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"strconv"
+	"strings"
 )
 
 func MustGenerateSecureRandomKey(size int) []byte {
@@ -55,6 +57,54 @@ func SecureEncryptedJsonValue(key []byte, val interface{}) (string, error) {
 	encoded := base64.StdEncoding.EncodeToString(combined)
 
 	return encoded, nil
+}
+
+// SecureEncryptedJsonValueVersioned encrypts a JSON value with the specified key and prepends
+// a version prefix "v1:<keyIndex>:" to the output.
+func SecureEncryptedJsonValueVersioned(keyIndex int, key []byte, val interface{}) (string, error) {
+	encoded, err := SecureEncryptedJsonValue(key, val)
+	if err != nil {
+		return "", err
+	}
+	return fmt.Sprintf("v1:%d:%s", keyIndex, encoded), nil
+}
+
+// SecureDecryptedJsonValueMultiKey decrypts a JSON value that may be in versioned or legacy format.
+// Versioned format: "v1:<keyIndex>:<base64>"
+// Legacy format: "<base64>" (tries all keys)
+func SecureDecryptedJsonValueMultiKey[T any](keys [][]byte, encoded string) (*T, error) {
+	if strings.HasPrefix(encoded, "v1:") {
+		rest := encoded[3:]
+		colonIdx := strings.Index(rest, ":")
+		if colonIdx < 0 {
+			return nil, fmt.Errorf("invalid versioned format: missing key index separator")
+		}
+
+		keyIndexStr := rest[:colonIdx]
+		base64Data := rest[colonIdx+1:]
+
+		keyIndex, err := strconv.Atoi(keyIndexStr)
+		if err != nil {
+			return nil, fmt.Errorf("invalid key index: %w", err)
+		}
+
+		if keyIndex < 0 || keyIndex >= len(keys) {
+			return nil, fmt.Errorf("key index %d out of range (have %d keys)", keyIndex, len(keys))
+		}
+
+		return SecureDecryptedJsonValue[T](keys[keyIndex], base64Data)
+	}
+
+	// Legacy format: try all keys
+	var lastErr error
+	for _, key := range keys {
+		result, err := SecureDecryptedJsonValue[T](key, encoded)
+		if err == nil {
+			return result, nil
+		}
+		lastErr = err
+	}
+	return nil, fmt.Errorf("decryption failed with all keys: %w", lastErr)
 }
 
 func SecureDecryptedJsonValue[T any](key []byte, encoded string) (*T, error) {

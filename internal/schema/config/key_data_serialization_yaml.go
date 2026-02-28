@@ -47,11 +47,20 @@ fieldLoop:
 		case "random":
 			keyData = &KeyDataRandomBytes{}
 			break fieldLoop
+		case "vault_address":
+			keyData = &KeyDataVault{}
+			break fieldLoop
+		case "aws_secret_id":
+			keyData = &KeyDataAwsSecret{}
+			break fieldLoop
+		case "gcp_secret_name":
+			keyData = &KeyDataGcpSecret{}
+			break fieldLoop
 		}
 	}
 
 	if keyData == nil {
-		return fmt.Errorf("invalid structure for key data type; does not match value, base64, env_var, env_var_base64, file")
+		return fmt.Errorf("invalid structure for key data type; does not match value, base64, env_var, env_var_base64, path, random, vault_address, aws_secret_id, gcp_secret_name")
 	}
 
 	if err := value.Decode(keyData); err != nil {
