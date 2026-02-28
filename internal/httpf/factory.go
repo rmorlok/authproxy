@@ -5,6 +5,7 @@ import (
 	"net/http"
 	"sync"
 
+	"github.com/rmorlok/authproxy/internal/apblob"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/request_log"
@@ -16,6 +17,7 @@ import (
 type clientFactory struct {
 	cfg         config.C
 	r           apredis.Client
+	blob        apblob.Client
 	logger      *slog.Logger
 	requestInfo request_log.RequestInfo
 
@@ -25,10 +27,11 @@ type clientFactory struct {
 	topLevelOnce sync.Once
 }
 
-func CreateFactory(cfg config.C, r apredis.Client, logger *slog.Logger) F {
+func CreateFactory(cfg config.C, r apredis.Client, blob apblob.Client, logger *slog.Logger) F {
 	return &clientFactory{
 		cfg:    cfg,
 		r:      r,
+		blob:   blob,
 		logger: logger,
 		requestInfo: request_log.RequestInfo{
 			Namespace: sconfig.RootNamespace,
@@ -41,6 +44,7 @@ func (f *clientFactory) ForRequestInfo(ri request_log.RequestInfo) F {
 	return &clientFactory{
 		cfg:         f.cfg,
 		r:           f.r,
+		blob:        f.blob,
 		logger:      f.logger,
 		requestInfo: ri,
 	}
@@ -94,6 +98,7 @@ func (f *clientFactory) New() *gentleman.Client {
 
 			l := request_log.NewRedisLogger(
 				f.r,
+				f.blob,
 				f.logger,
 				f.requestInfo,
 				expiration,

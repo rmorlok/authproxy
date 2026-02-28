@@ -111,7 +111,51 @@ database:
   sslmode: disable
 ```
 
-#### Start the Server
+Start MinIO (required for request log storage):
+
+```bash
+docker run --name minio -p 9002:9000 -p 9001:9001 \
+  -e MINIO_ROOT_USER=minioadmin \
+  -e MINIO_ROOT_PASSWORD=minioadmin \
+  --network authproxy \
+  -d minio/minio server /data --console-address ":9001"
+```
+
+Create the bucket (run once):
+
+```bash
+docker run --rm --network authproxy \
+  -e MC_HOST_minio=http://minioadmin:minioadmin@minio:9000 \
+  minio/mc mb minio/authproxy-request-logs
+```
+
+### TLS Certificates
+
+The dev config uses self-signed TLS certificates for the `public` (port 8080) and `admin_api` (port 8082) services. Certificates are auto-generated on first server start at `dev_config/keys/tls/` (this directory is gitignored).
+
+To avoid browser warnings, trust the generated certificate in your system keychain. On macOS:
+
+```bash
+# Start the server once to generate the certificate, then stop it (Ctrl+C)
+go run ./cmd/server serve --config=./dev_config/default.yaml all
+
+# Add the certificate to the system keychain as a trusted root
+sudo security add-trusted-cert -d -r trustRoot \
+  -k /Library/Keychains/System.keychain \
+  ./dev_config/keys/tls/cert.pem
+```
+
+After trusting the certificate, restart your browser for the change to take effect. You should then be able to visit `https://localhost:8080` and `https://localhost:8082` without TLS warnings.
+
+If you regenerate the certificate (e.g. by deleting `dev_config/keys/tls/` and restarting the server), you will need to re-run the trust command above.
+
+For CLI/curl usage without trusting the cert, you can skip verification:
+
+```bash
+curl -k https://localhost:8080/ping
+```
+
+Start the AuthProxy Server
 
 ```bash
 go run ./cmd/server serve --config=./dev_config/default.yaml all
@@ -184,6 +228,22 @@ redis://default@redis-server:6379
 ```
 
 ![redis-insight-add-db.jpg](docs/images/redis-insight-add-db.jpg)
+
+### Viewing MinIO Data
+
+MinIO includes a web-based console for browsing stored objects (e.g. full request/response logs).
+
+Open the MinIO Console:
+
+```bash
+open http://localhost:9001
+```
+
+Log in with:
+- **Username:** `minioadmin`
+- **Password:** `minioadmin`
+
+Navigate to **Object Browser** and select the `authproxy-request-logs` bucket to view stored request log entries.
 
 ### Viewing Background Tasks
 To manage tasks in asynq, install the [asynq cli](https://github.com/hibiken/asynq/blob/master/tools/asynq/README.md):

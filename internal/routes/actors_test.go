@@ -16,6 +16,7 @@ import (
 	"github.com/google/uuid"
 	coreAuth "github.com/rmorlok/authproxy/internal/apauth/core"
 	authService "github.com/rmorlok/authproxy/internal/apauth/service"
+	"github.com/rmorlok/authproxy/internal/apblob"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/apredis/mock"
 	"github.com/rmorlok/authproxy/internal/config"
@@ -50,7 +51,7 @@ func TestActorsRoutes(t *testing.T) {
 		cfg, auth, authUtil := authService.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
 		// Test encrypt service and http factory
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
-		h := httpf.CreateFactory(cfg, rds, test_utils.NewTestLogger())
+		h := httpf.CreateFactory(cfg, rds, apblob.NewMemoryClient(), test_utils.NewTestLogger())
 
 		// Build routes
 		ar := NewActorsRoutes(cfg, auth, db, rds, h, e, test_utils.NewTestLogger())

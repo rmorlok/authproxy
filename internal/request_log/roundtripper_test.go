@@ -264,6 +264,7 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 
 			rLogger := &redisLogger{
 				r:                     nil, // We are overriding the persistEntry method, so we don't need a redis client
+				blob:                  nil, // We are overriding the persistEntry method, so we don't need a blob client
 				logger:                logger,
 				recordFullRequest:     test.recordFullRequest,
 				maxFullRequestSize:    test.maxFullRequestSize,
@@ -385,6 +386,7 @@ func TestRedisLogger_RoundTrip_TimesOutAtConfiguredValue(t *testing.T) {
 
 	rLogger := &redisLogger{
 		r:                     nil, // We are overriding the persistEntry method, so we don't need a redis client
+		blob:                  nil, // We are overriding the persistEntry method, so we don't need a blob client
 		logger:                logger,
 		recordFullRequest:     false,
 		maxFullRequestSize:    0,
@@ -499,6 +501,7 @@ func TestRedisLogger_RoundTrip_TimesOutAtAtContextCancel(t *testing.T) {
 
 	rLogger := &redisLogger{
 		r:                     nil, // We are overriding the persistEntry method, so we don't need a redis client
+		blob:                  nil, // We are overriding the persistEntry method, so we don't need a blob client
 		logger:                logger,
 		recordFullRequest:     false,
 		maxFullRequestSize:    0,

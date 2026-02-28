@@ -7,11 +7,14 @@ import (
 	"net/http"
 	"time"
 
+	"github.com/rmorlok/authproxy/internal/apblob"
 	"github.com/rmorlok/authproxy/internal/apredis"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 type redisLogger struct {
 	r                     apredis.Client
+	blob                  apblob.Client
 	logger                *slog.Logger
 	requestInfo           RequestInfo
 	expiration            time.Duration
@@ -26,6 +29,7 @@ type redisLogger struct {
 
 func NewRedisLogger(
 	r apredis.Client,
+	blob apblob.Client,
 	logger *slog.Logger,
 	requestInfo RequestInfo,
 	expiration time.Duration,
@@ -38,6 +42,7 @@ func NewRedisLogger(
 ) Logger {
 	l := &redisLogger{
 		r:                     r,
+		blob:                  blob,
 		logger:                logger,
 		requestInfo:           requestInfo,
 		expiration:            expiration,
@@ -84,18 +89,6 @@ func (t *redisLogger) storeEntryInRedis(
 		return err
 	}
 
-	if t.recordFullRequest {
-		jsonData, err := json.Marshal(entry)
-		if err != nil {
-			t.logger.Error("error serializing entry to JSON", "error", err, "entry_id", entry.Id.String())
-		} else {
-			err = pipeline.Set(context.Background(), redisFullLogKey(entry.Id), jsonData, t.fullRequestExpiration).Err()
-			if err != nil {
-				t.logger.Error("error storing full HTTP log entry in Redis", "error", err, "entry_id", entry.Id.String())
-			}
-		}
-	}
-
 	cmdErr, err := pipeline.Exec(context.Background())
 	if err != nil {
 		t.logger.Error("error storing HTTP log entry in Redis", "error", err, "entry_id", entry.Id.String())
@@ -106,6 +99,24 @@ func (t *redisLogger) storeEntryInRedis(
 		if cmd.Err() != nil {
 			t.logger.Error("error storing HTTP log entry in Redis", "error", cmd.Err(), "entry_id", entry.Id.String())
 			return err
+		}
+	}
+
+	if t.recordFullRequest && t.blob != nil {
+		jsonData, err := json.Marshal(entry)
+		if err != nil {
+			t.logger.Error("error serializing entry to JSON", "error", err, "entry_id", entry.Id.String())
+		} else {
+			blobKey := entry.Id.String() + ".json"
+			if err := t.blob.Put(
+				context.Background(),
+				apblob.PutInput{
+					Key:         blobKey,
+					Data:        jsonData,
+					ContentType: util.ToPtr("application/json"),
+				}); err != nil {
+				t.logger.Error("error storing full HTTP log entry in blob storage", "error", err, "entry_id", entry.Id.String())
+			}
 		}
 	}
 

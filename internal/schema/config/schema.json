@@ -240,6 +240,9 @@
         },
         "full_request_retention": {
           "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "blob_storage": {
+          "$ref": "#/$defs/BlobStorage"
         }
       },
       "additionalProperties": false,
@@ -361,6 +364,58 @@
       "oneOf": [
         { "$ref": "#/$defs/RedisReal" },
         { "$ref": "#/$defs/RedisMiniredis" }
+      ]
+    },
+    "AwsCredentialsAccessKey": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "access_key" },
+        "access_key_id": { "$ref": "../common/schema.json#/$defs/StringValue" },
+        "secret_access_key": { "$ref": "../common/schema.json#/$defs/StringValue" }
+      },
+      "required": ["type", "access_key_id", "secret_access_key"],
+      "additionalProperties": false
+    },
+    "AwsCredentialsImplicit": {
+      "type": "object",
+      "properties": {
+        "type": { "const": "implicit" }
+      },
+      "required": ["type"],
+      "additionalProperties": false
+    },
+    "AwsCredentials": {
+      "oneOf": [
+        { "$ref": "#/$defs/AwsCredentialsAccessKey" },
+        { "$ref": "#/$defs/AwsCredentialsImplicit" }
+      ]
+    },
+    "BlobStorageS3": {
+      "type": "object",
+      "properties": {
+        "provider": { "const": "s3" },
+        "endpoint": { "type": "string" },
+        "region": { "type": "string" },
+        "bucket": { "type": "string" },
+        "credentials": { "$ref": "#/$defs/AwsCredentials" },
+        "force_path_style": { "type": "boolean" },
+        "prefix": { "type": "string" }
+      },
+      "required": ["bucket"],
+      "additionalProperties": false
+    },
+    "BlobStorageMemory": {
+      "type": "object",
+      "properties": {
+        "provider": { "const": "memory" }
+      },
+      "required": ["provider"],
+      "additionalProperties": false
+    },
+    "BlobStorage": {
+      "oneOf": [
+        { "$ref": "#/$defs/BlobStorageS3" },
+        { "$ref": "#/$defs/BlobStorageMemory" }
       ]
     },
     "ServiceAdminApi": {
