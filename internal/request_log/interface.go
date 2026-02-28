@@ -2,21 +2,15 @@ package request_log
 
 import (
 	"context"
-	"net/http"
 
 	"github.com/google/uuid"
 )
-
-// Logger is an interface for logging requests. This is used as a middleware for http.Client.
-type Logger interface {
-	RoundTrip(req *http.Request) (*http.Response, error)
-}
 
 // LogRetriever is an interface for retrieving logs. Used by the API to retrieve logs.
 //
 //go:generate mockgen -source=./interface.go -destination=./mock/service.go -package=mock
 type LogRetriever interface {
-	GetFullLog(ctx context.Context, id uuid.UUID) (*Entry, error)
+	GetFullLog(ctx context.Context, id uuid.UUID) (*FullLog, error)
 	NewListRequestsBuilder() ListRequestBuilder
 	ListRequestsFromCursor(ctx context.Context, cursor string) (ListRequestExecutor, error)
 }

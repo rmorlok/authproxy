@@ -9,10 +9,10 @@ import (
 
 // This file contains Entry/EntryRequest/EntryResponse structs which represent the request
 // as it was captured from the HTTP request. This value is serialized to JSON to store the
-// full request. To represent the redacted version of the request, an EntryRecord is used,
+// full request. To represent the redacted version of the request, an LogRecord is used,
 // which is a subset of the EntryRequest and organized for searching.
 
-type EntryRequest struct {
+type FullLogRequest struct {
 	URL           string              `json:"u"`
 	HttpVersion   string              `json:"v"`
 	Method        string              `json:"m"`
@@ -21,7 +21,7 @@ type EntryRequest struct {
 	Body          []byte              `json:"b,omitempty"`
 }
 
-func (e *EntryRequest) setRedisRecordFields(er *EntryRecord) {
+func (e *FullLogRequest) setRecordFields(er *LogRecord) {
 	if e == nil {
 		return
 	}
@@ -41,7 +41,7 @@ func (e *EntryRequest) setRedisRecordFields(er *EntryRecord) {
 	}
 }
 
-type EntryResponse struct {
+type FullLogResponse struct {
 	HttpVersion   string              `json:"v"`
 	StatusCode    int                 `json:"sc"`
 	Headers       map[string][]string `json:"h"`
@@ -50,7 +50,7 @@ type EntryResponse struct {
 	Err           string              `json:"err,omitempty"`
 }
 
-func (e *EntryResponse) setRedisRecordFields(er *EntryRecord) {
+func (e *FullLogResponse) setRecordFields(er *LogRecord) {
 	if e == nil {
 		return
 	}
@@ -66,7 +66,7 @@ func (e *EntryResponse) setRedisRecordFields(er *EntryRecord) {
 	er.ResponseError = e.Err
 }
 
-type Entry struct {
+type FullLog struct {
 	Id                  uuid.UUID           `json:"id"`
 	Namespace           string              `json:"ns"`
 	CorrelationID       string              `json:"cid"`
@@ -75,19 +75,19 @@ type Entry struct {
 	Full                bool                `json:"full,omitempty"`
 	InternalTimeout     bool                `json:"to,omitempty"`
 	RequestCancelled    bool                `json:"rc,omitempty"`
-	Request             EntryRequest        `json:"req"`
-	Response            EntryResponse       `json:"res"`
+	Request             FullLogRequest      `json:"req"`
+	Response            FullLogResponse     `json:"res"`
 }
 
-func (e *Entry) GetId() uuid.UUID {
+func (e *FullLog) GetId() uuid.UUID {
 	return e.Id
 }
 
-func (e *Entry) GetNamespace() string {
+func (e *FullLog) GetNamespace() string {
 	return e.Namespace
 }
 
-func (e *Entry) setRedisRecordFields(er *EntryRecord) {
+func (e *FullLog) setRecordFields(er *LogRecord) {
 	if e == nil {
 		return
 	}
@@ -99,16 +99,22 @@ func (e *Entry) setRedisRecordFields(er *EntryRecord) {
 	er.CorrelationId = e.CorrelationID
 	er.FullRequestRecorded = e.Full
 
-	e.Request.setRedisRecordFields(er)
-	e.Response.setRedisRecordFields(er)
+	e.Request.setRecordFields(er)
+	e.Response.setRecordFields(er)
 }
 
-func NewEntryFromRecord(er *EntryRecord) *Entry {
+func (e *FullLog) ToRecord() *LogRecord {
+	er := &LogRecord{}
+	e.setRecordFields(er)
+	return er
+}
+
+func NewFullLogFromRecord(er *LogRecord) *FullLog {
 	if er == nil {
 		return nil
 	}
 
-	entry := &Entry{
+	entry := &FullLog{
 		Id:                  er.RequestId,
 		Namespace:           er.Namespace,
 		CorrelationID:       er.CorrelationId,
@@ -127,7 +133,7 @@ func NewEntryFromRecord(er *EntryRecord) *Entry {
 	}
 
 	// Populate Request
-	entry.Request = EntryRequest{
+	entry.Request = FullLogRequest{
 		URL:           url.String(),
 		HttpVersion:   er.RequestHttpVersion,
 		Method:        er.Method,
@@ -139,7 +145,7 @@ func NewEntryFromRecord(er *EntryRecord) *Entry {
 	}
 
 	// Populate Response
-	entry.Response = EntryResponse{
+	entry.Response = FullLogResponse{
 		HttpVersion:   er.ResponseHttpVersion,
 		StatusCode:    er.ResponseStatusCode,
 		ContentLength: er.ResponseSizeBytes,

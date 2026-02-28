@@ -5,10 +5,10 @@ import (
 	"net/http"
 
 	"github.com/rmorlok/authproxy/internal/core/iface"
-	"github.com/rmorlok/authproxy/internal/request_log"
+	"github.com/rmorlok/authproxy/internal/httpf"
 )
 
-func (n *noAuthConnection) ProxyRequest(ctx context.Context, reqType request_log.RequestType, req *iface.ProxyRequest) (*iface.ProxyResponse, error) {
+func (n *noAuthConnection) ProxyRequest(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest) (*iface.ProxyResponse, error) {
 	r := n.httpf.
 		ForRequestType(reqType).
 		ForConnection(&n.c).
@@ -27,7 +27,7 @@ func (n *noAuthConnection) ProxyRequest(ctx context.Context, reqType request_log
 	return iface.ProxyResponseFromGentlemen(resp)
 }
 
-func (n *noAuthConnection) ProxyRequestRaw(ctx context.Context, reqType request_log.RequestType, req *iface.ProxyRequest, w http.ResponseWriter) error {
+func (n *noAuthConnection) ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest, w http.ResponseWriter) error {
 	return nil
 }
 

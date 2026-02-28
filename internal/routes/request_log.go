@@ -9,6 +9,7 @@ import (
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/request_log"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -50,7 +51,7 @@ func (q *ListRequestsQuery) ApplyToBuilder(
 	}
 
 	if q.RequestType != nil {
-		b = b.WithRequestType(request_log.RequestType(*q.RequestType))
+		b = b.WithRequestType(httpf.RequestType(*q.RequestType))
 	}
 
 	if q.CorrelationId != nil {
@@ -126,9 +127,9 @@ func (q *ListRequestsQuery) ApplyToBuilder(
 }
 
 type ListRequestsResponseJson struct {
-	Items  []*request_log.EntryRecord `json:"items"`
-	Cursor string                     `json:"cursor,omitempty"`
-	Total  *int64                     `json:"total,omitempty"`
+	Items  []*request_log.LogRecord `json:"items"`
+	Cursor string                   `json:"cursor,omitempty"`
+	Total  *int64                   `json:"total,omitempty"`
 }
 
 // @Summary		Get request log entry

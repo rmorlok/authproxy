@@ -187,62 +187,6 @@ func TestStoreFullRequestAndResponse_JSONStored(t *testing.T) {
 	require.Equal(t, 201, e.Response.StatusCode)
 }
 
-func TestDirectStore_WritesKeys(t *testing.T) {
-	r := newTestRedis(t)
-	logger := newNoopLogger()
-	blob := apblob.NewMemoryClient()
-
-	ft := &fakeTransport{status: 200, respBody: "ok", readReqBody: false}
-	ll := NewRedisLogger(
-		r,
-		blob,
-		logger,
-		RequestInfo{Type: RequestTypePublic},
-		1*time.Minute,
-		true,
-		30*time.Second,
-		1024,
-		1024,
-		60*time.Second,
-		ft,
-	)
-	rl := ll.(*redisLogger)
-
-	entry := &Entry{
-		Id:        uuid.New(),
-		Timestamp: time.Now(),
-		Request: EntryRequest{
-			URL:         "http://x/y",
-			Method:      "GET",
-			HttpVersion: "HTTP/1.1",
-		},
-		Response: EntryResponse{
-			StatusCode: 200,
-		},
-	}
-
-	// also try to mirror how values are constructed to ensure they are non-empty
-	er := EntryRecord{}
-	rl.requestInfo.setRedisRecordFields(&er)
-	entry.setRedisRecordFields(&er)
-
-	vals := make(map[string]string)
-	er.setRedisRecordFields(vals)
-	if len(vals) == 0 {
-		t.Fatalf("constructed vals unexpectedly empty")
-	}
-
-	// Call the actual method under test (no body stored)
-	err := rl.storeEntryInRedis(entry)
-	require.NoError(t, err)
-
-	key := redisLogKey(entry.Id)
-	m, err := r.HGetAll(context.Background(), key).Result()
-
-	require.NoError(t, err)
-	require.NotEmpty(t, m)
-}
-
 func TestErrorRoundTrip_StoresError(t *testing.T) {
 	r := newTestRedis(t)
 	logger := newNoopLogger()

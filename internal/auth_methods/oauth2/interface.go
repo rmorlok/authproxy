@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
-	"github.com/rmorlok/authproxy/internal/request_log"
+	"github.com/rmorlok/authproxy/internal/httpf"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
@@ -35,8 +35,8 @@ type OAuth2Connection interface {
 		returnToUrl string,
 	) (string, error)
 	CallbackFrom3rdParty(ctx context.Context, query url.Values) (string, error)
-	ProxyRequest(ctx context.Context, reqType request_log.RequestType, req *coreIface.ProxyRequest) (*coreIface.ProxyResponse, error)
-	ProxyRequestRaw(ctx context.Context, reqType request_log.RequestType, req *coreIface.ProxyRequest, w http.ResponseWriter) error
+	ProxyRequest(ctx context.Context, reqType httpf.RequestType, req *coreIface.ProxyRequest) (*coreIface.ProxyResponse, error)
+	ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *coreIface.ProxyRequest, w http.ResponseWriter) error
 	SupportsRevokeTokens() bool
 	RevokeTokens(ctx context.Context) error
 }

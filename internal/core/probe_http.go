@@ -5,7 +5,7 @@ import (
 	"context"
 
 	"github.com/rmorlok/authproxy/internal/core/iface"
-	"github.com/rmorlok/authproxy/internal/request_log"
+	"github.com/rmorlok/authproxy/internal/httpf"
 )
 
 type probeHttp struct {
@@ -31,7 +31,7 @@ func (p *probeHttp) Invoke(ctx context.Context) (string, error) {
 			}
 
 			// TODO: translate result
-			_, err = proxy.ProxyRequest(ctx, request_log.RequestTypeProbe, &req)
+			_, err = proxy.ProxyRequest(ctx, httpf.RequestTypeProbe, &req)
 			if err != nil {
 				return ProbeOutcomeError, err
 			} else {
@@ -41,7 +41,7 @@ func (p *probeHttp) Invoke(ctx context.Context) (string, error) {
 			req := p.s.httpf.
 				ForConnection(p.c).
 				ForConnectorVersion(p.cv).
-				ForRequestType(request_log.RequestTypeProbe).
+				ForRequestType(httpf.RequestTypeProbe).
 				New().
 				UseContext(ctx).
 				Request()

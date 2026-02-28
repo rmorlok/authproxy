@@ -61,6 +61,35 @@ database:
   sslmode: disable
 ```
 
+Optionally, start ClickHouse for HTTP request logging (otherwise SQLite is used by default):
+
+```bash
+docker run \
+  --name clickhouse-server \
+  -p 8123:8123 \
+  -p 9000:9000 \
+  --network authproxy \
+  -e CLICKHOUSE_DB=authproxy \
+  -e CLICKHOUSE_USER=clickhouse \
+  -e CLICKHOUSE_PASSWORD=clickhouse \
+  -e CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT=1 \
+  -d clickhouse/clickhouse-server:latest
+```
+
+To use ClickHouse, update `dev_config/default.yaml`:
+
+```yaml
+http_logging:
+  enabled: true
+  full_request_recording: always
+  database:
+    provider: clickhouse
+    auto_migrate: true
+    addresses:
+      - localhost:9000
+    database: authproxy
+```
+
 Start MinIO (required for request log storage):
 
 ```bash

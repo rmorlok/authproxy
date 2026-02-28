@@ -141,7 +141,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 	routesRequestLog := common_routes.NewRequestLogRoutes(
 		dm.GetConfig(),
 		authService,
-		dm.GetRequestLogRetriever(),
+		dm.GetLogStorageService(),
 	)
 	routesActors := common_routes.NewActorsRoutes(
 		dm.GetConfig(),

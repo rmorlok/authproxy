@@ -76,10 +76,10 @@ func (m *MockLogRetriever) EXPECT() *MockLogRetrieverMockRecorder {
 }
 
 // GetFullLog mocks base method.
-func (m *MockLogRetriever) GetFullLog(ctx context.Context, id uuid.UUID) (*request_log.Entry, error) {
+func (m *MockLogRetriever) GetFullLog(ctx context.Context, id uuid.UUID) (*request_log.FullLog, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetFullLog", ctx, id)
-	ret0, _ := ret[0].(*request_log.Entry)
+	ret0, _ := ret[0].(*request_log.FullLog)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

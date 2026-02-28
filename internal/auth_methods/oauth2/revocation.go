@@ -7,7 +7,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/database"
-	"github.com/rmorlok/authproxy/internal/request_log"
+	"github.com/rmorlok/authproxy/internal/httpf"
 )
 
 func (o *oAuth2Connection) SupportsRevokeTokens() bool {
@@ -66,7 +66,7 @@ func (o *oAuth2Connection) revokeRefreshToken(ctx context.Context, token *databa
 	}
 
 	c := o.httpf.
-		ForRequestType(request_log.RequestTypeOAuth).
+		ForRequestType(httpf.RequestTypeOAuth).
 		ForConnection(o.connection).
 		New().
 		UseContext(ctx)
@@ -128,7 +128,7 @@ func (o *oAuth2Connection) revokeAccessToken(ctx context.Context, token *databas
 	}
 
 	c := o.httpf.
-		ForRequestType(request_log.RequestTypeOAuth).
+		ForRequestType(httpf.RequestTypeOAuth).
 		ForConnection(o.connection).
 		New().
 		UseContext(ctx)
