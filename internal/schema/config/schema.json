@@ -194,6 +194,10 @@
         "database": {
           "$ref": "../common/schema.json#/$defs/StringValue"
         },
+        "protocol": {
+          "type": "string",
+          "enum": ["http", "native"]
+        },
         "auto_migrate": {
           "type": "boolean"
         },

@@ -4,8 +4,10 @@ import (
 	"context"
 	"testing"
 
+	"github.com/ClickHouse/clickhouse-go/v2"
 	"github.com/go-faster/errors"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -108,6 +110,46 @@ func TestDatabaseClickhouse_GetAddresses(t *testing.T) {
 				require.NoError(t, err)
 				assert.Equal(t, tt.expect, addresses)
 			}
+		})
+	}
+}
+
+func TestDatabaseClickhouse_ToClickhouseOptions(t *testing.T) {
+	tests := []struct {
+		name             string
+		protocol         *string
+		expectedProtocol clickhouse.Protocol
+	}{
+		{
+			name:             "default protocol is HTTP",
+			protocol:         nil,
+			expectedProtocol: clickhouse.HTTP,
+		},
+		{
+			name:             "http protocol",
+			protocol:         util.ToPtr("http"),
+			expectedProtocol: clickhouse.HTTP,
+		},
+		{
+			name:             "native protocol",
+			protocol:         util.ToPtr("native"),
+			expectedProtocol: clickhouse.Native,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			db := &DatabaseClickhouse{
+				Address:  NewStringValueDirect("localhost:9000"),
+				Database: NewStringValueDirect("testdb"),
+				Protocol: tt.protocol,
+			}
+
+			opts, err := db.ToClickhouseOptions()
+			require.NoError(t, err)
+			assert.Equal(t, tt.expectedProtocol, opts.Protocol)
+			assert.Equal(t, []string{"localhost:9000"}, opts.Addr)
+			assert.Equal(t, "testdb", opts.Auth.Database)
 		})
 	}
 }

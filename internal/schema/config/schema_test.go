@@ -437,6 +437,21 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": {"provider": "clickhouse", "address": "localhost", "auto_migration_lock_duration": "30s"}}`,
 				},
 				{
+					Name:  "clickhouse with protocol http",
+					Valid: true,
+					Data:  `{"test": {"provider": "clickhouse", "address": "localhost", "protocol": "http"}}`,
+				},
+				{
+					Name:  "clickhouse with protocol native",
+					Valid: true,
+					Data:  `{"test": {"provider": "clickhouse", "address": "localhost", "protocol": "native"}}`,
+				},
+				{
+					Name:  "clickhouse with invalid protocol",
+					Valid: false,
+					Data:  `{"test": {"provider": "clickhouse", "address": "localhost", "protocol": "grpc"}}`,
+				},
+				{
 					Name:  "missing provider",
 					Valid: false,
 					Data:  `{"test": {"path": "/data/db.sqlite"}}`,

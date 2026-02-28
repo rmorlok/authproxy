@@ -23,8 +23,9 @@ type DatabaseClickhouse struct {
 	Address                   *StringValue     `json:"address,omitempty" yaml:"address,omitempty"`
 	AddressList               *StringValue     `json:"address_list,omitempty" yaml:"address_list,omitempty"`
 	Database                  *StringValue     `json:"database" yaml:"database"`
-	User                      *StringValue     `json:"user,omitempty" yaml:"username,omitempty"`
+	User                      *StringValue     `json:"user,omitempty" yaml:"user,omitempty"`
 	Password                  *StringValue     `json:"password,omitempty" yaml:"password,omitempty"`
+	Protocol                  *string          `json:"protocol,omitempty" yaml:"protocol,omitempty"`
 	AutoMigrate               bool             `json:"auto_migrate,omitempty" yaml:"auto_migrate,omitempty"`
 	AutoMigrationLockDuration *HumanDuration   `json:"auto_migration_lock_duration,omitempty" yaml:"auto_migration_lock_duration,omitempty"`
 }
@@ -35,6 +36,14 @@ func (d *DatabaseClickhouse) GetProvider() DatabaseProvider {
 
 func (d *DatabaseClickhouse) GetDriver() string {
 	return "clickhouse"
+}
+
+// GetProtocol returns the ClickHouse connection protocol. Defaults to HTTP if not set.
+func (d *DatabaseClickhouse) GetProtocol() clickhouse.Protocol {
+	if d.Protocol != nil && strings.ToLower(*d.Protocol) == "native" {
+		return clickhouse.Native
+	}
+	return clickhouse.HTTP
 }
 
 func (d *DatabaseClickhouse) GetAutoMigrate() bool {
@@ -110,6 +119,13 @@ func (d *DatabaseClickhouse) Validate(vc *common.ValidationContext) error {
 		return vc.NewErrorForField("address", "only one of addresses, address, or address_list can be specified")
 	}
 
+	if d.Protocol != nil {
+		p := strings.ToLower(*d.Protocol)
+		if p != "http" && p != "native" {
+			result = multierror.Append(result, vc.NewErrorForField("protocol", "protocol must be 'http' or 'native'"))
+		}
+	}
+
 	if d.Database == nil {
 		result = multierror.Append(result, vc.NewErrorForField("database", "database must be specified"))
 	}
@@ -181,7 +197,8 @@ func (d *DatabaseClickhouse) ToClickhouseOptions() (*clickhouse.Options, error) 
 	}
 
 	cfg := &clickhouse.Options{
-		Addr: addresses,
+		Addr:     addresses,
+		Protocol: d.GetProtocol(),
 		Auth: clickhouse.Auth{
 			Database: db,
 		},
