@@ -8,7 +8,55 @@ proxy and stay focussed on the business logic of your product.
 
 ## Running Locally
 
-### Prerequisites
+### Quick Start with Docker Compose
+
+The fastest way to get started is with Docker Compose, which manages all dependencies for you.
+
+**Prerequisites:** Install [Docker Desktop](https://www.docker.com/products/docker-desktop/).
+
+**Start data stores only** (for local Go/frontend development):
+
+```bash
+docker compose up -d
+```
+
+This starts PostgreSQL (5432), Redis (6379), MinIO (9000/9001), and ClickHouse (8123/9009).
+
+Then run the server locally:
+
+```bash
+go run ./cmd/server serve --config=./dev_config/default.yaml all
+```
+
+**Start the full stack** (server runs in Docker too):
+
+```bash
+docker compose --profile server up -d
+```
+
+This also builds and starts the AuthProxy server (ports 8080-8083) using `dev_config/docker.yaml`.
+
+**Start monitoring tools:**
+
+```bash
+docker compose --profile tools up -d
+```
+
+This adds RedisInsight on port 5540. Connect to `redis://default@redis:6379`.
+
+**Stop everything:**
+
+```bash
+docker compose --profile server --profile tools down
+```
+
+Add `-v` to also remove data volumes.
+
+### Manual Setup
+
+If you prefer to manage dependencies yourself:
+
+#### Prerequisites
 
 Install the following on MacOS:
 
@@ -28,6 +76,8 @@ volta install node
 volta install yarn
 yarn install
 ```
+
+#### Start Dependencies
 
 Create a network for the asynq system to interact with redis:
 
@@ -105,7 +155,7 @@ For CLI/curl usage without trusting the cert, you can skip verification:
 curl -k https://localhost:8080/ping
 ```
 
-Start the AuthProxy backend
+Start the AuthProxy Server
 
 ```bash
 go run ./cmd/server serve --config=./dev_config/default.yaml all
@@ -125,7 +175,7 @@ Run tests with SQLite (default):
 go test -v ./...
 ```
 
-Run tests with Postgres:
+Run tests with Postgres (ensure Postgres is running via Docker Compose or manually):
 
 ```bash
 AUTH_PROXY_TEST_DATABASE_PROVIDER=postgres \
@@ -138,9 +188,9 @@ POSTGRES_TEST_OPTIONS=sslmode=disable \
 go test -v ./...
 ```
 
-# UI
+## UI
 
-## Marketplace UI
+### Marketplace UI
 
 Run the marketplace UI:
 
@@ -148,7 +198,7 @@ Run the marketplace UI:
 yarn workspace @authproxy/marketplace dev
 ```
 
-## Admin UI
+### Admin UI
 Run the admin UI:
 
 ```bash
@@ -157,8 +207,18 @@ yarn workspace @authproxy/admin dev
 
 ### Viewing Redis Data
 
+If using Docker Compose, start RedisInsight with:
+
 ```bash
-docker run -d --name redisinsight -p 5540:5540 -v redisinsight:/data --network authproxy redis/redisinsight:latest 
+docker compose --profile tools up -d
+```
+
+Then open http://localhost:5540 and connect to `redis://default@redis:6379`.
+
+Alternatively, run RedisInsight manually:
+
+```bash
+docker run -d --name redisinsight -p 5540:5540 -v redisinsight:/data --network authproxy redis/redisinsight:latest
 ```
 
 Add a connection to redis. Connect to the redis server using the following URI:

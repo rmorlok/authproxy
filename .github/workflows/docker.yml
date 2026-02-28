@@ -1,0 +1,56 @@
+# schema: https://json.schemastore.org/github-workflow.json
+name: Docker
+
+on:
+  push:
+    branches: ["main"]
+    paths:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.github/workflows/docker.yml'
+  pull_request:
+    branches: ["main"]
+    paths:
+      - '**/*.go'
+      - 'go.mod'
+      - 'go.sum'
+      - 'Dockerfile'
+      - 'docker-compose.yml'
+      - '.github/workflows/docker.yml'
+
+jobs:
+  docker-build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build Docker image
+        run: docker build -t authproxy:test .
+
+      - name: Start data stores
+        run: docker compose up -d postgres redis
+
+      - name: Wait for data stores to be healthy
+        run: |
+          echo "Waiting for postgres..."
+          timeout 60 bash -c 'until docker compose exec postgres pg_isready -U postgres; do sleep 2; done'
+          echo "Waiting for redis..."
+          timeout 60 bash -c 'until docker compose exec redis redis-cli ping; do sleep 2; done'
+
+      - name: Start server
+        run: docker compose --profile server up -d
+
+      - name: Wait for server to start
+        run: sleep 10
+
+      - name: Verify server is running
+        run: |
+          docker compose ps
+          docker compose logs server
+
+      - name: Tear down
+        if: always()
+        run: docker compose --profile server down -v
