@@ -80,8 +80,8 @@ http_logging:
   database:
     provider: clickhouse
     auto_migrate: true
-    user: clickhouse
-    password: clickhouse
+    user: authproxy
+    password: authproxy
     addresses:
       - localhost:8123
     database: authproxy

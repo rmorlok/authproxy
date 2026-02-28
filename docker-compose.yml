@@ -52,6 +52,8 @@ services:
       - "9009:9009"
     volumes:
       - clickhouse_data:/var/lib/clickhouse
+      - ./dev_config/clickhouse/users.xml:/etc/clickhouse-server/users.d/authproxy-user.xml:ro
+      - ./dev_config/clickhouse/init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
     networks:
       - authproxy
 
