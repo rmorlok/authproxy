@@ -6,51 +6,12 @@ package mock
 
 import (
 	context "context"
-	http "net/http"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
 	request_log "github.com/rmorlok/authproxy/internal/request_log"
 )
-
-// MockLogger is a mock of Logger interface.
-type MockLogger struct {
-	ctrl     *gomock.Controller
-	recorder *MockLoggerMockRecorder
-}
-
-// MockLoggerMockRecorder is the mock recorder for MockLogger.
-type MockLoggerMockRecorder struct {
-	mock *MockLogger
-}
-
-// NewMockLogger creates a new mock instance.
-func NewMockLogger(ctrl *gomock.Controller) *MockLogger {
-	mock := &MockLogger{ctrl: ctrl}
-	mock.recorder = &MockLoggerMockRecorder{mock}
-	return mock
-}
-
-// EXPECT returns an object that allows the caller to indicate expected use.
-func (m *MockLogger) EXPECT() *MockLoggerMockRecorder {
-	return m.recorder
-}
-
-// RoundTrip mocks base method.
-func (m *MockLogger) RoundTrip(req *http.Request) (*http.Response, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RoundTrip", req)
-	ret0, _ := ret[0].(*http.Response)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// RoundTrip indicates an expected call of RoundTrip.
-func (mr *MockLoggerMockRecorder) RoundTrip(req interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RoundTrip", reflect.TypeOf((*MockLogger)(nil).RoundTrip), req)
-}
 
 // MockLogRetriever is a mock of LogRetriever interface.
 type MockLogRetriever struct {
@@ -76,10 +37,10 @@ func (m *MockLogRetriever) EXPECT() *MockLogRetrieverMockRecorder {
 }
 
 // GetFullLog mocks base method.
-func (m *MockLogRetriever) GetFullLog(ctx context.Context, id uuid.UUID) (*request_log.Entry, error) {
+func (m *MockLogRetriever) GetFullLog(ctx context.Context, id uuid.UUID) (*request_log.FullLog, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetFullLog", ctx, id)
-	ret0, _ := ret[0].(*request_log.Entry)
+	ret0, _ := ret[0].(*request_log.FullLog)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }

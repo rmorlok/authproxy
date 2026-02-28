@@ -14,7 +14,7 @@ import (
 	uuid "github.com/google/uuid"
 	oauth2 "github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	iface "github.com/rmorlok/authproxy/internal/core/iface"
-	request_log "github.com/rmorlok/authproxy/internal/request_log"
+	"github.com/rmorlok/authproxy/internal/httpf"
 	auth "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
@@ -259,7 +259,7 @@ func (mr *MockOAuth2ConnectionMockRecorder) GenerateAuthUrl(ctx, actor interface
 }
 
 // ProxyRequest mocks base method.
-func (m *MockOAuth2Connection) ProxyRequest(ctx context.Context, reqType request_log.RequestType, req *iface.ProxyRequest) (*iface.ProxyResponse, error) {
+func (m *MockOAuth2Connection) ProxyRequest(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest) (*iface.ProxyResponse, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ProxyRequest", ctx, reqType, req)
 	ret0, _ := ret[0].(*iface.ProxyResponse)
@@ -274,7 +274,7 @@ func (mr *MockOAuth2ConnectionMockRecorder) ProxyRequest(ctx, reqType, req inter
 }
 
 // ProxyRequestRaw mocks base method.
-func (m *MockOAuth2Connection) ProxyRequestRaw(ctx context.Context, reqType request_log.RequestType, req *iface.ProxyRequest, w http.ResponseWriter) error {
+func (m *MockOAuth2Connection) ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest, w http.ResponseWriter) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ProxyRequestRaw", ctx, reqType, req, w)
 	ret0, _ := ret[0].(error)

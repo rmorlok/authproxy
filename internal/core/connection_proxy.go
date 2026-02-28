@@ -7,7 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/auth_methods/no_auth"
 	"github.com/rmorlok/authproxy/internal/core/iface"
-	"github.com/rmorlok/authproxy/internal/request_log"
+	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
@@ -45,7 +45,7 @@ func (c *connection) getProxyImpl() (iface.Proxy, error) {
 
 func (c *connection) ProxyRequest(
 	ctx context.Context,
-	reqType request_log.RequestType,
+	reqType httpf.RequestType,
 	req *iface.ProxyRequest,
 ) (*iface.ProxyResponse, error) {
 	p, err := c.getProxyImpl()
@@ -58,7 +58,7 @@ func (c *connection) ProxyRequest(
 
 func (c *connection) ProxyRequestRaw(
 	ctx context.Context,
-	reqType request_log.RequestType,
+	reqType httpf.RequestType,
 	req *iface.ProxyRequest,
 	w http.ResponseWriter,
 ) error {

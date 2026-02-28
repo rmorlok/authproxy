@@ -167,10 +167,62 @@
       "required": ["provider", "host"],
       "additionalProperties": false
     },
+    "DatabaseClickhouse": {
+      "type": "object",
+      "properties": {
+        "provider": {
+          "const": "clickhouse"
+        },
+        "addresses": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "address": {
+          "$ref": "../common/schema.json#/$defs/StringValue"
+        },
+        "address_list": {
+          "$ref": "../common/schema.json#/$defs/StringValue"
+        },
+        "user": {
+          "$ref": "../common/schema.json#/$defs/StringValue"
+        },
+        "password": {
+          "$ref": "../common/schema.json#/$defs/StringValue"
+        },
+        "database": {
+          "$ref": "../common/schema.json#/$defs/StringValue"
+        },
+        "protocol": {
+          "type": "string",
+          "enum": ["http", "native"]
+        },
+        "auto_migrate": {
+          "type": "boolean"
+        },
+        "auto_migration_lock_duration": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        }
+      },
+      "oneOf": [
+        { "required": ["provider", "addresses"], "not": { "required": ["address", "address_list"] } },
+        { "required": ["provider", "address"], "not": { "required": ["addresses","address_list"] } },
+        { "required": ["provider", "address_list"], "not": { "required": ["addresses", "address"] } }
+      ],
+      "additionalProperties": false
+    },
     "Database": {
       "oneOf": [
         { "$ref": "#/$defs/DatabaseSqlite" },
         { "$ref": "#/$defs/DatabasePostgres" }
+      ]
+    },
+    "DatabaseOrWarehouse": {
+      "oneOf": [
+        { "$ref": "#/$defs/DatabaseSqlite" },
+        { "$ref": "#/$defs/DatabasePostgres" },
+        { "$ref": "#/$defs/DatabaseClickhouse" }
       ]
     },
     "DevSettings": {
@@ -217,9 +269,6 @@
     },
     "HttpLogging": {
       "properties": {
-        "enabled": {
-          "type": "boolean"
-        },
         "auto_migrate": {
           "type": "boolean"
         },
@@ -240,6 +289,15 @@
         },
         "full_request_retention": {
           "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "flush_interval": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "flush_batch_size": {
+          "type": "integer"
+        },
+        "database": {
+          "$ref": "#/$defs/DatabaseOrWarehouse"
         },
         "blob_storage": {
           "$ref": "#/$defs/BlobStorage"

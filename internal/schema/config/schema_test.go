@@ -314,6 +314,144 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": {"provider": "sqlite", "path": "/data/db.sqlite", "auto_migration_lock_duration": "30s"}}`,
 				},
 				{
+					Name:  "postgres minimal",
+					Valid: true,
+					Data:  `{"test": {"provider": "postgres", "host": "localhost"}}`,
+				},
+				{
+					Name:  "postgres full",
+					Valid: true,
+					Data:  `{"test": {"provider": "postgres", "host": "example", "port": 1234, "user": "bobdole", "password": "secret", "sslmode": "disable"}}`,
+				},
+				{
+					Name:  "postgres with auto_migrate",
+					Valid: true,
+					Data:  `{"test": {"provider": "postgres", "host": "localhost", "auto_migrate": true}}`,
+				},
+				{
+					Name:  "postgres with auto_migration_lock_duration",
+					Valid: true,
+					Data:  `{"test": {"provider": "postgres", "host": "localhost", "auto_migration_lock_duration": "30s"}}`,
+				},
+				{
+					Name:  "missing provider",
+					Valid: false,
+					Data:  `{"test": {"path": "/data/db.sqlite"}}`,
+				},
+				{
+					Name:  "missing path",
+					Valid: false,
+					Data:  `{"test": {"provider": "sqlite"}}`,
+				},
+				{
+					Name:  "wrong provider",
+					Valid: false,
+					Data:  `{"test": {"provider": "postgres", "path": "/data/db"}}`,
+				},
+				{
+					Name:  "extra property",
+					Valid: false,
+					Data:  `{"test": {"provider": "sqlite", "path": "/data/db.sqlite", "extra": "field"}}`,
+				},
+			},
+		},
+		{
+			Name: "DatabaseOrWarehouse",
+			Schema: `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/config/test.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["test"],
+  "properties": {
+	"test": {
+		"$ref": "./schema.json#/$defs/DatabaseOrWarehouse"
+    }
+  }
+}`,
+			Tests: []test{
+				{
+					Name:  "sqlite minimal",
+					Valid: true,
+					Data:  `{"test": {"provider": "sqlite", "path": "/data/db.sqlite"}}`,
+				},
+				{
+					Name:  "sqlite with auto_migrate",
+					Valid: true,
+					Data:  `{"test": {"provider": "sqlite", "path": "/data/db.sqlite", "auto_migrate": true}}`,
+				},
+				{
+					Name:  "sqlite with auto_migration_lock_duration",
+					Valid: true,
+					Data:  `{"test": {"provider": "sqlite", "path": "/data/db.sqlite", "auto_migration_lock_duration": "30s"}}`,
+				},
+				{
+					Name:  "postgres minimal",
+					Valid: true,
+					Data:  `{"test": {"provider": "postgres", "host": "localhost"}}`,
+				},
+				{
+					Name:  "postgres full",
+					Valid: true,
+					Data:  `{"test": {"provider": "postgres", "host": "example", "port": 1234, "user": "bobdole", "password": "secret", "sslmode": "disable"}}`,
+				},
+				{
+					Name:  "postgres with auto_migrate",
+					Valid: true,
+					Data:  `{"test": {"provider": "postgres", "host": "localhost", "auto_migrate": true}}`,
+				},
+				{
+					Name:  "postgres with auto_migration_lock_duration",
+					Valid: true,
+					Data:  `{"test": {"provider": "postgres", "host": "localhost", "auto_migration_lock_duration": "30s"}}`,
+				},
+				{
+					Name:  "clickhouse minimal",
+					Valid: true,
+					Data:  `{"test": {"provider": "clickhouse", "address": "localhost"}}`,
+				},
+				{
+					Name:  "clickhouse full - addresses",
+					Valid: true,
+					Data:  `{"test": {"provider": "clickhouse", "addresses": ["host1", "host2"], "user": "bobdole", "password": "secret", "database": "authproxy"}}`,
+				},
+				{
+					Name:  "clickhouse full - address",
+					Valid: true,
+					Data:  `{"test": {"provider": "clickhouse", "address": "host1", "user": "bobdole", "password": "secret", "database": "authproxy"}}`,
+				},
+				{
+					Name:  "clickhouse full - address list",
+					Valid: true,
+					Data:  `{"test": {"provider": "clickhouse", "address_list": "host1,host2", "user": "bobdole", "password": "secret", "database": "authproxy"}}`,
+				},
+				{
+					Name:  "clickhouse with auto_migrate",
+					Valid: true,
+					Data:  `{"test": {"provider": "clickhouse", "address": "localhost", "auto_migrate": true}}`,
+				},
+				{
+					Name:  "clickhouse with auto_migration_lock_duration",
+					Valid: true,
+					Data:  `{"test": {"provider": "clickhouse", "address": "localhost", "auto_migration_lock_duration": "30s"}}`,
+				},
+				{
+					Name:  "clickhouse with protocol http",
+					Valid: true,
+					Data:  `{"test": {"provider": "clickhouse", "address": "localhost", "protocol": "http"}}`,
+				},
+				{
+					Name:  "clickhouse with protocol native",
+					Valid: true,
+					Data:  `{"test": {"provider": "clickhouse", "address": "localhost", "protocol": "native"}}`,
+				},
+				{
+					Name:  "clickhouse with invalid protocol",
+					Valid: false,
+					Data:  `{"test": {"provider": "clickhouse", "address": "localhost", "protocol": "grpc"}}`,
+				},
+				{
 					Name:  "missing provider",
 					Valid: false,
 					Data:  `{"test": {"path": "/data/db.sqlite"}}`,

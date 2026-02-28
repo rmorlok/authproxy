@@ -10,7 +10,6 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	uuid "github.com/google/uuid"
 	httpf "github.com/rmorlok/authproxy/internal/httpf"
-	request_log "github.com/rmorlok/authproxy/internal/request_log"
 	gentleman "gopkg.in/h2non/gentleman.v2"
 )
 
@@ -196,7 +195,7 @@ func (mr *MockFMockRecorder) ForConnectorVersion(cv interface{}) *gomock.Call {
 }
 
 // ForRequestInfo mocks base method.
-func (m *MockF) ForRequestInfo(ri request_log.RequestInfo) httpf.F {
+func (m *MockF) ForRequestInfo(ri httpf.RequestInfo) httpf.F {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ForRequestInfo", ri)
 	ret0, _ := ret[0].(httpf.F)
@@ -210,7 +209,7 @@ func (mr *MockFMockRecorder) ForRequestInfo(ri interface{}) *gomock.Call {
 }
 
 // ForRequestType mocks base method.
-func (m *MockF) ForRequestType(rt request_log.RequestType) httpf.F {
+func (m *MockF) ForRequestType(rt httpf.RequestType) httpf.F {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "ForRequestType", rt)
 	ret0, _ := ret[0].(httpf.F)

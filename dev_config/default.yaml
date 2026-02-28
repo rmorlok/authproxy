@@ -71,9 +71,20 @@ logging:
   level: debug
 
 http_logging:
-  enabled: true
   full_request_recording: always
   # full_request_recording: never
+  #  database:
+  #    provider: sqlite
+  #    auto_migrate: true
+  #    path: ./dev_config/http_log.db
+  database:
+    provider: clickhouse
+    auto_migrate: true
+    user: clickhouse
+    password: clickhouse
+    addresses:
+      - localhost:8123
+    database: authproxy
   blob_storage:
     provider: s3
     endpoint: http://localhost:9002

@@ -25,9 +25,11 @@ func (d *Database) UnmarshalJSON(data []byte) error {
 	if provider, ok := valueMap["provider"]; ok {
 		switch DatabaseProvider(fmt.Sprintf("%v", provider)) {
 		case DatabaseProviderSqlite:
-			t = &DatabaseSqlite{}
+			t = &DatabaseSqlite{Provider: DatabaseProviderSqlite}
 		case DatabaseProviderPostgres:
-			t = &DatabasePostgres{}
+			t = &DatabasePostgres{Provider: DatabaseProviderPostgres}
+		case DatabaseProviderClickhouse:
+			t = &DatabaseClickhouse{Provider: DatabaseProviderClickhouse}
 		default:
 			return fmt.Errorf("unknown database provider %v", provider)
 		}

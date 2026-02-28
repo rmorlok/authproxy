@@ -15,11 +15,82 @@ import (
 	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
-func TestRedisLogger_RoundTrip(t *testing.T) {
+// mockRecordStore captures StoreRecord calls for test assertions.
+type mockRecordStore struct {
+	mu      sync.Mutex
+	records []*LogRecord
+	err     error
+}
+
+func (m *mockRecordStore) StoreRecord(_ context.Context, record *LogRecord) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.records = append(m.records, record)
+	return m.err
+}
+
+func (m *mockRecordStore) StoreRecords(_ context.Context, records []*LogRecord) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.records = append(m.records, records...)
+	return m.err
+}
+
+func (m *mockRecordStore) getRecords() []*LogRecord {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	result := make([]*LogRecord, len(m.records))
+	copy(result, m.records)
+	return result
+}
+
+// mockFullStore captures Store calls for test assertions.
+type mockFullStore struct {
+	mu   sync.Mutex
+	logs []*FullLog
+	err  error
+	done chan struct{}
+}
+
+func newMockFullStore() *mockFullStore {
+	return &mockFullStore{done: make(chan struct{}, 10)}
+}
+
+func (m *mockFullStore) Store(_ context.Context, log *FullLog) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.logs = append(m.logs, log)
+	m.done <- struct{}{}
+	return m.err
+}
+
+func (m *mockFullStore) GetFullLog(_ context.Context, _ string, _ uuid.UUID) (*FullLog, error) {
+	return nil, nil
+}
+
+func (m *mockFullStore) getLogs() []*FullLog {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	result := make([]*FullLog, len(m.logs))
+	copy(result, m.logs)
+	return result
+}
+
+func (m *mockFullStore) waitForStore(t *testing.T, timeout time.Duration) {
+	t.Helper()
+	select {
+	case <-m.done:
+	case <-time.After(timeout):
+		t.Fatal("timed out waiting for store call")
+	}
+}
+
+func TestRoundTripper_RoundTrip(t *testing.T) {
 	mockTransport := &mockRoundTripper{}
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 
@@ -31,7 +102,7 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 		roundTripErr        error
 		request             *http.Request
 		response            *http.Response
-		expectedEntry       *Entry
+		expectedFullLog     *FullLog
 	}{
 		{
 			name:                "successful request, full logging enabled",
@@ -64,12 +135,12 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 				Body:          io.NopCloser(bytes.NewBufferString(`{"other": "json"}`)),
 				ContentLength: int64(len([]byte(`{"other": "json"}`))),
 			},
-			expectedEntry: &Entry{
+			expectedFullLog: &FullLog{
 				Id:            uuid.New(),
 				CorrelationID: "some-value",
 				Timestamp:     time.Now(),
 				Full:          true,
-				Request: EntryRequest{
+				Request: FullLogRequest{
 					URL:         "http://example.com/path?q=1",
 					HttpVersion: "HTTP/1.1",
 					Method:      "GET",
@@ -80,7 +151,7 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 					ContentLength: int64(len([]byte(`{"some": "json"}`))),
 					Body:          []byte(`{"some": "json"}`),
 				},
-				Response: EntryResponse{
+				Response: FullLogResponse{
 					HttpVersion: "HTTP/2",
 					StatusCode:  http.StatusOK,
 					Headers: http.Header{
@@ -123,12 +194,12 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 				Body:          io.NopCloser(bytes.NewBufferString(`{"other": "json"}`)),
 				ContentLength: int64(len([]byte(`{"other": "json"}`))),
 			},
-			expectedEntry: &Entry{
+			expectedFullLog: &FullLog{
 				Id:            uuid.New(),
 				CorrelationID: "some-value",
 				Timestamp:     time.Now(),
 				Full:          true,
-				Request: EntryRequest{
+				Request: FullLogRequest{
 					URL:         "http://example.com/path?q=1",
 					HttpVersion: "HTTP/1.1",
 					Method:      "GET",
@@ -139,7 +210,7 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 					ContentLength: int64(len([]byte(`{"some": "json"}`))),
 					Body:          []byte(`{"so`),
 				},
-				Response: EntryResponse{
+				Response: FullLogResponse{
 					HttpVersion: "HTTP/2",
 					StatusCode:  http.StatusOK,
 					Headers: http.Header{
@@ -182,12 +253,12 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 				Body:          io.NopCloser(bytes.NewBufferString(`{"other": "json"}`)),
 				ContentLength: int64(len([]byte(`{"other": "json"}`))),
 			},
-			expectedEntry: &Entry{
+			expectedFullLog: &FullLog{
 				Id:            uuid.New(),
 				CorrelationID: "some-value",
 				Timestamp:     time.Now(),
 				Full:          false,
-				Request: EntryRequest{
+				Request: FullLogRequest{
 					URL:         "http://example.com/path?q=1",
 					HttpVersion: "HTTP/1.1",
 					Method:      "GET",
@@ -198,7 +269,7 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 					ContentLength: int64(len([]byte(`{"some": "json"}`))),
 					Body:          nil,
 				},
-				Response: EntryResponse{
+				Response: FullLogResponse{
 					HttpVersion: "HTTP/2",
 					StatusCode:  http.StatusOK,
 					Headers: http.Header{
@@ -229,12 +300,12 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 				ContentLength: int64(len([]byte(`{"some": "json"}`))),
 			},
 			roundTripErr: errors.New("network issue"),
-			expectedEntry: &Entry{
+			expectedFullLog: &FullLog{
 				Id:            uuid.New(),
 				CorrelationID: "some-value",
 				Timestamp:     time.Now(),
 				Full:          true,
-				Request: EntryRequest{
+				Request: FullLogRequest{
 					URL:         "http://example.com/path?q=1",
 					HttpVersion: "HTTP/1.1",
 					Method:      "GET",
@@ -245,7 +316,7 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 					ContentLength: int64(len([]byte(`{"some": "json"}`))),
 					Body:          []byte(`{"some": "json"}`),
 				},
-				Response: EntryResponse{
+				Response: FullLogResponse{
 					StatusCode: http.StatusInternalServerError,
 					Err:        "network issue",
 				},
@@ -258,45 +329,42 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 			mockTransport.reset()
 			mockTransport.response = test.response
 			mockTransport.err = test.roundTripErr
-			var result *Entry
-			wg := sync.WaitGroup{}
-			wg.Add(1)
+			store := &mockRecordStore{}
+			fullStore := newMockFullStore()
 
-			rLogger := &redisLogger{
-				r:                     nil, // We are overriding the persistEntry method, so we don't need a redis client
-				blob:                  nil, // We are overriding the persistEntry method, so we don't need a blob client
-				logger:                logger,
-				recordFullRequest:     test.recordFullRequest,
-				maxFullRequestSize:    test.maxFullRequestSize,
-				maxFullResponseSize:   test.maxFullResponseSize,
-				transport:             mockTransport,
-				expiration:            time.Minute,
-				fullRequestExpiration: time.Minute,
-				maxResponseWait:       5 * 60 * time.Second, // This is to make tests run really long if things aren't working
-				persistEntry: func(e *Entry) error {
-					defer wg.Done()
-					result = e
-					return nil
+			rt := &RoundTripper{
+				store:     store,
+				fullStore: fullStore,
+				logger:    logger,
+				captureConfig: captureConfig{
+					recordFullRequest:   test.recordFullRequest,
+					maxFullRequestSize:  test.maxFullRequestSize,
+					maxFullResponseSize: test.maxFullResponseSize,
+					expiration:          time.Minute,
+					fullRequestExpiration: time.Minute,
+					maxResponseWait:     5 * 60 * time.Second,
 				},
+				requestInfo: httpf.RequestInfo{},
+				transport:   mockTransport,
 			}
 
 			ctx := apctx.
 				NewBuilderBackground().
-				WithFixedUuidGenerator(test.expectedEntry.Id).
-				WithCorrelationID(test.expectedEntry.CorrelationID).
-				WithFixedClock(test.expectedEntry.Timestamp).
+				WithFixedUuidGenerator(test.expectedFullLog.Id).
+				WithCorrelationID(test.expectedFullLog.CorrelationID).
+				WithFixedClock(test.expectedFullLog.Timestamp).
 				Build()
 
 			req := test.request.WithContext(ctx)
-			resp, err := rLogger.RoundTrip(req)
+			resp, err := rt.RoundTrip(req)
 
 			if resp != nil && resp.Body != nil {
 				io.ReadAll(resp.Body) // Simulate response being consumed
 				resp.Body.Close()
 			}
 
-			start := time.Now()
-			wg.Wait()
+			// Wait for the async goroutine to store the full log
+			fullStore.waitForStore(t, 5*time.Second)
 
 			if test.roundTripErr != nil {
 				if err == nil || err.Error() != test.roundTripErr.Error() {
@@ -304,24 +372,25 @@ func TestRedisLogger_RoundTrip(t *testing.T) {
 				}
 			}
 
-			if result == nil {
-				t.Fatal("persistEntry not invoked")
-			}
-
-			if time.Since(start) > time.Second {
-				t.Fatalf("persistEntry took too long: %v; this likely implies a deadlock that was broken by the max request timeout", time.Since(start))
-			}
+			logs := fullStore.getLogs()
+			require.Len(t, logs, 1, "expected exactly one full log stored")
+			result := logs[0]
 
 			// We freeze time so duration is zero
-			test.expectedEntry.MillisecondDuration = 0
+			test.expectedFullLog.MillisecondDuration = 0
 
 			require.Equal(t, test.response, resp)
-			require.Equal(t, test.expectedEntry, result)
+			require.Equal(t, test.expectedFullLog, result)
+
+			// Verify that a record was also stored
+			records := store.getRecords()
+			require.Len(t, records, 1, "expected exactly one record stored")
+			require.Equal(t, test.expectedFullLog.Id, records[0].RequestId)
 		})
 	}
 }
 
-func TestRedisLogger_RoundTrip_TimesOutAtConfiguredValue(t *testing.T) {
+func TestRoundTripper_RoundTrip_TimesOutAtConfiguredValue(t *testing.T) {
 	request := &http.Request{
 		Method:     "GET",
 		URL:        util.Must(url.Parse("http://example.com/path?q=1")),
@@ -348,13 +417,13 @@ func TestRedisLogger_RoundTrip_TimesOutAtConfiguredValue(t *testing.T) {
 		Body:          io.NopCloser(bytes.NewBufferString(`{"other": "json"}`)),
 		ContentLength: 0, // Unset directly, must be inferred from the response size
 	}
-	expectedEntry := &Entry{
+	expectedFullLog := &FullLog{
 		Id:               uuid.New(),
 		CorrelationID:    "some-value",
 		Timestamp:        time.Now(),
 		InternalTimeout:  true,
 		RequestCancelled: false,
-		Request: EntryRequest{
+		Request: FullLogRequest{
 			URL:         "http://example.com/path?q=1",
 			HttpVersion: "HTTP/1.1",
 			Method:      "GET",
@@ -365,7 +434,7 @@ func TestRedisLogger_RoundTrip_TimesOutAtConfiguredValue(t *testing.T) {
 			ContentLength: int64(len([]byte(`{"some": "json"}`))),
 			Body:          nil, // Not configured for full request logging
 		},
-		Response: EntryResponse{
+		Response: FullLogResponse{
 			HttpVersion: "HTTP/2",
 			StatusCode:  http.StatusOK,
 			Headers: http.Header{
@@ -380,63 +449,54 @@ func TestRedisLogger_RoundTrip_TimesOutAtConfiguredValue(t *testing.T) {
 	mockTransport := &mockRoundTripper{}
 	mockTransport.response = response
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	var result *Entry
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+	store := &mockRecordStore{}
+	fullStore := newMockFullStore()
 
-	rLogger := &redisLogger{
-		r:                     nil, // We are overriding the persistEntry method, so we don't need a redis client
-		blob:                  nil, // We are overriding the persistEntry method, so we don't need a blob client
-		logger:                logger,
-		recordFullRequest:     false,
-		maxFullRequestSize:    0,
-		maxFullResponseSize:   0,
-		transport:             mockTransport,
-		expiration:            time.Minute,
-		fullRequestExpiration: time.Minute,
-		maxResponseWait:       250 * time.Millisecond,
-		persistEntry: func(e *Entry) error {
-			defer wg.Done()
-			result = e
-			return nil
+	rt := &RoundTripper{
+		store:     store,
+		fullStore: fullStore,
+		logger:    logger,
+		captureConfig: captureConfig{
+			recordFullRequest:     false,
+			maxFullRequestSize:    0,
+			maxFullResponseSize:   0,
+			expiration:            time.Minute,
+			fullRequestExpiration: time.Minute,
+			maxResponseWait:       250 * time.Millisecond,
 		},
+		requestInfo: httpf.RequestInfo{},
+		transport:   mockTransport,
 	}
 
 	ctx := apctx.
 		NewBuilderBackground().
-		WithFixedUuidGenerator(expectedEntry.Id).
-		WithCorrelationID(expectedEntry.CorrelationID).
-		WithFixedClock(expectedEntry.Timestamp).
+		WithFixedUuidGenerator(expectedFullLog.Id).
+		WithCorrelationID(expectedFullLog.CorrelationID).
+		WithFixedClock(expectedFullLog.Timestamp).
 		Build()
 
 	req := request.WithContext(ctx)
-	resp, _ := rLogger.RoundTrip(req)
+	resp, _ := rt.RoundTrip(req)
 
 	if resp != nil && resp.Body != nil {
 		// Do not consume the body to force a timeout
-		// io.ReadAll(resp.Body)
-		// resp.Body.Close()
 	}
 
-	start := time.Now()
-	wg.Wait()
+	// Wait for the async goroutine to store
+	fullStore.waitForStore(t, 5*time.Second)
 
-	if result == nil {
-		t.Fatal("persistEntry not invoked")
-	}
-
-	if time.Since(start) > time.Second {
-		t.Fatalf("persistEntry took too long: %v; this likely implies a deadlock that was broken by the max request timeout", time.Since(start))
-	}
+	logs := fullStore.getLogs()
+	require.Len(t, logs, 1)
+	result := logs[0]
 
 	// We freeze time so duration is zero
-	expectedEntry.MillisecondDuration = 0
+	expectedFullLog.MillisecondDuration = 0
 
 	require.Equal(t, response, resp)
-	require.Equal(t, expectedEntry, result)
+	require.Equal(t, expectedFullLog, result)
 }
 
-func TestRedisLogger_RoundTrip_TimesOutAtAtContextCancel(t *testing.T) {
+func TestRoundTripper_RoundTrip_TimesOutAtContextCancel(t *testing.T) {
 	request := &http.Request{
 		Method:     "GET",
 		URL:        util.Must(url.Parse("http://example.com/path?q=1")),
@@ -463,13 +523,13 @@ func TestRedisLogger_RoundTrip_TimesOutAtAtContextCancel(t *testing.T) {
 		Body:          io.NopCloser(bytes.NewBufferString(`{"other": "json"}`)),
 		ContentLength: 0, // Unset directly, must be inferred from the response size
 	}
-	expectedEntry := &Entry{
+	expectedFullLog := &FullLog{
 		Id:               uuid.New(),
 		CorrelationID:    "some-value",
 		Timestamp:        time.Now(),
 		InternalTimeout:  false,
 		RequestCancelled: true,
-		Request: EntryRequest{
+		Request: FullLogRequest{
 			URL:         "http://example.com/path?q=1",
 			HttpVersion: "HTTP/1.1",
 			Method:      "GET",
@@ -480,7 +540,7 @@ func TestRedisLogger_RoundTrip_TimesOutAtAtContextCancel(t *testing.T) {
 			ContentLength: int64(len([]byte(`{"some": "json"}`))),
 			Body:          nil, // Not configured for full request logging
 		},
-		Response: EntryResponse{
+		Response: FullLogResponse{
 			HttpVersion: "HTTP/2",
 			StatusCode:  http.StatusOK,
 			Headers: http.Header{
@@ -495,62 +555,54 @@ func TestRedisLogger_RoundTrip_TimesOutAtAtContextCancel(t *testing.T) {
 	mockTransport := &mockRoundTripper{}
 	mockTransport.response = response
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	var result *Entry
-	wg := sync.WaitGroup{}
-	wg.Add(1)
+	store := &mockRecordStore{}
+	fullStore := newMockFullStore()
 
-	rLogger := &redisLogger{
-		r:                     nil, // We are overriding the persistEntry method, so we don't need a redis client
-		blob:                  nil, // We are overriding the persistEntry method, so we don't need a blob client
-		logger:                logger,
-		recordFullRequest:     false,
-		maxFullRequestSize:    0,
-		maxFullResponseSize:   0,
-		transport:             mockTransport,
-		expiration:            time.Minute,
-		fullRequestExpiration: time.Minute,
-		maxResponseWait:       2 * time.Hour, // Really long so it will wait
-		persistEntry: func(e *Entry) error {
-			defer wg.Done()
-			result = e
-			return nil
+	rt := &RoundTripper{
+		store:     store,
+		fullStore: fullStore,
+		logger:    logger,
+		captureConfig: captureConfig{
+			recordFullRequest:     false,
+			maxFullRequestSize:    0,
+			maxFullResponseSize:   0,
+			expiration:            time.Minute,
+			fullRequestExpiration: time.Minute,
+			maxResponseWait:       2 * time.Hour, // Really long so it will wait
 		},
+		requestInfo: httpf.RequestInfo{},
+		transport:   mockTransport,
 	}
 
 	ctx := apctx.
 		NewBuilderBackground().
-		WithFixedUuidGenerator(expectedEntry.Id).
-		WithCorrelationID(expectedEntry.CorrelationID).
-		WithFixedClock(expectedEntry.Timestamp).
+		WithFixedUuidGenerator(expectedFullLog.Id).
+		WithCorrelationID(expectedFullLog.CorrelationID).
+		WithFixedClock(expectedFullLog.Timestamp).
 		Build()
 	ctx, cancel := context.WithCancel(ctx)
 
 	req := request.WithContext(ctx)
-	resp, _ := rLogger.RoundTrip(req)
+	resp, _ := rt.RoundTrip(req)
 
 	if resp != nil && resp.Body != nil {
 		// Do not consume the body to force a timeout
-		// io.ReadAll(resp.Body)
-		// resp.Body.Close()
 	}
 
-	start := time.Now()
 	cancel()
-	wg.Wait()
 
-	if result == nil {
-		t.Fatal("persistEntry not invoked")
-	}
+	// Wait for the async goroutine to store
+	fullStore.waitForStore(t, 5*time.Second)
 
-	if time.Since(start) > time.Second {
-		t.Fatalf("persistEntry took too long: %v; this likely implies a deadlock that was broken by the max request timeout", time.Since(start))
-	}
+	logs := fullStore.getLogs()
+	require.Len(t, logs, 1)
+	result := logs[0]
 
 	// We freeze time so duration is zero
-	expectedEntry.MillisecondDuration = 0
+	expectedFullLog.MillisecondDuration = 0
 
 	require.Equal(t, response, resp)
-	require.Equal(t, expectedEntry, result)
+	require.Equal(t, expectedFullLog, result)
 }
 
 type mockRoundTripper struct {

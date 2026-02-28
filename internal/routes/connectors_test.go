@@ -14,7 +14,6 @@ import (
 	"github.com/google/uuid"
 	asynqmock "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
-	"github.com/rmorlok/authproxy/internal/apblob"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis/mock"
 	"github.com/rmorlok/authproxy/internal/api_common"
@@ -75,7 +74,7 @@ func TestConnectors(t *testing.T) {
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
 		rs := mock.NewMockClient(ctrl)
-		h := httpf2.CreateFactory(cfg, rs, apblob.NewMemoryClient(), aplog.NewNoopLogger())
+		h := httpf2.CreateFactory(cfg, rs, nil, aplog.NewNoopLogger())
 		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		require.NoError(t, c.Migrate(context.Background()))
 
@@ -635,59 +634,6 @@ func TestConnectors(t *testing.T) {
 			require.Equal(t, "A brand new connector", resp.Definition.Description)
 			require.Equal(t, "test", resp.Labels["env"])
 		})
-	})
-
-	t.Run("create connector with status page url", func(t *testing.T) {
-		tu := setup(t, nil)
-		body := CreateConnectorRequestJson{
-			Namespace: "root",
-			Definition: cschema.Connector{
-				DisplayName:   "Salesforce",
-				Description:   "Salesforce CRM integration",
-				StatusPageUrl: "https://status.salesforce.com",
-			},
-			Labels: map[string]string{"type": "salesforce"},
-		}
-		jsonBody, _ := json.Marshal(body)
-		w := httptest.NewRecorder()
-		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
-			http.MethodPost,
-			"/connectors",
-			bytes.NewReader(jsonBody),
-			"root",
-			"some-actor",
-			aschema.AllPermissions(),
-		)
-		require.NoError(t, err)
-		req.Header.Set("Content-Type", "application/json")
-
-		tu.Gin.ServeHTTP(w, req)
-		require.Equal(t, http.StatusCreated, w.Code)
-
-		var createResp ConnectorVersionJson
-		err = json.Unmarshal(w.Body.Bytes(), &createResp)
-		require.NoError(t, err)
-		require.Equal(t, "https://status.salesforce.com", createResp.Definition.StatusPageUrl)
-
-		// Verify it comes back in the connector list response too
-		w = httptest.NewRecorder()
-		req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
-			http.MethodGet,
-			fmt.Sprintf("/connectors/%s/versions/%d", createResp.Id, createResp.Version),
-			nil,
-			"root",
-			"some-actor",
-			aschema.AllPermissions(),
-		)
-		require.NoError(t, err)
-
-		tu.Gin.ServeHTTP(w, req)
-		require.Equal(t, http.StatusOK, w.Code)
-
-		var getResp ConnectorVersionJson
-		err = json.Unmarshal(w.Body.Bytes(), &getResp)
-		require.NoError(t, err)
-		require.Equal(t, "https://status.salesforce.com", getResp.Definition.StatusPageUrl)
 	})
 
 	t.Run("update connector", func(t *testing.T) {

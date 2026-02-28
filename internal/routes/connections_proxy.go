@@ -3,6 +3,8 @@ package routes
 import (
 	"errors"
 
+	"log/slog"
+
 	"github.com/gin-gonic/gin"
 	"github.com/google/uuid"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
@@ -13,9 +15,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httpf"
-	"github.com/rmorlok/authproxy/internal/request_log"
-
-	"log/slog"
 )
 
 type ConnectionsProxyRoutes struct {
@@ -118,7 +117,7 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 		return
 	}
 
-	resp, err := conn.ProxyRequest(ctx, request_log.RequestTypeProxy, &proxyRequest)
+	resp, err := conn.ProxyRequest(ctx, httpf.RequestTypeProxy, &proxyRequest)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithInternalErr(err).

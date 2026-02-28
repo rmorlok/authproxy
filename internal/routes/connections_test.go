@@ -15,7 +15,6 @@ import (
 	asynqmock "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apctx"
-	"github.com/rmorlok/authproxy/internal/apblob"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/apredis/mock"
@@ -60,7 +59,7 @@ func TestConnections(t *testing.T) {
 		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 		cfg, rds := apredis.MustApplyTestConfig(cfg)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
-		h := httpf2.CreateFactory(cfg, rds, apblob.NewMemoryClient(), aplog.NewNoopLogger())
+		h := httpf2.CreateFactory(cfg, rds, nil, aplog.NewNoopLogger())
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
 		ctrl := gomock.NewController(t)
 		ac := asynqmock.NewMockClient(ctrl)

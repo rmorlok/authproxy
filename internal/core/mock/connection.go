@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
-	"github.com/rmorlok/authproxy/internal/request_log"
+	"github.com/rmorlok/authproxy/internal/httpf"
 )
 
 type Connection struct {
@@ -79,7 +79,7 @@ func (m *Connection) GetProbes() []iface.Probe {
 
 func (m *Connection) ProxyRequest(
 	ctx context.Context,
-	reqType request_log.RequestType,
+	reqType httpf.RequestType,
 	req *iface.ProxyRequest,
 ) (*iface.ProxyResponse, error) {
 	return nil, nil
@@ -87,7 +87,7 @@ func (m *Connection) ProxyRequest(
 
 func (m *Connection) ProxyRequestRaw(
 	ctx context.Context,
-	reqType request_log.RequestType,
+	reqType httpf.RequestType,
 	req *iface.ProxyRequest,
 	w http.ResponseWriter,
 ) error {

@@ -6,12 +6,13 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/stretchr/testify/require"
 )
 
-func TestEntryRecord(t *testing.T) {
-	val := EntryRecord{
-		Type:                RequestTypeOAuth,
+func TestLogRecord(t *testing.T) {
+	val := LogRecord{
+		Type:                httpf.RequestTypeOAuth,
 		Namespace:           "root.child",
 		RequestId:           uuid.New(),
 		CorrelationId:       "some-correlation-id",
@@ -37,24 +38,11 @@ func TestEntryRecord(t *testing.T) {
 		FullRequestRecorded: true,
 	}
 
-	t.Run("it roundtrips from redis fields", func(t *testing.T) {
-		data := make(map[string]string)
-		val.setRedisRecordFields(data)
-
-		result, err := EntryRecordFromRedisFields(data)
-		require.NoError(t, err)
-		require.Equal(t, val, *result)
-
-		result, err = EntryRecordFromRedisFields(nil)
-		require.NoError(t, err)
-		require.Nil(t, result)
-	})
-
 	t.Run("it roundtrips as json", func(t *testing.T) {
 		data, err := json.Marshal(val)
 		require.NoError(t, err)
 
-		result := EntryRecord{}
+		result := LogRecord{}
 		err = json.Unmarshal(data, &result)
 		require.NoError(t, err)
 		require.Equal(t, val, result)

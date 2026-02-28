@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/database"
-	"github.com/rmorlok/authproxy/internal/request_log"
+	"github.com/rmorlok/authproxy/internal/httpf"
 )
 
 type Connection interface {
@@ -40,12 +40,12 @@ type Connection interface {
 	GetProbes() []Probe
 	ProxyRequest(
 		ctx context.Context,
-		reqType request_log.RequestType,
+		reqType httpf.RequestType,
 		req *ProxyRequest,
 	) (*ProxyResponse, error)
 	ProxyRequestRaw(
 		ctx context.Context,
-		reqType request_log.RequestType,
+		reqType httpf.RequestType,
 		req *ProxyRequest,
 		w http.ResponseWriter,
 	) error

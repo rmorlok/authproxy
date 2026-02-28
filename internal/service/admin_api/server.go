@@ -121,7 +121,7 @@ func GetGinServer(
 	routesRequestLog := common_routes.NewRequestLogRoutes(
 		dm.GetConfig(),
 		authService,
-		dm.GetRequestLogRetriever(),
+		dm.GetLogStorageService(),
 	)
 	routesActors := common_routes.NewActorsRoutes(
 		dm.GetConfig(),

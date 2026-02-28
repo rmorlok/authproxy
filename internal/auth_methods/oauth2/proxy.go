@@ -10,11 +10,11 @@ import (
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
-	"github.com/rmorlok/authproxy/internal/request_log"
+	"github.com/rmorlok/authproxy/internal/httpf"
 	"gopkg.in/h2non/gentleman.v2"
 )
 
-func (o *oAuth2Connection) newHttpClient(rt request_log.RequestType) *gentleman.Client {
+func (o *oAuth2Connection) newHttpClient(rt httpf.RequestType) *gentleman.Client {
 	return o.httpf.
 		ForRequestType(rt).
 		ForConnection(o.connection).
@@ -66,7 +66,7 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 	}
 
 	// Prepare a refresh token request
-	client := o.newHttpClient(request_log.RequestTypeOAuth)
+	client := o.newHttpClient(httpf.RequestTypeOAuth)
 	refreshReq := client.
 		UseContext(ctx).
 		Request().
@@ -132,7 +132,7 @@ func (o *oAuth2Connection) getValidToken(ctx context.Context) (*database.OAuth2T
 	return token, nil
 }
 
-func (o *oAuth2Connection) ProxyRequest(ctx context.Context, reqType request_log.RequestType, req *iface.ProxyRequest) (*iface.ProxyResponse, error) {
+func (o *oAuth2Connection) ProxyRequest(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest) (*iface.ProxyResponse, error) {
 	token, err := o.getValidToken(ctx)
 	if err != nil {
 		return nil, err
@@ -158,7 +158,7 @@ func (o *oAuth2Connection) ProxyRequest(ctx context.Context, reqType request_log
 	return iface.ProxyResponseFromGentlemen(resp)
 }
 
-func (o *oAuth2Connection) ProxyRequestRaw(ctx context.Context, reqType request_log.RequestType, req *iface.ProxyRequest, w http.ResponseWriter) error {
+func (o *oAuth2Connection) ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest, w http.ResponseWriter) error {
 	return nil
 }
 

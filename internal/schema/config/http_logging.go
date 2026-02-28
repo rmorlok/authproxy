@@ -1,21 +1,18 @@
 package config
 
-import "time"
+import (
+	"time"
+)
 
 type FullRequestRecording string
 
 const (
-	FullRequestRecordingNever     FullRequestRecording = "never"
-	FullRequestRecordingApiEnable FullRequestRecording = "api_enable"
-	FullRequestRecordingAlways    FullRequestRecording = "always"
+	FullRequestRecordingNever  FullRequestRecording = "never"
+	FullRequestRecordingAlways FullRequestRecording = "always"
 )
 
 // HttpLogging are the settings related to logging HTTP requests.
 type HttpLogging struct {
-	// Enabled is whether any form of http logging is enabled. If true, this will log the high level details of requests
-	// and responses, but not the body or headers unless additional configuration is present below.
-	Enabled bool `json:"enabled" yaml:"enabled"`
-
 	// AutoMigrate controls if the migration to build the indexes for http logging happens automatically on startup.
 	// If this value is not specified in the config, it defaults to true.
 	AutoMigrate *bool `json:"auto_migrate,omitempty" yaml:"auto_migrate,omitempty"`
@@ -39,24 +36,22 @@ type HttpLogging struct {
 	// FullRequestRetention is how long the full request logs should be retained. If unset, defaults to 30 days.
 	FullRequestRetention *HumanDuration `json:"full_request_retention,omitempty" yaml:"full_request_retention,omitempty"`
 
+	// FlushInterval is how often buffered records are flushed the database. Defaults to 5s.
+	FlushInterval *HumanDuration `json:"flush_interval,omitempty" yaml:"flush_interval,omitempty"`
+
+	// FlushBatchSize is the number of records that triggers a flush. Defaults to 1000.
+	FlushBatchSize *int `json:"flush_batch_size,omitempty" yaml:"flush_batch_size,omitempty"`
+
+	// Database is the database provider for HTTP logging metadata. This can be the same database as the main
+	// database but would be a data warehouse in production.
+	Database *Database `json:"database" yaml:"database"`
+
 	// BlobStorage configures the blob storage backend used for storing full request/response logs.
 	// If not configured, full request logging will use an in-memory store (not suitable for production).
 	BlobStorage *BlobStorage `json:"blob_storage,omitempty" yaml:"blob_storage,omitempty"`
 }
 
-func (d *HttpLogging) IsEnabled() bool {
-	if d == nil {
-		return false
-	}
-
-	return d.Enabled
-}
-
 func (d *HttpLogging) GetAutoMigrate() bool {
-	if !d.IsEnabled() {
-		return false
-	}
-
 	if d.AutoMigrate == nil {
 		return true
 	}
@@ -65,10 +60,6 @@ func (d *HttpLogging) GetAutoMigrate() bool {
 }
 
 func (d *HttpLogging) GetRetention() time.Duration {
-	if !d.IsEnabled() {
-		return 0
-	}
-
 	if d.Retention == nil {
 		return 30 * 24 * time.Hour
 	}
@@ -77,10 +68,6 @@ func (d *HttpLogging) GetRetention() time.Duration {
 }
 
 func (d *HttpLogging) GetFullRequestRecording() FullRequestRecording {
-	if !d.IsEnabled() {
-		return FullRequestRecordingNever
-	}
-
 	if d.FullRequestRecording == nil {
 		return FullRequestRecordingNever
 	}
@@ -101,10 +88,6 @@ func (d *HttpLogging) GetFullRequestRetention() time.Duration {
 }
 
 func (d *HttpLogging) GetMaxRequestSize() uint64 {
-	if !d.IsEnabled() {
-		return 0
-	}
-
 	if d.MaxRequestSize == nil {
 		// Default value is 250kb
 		return 250 * 1024
@@ -114,16 +97,28 @@ func (d *HttpLogging) GetMaxRequestSize() uint64 {
 }
 
 func (d *HttpLogging) GetMaxResponseSize() uint64 {
-	if !d.IsEnabled() {
-		return 0
-	}
-
 	if d.MaxResponseSize == nil {
 		// Default value is 250kb
 		return 250 * 1024
 	}
 
 	return d.MaxResponseSize.Value()
+}
+
+func (d *HttpLogging) GetFlushInterval() time.Duration {
+	if d.FlushInterval == nil {
+		return 5 * time.Second
+	}
+
+	return d.FlushInterval.Duration
+}
+
+func (d *HttpLogging) GetFlushBatchSize() int {
+	if d.FlushBatchSize == nil {
+		return 1000
+	}
+
+	return *d.FlushBatchSize
 }
 
 func (d *HttpLogging) GetMaxResponseWait() time.Duration {

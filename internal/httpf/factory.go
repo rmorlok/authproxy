@@ -5,10 +5,8 @@ import (
 	"net/http"
 	"sync"
 
-	"github.com/rmorlok/authproxy/internal/apblob"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
-	"github.com/rmorlok/authproxy/internal/request_log"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"gopkg.in/h2non/gentleman.v2"
 	"gopkg.in/h2non/gentleman.v2/plugins/transport"
@@ -17,40 +15,48 @@ import (
 type clientFactory struct {
 	cfg         config.C
 	r           apredis.Client
-	blob        apblob.Client
+	middlewares []RoundTripperFactory
 	logger      *slog.Logger
-	requestInfo request_log.RequestInfo
+	requestInfo RequestInfo
 
 	// Cached at the object level
 
-	toplevel     *gentleman.Client
-	topLevelOnce sync.Once
+	factoryParent     *gentleman.Client
+	factoryParentOnce sync.Once
 }
 
-func CreateFactory(cfg config.C, r apredis.Client, blob apblob.Client, logger *slog.Logger) F {
+func CreateFactory(
+	cfg config.C,
+	r apredis.Client,
+	requestLog RoundTripperFactory,
+	logger *slog.Logger,
+) F {
+	// Order matters here to determine the order of middlewares
+	middlewares := []RoundTripperFactory{requestLog}
+
 	return &clientFactory{
-		cfg:    cfg,
-		r:      r,
-		blob:   blob,
-		logger: logger,
-		requestInfo: request_log.RequestInfo{
+		cfg:         cfg,
+		r:           r,
+		middlewares: middlewares,
+		logger:      logger,
+		requestInfo: RequestInfo{
 			Namespace: sconfig.RootNamespace,
-			Type:      request_log.RequestTypeGlobal,
+			Type:      RequestTypeGlobal,
 		},
 	}
 }
 
-func (f *clientFactory) ForRequestInfo(ri request_log.RequestInfo) F {
+func (f *clientFactory) ForRequestInfo(ri RequestInfo) F {
 	return &clientFactory{
 		cfg:         f.cfg,
 		r:           f.r,
-		blob:        f.blob,
+		middlewares: f.middlewares,
 		logger:      f.logger,
 		requestInfo: ri,
 	}
 }
 
-func (f *clientFactory) ForRequestType(rt request_log.RequestType) F {
+func (f *clientFactory) ForRequestType(rt RequestType) F {
 	ri := f.requestInfo
 	ri.Type = rt
 
@@ -84,36 +90,24 @@ func (f *clientFactory) ForConnection(c Connection) F {
 }
 
 func (f *clientFactory) New() *gentleman.Client {
-	f.topLevelOnce.Do(func() {
-		f.toplevel = gentleman.New()
+	// Callers use chaining within the factor With(...) structure to
+	// define context. By the time they trigger new, the context is established
+	// and we can cache with middlewares applied.
+	f.factoryParentOnce.Do(func() {
+		f.factoryParent = gentleman.New()
 
-		root := f.cfg.GetRoot()
-		if root.HttpLogging.IsEnabled() {
-			expiration := root.HttpLogging.GetRetention()
-			recordFullRequest := root.HttpLogging.GetFullRequestRecording() == sconfig.FullRequestRecordingAlways
-			maxFullRequestSize := root.HttpLogging.GetMaxRequestSize()
-			maxFullResponseSize := root.HttpLogging.GetMaxResponseSize()
-			maxResponseWait := root.HttpLogging.GetMaxResponseWait()
-			fullRequestExpiration := root.HttpLogging.GetFullRequestRetention()
-
-			l := request_log.NewRedisLogger(
-				f.r,
-				f.blob,
-				f.logger,
-				f.requestInfo,
-				expiration,
-				recordFullRequest,
-				fullRequestExpiration,
-				maxFullRequestSize,
-				maxFullResponseSize,
-				maxResponseWait,
-				http.DefaultTransport,
-			)
-
-			// Add the Redis transport plugin
-			f.toplevel.Use(transport.Set(l))
+		parent := http.DefaultTransport
+		for _, m := range f.middlewares {
+			result := m.NewRoundTripper(f.requestInfo, parent)
+			if result != nil {
+				parent = result
+			}
 		}
+
+		f.factoryParent.Use(
+			transport.Set(parent),
+		)
 	})
 
-	return gentleman.New().UseParent(f.toplevel)
+	return gentleman.New().UseParent(f.factoryParent)
 }

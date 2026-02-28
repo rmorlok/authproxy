@@ -10,8 +10,9 @@ import (
 type DatabaseProvider string
 
 const (
-	DatabaseProviderSqlite   DatabaseProvider = "sqlite"
-	DatabaseProviderPostgres DatabaseProvider = "postgres"
+	DatabaseProviderSqlite     DatabaseProvider = "sqlite"
+	DatabaseProviderPostgres   DatabaseProvider = "postgres"
+	DatabaseProviderClickhouse DatabaseProvider = "clickhouse"
 )
 
 // DatabaseImpl is the interface implemented by concrete database configurations.
@@ -21,6 +22,7 @@ type DatabaseImpl interface {
 	GetAutoMigrationLockDuration() time.Duration
 	GetUri() string
 	GetDsn() string
+	GetDriver() string
 	GetPlaceholderFormat() sq.PlaceholderFormat
 	Validate(vc *common.ValidationContext) error
 }
@@ -63,6 +65,13 @@ func (d *Database) GetDsn() string {
 		return ""
 	}
 	return d.InnerVal.GetDsn()
+}
+
+func (d *Database) GetDriver() string {
+	if d == nil || d.InnerVal == nil {
+		return ""
+	}
+	return d.InnerVal.GetDriver()
 }
 
 func (d *Database) GetPlaceholderFormat() sq.PlaceholderFormat {

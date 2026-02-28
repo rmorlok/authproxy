@@ -7,7 +7,7 @@ import (
 	"strings"
 
 	"github.com/rmorlok/authproxy/internal/api_common"
-	"github.com/rmorlok/authproxy/internal/request_log"
+	"github.com/rmorlok/authproxy/internal/httpf"
 	"gopkg.in/h2non/gentleman.v2"
 )
 
@@ -116,6 +116,6 @@ func ProxyResponseFromGentlemen(resp *gentleman.Response) (*ProxyResponse, error
 }
 
 type Proxy interface {
-	ProxyRequest(ctx context.Context, reqType request_log.RequestType, req *ProxyRequest) (*ProxyResponse, error)
-	ProxyRequestRaw(ctx context.Context, reqType request_log.RequestType, req *ProxyRequest, w http.ResponseWriter) error
+	ProxyRequest(ctx context.Context, reqType httpf.RequestType, req *ProxyRequest) (*ProxyResponse, error)
+	ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *ProxyRequest, w http.ResponseWriter) error
 }

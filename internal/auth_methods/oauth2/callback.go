@@ -5,7 +5,7 @@ import (
 	"net/url"
 
 	"github.com/pkg/errors"
-	"github.com/rmorlok/authproxy/internal/request_log"
+	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
@@ -45,7 +45,7 @@ func (o *oAuth2Connection) CallbackFrom3rdParty(ctx context.Context, query url.V
 	}
 
 	c := o.httpf.
-		ForRequestType(request_log.RequestTypeOAuth).
+		ForRequestType(httpf.RequestTypeOAuth).
 		ForConnection(o.connection).
 		New().
 		UseContext(ctx)

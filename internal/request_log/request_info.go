@@ -1,34 +1,16 @@
 package request_log
 
-import "github.com/google/uuid"
+import "github.com/rmorlok/authproxy/internal/httpf"
 
-type RequestType string
-
-const (
-	RequestTypeGlobal RequestType = "global"
-	RequestTypeProxy  RequestType = "proxy"
-	RequestTypeOAuth  RequestType = "oauth"
-	RequestTypePublic RequestType = "public"
-	RequestTypeProbe  RequestType = "probe"
-)
-
-type RequestInfo struct {
-	Namespace        string
-	Type             RequestType
-	ConnectorId      uuid.UUID
-	ConnectorVersion uint64
-	ConnectionId     uuid.UUID
-}
-
-func (r *RequestInfo) setRedisRecordFields(er *EntryRecord) {
-	t := r.Type
+func SetLogRecordFieldsFromRequestInfo(er *LogRecord, ri httpf.RequestInfo) {
+	t := ri.Type
 	if t == "" {
-		t = RequestTypeGlobal
+		t = httpf.RequestTypeGlobal
 	}
 
-	er.Namespace = r.Namespace
+	er.Namespace = ri.Namespace
 	er.Type = t
-	er.ConnectorId = r.ConnectorId
-	er.ConnectorVersion = r.ConnectorVersion
-	er.ConnectionId = r.ConnectionId
+	er.ConnectorId = ri.ConnectorId
+	er.ConnectorVersion = ri.ConnectorVersion
+	er.ConnectionId = ri.ConnectionId
 }

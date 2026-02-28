@@ -2,123 +2,107 @@ package request_log
 
 import (
 	"context"
-	"encoding/json"
 	"log/slog"
 	"net/http"
-	"time"
 
+	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/apblob"
-	"github.com/rmorlok/authproxy/internal/apredis"
+	"github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
-type redisLogger struct {
-	r                     apredis.Client
-	blob                  apblob.Client
-	logger                *slog.Logger
-	requestInfo           RequestInfo
-	expiration            time.Duration
-	recordFullRequest     bool
-	fullRequestExpiration time.Duration
-	maxFullRequestSize    uint64        // The largest full request size to store
-	maxFullResponseSize   uint64        // The largest full response size to store
-	maxResponseWait       time.Duration // The longest amount of time to wait for the full response to be consumed before logging
-	transport             http.RoundTripper
-	persistEntry          func(*Entry) error // So test can override
+type StorageService struct {
+	logger        *slog.Logger
+	store         RecordStore
+	fullStore     FullStore
+	retriever     RecordRetriever
+	captureConfig captureConfig
 }
 
-func NewRedisLogger(
-	r apredis.Client,
-	blob apblob.Client,
-	logger *slog.Logger,
-	requestInfo RequestInfo,
-	expiration time.Duration,
-	recordFullRequest bool,
-	fullRequestExpiration time.Duration,
-	maxFullRequestSize uint64,
-	maxFullResponseSize uint64,
-	maxResponseWait time.Duration,
-	transport http.RoundTripper,
-) Logger {
-	l := &redisLogger{
-		r:                     r,
-		blob:                  blob,
-		logger:                logger,
-		requestInfo:           requestInfo,
-		expiration:            expiration,
-		recordFullRequest:     recordFullRequest,
-		fullRequestExpiration: fullRequestExpiration,
-		maxFullRequestSize:    maxFullRequestSize,
-		maxFullResponseSize:   maxFullResponseSize,
-		maxResponseWait:       maxResponseWait,
-		transport:             transport,
+func (ss *StorageService) NewRoundTripper(ri httpf.RequestInfo, transport http.RoundTripper) http.RoundTripper {
+	return &RoundTripper{
+		store:         ss.store,
+		fullStore:     ss.fullStore,
+		logger:        ss.logger,
+		captureConfig: ss.captureConfig,
+		requestInfo:   ri,
+		transport:     transport,
 	}
-
-	// Apply default behavior
-	l.persistEntry = l.storeEntryInRedis
-
-	return l
 }
 
-// storeEntryInRedis stores the log entry in Redis. Note that this method logs errors as well as returns them because
-// errors will be ignored where this is called.
-func (t *redisLogger) storeEntryInRedis(
-	entry *Entry,
-) error {
-	// Get the Redis client
-	client := t.r
-	pipeline := client.Pipeline()
+// GetRecord retrieves a single LogRecord by its request ID.
+func (ss *StorageService) GetRecord(ctx context.Context, id uuid.UUID) (*LogRecord, error) {
+	return ss.retriever.GetRecord(ctx, id)
+}
 
-	er := EntryRecord{}
-	t.requestInfo.setRedisRecordFields(&er)
-	entry.setRedisRecordFields(&er)
+// NewListRequestsBuilder creates a new builder for listing entry records with filters.
+func (ss *StorageService) NewListRequestsBuilder() ListRequestBuilder {
+	return ss.retriever.NewListRequestsBuilder()
+}
 
-	vals := make(map[string]string)
-	er.setRedisRecordFields(vals)
+// ListRequestsFromCursor resumes a paginated listing from a cursor string.
+func (ss *StorageService) ListRequestsFromCursor(ctx context.Context, cursor string) (ListRequestExecutor, error) {
+	return ss.retriever.ListRequestsFromCursor(ctx, cursor)
+}
 
-	// Store the entry
-	err := pipeline.HSet(context.Background(), redisLogKey(entry.Id), vals).Err()
+func (ss *StorageService) GetFullLog(ctx context.Context, id uuid.UUID) (*FullLog, error) {
+	log, err := ss.GetRecord(ctx, id)
 	if err != nil {
-		t.logger.Error("error storing HTTP log entry in Redis", "error", err, "entry_id", entry.Id.String())
-		return err
+		return nil, err
 	}
 
-	err = pipeline.Expire(context.Background(), redisLogKey(entry.Id), t.expiration).Err()
-	if err != nil {
-		t.logger.Error("error setting expiry for log entry in Redis", "error", err, "entry_id", entry.Id.String())
-		return err
-	}
+	return ss.fullStore.GetFullLog(ctx, log.Namespace, id)
+}
 
-	cmdErr, err := pipeline.Exec(context.Background())
-	if err != nil {
-		t.logger.Error("error storing HTTP log entry in Redis", "error", err, "entry_id", entry.Id.String())
-		return err
-	}
+// Migrate runs any necessary schema migrations for the storage backend.
+func (ss *StorageService) Migrate(ctx context.Context) error {
+	ss.logger.Info("running request log migrations")
+	defer ss.logger.Info("request log migrations complete")
 
-	for _, cmd := range cmdErr {
-		if cmd.Err() != nil {
-			t.logger.Error("error storing HTTP log entry in Redis", "error", cmd.Err(), "entry_id", entry.Id.String())
+	if m, ok := ss.store.(migratable); ok {
+		ss.logger.Info("running store migrations")
+		if err := m.Migrate(ctx); err != nil {
 			return err
 		}
 	}
 
-	if t.recordFullRequest && t.blob != nil {
-		jsonData, err := json.Marshal(entry)
-		if err != nil {
-			t.logger.Error("error serializing entry to JSON", "error", err, "entry_id", entry.Id.String())
-		} else {
-			blobKey := entry.Id.String() + ".json"
-			if err := t.blob.Put(
-				context.Background(),
-				apblob.PutInput{
-					Key:         blobKey,
-					Data:        jsonData,
-					ContentType: util.ToPtr("application/json"),
-				}); err != nil {
-				t.logger.Error("error storing full HTTP log entry in blob storage", "error", err, "entry_id", entry.Id.String())
-			}
-		}
+	if util.SameInstance(ss.store, ss.fullStore) {
+		return nil
+	}
+
+	if m, ok := ss.fullStore.(migratable); ok {
+		ss.logger.Info("running full store migrations")
+		return m.Migrate(ctx)
 	}
 
 	return nil
+}
+
+// NewStorageService that will store the log records and the full request/response.
+func NewStorageService(
+	ctx context.Context,
+	cfg *config.HttpLogging,
+	cursorKey config.KeyDataType,
+	logger *slog.Logger,
+) (*StorageService, error) {
+	logger = logger.With("service", "request_log")
+	store := NewRecordStore(cfg.Database, logger)
+	retriever := NewRecordRetriever(cfg.Database, cursorKey, logger)
+	blobStore, err := apblob.NewFromConfig(ctx, cfg.BlobStorage)
+	if err != nil {
+		return nil, err
+	}
+	fullStore := NewBlobStore(blobStore, logger)
+
+	cc := captureConfig{}
+	cc.setFromConfig(cfg)
+
+	return &StorageService{
+		store:         store,
+		logger:        logger,
+		retriever:     retriever,
+		fullStore:     fullStore,
+		captureConfig: cc,
+	}, nil
 }
