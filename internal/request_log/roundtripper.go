@@ -2,6 +2,7 @@ package request_log
 
 import (
 	"bytes"
+	"context"
 	"io"
 	"log/slog"
 	"net/http"
@@ -23,6 +24,10 @@ type RoundTripper struct {
 // RoundTrip implements the http.RoundTripper interface
 func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	ctx := req.Context()
+	// Create a context that won't be cancelled when the request completes, for use in async
+	// goroutines that store logs after the round trip returns. This preserves context values
+	// (correlation ID, clock, etc.) but prevents "context canceled" errors.
+	asyncCtx := context.WithoutCancel(ctx)
 	cc := t.captureConfig
 	var responseBodyReader *io.PipeReader
 	var requestBodyBuf *bytes.Buffer
@@ -118,14 +123,14 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			record := full_log.ToRecord()
 			SetLogRecordFieldsFromRequestInfo(record, t.requestInfo)
 
-			err = t.store.StoreRecord(ctx, record)
+			err = t.store.StoreRecord(asyncCtx, record)
 			if err != nil {
 				t.logger.Error("error storing HTTP log record", "error", err, "entry_id", full_log.Id.String(), "correlation_id", full_log.CorrelationID)
 				return
 			}
 
 			if t.fullStore != nil {
-				err = t.fullStore.Store(ctx, full_log)
+				err = t.fullStore.Store(asyncCtx, full_log)
 				if err != nil {
 					t.logger.Error("error storing full HTTP log in blob storage", "error", err, "entry_id", full_log.Id.String())
 				}
@@ -211,13 +216,13 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		record := full_log.ToRecord()
 		SetLogRecordFieldsFromRequestInfo(record, t.requestInfo)
 
-		if err := t.store.StoreRecord(ctx, record); err != nil {
+		if err := t.store.StoreRecord(asyncCtx, record); err != nil {
 			t.logger.Error("error storing HTTP log record", "error", err, "entry_id", full_log.Id.String(), "correlation_id", full_log.CorrelationID)
 		}
 
 		if t.fullStore != nil {
-			if err := t.fullStore.Store(ctx, full_log); err != nil {
-				t.logger.Error("error storing full HTTP log in blob storage", "error", err, "entry_id", full_log.Id.String(), "correlation_id", full_log.CorrelationID)
+			if err := t.fullStore.Store(asyncCtx, full_log); err != nil {
+				t.logger.Error("error storing full HTTP log entry in blob storage", "error", err, "record_id", full_log.Id.String())
 			}
 		}
 	}()
