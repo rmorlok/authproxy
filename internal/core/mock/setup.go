@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/database"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
@@ -15,7 +15,7 @@ import (
 )
 
 // MockConnectionRetrieval sets up the service to retrieve a connection with an associated connector any number of times
-func MockConnectionRetrieval(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.MockE, connUuuid uuid.UUID, c *cschema.Connector) {
+func MockConnectionRetrieval(ctx context.Context, dbMock *mockDb.MockDB, e *mockE.MockE, connUuuid apid.ID, c *cschema.Connector) {
 	clock := apctx.GetClock(ctx)
 
 	dbMock.

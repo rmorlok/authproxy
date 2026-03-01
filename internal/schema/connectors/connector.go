@@ -5,7 +5,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hashicorp/go-multierror"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/common"
@@ -15,7 +15,7 @@ type Connector struct {
 	// Id is the global id for this connector. This does not change version to version. In the config file, this can
 	// be omitted if there is only one instance of a particular type of connector. If there are multiple connectors that
 	// share the same identifying labels, the ids would need to be explicitly defined.
-	Id uuid.UUID `json:"id" yaml:"id"`
+	Id apid.ID `json:"id" yaml:"id"`
 
 	// Version is the logical version of the connector. When auth materially changes, such as adding new scopes,
 	// changing client ids/secrets, adding configuration settings, etc. the logical version of the connector must change
@@ -156,7 +156,7 @@ func (c *Connector) HasId() bool {
 		return false
 	}
 
-	return c.Id != uuid.Nil
+	return c.Id != apid.Nil
 }
 
 // HasVersion returns true if the connector has a version. This implies that the configuration set a version explicitly.

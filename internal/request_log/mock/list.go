@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/request_log"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -24,9 +24,9 @@ type MockListRequestBuilderExecutor struct {
 	Namespaces               []string    `json:"namespaces,omitempty"`
 	RequestType              *string     `json:"request_type,omitempty"`
 	CorrelationId            *string     `json:"correlation_id,omitempty"`
-	ConnectionId             *uuid.UUID  `json:"connection_id,omitempty"`
+	ConnectionId             *apid.ID  `json:"connection_id,omitempty"`
 	ConnectorType            *string     `json:"connector_type,omitempty"`
-	ConnectorId              *uuid.UUID  `json:"connector_id,omitempty"`
+	ConnectorId              *apid.ID  `json:"connector_id,omitempty"`
 	ConnectorVersion         *uint64     `json:"connector_version,omitempty"`
 	Method                   *string     `json:"method,omitempty"`
 	StatusCodeRangeInclusive []int       `json:"status_code_range,omitempty"`
@@ -55,7 +55,7 @@ func (l *MockListRequestBuilderExecutor) WithCorrelationId(correlationId string)
 	return l
 }
 
-func (l *MockListRequestBuilderExecutor) WithConnectionId(u uuid.UUID) request_log.ListRequestBuilder {
+func (l *MockListRequestBuilderExecutor) WithConnectionId(u apid.ID) request_log.ListRequestBuilder {
 	l.ConnectionId = util.ToPtr(u)
 	return l
 }
@@ -67,7 +67,7 @@ func (l *MockListRequestBuilderExecutor) WithConnectorType(t string) request_log
 	return l
 }
 
-func (l *MockListRequestBuilderExecutor) WithConnectorId(u uuid.UUID) request_log.ListRequestBuilder {
+func (l *MockListRequestBuilderExecutor) WithConnectorId(u apid.ID) request_log.ListRequestBuilder {
 	l.ConnectorId = util.ToPtr(u)
 	return l
 }

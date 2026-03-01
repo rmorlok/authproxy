@@ -8,7 +8,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apasynq"
 	"github.com/rmorlok/authproxy/internal/apasynq/mock"
 	"github.com/rmorlok/authproxy/internal/apredis"
@@ -103,7 +103,7 @@ func TestMigration(t *testing.T) {
 			t.Run("single initial", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:      uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:      apid.MustParse("cxr_test0000000000001"),
 						Version: 1,
 						Labels:  map[string]string{"type": "fake"},
 					},
@@ -123,7 +123,7 @@ func TestMigration(t *testing.T) {
 			SELECT id, version, state FROM connector_versions;
 		`, []connectorResult{
 					{
-						Id:      "00000000-0000-0000-0000-000000000001",
+						Id:      "cxr_test0000000000001",
 						Version: 1,
 						State:   "primary",
 					},
@@ -133,12 +133,12 @@ func TestMigration(t *testing.T) {
 			t.Run("double initial same type", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:      uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:      apid.MustParse("cxr_test0000000000001"),
 						Version: 1,
 						Labels:  map[string]string{"type": "fake"},
 					},
 					{
-						Id:      uuid.MustParse("00000000-0000-0000-0000-000000000002"),
+						Id:      apid.MustParse("cxr_test0000000000002"),
 						Version: 1,
 						Labels:  map[string]string{"type": "fake"},
 					},
@@ -158,12 +158,12 @@ func TestMigration(t *testing.T) {
 			SELECT id, version, state FROM connector_versions ORDER BY id;
 		`, []connectorResult{
 					{
-						Id:      "00000000-0000-0000-0000-000000000001",
+						Id:      "cxr_test0000000000001",
 						Version: 1,
 						State:   "primary",
 					},
 					{
-						Id:      "00000000-0000-0000-0000-000000000002",
+						Id:      "cxr_test0000000000002",
 						Version: 1,
 						State:   "primary",
 					},
@@ -173,12 +173,12 @@ func TestMigration(t *testing.T) {
 			t.Run("double initial different type", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:      uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:      apid.MustParse("cxr_test0000000000001"),
 						Version: 1,
 						Labels:  map[string]string{"type": "fake1"},
 					},
 					{
-						Id:      uuid.MustParse("00000000-0000-0000-0000-000000000002"),
+						Id:      apid.MustParse("cxr_test0000000000002"),
 						Version: 1,
 						Labels:  map[string]string{"type": "fake2"},
 					},
@@ -198,12 +198,12 @@ func TestMigration(t *testing.T) {
 			SELECT id, version, state FROM connector_versions ORDER BY id;
 		`, []connectorResult{
 					{
-						Id:      "00000000-0000-0000-0000-000000000001",
+						Id:      "cxr_test0000000000001",
 						Version: 1,
 						State:   "primary",
 					},
 					{
-						Id:      "00000000-0000-0000-0000-000000000002",
+						Id:      "cxr_test0000000000002",
 						Version: 1,
 						State:   "primary",
 					},
@@ -213,7 +213,7 @@ func TestMigration(t *testing.T) {
 			t.Run("unchanged from initial", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:      uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:      apid.MustParse("cxr_test0000000000001"),
 						Version: 1,
 						Labels:  map[string]string{"type": "fake"},
 					},
@@ -236,7 +236,7 @@ func TestMigration(t *testing.T) {
 			SELECT id, version, state FROM connector_versions;
 		`, []connectorResult{
 					{
-						Id:      "00000000-0000-0000-0000-000000000001",
+						Id:      "cxr_test0000000000001",
 						Version: 1,
 						State:   "primary",
 					},
@@ -246,7 +246,7 @@ func TestMigration(t *testing.T) {
 			t.Run("changed once", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
@@ -274,13 +274,13 @@ func TestMigration(t *testing.T) {
 			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     1,
 						State:       "active",
 						DisplayName: "initial",
 					},
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     2,
 						State:       "primary",
 						DisplayName: "changed",
@@ -291,7 +291,7 @@ func TestMigration(t *testing.T) {
 			t.Run("add draft version", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
@@ -304,7 +304,7 @@ func TestMigration(t *testing.T) {
 
 				// Draft versions can be added; non-specified versions default to primary
 				cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, cschema.Connector{
-					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+					Id:          apid.MustParse("cxr_test0000000000001"),
 					Version:     2,
 					State:       "draft",
 					Labels:      map[string]string{"type": "fake"},
@@ -325,13 +325,13 @@ func TestMigration(t *testing.T) {
 			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     1,
 						State:       "primary",
 						DisplayName: "initial",
 					},
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     2,
 						State:       "draft",
 						DisplayName: "changed",
@@ -342,7 +342,7 @@ func TestMigration(t *testing.T) {
 			t.Run("changed once then unchanged", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
@@ -373,13 +373,13 @@ func TestMigration(t *testing.T) {
 			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     1,
 						State:       "active",
 						DisplayName: "initial",
 					},
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     2,
 						State:       "primary",
 						DisplayName: "changed",
@@ -390,7 +390,7 @@ func TestMigration(t *testing.T) {
 			t.Run("changed twice", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
@@ -424,19 +424,19 @@ func TestMigration(t *testing.T) {
 			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     1,
 						State:       "active",
 						DisplayName: "initial",
 					},
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     2,
 						State:       "active",
 						DisplayName: "changed",
 					},
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     3,
 						State:       "primary",
 						DisplayName: "changed again",
@@ -447,7 +447,7 @@ func TestMigration(t *testing.T) {
 			t.Run("cannot change published version", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
@@ -474,7 +474,7 @@ func TestMigration(t *testing.T) {
 			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     1,
 						State:       "primary",
 						DisplayName: "initial",
@@ -485,13 +485,13 @@ func TestMigration(t *testing.T) {
 			t.Run("does not allow duplicate id versions initial", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "first",
 					},
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "second",
@@ -517,7 +517,7 @@ func TestMigration(t *testing.T) {
 			t.Run("does not allow duplicate id versions when migrated", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "first",
@@ -529,7 +529,7 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, cschema.Connector{
-					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+					Id:          apid.MustParse("cxr_test0000000000001"),
 					Version:     1,
 					Labels:      map[string]string{"type": "fake"},
 					DisplayName: "second",
@@ -549,7 +549,7 @@ func TestMigration(t *testing.T) {
 			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     1,
 						State:       "primary",
 						DisplayName: "first",
@@ -562,7 +562,7 @@ func TestMigration(t *testing.T) {
 			t.Run("single initial", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:     uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:     apid.MustParse("cxr_test0000000000001"),
 						Labels: map[string]string{"type": "fake"},
 					},
 				})
@@ -581,7 +581,7 @@ func TestMigration(t *testing.T) {
 			SELECT id, version, state FROM connector_versions;
 		`, []connectorResult{
 					{
-						Id:      "00000000-0000-0000-0000-000000000001",
+						Id:      "cxr_test0000000000001",
 						Version: 1,
 						State:   "primary",
 					},
@@ -591,11 +591,11 @@ func TestMigration(t *testing.T) {
 			t.Run("double initial same type", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:     uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:     apid.MustParse("cxr_test0000000000001"),
 						Labels: map[string]string{"type": "fake"},
 					},
 					{
-						Id:     uuid.MustParse("00000000-0000-0000-0000-000000000002"),
+						Id:     apid.MustParse("cxr_test0000000000002"),
 						Labels: map[string]string{"type": "fake"},
 					},
 				})
@@ -614,12 +614,12 @@ func TestMigration(t *testing.T) {
 			SELECT id, version, state FROM connector_versions ORDER BY id;
 		`, []connectorResult{
 					{
-						Id:      "00000000-0000-0000-0000-000000000001",
+						Id:      "cxr_test0000000000001",
 						Version: 1,
 						State:   "primary",
 					},
 					{
-						Id:      "00000000-0000-0000-0000-000000000002",
+						Id:      "cxr_test0000000000002",
 						Version: 1,
 						State:   "primary",
 					},
@@ -629,7 +629,7 @@ func TestMigration(t *testing.T) {
 			t.Run("unchanged from initial", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:     uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:     apid.MustParse("cxr_test0000000000001"),
 						Labels: map[string]string{"type": "fake"},
 					},
 				})
@@ -651,7 +651,7 @@ func TestMigration(t *testing.T) {
 			SELECT id, version, state FROM connector_versions;
 		`, []connectorResult{
 					{
-						Id:      "00000000-0000-0000-0000-000000000001",
+						Id:      "cxr_test0000000000001",
 						Version: 1,
 						State:   "primary",
 					},
@@ -661,7 +661,7 @@ func TestMigration(t *testing.T) {
 			t.Run("changed once", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
@@ -687,13 +687,13 @@ func TestMigration(t *testing.T) {
 			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     1,
 						State:       "active",
 						DisplayName: "initial",
 					},
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     2,
 						State:       "primary",
 						DisplayName: "changed",
@@ -704,7 +704,7 @@ func TestMigration(t *testing.T) {
 			t.Run("add draft version", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
@@ -715,7 +715,7 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, cschema.Connector{
-					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+					Id:          apid.MustParse("cxr_test0000000000001"),
 					Labels:      map[string]string{"type": "fake"},
 					State:       "draft",
 					DisplayName: "changed",
@@ -735,13 +735,13 @@ func TestMigration(t *testing.T) {
 			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     1,
 						State:       "primary",
 						DisplayName: "initial",
 					},
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     2,
 						State:       "draft",
 						DisplayName: "changed",
@@ -752,7 +752,7 @@ func TestMigration(t *testing.T) {
 			t.Run("changed once then unchanged", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
@@ -781,13 +781,13 @@ func TestMigration(t *testing.T) {
 			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     1,
 						State:       "active",
 						DisplayName: "initial",
 					},
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     2,
 						State:       "primary",
 						DisplayName: "changed",
@@ -798,7 +798,7 @@ func TestMigration(t *testing.T) {
 			t.Run("changed twice", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "initial",
 					},
@@ -829,19 +829,19 @@ func TestMigration(t *testing.T) {
 			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     1,
 						State:       "active",
 						DisplayName: "initial",
 					},
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     2,
 						State:       "active",
 						DisplayName: "changed",
 					},
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     3,
 						State:       "primary",
 						DisplayName: "changed again",
@@ -852,12 +852,12 @@ func TestMigration(t *testing.T) {
 			t.Run("does not allow duplicate id initial", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "first",
 					},
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "second",
 					},
@@ -882,7 +882,7 @@ func TestMigration(t *testing.T) {
 			t.Run("does not allow duplicate id when migrated", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "first",
 					},
@@ -893,7 +893,7 @@ func TestMigration(t *testing.T) {
 				require.NoError(t, err)
 
 				cfg.GetRoot().Connectors.LoadFromList = append(cfg.GetRoot().Connectors.LoadFromList, cschema.Connector{
-					Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+					Id:          apid.MustParse("cxr_test0000000000001"),
 					Labels:      map[string]string{"type": "fake"},
 					DisplayName: "second",
 				})
@@ -912,7 +912,7 @@ func TestMigration(t *testing.T) {
 			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{
 					{
-						Id:          "00000000-0000-0000-0000-000000000001",
+						Id:          "cxr_test0000000000001",
 						Version:     1,
 						State:       "primary",
 						DisplayName: "first",
@@ -1177,13 +1177,13 @@ func TestMigration(t *testing.T) {
 			t.Run("duplicate id version type", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
@@ -1209,14 +1209,14 @@ func TestMigration(t *testing.T) {
 			t.Run("duplicate id version state primary", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						State:       "primary",
 						Labels:      map[string]string{"type": "fake1"},
 						DisplayName: "duplicate",
 					},
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						State:       "primary",
 						Labels:      map[string]string{"type": "fake2"},
@@ -1243,14 +1243,14 @@ func TestMigration(t *testing.T) {
 			t.Run("duplicate id version state draft", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						State:       "draft",
 						Labels:      map[string]string{"type": "fake1"},
 						DisplayName: "duplicate",
 					},
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						State:       "draft",
 						Labels:      map[string]string{"type": "fake2"},
@@ -1277,13 +1277,13 @@ func TestMigration(t *testing.T) {
 			t.Run("duplicate id version", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						Labels:      map[string]string{"type": "fake1"},
 						DisplayName: "duplicate",
 					},
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						Labels:      map[string]string{"type": "fake2"},
 						DisplayName: "duplicate",
@@ -1309,13 +1309,13 @@ func TestMigration(t *testing.T) {
 			t.Run("id with and without version", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						Labels:      map[string]string{"type": "fake1"},
 						DisplayName: "duplicate",
 					},
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Labels:      map[string]string{"type": "fake2"},
 						DisplayName: "duplicate",
 					},
@@ -1340,7 +1340,7 @@ func TestMigration(t *testing.T) {
 			t.Run("id version and type without id", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
@@ -1357,7 +1357,7 @@ func TestMigration(t *testing.T) {
 
 				cleanup2 := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
@@ -1375,7 +1375,7 @@ func TestMigration(t *testing.T) {
 
 				cleanup3 := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Version:     1,
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
@@ -1407,7 +1407,7 @@ func TestMigration(t *testing.T) {
 			t.Run("id and type without id", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
@@ -1423,7 +1423,7 @@ func TestMigration(t *testing.T) {
 
 				cleanup2 := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},
@@ -1440,7 +1440,7 @@ func TestMigration(t *testing.T) {
 
 				cleanup3 := setup(t, []cschema.Connector{
 					{
-						Id:          uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+						Id:          apid.MustParse("cxr_test0000000000001"),
 						Labels:      map[string]string{"type": "fake"},
 						DisplayName: "duplicate",
 					},

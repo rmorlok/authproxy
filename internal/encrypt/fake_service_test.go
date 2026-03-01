@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
@@ -18,7 +18,7 @@ func TestFakeService(t *testing.T) {
 	for _, doBase64 := range []bool{true, false} {
 		t.Run(fmt.Sprintf("doBase64=%v", doBase64), func(t *testing.T) {
 			connectorVersion := database.ConnectorVersion{
-				Id:                  uuid.New(),
+				Id:                  apid.New(apid.PrefixConnectorVersion),
 				Version:             1,
 				State:               database.ConnectorVersionStatePrimary,
 				Labels:              map[string]string{"type": "test"},
@@ -39,9 +39,9 @@ func TestFakeService(t *testing.T) {
 			s := NewEncryptService(cfg, db)
 
 			connection := database.Connection{
-				Id:               uuid.New(),
+				Id:               apid.New(apid.PrefixConnection),
 				Namespace:        "root.some-namespace",
-				ConnectorId:      uuid.New(),
+				ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 				ConnectorVersion: 1,
 				State:            database.ConnectionStateReady,
 			}

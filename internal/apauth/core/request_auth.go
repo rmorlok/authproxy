@@ -4,7 +4,7 @@ import (
 	"context"
 	"slices"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
@@ -25,7 +25,7 @@ func GetAuthFromContext(ctx context.Context) *RequestAuth {
 // permission restrictions that further limit what the request can do beyond the
 // actor's base permissions.
 type RequestAuth struct {
-	sessionId *uuid.UUID
+	sessionId *apid.ID
 	actor     *Actor
 
 	// permissions restricts what actions this specific request can perform.
@@ -43,11 +43,11 @@ func (ra *RequestAuth) IsSession() bool {
 	return ra.IsAuthenticated() && ra.sessionId != nil
 }
 
-func (ra *RequestAuth) GetSessionId() *uuid.UUID {
+func (ra *RequestAuth) GetSessionId() *apid.ID {
 	return ra.sessionId
 }
 
-func (ra *RequestAuth) SetSessionId(sessionId *uuid.UUID) {
+func (ra *RequestAuth) SetSessionId(sessionId *apid.ID) {
 	ra.sessionId = sessionId
 }
 
@@ -190,7 +190,7 @@ func NewAuthenticatedRequestAuth(a IActorData) *RequestAuth {
 	}
 }
 
-func NewAuthenticatedRequestAuthWithSession(a IActorData, sess *uuid.UUID) *RequestAuth {
+func NewAuthenticatedRequestAuthWithSession(a IActorData, sess *apid.ID) *RequestAuth {
 	return &RequestAuth{
 		actor:     CreateActor(a),
 		sessionId: sess,
@@ -208,7 +208,7 @@ func NewAuthenticatedRequestAuthWithPermissions(a IActorData, permissions []asch
 
 // NewAuthenticatedRequestAuthWithSessionAndPermissions creates a RequestAuth with an actor,
 // session, and request-level permission restrictions.
-func NewAuthenticatedRequestAuthWithSessionAndPermissions(a IActorData, sess *uuid.UUID, permissions []aschema.Permission) *RequestAuth {
+func NewAuthenticatedRequestAuthWithSessionAndPermissions(a IActorData, sess *apid.ID, permissions []aschema.Permission) *RequestAuth {
 	return &RequestAuth{
 		actor:       CreateActor(a),
 		sessionId:   sess,

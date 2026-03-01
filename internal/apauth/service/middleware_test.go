@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -16,7 +16,7 @@ func TestActorOnRequest(t *testing.T) {
 	assert.False(t, GetAuthFromRequest(util.Must(http.NewRequest("GET", "https://example.com", nil))).IsAuthenticated())
 
 	a := database.Actor{
-		Id:         uuid.New(),
+		Id:         apid.New(apid.PrefixActor),
 		ExternalId: "bobdole",
 	}
 

@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 )
@@ -66,9 +66,9 @@ func (c *Connectors) Validate(vc *common.ValidationContext) error {
 	identifyingLabelHasVersionCount := make(map[string]int) // serialized labels -> count with version
 	identifyingLabelNoUuidVersionCount := make(map[string]map[uint64]int)
 
-	uuidToCount := make(map[uuid.UUID]int)
-	uuidHasVersionsCount := make(map[uuid.UUID]int)
-	uuidVersionCount := make(map[uuid.UUID]map[uint64]int)
+	uuidToCount := make(map[apid.ID]int)
+	uuidHasVersionsCount := make(map[apid.ID]int)
+	uuidVersionCount := make(map[apid.ID]map[uint64]int)
 
 	// Beyond the validation of the individual connector configurations, this validate method checks to make sure that
 	// all connectors in the list are properly differentiated. We allow users to specify connectors only by identifying
@@ -87,9 +87,9 @@ func (c *Connectors) Validate(vc *common.ValidationContext) error {
 			labelValues := connector.GetIdentifyingLabelValues(identifyingLabels)
 			labelKey := serializeLabelValues(labelValues)
 
-			if connector.Id != uuid.Nil && labelKey != "{}" {
+			if connector.Id != apid.Nil && labelKey != "{}" {
 				err = multierror.Prefix(err, fmt.Sprintf("connector %s (%s): ", connector.Id.String(), labelKey))
-			} else if connector.Id != uuid.Nil {
+			} else if connector.Id != apid.Nil {
 				err = multierror.Prefix(err, fmt.Sprintf("connector %s: ", connector.Id.String()))
 			} else if labelKey != "{}" {
 				err = multierror.Prefix(err, fmt.Sprintf("connector with labels %s: ", labelKey))
@@ -114,7 +114,7 @@ func (c *Connectors) Validate(vc *common.ValidationContext) error {
 		// Create key from identifying label values
 		identifyingKey := serializeLabelValues(labelValues)
 
-		if connector.Id != uuid.Nil {
+		if connector.Id != apid.Nil {
 			uuidToCount[connector.Id]++
 
 			if connector.Version != 0 {
@@ -129,7 +129,7 @@ func (c *Connectors) Validate(vc *common.ValidationContext) error {
 		if identifyingKey != "{}" {
 			identifyingLabelCounts[identifyingKey]++
 
-			if connector.Id != uuid.Nil {
+			if connector.Id != apid.Nil {
 				identifyingLabelHasUuidCount[identifyingKey]++
 			} else {
 				if connector.Version != 0 {

@@ -5,7 +5,7 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 )
@@ -15,10 +15,10 @@ type Connection interface {
 	 * Core fields
 	 */
 
-	GetId() uuid.UUID
+	GetId() apid.ID
 	GetNamespace() string
 	GetState() database.ConnectionState
-	GetConnectorId() uuid.UUID
+	GetConnectorId() apid.ID
 	GetConnectorVersion() uint64
 	GetCreatedAt() time.Time
 	GetUpdatedAt() time.Time

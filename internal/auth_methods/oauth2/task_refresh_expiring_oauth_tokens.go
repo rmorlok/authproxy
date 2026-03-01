@@ -3,7 +3,7 @@ package oauth2
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -28,7 +28,7 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 		return nil
 	}
 
-	connectorIdToConnector := make(map[uuid.UUID]*config.Connector)
+	connectorIdToConnector := make(map[apid.ID]*config.Connector)
 	refreshWithin := th.cfg.GetRoot().Oauth.GetRefreshTokensTimeBeforeExpiryOrDefault()
 
 	// Establish the smallest value of refreshWithIn for all active connector versions

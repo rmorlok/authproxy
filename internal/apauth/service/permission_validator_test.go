@@ -10,7 +10,7 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -75,16 +75,16 @@ type fakeNamespaceObject struct {
 func (fno *fakeNamespaceObject) GetNamespace() string {
 	return fno.namespace
 }
-func (fno *fakeNamespaceObject) GetId() uuid.UUID {
-	return uuid.New()
+func (fno *fakeNamespaceObject) GetId() apid.ID {
+	return apid.New(apid.PrefixActor)
 }
 
 type fakeIdObject struct {
 	fakeNamespaceObject
-	id uuid.UUID
+	id apid.ID
 }
 
-func (fio *fakeIdObject) GetId() uuid.UUID {
+func (fio *fakeIdObject) GetId() apid.ID {
 	return fio.id
 }
 
@@ -133,13 +133,13 @@ func TestResourcePermissionValidator_Validate(t *testing.T) {
 				{
 					Namespace:   "root.namespace1",
 					Resources:   []string{"connections"},
-					ResourceIds: []string{"123e4567-e89b-12d3-a456-426614174000"},
+					ResourceIds: []string{"act_test123e4567a000"},
 					Verbs:       []string{"get"},
 				},
 			},
 			inputObj: &fakeIdObject{
 				fakeNamespaceObject: fakeNamespaceObject{namespace: "root.namespace1"},
-				id:                  uuid.MustParse("123e4567-e89b-12d3-a456-426614174000"),
+				id:                  apid.MustParse("act_test123e4567a000"),
 			},
 			expectErr: nil,
 		},
@@ -151,13 +151,13 @@ func TestResourcePermissionValidator_Validate(t *testing.T) {
 				{
 					Namespace:   "root.namespace1",
 					Resources:   []string{"connections"},
-					ResourceIds: []string{"123e4567-e89b-12d3-a456-426614174000"},
+					ResourceIds: []string{"act_test123e4567a000"},
 					Verbs:       []string{"get"},
 				},
 			},
 			inputObj: &fakeIdObject{
 				fakeNamespaceObject: fakeNamespaceObject{namespace: "root.namespace1"},
-				id:                  uuid.MustParse("123e4567-e89b-12d3-a456-426614174001"),
+				id:                  apid.MustParse("act_test123e4567a001"),
 			},
 			expectErr: errors.New("permission denied: actor permissions do not allow this action"),
 		},
@@ -178,7 +178,7 @@ func TestResourcePermissionValidator_Validate(t *testing.T) {
 			},
 			inputObj: &fakeIdObject{
 				fakeNamespaceObject: fakeNamespaceObject{namespace: "root.namespace1"},
-				id:                  uuid.MustParse("123e4567-e89b-12d3-a456-426614174001"),
+				id:                  apid.MustParse("act_test123e4567a001"),
 			},
 			expectErr: nil,
 		},
@@ -243,13 +243,13 @@ func TestResourcePermissionValidator_Validate(t *testing.T) {
 
 type fakeModel struct {
 	namespace string
-	id        uuid.UUID
+	id        apid.ID
 }
 
 func (fm *fakeModel) GetNamespace() string {
 	return fm.namespace
 }
-func (fm *fakeModel) GetId() uuid.UUID {
+func (fm *fakeModel) GetId() apid.ID {
 	return fm.id
 }
 
@@ -432,14 +432,14 @@ func strPtr(s string) *string {
 // filterTestResource implements hasNamespace and hasId for testing FilterForValidatedResources
 type filterTestResource struct {
 	namespace string
-	id        uuid.UUID
+	id        apid.ID
 }
 
 func (r *filterTestResource) GetNamespace() string {
 	return r.namespace
 }
 
-func (r *filterTestResource) GetId() uuid.UUID {
+func (r *filterTestResource) GetId() apid.ID {
 	return r.id
 }
 
@@ -513,7 +513,7 @@ func TestFilterForValidatedResources(t *testing.T) {
 
 			input := make([]*filterTestResource, len(tt.inputNamespaces))
 			for i, ns := range tt.inputNamespaces {
-				input[i] = &filterTestResource{namespace: ns, id: uuid.New()}
+				input[i] = &filterTestResource{namespace: ns, id: apid.New(apid.PrefixActor)}
 			}
 
 			result := FilterForValidatedResources(validator, input)
@@ -559,7 +559,7 @@ func TestValidatorOnRoutes(t *testing.T) {
 		fakeRouteThatValidates := func(gctx *gin.Context) {
 			fm := &fakeModel{
 				namespace: "root.test",
-				id:        uuid.MustParse("10000000-0000-0000-0000-000000000001"),
+				id:        apid.MustParse("cxr_test0000000000001"),
 			}
 
 			val := MustGetValidatorFromGinContext(gctx)
@@ -609,7 +609,7 @@ func TestValidatorOnRoutes(t *testing.T) {
 				nil,
 				"root",
 				"some-actor",
-				aschema.PermissionsSingleWithResourceIds("root.**", "cats", "meow", "10000000-0000-0000-0000-000000000002"),
+				aschema.PermissionsSingleWithResourceIds("root.**", "cats", "meow", "cxr_test0000000000002"),
 			)
 			require.NoError(t, err)
 
@@ -677,7 +677,7 @@ func TestValidatorOnRoutes(t *testing.T) {
 				nil,
 				"root",
 				"some-actor",
-				aschema.PermissionsSingleWithResourceIds("root.**", "cats", "meow", "10000000-0000-0000-0000-000000000001"),
+				aschema.PermissionsSingleWithResourceIds("root.**", "cats", "meow", "cxr_test0000000000001"),
 			)
 			require.NoError(t, err)
 
@@ -750,7 +750,7 @@ func TestValidatorOnRoutes(t *testing.T) {
 				nil,
 				"root",
 				"some-actor",
-				aschema.PermissionsSingleWithResourceIds("root.**", "cats", "meow", "10000000-0000-0000-0000-000000000001"),
+				aschema.PermissionsSingleWithResourceIds("root.**", "cats", "meow", "cxr_test0000000000001"),
 			)
 			require.NoError(t, err)
 

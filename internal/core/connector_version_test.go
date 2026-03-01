@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	coreMock "github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -26,7 +26,7 @@ func TestWrapConnectorVersion(t *testing.T) {
 		logger:  aplog.NewNoopLogger(),
 	}
 
-	connectorId := uuid.New()
+	connectorId := apid.New(apid.PrefixActor)
 	dbConnectorVersion := database.ConnectorVersion{
 		Id:                  connectorId,
 		Version:             1,
@@ -56,7 +56,7 @@ func TestConnectorVersion_GetDefinition(t *testing.T) {
 		logger:  aplog.NewNoopLogger(),
 	}
 
-	connectorId := uuid.New()
+	connectorId := apid.New(apid.PrefixActor)
 	dbConnectorVersion := database.ConnectorVersion{
 		Id:                  connectorId,
 		Version:             1,
@@ -104,7 +104,7 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 		logger:  aplog.NewNoopLogger(),
 	}
 
-	connectorId := uuid.New()
+	connectorId := apid.New(apid.PrefixActor)
 	dbConnectorVersion := database.ConnectorVersion{
 		Id:                  connectorId,
 		Version:             1,
@@ -150,8 +150,8 @@ func TestConnectorVersion_SetDefinition(t *testing.T) {
 // NewTestConnectorVersion creates a new test connector version using provided connector configuration data.
 func NewTestConnectorVersion(c cschema.Connector) *ConnectorVersion {
 	e := encrypt.NewFakeEncryptService(false)
-	connectorId := uuid.New()
-	if c.Id != uuid.Nil {
+	connectorId := apid.New(apid.PrefixActor)
+	if c.Id != apid.Nil {
 		connectorId = c.Id
 	}
 	version := uint64(1)

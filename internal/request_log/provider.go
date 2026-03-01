@@ -3,7 +3,7 @@ package request_log
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 )
 
 // RecordStore handles persisting LogRecord metadata to a storage backend.
@@ -23,7 +23,7 @@ type migratable interface {
 // RecordRetriever handles querying LogRecord metadata from a storage backend.
 type RecordRetriever interface {
 	// GetRecord retrieves a single LogRecord by its request ID.
-	GetRecord(ctx context.Context, id uuid.UUID) (*LogRecord, error)
+	GetRecord(ctx context.Context, id apid.ID) (*LogRecord, error)
 
 	// NewListRequestsBuilder creates a new builder for listing entry records with filters.
 	NewListRequestsBuilder() ListRequestBuilder

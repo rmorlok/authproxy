@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 )
 
@@ -18,13 +18,13 @@ type contextKeyActorCache struct{}
 // This eliminates the need for nil checks at every call site.
 type actorCache struct {
 	byExternalId map[string]*database.Actor
-	byId         map[uuid.UUID]*database.Actor
+	byId         map[apid.ID]*database.Actor
 }
 
 func newActorCache() *actorCache {
 	return &actorCache{
 		byExternalId: make(map[string]*database.Actor),
-		byId:         make(map[uuid.UUID]*database.Actor),
+		byId:         make(map[apid.ID]*database.Actor),
 	}
 }
 
@@ -39,7 +39,7 @@ func (c *actorCache) Put(actor *database.Actor) {
 		return
 	}
 	c.byExternalId[externalIdKey(actor.Namespace, actor.ExternalId)] = actor
-	if actor.Id != uuid.Nil {
+	if !actor.Id.IsNil() {
 		c.byId[actor.Id] = actor
 	}
 }
@@ -53,9 +53,9 @@ func (c *actorCache) GetByExternalId(namespace, externalId string) *database.Act
 	return c.byExternalId[externalIdKey(namespace, externalId)]
 }
 
-// GetById returns a cached actor by internal UUID, or nil if not cached.
+// GetById returns a cached actor by internal ID, or nil if not cached.
 // Safe to call on a nil receiver (returns nil).
-func (c *actorCache) GetById(id uuid.UUID) *database.Actor {
+func (c *actorCache) GetById(id apid.ID) *database.Actor {
 	if c == nil {
 		return nil
 	}

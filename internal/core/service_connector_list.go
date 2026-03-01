@@ -3,7 +3,7 @@ package core
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -73,7 +73,7 @@ func (l *listConnectorWrapper) ForType(t string) iface.ListConnectorsBuilder {
 	}
 }
 
-func (l *listConnectorWrapper) ForId(id uuid.UUID) iface.ListConnectorsBuilder {
+func (l *listConnectorWrapper) ForId(id apid.ID) iface.ListConnectorsBuilder {
 	return &listConnectorWrapper{
 		l: l.l.ForId(id),
 		s: l.s,

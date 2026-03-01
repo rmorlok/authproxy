@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"k8s.io/utils/clock"
 )
 
@@ -20,8 +20,8 @@ type Builder interface {
 	With(wa WithApplier) Builder
 	WithClock(clock clock.Clock) Builder
 	WithFixedClock(t time.Time) Builder
-	WithUuidGenerator(generator UuidGenerator) Builder
-	WithFixedUuidGenerator(u uuid.UUID) Builder
+	WithIdGenerator(generator IdGenerator) Builder
+	WithFixedIdGenerator(id apid.ID) Builder
 	WithCorrelationID(correlationID string) Builder
 	WithDebugMode(debug bool) Builder
 	Build() context.Context
@@ -46,14 +46,14 @@ func (b *builder) WithFixedClock(t time.Time) Builder {
 	return &builder{WithFixedClock(b.ctx, t)}
 }
 
-// WithUuidGenerator sets a UUID generator on the context.
-func (b *builder) WithUuidGenerator(generator UuidGenerator) Builder {
-	return &builder{WithUuidGenerator(b.ctx, generator)}
+// WithIdGenerator sets an ID generator on the context.
+func (b *builder) WithIdGenerator(generator IdGenerator) Builder {
+	return &builder{WithIdGenerator(b.ctx, generator)}
 }
 
-// WithFixedUuidGenerator sets a fixed UUID generator on the context that will always return the same UUID.
-func (b *builder) WithFixedUuidGenerator(u uuid.UUID) Builder {
-	return &builder{WithFixedUuidGenerator(b.ctx, u)}
+// WithFixedIdGenerator sets a fixed ID generator on the context that will always return the same ID.
+func (b *builder) WithFixedIdGenerator(id apid.ID) Builder {
+	return &builder{WithFixedIdGenerator(b.ctx, id)}
 }
 
 // WithCorrelationID sets a correlation ID on the context.

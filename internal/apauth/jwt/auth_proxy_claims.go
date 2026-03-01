@@ -6,11 +6,11 @@ import (
 	"fmt"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 )
 
 var ErrInvalidClaims = errors.New("invalid jwt claims")
@@ -42,7 +42,7 @@ type AuthProxyClaims struct {
 
 	// Nonce is a one-time-use value. Adding a nonce to the JWT make it a one-time-use for auth purposes. If you use
 	// a nonce, the JWT must also have an expiry so that tracking of the nonce values do not need to be kept forever.
-	Nonce *uuid.UUID `json:"nonce,omitempty"`
+	Nonce *apid.ID `json:"nonce,omitempty"`
 }
 
 func (tc *AuthProxyClaims) String() string {

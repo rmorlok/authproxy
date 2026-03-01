@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -53,13 +53,61 @@ func TestOAuth2Token_IsAccessTokenExpired(t *testing.T) {
 	})
 }
 
+func TestOAuth2Token_Validate(t *testing.T) {
+	t.Run("valid token", func(t *testing.T) {
+		tok := &OAuth2Token{
+			Id:           apid.New(apid.PrefixOAuth2Token),
+			ConnectionId: apid.New(apid.PrefixConnection),
+		}
+		require.NoError(t, tok.Validate())
+	})
+	t.Run("missing id", func(t *testing.T) {
+		tok := &OAuth2Token{
+			ConnectionId: apid.New(apid.PrefixConnection),
+		}
+		require.Error(t, tok.Validate())
+	})
+	t.Run("wrong prefix on id", func(t *testing.T) {
+		tok := &OAuth2Token{
+			Id:           apid.New(apid.PrefixActor),
+			ConnectionId: apid.New(apid.PrefixConnection),
+		}
+		require.Error(t, tok.Validate())
+	})
+	t.Run("wrong prefix on connection id", func(t *testing.T) {
+		tok := &OAuth2Token{
+			Id:           apid.New(apid.PrefixOAuth2Token),
+			ConnectionId: apid.New(apid.PrefixActor),
+		}
+		require.Error(t, tok.Validate())
+	})
+	t.Run("wrong prefix on refreshed from id", func(t *testing.T) {
+		wrongId := apid.New(apid.PrefixActor)
+		tok := &OAuth2Token{
+			Id:              apid.New(apid.PrefixOAuth2Token),
+			ConnectionId:    apid.New(apid.PrefixConnection),
+			RefreshedFromId: &wrongId,
+		}
+		require.Error(t, tok.Validate())
+	})
+	t.Run("valid with refreshed from id", func(t *testing.T) {
+		refreshId := apid.New(apid.PrefixOAuth2Token)
+		tok := &OAuth2Token{
+			Id:              apid.New(apid.PrefixOAuth2Token),
+			ConnectionId:    apid.New(apid.PrefixConnection),
+			RefreshedFromId: &refreshId,
+		}
+		require.NoError(t, tok.Validate())
+	})
+}
+
 func TestOAuth2Tokens(t *testing.T) {
 	t.Run("round trip", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		connectionId := uuid.New()
+		connectionId := apid.New(apid.PrefixConnection)
 
 		tok, err := db.InsertOAuth2Token(
 			ctx,
@@ -91,8 +139,8 @@ func TestOAuth2Tokens(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		connectionId1 := uuid.New()
-		connectionId2 := uuid.New()
+		connectionId1 := apid.New(apid.PrefixConnection)
+		connectionId2 := apid.New(apid.PrefixConnection)
 
 		_, err := db.InsertOAuth2Token(
 			ctx,
@@ -114,7 +162,7 @@ func TestOAuth2Tokens(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		connectionId := uuid.New()
+		connectionId := apid.New(apid.PrefixConnection)
 
 		tok1, err := db.InsertOAuth2Token(
 			ctx,
@@ -163,7 +211,7 @@ func TestOAuth2Tokens(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		connectionId := uuid.New()
+		connectionId := apid.New(apid.PrefixConnection)
 
 		tok1, err := db.InsertOAuth2Token(
 			ctx,
@@ -212,7 +260,7 @@ func TestOAuth2Tokens(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		connectionId := uuid.New()
+		connectionId := apid.New(apid.PrefixConnection)
 
 		tok, err := db.InsertOAuth2Token(
 			ctx,
@@ -225,7 +273,7 @@ func TestOAuth2Tokens(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		connectionId2 := uuid.New()
+		connectionId2 := apid.New(apid.PrefixConnection)
 		_, err = db.InsertOAuth2Token(
 			ctx,
 			connectionId2,
@@ -261,7 +309,7 @@ func TestOAuth2Tokens(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		connectionId := uuid.New()
+		connectionId := apid.New(apid.PrefixConnection)
 
 		tok, err := db.InsertOAuth2Token(
 			ctx,
@@ -285,7 +333,7 @@ func TestOAuth2Tokens(t *testing.T) {
 		)
 		require.NoError(t, err)
 
-		connectionId2 := uuid.New()
+		connectionId2 := apid.New(apid.PrefixConnection)
 		_, err = db.InsertOAuth2Token(
 			ctx,
 			connectionId2,
@@ -325,45 +373,45 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		createdConnection := Connection{
-			Id:               uuid.MustParse("00000000-0000-0000-0000-000000000001"),
+			Id:               apid.MustParse("cxn_test0000000000001"),
 			State:            ConnectionStateCreated,
-			ConnectorId:      uuid.MustParse("10000000-0000-0000-0000-000000000001"),
+			ConnectorId:      apid.MustParse("cxr_test0000000000001"),
 			ConnectorVersion: 1,
 			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 			UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
 
 		readyConnection1 := Connection{
-			Id:               uuid.MustParse("00000000-0000-0000-0000-000000000002"),
+			Id:               apid.MustParse("cxn_test0000000000002"),
 			State:            ConnectionStateReady,
-			ConnectorId:      uuid.MustParse("10000000-0000-0000-0000-000000000001"),
+			ConnectorId:      apid.MustParse("cxr_test0000000000001"),
 			ConnectorVersion: 1,
 			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 			UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
 
 		readyConnection2 := Connection{
-			Id:               uuid.MustParse("00000000-0000-0000-0000-000000000003"),
+			Id:               apid.MustParse("cxn_test0000000000003"),
 			State:            ConnectionStateReady,
-			ConnectorId:      uuid.MustParse("10000000-0000-0000-0000-000000000001"),
+			ConnectorId:      apid.MustParse("cxr_test0000000000001"),
 			ConnectorVersion: 1,
 			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 			UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
 
 		disabledConnection := Connection{
-			Id:               uuid.MustParse("00000000-0000-0000-0000-000000000004"),
+			Id:               apid.MustParse("cxn_test0000000000004"),
 			State:            ConnectionStateDisabled,
-			ConnectorId:      uuid.MustParse("10000000-0000-0000-0000-000000000001"),
+			ConnectorId:      apid.MustParse("cxr_test0000000000001"),
 			ConnectorVersion: 1,
 			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 			UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 		}
 
 		deletedConnection := Connection{
-			Id:               uuid.MustParse("00000000-0000-0000-0000-000000000005"),
+			Id:               apid.MustParse("cxn_test0000000000005"),
 			State:            ConnectionStateReady,
-			ConnectorId:      uuid.MustParse("10000000-0000-0000-0000-000000000001"),
+			ConnectorId:      apid.MustParse("cxr_test0000000000001"),
 			ConnectorVersion: 1,
 			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 			UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
@@ -373,9 +421,9 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 		manyReadyConnections := make([]Connection, 0)
 		for i := 0; i < 200; i++ {
 			manyReadyConnections = append(manyReadyConnections, Connection{
-				Id:               uuid.New(),
+				Id:               apid.New(apid.PrefixConnection),
 				State:            ConnectionStateReady,
-				ConnectorId:      uuid.MustParse("10000000-0000-0000-0000-000000000001"),
+				ConnectorId:      apid.MustParse("cxr_test0000000000001"),
 				ConnectorVersion: 1,
 				CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
 				UpdatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),

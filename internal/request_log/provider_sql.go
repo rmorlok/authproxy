@@ -15,8 +15,8 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -223,16 +223,16 @@ func scanLogRecord(row interface{ Scan(dest ...any) error }) (*LogRecord, error)
 		return nil, err
 	}
 
-	er.RequestId, _ = uuid.Parse(requestId)
-	er.ConnectionId, _ = uuid.Parse(connectionId)
-	er.ConnectorId, _ = uuid.Parse(connectorId)
+	er.RequestId = apid.ID(requestId)
+	er.ConnectionId = apid.ID(connectionId)
+	er.ConnectorId = apid.ID(connectorId)
 	er.Timestamp = time.Unix(0, timestampMs*int64(time.Millisecond)).In(time.UTC)
 	er.MillisecondDuration = MillisecondDuration(time.Duration(durationMs) * time.Millisecond)
 
 	return er, nil
 }
 
-func (r *sqlRecordRetriever) GetRecord(ctx context.Context, id uuid.UUID) (*LogRecord, error) {
+func (r *sqlRecordRetriever) GetRecord(ctx context.Context, id apid.ID) (*LogRecord, error) {
 	query, args, err := sq.Select(entryRecordColumns...).
 		From(entryRecordsTable).
 		PlaceholderFormat(r.placeholderFormat).
@@ -341,7 +341,7 @@ func (l *sqlListRequestsBuilder) WithCorrelationId(correlationId string) ListReq
 	return l
 }
 
-func (l *sqlListRequestsBuilder) WithConnectionId(u uuid.UUID) ListRequestBuilder {
+func (l *sqlListRequestsBuilder) WithConnectionId(u apid.ID) ListRequestBuilder {
 	l.ListFilters.SetConnectionId(u)
 	return l
 }
@@ -351,7 +351,7 @@ func (l *sqlListRequestsBuilder) WithConnectorType(t string) ListRequestBuilder 
 	return l
 }
 
-func (l *sqlListRequestsBuilder) WithConnectorId(u uuid.UUID) ListRequestBuilder {
+func (l *sqlListRequestsBuilder) WithConnectorId(u apid.ID) ListRequestBuilder {
 	l.ListFilters.SetConnectorId(u)
 	return l
 }

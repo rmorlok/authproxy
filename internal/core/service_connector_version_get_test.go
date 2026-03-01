@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/mock"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/stretchr/testify/require"
@@ -15,7 +15,7 @@ func TestGetConnectorVersion(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	s, db, _, _, _, e := FullMockService(t, ctrl)
 
-	id := uuid.New()
+	id := apid.New(apid.PrefixActor)
 	version := uint64(1)
 
 	mock.MockConnectorRetrival(context.Background(), db, e, &cschema.Connector{

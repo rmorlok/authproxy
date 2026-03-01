@@ -7,7 +7,7 @@ import (
 	"regexp"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/httpf"
@@ -68,9 +68,9 @@ type ListRequestBuilder interface {
 	WithNamespaceMatchers(matchers []string) ListRequestBuilder
 	WithRequestType(requestType httpf.RequestType) ListRequestBuilder
 	WithCorrelationId(correlationId string) ListRequestBuilder
-	WithConnectionId(u uuid.UUID) ListRequestBuilder
+	WithConnectionId(u apid.ID) ListRequestBuilder
 	WithConnectorType(t string) ListRequestBuilder
-	WithConnectorId(u uuid.UUID) ListRequestBuilder
+	WithConnectorId(u apid.ID) ListRequestBuilder
 	WithConnectorVersion(v uint64) ListRequestBuilder
 	WithMethod(method string) ListRequestBuilder
 	WithStatusCode(s int) ListRequestBuilder
@@ -92,9 +92,9 @@ type ListFilters struct {
 
 	RequestType              *string           `json:"request_type,omitempty"`
 	CorrelationId            *string           `json:"correlation_id,omitempty"`
-	ConnectionId             *uuid.UUID        `json:"connection_id,omitempty"`
+	ConnectionId             *apid.ID        `json:"connection_id,omitempty"`
 	ConnectorType            *string           `json:"connector_type,omitempty"`
-	ConnectorId              *uuid.UUID        `json:"connector_id,omitempty"`
+	ConnectorId              *apid.ID        `json:"connector_id,omitempty"`
 	ConnectorVersion         *uint64           `json:"connector_version,omitempty"`
 	Method                   *string           `json:"method,omitempty"`
 	StatusCodeRangeInclusive []int             `json:"status_code_range,omitempty"`
@@ -159,7 +159,7 @@ func (l *ListFilters) SetCorrelationId(correlationId string) {
 	l.CorrelationId = util.ToPtr(correlationId)
 }
 
-func (l *ListFilters) SetConnectionId(u uuid.UUID) {
+func (l *ListFilters) SetConnectionId(u apid.ID) {
 	l.ConnectionId = util.ToPtr(u)
 }
 
@@ -167,7 +167,7 @@ func (l *ListFilters) SetConnectorType(t string) {
 	l.ConnectorType = util.ToPtr(t)
 }
 
-func (l *ListFilters) SetConnectorId(u uuid.UUID) {
+func (l *ListFilters) SetConnectorId(u apid.ID) {
 	l.ConnectorId = util.ToPtr(u)
 }
 

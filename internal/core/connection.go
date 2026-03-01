@@ -5,7 +5,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -39,7 +39,7 @@ func wrapConnection(c *database.Connection, cv *ConnectorVersion, s *service) *c
 	}
 }
 
-func (c *connection) GetId() uuid.UUID {
+func (c *connection) GetId() apid.ID {
 	return c.Id
 }
 
@@ -51,7 +51,7 @@ func (c *connection) GetState() database.ConnectionState {
 	return c.State
 }
 
-func (c *connection) GetConnectorId() uuid.UUID {
+func (c *connection) GetConnectorId() apid.ID {
 	return c.ConnectorId
 }
 

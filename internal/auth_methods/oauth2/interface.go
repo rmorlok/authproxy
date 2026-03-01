@@ -5,14 +5,14 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
 type IActorData interface {
-	GetId() uuid.UUID
+	GetId() apid.ID
 	GetExternalId() string
 	GetLabels() map[string]string
 	GetPermissions() []aschema.Permission
@@ -22,7 +22,7 @@ type IActorData interface {
 //go:generate mockgen -source=./interface.go -destination=./mock/oauth2.go -package=mock
 type Factory interface {
 	NewOAuth2(connection coreIface.Connection) OAuth2Connection
-	GetOAuth2State(ctx context.Context, actor IActorData, stateId uuid.UUID) (OAuth2Connection, error)
+	GetOAuth2State(ctx context.Context, actor IActorData, stateId apid.ID) (OAuth2Connection, error)
 }
 
 type OAuth2Connection interface {

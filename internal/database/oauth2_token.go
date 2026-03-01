@@ -5,10 +5,13 @@ import (
 	"database/sql"
 	"time"
 
+	"fmt"
+
 	sq "github.com/Masterminds/squirrel"
-	"github.com/google/uuid"
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/util"
 )
@@ -16,9 +19,9 @@ import (
 const OAuth2TokensTable = "oauth2_tokens"
 
 type OAuth2Token struct {
-	Id                    uuid.UUID
-	ConnectionId          uuid.UUID // Foreign key to Connection; not enforced by database
-	RefreshedFromId       *uuid.UUID
+	Id                    apid.ID
+	ConnectionId          apid.ID // Foreign key to Connection; not enforced by database
+	RefreshedFromId       *apid.ID
 	EncryptedRefreshToken string
 	EncryptedAccessToken  string
 	AccessTokenExpiresAt  *time.Time
@@ -77,9 +80,37 @@ func (t *OAuth2Token) IsAccessTokenExpired(ctx context.Context) bool {
 	return t.AccessTokenExpiresAt.Before(apctx.GetClock(ctx).Now())
 }
 
+func (t *OAuth2Token) Validate() error {
+	result := &multierror.Error{}
+
+	if t.Id == apid.Nil {
+		result = multierror.Append(result, errors.New("oauth2 token id is required"))
+	}
+
+	if err := t.Id.ValidatePrefix(apid.PrefixOAuth2Token); err != nil {
+		result = multierror.Append(result, fmt.Errorf("invalid oauth2 token id: %w", err))
+	}
+
+	if t.ConnectionId == apid.Nil {
+		result = multierror.Append(result, errors.New("oauth2 token connection id is required"))
+	}
+
+	if err := t.ConnectionId.ValidatePrefix(apid.PrefixConnection); err != nil {
+		result = multierror.Append(result, fmt.Errorf("invalid oauth2 token connection id: %w", err))
+	}
+
+	if t.RefreshedFromId != nil {
+		if err := t.RefreshedFromId.ValidatePrefix(apid.PrefixOAuth2Token); err != nil {
+			result = multierror.Append(result, fmt.Errorf("invalid oauth2 token refreshed from id: %w", err))
+		}
+	}
+
+	return result.ErrorOrNil()
+}
+
 func (s *service) GetOAuth2Token(
 	ctx context.Context,
-	connectionId uuid.UUID,
+	connectionId apid.ID,
 ) (*OAuth2Token, error) {
 	var result OAuth2Token
 	err := s.sq.
@@ -107,7 +138,7 @@ func (s *service) GetOAuth2Token(
 
 func (s *service) DeleteOAuth2Token(
 	ctx context.Context,
-	tokenId uuid.UUID,
+	tokenId apid.ID,
 ) error {
 	now := apctx.GetClock(ctx).Now()
 	dbResult, err := s.sq.
@@ -138,7 +169,7 @@ func (s *service) DeleteOAuth2Token(
 
 func (s *service) DeleteAllOAuth2TokensForConnection(
 	ctx context.Context,
-	connectionId uuid.UUID,
+	connectionId apid.ID,
 ) error {
 	logger := aplog.NewBuilder(s.logger).
 		WithCtx(ctx).
@@ -169,8 +200,8 @@ func (s *service) DeleteAllOAuth2TokensForConnection(
 
 func (s *service) InsertOAuth2Token(
 	ctx context.Context,
-	connectionId uuid.UUID,
-	refreshedFrom *uuid.UUID,
+	connectionId apid.ID,
+	refreshedFrom *apid.ID,
 	encryptedRefreshToken string,
 	encryptedAccessToken string,
 	accessTokenExpiresAt *time.Time,
@@ -208,7 +239,7 @@ func (s *service) InsertOAuth2Token(
 
 		// Create a new token
 		newToken = &OAuth2Token{
-			Id:                    apctx.GetUuidGenerator(ctx).New(),
+			Id:                    apctx.GetIdGenerator(ctx).New(apid.PrefixOAuth2Token),
 			ConnectionId:          connectionId,
 			RefreshedFromId:       refreshedFrom,
 			EncryptedRefreshToken: encryptedRefreshToken,
@@ -216,6 +247,10 @@ func (s *service) InsertOAuth2Token(
 			AccessTokenExpiresAt:  accessTokenExpiresAt,
 			Scopes:                scopes,
 			CreatedAt:             now,
+		}
+
+		if err := newToken.Validate(); err != nil {
+			return err
 		}
 
 		result, err := s.sq.

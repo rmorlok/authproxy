@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hibiken/asynq"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/aplog"
@@ -15,7 +15,7 @@ import (
 
 const taskTypeProbe = "connectors:probe"
 
-func newProbeTask(connectionId uuid.UUID, probeId string) (*asynq.Task, error) {
+func newProbeTask(connectionId apid.ID, probeId string) (*asynq.Task, error) {
 	payload, err := json.Marshal(probeTaskPayload{ConnectionId: connectionId, ProbeId: probeId})
 	if err != nil {
 		return nil, err
@@ -24,7 +24,7 @@ func newProbeTask(connectionId uuid.UUID, probeId string) (*asynq.Task, error) {
 }
 
 type probeTaskPayload struct {
-	ConnectionId uuid.UUID `json:"connection_id"`
+	ConnectionId apid.ID `json:"connection_id"`
 	ProbeId      string    `json:"probe_id"`
 }
 
@@ -53,7 +53,7 @@ func (s *service) runProbeForConnection(ctx context.Context, t *asynq.Task) erro
 		return fmt.Errorf("%s json.Unmarshal failed: %v: %w", taskTypeDisconnectConnection, err, asynq.SkipRetry)
 	}
 
-	if p.ConnectionId == uuid.Nil {
+	if p.ConnectionId == apid.Nil {
 		return fmt.Errorf("%s connection id not specified: %w", taskTypeDisconnectConnection, asynq.SkipRetry)
 	}
 

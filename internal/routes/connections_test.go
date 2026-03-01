@@ -11,7 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	asynqmock "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apctx"
@@ -40,7 +40,7 @@ func TestConnections(t *testing.T) {
 		Db       database.DB
 	}
 
-	connectorId := uuid.MustParse("10000000-0000-0000-0000-000000000001")
+	connectorId := apid.MustParse("cxr_test0000000000001")
 	connectorVersion := uint64(1)
 
 	setup := func(t *testing.T, cfg config.C) (*TestSetup, func()) {
@@ -83,7 +83,7 @@ func TestConnections(t *testing.T) {
 	t.Run("get connection", func(t *testing.T) {
 		tu, done := setup(t, nil)
 		defer done()
-		u := uuid.New()
+		u := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 			Id:               u,
 			Namespace:        sconfig.RootNamespace,
@@ -106,7 +106,7 @@ func TestConnections(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				"/connections/"+uuid.New().String(),
+				"/connections/"+apid.New(apid.PrefixConnection).String(),
 				nil,
 				"root",
 				"some-actor",
@@ -120,7 +120,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("invalid uuid", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections/"+uuid.New().String(), nil, "root", "some-actor", aschema.AllPermissions())
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections/"+apid.New(apid.PrefixConnection).String(), nil, "root", "some-actor", aschema.AllPermissions())
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -164,7 +164,7 @@ func TestConnections(t *testing.T) {
 		})
 
 		t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
-			otherResourceId := uuid.New()
+			otherResourceId := apid.New(apid.PrefixConnection)
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
@@ -181,7 +181,7 @@ func TestConnections(t *testing.T) {
 		})
 
 		t.Run("allowed with multiple resource ids including target", func(t *testing.T) {
-			otherResourceId := uuid.New()
+			otherResourceId := apid.New(apid.PrefixConnection)
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
@@ -211,7 +211,7 @@ func TestConnections(t *testing.T) {
 		c := clock.NewFakeClock(now)
 		ctx := apctx.WithClock(context.Background(), c)
 
-		u := uuid.New()
+		u := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(ctx, &database.Connection{
 			Id:               u,
 			Namespace:        "root",
@@ -224,7 +224,7 @@ func TestConnections(t *testing.T) {
 		now = now.Add(time.Second)
 		c.SetTime(now)
 		err = tu.Db.CreateConnection(ctx, &database.Connection{
-			Id:               uuid.New(),
+			Id:               apid.New(apid.PrefixConnection),
 			Namespace:        "root.child",
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
@@ -235,7 +235,7 @@ func TestConnections(t *testing.T) {
 		now = now.Add(time.Second)
 		c.SetTime(now)
 		err = tu.Db.CreateConnection(ctx, &database.Connection{
-			Id:               uuid.New(),
+			Id:               apid.New(apid.PrefixConnection),
 			Namespace:        "root.child",
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
@@ -246,7 +246,7 @@ func TestConnections(t *testing.T) {
 		now = now.Add(time.Second)
 		c.SetTime(now)
 		err = tu.Db.CreateConnection(ctx, &database.Connection{
-			Id:               uuid.New(),
+			Id:               apid.New(apid.PrefixConnection),
 			Namespace:        "root.child.grandchild",
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
@@ -330,7 +330,7 @@ func TestConnections(t *testing.T) {
 		})
 
 		t.Run("filter with label_selector", func(t *testing.T) {
-			connId := uuid.New()
+			connId := apid.New(apid.PrefixConnection)
 			err := tu.Db.CreateConnection(ctx, &database.Connection{
 				Id:               connId,
 				Namespace:        "root",
@@ -360,7 +360,7 @@ func TestConnections(t *testing.T) {
 	t.Run("disconnect connection", func(t *testing.T) {
 		tu, done := setup(t, nil)
 		defer done()
-		u := uuid.New()
+		u := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 			Id:               u,
 			Namespace:        sconfig.RootNamespace,
@@ -396,7 +396,7 @@ func TestConnections(t *testing.T) {
 		})
 
 		t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
-			otherResourceId := uuid.New()
+			otherResourceId := apid.New(apid.PrefixConnection)
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
@@ -453,7 +453,7 @@ func TestConnections(t *testing.T) {
 	t.Run("update connection (PATCH)", func(t *testing.T) {
 		tu, done := setup(t, nil)
 		defer done()
-		u := uuid.New()
+		u := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 			Id:               u,
 			Namespace:        sconfig.RootNamespace,
@@ -518,7 +518,7 @@ func TestConnections(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				"/connections/"+uuid.New().String(),
+				"/connections/"+apid.New(apid.PrefixConnection).String(),
 				util.JsonToReader(map[string]interface{}{
 					"labels": map[string]string{"env": "prod"},
 				}),
@@ -608,7 +608,7 @@ func TestConnections(t *testing.T) {
 	t.Run("get connection labels", func(t *testing.T) {
 		tu, done := setup(t, nil)
 		defer done()
-		u := uuid.New()
+		u := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 			Id:               u,
 			Namespace:        sconfig.RootNamespace,
@@ -648,7 +648,7 @@ func TestConnections(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				"/connections/"+uuid.New().String()+"/labels",
+				"/connections/"+apid.New(apid.PrefixConnection).String()+"/labels",
 				nil,
 				"root",
 				"some-actor",
@@ -683,7 +683,7 @@ func TestConnections(t *testing.T) {
 		})
 
 		t.Run("success with empty labels", func(t *testing.T) {
-			noLabelsId := uuid.New()
+			noLabelsId := apid.New(apid.PrefixConnection)
 			err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 				Id:               noLabelsId,
 				Namespace:        sconfig.RootNamespace,
@@ -717,7 +717,7 @@ func TestConnections(t *testing.T) {
 	t.Run("get connection label", func(t *testing.T) {
 		tu, done := setup(t, nil)
 		defer done()
-		u := uuid.New()
+		u := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 			Id:               u,
 			Namespace:        sconfig.RootNamespace,
@@ -757,7 +757,7 @@ func TestConnections(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodGet,
-				"/connections/"+uuid.New().String()+"/labels/env",
+				"/connections/"+apid.New(apid.PrefixConnection).String()+"/labels/env",
 				nil,
 				"root",
 				"some-actor",
@@ -811,7 +811,7 @@ func TestConnections(t *testing.T) {
 	t.Run("put connection label", func(t *testing.T) {
 		tu, done := setup(t, nil)
 		defer done()
-		u := uuid.New()
+		u := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 			Id:               u,
 			Namespace:        sconfig.RootNamespace,
@@ -832,7 +832,7 @@ func TestConnections(t *testing.T) {
 		})
 
 		t.Run("forbidden with non-matching resource id", func(t *testing.T) {
-			otherResourceId := uuid.New()
+			otherResourceId := apid.New(apid.PrefixConnection)
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
@@ -870,7 +870,7 @@ func TestConnections(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				"/connections/"+uuid.New().String()+"/labels/env",
+				"/connections/"+apid.New(apid.PrefixConnection).String()+"/labels/env",
 				util.JsonToReader(map[string]interface{}{"value": "production"}),
 				"root",
 				"some-actor",
@@ -982,7 +982,7 @@ func TestConnections(t *testing.T) {
 	t.Run("delete connection label", func(t *testing.T) {
 		tu, done := setup(t, nil)
 		defer done()
-		u := uuid.New()
+		u := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 			Id:               u,
 			Namespace:        sconfig.RootNamespace,
@@ -1003,7 +1003,7 @@ func TestConnections(t *testing.T) {
 		})
 
 		t.Run("forbidden with non-matching resource id", func(t *testing.T) {
-			otherResourceId := uuid.New()
+			otherResourceId := apid.New(apid.PrefixConnection)
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodDelete,
@@ -1039,7 +1039,7 @@ func TestConnections(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodDelete,
-				"/connections/"+uuid.New().String()+"/labels/env",
+				"/connections/"+apid.New(apid.PrefixConnection).String()+"/labels/env",
 				nil,
 				"root",
 				"some-actor",
@@ -1069,7 +1069,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("success delete", func(t *testing.T) {
 			// Create a fresh connection with labels for this test
-			deleteTestId := uuid.New()
+			deleteTestId := apid.New(apid.PrefixConnection)
 			err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 				Id:               deleteTestId,
 				Namespace:        sconfig.RootNamespace,
@@ -1104,7 +1104,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("success idempotent delete", func(t *testing.T) {
 			// Create a fresh connection for idempotent test
-			idempotentId := uuid.New()
+			idempotentId := apid.New(apid.PrefixConnection)
 			err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 				Id:               idempotentId,
 				Namespace:        sconfig.RootNamespace,
@@ -1143,7 +1143,7 @@ func TestConnections(t *testing.T) {
 	t.Run("force connection state", func(t *testing.T) {
 		tu, done := setup(t, nil)
 		defer done()
-		u := uuid.New()
+		u := apid.New(apid.PrefixConnection)
 		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
 			Id:               u,
 			Namespace:        sconfig.RootNamespace,
@@ -1166,7 +1166,7 @@ func TestConnections(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				"/connections/"+uuid.New().String()+"/_force_state",
+				"/connections/"+apid.New(apid.PrefixConnection).String()+"/_force_state",
 				util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}),
 				"root",
 				"some-actor",
@@ -1182,7 +1182,7 @@ func TestConnections(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
-				"/connections/"+uuid.New().String()+"/_force_state",
+				"/connections/"+apid.New(apid.PrefixConnection).String()+"/_force_state",
 				util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}),
 				"root",
 				"some-actor",
@@ -1243,7 +1243,7 @@ func TestConnections(t *testing.T) {
 		})
 
 		t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
-			otherResourceId := uuid.New()
+			otherResourceId := apid.New(apid.PrefixConnection)
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,

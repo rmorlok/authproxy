@@ -3,7 +3,7 @@ package iface
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/database"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
@@ -38,13 +38,13 @@ type C interface {
 	 */
 
 	// GetConnectorVersion returns the specified version of a connector.
-	GetConnectorVersion(ctx context.Context, id uuid.UUID, version uint64) (ConnectorVersion, error)
+	GetConnectorVersion(ctx context.Context, id apid.ID, version uint64) (ConnectorVersion, error)
 
 	// GetConnectorVersions Retrieves multiple connector versions at once.
 	GetConnectorVersions(ctx context.Context, requested []ConnectorVersionId) (map[ConnectorVersionId]ConnectorVersion, error)
 
 	// GetConnectorVersionForState returns the most recent version of the connector for the specified state.
-	GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state database.ConnectorVersionState) (ConnectorVersion, error)
+	GetConnectorVersionForState(ctx context.Context, id apid.ID, state database.ConnectorVersionState) (ConnectorVersion, error)
 
 	// ListConnectorsBuilder returns a builder to allow the caller to list connectors matching certain criteria.
 	ListConnectorsBuilder() ListConnectorsBuilder
@@ -63,14 +63,14 @@ type C interface {
 
 	// CreateDraftConnectorVersion creates a new draft version for an existing connector.
 	// Returns ErrDraftAlreadyExists if a draft version already exists.
-	CreateDraftConnectorVersion(ctx context.Context, id uuid.UUID, definition *cschema.Connector, labels map[string]string) (ConnectorVersion, error)
+	CreateDraftConnectorVersion(ctx context.Context, id apid.ID, definition *cschema.Connector, labels map[string]string) (ConnectorVersion, error)
 
 	// UpdateDraftConnectorVersion updates an existing draft version.
 	// Returns ErrNotDraft if the version is not in draft state.
-	UpdateDraftConnectorVersion(ctx context.Context, id uuid.UUID, version uint64, definition *cschema.Connector, labels map[string]string) (ConnectorVersion, error)
+	UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, version uint64, definition *cschema.Connector, labels map[string]string) (ConnectorVersion, error)
 
 	// GetOrCreateDraftConnectorVersion returns the existing draft version, or creates a new one by cloning the latest version.
-	GetOrCreateDraftConnectorVersion(ctx context.Context, id uuid.UUID) (ConnectorVersion, error)
+	GetOrCreateDraftConnectorVersion(ctx context.Context, id apid.ID) (ConnectorVersion, error)
 
 	/*
 	 *
@@ -80,10 +80,10 @@ type C interface {
 
 	// DisconnectConnection disconnects a connection. This is a state transition that queues work to do any cleanup
 	// with the 3rd party.
-	DisconnectConnection(ctx context.Context, id uuid.UUID) (taskInfo *tasks.TaskInfo, err error)
+	DisconnectConnection(ctx context.Context, id apid.ID) (taskInfo *tasks.TaskInfo, err error)
 
 	// GetConnection returns a connection by ID. This connection has the full connection version details in it.
-	GetConnection(ctx context.Context, id uuid.UUID) (Connection, error)
+	GetConnection(ctx context.Context, id apid.ID) (Connection, error)
 
 	// CreateConnection creates a new connection.
 	CreateConnection(ctx context.Context, namespace string, cv ConnectorVersion) (Connection, error)

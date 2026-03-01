@@ -13,7 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/mohae/deepcopy"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	jwt2 "github.com/rmorlok/authproxy/internal/apauth/jwt"
@@ -403,7 +403,7 @@ func TestAuth_Parse(t *testing.T) {
 
 		// Create the actor in the database
 		err = testDb.CreateActor(ctx, &database.Actor{
-			Id:           uuid.New(),
+			Id:           apid.New(apid.PrefixActor),
 			Namespace:    "root",
 			ExternalId:   "bobdole",
 			EncryptedKey: &encryptedKey,
@@ -509,7 +509,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			t.Run("actor loaded from database", func(t *testing.T) {
 				setup(t)
 
-				dbActorId := uuid.New()
+				dbActorId := apid.New(apid.PrefixActor)
 				dbActor := &database.Actor{
 					Id:         dbActorId,
 					Namespace:  "root",
@@ -535,7 +535,7 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 			t.Run("actor permissions updated in database", func(t *testing.T) {
 				setup(t)
 
-				dbActorId := uuid.New()
+				dbActorId := apid.New(apid.PrefixActor)
 				externalId := "perm-test-actor"
 				oldPerms := database.Permissions{
 					{
@@ -770,7 +770,7 @@ func TestAuth_ActorPermissionsSync(t *testing.T) {
 		}
 
 		// Create actor in database with permissions (simulating actor sync)
-		dbActorId := uuid.New()
+		dbActorId := apid.New(apid.PrefixActor)
 		dbActor := &database.Actor{
 			Id:          dbActorId,
 			Namespace:   "root",
@@ -851,7 +851,7 @@ func TestAuth_ActorCacheReducesDbCalls(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	mockDb := mock.NewMockDB(ctrl)
 
-	actorId := uuid.New()
+	actorId := apid.New(apid.PrefixActor)
 	actor := &database.Actor{
 		Id:         actorId,
 		Namespace:  "root",
@@ -914,7 +914,7 @@ func TestAuth_Nonce(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		ts := setup(t)
 		c := testClaims()
-		c.Nonce = util.ToPtr(uuid.New())
+		c.Nonce = util.ToPtr(apid.New(apid.PrefixNonce))
 		c.ExpiresAt = &jwt.NumericDate{now.Add(time.Hour)}
 		c.NotBefore = nil
 
@@ -931,7 +931,7 @@ func TestAuth_Nonce(t *testing.T) {
 	t.Run("expired", func(t *testing.T) {
 		ts := setup(t)
 		c := testClaims()
-		c.Nonce = util.ToPtr(uuid.New())
+		c.Nonce = util.ToPtr(apid.New(apid.PrefixNonce))
 		c.ExpiresAt = &jwt.NumericDate{now.Add(-time.Hour)}
 		c.NotBefore = nil
 
@@ -947,7 +947,7 @@ func TestAuth_Nonce(t *testing.T) {
 	t.Run("used more than once", func(t *testing.T) {
 		ts := setup(t)
 		c := testClaims()
-		c.Nonce = util.ToPtr(uuid.New())
+		c.Nonce = util.ToPtr(apid.New(apid.PrefixNonce))
 		c.ExpiresAt = &jwt.NumericDate{now.Add(time.Hour)}
 		c.NotBefore = nil
 
@@ -971,7 +971,7 @@ func TestAuth_Nonce(t *testing.T) {
 	t.Run("token does not contain expiry", func(t *testing.T) {
 		ts := setup(t)
 		c := testClaims()
-		c.Nonce = util.ToPtr(uuid.New())
+		c.Nonce = util.ToPtr(apid.New(apid.PrefixNonce))
 		c.ExpiresAt = nil
 		c.NotBefore = nil
 

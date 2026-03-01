@@ -6,17 +6,17 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 )
 
 type Connection struct {
-	Id               uuid.UUID
+	Id               apid.ID
 	Namespace        string
 	State            database.ConnectionState
-	ConnectorId      uuid.UUID
+	ConnectorId      apid.ID
 	ConnectorVersion uint64
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
@@ -24,7 +24,7 @@ type Connection struct {
 	Labels           map[string]string
 }
 
-func (m *Connection) GetId() uuid.UUID {
+func (m *Connection) GetId() apid.ID {
 	return m.Id
 }
 
@@ -36,7 +36,7 @@ func (m *Connection) GetState() database.ConnectionState {
 	return m.State
 }
 
-func (m *Connection) GetConnectorId() uuid.UUID {
+func (m *Connection) GetConnectorId() apid.ID {
 	return m.ConnectorId
 }
 
@@ -97,7 +97,7 @@ func (m *Connection) ProxyRequestRaw(
 var _ iface.Connection = (*Connection)(nil)
 
 type ConnectionMatcher struct {
-	ExpectedId uuid.UUID
+	ExpectedId apid.ID
 }
 
 func (m ConnectionMatcher) Matches(x interface{}) bool {

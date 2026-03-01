@@ -5,8 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 
-	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/apblob"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -32,7 +32,7 @@ func (ss *StorageService) NewRoundTripper(ri httpf.RequestInfo, transport http.R
 }
 
 // GetRecord retrieves a single LogRecord by its request ID.
-func (ss *StorageService) GetRecord(ctx context.Context, id uuid.UUID) (*LogRecord, error) {
+func (ss *StorageService) GetRecord(ctx context.Context, id apid.ID) (*LogRecord, error) {
 	return ss.retriever.GetRecord(ctx, id)
 }
 
@@ -46,7 +46,7 @@ func (ss *StorageService) ListRequestsFromCursor(ctx context.Context, cursor str
 	return ss.retriever.ListRequestsFromCursor(ctx, cursor)
 }
 
-func (ss *StorageService) GetFullLog(ctx context.Context, id uuid.UUID) (*FullLog, error) {
+func (ss *StorageService) GetFullLog(ctx context.Context, id apid.ID) (*FullLog, error) {
 	log, err := ss.GetRecord(ctx, id)
 	if err != nil {
 		return nil, err

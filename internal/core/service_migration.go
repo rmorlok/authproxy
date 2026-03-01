@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
@@ -147,18 +147,18 @@ func (s *service) configConnectorToVersion(configConnector *config.Connector) (*
 
 func (s *service) precheckConnectorsForMigration(ctx context.Context, configConnectors *config.Connectors) error {
 	type IdVersionStateTuple struct {
-		Id      uuid.UUID
+		Id      apid.ID
 		Version uint64
 		State   string
 	}
 
 	type IdVersionTuple struct {
-		Id      uuid.UUID
+		Id      apid.ID
 		Version uint64
 	}
 
 	type IdStateTuple struct {
-		Id    uuid.UUID
+		Id    apid.ID
 		State string
 	}
 
@@ -167,7 +167,7 @@ func (s *service) precheckConnectorsForMigration(ctx context.Context, configConn
 	idVersionStateCounts := make(map[IdVersionStateTuple]int)
 	idVersionCounts := make(map[IdVersionTuple]int)
 	idStateCounts := make(map[IdStateTuple]int)
-	idCounts := make(map[uuid.UUID]int)
+	idCounts := make(map[apid.ID]int)
 	identifyingLabelCounts := make(map[string]int)
 
 	// Helper to serialize identifying label values for map key
@@ -388,7 +388,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 	b := newConnectorVersionBuilder(s)
 	identifyingLabels := configConnectors.GetIdentifyingLabels()
 
-	id := apctx.GetUuidGenerator(ctx).New()
+	id := apctx.GetIdGenerator(ctx).New(apid.PrefixConnectorVersion)
 	if configConnector.HasId() {
 		id = configConnector.Id
 	}

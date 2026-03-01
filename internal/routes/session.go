@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/pkg/errors"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
@@ -49,7 +49,7 @@ type InitiateFailureResponse struct {
 
 type InitiateSuccessResponse struct {
 	// This should include any configuration the SPA needs
-	ActorId uuid.UUID `json:"actor_id"`
+	ActorId apid.ID `json:"actor_id" swaggertype:"string"`
 }
 
 //	@Summary		Initiate session

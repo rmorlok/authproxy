@@ -9,7 +9,7 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
@@ -22,7 +22,7 @@ import (
 type ConnectorVersionState string
 
 type ConnectorVersionId struct {
-	Id      uuid.UUID
+	Id      apid.ID
 	Version uint64
 }
 
@@ -110,7 +110,7 @@ func IsValidConnectorVersionState[T string | ConnectorVersionState](state T) boo
 const ConnectorVersionsTable = "connector_versions"
 
 type ConnectorVersion struct {
-	Id                  uuid.UUID
+	Id                  apid.ID
 	Version             uint64
 	Namespace           string
 	State               ConnectorVersionState
@@ -167,7 +167,7 @@ func (cv *ConnectorVersion) values() []any {
 	}
 }
 
-func (cv *ConnectorVersion) GetId() uuid.UUID {
+func (cv *ConnectorVersion) GetId() apid.ID {
 	return cv.Id
 }
 
@@ -182,8 +182,12 @@ func (cv *ConnectorVersion) GetVersion() uint64 {
 func (cv *ConnectorVersion) Validate() error {
 	result := &multierror.Error{}
 
-	if cv.Id == uuid.Nil {
+	if cv.Id == apid.Nil {
 		result = multierror.Append(result, errors.New("id is required"))
+	}
+
+	if err := cv.Id.ValidatePrefix(apid.PrefixConnectorVersion); err != nil {
+		result = multierror.Append(result, fmt.Errorf("invalid connector version id: %w", err))
 	}
 
 	if cv.Version == 0 {
@@ -213,7 +217,7 @@ func (cv *ConnectorVersion) Validate() error {
 	return result.ErrorOrNil()
 }
 
-func (s *service) GetConnectorVersion(ctx context.Context, id uuid.UUID, version uint64) (*ConnectorVersion, error) {
+func (s *service) GetConnectorVersion(ctx context.Context, id apid.ID, version uint64) (*ConnectorVersion, error) {
 	var result ConnectorVersion
 	err := s.sq.
 		Select(result.cols()...).
@@ -433,8 +437,8 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 	})
 }
 
-func (s *service) SetConnectorVersionState(ctx context.Context, id uuid.UUID, version uint64, state ConnectorVersionState) error {
-	if id == uuid.Nil {
+func (s *service) SetConnectorVersionState(ctx context.Context, id apid.ID, version uint64, state ConnectorVersionState) error {
+	if id == apid.Nil {
 		return errors.New("connector version id is required")
 	}
 
@@ -562,7 +566,7 @@ func (s *service) GetConnectorVersionForLabelsAndVersion(ctx context.Context, la
 	return &result, nil
 }
 
-func (s *service) GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state ConnectorVersionState) (*ConnectorVersion, error) {
+func (s *service) GetConnectorVersionForState(ctx context.Context, id apid.ID, state ConnectorVersionState) (*ConnectorVersion, error) {
 	var result ConnectorVersion
 	err := s.sq.
 		Select(result.cols()...).
@@ -589,7 +593,7 @@ func (s *service) GetConnectorVersionForState(ctx context.Context, id uuid.UUID,
 	return &result, nil
 }
 
-func (s *service) NewestConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error) {
+func (s *service) NewestConnectorVersionForId(ctx context.Context, id apid.ID) (*ConnectorVersion, error) {
 	var result ConnectorVersion
 	err := s.sq.
 		Select(result.cols()...).
@@ -615,7 +619,7 @@ func (s *service) NewestConnectorVersionForId(ctx context.Context, id uuid.UUID)
 	return &result, nil
 }
 
-func (s *service) NewestPublishedConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error) {
+func (s *service) NewestPublishedConnectorVersionForId(ctx context.Context, id apid.ID) (*ConnectorVersion, error) {
 	var result ConnectorVersion
 	err := s.sq.
 		Select(result.cols()...).
@@ -673,7 +677,7 @@ type ListConnectorVersionsExecutor interface {
 type ListConnectorVersionsBuilder interface {
 	ListConnectorVersionsExecutor
 	Limit(int32) ListConnectorVersionsBuilder
-	ForId(uuid.UUID) ListConnectorVersionsBuilder
+	ForId(apid.ID) ListConnectorVersionsBuilder
 	ForVersion(uint64) ListConnectorVersionsBuilder
 	ForState(ConnectorVersionState) ListConnectorVersionsBuilder
 	ForStates([]ConnectorVersionState) ListConnectorVersionsBuilder
@@ -690,7 +694,7 @@ type listConnectorVersionsFilters struct {
 	Offset            uint64                        `json:"offset"`
 	StatesVal         []ConnectorVersionState       `json:"states,omitempty"`
 	NamespaceMatchers []string                      `json:"namespace_matchers,omitempty"`
-	IdsVal            []uuid.UUID                   `json:"ids,omitempty"`
+	IdsVal            []apid.ID                   `json:"ids,omitempty"`
 	VersionsVal       []uint64                      `json:"versions,omitempty"`
 	OrderByFieldVal   *ConnectorVersionOrderByField `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy           `json:"order_by"`
@@ -739,8 +743,8 @@ func (l *listConnectorVersionsFilters) ForNamespaceMatchers(matchers []string) L
 	return l
 }
 
-func (l *listConnectorVersionsFilters) ForId(id uuid.UUID) ListConnectorVersionsBuilder {
-	l.IdsVal = []uuid.UUID{id}
+func (l *listConnectorVersionsFilters) ForId(id apid.ID) ListConnectorVersionsBuilder {
+	l.IdsVal = []apid.ID{id}
 	return l
 }
 

@@ -3889,7 +3889,7 @@ const docTemplateadmin_api = `{
                 "id": {
                     "description": "Connection UUID",
                     "type": "string",
-                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                    "example": "req_test550e8400abcde"
                 },
                 "redirect_url": {
                     "description": "URL to redirect the user to",
@@ -3910,7 +3910,7 @@ const docTemplateadmin_api = `{
                 "connector_id": {
                     "description": "ID of the connector to initiate the connection for",
                     "type": "string",
-                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                    "example": "req_test550e8400abcde"
                 },
                 "connector_version": {
                     "description": "Version of the connector (optional, defaults to primary version)",
@@ -4075,7 +4075,7 @@ const docTemplateadmin_api = `{
                 "id": {
                     "description": "Connection UUID",
                     "type": "string",
-                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                    "example": "req_test550e8400abcde"
                 },
                 "labels": {
                     "description": "Labels assigned to the connection",
@@ -4142,7 +4142,7 @@ const docTemplateadmin_api = `{
                 "id": {
                     "description": "Connector UUID",
                     "type": "string",
-                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                    "example": "req_test550e8400abcde"
                 },
                 "labels": {
                     "description": "Labels assigned to the connector",
@@ -4212,7 +4212,7 @@ const docTemplateadmin_api = `{
                 "id": {
                     "description": "Connector UUID",
                     "type": "string",
-                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                    "example": "req_test550e8400abcde"
                 },
                 "labels": {
                     "description": "Labels assigned to the connector",
@@ -4509,7 +4509,7 @@ const docTemplateadmin_api = `{
                 "request_id": {
                     "description": "Request UUID",
                     "type": "string",
-                    "example": "550e8400-e29b-41d4-a716-446655440000"
+                    "example": "req_test550e8400abcde"
                 },
                 "response_status_code": {
                     "description": "HTTP response status code",

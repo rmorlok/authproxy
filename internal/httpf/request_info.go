@@ -1,6 +1,6 @@
 package httpf
 
-import "github.com/google/uuid"
+import "github.com/rmorlok/authproxy/internal/apid"
 
 type RequestType string
 
@@ -15,7 +15,7 @@ const (
 type RequestInfo struct {
 	Namespace        string
 	Type             RequestType
-	ConnectorId      uuid.UUID
+	ConnectorId      apid.ID
 	ConnectorVersion uint64
-	ConnectionId     uuid.UUID
+	ConnectionId     apid.ID
 }

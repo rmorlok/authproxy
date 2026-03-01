@@ -13,7 +13,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	coreAuth "github.com/rmorlok/authproxy/internal/apauth/core"
 	authService "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apredis"
@@ -73,7 +73,7 @@ func TestActorsRoutes(t *testing.T) {
 	createActor := func(t *testing.T, db database.DB, externalId, namespace string) *database.Actor {
 		require.NoError(t, db.EnsureNamespaceByPath(context.Background(), namespace))
 		a := &database.Actor{
-			Id:         uuid.New(),
+			Id:         apid.New(apid.PrefixActor),
 			Namespace:  namespace,
 			ExternalId: externalId,
 			CreatedAt:  time.Now().UTC(),
@@ -87,7 +87,7 @@ func TestActorsRoutes(t *testing.T) {
 	createActorWithNamespace := func(t *testing.T, db database.DB, externalId, namespace string) *database.Actor {
 		db.EnsureNamespaceByPath(context.Background(), namespace)
 		a := &database.Actor{
-			Id:         uuid.New(),
+			Id:         apid.New(apid.PrefixActor),
 			Namespace:  namespace,
 			ExternalId: externalId,
 			CreatedAt:  time.Now().UTC(),
@@ -217,7 +217,7 @@ func TestActorsRoutes(t *testing.T) {
 		defer done()
 
 		a := createActor(t, tu.Db, "user/10", "root")
-		otherId := uuid.New()
+		otherId := apid.New(apid.PrefixActor)
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
@@ -256,7 +256,7 @@ func TestActorsRoutes(t *testing.T) {
 
 		t.Run("not found", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodGet, "/actors/"+uuid.New().String(), nil)
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+apid.New(apid.PrefixActor).String(), nil)
 			require.NoError(t, err)
 			req = authenticate(t, tu, req)
 
@@ -342,7 +342,7 @@ func TestActorsRoutes(t *testing.T) {
 		defer done()
 
 		a := createActor(t, tu.Db, "user/30", "root")
-		otherId := uuid.New()
+		otherId := apid.New(apid.PrefixActor)
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
@@ -381,7 +381,7 @@ func TestActorsRoutes(t *testing.T) {
 
 		t.Run("not found returns 204", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodDelete, "/actors/"+uuid.New().String(), nil)
+			req, err := http.NewRequest(http.MethodDelete, "/actors/"+apid.New(apid.PrefixActor).String(), nil)
 			require.NoError(t, err)
 			req = authenticate(t, tu, req)
 
@@ -701,7 +701,7 @@ func TestActorsRoutes(t *testing.T) {
 
 			var resp ActorJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			require.NotEqual(t, uuid.Nil, resp.Id)
+			require.NotEqual(t, apid.Nil, resp.Id)
 			require.Equal(t, "created-actor", resp.ExternalId)
 			require.Equal(t, "root", resp.Namespace)
 			require.NotZero(t, resp.CreatedAt)
@@ -790,7 +790,7 @@ func TestActorsRoutes(t *testing.T) {
 		defer done()
 
 		a := createActor(t, tu.Db, "update-actor-1", "root")
-		otherId := uuid.New()
+		otherId := apid.New(apid.PrefixActor)
 
 		t.Run("unauthorized", func(t *testing.T) {
 			reqBody := UpdateActorRequestJson{
@@ -848,7 +848,7 @@ func TestActorsRoutes(t *testing.T) {
 			}
 			body := util.MustPrettyJSON(reqBody)
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodPatch, "/actors/"+uuid.New().String(), bytes.NewBufferString(body))
+			req, err := http.NewRequest(http.MethodPatch, "/actors/"+apid.New(apid.PrefixActor).String(), bytes.NewBufferString(body))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 			req = authenticate(t, tu, req)
@@ -1091,7 +1091,7 @@ func TestActorsRoutes(t *testing.T) {
 
 		t.Run("not found", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodGet, "/actors/"+uuid.New().String()+"/labels", nil)
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+apid.New(apid.PrefixActor).String()+"/labels", nil)
 			require.NoError(t, err)
 			req = authenticate(t, tu, req)
 
@@ -1166,7 +1166,7 @@ func TestActorsRoutes(t *testing.T) {
 
 		t.Run("actor not found", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodGet, "/actors/"+uuid.New().String()+"/labels/env", nil)
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+apid.New(apid.PrefixActor).String()+"/labels/env", nil)
 			require.NoError(t, err)
 			req = authenticate(t, tu, req)
 
@@ -1205,7 +1205,7 @@ func TestActorsRoutes(t *testing.T) {
 		defer done()
 
 		a := createActor(t, tu.Db, "put-label-actor", "root")
-		otherId := uuid.New()
+		otherId := apid.New(apid.PrefixActor)
 
 		t.Run("unauthorized", func(t *testing.T) {
 			body := `{"value": "production"}`
@@ -1251,7 +1251,7 @@ func TestActorsRoutes(t *testing.T) {
 		t.Run("actor not found", func(t *testing.T) {
 			body := `{"value": "production"}`
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodPut, "/actors/"+uuid.New().String()+"/labels/env", bytes.NewBufferString(body))
+			req, err := http.NewRequest(http.MethodPut, "/actors/"+apid.New(apid.PrefixActor).String()+"/labels/env", bytes.NewBufferString(body))
 			require.NoError(t, err)
 			req.Header.Set("Content-Type", "application/json")
 			req = authenticate(t, tu, req)
@@ -1371,7 +1371,7 @@ func TestActorsRoutes(t *testing.T) {
 		})
 		require.NoError(t, err)
 
-		otherId := uuid.New()
+		otherId := apid.New(apid.PrefixActor)
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
@@ -1410,7 +1410,7 @@ func TestActorsRoutes(t *testing.T) {
 
 		t.Run("actor not found returns 204", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodDelete, "/actors/"+uuid.New().String()+"/labels/env", nil)
+			req, err := http.NewRequest(http.MethodDelete, "/actors/"+apid.New(apid.PrefixActor).String()+"/labels/env", nil)
 			require.NoError(t, err)
 			req = authenticate(t, tu, req)
 

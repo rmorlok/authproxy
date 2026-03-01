@@ -13,7 +13,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
@@ -287,7 +287,7 @@ func (ts *TestSetup) MustGetValidActorWithKey(ctx context.Context) database.Acto
 		}
 
 		a = &database.Actor{
-			Id:           uuid.New(),
+			Id:           apid.New(apid.PrefixActor),
 			Namespace:    "root",
 			ExternalId:   "bobdole",
 			EncryptedKey: &encryptedKey,
@@ -303,7 +303,7 @@ func (ts *TestSetup) MustGetValidActorWithKey(ctx context.Context) database.Acto
 // MustGetValidUninitializedActorWithKey gives a valid actor with a key in config, but does not create in the database ahead of time.
 func (ts *TestSetup) MustGetValidUninitializedActorWithKey(ctx context.Context) database.Actor {
 	return database.Actor{
-		Id:         uuid.New(),
+		Id:         apid.New(apid.PrefixActor),
 		Namespace:  "root",
 		ExternalId: "ronaldreagan",
 	}
@@ -319,7 +319,7 @@ func (ts *TestSetup) MustGetValidUserByExternalId(ctx context.Context, externalI
 
 	if errors.Is(err, database.ErrNotFound) {
 		a = &database.Actor{
-			Id:         uuid.New(),
+			Id:         apid.New(apid.PrefixActor),
 			Namespace:  "root",
 			ExternalId: externalId,
 		}
@@ -438,7 +438,7 @@ func (ts *TestSetup) PostWithSigner(ctx context.Context, path string, body gin.H
 // the information.
 func (ts *TestSetup) MustGetInvalidActorWithKey(ctx context.Context) database.Actor {
 	return database.Actor{
-		Id:         uuid.New(),
+		Id:         apid.New(apid.PrefixActor),
 		ExternalId: "billclinton",
 	}
 }

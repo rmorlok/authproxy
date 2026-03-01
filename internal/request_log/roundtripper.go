@@ -9,6 +9,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/httpf"
 )
 
@@ -35,7 +36,7 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	var responseBodyTrackingReader trackingReader
 
 	// Generate a unique ID for this request
-	id := apctx.GetUuidGenerator(ctx).New()
+	id := apctx.GetIdGenerator(ctx).New(apid.PrefixRequestLog)
 
 	// Record start time
 	clock := apctx.GetClock(ctx)

@@ -5,7 +5,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -63,7 +63,7 @@ func (o *oAuth2Connection) createDbTokenFromResponse(ctx context.Context, resp *
 		expiresAt = util.ToPtr(apctx.GetClock(ctx).Now().Add(time.Duration(*jsonResp.ExpiresIn) * time.Second))
 	}
 
-	var refreshFromId *uuid.UUID
+	var refreshFromId *apid.ID
 	if refreshFrom != nil {
 		refreshFromId = &refreshFrom.Id
 	}

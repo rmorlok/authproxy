@@ -7,7 +7,7 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
@@ -41,10 +41,10 @@ func IsValidConnectionState[T string | ConnectionState](state T) bool {
 const ConnectionsTable = "connections"
 
 type Connection struct {
-	Id               uuid.UUID
+	Id               apid.ID
 	Namespace        string
 	State            ConnectionState
-	ConnectorId      uuid.UUID
+	ConnectorId      apid.ID
 	ConnectorVersion uint64
 	Labels           Labels
 	CreatedAt        time.Time
@@ -94,11 +94,11 @@ func (c *Connection) values() []any {
 	}
 }
 
-func (c *Connection) GetId() uuid.UUID {
+func (c *Connection) GetId() apid.ID {
 	return c.Id
 }
 
-func (c *Connection) GetConnectorId() uuid.UUID {
+func (c *Connection) GetConnectorId() apid.ID {
 	return c.ConnectorId
 }
 
@@ -113,8 +113,12 @@ func (c *Connection) GetNamespace() string {
 func (c *Connection) Validate() error {
 	result := &multierror.Error{}
 
-	if c.Id == uuid.Nil {
+	if c.Id == apid.Nil {
 		result = multierror.Append(result, errors.New("connection id is required"))
+	}
+
+	if err := c.Id.ValidatePrefix(apid.PrefixConnection); err != nil {
+		result = multierror.Append(result, fmt.Errorf("invalid connection id: %w", err))
 	}
 
 	if err := ValidateNamespacePath(c.Namespace); err != nil {
@@ -125,8 +129,12 @@ func (c *Connection) Validate() error {
 		result = multierror.Append(result, errors.New("invalid connection state"))
 	}
 
-	if c.ConnectorId == uuid.Nil {
+	if c.ConnectorId == apid.Nil {
 		result = multierror.Append(result, errors.New("connection connector id is required"))
+	}
+
+	if err := c.ConnectorId.ValidatePrefix(apid.PrefixConnectorVersion); err != nil {
+		result = multierror.Append(result, fmt.Errorf("invalid connection connector id: %w", err))
 	}
 
 	if c.ConnectorVersion == 0 {
@@ -176,7 +184,7 @@ func (s *service) CreateConnection(ctx context.Context, c *Connection) error {
 	return nil
 }
 
-func (s *service) GetConnection(ctx context.Context, id uuid.UUID) (*Connection, error) {
+func (s *service) GetConnection(ctx context.Context, id apid.ID) (*Connection, error) {
 	var result Connection
 	err := s.sq.
 		Select(result.cols()...).
@@ -196,7 +204,7 @@ func (s *service) GetConnection(ctx context.Context, id uuid.UUID) (*Connection,
 	return &result, nil
 }
 
-func (s *service) DeleteConnection(ctx context.Context, id uuid.UUID) error {
+func (s *service) DeleteConnection(ctx context.Context, id apid.ID) error {
 	now := apctx.GetClock(ctx).Now()
 	dbResult, err := s.sq.
 		Update(ConnectionsTable).
@@ -225,8 +233,8 @@ func (s *service) DeleteConnection(ctx context.Context, id uuid.UUID) error {
 	return nil
 }
 
-func (s *service) SetConnectionState(ctx context.Context, id uuid.UUID, state ConnectionState) error {
-	if id == uuid.Nil {
+func (s *service) SetConnectionState(ctx context.Context, id apid.ID, state ConnectionState) error {
+	if id == apid.Nil {
 		return errors.New("connection id is required")
 	}
 
@@ -505,8 +513,8 @@ func (l *listConnectionsFilters) Enumerate(ctx context.Context, callback func(pa
 
 // UpdateConnectionLabels replaces all labels on a connection within a single transaction.
 // Unlike PutConnectionLabels, this does a full replacement rather than a merge.
-func (s *service) UpdateConnectionLabels(ctx context.Context, id uuid.UUID, labels map[string]string) (*Connection, error) {
-	if id == uuid.Nil {
+func (s *service) UpdateConnectionLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Connection, error) {
+	if id == apid.Nil {
 		return nil, errors.New("connection id is required")
 	}
 
@@ -555,8 +563,8 @@ func (s *service) UpdateConnectionLabels(ctx context.Context, id uuid.UUID, labe
 
 // PutConnectionLabels adds or updates the specified labels on a connection within a single transaction.
 // Existing labels not in the provided map are preserved.
-func (s *service) PutConnectionLabels(ctx context.Context, id uuid.UUID, labels map[string]string) (*Connection, error) {
-	if id == uuid.Nil {
+func (s *service) PutConnectionLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Connection, error) {
+	if id == apid.Nil {
 		return nil, errors.New("connection id is required")
 	}
 
@@ -607,8 +615,8 @@ func (s *service) PutConnectionLabels(ctx context.Context, id uuid.UUID, labels 
 
 // DeleteConnectionLabels removes the specified label keys from a connection within a single transaction.
 // Keys that don't exist are ignored.
-func (s *service) DeleteConnectionLabels(ctx context.Context, id uuid.UUID, keys []string) (*Connection, error) {
-	if id == uuid.Nil {
+func (s *service) DeleteConnectionLabels(ctx context.Context, id apid.ID, keys []string) (*Connection, error) {
+	if id == apid.Nil {
 		return nil, errors.New("connection id is required")
 	}
 

@@ -7,7 +7,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	mockCore "github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
 	database_mock "github.com/rmorlok/authproxy/internal/database/mock"
@@ -95,7 +95,7 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 					Scopes: []sconfig.Scope{{Id: "read"}, {Id: "write"}},
 				},
 				connection: &mockCore.Connection{
-					Id: uuid.MustParse("12345678-1234-1234-1234-123456789abc"),
+					Id: apid.MustParse("cxn_test1234567890ab"),
 				},
 			}
 

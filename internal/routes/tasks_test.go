@@ -12,7 +12,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/apasynq/mock"
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
@@ -88,7 +88,7 @@ func TestTasks(t *testing.T) {
 				AsynqId:    "test-id",
 				AsynqQueue: "test-queue",
 				AsynqType:  "test-type",
-				ActorId:    uuid.New(),
+				ActorId:    apid.New(apid.PrefixActor),
 			}
 
 			// Encrypt the TaskInfo

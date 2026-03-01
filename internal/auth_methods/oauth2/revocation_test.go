@@ -5,7 +5,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	mockLog "github.com/rmorlok/authproxy/internal/aplog/mock"
 	mockCore "github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -37,8 +37,8 @@ func TestSupportsRevokeRefreshToken(t *testing.T) {
 }
 
 func TestRevokeRefreshToken(t *testing.T) {
-	connectionId := uuid.New()
-	tokenId := uuid.New()
+	connectionId := apid.New(apid.PrefixActor)
+	tokenId := apid.New(apid.PrefixOAuth2Token)
 
 	setupWithMocks := func(t *testing.T) (*oAuth2Connection, *mockDb.MockDB, *mockEncrypt.MockE, *gomock.Controller) {
 		ctrl := gomock.NewController(t)

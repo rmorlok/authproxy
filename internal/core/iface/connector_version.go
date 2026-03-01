@@ -4,13 +4,13 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
 type ConnectorVersion interface {
-	GetId() uuid.UUID
+	GetId() apid.ID
 	GetNamespace() string
 	GetVersion() uint64
 	GetState() database.ConnectorVersionState

@@ -3,12 +3,12 @@ package mock
 import (
 	"fmt"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 )
 
 type ConnectorVersionMatcher struct {
-	ExpectedId      uuid.UUID
+	ExpectedId      apid.ID
 	ExpectedVersion uint64
 }
 
@@ -26,7 +26,7 @@ func (m ConnectorVersionMatcher) String() string {
 }
 
 type ConnectionMatcher struct {
-	ExpectedId uuid.UUID
+	ExpectedId apid.ID
 }
 
 func (m ConnectionMatcher) Matches(x interface{}) bool {

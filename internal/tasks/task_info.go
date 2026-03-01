@@ -5,7 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hibiken/asynq"
 )
 
@@ -18,14 +18,14 @@ const (
 
 type TaskInfo struct {
 	TrackedVia TrackedVia `json:"tracked_via"`
-	ActorId    uuid.UUID  `json:"actor_id,omitempty"`
+	ActorId    apid.ID  `json:"actor_id,omitempty"`
 	AsynqId    string     `json:"asynq_id,omitempty"`
 	AsynqQueue string     `json:"asynq_queue,omitempty"`
 	AsynqType  string     `json:"asynq_type,omitempty"`
 }
 
 type Actor interface {
-	GetId() uuid.UUID
+	GetId() apid.ID
 }
 
 func (ti *TaskInfo) BindToActor(actor Actor) *TaskInfo {

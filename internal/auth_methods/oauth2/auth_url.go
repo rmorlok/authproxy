@@ -5,15 +5,15 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
-func (o *oAuth2Connection) getPublicRedirectUrl(ctx context.Context, stateId uuid.UUID, actor IActorData) (string, error) {
+func (o *oAuth2Connection) getPublicRedirectUrl(ctx context.Context, stateId apid.ID, actor IActorData) (string, error) {
 	if o.cfg == nil {
 		return "", errors.New("config is nil")
 	}
@@ -113,7 +113,7 @@ func (o *oAuth2Connection) SetStateAndGeneratePublicUrl(
 	actor IActorData,
 	returnToUrl string,
 ) (string, error) {
-	stateId := uuid.New()
+	stateId := apid.New(apid.PrefixOauth2State)
 
 	if err := o.saveStateToRedis(ctx, actor, stateId, returnToUrl); err != nil {
 		return "", err

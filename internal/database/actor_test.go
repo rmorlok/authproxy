@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
@@ -28,7 +28,7 @@ func TestActor(t *testing.T) {
 
 	t.Run("Validation", func(t *testing.T) {
 		require.NoError(t, util.ToPtr(Actor{
-			Id:         uuid.New(),
+			Id:         apid.New(apid.PrefixActor),
 			Namespace:  "root",
 			ExternalId: "1234567890",
 		}).validate())
@@ -37,20 +37,25 @@ func TestActor(t *testing.T) {
 			ExternalId: "1234567890",
 		}).validate())
 		require.Error(t, util.ToPtr(Actor{
-			Id:        uuid.New(),
+			Id:        apid.New(apid.PrefixActor),
 			Namespace: "root",
 		}).validate())
 		require.Error(t, util.ToPtr(Actor{
-			Id:         uuid.New(),
+			Id:         apid.New(apid.PrefixActor),
 			Namespace:  "bad",
 			ExternalId: "1234567890",
 		}).validate())
 		require.Error(t, util.ToPtr(Actor{}).validate())
+		require.Error(t, util.ToPtr(Actor{
+			Id:         apid.New(apid.PrefixConnection), // wrong prefix
+			Namespace:  "root",
+			ExternalId: "1234567890",
+		}).validate())
 	})
 	t.Run("GetActor", func(t *testing.T) {
 		setup(t)
 
-		otherId := uuid.New()
+		otherId := apid.New(apid.PrefixActor)
 		otherActor := &Actor{
 			Id:         otherId,
 			Namespace:  "root",
@@ -58,7 +63,7 @@ func TestActor(t *testing.T) {
 		}
 		require.NoError(t, db.CreateActor(ctx, otherActor))
 
-		id := uuid.New()
+		id := apid.New(apid.PrefixActor)
 		a, err := db.GetActor(ctx, id)
 		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, a, "actor should not exist")
@@ -77,7 +82,7 @@ func TestActor(t *testing.T) {
 	t.Run("GetActorByExternalId", func(t *testing.T) {
 		setup(t)
 
-		otherId := uuid.New()
+		otherId := apid.New(apid.PrefixActor)
 		otherActor := &Actor{
 			Id:         otherId,
 			Namespace:  "root",
@@ -85,7 +90,7 @@ func TestActor(t *testing.T) {
 		}
 		require.NoError(t, db.CreateActor(ctx, otherActor))
 
-		id := uuid.New()
+		id := apid.New(apid.PrefixActor)
 		a, err := db.GetActorByExternalId(ctx, "root", id.String())
 		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, a, "actor should not exist")
@@ -112,7 +117,7 @@ func TestActor(t *testing.T) {
 		t.Run("valid", func(t *testing.T) {
 			setup(t)
 
-			id := uuid.New()
+			id := apid.New(apid.PrefixActor)
 			actor := &Actor{
 				Id:         id,
 				Namespace:  "root",
@@ -134,7 +139,7 @@ func TestActor(t *testing.T) {
 		t.Run("validates", func(t *testing.T) {
 			setup(t)
 
-			id := uuid.New()
+			id := apid.New(apid.PrefixActor)
 			actor := &Actor{
 				Id: id,
 				// ExternalId omitted
@@ -145,14 +150,14 @@ func TestActor(t *testing.T) {
 			setup(t)
 
 			actor1 := &Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				Namespace:  "root",
 				ExternalId: "duplicate",
 			}
 			require.NoError(t, db.CreateActor(ctx, actor1))
 
 			actor2 := &Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "duplicate",
 			}
 			require.Error(t, db.CreateActor(ctx, actor2))
@@ -160,17 +165,17 @@ func TestActor(t *testing.T) {
 		t.Run("doesn't update from an existing id", func(t *testing.T) {
 			setup(t)
 
-			id := uuid.New()
+			id := apid.New(apid.PrefixActor)
 			actor1 := &Actor{
 				Id:         id,
 				Namespace:  "root",
-				ExternalId: uuid.New().String(),
+				ExternalId: apid.New(apid.PrefixActor).String(),
 			}
 			require.NoError(t, db.CreateActor(ctx, actor1))
 
 			actor2 := &Actor{
 				Id:         id,
-				ExternalId: uuid.New().String(),
+				ExternalId: apid.New(apid.PrefixActor).String(),
 			}
 			require.Error(t, db.CreateActor(ctx, actor2))
 		})
@@ -196,7 +201,7 @@ func TestActor(t *testing.T) {
 			t.Run("permissions", func(t *testing.T) {
 				setup(t)
 
-				id := uuid.New()
+				id := apid.New(apid.PrefixActor)
 				externalId := "bobdole"
 				err := db.CreateActor(ctx, &Actor{
 					Id:         id,
@@ -278,7 +283,7 @@ func TestActor(t *testing.T) {
 				setup(t)
 
 				// Create first actor
-				id1 := uuid.New()
+				id1 := apid.New(apid.PrefixActor)
 				externalId1 := "actor1"
 				originalPerms1 := Permissions{
 					aschema.Permission{
@@ -296,7 +301,7 @@ func TestActor(t *testing.T) {
 				require.NoError(t, err)
 
 				// Create second actor
-				id2 := uuid.New()
+				id2 := apid.New(apid.PrefixActor)
 				externalId2 := "actor2"
 				originalPerms2 := Permissions{
 					aschema.Permission{
@@ -314,7 +319,7 @@ func TestActor(t *testing.T) {
 				require.NoError(t, err)
 
 				// Create third actor
-				id3 := uuid.New()
+				id3 := apid.New(apid.PrefixActor)
 				externalId3 := "actor3"
 				originalPerms3 := Permissions{
 					aschema.Permission{
@@ -371,12 +376,12 @@ func TestActor(t *testing.T) {
 	t.Run("List", func(t *testing.T) {
 		setup(t)
 
-		var firstUuid, lastUuid uuid.UUID
+		var firstUuid, lastUuid apid.ID
 		for i := 0; i < 50; i++ {
 			now = now.Add(time.Second)
 			clk.SetTime(now)
 
-			u := uuid.New()
+			u := apid.New(apid.PrefixActor)
 			if i == 0 {
 				firstUuid = u
 			}
@@ -450,7 +455,7 @@ func TestActor(t *testing.T) {
 		setup(t)
 
 		// create a single actor
-		id := uuid.New()
+		id := apid.New(apid.PrefixActor)
 		a := &Actor{Id: id, Namespace: "root", ExternalId: id.String()}
 		require.NoError(t, db.CreateActor(ctx, a))
 
@@ -499,34 +504,34 @@ func TestActor(t *testing.T) {
 		t.Run("validation", func(t *testing.T) {
 			t.Run("valid paths", func(t *testing.T) {
 				require.NoError(t, util.ToPtr(Actor{
-					Id:         uuid.New(),
+					Id:         apid.New(apid.PrefixActor),
 					Namespace:  "root",
 					ExternalId: "test",
 				}).validate())
 				require.NoError(t, util.ToPtr(Actor{
-					Id:         uuid.New(),
+					Id:         apid.New(apid.PrefixActor),
 					Namespace:  "root.tenant1",
 					ExternalId: "test",
 				}).validate())
 				require.NoError(t, util.ToPtr(Actor{
-					Id:         uuid.New(),
+					Id:         apid.New(apid.PrefixActor),
 					Namespace:  "root.tenant1.subtenant",
 					ExternalId: "test",
 				}).validate())
 			})
 			t.Run("invalid paths", func(t *testing.T) {
 				require.Error(t, util.ToPtr(Actor{
-					Id:         uuid.New(),
+					Id:         apid.New(apid.PrefixActor),
 					Namespace:  "",
 					ExternalId: "test",
 				}).validate())
 				require.Error(t, util.ToPtr(Actor{
-					Id:         uuid.New(),
+					Id:         apid.New(apid.PrefixActor),
 					Namespace:  "invalid",
 					ExternalId: "test",
 				}).validate())
 				require.Error(t, util.ToPtr(Actor{
-					Id:         uuid.New(),
+					Id:         apid.New(apid.PrefixActor),
 					Namespace:  "root.",
 					ExternalId: "test",
 				}).validate())
@@ -538,7 +543,7 @@ func TestActor(t *testing.T) {
 
 			err := db.EnsureNamespaceByPath(ctx, "root.tenant1")
 			require.NoError(t, err)
-			id := uuid.New()
+			id := apid.New(apid.PrefixActor)
 			actor := &Actor{
 				Id:         id,
 				Namespace:  "root.tenant1",
@@ -613,7 +618,7 @@ func TestActor(t *testing.T) {
 			require.NoError(t, err)
 
 			for _, a := range actors {
-				id := uuid.New()
+				id := apid.New(apid.PrefixActor)
 				err := db.CreateActor(ctx, &Actor{
 					Id:         id,
 					Namespace:  a.namespace,
@@ -662,25 +667,25 @@ func TestActor(t *testing.T) {
 			// Seed data for Actors
 			actors := []*Actor{
 				{
-					Id:         uuid.New(),
+					Id:         apid.New(apid.PrefixActor),
 					Namespace:  "root",
 					ExternalId: "actor1",
 					Labels:     Labels{"app": "web", "env": "prod"},
 				},
 				{
-					Id:         uuid.New(),
+					Id:         apid.New(apid.PrefixActor),
 					Namespace:  "root",
 					ExternalId: "actor2",
 					Labels:     Labels{"app": "api", "env": "prod"},
 				},
 				{
-					Id:         uuid.New(),
+					Id:         apid.New(apid.PrefixActor),
 					Namespace:  "root",
 					ExternalId: "actor3",
 					Labels:     Labels{"app": "web", "env": "dev", "tier": "frontend"},
 				},
 				{
-					Id:         uuid.New(),
+					Id:         apid.New(apid.PrefixActor),
 					Namespace:  "root",
 					ExternalId: "actor4",
 					Labels:     Labels{"env": "dev"},
@@ -779,7 +784,7 @@ func TestActor(t *testing.T) {
 
 			encryptedKeyVal := "base64encodedencryptedkey123"
 			actor := &Actor{
-				Id:           uuid.New(),
+				Id:           apid.New(apid.PrefixActor),
 				Namespace:    "root",
 				ExternalId:   "testuser",
 				EncryptedKey: &encryptedKeyVal,
@@ -796,7 +801,7 @@ func TestActor(t *testing.T) {
 			setup(t)
 
 			actor := &Actor{
-				Id:           uuid.New(),
+				Id:           apid.New(apid.PrefixActor),
 				Namespace:    "root",
 				ExternalId:   "testuser2",
 				EncryptedKey: nil,
@@ -814,7 +819,7 @@ func TestActor(t *testing.T) {
 			setup(t)
 
 			actor := &Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				Namespace:  "root",
 				ExternalId: "put-labels-1",
 			}
@@ -839,7 +844,7 @@ func TestActor(t *testing.T) {
 			setup(t)
 
 			actor := &Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				Namespace:  "root",
 				ExternalId: "put-labels-2",
 				Labels:     Labels{"existing": "value"},
@@ -858,7 +863,7 @@ func TestActor(t *testing.T) {
 			setup(t)
 
 			actor := &Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				Namespace:  "root",
 				ExternalId: "put-labels-3",
 				Labels:     Labels{"env": "dev"},
@@ -876,7 +881,7 @@ func TestActor(t *testing.T) {
 			setup(t)
 
 			actor := &Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				Namespace:  "root",
 				ExternalId: "put-labels-4",
 				Labels:     Labels{"keep": "this"},
@@ -899,7 +904,7 @@ func TestActor(t *testing.T) {
 			setup(t)
 
 			actor := &Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				Namespace:  "root",
 				ExternalId: "put-labels-5",
 				Labels:     Labels{"existing": "value"},
@@ -914,14 +919,14 @@ func TestActor(t *testing.T) {
 		t.Run("actor not found", func(t *testing.T) {
 			setup(t)
 
-			_, err := db.PutActorLabels(ctx, uuid.New(), map[string]string{"key": "value"})
+			_, err := db.PutActorLabels(ctx, apid.New(apid.PrefixActor), map[string]string{"key": "value"})
 			require.ErrorIs(t, err, ErrNotFound)
 		})
 
 		t.Run("nil id returns error", func(t *testing.T) {
 			setup(t)
 
-			_, err := db.PutActorLabels(ctx, uuid.Nil, map[string]string{"key": "value"})
+			_, err := db.PutActorLabels(ctx, apid.Nil, map[string]string{"key": "value"})
 			require.Error(t, err)
 		})
 
@@ -929,7 +934,7 @@ func TestActor(t *testing.T) {
 			setup(t)
 
 			actor := &Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				Namespace:  "root",
 				ExternalId: "put-labels-6",
 			}
@@ -945,7 +950,7 @@ func TestActor(t *testing.T) {
 			setup(t)
 
 			actor := &Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				Namespace:  "root",
 				ExternalId: "put-labels-7",
 			}
@@ -968,7 +973,7 @@ func TestActor(t *testing.T) {
 			setup(t)
 
 			actor := &Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				Namespace:  "root",
 				ExternalId: "delete-labels-1",
 				Labels:     Labels{"env": "prod", "team": "backend"},
@@ -993,7 +998,7 @@ func TestActor(t *testing.T) {
 			setup(t)
 
 			actor := &Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				Namespace:  "root",
 				ExternalId: "delete-labels-2",
 				Labels:     Labels{"a": "1", "b": "2", "c": "3", "d": "4"},
@@ -1015,7 +1020,7 @@ func TestActor(t *testing.T) {
 			setup(t)
 
 			actor := &Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				Namespace:  "root",
 				ExternalId: "delete-labels-3",
 				Labels:     Labels{"existing": "value"},
@@ -1031,7 +1036,7 @@ func TestActor(t *testing.T) {
 			setup(t)
 
 			actor := &Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				Namespace:  "root",
 				ExternalId: "delete-labels-4",
 			}
@@ -1046,7 +1051,7 @@ func TestActor(t *testing.T) {
 			setup(t)
 
 			actor := &Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				Namespace:  "root",
 				ExternalId: "delete-labels-5",
 				Labels:     Labels{"existing": "value"},
@@ -1061,14 +1066,14 @@ func TestActor(t *testing.T) {
 		t.Run("actor not found", func(t *testing.T) {
 			setup(t)
 
-			_, err := db.DeleteActorLabels(ctx, uuid.New(), []string{"key"})
+			_, err := db.DeleteActorLabels(ctx, apid.New(apid.PrefixActor), []string{"key"})
 			require.ErrorIs(t, err, ErrNotFound)
 		})
 
 		t.Run("nil id returns error", func(t *testing.T) {
 			setup(t)
 
-			_, err := db.DeleteActorLabels(ctx, uuid.Nil, []string{"key"})
+			_, err := db.DeleteActorLabels(ctx, apid.Nil, []string{"key"})
 			require.Error(t, err)
 		})
 
@@ -1076,7 +1081,7 @@ func TestActor(t *testing.T) {
 			setup(t)
 
 			actor := &Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				Namespace:  "root",
 				ExternalId: "delete-labels-6",
 				Labels:     Labels{"to-delete": "value"},

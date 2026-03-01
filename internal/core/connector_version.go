@@ -7,7 +7,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -38,7 +38,7 @@ func wrapConnectorVersion(cv database.ConnectorVersion, s *service) *ConnectorVe
 	}
 }
 
-func (cv *ConnectorVersion) GetId() uuid.UUID {
+func (cv *ConnectorVersion) GetId() apid.ID {
 	return cv.ConnectorVersion.Id
 }
 

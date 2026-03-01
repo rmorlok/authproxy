@@ -5,6 +5,7 @@ import (
 	"errors"
 
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
@@ -32,7 +33,7 @@ func (s *service) CreateConnection(
 			Build()
 	}
 
-	id := apctx.GetUuidGenerator(ctx).New()
+	id := apctx.GetIdGenerator(ctx).New(apid.PrefixConnection)
 	now := apctx.GetClock(ctx).Now()
 
 	dbConn := database.Connection{

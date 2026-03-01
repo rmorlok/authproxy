@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -19,7 +19,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		s, db, _, _, _, e := FullMockService(t, ctrl)
 
-		id := uuid.MustParse("aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa")
+		id := apid.MustParse("cxr_testaaaaaaaaaaaa")
 		ctx := context.Background()
 
 		// Existing draft version
@@ -69,7 +69,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		s, db, _, _, _, e := FullMockService(t, ctrl)
 
-		id := uuid.MustParse("bbbbbbbb-bbbb-bbbb-bbbb-bbbbbbbbbbbb")
+		id := apid.MustParse("cxr_testbbbbbbbbbbbb")
 		ctx := context.Background()
 		existingLabels := map[string]string{"env": "kept"}
 
@@ -112,7 +112,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		s, db, _, _, _, _ := FullMockService(t, ctrl)
 
-		id := uuid.New()
+		id := apid.New(apid.PrefixActor)
 		ctx := context.Background()
 
 		db.EXPECT().
@@ -128,7 +128,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		s, db, _, _, _, _ := FullMockService(t, ctrl)
 
-		id := uuid.New()
+		id := apid.New(apid.PrefixActor)
 		ctx := context.Background()
 
 		db.EXPECT().
@@ -144,7 +144,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		s, db, _, _, _, _ := FullMockService(t, ctrl)
 
-		id := uuid.New()
+		id := apid.New(apid.PrefixActor)
 		ctx := context.Background()
 
 		db.EXPECT().
@@ -164,7 +164,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		s, db, _, _, _, e := FullMockService(t, ctrl)
 
-		id := uuid.New()
+		id := apid.New(apid.PrefixActor)
 		ctx := context.Background()
 
 		db.EXPECT().
@@ -195,7 +195,7 @@ func TestGetOrCreateDraftConnectorVersion(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		s, db, _, _, _, e := FullMockService(t, ctrl)
 
-		id := uuid.MustParse("cccccccc-cccc-cccc-cccc-cccccccccccc")
+		id := apid.MustParse("cxr_testcccccccccccc")
 		ctx := context.Background()
 		encryptedDef := "existing-encrypted-def"
 
@@ -232,7 +232,7 @@ func TestGetOrCreateDraftConnectorVersion(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		s, db, _, _, _, e := FullMockService(t, ctrl)
 
-		id := uuid.MustParse("dddddddd-dddd-dddd-dddd-dddddddddddd")
+		id := apid.MustParse("cxr_testdddddddddddd")
 		ctx := context.Background()
 		encryptedDef := "latest-encrypted-def"
 
@@ -296,7 +296,7 @@ func TestGetOrCreateDraftConnectorVersion(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		s, db, _, _, _, _ := FullMockService(t, ctrl)
 
-		id := uuid.New()
+		id := apid.New(apid.PrefixActor)
 		ctx := context.Background()
 
 		db.EXPECT().
@@ -312,7 +312,7 @@ func TestGetOrCreateDraftConnectorVersion(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		s, db, _, _, _, _ := FullMockService(t, ctrl)
 
-		id := uuid.New()
+		id := apid.New(apid.PrefixActor)
 		ctx := context.Background()
 
 		db.EXPECT().
@@ -332,7 +332,7 @@ func TestGetOrCreateDraftConnectorVersion(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		s, db, _, _, _, _ := FullMockService(t, ctrl)
 
-		id := uuid.New()
+		id := apid.New(apid.PrefixActor)
 		ctx := context.Background()
 
 		db.EXPECT().
@@ -352,7 +352,7 @@ func TestGetOrCreateDraftConnectorVersion(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		s, db, _, _, _, e := FullMockService(t, ctrl)
 
-		id := uuid.New()
+		id := apid.New(apid.PrefixActor)
 		ctx := context.Background()
 		encryptedDef := "latest-encrypted-def"
 

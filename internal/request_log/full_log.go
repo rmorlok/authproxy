@@ -4,7 +4,7 @@ import (
 	"net/url"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 )
 
 // This file contains Entry/EntryRequest/EntryResponse structs which represent the request
@@ -67,7 +67,7 @@ func (e *FullLogResponse) setRecordFields(er *LogRecord) {
 }
 
 type FullLog struct {
-	Id                  uuid.UUID           `json:"id"`
+	Id                  apid.ID             `json:"id"`
 	Namespace           string              `json:"ns"`
 	CorrelationID       string              `json:"cid"`
 	Timestamp           time.Time           `json:"ts"`
@@ -79,7 +79,7 @@ type FullLog struct {
 	Response            FullLogResponse     `json:"res"`
 }
 
-func (e *FullLog) GetId() uuid.UUID {
+func (e *FullLog) GetId() apid.ID {
 	return e.Id
 }
 

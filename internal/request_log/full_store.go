@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"log/slog"
 
-	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/apblob"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
@@ -15,7 +15,7 @@ type FullStore interface {
 	Store(ctx context.Context, log *FullLog) error
 
 	// GetFullLog retrieves a FullLog from the storage backend.
-	GetFullLog(ctx context.Context, ns string, id uuid.UUID) (*FullLog, error)
+	GetFullLog(ctx context.Context, ns string, id apid.ID) (*FullLog, error)
 }
 
 type blobStore struct {
@@ -30,7 +30,7 @@ func NewBlobStore(client apblob.Client, logger *slog.Logger) FullStore {
 	}
 }
 
-func (s *blobStore) pathFor(ns string, id uuid.UUID) string {
+func (s *blobStore) pathFor(ns string, id apid.ID) string {
 	return ns + "/" + id.String() + ".json"
 }
 
@@ -53,7 +53,7 @@ func (s *blobStore) Store(ctx context.Context, log *FullLog) error {
 	return nil
 }
 
-func (s *blobStore) GetFullLog(ctx context.Context, ns string, id uuid.UUID) (*FullLog, error) {
+func (s *blobStore) GetFullLog(ctx context.Context, ns string, id apid.ID) (*FullLog, error) {
 	data, err := s.client.Get(ctx, s.pathFor(ns, id))
 	if err != nil {
 		return nil, err

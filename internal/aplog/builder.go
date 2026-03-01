@@ -4,8 +4,8 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/google/uuid"
 	"github.com/hibiken/asynq"
+	"github.com/rmorlok/authproxy/internal/apid"
 )
 
 type Builder interface {
@@ -13,8 +13,8 @@ type Builder interface {
 	WithComponent(componentId string) Builder
 	WithTask(t *asynq.Task) Builder
 	WithCtx(ctx context.Context) Builder
-	WithConnectionId(connectionId uuid.UUID) Builder
-	WithConnectorId(connectionId uuid.UUID) Builder
+	WithConnectionId(connectionId apid.ID) Builder
+	WithConnectorId(connectionId apid.ID) Builder
 	WithConnectorVersion(version uint64) Builder
 	WithNamespace(path string) Builder
 	With(args ...any) Builder
@@ -56,11 +56,11 @@ func (b *builder) WithCtx(ctx context.Context) Builder {
 	return b
 }
 
-func (b *builder) WithConnectionId(connectionId uuid.UUID) Builder {
+func (b *builder) WithConnectionId(connectionId apid.ID) Builder {
 	return &builder{l: b.l.With("connection_id", connectionId.String())}
 }
 
-func (b *builder) WithConnectorId(connectorId uuid.UUID) Builder {
+func (b *builder) WithConnectorId(connectorId apid.ID) Builder {
 	return &builder{l: b.l.With("connector_id", connectorId.String())}
 }
 

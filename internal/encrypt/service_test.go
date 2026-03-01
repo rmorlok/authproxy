@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
@@ -50,16 +50,16 @@ func TestService(t *testing.T) {
 	s := NewEncryptService(cfg, db)
 
 	connection := database.Connection{
-		Id:               uuid.New(),
+		Id:               apid.New(apid.PrefixConnection),
 		Namespace:        "root.some-namespace",
-		ConnectorId:      uuid.New(),
+		ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 		ConnectorVersion: 1,
 		State:            database.ConnectionStateReady,
 	}
 	require.NoError(t, db.CreateConnection(context.Background(), &connection))
 
 	connectorVersion := database.ConnectorVersion{
-		Id:                  uuid.New(),
+		Id:                  apid.New(apid.PrefixConnectorVersion),
 		Version:             1,
 		Namespace:           "root.some-namespace",
 		State:               database.ConnectorVersionStatePrimary,

@@ -9,7 +9,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hibiken/asynq"
 	mockEncrypt "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	"github.com/stretchr/testify/assert"
@@ -18,10 +18,10 @@ import (
 
 // MockActor is a simple mock implementation of the Actor interface
 type MockActor struct {
-	id uuid.UUID
+	id apid.ID
 }
 
-func (m *MockActor) GetId() uuid.UUID {
+func (m *MockActor) GetId() apid.ID {
 	return m.id
 }
 
@@ -35,7 +35,7 @@ func TestBindToActor(t *testing.T) {
 	}
 
 	// Create a mock actor
-	actorId := uuid.New()
+	actorId := apid.New(apid.PrefixActor)
 	mockActor := &MockActor{id: actorId}
 
 	// Call BindToActor
@@ -57,7 +57,7 @@ func TestToSecureEncryptedString(t *testing.T) {
 
 	taskInfo := &TaskInfo{
 		TrackedVia: TrackedViaAsynq,
-		ActorId:    uuid.New(),
+		ActorId:    apid.New(apid.PrefixActor),
 		AsynqId:    "test-id",
 		AsynqQueue: "test-queue",
 		AsynqType:  "test-type",
@@ -136,7 +136,7 @@ func TestRoundTrip(t *testing.T) {
 	e := encrypt.NewFakeEncryptService(false)
 	taskInfo := &TaskInfo{
 		TrackedVia: TrackedViaAsynq,
-		ActorId:    uuid.New(),
+		ActorId:    apid.New(apid.PrefixActor),
 		AsynqId:    "test-id",
 		AsynqQueue: "test-queue",
 		AsynqType:  "test-type",
