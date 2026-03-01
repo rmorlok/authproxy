@@ -6,9 +6,9 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 )
 
 const UsedNoncesTable = "used_nonces"
@@ -48,6 +48,14 @@ func (n *UsedNonce) values() []any {
 }
 
 func (s *service) hasNonceBeenUsed(ctx context.Context, tx sq.BaseRunner, nonce apid.ID) (hasBeenUsed bool, err error) {
+	if nonce == apid.Nil {
+		return false, errors.New("nonce is required")
+	}
+
+	if err := nonce.ValidatePrefix(apid.PrefixNonce); err != nil {
+		return false, errors.Wrap(err, "invalid nonce")
+	}
+
 	var count int64
 	err = s.sq.
 		Select("COUNT(*)").
@@ -74,6 +82,13 @@ func (s *service) CheckNonceValidAndMarkUsed(
 	nonce apid.ID,
 	retainRecordUntil time.Time,
 ) (wasValid bool, err error) {
+	if nonce == apid.Nil {
+		return false, errors.New("nonce is required")
+	}
+
+	if err := nonce.ValidatePrefix(apid.PrefixNonce); err != nil {
+		return false, errors.Wrap(err, "invalid nonce")
+	}
 
 	err = s.transaction(func(tx *sql.Tx) error {
 		hasBeenUsed, err := s.hasNonceBeenUsed(ctx, tx, nonce)

@@ -914,7 +914,7 @@ func TestAuth_Nonce(t *testing.T) {
 	t.Run("valid", func(t *testing.T) {
 		ts := setup(t)
 		c := testClaims()
-		c.Nonce = util.ToPtr(apid.New(apid.PrefixActor))
+		c.Nonce = util.ToPtr(apid.New(apid.PrefixNonce))
 		c.ExpiresAt = &jwt.NumericDate{now.Add(time.Hour)}
 		c.NotBefore = nil
 
@@ -931,7 +931,7 @@ func TestAuth_Nonce(t *testing.T) {
 	t.Run("expired", func(t *testing.T) {
 		ts := setup(t)
 		c := testClaims()
-		c.Nonce = util.ToPtr(apid.New(apid.PrefixActor))
+		c.Nonce = util.ToPtr(apid.New(apid.PrefixNonce))
 		c.ExpiresAt = &jwt.NumericDate{now.Add(-time.Hour)}
 		c.NotBefore = nil
 
@@ -947,7 +947,7 @@ func TestAuth_Nonce(t *testing.T) {
 	t.Run("used more than once", func(t *testing.T) {
 		ts := setup(t)
 		c := testClaims()
-		c.Nonce = util.ToPtr(apid.New(apid.PrefixActor))
+		c.Nonce = util.ToPtr(apid.New(apid.PrefixNonce))
 		c.ExpiresAt = &jwt.NumericDate{now.Add(time.Hour)}
 		c.NotBefore = nil
 
@@ -971,7 +971,7 @@ func TestAuth_Nonce(t *testing.T) {
 	t.Run("token does not contain expiry", func(t *testing.T) {
 		ts := setup(t)
 		c := testClaims()
-		c.Nonce = util.ToPtr(apid.New(apid.PrefixActor))
+		c.Nonce = util.ToPtr(apid.New(apid.PrefixNonce))
 		c.ExpiresAt = nil
 		c.NotBefore = nil
 
