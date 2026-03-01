@@ -1,12 +1,13 @@
 package database
 
 import (
-	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/apctx"
-	"github.com/stretchr/testify/assert"
-	clock "k8s.io/utils/clock/testing"
 	"testing"
 	"time"
+
+	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/stretchr/testify/assert"
+	clock "k8s.io/utils/clock/testing"
 )
 
 func TestNonces(t *testing.T) {
@@ -15,7 +16,7 @@ func TestNonces(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		nonce := apid.New(apid.PrefixActor)
+		nonce := apid.New(apid.PrefixNonce)
 
 		hasBeenUsed, err := db.HasNonceBeenUsed(ctx, nonce)
 		assert.NoError(t, err)
@@ -47,8 +48,8 @@ func TestNonces(t *testing.T) {
 		fc := clock.NewFakeClock(now)
 		ctx := apctx.NewBuilderBackground().WithClock(fc).Build()
 
-		nonce1 := apid.New(apid.PrefixActor)
-		nonce2 := apid.New(apid.PrefixActor)
+		nonce1 := apid.New(apid.PrefixNonce)
+		nonce2 := apid.New(apid.PrefixNonce)
 
 		// Mark nonce1 to expire in 1 hour
 		wasValid, err := db.CheckNonceValidAndMarkUsed(ctx, nonce1, now.Add(time.Hour))

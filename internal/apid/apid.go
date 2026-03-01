@@ -25,7 +25,7 @@ const (
 	PrefixConnectorVersion Prefix = "cxr_"
 	PrefixOAuth2Token      Prefix = "tok_"
 	PrefixOauth2State      Prefix = "oas_"
-	PrefixUsedNonce        Prefix = "non_"
+	PrefixNonce            Prefix = "non_"
 	PrefixRequestLog       Prefix = "req_"
 	PrefixCorrelation      Prefix = "cor_"
 	PrefixJwtId            Prefix = "jti_"
@@ -39,7 +39,7 @@ var validPrefixes = map[Prefix]bool{
 	PrefixConnection:       true,
 	PrefixConnectorVersion: true,
 	PrefixOAuth2Token:      true,
-	PrefixUsedNonce:        true,
+	PrefixNonce:            true,
 	PrefixRequestLog:       true,
 	PrefixCorrelation:      true,
 	PrefixJwtId:            true,

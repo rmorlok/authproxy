@@ -39,17 +39,17 @@ type ClaimsBuilder interface {
 }
 
 type claimsBuilder struct {
-	issuer     *string
-	audiences  []string
-	expiresIn  *time.Duration
-	expiration *time.Time
-	externalId *string
-	namespace  *string
-	actor      *core.Actor
-	labels     map[string]string
+	issuer       *string
+	audiences    []string
+	expiresIn    *time.Duration
+	expiration   *time.Time
+	externalId   *string
+	namespace    *string
+	actor        *core.Actor
+	labels       map[string]string
 	systemSigned bool
 	actorSigned  bool
-	nonce      *apid.ID
+	nonce        *apid.ID
 }
 
 func (b *claimsBuilder) WithIssuer(issuer string) ClaimsBuilder {
@@ -130,7 +130,7 @@ func (b *claimsBuilder) WithLabel(key, value string) ClaimsBuilder {
 }
 
 func (b *claimsBuilder) WithNonce() ClaimsBuilder {
-	id := apid.New(apid.PrefixUsedNonce)
+	id := apid.New(apid.PrefixNonce)
 	b.nonce = &id
 	return b
 }

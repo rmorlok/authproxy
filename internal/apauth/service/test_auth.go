@@ -142,7 +142,7 @@ func (atu *AuthTestUtil) SignRequestHeaderAs(ctx context.Context, req *http.Requ
 
 func (atu *AuthTestUtil) SignRequestQueryAs(ctx context.Context, req *http.Request, a core.Actor) (*http.Request, error) {
 	claims := atu.claimsForActor(ctx, a)
-	claims.Nonce = util.ToPtr(apid.New(apid.PrefixUsedNonce))
+	claims.Nonce = util.ToPtr(apid.New(apid.PrefixNonce))
 	claims.ExpiresAt = &jwt.NumericDate{apctx.GetClock(ctx).Now().Add(time.Hour)}
 
 	tokenString, err := atu.s.Token(ctx, claims)
