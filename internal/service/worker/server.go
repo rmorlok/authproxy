@@ -17,6 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/service"
 )
 
@@ -140,6 +141,13 @@ func Serve(cfg config.C) {
 		logger,
 	)
 	adminSyncTaskHandler.RegisterTasks(mux)
+
+	reencryptTaskHandler := encrypt.NewReencryptTaskHandler(
+		dm.GetDatabase(),
+		dm.GetEncryptService(),
+		logger,
+	)
+	reencryptTaskHandler.RegisterTasks(mux)
 
 	var wg sync.WaitGroup
 

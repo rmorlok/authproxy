@@ -137,3 +137,7 @@ func (s *fakeService) DecryptStringForConnector(ctx context.Context, cv Connecto
 
 	return string(decryptedData), nil
 }
+
+func (s *fakeService) IsEncryptedWithPrimaryKey(base64Str string) bool {
+	return true
+}

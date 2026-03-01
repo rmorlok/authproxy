@@ -33,4 +33,8 @@ type C interface {
 	// GetGlobalKey returns the global key for the application. This is used for symmetric encryption of data in things
 	// like cursors, JWTs, etc.
 	GetGlobalKey() sconfig.KeyDataType
+
+	// GetGlobalKeys returns all global keys for the application, with the primary key first.
+	// This is used for key rotation support where old keys can still decrypt data.
+	GetGlobalKeys() []*sconfig.KeyData
 }

@@ -529,6 +529,74 @@ func (s *service) DeleteActor(ctx context.Context, id apid.ID) error {
 	return nil
 }
 
+func (s *service) EnumerateActorsWithEncryptedKey(
+	ctx context.Context,
+	callback func(actors []*Actor, lastPage bool) (stop bool, err error),
+) error {
+	const pageSize = 100
+	offset := uint64(0)
+
+	for {
+		rows, err := s.sq.
+			Select(util.ToPtr(Actor{}).cols()...).
+			From(ActorTable).
+			Where(sq.NotEq{"encrypted_key": nil}).
+			Where(sq.Eq{"deleted_at": nil}).
+			OrderBy("id").
+			Limit(pageSize + 1).
+			Offset(offset).
+			RunWith(s.db).
+			Query()
+		if err != nil {
+			return err
+		}
+
+		var results []*Actor
+		for rows.Next() {
+			var r Actor
+			if err := rows.Scan(r.fields()...); err != nil {
+				rows.Close()
+				return err
+			}
+			results = append(results, &r)
+		}
+		rows.Close()
+
+		lastPage := len(results) <= pageSize
+		if len(results) > pageSize {
+			results = results[:pageSize]
+		}
+
+		stop, err := callback(results, lastPage)
+		if err != nil {
+			return err
+		}
+
+		if stop || lastPage {
+			break
+		}
+
+		offset += pageSize
+	}
+
+	return nil
+}
+
+func (s *service) BatchUpdateActorEncryptedKey(ctx context.Context, updates []ActorEncryptedKeyUpdate) error {
+	for _, u := range updates {
+		_, err := s.sq.
+			Update(ActorTable).
+			Set("encrypted_key", u.EncryptedKey).
+			Where(sq.Eq{"id": u.Id}).
+			RunWith(s.db).
+			Exec()
+		if err != nil {
+			return errors.Wrapf(err, "failed to update actor encrypted key %s", u.Id)
+		}
+	}
+	return nil
+}
+
 type ListActorsExecutor interface {
 	FetchPage(context.Context) pagination.PageResult[*Actor]
 	Enumerate(context.Context, func(pagination.PageResult[*Actor]) (keepGoing bool, err error)) error

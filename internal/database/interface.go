@@ -8,6 +8,26 @@ import (
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
+// OAuth2TokenEncryptedFieldsUpdate carries just the primary key + new encrypted values for batch updates.
+type OAuth2TokenEncryptedFieldsUpdate struct {
+	Id                    apid.ID
+	EncryptedAccessToken  string
+	EncryptedRefreshToken string
+}
+
+// ActorEncryptedKeyUpdate carries just the primary key + new encrypted key for batch updates.
+type ActorEncryptedKeyUpdate struct {
+	Id           apid.ID
+	EncryptedKey string
+}
+
+// ConnectorVersionEncryptedDefinitionUpdate carries just the composite primary key + new encrypted definition for batch updates.
+type ConnectorVersionEncryptedDefinitionUpdate struct {
+	Id                  apid.ID
+	Version             uint64
+	EncryptedDefinition string
+}
+
 type DeletedHandling bool
 
 const (
@@ -124,6 +144,33 @@ type DB interface {
 		duration time.Duration,
 		callback func(tokens []*OAuth2TokenWithConnection, lastPage bool) (stop bool, err error),
 	) error
+
+	// EnumerateOAuth2Tokens enumerates all non-deleted OAuth2 tokens in batches.
+	EnumerateOAuth2Tokens(
+		ctx context.Context,
+		callback func(tokens []*OAuth2Token, lastPage bool) (stop bool, err error),
+	) error
+
+	// BatchUpdateOAuth2TokenEncryptedFields updates encrypted fields for multiple OAuth2 tokens.
+	BatchUpdateOAuth2TokenEncryptedFields(ctx context.Context, updates []OAuth2TokenEncryptedFieldsUpdate) error
+
+	// EnumerateActorsWithEncryptedKey enumerates all non-deleted actors that have an encrypted key, in batches.
+	EnumerateActorsWithEncryptedKey(
+		ctx context.Context,
+		callback func(actors []*Actor, lastPage bool) (stop bool, err error),
+	) error
+
+	// BatchUpdateActorEncryptedKey updates the encrypted key for multiple actors.
+	BatchUpdateActorEncryptedKey(ctx context.Context, updates []ActorEncryptedKeyUpdate) error
+
+	// EnumerateConnectorVersions enumerates all non-deleted connector versions in batches.
+	EnumerateConnectorVersions(
+		ctx context.Context,
+		callback func(cvs []*ConnectorVersion, lastPage bool) (stop bool, err error),
+	) error
+
+	// BatchUpdateConnectorVersionEncryptedDefinition updates the encrypted definition for multiple connector versions.
+	BatchUpdateConnectorVersionEncryptedDefinition(ctx context.Context, updates []ConnectorVersionEncryptedDefinitionUpdate) error
 
 	/*
 	 *  Nonces
