@@ -21,7 +21,7 @@ import (
 )
 
 type ConnectorJson struct {
-	Id          apid.ID                      `json:"id"`
+	Id          apid.ID                      `json:"id" swaggertype:"string"`
 	Version     uint64                         `json:"version"`
 	Namespace   string                         `json:"namespace"`
 	State       database.ConnectorVersionState `json:"state"`
@@ -83,7 +83,7 @@ type ListConnectorsResponseJson struct {
 }
 
 type ConnectorVersionJson struct {
-	Id         apid.ID                      `json:"id"`
+	Id         apid.ID                      `json:"id" swaggertype:"string"`
 	Version    uint64                         `json:"version"`
 	Namespace  string                         `json:"namespace"`
 	State      database.ConnectorVersionState `json:"state"`

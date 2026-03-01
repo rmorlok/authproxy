@@ -60,7 +60,7 @@ definitions:
     properties:
       id:
         description: Connection UUID
-        example: 550e8400-e29b-41d4-a716-446655440000
+        example: req_test550e8400abcde
         type: string
       redirect_url:
         description: URL to redirect the user to
@@ -76,7 +76,7 @@ definitions:
     properties:
       connector_id:
         description: ID of the connector to initiate the connection for
-        example: 550e8400-e29b-41d4-a716-446655440000
+        example: req_test550e8400abcde
         type: string
       connector_version:
         description: Version of the connector (optional, defaults to primary version)
@@ -190,7 +190,7 @@ definitions:
         type: string
       id:
         description: Connection UUID
-        example: 550e8400-e29b-41d4-a716-446655440000
+        example: req_test550e8400abcde
         type: string
       labels:
         additionalProperties:
@@ -242,7 +242,7 @@ definitions:
         type: string
       id:
         description: Connector UUID
-        example: 550e8400-e29b-41d4-a716-446655440000
+        example: req_test550e8400abcde
         type: string
       labels:
         additionalProperties:
@@ -295,7 +295,7 @@ definitions:
         description: Connector definition (full schema)
       id:
         description: Connector UUID
-        example: 550e8400-e29b-41d4-a716-446655440000
+        example: req_test550e8400abcde
         type: string
       labels:
         additionalProperties:
@@ -512,7 +512,7 @@ definitions:
         type: string
       request_id:
         description: Request UUID
-        example: 550e8400-e29b-41d4-a716-446655440000
+        example: req_test550e8400abcde
         type: string
       response_status_code:
         description: HTTP response status code

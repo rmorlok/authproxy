@@ -21,7 +21,7 @@ type ErrorResponse struct {
 //	@Description	Request to initiate a connection
 type InitiateConnectionRequest struct {
 	// ID of the connector to initiate the connection for
-	ConnectorId apid.ID `json:"connector_id" example:"req_test550e8400abcde"`
+	ConnectorId apid.ID `swaggertype:"string" json:"connector_id" example:"req_test550e8400abcde"`
 	// Version of the connector (optional, defaults to primary version)
 	ConnectorVersion uint64 `json:"connector_version,omitempty" example:"1"`
 	// Namespace to create the connection in (optional, defaults to connector namespace)
@@ -35,7 +35,7 @@ type InitiateConnectionRequest struct {
 //	@Description	Redirect response for connection initiation
 type InitiateConnectionRedirect struct {
 	// Connection UUID
-	Id apid.ID `json:"id" example:"req_test550e8400abcde"`
+	Id apid.ID `swaggertype:"string" json:"id" example:"req_test550e8400abcde"`
 	// Response type (always "redirect")
 	Type string `json:"type" example:"redirect"`
 	// URL to redirect the user to
@@ -77,7 +77,7 @@ type ProxyResponse struct {
 //	@Description	Connection to an external service
 type SwaggerConnectionJson struct {
 	// Connection UUID
-	Id apid.ID `json:"id" example:"req_test550e8400abcde"`
+	Id apid.ID `swaggertype:"string" json:"id" example:"req_test550e8400abcde"`
 	// Namespace path
 	Namespace string `json:"namespace" example:"acme"`
 	// Labels assigned to the connection
@@ -97,7 +97,7 @@ type SwaggerConnectionJson struct {
 //	@Description	Connector definition for external service integration
 type SwaggerConnectorJson struct {
 	// Connector UUID
-	Id apid.ID `json:"id" example:"req_test550e8400abcde"`
+	Id apid.ID `swaggertype:"string" json:"id" example:"req_test550e8400abcde"`
 	// Connector version number
 	Version uint64 `json:"version" example:"1"`
 	// Namespace path
@@ -147,7 +147,7 @@ type SwaggerRequestLogEntry struct {
 	// Request type (proxy, oauth, probe)
 	Type string `json:"type" example:"proxy"`
 	// Request UUID
-	RequestId apid.ID `json:"request_id" example:"req_test550e8400abcde"`
+	RequestId apid.ID `swaggertype:"string" json:"request_id" example:"req_test550e8400abcde"`
 	// Correlation ID for tracing
 	CorrelationId string `json:"correlation_id,omitempty"`
 	// Request timestamp
@@ -155,9 +155,9 @@ type SwaggerRequestLogEntry struct {
 	// Duration in milliseconds
 	Duration int64 `json:"duration" example:"150"`
 	// Connection UUID
-	ConnectionId apid.ID `json:"connection_id,omitempty"`
+	ConnectionId apid.ID `swaggertype:"string" json:"connection_id,omitempty"`
 	// Connector UUID
-	ConnectorId apid.ID `json:"connector_id,omitempty"`
+	ConnectorId apid.ID `swaggertype:"string" json:"connector_id,omitempty"`
 	// Connector version
 	ConnectorVersion uint64 `json:"connector_version,omitempty"`
 	// HTTP method
@@ -207,7 +207,7 @@ type SwaggerListConnectorsResponse struct {
 //	@Description	Detailed connector version information
 type SwaggerConnectorVersionJson struct {
 	// Connector UUID
-	Id apid.ID `json:"id" example:"req_test550e8400abcde"`
+	Id apid.ID `swaggertype:"string" json:"id" example:"req_test550e8400abcde"`
 	// Connector version number
 	Version uint64 `json:"version" example:"1"`
 	// Namespace path

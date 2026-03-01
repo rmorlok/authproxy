@@ -75,7 +75,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 }
 
 type ConnectionJson struct {
-	Id        apid.ID                `json:"id"`
+	Id        apid.ID                `json:"id" swaggertype:"string"`
 	Namespace string                   `json:"namespace"`
 	Labels    map[string]string        `json:"labels,omitempty"`
 	State     database.ConnectionState `json:"state"`

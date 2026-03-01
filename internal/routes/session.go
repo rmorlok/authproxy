@@ -49,7 +49,7 @@ type InitiateFailureResponse struct {
 
 type InitiateSuccessResponse struct {
 	// This should include any configuration the SPA needs
-	ActorId apid.ID `json:"actor_id"`
+	ActorId apid.ID `json:"actor_id" swaggertype:"string"`
 }
 
 //	@Summary		Initiate session

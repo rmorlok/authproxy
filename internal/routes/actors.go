@@ -30,7 +30,7 @@ type ActorsRoutes struct {
 }
 
 type ActorJson struct {
-	Id         apid.ID         `json:"id"`
+	Id         apid.ID         `json:"id" swaggertype:"string"`
 	Namespace  string            `json:"namespace"`
 	ExternalId string            `json:"external_id"`
 	Labels     map[string]string `json:"labels,omitempty"`

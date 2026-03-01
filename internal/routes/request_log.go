@@ -31,9 +31,9 @@ type ListRequestsQuery struct {
 	Namespace                *string    `form:"namespace"`
 	RequestType              *string    `form:"request_type"`
 	CorrelationId            *string    `form:"correlation_id"`
-	ConnectionId             *apid.ID `form:"connection_id"`
+	ConnectionId             *apid.ID `form:"connection_id" swaggertype:"string"`
 	ConnectorType            *string    `form:"connector_type"`
-	ConnectorId              *apid.ID `form:"connector_id"`
+	ConnectorId              *apid.ID `form:"connector_id" swaggertype:"string"`
 	ConnectorVersion         *uint64    `form:"connector_version"`
 	Method                   *string    `form:"method"`
 	StatusCode               *int       `form:"status_code"`
