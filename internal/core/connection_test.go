@@ -1,17 +1,17 @@
 package core
 
 import (
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/database"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
 func newTestConnection(c cschema.Connector) *connection {
-	return newTestConnectionWithDetails(uuid.New(), database.ConnectionStateReady, c)
+	return newTestConnectionWithDetails(apid.New(apid.PrefixActor), database.ConnectionStateReady, c)
 }
 
-func newTestConnectionWithDetails(u uuid.UUID, s database.ConnectionState, c cschema.Connector) *connection {
+func newTestConnectionWithDetails(u apid.ID, s database.ConnectionState, c cschema.Connector) *connection {
 	cv := NewTestConnectorVersion(c)
 	return &connection{
 		Connection: database.Connection{

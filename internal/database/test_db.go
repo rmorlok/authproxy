@@ -13,10 +13,10 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/google/uuid"
 	"github.com/joho/godotenv"
 	"github.com/peterldowns/pgtestdb"
 	"github.com/peterldowns/pgtestdb/migrators/golangmigrator"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/config"
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
@@ -102,7 +102,7 @@ func mustApplyBlankSqliteTestDbConfig(t testing.TB, cfg config.C) (config.C, DB,
 	} else {
 		tempFilePath = filepath.Join(
 			os.TempDir(),
-			fmt.Sprintf("authproxy-tests/db/%s-%d-%s%s.sqlite3", time.Now().Format("2006-01-02T15-04-05"), os.Getpid(), testName, uuid.New().String()),
+			fmt.Sprintf("authproxy-tests/db/%s-%d-%s%s.sqlite3", time.Now().Format("2006-01-02T15-04-05"), os.Getpid(), testName, apid.New(apid.PrefixCorrelation).String()),
 		)
 	}
 

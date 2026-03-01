@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/pkg/errors"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
@@ -21,7 +21,7 @@ import (
 )
 
 type ConnectorJson struct {
-	Id          uuid.UUID                      `json:"id"`
+	Id          apid.ID                      `json:"id"`
 	Version     uint64                         `json:"version"`
 	Namespace   string                         `json:"namespace"`
 	State       database.ConnectorVersionState `json:"state"`
@@ -83,7 +83,7 @@ type ListConnectorsResponseJson struct {
 }
 
 type ConnectorVersionJson struct {
-	Id         uuid.UUID                      `json:"id"`
+	Id         apid.ID                      `json:"id"`
 	Version    uint64                         `json:"version"`
 	Namespace  string                         `json:"namespace"`
 	State      database.ConnectorVersionState `json:"state"`
@@ -186,18 +186,18 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	connectorId, err := uuid.Parse(connectorIdStr)
+	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if connectorId == uuid.Nil {
+	if connectorId == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
@@ -385,18 +385,18 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 		return
 	}
 
-	connectorId, err := uuid.Parse(connectorIdStr)
+	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if connectorId == uuid.Nil {
+	if connectorId == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
@@ -506,18 +506,18 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 		return
 	}
 
-	connectorId, err := uuid.Parse(connectorIdStr)
+	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if connectorId == uuid.Nil {
+	if connectorId == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
@@ -746,18 +746,18 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 		return
 	}
 
-	connectorId, err := uuid.Parse(connectorIdStr)
+	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if connectorId == uuid.Nil {
+	if connectorId == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
@@ -887,18 +887,18 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 		return
 	}
 
-	connectorId, err := uuid.Parse(connectorIdStr)
+	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if connectorId == uuid.Nil {
+	if connectorId == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
@@ -1048,18 +1048,18 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 		return
 	}
 
-	connectorId, err := uuid.Parse(connectorIdStr)
+	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if connectorId == uuid.Nil {
+	if connectorId == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
@@ -1227,18 +1227,18 @@ func (r *ConnectorsRoutes) getLabels(gctx *gin.Context) {
 		return
 	}
 
-	connectorId, err := uuid.Parse(connectorIdStr)
+	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if connectorId == uuid.Nil {
+	if connectorId == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
@@ -1318,18 +1318,18 @@ func (r *ConnectorsRoutes) getLabel(gctx *gin.Context) {
 		return
 	}
 
-	connectorId, err := uuid.Parse(connectorIdStr)
+	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if connectorId == uuid.Nil {
+	if connectorId == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
@@ -1432,18 +1432,18 @@ func (r *ConnectorsRoutes) putLabel(gctx *gin.Context) {
 		return
 	}
 
-	connectorId, err := uuid.Parse(connectorIdStr)
+	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if connectorId == uuid.Nil {
+	if connectorId == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
@@ -1575,18 +1575,18 @@ func (r *ConnectorsRoutes) deleteLabel(gctx *gin.Context) {
 		return
 	}
 
-	connectorId, err := uuid.Parse(connectorIdStr)
+	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if connectorId == uuid.Nil {
+	if connectorId == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
@@ -1677,18 +1677,18 @@ func (r *ConnectorsRoutes) getVersionLabels(gctx *gin.Context) {
 		return
 	}
 
-	connectorId, err := uuid.Parse(connectorIdStr)
+	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if connectorId == uuid.Nil {
+	if connectorId == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
@@ -1783,18 +1783,18 @@ func (r *ConnectorsRoutes) getVersionLabel(gctx *gin.Context) {
 		return
 	}
 
-	connectorId, err := uuid.Parse(connectorIdStr)
+	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if connectorId == uuid.Nil {
+	if connectorId == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
@@ -1913,18 +1913,18 @@ func (r *ConnectorsRoutes) putVersionLabel(gctx *gin.Context) {
 		return
 	}
 
-	connectorId, err := uuid.Parse(connectorIdStr)
+	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if connectorId == uuid.Nil {
+	if connectorId == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
@@ -2090,18 +2090,18 @@ func (r *ConnectorsRoutes) deleteVersionLabel(gctx *gin.Context) {
 		return
 	}
 
-	connectorId, err := uuid.Parse(connectorIdStr)
+	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if connectorId == uuid.Nil {
+	if connectorId == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
@@ -2230,18 +2230,18 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 		return
 	}
 
-	connectorId, err := uuid.Parse(connectorIdStr)
+	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if connectorId == uuid.Nil {
+	if connectorId == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").

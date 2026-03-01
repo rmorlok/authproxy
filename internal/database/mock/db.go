@@ -10,7 +10,7 @@ import (
 	time "time"
 
 	gomock "github.com/golang/mock/gomock"
-	uuid "github.com/google/uuid"
+	apid "github.com/rmorlok/authproxy/internal/apid"
 	database "github.com/rmorlok/authproxy/internal/database"
 	auth "github.com/rmorlok/authproxy/internal/schema/auth"
 )
@@ -53,10 +53,10 @@ func (mr *MockIActorDataMockRecorder) GetExternalId() *gomock.Call {
 }
 
 // GetId mocks base method.
-func (m *MockIActorData) GetId() uuid.UUID {
+func (m *MockIActorData) GetId() apid.ID {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetId")
-	ret0, _ := ret[0].(uuid.UUID)
+	ret0, _ := ret[0].(apid.ID)
 	return ret0
 }
 
@@ -160,10 +160,10 @@ func (mr *MockIActorDataExtendedMockRecorder) GetExternalId() *gomock.Call {
 }
 
 // GetId mocks base method.
-func (m *MockIActorDataExtended) GetId() uuid.UUID {
+func (m *MockIActorDataExtended) GetId() apid.ID {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetId")
-	ret0, _ := ret[0].(uuid.UUID)
+	ret0, _ := ret[0].(apid.ID)
 	return ret0
 }
 
@@ -239,7 +239,7 @@ func (m *MockDB) EXPECT() *MockDBMockRecorder {
 }
 
 // CheckNonceValidAndMarkUsed mocks base method.
-func (m *MockDB) CheckNonceValidAndMarkUsed(ctx context.Context, nonce uuid.UUID, retainRecordUntil time.Time) (bool, error) {
+func (m *MockDB) CheckNonceValidAndMarkUsed(ctx context.Context, nonce apid.ID, retainRecordUntil time.Time) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "CheckNonceValidAndMarkUsed", ctx, nonce, retainRecordUntil)
 	ret0, _ := ret[0].(bool)
@@ -296,7 +296,7 @@ func (mr *MockDBMockRecorder) CreateNamespace(ctx, ns interface{}) *gomock.Call 
 }
 
 // DeleteActor mocks base method.
-func (m *MockDB) DeleteActor(ctx context.Context, id uuid.UUID) error {
+func (m *MockDB) DeleteActor(ctx context.Context, id apid.ID) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteActor", ctx, id)
 	ret0, _ := ret[0].(error)
@@ -310,7 +310,7 @@ func (mr *MockDBMockRecorder) DeleteActor(ctx, id interface{}) *gomock.Call {
 }
 
 // DeleteActorLabels mocks base method.
-func (m *MockDB) DeleteActorLabels(ctx context.Context, id uuid.UUID, keys []string) (*database.Actor, error) {
+func (m *MockDB) DeleteActorLabels(ctx context.Context, id apid.ID, keys []string) (*database.Actor, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteActorLabels", ctx, id, keys)
 	ret0, _ := ret[0].(*database.Actor)
@@ -325,7 +325,7 @@ func (mr *MockDBMockRecorder) DeleteActorLabels(ctx, id, keys interface{}) *gomo
 }
 
 // DeleteAllOAuth2TokensForConnection mocks base method.
-func (m *MockDB) DeleteAllOAuth2TokensForConnection(ctx context.Context, connectionId uuid.UUID) error {
+func (m *MockDB) DeleteAllOAuth2TokensForConnection(ctx context.Context, connectionId apid.ID) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteAllOAuth2TokensForConnection", ctx, connectionId)
 	ret0, _ := ret[0].(error)
@@ -339,7 +339,7 @@ func (mr *MockDBMockRecorder) DeleteAllOAuth2TokensForConnection(ctx, connection
 }
 
 // DeleteConnection mocks base method.
-func (m *MockDB) DeleteConnection(ctx context.Context, id uuid.UUID) error {
+func (m *MockDB) DeleteConnection(ctx context.Context, id apid.ID) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteConnection", ctx, id)
 	ret0, _ := ret[0].(error)
@@ -353,7 +353,7 @@ func (mr *MockDBMockRecorder) DeleteConnection(ctx, id interface{}) *gomock.Call
 }
 
 // DeleteConnectionLabels mocks base method.
-func (m *MockDB) DeleteConnectionLabels(ctx context.Context, id uuid.UUID, keys []string) (*database.Connection, error) {
+func (m *MockDB) DeleteConnectionLabels(ctx context.Context, id apid.ID, keys []string) (*database.Connection, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteConnectionLabels", ctx, id, keys)
 	ret0, _ := ret[0].(*database.Connection)
@@ -411,7 +411,7 @@ func (mr *MockDBMockRecorder) DeleteNamespaceLabels(ctx, path, keys interface{})
 }
 
 // DeleteOAuth2Token mocks base method.
-func (m *MockDB) DeleteOAuth2Token(ctx context.Context, tokenId uuid.UUID) error {
+func (m *MockDB) DeleteOAuth2Token(ctx context.Context, tokenId apid.ID) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "DeleteOAuth2Token", ctx, tokenId)
 	ret0, _ := ret[0].(error)
@@ -453,7 +453,7 @@ func (mr *MockDBMockRecorder) EnumerateOAuth2TokensExpiringWithin(ctx, duration,
 }
 
 // GetActor mocks base method.
-func (m *MockDB) GetActor(ctx context.Context, id uuid.UUID) (*database.Actor, error) {
+func (m *MockDB) GetActor(ctx context.Context, id apid.ID) (*database.Actor, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetActor", ctx, id)
 	ret0, _ := ret[0].(*database.Actor)
@@ -483,7 +483,7 @@ func (mr *MockDBMockRecorder) GetActorByExternalId(ctx, namespace, externalId in
 }
 
 // GetConnection mocks base method.
-func (m *MockDB) GetConnection(ctx context.Context, id uuid.UUID) (*database.Connection, error) {
+func (m *MockDB) GetConnection(ctx context.Context, id apid.ID) (*database.Connection, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetConnection", ctx, id)
 	ret0, _ := ret[0].(*database.Connection)
@@ -498,7 +498,7 @@ func (mr *MockDBMockRecorder) GetConnection(ctx, id interface{}) *gomock.Call {
 }
 
 // GetConnectorVersion mocks base method.
-func (m *MockDB) GetConnectorVersion(ctx context.Context, id uuid.UUID, version uint64) (*database.ConnectorVersion, error) {
+func (m *MockDB) GetConnectorVersion(ctx context.Context, id apid.ID, version uint64) (*database.ConnectorVersion, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetConnectorVersion", ctx, id, version)
 	ret0, _ := ret[0].(*database.ConnectorVersion)
@@ -543,7 +543,7 @@ func (mr *MockDBMockRecorder) GetConnectorVersionForLabelsAndVersion(ctx, labelS
 }
 
 // GetConnectorVersionForState mocks base method.
-func (m *MockDB) GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state database.ConnectorVersionState) (*database.ConnectorVersion, error) {
+func (m *MockDB) GetConnectorVersionForState(ctx context.Context, id apid.ID, state database.ConnectorVersionState) (*database.ConnectorVersion, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetConnectorVersionForState", ctx, id, state)
 	ret0, _ := ret[0].(*database.ConnectorVersion)
@@ -588,7 +588,7 @@ func (mr *MockDBMockRecorder) GetNamespace(ctx, path interface{}) *gomock.Call {
 }
 
 // GetOAuth2Token mocks base method.
-func (m *MockDB) GetOAuth2Token(ctx context.Context, connectionId uuid.UUID) (*database.OAuth2Token, error) {
+func (m *MockDB) GetOAuth2Token(ctx context.Context, connectionId apid.ID) (*database.OAuth2Token, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetOAuth2Token", ctx, connectionId)
 	ret0, _ := ret[0].(*database.OAuth2Token)
@@ -603,7 +603,7 @@ func (mr *MockDBMockRecorder) GetOAuth2Token(ctx, connectionId interface{}) *gom
 }
 
 // HasNonceBeenUsed mocks base method.
-func (m *MockDB) HasNonceBeenUsed(ctx context.Context, nonce uuid.UUID) (bool, error) {
+func (m *MockDB) HasNonceBeenUsed(ctx context.Context, nonce apid.ID) (bool, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "HasNonceBeenUsed", ctx, nonce)
 	ret0, _ := ret[0].(bool)
@@ -618,7 +618,7 @@ func (mr *MockDBMockRecorder) HasNonceBeenUsed(ctx, nonce interface{}) *gomock.C
 }
 
 // InsertOAuth2Token mocks base method.
-func (m *MockDB) InsertOAuth2Token(ctx context.Context, connectionId uuid.UUID, refreshedFrom *uuid.UUID, encryptedRefreshToken, encryptedAccessToken string, accessTokenExpiresAt *time.Time, scopes string) (*database.OAuth2Token, error) {
+func (m *MockDB) InsertOAuth2Token(ctx context.Context, connectionId apid.ID, refreshedFrom *apid.ID, encryptedRefreshToken, encryptedAccessToken string, accessTokenExpiresAt *time.Time, scopes string) (*database.OAuth2Token, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "InsertOAuth2Token", ctx, connectionId, refreshedFrom, encryptedRefreshToken, encryptedAccessToken, accessTokenExpiresAt, scopes)
 	ret0, _ := ret[0].(*database.OAuth2Token)
@@ -792,7 +792,7 @@ func (mr *MockDBMockRecorder) Migrate(ctx interface{}) *gomock.Call {
 }
 
 // NewestConnectorVersionForId mocks base method.
-func (m *MockDB) NewestConnectorVersionForId(ctx context.Context, id uuid.UUID) (*database.ConnectorVersion, error) {
+func (m *MockDB) NewestConnectorVersionForId(ctx context.Context, id apid.ID) (*database.ConnectorVersion, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NewestConnectorVersionForId", ctx, id)
 	ret0, _ := ret[0].(*database.ConnectorVersion)
@@ -807,7 +807,7 @@ func (mr *MockDBMockRecorder) NewestConnectorVersionForId(ctx, id interface{}) *
 }
 
 // NewestPublishedConnectorVersionForId mocks base method.
-func (m *MockDB) NewestPublishedConnectorVersionForId(ctx context.Context, id uuid.UUID) (*database.ConnectorVersion, error) {
+func (m *MockDB) NewestPublishedConnectorVersionForId(ctx context.Context, id apid.ID) (*database.ConnectorVersion, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "NewestPublishedConnectorVersionForId", ctx, id)
 	ret0, _ := ret[0].(*database.ConnectorVersion)
@@ -836,7 +836,7 @@ func (mr *MockDBMockRecorder) Ping(ctx interface{}) *gomock.Call {
 }
 
 // PutActorLabels mocks base method.
-func (m *MockDB) PutActorLabels(ctx context.Context, id uuid.UUID, labels map[string]string) (*database.Actor, error) {
+func (m *MockDB) PutActorLabels(ctx context.Context, id apid.ID, labels map[string]string) (*database.Actor, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PutActorLabels", ctx, id, labels)
 	ret0, _ := ret[0].(*database.Actor)
@@ -851,7 +851,7 @@ func (mr *MockDBMockRecorder) PutActorLabels(ctx, id, labels interface{}) *gomoc
 }
 
 // PutConnectionLabels mocks base method.
-func (m *MockDB) PutConnectionLabels(ctx context.Context, id uuid.UUID, labels map[string]string) (*database.Connection, error) {
+func (m *MockDB) PutConnectionLabels(ctx context.Context, id apid.ID, labels map[string]string) (*database.Connection, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PutConnectionLabels", ctx, id, labels)
 	ret0, _ := ret[0].(*database.Connection)
@@ -880,22 +880,8 @@ func (mr *MockDBMockRecorder) PutNamespaceLabels(ctx, path, labels interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutNamespaceLabels", reflect.TypeOf((*MockDB)(nil).PutNamespaceLabels), ctx, path, labels)
 }
 
-// SetConnectorVersionState mocks base method.
-func (m *MockDB) SetConnectorVersionState(ctx context.Context, id uuid.UUID, version uint64, state database.ConnectorVersionState) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetConnectorVersionState", ctx, id, version, state)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetConnectorVersionState indicates an expected call of SetConnectorVersionState.
-func (mr *MockDBMockRecorder) SetConnectorVersionState(ctx, id, version, state interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectorVersionState", reflect.TypeOf((*MockDB)(nil).SetConnectorVersionState), ctx, id, version, state)
-}
-
 // SetConnectionState mocks base method.
-func (m *MockDB) SetConnectionState(ctx context.Context, id uuid.UUID, state database.ConnectionState) error {
+func (m *MockDB) SetConnectionState(ctx context.Context, id apid.ID, state database.ConnectionState) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetConnectionState", ctx, id, state)
 	ret0, _ := ret[0].(error)
@@ -906,6 +892,20 @@ func (m *MockDB) SetConnectionState(ctx context.Context, id uuid.UUID, state dat
 func (mr *MockDBMockRecorder) SetConnectionState(ctx, id, state interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectionState", reflect.TypeOf((*MockDB)(nil).SetConnectionState), ctx, id, state)
+}
+
+// SetConnectorVersionState mocks base method.
+func (m *MockDB) SetConnectorVersionState(ctx context.Context, id apid.ID, version uint64, state database.ConnectorVersionState) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetConnectorVersionState", ctx, id, version, state)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetConnectorVersionState indicates an expected call of SetConnectorVersionState.
+func (mr *MockDBMockRecorder) SetConnectorVersionState(ctx, id, version, state interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectorVersionState", reflect.TypeOf((*MockDB)(nil).SetConnectorVersionState), ctx, id, version, state)
 }
 
 // SetNamespaceState mocks base method.
@@ -923,7 +923,7 @@ func (mr *MockDBMockRecorder) SetNamespaceState(ctx, path, state interface{}) *g
 }
 
 // UpdateConnectionLabels mocks base method.
-func (m *MockDB) UpdateConnectionLabels(ctx context.Context, id uuid.UUID, labels map[string]string) (*database.Connection, error) {
+func (m *MockDB) UpdateConnectionLabels(ctx context.Context, id apid.ID, labels map[string]string) (*database.Connection, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "UpdateConnectionLabels", ctx, id, labels)
 	ret0, _ := ret[0].(*database.Connection)

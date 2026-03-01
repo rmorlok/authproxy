@@ -4,7 +4,7 @@ import (
 	"context"
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/stretchr/testify/require"
 )
@@ -14,7 +14,7 @@ func TestActorCache_PutAndGetByExternalId(t *testing.T) {
 	c := newActorCache()
 
 	actor := &database.Actor{
-		Id:         uuid.New(),
+		Id:         apid.New(apid.PrefixActor),
 		Namespace:  "root",
 		ExternalId: "alice",
 	}
@@ -29,7 +29,7 @@ func TestActorCache_PutAndGetById(t *testing.T) {
 	t.Parallel()
 	c := newActorCache()
 
-	id := uuid.New()
+	id := apid.New(apid.PrefixActor)
 	actor := &database.Actor{
 		Id:         id,
 		Namespace:  "root",
@@ -54,7 +54,7 @@ func TestActorCache_GetById_Miss(t *testing.T) {
 	t.Parallel()
 	c := newActorCache()
 
-	got := c.GetById(uuid.New())
+	got := c.GetById(apid.New(apid.PrefixActor))
 	require.Nil(t, got)
 }
 
@@ -74,7 +74,7 @@ func TestActorCache_PutNilId(t *testing.T) {
 	c := newActorCache()
 
 	actor := &database.Actor{
-		Id:         uuid.Nil,
+		Id:         apid.Nil,
 		Namespace:  "root",
 		ExternalId: "charlie",
 	}
@@ -85,7 +85,7 @@ func TestActorCache_PutNilId(t *testing.T) {
 	got := c.GetByExternalId("root", "charlie")
 	require.Equal(t, actor, got)
 
-	got = c.GetById(uuid.Nil)
+	got = c.GetById(apid.Nil)
 	require.Nil(t, got)
 }
 
@@ -94,12 +94,12 @@ func TestActorCache_NamespaceIsolation(t *testing.T) {
 	c := newActorCache()
 
 	actor1 := &database.Actor{
-		Id:         uuid.New(),
+		Id:         apid.New(apid.PrefixActor),
 		Namespace:  "ns1",
 		ExternalId: "alice",
 	}
 	actor2 := &database.Actor{
-		Id:         uuid.New(),
+		Id:         apid.New(apid.PrefixActor),
 		Namespace:  "ns2",
 		ExternalId: "alice",
 	}
@@ -149,7 +149,7 @@ func TestActorCache_NilReceiver_Put(t *testing.T) {
 	var c *actorCache
 	// Should not panic
 	c.Put(&database.Actor{
-		Id:         uuid.New(),
+		Id:         apid.New(apid.PrefixActor),
 		Namespace:  "root",
 		ExternalId: "alice",
 	})
@@ -165,6 +165,6 @@ func TestActorCache_NilReceiver_GetByExternalId(t *testing.T) {
 func TestActorCache_NilReceiver_GetById(t *testing.T) {
 	t.Parallel()
 	var c *actorCache
-	got := c.GetById(uuid.New())
+	got := c.GetById(apid.New(apid.PrefixActor))
 	require.Nil(t, got)
 }

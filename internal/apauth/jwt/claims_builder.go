@@ -5,10 +5,10 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 )
@@ -49,7 +49,7 @@ type claimsBuilder struct {
 	labels     map[string]string
 	systemSigned bool
 	actorSigned  bool
-	nonce      *uuid.UUID
+	nonce      *apid.ID
 }
 
 func (b *claimsBuilder) WithIssuer(issuer string) ClaimsBuilder {
@@ -130,8 +130,8 @@ func (b *claimsBuilder) WithLabel(key, value string) ClaimsBuilder {
 }
 
 func (b *claimsBuilder) WithNonce() ClaimsBuilder {
-	u := uuid.New()
-	b.nonce = &u
+	id := apid.New(apid.PrefixUsedNonce)
+	b.nonce = &id
 	return b
 }
 
@@ -181,7 +181,7 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 		RegisteredClaims: jwt.RegisteredClaims{
 			Subject:  util.CoerceString(b.externalId),
 			IssuedAt: &jwt.NumericDate{apctx.GetClock(ctx).Now()},
-			ID:       apctx.GetUuidGenerator(ctx).NewString(),
+			ID:       apctx.GetIdGenerator(ctx).NewString(apid.PrefixJwtId),
 		},
 		Actor:        b.actor,
 		SystemSigned: b.systemSigned,

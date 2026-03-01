@@ -5,18 +5,17 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/stretchr/testify/require"
 	clocktest "k8s.io/utils/clock/testing"
 )
 
-type testUuidGenerator struct {
+type testIdGenerator struct {
 	s string
 }
 
-func (g *testUuidGenerator) NewUUID() (uuid.UUID, error) { return uuid.UUID{}, nil }
-func (g *testUuidGenerator) New() uuid.UUID              { return uuid.UUID{} }
-func (g *testUuidGenerator) NewString() string           { return g.s }
+func (g *testIdGenerator) New(prefix apid.Prefix) apid.ID  { return apid.ID(g.s) }
+func (g *testIdGenerator) NewString(prefix apid.Prefix) string { return g.s }
 
 func TestBuilder(t *testing.T) {
 	t.Run("NewBuilderAndBackground", func(t *testing.T) {
@@ -52,18 +51,18 @@ func TestBuilder(t *testing.T) {
 		ctx := NewBuilderBackground().WithFixedClock(tm).Build()
 		require.Equal(t, tm, GetClock(ctx).Now())
 	})
-	t.Run("WithUuidGenerator", func(t *testing.T) {
-		gen := &testUuidGenerator{s: "hello-world"}
+	t.Run("WithIdGenerator", func(t *testing.T) {
+		gen := &testIdGenerator{s: "act_helloworld00001"}
 
-		ctx := NewBuilderBackground().WithUuidGenerator(gen).Build()
+		ctx := NewBuilderBackground().WithIdGenerator(gen).Build()
 
 		// ensure our generator is returned
-		require.Equal(t, "hello-world", GetUuidGenerator(ctx).NewString())
+		require.Equal(t, "act_helloworld00001", GetIdGenerator(ctx).NewString(apid.PrefixActor))
 	})
-	t.Run("WithFixedUuidGenerator", func(t *testing.T) {
-		u := uuid.New()
-		ctx := NewBuilderBackground().WithFixedUuidGenerator(u).Build()
-		require.Equal(t, u, GetUuidGenerator(ctx).New())
+	t.Run("WithFixedIdGenerator", func(t *testing.T) {
+		id := apid.MustParse("act_testvalue0000001")
+		ctx := NewBuilderBackground().WithFixedIdGenerator(id).Build()
+		require.Equal(t, id, GetIdGenerator(ctx).New(apid.PrefixActor))
 	})
 	t.Run("WithCorrelationID", func(t *testing.T) {
 		ctx := NewBuilderBackground().WithCorrelationID("cid-123").Build()
@@ -72,18 +71,18 @@ func TestBuilder(t *testing.T) {
 	t.Run("Chaining", func(t *testing.T) {
 		tm := time.Date(2017, 10, 1, 0, 0, 0, 0, time.UTC)
 		fake := clocktest.NewFakeClock(tm)
-		gen := &testUuidGenerator{s: "abc-123"}
+		gen := &testIdGenerator{s: "act_abc12300000001"}
 
 		ctx := NewBuilderBackground().
 			With(Set("k", 42)).
 			WithCorrelationID("cid-xyz").
 			WithClock(fake).
-			WithUuidGenerator(gen).
+			WithIdGenerator(gen).
 			Build()
 
 		require.Equal(t, 42, ctx.Value("k"))
 		require.Equal(t, "cid-xyz", CorrelationID(ctx))
 		require.Equal(t, tm, GetClock(ctx).Now())
-		require.Equal(t, "abc-123", GetUuidGenerator(ctx).NewString())
+		require.Equal(t, "act_abc12300000001", GetIdGenerator(ctx).NewString(apid.PrefixActor))
 	})
 }

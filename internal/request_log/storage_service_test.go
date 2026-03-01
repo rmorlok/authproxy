@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apblob"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/stretchr/testify/assert"
@@ -197,7 +197,7 @@ func TestGetFullLog_BlobStore(t *testing.T) {
 	blob := apblob.NewMemoryClient()
 	fullStore := NewBlobStore(blob, logger)
 
-	testId := uuid.New()
+	testId := apid.New(apid.PrefixRequestLog)
 	ns := "root.test"
 
 	original := &FullLog{

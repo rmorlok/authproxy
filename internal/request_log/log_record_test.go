@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/stretchr/testify/require"
 )
@@ -14,12 +14,12 @@ func TestLogRecord(t *testing.T) {
 	val := LogRecord{
 		Type:                httpf.RequestTypeOAuth,
 		Namespace:           "root.child",
-		RequestId:           uuid.New(),
+		RequestId:           apid.New(apid.PrefixRequestLog),
 		CorrelationId:       "some-correlation-id",
 		Timestamp:           time.Date(1970, time.January, 1, 0, 20, 34, 567000000, time.UTC), // This only has millisecond precision
 		MillisecondDuration: MillisecondDuration(2 * time.Second),
-		ConnectionId:        uuid.New(),
-		ConnectorId:         uuid.New(),
+		ConnectionId:        apid.New(apid.PrefixConnection),
+		ConnectorId:         apid.New(apid.PrefixConnectorVersion),
 		ConnectorVersion:    7,
 		Method:              "GET",
 		Host:                "example.com",

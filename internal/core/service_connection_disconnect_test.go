@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	mockAsynq "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	mockLog "github.com/rmorlok/authproxy/internal/aplog/mock"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
@@ -21,7 +21,7 @@ import (
 
 func TestDisconnectConnection(t *testing.T) {
 	ctx := context.Background()
-	connectionId := uuid.New()
+	connectionId := apid.New(apid.PrefixActor)
 
 	setup := func(t *testing.T) (*service, *mockDb.MockDB, *mockAsynq.MockClient, *gomock.Controller) {
 		ctrl := gomock.NewController(t)
@@ -58,7 +58,7 @@ func TestDisconnectConnection(t *testing.T) {
 
 				// Parse the payload to verify the connection ID
 				var payload struct {
-					ConnectionId uuid.UUID `json:"connection_id"`
+					ConnectionId apid.ID `json:"connection_id"`
 				}
 				err := json.Unmarshal(task.Payload(), &payload)
 				require.NoError(t, err)

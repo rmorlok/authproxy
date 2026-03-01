@@ -10,7 +10,7 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
@@ -76,7 +76,7 @@ const ActorTable = "actors"
 
 // Actor is some entity taking action within the system.
 type Actor struct {
-	Id           uuid.UUID
+	Id           apid.ID
 	Namespace    string
 	ExternalId   string
 	Permissions  Permissions
@@ -193,7 +193,7 @@ func (a *Actor) sameAsData(d IActorData) bool {
 	return true
 }
 
-func (a *Actor) GetId() uuid.UUID {
+func (a *Actor) GetId() apid.ID {
 	return a.Id
 }
 
@@ -216,8 +216,12 @@ func (a *Actor) normalize() {
 func (a *Actor) validate() error {
 	result := &multierror.Error{}
 
-	if a.Id == uuid.Nil {
+	if a.Id == apid.Nil {
 		result = multierror.Append(result, errors.New("actor id is empty"))
+	}
+
+	if err := a.Id.ValidatePrefix(apid.PrefixActor); err != nil {
+		result = multierror.Append(result, fmt.Errorf("invalid actor id: %w", err))
 	}
 
 	if err := ValidateNamespacePath(a.Namespace); err != nil {
@@ -245,7 +249,7 @@ func (a *Actor) validate() error {
 var _ IActorData = (*Actor)(nil)
 var _ IActorDataExtended = (*Actor)(nil)
 
-func (s *service) GetActor(ctx context.Context, id uuid.UUID) (*Actor, error) {
+func (s *service) GetActor(ctx context.Context, id apid.ID) (*Actor, error) {
 	var result Actor
 	err := s.sq.
 		Select(result.cols()...).
@@ -377,7 +381,7 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 
 	var lookupCond sq.Eq
 
-	if d.GetId() != uuid.Nil {
+	if d.GetId() != apid.Nil {
 		lookupCond = sq.Eq{"id": d.GetId()}
 	} else {
 		lookupCond = sq.Eq{
@@ -410,11 +414,11 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 			if errors.Is(err, sql.ErrNoRows) {
 				// Actor does not exist. Create a new actor.
 				now := apctx.GetClock(ctx).Now()
-				uuidGen := apctx.GetUuidGenerator(ctx)
+				idGen := apctx.GetIdGenerator(ctx)
 
 				id := d.GetId()
-				if id == uuid.Nil {
-					id = uuidGen.New()
+				if id == apid.Nil {
+					id = idGen.New(apid.PrefixActor)
 				}
 				newActor := Actor{
 					Id:        id,
@@ -496,7 +500,7 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 	return result, nil
 }
 
-func (s *service) DeleteActor(ctx context.Context, id uuid.UUID) error {
+func (s *service) DeleteActor(ctx context.Context, id apid.ID) error {
 	now := apctx.GetClock(ctx).Now()
 	dbResult, err := s.sq.
 		Update(ActorTable).
@@ -738,8 +742,8 @@ func (s *service) ListActorsFromCursor(ctx context.Context, cursor string) (List
 
 // PutActorLabels adds or updates the specified labels on an actor within a single transaction.
 // Existing labels not in the provided map are preserved.
-func (s *service) PutActorLabels(ctx context.Context, id uuid.UUID, labels map[string]string) (*Actor, error) {
-	if id == uuid.Nil {
+func (s *service) PutActorLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Actor, error) {
+	if id == apid.Nil {
 		return nil, errors.New("actor id is required")
 	}
 
@@ -789,8 +793,8 @@ func (s *service) PutActorLabels(ctx context.Context, id uuid.UUID, labels map[s
 
 // DeleteActorLabels removes the specified label keys from an actor within a single transaction.
 // Keys that don't exist are ignored.
-func (s *service) DeleteActorLabels(ctx context.Context, id uuid.UUID, keys []string) (*Actor, error) {
-	if id == uuid.Nil {
+func (s *service) DeleteActorLabels(ctx context.Context, id apid.ID, keys []string) (*Actor, error) {
+	if id == apid.Nil {
 		return nil, errors.New("actor id is required")
 	}
 

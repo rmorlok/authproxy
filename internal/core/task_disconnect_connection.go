@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hibiken/asynq"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/aplog"
@@ -14,7 +14,7 @@ import (
 
 const taskTypeDisconnectConnection = "connectors:disconnect_connection"
 
-func newDisconnectConnectionTask(connectionId uuid.UUID) (*asynq.Task, error) {
+func newDisconnectConnectionTask(connectionId apid.ID) (*asynq.Task, error) {
 	payload, err := json.Marshal(disconnectConnectionTaskPayload{connectionId})
 	if err != nil {
 		return nil, err
@@ -23,7 +23,7 @@ func newDisconnectConnectionTask(connectionId uuid.UUID) (*asynq.Task, error) {
 }
 
 type disconnectConnectionTaskPayload struct {
-	ConnectionId uuid.UUID `json:"connection_id"`
+	ConnectionId apid.ID `json:"connection_id"`
 }
 
 func (s *service) disconnectConnection(ctx context.Context, t *asynq.Task) error {
@@ -39,7 +39,7 @@ func (s *service) disconnectConnection(ctx context.Context, t *asynq.Task) error
 		return fmt.Errorf("%s json.Unmarshal failed: %v: %w", taskTypeDisconnectConnection, err, asynq.SkipRetry)
 	}
 
-	if p.ConnectionId == uuid.Nil {
+	if p.ConnectionId == apid.Nil {
 		return fmt.Errorf("%s connection id not specified: %w", taskTypeDisconnectConnection, asynq.SkipRetry)
 	}
 

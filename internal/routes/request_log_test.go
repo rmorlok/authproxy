@@ -11,7 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -118,7 +118,7 @@ func TestRequestLogRoutes(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			id := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
+			id := apid.MustParse("req_test550e8400abcde")
 			b := mock.MockListRequestBuilderExecutor{
 				ReturnResults: pagination.PageResult[*request_log.LogRecord]{
 					Results: []*request_log.LogRecord{
@@ -160,7 +160,7 @@ func TestRequestLogRoutes(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			id := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
+			id := apid.MustParse("req_test550e8400abcde")
 			b := mock.MockListRequestBuilderExecutor{
 				ReturnResults: pagination.PageResult[*request_log.LogRecord]{
 					Results: []*request_log.LogRecord{
@@ -203,7 +203,7 @@ func TestRequestLogRoutes(t *testing.T) {
 			)
 			require.NoError(t, err)
 
-			id := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
+			id := apid.MustParse("req_test550e8400abcde")
 			b := mock.MockListRequestBuilderExecutor{
 				ReturnResults: pagination.PageResult[*request_log.LogRecord]{
 					Results: []*request_log.LogRecord{
@@ -260,8 +260,8 @@ func TestRequestLogRoutes(t *testing.T) {
 
 	t.Run("get", func(t *testing.T) {
 		tu := setup(t, nil)
-		testId := uuid.MustParse("550e8400-e29b-41d4-a716-446655440000")
-		otherId := uuid.MustParse("660e8400-e29b-41d4-a716-446655440001")
+		testId := apid.MustParse("req_test550e8400abcde")
+		otherId := apid.MustParse("req_test660e8400abcde")
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()

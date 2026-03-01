@@ -5,14 +5,14 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
 type ConnectorVersion struct {
-	Id         uuid.UUID
+	Id         apid.ID
 	Namespace  string
 	Version    uint64
 	State      database.ConnectorVersionState
@@ -24,7 +24,7 @@ type ConnectorVersion struct {
 	Definition *cschema.Connector
 }
 
-func (m *ConnectorVersion) GetId() uuid.UUID {
+func (m *ConnectorVersion) GetId() apid.ID {
 	return m.Id
 }
 
@@ -72,7 +72,7 @@ func (m *ConnectorVersion) SetState(_ context.Context, state database.ConnectorV
 var _ iface.ConnectorVersion = (*ConnectorVersion)(nil)
 
 type ConnectorVersionMatcher struct {
-	ExpectedId      uuid.UUID
+	ExpectedId      apid.ID
 	ExpectedVersion uint64
 }
 

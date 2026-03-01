@@ -1,14 +1,14 @@
 package tasks
 
 import (
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
 // configuredActorData implements database.IActorDataExtended for configured actor sync operations.
 type configuredActorData struct {
-	id           uuid.UUID
+	id           apid.ID
 	namespace    string
 	externalId   string
 	permissions  []aschema.Permission
@@ -16,7 +16,7 @@ type configuredActorData struct {
 	encryptedKey *string
 }
 
-func (a *configuredActorData) GetId() uuid.UUID {
+func (a *configuredActorData) GetId() apid.ID {
 	return a.id
 }
 

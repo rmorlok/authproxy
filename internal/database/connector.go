@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hashicorp/go-multierror"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -60,7 +60,7 @@ type ListConnectorsBuilder interface {
 	ListConnectorsExecutor
 	Limit(int32) ListConnectorsBuilder
 	ForType(string) ListConnectorsBuilder
-	ForId(uuid.UUID) ListConnectorsBuilder
+	ForId(apid.ID) ListConnectorsBuilder
 	ForNamespaceMatcher(string) ListConnectorsBuilder
 	ForNamespaceMatchers([]string) ListConnectorsBuilder
 	ForState(ConnectorVersionState) ListConnectorsBuilder
@@ -77,7 +77,7 @@ type listConnectorsFilters struct {
 	StatesVal         []ConnectorVersionState `json:"states,omitempty"`
 	NamespaceMatchers []string                `json:"namespace_matchers,omitempty"`
 	TypeVal           []string                `json:"types,omitempty"`
-	IdsVal            []uuid.UUID             `json:"ids,omitempty"`
+	IdsVal            []apid.ID             `json:"ids,omitempty"`
 	OrderByFieldVal   *ConnectorOrderByField  `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy     `json:"order_by"`
 	IncludeDeletedVal bool                    `json:"include_deleted,omitempty"`
@@ -130,8 +130,8 @@ func (l *listConnectorsFilters) ForType(t string) ListConnectorsBuilder {
 	return l
 }
 
-func (l *listConnectorsFilters) ForId(id uuid.UUID) ListConnectorsBuilder {
-	l.IdsVal = []uuid.UUID{id}
+func (l *listConnectorsFilters) ForId(id apid.ID) ListConnectorsBuilder {
+	l.IdsVal = []apid.ID{id}
 	return l
 }
 

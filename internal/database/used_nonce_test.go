@@ -1,7 +1,7 @@
 package database
 
 import (
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/stretchr/testify/assert"
 	clock "k8s.io/utils/clock/testing"
@@ -15,7 +15,7 @@ func TestNonces(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		nonce := uuid.New()
+		nonce := apid.New(apid.PrefixActor)
 
 		hasBeenUsed, err := db.HasNonceBeenUsed(ctx, nonce)
 		assert.NoError(t, err)
@@ -47,8 +47,8 @@ func TestNonces(t *testing.T) {
 		fc := clock.NewFakeClock(now)
 		ctx := apctx.NewBuilderBackground().WithClock(fc).Build()
 
-		nonce1 := uuid.New()
-		nonce2 := uuid.New()
+		nonce1 := apid.New(apid.PrefixActor)
+		nonce2 := apid.New(apid.PrefixActor)
 
 		// Mark nonce1 to expire in 1 hour
 		wasValid, err := db.CheckNonceValidAndMarkUsed(ctx, nonce1, now.Add(time.Hour))

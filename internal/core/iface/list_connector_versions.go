@@ -3,7 +3,7 @@ package iface
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -20,7 +20,7 @@ type ListConnectorVersionsExecutor interface {
 type ListConnectorVersionsBuilder interface {
 	ListConnectorVersionsExecutor
 	Limit(int32) ListConnectorVersionsBuilder
-	ForId(uuid.UUID) ListConnectorVersionsBuilder
+	ForId(apid.ID) ListConnectorVersionsBuilder
 	ForVersion(version uint64) ListConnectorVersionsBuilder
 	ForState(database.ConnectorVersionState) ListConnectorVersionsBuilder
 	ForStates([]database.ConnectorVersionState) ListConnectorVersionsBuilder

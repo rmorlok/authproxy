@@ -10,8 +10,8 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	sq "github.com/Masterminds/squirrel"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -166,7 +166,7 @@ func NewClickhouseRecordRetriever(cfg *config.Database, cursorKey config.KeyData
 	}
 }
 
-func (r *clickhouseRecordRetriever) GetRecord(ctx context.Context, id uuid.UUID) (*LogRecord, error) {
+func (r *clickhouseRecordRetriever) GetRecord(ctx context.Context, id apid.ID) (*LogRecord, error) {
 	query, args, err := sq.Select(entryRecordColumns...).
 		From(entryRecordsTable).
 		Where(sq.Eq{"request_id": id.String()}).
@@ -289,7 +289,7 @@ func (l *clickhouseListRequestsBuilder) WithCorrelationId(correlationId string) 
 	return l
 }
 
-func (l *clickhouseListRequestsBuilder) WithConnectionId(u uuid.UUID) ListRequestBuilder {
+func (l *clickhouseListRequestsBuilder) WithConnectionId(u apid.ID) ListRequestBuilder {
 	l.sqlListRequestsBuilder.WithConnectionId(u)
 	return l
 }
@@ -299,7 +299,7 @@ func (l *clickhouseListRequestsBuilder) WithConnectorType(t string) ListRequestB
 	return l
 }
 
-func (l *clickhouseListRequestsBuilder) WithConnectorId(u uuid.UUID) ListRequestBuilder {
+func (l *clickhouseListRequestsBuilder) WithConnectorId(u apid.ID) ListRequestBuilder {
 	l.sqlListRequestsBuilder.WithConnectorId(u)
 	return l
 }

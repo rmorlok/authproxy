@@ -4,7 +4,7 @@ import (
 	"context"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
@@ -19,7 +19,7 @@ const (
 )
 
 type IActorData interface {
-	GetId() uuid.UUID
+	GetId() apid.ID
 	GetExternalId() string
 	GetPermissions() []aschema.Permission
 	GetNamespace() string
@@ -58,13 +58,13 @@ type DB interface {
 	 *  Actors
 	 */
 
-	GetActor(ctx context.Context, id uuid.UUID) (*Actor, error)
+	GetActor(ctx context.Context, id apid.ID) (*Actor, error)
 	GetActorByExternalId(ctx context.Context, namespace, externalId string) (*Actor, error)
 	CreateActor(ctx context.Context, actor *Actor) error
 	UpsertActor(ctx context.Context, actor IActorData) (*Actor, error)
-	DeleteActor(ctx context.Context, id uuid.UUID) error
-	PutActorLabels(ctx context.Context, id uuid.UUID, labels map[string]string) (*Actor, error)
-	DeleteActorLabels(ctx context.Context, id uuid.UUID, keys []string) (*Actor, error)
+	DeleteActor(ctx context.Context, id apid.ID) error
+	PutActorLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Actor, error)
+	DeleteActorLabels(ctx context.Context, id apid.ID, keys []string) (*Actor, error)
 	ListActorsBuilder() ListActorsBuilder
 	ListActorsFromCursor(ctx context.Context, cursor string) (ListActorsExecutor, error)
 
@@ -72,15 +72,15 @@ type DB interface {
 	 * Connectors
 	 */
 
-	GetConnectorVersion(ctx context.Context, id uuid.UUID, version uint64) (*ConnectorVersion, error)
+	GetConnectorVersion(ctx context.Context, id apid.ID, version uint64) (*ConnectorVersion, error)
 	GetConnectorVersions(ctx context.Context, requested []ConnectorVersionId) (map[ConnectorVersionId]*ConnectorVersion, error)
 	GetConnectorVersionForLabels(ctx context.Context, labelSelector string) (*ConnectorVersion, error)
 	GetConnectorVersionForLabelsAndVersion(ctx context.Context, labelSelector string, version uint64) (*ConnectorVersion, error)
-	GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state ConnectorVersionState) (*ConnectorVersion, error)
-	NewestConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error)
-	NewestPublishedConnectorVersionForId(ctx context.Context, id uuid.UUID) (*ConnectorVersion, error)
+	GetConnectorVersionForState(ctx context.Context, id apid.ID, state ConnectorVersionState) (*ConnectorVersion, error)
+	NewestConnectorVersionForId(ctx context.Context, id apid.ID) (*ConnectorVersion, error)
+	NewestPublishedConnectorVersionForId(ctx context.Context, id apid.ID) (*ConnectorVersion, error)
 	UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersion) error
-	SetConnectorVersionState(ctx context.Context, id uuid.UUID, version uint64, state ConnectorVersionState) error
+	SetConnectorVersionState(ctx context.Context, id apid.ID, version uint64, state ConnectorVersionState) error
 	ListConnectorVersionsBuilder() ListConnectorVersionsBuilder
 	ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error)
 	ListConnectorsBuilder() ListConnectorsBuilder
@@ -90,31 +90,31 @@ type DB interface {
 	 *  Connections
 	 */
 
-	GetConnection(ctx context.Context, id uuid.UUID) (*Connection, error)
+	GetConnection(ctx context.Context, id apid.ID) (*Connection, error)
 	CreateConnection(ctx context.Context, c *Connection) error
-	DeleteConnection(ctx context.Context, id uuid.UUID) error
-	SetConnectionState(ctx context.Context, id uuid.UUID, state ConnectionState) error
-	UpdateConnectionLabels(ctx context.Context, id uuid.UUID, labels map[string]string) (*Connection, error)
-	PutConnectionLabels(ctx context.Context, id uuid.UUID, labels map[string]string) (*Connection, error)
-	DeleteConnectionLabels(ctx context.Context, id uuid.UUID, keys []string) (*Connection, error)
+	DeleteConnection(ctx context.Context, id apid.ID) error
+	SetConnectionState(ctx context.Context, id apid.ID, state ConnectionState) error
+	UpdateConnectionLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Connection, error)
+	PutConnectionLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Connection, error)
+	DeleteConnectionLabels(ctx context.Context, id apid.ID, keys []string) (*Connection, error)
 	ListConnectionsBuilder() ListConnectionsBuilder
 	ListConnectionsFromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error)
 
 	/*
 	 * OAuth2 tokens
 	 */
-	GetOAuth2Token(ctx context.Context, connectionId uuid.UUID) (*OAuth2Token, error)
+	GetOAuth2Token(ctx context.Context, connectionId apid.ID) (*OAuth2Token, error)
 	InsertOAuth2Token(
 		ctx context.Context,
-		connectionId uuid.UUID,
-		refreshedFrom *uuid.UUID,
+		connectionId apid.ID,
+		refreshedFrom *apid.ID,
 		encryptedRefreshToken string,
 		encryptedAccessToken string,
 		accessTokenExpiresAt *time.Time,
 		scopes string,
 	) (*OAuth2Token, error)
-	DeleteOAuth2Token(ctx context.Context, tokenId uuid.UUID) error
-	DeleteAllOAuth2TokensForConnection(ctx context.Context, connectionId uuid.UUID) error
+	DeleteOAuth2Token(ctx context.Context, tokenId apid.ID) error
+	DeleteAllOAuth2TokensForConnection(ctx context.Context, connectionId apid.ID) error
 
 	// EnumerateOAuth2TokensExpiringWithin enumerates OAuth2 tokens that are expiring within a specified time interval
 	// of now. This includes tokens that are already expired. Deleted tokens are not considered, nor are tokens tied
@@ -129,7 +129,7 @@ type DB interface {
 	 *  Nonces
 	 */
 
-	HasNonceBeenUsed(ctx context.Context, nonce uuid.UUID) (hasBeenUsed bool, err error)
-	CheckNonceValidAndMarkUsed(ctx context.Context, nonce uuid.UUID, retainRecordUntil time.Time) (wasValid bool, err error)
+	HasNonceBeenUsed(ctx context.Context, nonce apid.ID) (hasBeenUsed bool, err error)
+	CheckNonceValidAndMarkUsed(ctx context.Context, nonce apid.ID, retainRecordUntil time.Time) (wasValid bool, err error)
 	DeleteExpiredNonces(ctx context.Context) (err error)
 }

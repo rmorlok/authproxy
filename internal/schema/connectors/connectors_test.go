@@ -3,14 +3,14 @@ package connectors
 import (
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestConnectors_Validate(t *testing.T) {
 	// Helper function to create a basic connector
-	createConnector := func(id uuid.UUID, typ string, version uint64) Connector {
+	createConnector := func(id apid.ID, typ string, version uint64) Connector {
 		return Connector{
 			Id:          id,
 			Labels:      map[string]string{"type": typ},
@@ -21,8 +21,8 @@ func TestConnectors_Validate(t *testing.T) {
 	}
 
 	// Generate some UUIDs for testing
-	id1 := uuid.MustParse("11111111-1111-1111-1111-111111111111")
-	id2 := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	id1 := apid.MustParse("cxr_test1111111111aa")
+	id2 := apid.MustParse("cxr_test2222222222aa")
 
 	tests := []struct {
 		name       string
@@ -33,15 +33,15 @@ func TestConnectors_Validate(t *testing.T) {
 		{
 			name: "Valid - Single connector",
 			connectors: FromList([]Connector{
-				createConnector(uuid.Nil, "type1", 0),
+				createConnector(apid.Nil, "type1", 0),
 			}),
 			wantErr: false,
 		},
 		{
 			name: "Valid - Multiple connectors with different types",
 			connectors: FromList([]Connector{
-				createConnector(uuid.Nil, "type1", 0),
-				createConnector(uuid.Nil, "type2", 0),
+				createConnector(apid.Nil, "type1", 0),
+				createConnector(apid.Nil, "type2", 0),
 			}),
 			wantErr: false,
 		},
@@ -64,16 +64,16 @@ func TestConnectors_Validate(t *testing.T) {
 		{
 			name: "Valid - Multiple connectors with same type but different versions (no IDs)",
 			connectors: FromList([]Connector{
-				createConnector(uuid.Nil, "type1", 1),
-				createConnector(uuid.Nil, "type1", 2),
+				createConnector(apid.Nil, "type1", 1),
+				createConnector(apid.Nil, "type1", 2),
 			}),
 			wantErr: false,
 		},
 		{
 			name: "Invalid - Multiple connectors with same type, no IDs, no versions",
 			connectors: FromList([]Connector{
-				createConnector(uuid.Nil, "type1", 0),
-				createConnector(uuid.Nil, "type1", 0),
+				createConnector(apid.Nil, "type1", 0),
+				createConnector(apid.Nil, "type1", 0),
 			}),
 			wantErr: true,
 			errMsg:  "duplicate connectors exist for identifying labels",
@@ -85,13 +85,13 @@ func TestConnectors_Validate(t *testing.T) {
 				createConnector(id1, "type1", 0),
 			}),
 			wantErr: true,
-			errMsg:  "duplicate connectors exist for id 11111111-1111-1111-1111-111111111111 without differentiated versions",
+			errMsg:  "duplicate connectors exist for id cxr_test1111111111aa without differentiated versions",
 		},
 		{
 			name: "Invalid - Multiple connectors with same type and version (no IDs)",
 			connectors: FromList([]Connector{
-				createConnector(uuid.Nil, "type1", 1),
-				createConnector(uuid.Nil, "type1", 1),
+				createConnector(apid.Nil, "type1", 1),
+				createConnector(apid.Nil, "type1", 1),
 			}),
 			wantErr: true,
 			errMsg:  "duplicate connectors exist for identifying labels",
@@ -103,15 +103,15 @@ func TestConnectors_Validate(t *testing.T) {
 				createConnector(id1, "type1", 1),
 			}),
 			wantErr: true,
-			errMsg:  "duplicate connectors exist for id 11111111-1111-1111-1111-111111111111 with version 1",
+			errMsg:  "duplicate connectors exist for id cxr_test1111111111aa with version 1",
 		},
 		{
 			name: "Invalid - Mixed duplication scenarios",
 			connectors: FromList([]Connector{
 				createConnector(id1, "type1", 1),
 				createConnector(id1, "type1", 1), // Duplicate ID and version
-				createConnector(uuid.Nil, "type2", 1),
-				createConnector(uuid.Nil, "type2", 1), // Duplicate type and version (no ID)
+				createConnector(apid.Nil, "type2", 1),
+				createConnector(apid.Nil, "type2", 1), // Duplicate type and version (no ID)
 				createConnector(id2, "type3", 0),
 				createConnector(id2, "type3", 0), // Duplicate ID, no version
 			}),
@@ -123,8 +123,8 @@ func TestConnectors_Validate(t *testing.T) {
 			connectors: FromList([]Connector{
 				createConnector(id1, "type1", 1),
 				createConnector(id1, "type1", 2), // Same ID, different version
-				createConnector(uuid.Nil, "type2", 1),
-				createConnector(uuid.Nil, "type2", 2), // Same type, different version (no ID)
+				createConnector(apid.Nil, "type2", 1),
+				createConnector(apid.Nil, "type2", 2), // Same type, different version (no ID)
 				createConnector(id2, "type1", 1),      // Same type as first, different ID
 			}),
 			wantErr: false,
@@ -133,8 +133,8 @@ func TestConnectors_Validate(t *testing.T) {
 			name: "Invalid - Some connectors with same type have IDs, some don't",
 			connectors: FromList([]Connector{
 				createConnector(id1, "type1", 0),
-				createConnector(uuid.Nil, "type1", 0),
-				createConnector(uuid.Nil, "type1", 0),
+				createConnector(apid.Nil, "type1", 0),
+				createConnector(apid.Nil, "type1", 0),
 			}),
 			wantErr: true,
 			errMsg:  "duplicate connectors exist for identifying labels",
@@ -143,8 +143,8 @@ func TestConnectors_Validate(t *testing.T) {
 			name: "Invalid - Some connectors with same type have IDs, some have versions",
 			connectors: FromList([]Connector{
 				createConnector(id1, "type1", 0),
-				createConnector(uuid.Nil, "type1", 1),
-				createConnector(uuid.Nil, "type1", 2),
+				createConnector(apid.Nil, "type1", 1),
+				createConnector(apid.Nil, "type1", 2),
 			}),
 			wantErr: true,
 			errMsg:  "duplicate connectors exist for identifying labels",
@@ -157,7 +157,7 @@ func TestConnectors_Validate(t *testing.T) {
 				createConnector(id1, "type1", 0),
 			}),
 			wantErr: true,
-			errMsg:  "duplicate connectors exist for id 11111111-1111-1111-1111-111111111111 without differentiated versions",
+			errMsg:  "duplicate connectors exist for id cxr_test1111111111aa without differentiated versions",
 		},
 	}
 
@@ -179,7 +179,7 @@ func TestConnectors_Validate(t *testing.T) {
 // TestConnectors_Validate_Exhaustive tests all possible combinations of type, ID, and version duplication
 func TestConnectors_Validate_Exhaustive(t *testing.T) {
 	// Helper function to create a basic connector
-	createConnector := func(id uuid.UUID, typ string, version uint64) Connector {
+	createConnector := func(id apid.ID, typ string, version uint64) Connector {
 		return Connector{
 			Id:          id,
 			Labels:      map[string]string{"type": typ},
@@ -190,8 +190,8 @@ func TestConnectors_Validate_Exhaustive(t *testing.T) {
 	}
 
 	// Generate some UUIDs for testing
-	id1 := uuid.MustParse("11111111-1111-1111-1111-111111111111")
-	id2 := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	id1 := apid.MustParse("cxr_test1111111111aa")
+	id2 := apid.MustParse("cxr_test2222222222aa")
 
 	// Define all possible combinations for two connectors
 	tests := []struct {
@@ -204,21 +204,21 @@ func TestConnectors_Validate_Exhaustive(t *testing.T) {
 		// Same type, different scenarios
 		{
 			name:    "Same type, no IDs, no versions",
-			conn1:   createConnector(uuid.Nil, "type1", 0),
-			conn2:   createConnector(uuid.Nil, "type1", 0),
+			conn1:   createConnector(apid.Nil, "type1", 0),
+			conn2:   createConnector(apid.Nil, "type1", 0),
 			wantErr: true,
 			errMsg:  "duplicate connectors exist for identifying labels",
 		},
 		{
 			name:    "Same type, no IDs, different versions",
-			conn1:   createConnector(uuid.Nil, "type1", 1),
-			conn2:   createConnector(uuid.Nil, "type1", 2),
+			conn1:   createConnector(apid.Nil, "type1", 1),
+			conn2:   createConnector(apid.Nil, "type1", 2),
 			wantErr: false,
 		},
 		{
 			name:    "Same type, no IDs, same versions",
-			conn1:   createConnector(uuid.Nil, "type1", 1),
-			conn2:   createConnector(uuid.Nil, "type1", 1),
+			conn1:   createConnector(apid.Nil, "type1", 1),
+			conn2:   createConnector(apid.Nil, "type1", 1),
 			wantErr: true,
 			errMsg:  "duplicate connectors exist for identifying labels",
 		},
@@ -245,7 +245,7 @@ func TestConnectors_Validate_Exhaustive(t *testing.T) {
 			conn1:   createConnector(id1, "type1", 0),
 			conn2:   createConnector(id1, "type1", 0),
 			wantErr: true,
-			errMsg:  "duplicate connectors exist for id 11111111-1111-1111-1111-111111111111 without differentiated versions",
+			errMsg:  "duplicate connectors exist for id cxr_test1111111111aa without differentiated versions",
 		},
 		{
 			name:    "Same type, same IDs, different versions",
@@ -258,26 +258,26 @@ func TestConnectors_Validate_Exhaustive(t *testing.T) {
 			conn1:   createConnector(id1, "type1", 1),
 			conn2:   createConnector(id1, "type1", 1),
 			wantErr: true,
-			errMsg:  "duplicate connectors exist for id 11111111-1111-1111-1111-111111111111 with version 1",
+			errMsg:  "duplicate connectors exist for id cxr_test1111111111aa with version 1",
 		},
 
 		// Different type, same scenarios
 		{
 			name:    "Different type, no IDs, no versions",
-			conn1:   createConnector(uuid.Nil, "type1", 0),
-			conn2:   createConnector(uuid.Nil, "type2", 0),
+			conn1:   createConnector(apid.Nil, "type1", 0),
+			conn2:   createConnector(apid.Nil, "type2", 0),
 			wantErr: false,
 		},
 		{
 			name:    "Different type, no IDs, different versions",
-			conn1:   createConnector(uuid.Nil, "type1", 1),
-			conn2:   createConnector(uuid.Nil, "type2", 2),
+			conn1:   createConnector(apid.Nil, "type1", 1),
+			conn2:   createConnector(apid.Nil, "type2", 2),
 			wantErr: false,
 		},
 		{
 			name:    "Different type, no IDs, same versions",
-			conn1:   createConnector(uuid.Nil, "type1", 1),
-			conn2:   createConnector(uuid.Nil, "type2", 1),
+			conn1:   createConnector(apid.Nil, "type1", 1),
+			conn2:   createConnector(apid.Nil, "type2", 1),
 			wantErr: false,
 		},
 		{
@@ -303,7 +303,7 @@ func TestConnectors_Validate_Exhaustive(t *testing.T) {
 			conn1:   createConnector(id1, "type1", 0),
 			conn2:   createConnector(id1, "type2", 0),
 			wantErr: true,
-			errMsg:  "duplicate connectors exist for id 11111111-1111-1111-1111-111111111111 without differentiated versions",
+			errMsg:  "duplicate connectors exist for id cxr_test1111111111aa without differentiated versions",
 		},
 		{
 			name:    "Different type, same IDs, different versions",
@@ -316,7 +316,7 @@ func TestConnectors_Validate_Exhaustive(t *testing.T) {
 			conn1:   createConnector(id1, "type1", 1),
 			conn2:   createConnector(id1, "type2", 1),
 			wantErr: true,
-			errMsg:  "duplicate connectors exist for id 11111111-1111-1111-1111-111111111111 with version 1",
+			errMsg:  "duplicate connectors exist for id cxr_test1111111111aa with version 1",
 		},
 	}
 

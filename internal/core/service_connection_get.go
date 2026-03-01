@@ -4,13 +4,13 @@ import (
 	"context"
 	"errors"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 )
 
-func (s *service) getConnection(ctx context.Context, id uuid.UUID) (*connection, error) {
+func (s *service) getConnection(ctx context.Context, id apid.ID) (*connection, error) {
 	logger := aplog.NewBuilder(s.logger).
 		WithConnectionId(id).
 		Build()
@@ -30,6 +30,6 @@ func (s *service) getConnection(ctx context.Context, id uuid.UUID) (*connection,
 	return s.getConnectionForDb(ctx, dbConn)
 }
 
-func (s *service) GetConnection(ctx context.Context, id uuid.UUID) (iface.Connection, error) {
+func (s *service) GetConnection(ctx context.Context, id apid.ID) (iface.Connection, error) {
 	return s.getConnection(ctx, id)
 }

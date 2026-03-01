@@ -11,7 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	asynqmock "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/aplog"
@@ -54,13 +54,13 @@ func TestConnectors(t *testing.T) {
 		if len(root.Connectors.LoadFromList) == 0 {
 			root.Connectors.LoadFromList = []sconfig.Connector{
 				{
-					Id:          uuid.MustParse("10000000-0000-0000-0000-000000000001"),
+					Id:          apid.MustParse("cxr_test0000000000001"),
 					Namespace:   util.ToPtr("root"),
 					Labels:      map[string]string{"type": "test-connector"},
 					DisplayName: "Test ConnectorJson",
 				},
 				{
-					Id:          uuid.MustParse("20000000-0000-0000-0000-000000000002"),
+					Id:          apid.MustParse("cxr_test2000000000002"),
 					Namespace:   util.ToPtr("root.child"),
 					Labels:      map[string]string{"type": "test-connector-2"},
 					DisplayName: "Test ConnectorJson 2",
@@ -114,18 +114,18 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("invalid id", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001", nil, "root", "some-actor", aschema.AllPermissions())
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/bad_notavalidid", nil, "root", "some-actor", aschema.AllPermissions())
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusNotFound, w.Code)
+				require.Equal(t, http.StatusBadRequest, w.Code)
 			})
 
 			t.Run("forbidden", func(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/10000000-0000-0000-0000-000000000001",
+					"/connectors/cxr_test0000000000001",
 					nil,
 					"root",
 					"some-actor",
@@ -141,11 +141,11 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/10000000-0000-0000-0000-000000000001",
+					"/connectors/cxr_test0000000000001",
 					nil,
 					"root",
 					"some-actor",
-					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "get", "10000000-0000-0000-0000-000000000001"),
+					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "get", "cxr_test0000000000001"),
 				)
 				require.NoError(t, err)
 
@@ -155,18 +155,18 @@ func TestConnectors(t *testing.T) {
 				var resp ConnectorJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
-				require.Equal(t, uuid.MustParse("10000000-0000-0000-0000-000000000001"), resp.Id)
+				require.Equal(t, apid.MustParse("cxr_test0000000000001"), resp.Id)
 			})
 
 			t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/10000000-0000-0000-0000-000000000001",
+					"/connectors/cxr_test0000000000001",
 					nil,
 					"root",
 					"some-actor",
-					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "get", "20000000-0000-0000-0000-000000000002"),
+					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "get", "cxr_test2000000000002"),
 				)
 				require.NoError(t, err)
 
@@ -178,11 +178,11 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/10000000-0000-0000-0000-000000000001",
+					"/connectors/cxr_test0000000000001",
 					nil,
 					"root",
 					"some-actor",
-					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "get", "20000000-0000-0000-0000-000000000002", "10000000-0000-0000-0000-000000000001"),
+					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "get", "cxr_test2000000000002", "cxr_test0000000000001"),
 				)
 				require.NoError(t, err)
 
@@ -194,7 +194,7 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/10000000-0000-0000-0000-000000000001",
+					"/connectors/cxr_test0000000000001",
 					nil,
 					"root",
 					"some-actor",
@@ -208,7 +208,7 @@ func TestConnectors(t *testing.T) {
 				var resp ConnectorJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
-				require.Equal(t, uuid.MustParse("10000000-0000-0000-0000-000000000001"), resp.Id)
+				require.Equal(t, apid.MustParse("cxr_test0000000000001"), resp.Id)
 				require.Equal(t, "Test ConnectorJson", resp.DisplayName)
 			})
 		})
@@ -260,9 +260,9 @@ func TestConnectors(t *testing.T) {
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Len(t, resp.Items, 2)
-				require.Equal(t, uuid.MustParse("10000000-0000-0000-0000-000000000001"), resp.Items[0].Id)
+				require.Equal(t, apid.MustParse("cxr_test0000000000001"), resp.Items[0].Id)
 				require.Equal(t, "Test ConnectorJson", resp.Items[0].DisplayName)
-				require.Equal(t, uuid.MustParse("20000000-0000-0000-0000-000000000002"), resp.Items[1].Id)
+				require.Equal(t, apid.MustParse("cxr_test2000000000002"), resp.Items[1].Id)
 				require.Equal(t, "Test ConnectorJson 2", resp.Items[1].DisplayName)
 			})
 
@@ -285,17 +285,17 @@ func TestConnectors(t *testing.T) {
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Len(t, resp.Items, 1)
-				require.Equal(t, uuid.MustParse("20000000-0000-0000-0000-000000000002"), resp.Items[0].Id)
+				require.Equal(t, apid.MustParse("cxr_test2000000000002"), resp.Items[0].Id)
 				require.Equal(t, "Test ConnectorJson 2", resp.Items[0].DisplayName)
 			})
 
 			t.Run("label filter", func(t *testing.T) {
-				connectorId := uuid.MustParse("10000000-0000-0000-0000-000000000001")
+				connectorId := apid.MustParse("cxr_test0000000000001")
 				cfg := config.FromRoot(&sconfig.Root{
 					Connectors: &sconfig.Connectors{
 						LoadFromList: []sconfig.Connector{
 							{
-								Id:          uuid.MustParse("10000000-0000-0000-0000-000000000123"),
+								Id:          apid.MustParse("cxr_test0000000000123"),
 								Version:     1,
 								Labels:      map[string]string{"type": "test-connector", "env": "dev"},
 								DisplayName: "Test Connector",
@@ -359,27 +359,27 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("invalid id", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001/versions/1", nil, "root", "some-actor", aschema.AllPermissions())
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/bad_notavalidid/versions/1", nil, "root", "some-actor", aschema.AllPermissions())
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusNotFound, w.Code)
+				require.Equal(t, http.StatusBadRequest, w.Code)
 			})
 
 			t.Run("invalid version", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/99999999-0000-0000-0000-000000000001/versions/999", nil, "root", "some-actor", aschema.AllPermissions())
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connectors/bad_notavalidid/versions/999", nil, "root", "some-actor", aschema.AllPermissions())
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
-				require.Equal(t, http.StatusNotFound, w.Code)
+				require.Equal(t, http.StatusBadRequest, w.Code)
 			})
 
 			t.Run("forbidden", func(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/10000000-0000-0000-0000-000000000001/versions/1",
+					"/connectors/cxr_test0000000000001/versions/1",
 					nil,
 					"root",
 					"some-actor",
@@ -395,11 +395,11 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/10000000-0000-0000-0000-000000000001/versions/1",
+					"/connectors/cxr_test0000000000001/versions/1",
 					nil,
 					"root",
 					"some-actor",
-					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "list/versions", "10000000-0000-0000-0000-000000000001"),
+					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "list/versions", "cxr_test0000000000001"),
 				)
 				require.NoError(t, err)
 
@@ -409,18 +409,18 @@ func TestConnectors(t *testing.T) {
 				var resp ConnectorVersionJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
-				require.Equal(t, uuid.MustParse("10000000-0000-0000-0000-000000000001"), resp.Id)
+				require.Equal(t, apid.MustParse("cxr_test0000000000001"), resp.Id)
 			})
 
 			t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/10000000-0000-0000-0000-000000000001/versions/1",
+					"/connectors/cxr_test0000000000001/versions/1",
 					nil,
 					"root",
 					"some-actor",
-					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "list/versions", "20000000-0000-0000-0000-000000000002"),
+					aschema.PermissionsSingleWithResourceIds("root.**", "connectors", "list/versions", "cxr_test2000000000002"),
 				)
 				require.NoError(t, err)
 
@@ -432,7 +432,7 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/10000000-0000-0000-0000-000000000001/versions/1",
+					"/connectors/cxr_test0000000000001/versions/1",
 					nil,
 					"root",
 					"some-actor",
@@ -446,7 +446,7 @@ func TestConnectors(t *testing.T) {
 				var resp ConnectorVersionJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
-				require.Equal(t, uuid.MustParse("10000000-0000-0000-0000-000000000001"), resp.Id)
+				require.Equal(t, apid.MustParse("cxr_test0000000000001"), resp.Id)
 			})
 		})
 
@@ -455,7 +455,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("unauthorized", func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req, err := http.NewRequest(http.MethodGet, "/connectors/10000000-0000-0000-0000-000000000001/versions", nil)
+				req, err := http.NewRequest(http.MethodGet, "/connectors/cxr_test0000000000001/versions", nil)
 				require.NoError(t, err)
 
 				tu.Gin.ServeHTTP(w, req)
@@ -466,7 +466,7 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/10000000-0000-0000-0000-000000000001/versions?order=id%20asc",
+					"/connectors/cxr_test0000000000001/versions?order=id%20asc",
 					nil,
 					"root",
 					"some-actor",
@@ -481,7 +481,7 @@ func TestConnectors(t *testing.T) {
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Len(t, resp.Items, 1)
-				require.Equal(t, uuid.MustParse("10000000-0000-0000-0000-000000000001"), resp.Items[0].Id)
+				require.Equal(t, apid.MustParse("cxr_test0000000000001"), resp.Items[0].Id)
 			})
 
 			t.Run("namespace filter", func(t *testing.T) {
@@ -489,7 +489,7 @@ func TestConnectors(t *testing.T) {
 				// Namespace filter doesn't actually make sense here because versions can't change namespaces
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/10000000-0000-0000-0000-000000000001/versions?order=id%20asc&namespace=root.child",
+					"/connectors/cxr_test0000000000001/versions?order=id%20asc&namespace=root.child",
 					nil,
 					"root",
 					"some-actor",
@@ -626,7 +626,7 @@ func TestConnectors(t *testing.T) {
 			var resp ConnectorVersionJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.NotEqual(t, uuid.Nil, resp.Id)
+			require.NotEqual(t, apid.Nil, resp.Id)
 			require.Equal(t, uint64(1), resp.Version)
 			require.Equal(t, "root", resp.Namespace)
 			require.Equal(t, database.ConnectorVersionStateDraft, resp.State)
@@ -637,7 +637,7 @@ func TestConnectors(t *testing.T) {
 	})
 
 	t.Run("update connector", func(t *testing.T) {
-		connectorId := uuid.MustParse("10000000-0000-0000-0000-000000000001")
+		connectorId := apid.MustParse("cxr_test0000000000001")
 
 		t.Run("unauthorized", func(t *testing.T) {
 			tu := setup(t, nil)
@@ -663,7 +663,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				"/connectors/99999999-0000-0000-0000-000000000099",
+				"/connectors/cxr_nonexistent00099",
 				bytes.NewReader(jsonBody),
 				"root",
 				"some-actor",
@@ -762,7 +762,7 @@ func TestConnectors(t *testing.T) {
 	})
 
 	t.Run("create version", func(t *testing.T) {
-		connectorId := uuid.MustParse("10000000-0000-0000-0000-000000000001")
+		connectorId := apid.MustParse("cxr_test0000000000001")
 
 		t.Run("unauthorized", func(t *testing.T) {
 			tu := setup(t, nil)
@@ -779,7 +779,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
-				"/connectors/99999999-0000-0000-0000-000000000099/versions",
+				"/connectors/cxr_nonexistent00099/versions",
 				nil,
 				"root",
 				"some-actor",
@@ -903,7 +903,7 @@ func TestConnectors(t *testing.T) {
 	})
 
 	t.Run("update version", func(t *testing.T) {
-		connectorId := uuid.MustParse("10000000-0000-0000-0000-000000000001")
+		connectorId := apid.MustParse("cxr_test0000000000001")
 
 		t.Run("unauthorized", func(t *testing.T) {
 			tu := setup(t, nil)
@@ -929,7 +929,7 @@ func TestConnectors(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPatch,
-				"/connectors/99999999-0000-0000-0000-000000000099/versions/1",
+				"/connectors/cxr_nonexistent00099/versions/1",
 				bytes.NewReader(jsonBody),
 				"root",
 				"some-actor",
@@ -1064,7 +1064,7 @@ func TestConnectors(t *testing.T) {
 	})
 
 	t.Run("labels", func(t *testing.T) {
-		connectorId := uuid.MustParse("10000000-0000-0000-0000-000000000001")
+		connectorId := apid.MustParse("cxr_test0000000000001")
 
 		t.Run("get labels", func(t *testing.T) {
 			t.Run("unauthorized", func(t *testing.T) {
@@ -1099,7 +1099,7 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodGet,
-					"/connectors/99999999-0000-0000-0000-000000000099/labels",
+					"/connectors/cxr_nonexistent00099/labels",
 					nil,
 					"root",
 					"some-actor",
@@ -1224,7 +1224,7 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodPut,
-					"/connectors/99999999-0000-0000-0000-000000000099/labels/env",
+					"/connectors/cxr_nonexistent00099/labels/env",
 					bytes.NewReader(jsonBody),
 					"root",
 					"some-actor",
@@ -1290,7 +1290,7 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodDelete,
-					"/connectors/99999999-0000-0000-0000-000000000099/labels/env",
+					"/connectors/cxr_nonexistent00099/labels/env",
 					nil,
 					"root",
 					"some-actor",
@@ -1342,7 +1342,7 @@ func TestConnectors(t *testing.T) {
 	})
 
 	t.Run("version labels", func(t *testing.T) {
-		connectorId := uuid.MustParse("10000000-0000-0000-0000-000000000001")
+		connectorId := apid.MustParse("cxr_test0000000000001")
 
 		t.Run("get version labels", func(t *testing.T) {
 			t.Run("version not found", func(t *testing.T) {
@@ -1519,7 +1519,7 @@ func TestConnectors(t *testing.T) {
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodDelete,
-					"/connectors/99999999-0000-0000-0000-000000000099/versions/999/labels/env",
+					"/connectors/cxr_nonexistent00099/versions/999/labels/env",
 					nil,
 					"root",
 					"some-actor",
@@ -1592,7 +1592,7 @@ func TestConnectors(t *testing.T) {
 	})
 
 	t.Run("force connector version state", func(t *testing.T) {
-		connectorId := "10000000-0000-0000-0000-000000000001"
+		connectorId := "cxr_test0000000000001"
 
 		t.Run("unauthorized", func(t *testing.T) {
 			tu := setup(t, nil)

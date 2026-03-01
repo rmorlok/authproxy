@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/apasynq"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
@@ -173,7 +173,7 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	if ti.ActorId != uuid.Nil && ti.ActorId != ra.MustGetActor().Id {
+	if ti.ActorId != apid.Nil && ti.ActorId != ra.MustGetActor().Id {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusForbidden().
 			WithResponseMsg("not authorized to view task").

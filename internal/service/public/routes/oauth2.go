@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/pkg/errors"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
@@ -56,7 +56,7 @@ func (r *Oauth2Routes) callback(gctx *gin.Context) {
 		return
 	}
 
-	stateUUID, err := uuid.Parse(gctx.Query("state"))
+	stateUUID, err := apid.Parse(gctx.Query("state"))
 	if err != nil {
 		err = errors.Wrap(err, "failed to parse state param to UUID")
 		logger.Error(err.Error(), "error", err)
@@ -159,7 +159,7 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 		return
 	}
 
-	stateId, err := uuid.Parse(req.StateId)
+	stateId, err := apid.Parse(req.StateId)
 	if err != nil {
 		err = errors.Wrap(err, "failed to parse state_id")
 		logger.Error(err.Error(), "error", err)

@@ -3,7 +3,7 @@ package core
 import (
 	"errors"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
@@ -36,7 +36,7 @@ func (b *connectorVersionBuilder) WithConfig(c *config.Connector) *connectorVers
 	return b
 }
 
-func (b *connectorVersionBuilder) WithId(id uuid.UUID) *connectorVersionBuilder {
+func (b *connectorVersionBuilder) WithId(id apid.ID) *connectorVersionBuilder {
 	b.versionSetters = append(b.versionSetters,
 		func(v *ConnectorVersion) {
 			v.Id = id

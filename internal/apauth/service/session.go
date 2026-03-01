@@ -12,6 +12,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
@@ -28,9 +29,9 @@ type Encrypt interface {
 
 // session is the object stored in redis to track the session
 type session struct {
-	Id              uuid.UUID `json:"id"`
-	ActorId         uuid.UUID `json:"actor_id"`
-	ValidXsrfValues []string  `json:"-"` // Serialized separately in a different key
+	Id              apid.ID  `json:"id"`
+	ActorId         apid.ID  `json:"actor_id"`
+	ValidXsrfValues []string `json:"-"` // Serialized separately in a different key
 	ExpiresAt       time.Time `json:"expires_at"`
 }
 
@@ -43,7 +44,7 @@ func (s *session) UnmarshalBinary(data []byte) error {
 }
 
 func (s *session) IsValid() bool {
-	return s.Id != uuid.Nil && s.ActorId != uuid.Nil && !s.ExpiresAt.IsZero()
+	return !s.Id.IsNil() && !s.ActorId.IsNil() && !s.ExpiresAt.IsZero()
 }
 
 func (s *session) IsExpired(ctx context.Context) bool {
@@ -60,8 +61,8 @@ func (s *session) GetSessionId() sessionId {
 // sessionId is the data used to compute a secure id that is sent as the session cookie. This data overlaps with
 // data in the session itself so that sessions can't be hijacked by changing data in redis
 type sessionId struct {
-	Id      uuid.UUID `json:"id"`
-	ActorId uuid.UUID `json:"actor_id"`
+	Id      apid.ID `json:"id"`
+	ActorId apid.ID `json:"actor_id"`
 }
 
 func (s *sessionId) GetSessionCookieId(e Encrypt) (string, error) {
@@ -126,7 +127,7 @@ func (s *service) establishAuthFromSession(
 
 	// Parse the session cookie ID from the cookie's value
 	sessionCookieId, err := fromSessionCookieId(sessionCookie.Value, s.encrypt)
-	if err != nil || sessionCookieId.Id == uuid.Nil {
+	if err != nil || sessionCookieId.Id.IsNil() {
 		return fromJwt, errors.Wrap(err, "invalid session ID in cookie")
 	}
 
@@ -239,8 +240,8 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 	var sess *session
 
 	if ra.IsSession() {
-		sessionId := *ra.GetSessionId()
-		sess, err = s.tryReadSessionFromRedis(ctx, sessionId)
+		sessId := *ra.GetSessionId()
+		sess, err = s.tryReadSessionFromRedis(ctx, sessId)
 		if err != nil {
 			return errors.Wrap(err, "failed to read session from redis")
 		}
@@ -248,7 +249,7 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 		if sess != nil {
 			// Sanity check that this session is for the same actor
 			if sess.ActorId != ra.GetActor().Id {
-				err = s.deleteSessionFromRedis(ctx, sessionId)
+				err = s.deleteSessionFromRedis(ctx, sessId)
 				if err != nil {
 					return errors.Wrap(err, "failed to delete session from redis")
 				}
@@ -259,7 +260,7 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 
 	if sess == nil {
 		sess = &session{
-			Id:        uuid.New(),
+			Id:        apid.New(apid.PrefixSession),
 			ActorId:   ra.GetActor().Id,
 			ExpiresAt: apctx.GetClock(ctx).Now().Add(sessionService.SessionTimeout()),
 		}
@@ -283,7 +284,7 @@ func (s *service) extendSession(ctx context.Context, sess *session, w http.Respo
 	sessionService := s.service.(config.HttpServiceWithSession)
 	validXsrfValuesLimit := int64(sessionService.XsrfRequestQueueDepth())
 
-	// Generate a new UUID to push onto the list.
+	// Generate a new UUID for XSRF token (random token, not an entity ID)
 	newXsrfValue := uuid.New()
 
 	pipe := s.r.Pipeline()
@@ -357,22 +358,22 @@ func (s *service) EndSession(ctx context.Context, w http.ResponseWriter, ra *cor
 	return nil
 }
 
-func getRedisSessionKeys(sessionId uuid.UUID) []string {
+func getRedisSessionKeys(sessionId apid.ID) []string {
 	return []string{
 		getRedisSessionJsonKey(sessionId),
 		getRedisXsrfKey(sessionId),
 	}
 }
 
-func getRedisSessionJsonKey(sessionId uuid.UUID) string {
+func getRedisSessionJsonKey(sessionId apid.ID) string {
 	return "session:" + sessionId.String() + ":json"
 }
 
-func getRedisXsrfKey(sessionId uuid.UUID) string {
+func getRedisXsrfKey(sessionId apid.ID) string {
 	return "session:" + sessionId.String() + ":xsrf"
 }
 
-func (s *service) deleteSessionFromRedis(ctx context.Context, sessionId uuid.UUID) error {
+func (s *service) deleteSessionFromRedis(ctx context.Context, sessionId apid.ID) error {
 	if err := s.r.Del(ctx, getRedisSessionKeys(sessionId)...).Err(); err != nil {
 		if err == redis.Nil {
 			// Key does not exist, this is not an error
@@ -385,7 +386,7 @@ func (s *service) deleteSessionFromRedis(ctx context.Context, sessionId uuid.UUI
 }
 
 // tryReadSessionFromRedis attempts to get session from Redis. Returns nil if the session does not exist, or is expired.
-func (s *service) tryReadSessionFromRedis(ctx context.Context, sessionId uuid.UUID) (*session, error) {
+func (s *service) tryReadSessionFromRedis(ctx context.Context, sessionId apid.ID) (*session, error) {
 	pipe := s.r.Pipeline()
 
 	jsonData := pipe.Get(ctx, getRedisSessionJsonKey(sessionId))

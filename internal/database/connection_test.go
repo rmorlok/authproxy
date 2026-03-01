@@ -5,7 +5,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -14,16 +14,36 @@ import (
 )
 
 func TestConnections(t *testing.T) {
+	t.Run("validation rejects wrong prefix on id", func(t *testing.T) {
+		c := &Connection{
+			Id:               apid.New(apid.PrefixActor), // wrong prefix
+			Namespace:        "root",
+			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+		}
+		assert.Error(t, c.Validate())
+	})
+	t.Run("validation rejects wrong prefix on connector id", func(t *testing.T) {
+		c := &Connection{
+			Id:               apid.New(apid.PrefixConnection),
+			Namespace:        "root",
+			ConnectorId:      apid.New(apid.PrefixActor), // wrong prefix
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+		}
+		assert.Error(t, c.Validate())
+	})
 	t.Run("round trip", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		u := uuid.New()
+		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
 			Id:               u,
 			Namespace:        "root.some-namespace",
-			ConnectorId:      uuid.New(),
+			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 			ConnectorVersion: 1,
 			State:            ConnectionStateCreated,
 		})
@@ -42,7 +62,7 @@ func TestConnections(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		u := uuid.New()
+		u := apid.New(apid.PrefixConnection)
 		labels := Labels{
 			"env":     "production",
 			"project": "authproxy",
@@ -50,7 +70,7 @@ func TestConnections(t *testing.T) {
 		err := db.CreateConnection(ctx, &Connection{
 			Id:               u,
 			Namespace:        "root.some-namespace",
-			ConnectorId:      uuid.New(),
+			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 			ConnectorVersion: 1,
 			State:            ConnectionStateCreated,
 			Labels:           labels,
@@ -79,11 +99,11 @@ func TestConnections(t *testing.T) {
 			SELECT id, state, deleted_at FROM connections;
 		`, []connectionResult{})
 
-		u := uuid.New()
+		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
 			Id:               u,
 			Namespace:        "root.some-namespace",
-			ConnectorId:      uuid.New(),
+			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 			ConnectorVersion: 1,
 			State:            ConnectionStateCreated})
 		assert.NoError(t, err)
@@ -99,7 +119,7 @@ func TestConnections(t *testing.T) {
 		})
 
 		// Delete a connection that does not exist
-		err = db.DeleteConnection(ctx, uuid.New())
+		err = db.DeleteConnection(ctx, apid.New(apid.PrefixConnection))
 		assert.ErrorIs(t, err, ErrNotFound)
 
 		// Unchanged
@@ -142,11 +162,11 @@ func TestConnections(t *testing.T) {
 			SELECT id,state, updated_at FROM connections;
 		`, []connectionResult{})
 
-		u := uuid.New()
+		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
 			Id:               u,
 			Namespace:        "root.some-namespace",
-			ConnectorId:      uuid.New(),
+			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 			ConnectorVersion: 1,
 			State:            ConnectionStateCreated,
 		})
@@ -166,7 +186,7 @@ func TestConnections(t *testing.T) {
 		ctx = apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(newNow)).Build()
 
 		// Attempt update for connection that does not exist
-		err = db.SetConnectionState(ctx, uuid.New(), ConnectionStateReady)
+		err = db.SetConnectionState(ctx, apid.New(apid.PrefixConnection), ConnectionStateReady)
 		assert.ErrorIs(t, err, ErrNotFound)
 
 		// Unchanged
@@ -200,12 +220,12 @@ func TestConnections(t *testing.T) {
 		c := clock.NewFakeClock(now)
 		ctx := apctx.NewBuilderBackground().WithClock(c).Build()
 
-		var firstUuid, lastUuid uuid.UUID
+		var firstUuid, lastUuid apid.ID
 		for i := 0; i < 50; i++ {
 			now = now.Add(time.Second)
 			c.SetTime(now)
 
-			u := uuid.New()
+			u := apid.New(apid.PrefixConnection)
 			if i == 0 {
 				firstUuid = u
 			}
@@ -219,7 +239,7 @@ func TestConnections(t *testing.T) {
 			err := db.CreateConnection(ctx, &Connection{
 				Id:               u,
 				Namespace:        fmt.Sprintf("root.some-namespace.%d", i%10),
-				ConnectorId:      uuid.New(),
+				ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 				ConnectorVersion: 1,
 				State:            state,
 			})
@@ -353,21 +373,21 @@ func TestConnections(t *testing.T) {
 
 		// Create some connections with different labels
 		connections := []struct {
-			id     uuid.UUID
+			id     apid.ID
 			labels Labels
 		}{
-			{uuid.New(), Labels{"env": "prod", "tier": "web", "version": "v1"}},
-			{uuid.New(), Labels{"env": "prod", "tier": "db", "version": "v1"}},
-			{uuid.New(), Labels{"env": "staging", "tier": "web", "version": "v2"}},
-			{uuid.New(), Labels{"env": "staging", "tier": "db"}},
-			{uuid.New(), Labels{"project": "authproxy"}},
+			{apid.New(apid.PrefixConnection), Labels{"env": "prod", "tier": "web", "version": "v1"}},
+			{apid.New(apid.PrefixConnection), Labels{"env": "prod", "tier": "db", "version": "v1"}},
+			{apid.New(apid.PrefixConnection), Labels{"env": "staging", "tier": "web", "version": "v2"}},
+			{apid.New(apid.PrefixConnection), Labels{"env": "staging", "tier": "db"}},
+			{apid.New(apid.PrefixConnection), Labels{"project": "authproxy"}},
 		}
 
 		for _, conn := range connections {
 			err := db.CreateConnection(ctx, &Connection{
 				Id:               conn.id,
 				Namespace:        "root",
-				ConnectorId:      uuid.New(),
+				ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 				ConnectorVersion: 1,
 				State:            ConnectionStateCreated,
 				Labels:           conn.labels,
@@ -378,42 +398,42 @@ func TestConnections(t *testing.T) {
 		testCases := []struct {
 			name     string
 			selector string
-			expected []uuid.UUID
+			expected []apid.ID
 		}{
 			{
 				name:     "equality",
 				selector: "env=prod",
-				expected: []uuid.UUID{connections[0].id, connections[1].id},
+				expected: []apid.ID{connections[0].id, connections[1].id},
 			},
 			{
 				name:     "multiple equality",
 				selector: "env=prod,tier=web",
-				expected: []uuid.UUID{connections[0].id},
+				expected: []apid.ID{connections[0].id},
 			},
 			{
 				name:     "inequality",
 				selector: "env!=prod",
-				expected: []uuid.UUID{connections[2].id, connections[3].id, connections[4].id},
+				expected: []apid.ID{connections[2].id, connections[3].id, connections[4].id},
 			},
 			{
 				name:     "exists",
 				selector: "version",
-				expected: []uuid.UUID{connections[0].id, connections[1].id, connections[2].id},
+				expected: []apid.ID{connections[0].id, connections[1].id, connections[2].id},
 			},
 			{
 				name:     "not exists",
 				selector: "!version",
-				expected: []uuid.UUID{connections[3].id, connections[4].id},
+				expected: []apid.ID{connections[3].id, connections[4].id},
 			},
 			{
 				name:     "complex",
 				selector: "env=staging,!version",
-				expected: []uuid.UUID{connections[3].id},
+				expected: []apid.ID{connections[3].id},
 			},
 			{
 				name:     "no match",
 				selector: "env=dev",
-				expected: []uuid.UUID{},
+				expected: []apid.ID{},
 			},
 		}
 
@@ -425,7 +445,7 @@ func TestConnections(t *testing.T) {
 				assert.NoError(t, result.Error)
 				assert.Len(t, result.Results, len(tc.expected))
 
-				foundIds := make([]uuid.UUID, 0, len(result.Results))
+				foundIds := make([]apid.ID, 0, len(result.Results))
 				for _, r := range result.Results {
 					foundIds = append(foundIds, r.Id)
 				}
@@ -439,8 +459,8 @@ func TestConnections(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		connectorId := uuid.New()
-		u := uuid.New()
+		connectorId := apid.New(apid.PrefixConnectorVersion)
+		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
 			Id:               u,
 			Namespace:        "root.some-namespace",
@@ -480,7 +500,7 @@ func TestConnections(t *testing.T) {
 		})
 
 		t.Run("not found", func(t *testing.T) {
-			c, err := db.PutConnectionLabels(ctx, uuid.New(), map[string]string{"key": "val"})
+			c, err := db.PutConnectionLabels(ctx, apid.New(apid.PrefixConnection), map[string]string{"key": "val"})
 			assert.ErrorIs(t, err, ErrNotFound)
 			assert.Nil(t, c)
 		})
@@ -491,8 +511,8 @@ func TestConnections(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		connectorId := uuid.New()
-		u := uuid.New()
+		connectorId := apid.New(apid.PrefixConnectorVersion)
+		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
 			Id:               u,
 			Namespace:        "root.some-namespace",
@@ -533,7 +553,7 @@ func TestConnections(t *testing.T) {
 		})
 
 		t.Run("not found", func(t *testing.T) {
-			c, err := db.DeleteConnectionLabels(ctx, uuid.New(), []string{"env"})
+			c, err := db.DeleteConnectionLabels(ctx, apid.New(apid.PrefixConnection), []string{"env"})
 			assert.ErrorIs(t, err, ErrNotFound)
 			assert.Nil(t, c)
 		})
@@ -544,8 +564,8 @@ func TestConnections(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		connectorId := uuid.New()
-		u := uuid.New()
+		connectorId := apid.New(apid.PrefixConnectorVersion)
+		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
 			Id:               u,
 			Namespace:        "root.some-namespace",
@@ -588,7 +608,7 @@ func TestConnections(t *testing.T) {
 		})
 
 		t.Run("not found", func(t *testing.T) {
-			c, err := db.UpdateConnectionLabels(ctx, uuid.New(), map[string]string{"key": "val"})
+			c, err := db.UpdateConnectionLabels(ctx, apid.New(apid.PrefixConnection), map[string]string{"key": "val"})
 			assert.ErrorIs(t, err, ErrNotFound)
 			assert.Nil(t, c)
 		})
@@ -604,7 +624,7 @@ func TestConnections(t *testing.T) {
 			now = now.Add(time.Second)
 			c.SetTime(now)
 
-			u := uuid.New()
+			u := apid.New(apid.PrefixConnection)
 
 			state := ConnectionStateCreated
 			if i%2 == 1 {
@@ -614,7 +634,7 @@ func TestConnections(t *testing.T) {
 			err := db.CreateConnection(ctx, &Connection{
 				Id:               u,
 				Namespace:        "root.some-namespace",
-				ConnectorId:      uuid.New(),
+				ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 				ConnectorVersion: 1,
 				State:            state,
 			})
@@ -624,11 +644,11 @@ func TestConnections(t *testing.T) {
 		// A disconnecting connection
 		now = now.Add(time.Second)
 		c.SetTime(now)
-		u := uuid.New()
+		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
 			Id:               u,
 			Namespace:        "root.some-namespace",
-			ConnectorId:      uuid.New(),
+			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 			ConnectorVersion: 1,
 			State:            ConnectionStateDisconnecting,
 		})
@@ -637,11 +657,11 @@ func TestConnections(t *testing.T) {
 		// A deleted connection
 		now = now.Add(time.Second)
 		c.SetTime(now)
-		u = uuid.New()
+		u = apid.New(apid.PrefixConnection)
 		err = db.CreateConnection(ctx, &Connection{
 			Id:               u,
 			Namespace:        "root.some-namespace",
-			ConnectorId:      uuid.New(),
+			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 			ConnectorVersion: 1,
 			State:            ConnectionStateDisconnected,
 		})

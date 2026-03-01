@@ -5,7 +5,7 @@ import (
 	"errors"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -14,7 +14,7 @@ import (
 
 func (s *service) DisconnectConnection(
 	ctx context.Context,
-	id uuid.UUID,
+	id apid.ID,
 ) (taskInfo *tasks.TaskInfo, err error) {
 	s.logger.Info("disconnecting connection", "id", id)
 	err = s.db.SetConnectionState(ctx, id, database.ConnectionStateDisconnecting)

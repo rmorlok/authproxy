@@ -8,7 +8,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apredis"
@@ -21,11 +21,11 @@ import (
 )
 
 type state struct {
-	Id                     uuid.UUID `json:"id"`
-	ActorId                uuid.UUID `json:"actor_id"`
-	ConnectorId            uuid.UUID `json:"connector_id"`
+	Id                     apid.ID `json:"id"`
+	ActorId                apid.ID `json:"actor_id"`
+	ConnectorId            apid.ID `json:"connector_id"`
 	ConnectorVersion       uint64    `json:"connector_version"`
-	ConnectionId           uuid.UUID `json:"connection_id"`
+	ConnectionId           apid.ID `json:"connection_id"`
 	ReturnToUrl            string    `json:"return_to"`
 	CancelSessionAfterAuth bool      `json:"cancel_session_after_auth"`
 	ExpiresAt              time.Time `json:"expires_at"`
@@ -44,17 +44,17 @@ var _ encoding.BinaryMarshaler = (*state)(nil)
 var _ encoding.BinaryUnmarshaler = (*state)(nil)
 
 func (s *state) IsValid() bool {
-	return s.ActorId != uuid.Nil && s.ConnectorId != uuid.Nil && s.ConnectionId != uuid.Nil && !s.ExpiresAt.IsZero()
+	return s.ActorId != apid.Nil && s.ConnectorId != apid.Nil && s.ConnectionId != apid.Nil && !s.ExpiresAt.IsZero()
 }
 
-func getStateRedisKey(u uuid.UUID) string {
+func getStateRedisKey(u apid.ID) string {
 	// Not using the state id directly to avoid cases where we do a direct lookup with a value that can be
 	// tainted by a value included in URLs. The fact that this method takes a UUID also forces parsing
 	// of state ids to UUIDs to ensure validation.
 	return fmt.Sprintf("oauth2:state:%s", u.String())
 }
 
-func (o *oAuth2Connection) saveStateToRedis(ctx context.Context, actor IActorData, stateId uuid.UUID, returnToUrl string) error {
+func (o *oAuth2Connection) saveStateToRedis(ctx context.Context, actor IActorData, stateId apid.ID, returnToUrl string) error {
 	ttl := o.cfg.GetRoot().Oauth.GetRoundTripTtlOrDefault()
 	s := &state{
 		Id:               stateId,
@@ -85,7 +85,7 @@ func getOAuth2State(
 	encrypt encrypt.E,
 	logger *slog.Logger,
 	actor IActorData,
-	stateId uuid.UUID,
+	stateId apid.ID,
 ) (OAuth2Connection, error) {
 	logger.DebugContext(ctx, "getting oauth state",
 		"state_id", stateId,

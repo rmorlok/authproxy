@@ -1,7 +1,7 @@
 package database
 
 import (
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/sqlh"
@@ -22,59 +22,59 @@ func TestConnectorVersions(t *testing.T) {
 		sql := `
 INSERT INTO connector_versions
 (id,                                     version, namespace,          labels,                      state,     encrypted_definition, hash,    created_at,            updated_at,            deleted_at) VALUES
-('6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11', 1,       'root',             '{"type":"gmail"}',          'active',  'encrypted-def',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
-('6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11', 2,       'root',             '{"type":"gmail"}',          'primary', 'encrypted-def',      'hash2', '2023-10-10 00:00:00', '2023-10-10 00:00:00', null),
-('8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64', 1,       'root.child',       '{"type":"gmail"}',          'archived','encrypted-def',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
-('8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64', 2,       'root.child',       '{"type":"gmail"}',          'primary', 'encrypted-def',      'hash4', '2023-10-11 00:00:00', '2023-10-11 00:00:00', null),
-('4a9f3c22-a8d5-423e-af53-e459f1d7c8da', 1,       'root.child2',      '{"type":"outlook"}',        'active',  'encrypted-def',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
-('4a9f3c22-a8d5-423e-af53-e459f1d7c8da', 2,       'root.child2',      '{"type":"outlook"}',        'primary', 'encrypted-def',      'hash6', '2023-10-12 00:00:00', '2023-10-12 00:00:00', null),
-('c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa', 1,       'root.child.grand', '{"type":"google_drive"}',   'archived','encrypted-def',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null),
-('c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa', 2,       'root.child.grand', '{"type":"google_drive"}',   'active',  'encrypted-def',      'hash8', '2023-10-13 00:00:00', '2023-10-13 00:00:00', null),
-('c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa', 3,       'root.child.grand', '{"type":"google_drive"}',   'primary', 'encrypted-def',      'hash9', '2023-10-14 00:00:00', '2023-10-14 00:00:00', null);
+('cxr_testgmail0000001', 1,       'root',             '{"type":"gmail"}',          'active',  'encrypted-def',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
+('cxr_testgmail0000001', 2,       'root',             '{"type":"gmail"}',          'primary', 'encrypted-def',      'hash2', '2023-10-10 00:00:00', '2023-10-10 00:00:00', null),
+('cxr_testgmail0000002', 1,       'root.child',       '{"type":"gmail"}',          'archived','encrypted-def',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
+('cxr_testgmail0000002', 2,       'root.child',       '{"type":"gmail"}',          'primary', 'encrypted-def',      'hash4', '2023-10-11 00:00:00', '2023-10-11 00:00:00', null),
+('cxr_testslack0000001', 1,       'root.child2',      '{"type":"outlook"}',        'active',  'encrypted-def',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
+('cxr_testslack0000001', 2,       'root.child2',      '{"type":"outlook"}',        'primary', 'encrypted-def',      'hash6', '2023-10-12 00:00:00', '2023-10-12 00:00:00', null),
+('cxr_testgmail0000003', 1,       'root.child.grand', '{"type":"google_drive"}',   'archived','encrypted-def',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null),
+('cxr_testgmail0000003', 2,       'root.child.grand', '{"type":"google_drive"}',   'active',  'encrypted-def',      'hash8', '2023-10-13 00:00:00', '2023-10-13 00:00:00', null),
+('cxr_testgmail0000003', 3,       'root.child.grand', '{"type":"google_drive"}',   'primary', 'encrypted-def',      'hash9', '2023-10-14 00:00:00', '2023-10-14 00:00:00', null);
 `
 		_, err := rawDb.Exec(sql)
 		require.NoError(t, err)
 
-		v, err := db.GetConnectorVersion(ctx, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1)
+		v, err := db.GetConnectorVersion(ctx, apid.MustParse("cxr_testgmail0000001"), 1)
 		require.NoError(t, err)
 		require.Equal(t, "gmail", v.Labels["type"])
 		require.Equal(t, ConnectorVersionStateActive, v.State)
 
 		results, err := db.GetConnectorVersions(ctx, []ConnectorVersionId{
-			{uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1},
+			{apid.MustParse("cxr_testgmail0000001"), 1},
 		})
 		require.NoError(t, err)
 		require.Len(t, results, 1)
-		require.Equal(t, "gmail", results[ConnectorVersionId{uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1}].Labels["type"])
-		require.Equal(t, ConnectorVersionStateActive, results[ConnectorVersionId{uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1}].State)
+		require.Equal(t, "gmail", results[ConnectorVersionId{apid.MustParse("cxr_testgmail0000001"), 1}].Labels["type"])
+		require.Equal(t, ConnectorVersionStateActive, results[ConnectorVersionId{apid.MustParse("cxr_testgmail0000001"), 1}].State)
 
 		results, err = db.GetConnectorVersions(ctx, []ConnectorVersionId{
-			{uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1},
-			{uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), 2},
+			{apid.MustParse("cxr_testgmail0000001"), 1},
+			{apid.MustParse("cxr_testgmail0000002"), 2},
 		})
 		require.NoError(t, err)
 		require.Len(t, results, 2)
-		require.Equal(t, "gmail", results[ConnectorVersionId{uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1}].Labels["type"])
-		require.Equal(t, ConnectorVersionStateActive, results[ConnectorVersionId{uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 1}].State)
-		require.Equal(t, "gmail", results[ConnectorVersionId{uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), 2}].Labels["type"])
-		require.Equal(t, ConnectorVersionStatePrimary, results[ConnectorVersionId{uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), 2}].State)
+		require.Equal(t, "gmail", results[ConnectorVersionId{apid.MustParse("cxr_testgmail0000001"), 1}].Labels["type"])
+		require.Equal(t, ConnectorVersionStateActive, results[ConnectorVersionId{apid.MustParse("cxr_testgmail0000001"), 1}].State)
+		require.Equal(t, "gmail", results[ConnectorVersionId{apid.MustParse("cxr_testgmail0000002"), 2}].Labels["type"])
+		require.Equal(t, ConnectorVersionStatePrimary, results[ConnectorVersionId{apid.MustParse("cxr_testgmail0000002"), 2}].State)
 
 		// Version doesn't exist
-		v, err = db.GetConnectorVersion(ctx, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), 99)
+		v, err = db.GetConnectorVersion(ctx, apid.MustParse("cxr_testgmail0000001"), 99)
 		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, v)
 
 		// UUID doesn't exist
-		v, err = db.GetConnectorVersion(ctx, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-999999999999"), 1)
+		v, err = db.GetConnectorVersion(ctx, apid.MustParse("cxr_testnotfound0001"), 1)
 		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, v)
 
-		v, err = db.GetConnectorVersionForState(ctx, uuid.MustParse("4a9f3c22-a8d5-423e-af53-e459f1d7c8da"), ConnectorVersionStatePrimary)
+		v, err = db.GetConnectorVersionForState(ctx, apid.MustParse("cxr_testslack0000001"), ConnectorVersionStatePrimary)
 		require.NoError(t, err)
 		require.Equal(t, "outlook", v.Labels["type"])
 		require.Equal(t, ConnectorVersionStatePrimary, v.State)
 
-		v, err = db.GetConnectorVersionForState(ctx, uuid.MustParse("4a9f3c22-a8d5-423e-af53-e459f1d7c8da"), ConnectorVersionStateArchived)
+		v, err = db.GetConnectorVersionForState(ctx, apid.MustParse("cxr_testslack0000001"), ConnectorVersionStateArchived)
 		require.ErrorIs(t, err, ErrNotFound)
 		require.Nil(t, v)
 
@@ -84,13 +84,13 @@ INSERT INTO connector_versions
 			FetchPage(ctx)
 		require.NoError(t, pr.Error)
 		require.Len(t, pr.Results, 4)
-		require.Equal(t, pr.Results[0].Id, uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"))
+		require.Equal(t, pr.Results[0].Id, apid.MustParse("cxr_testgmail0000002"))
 		require.Equal(t, uint64(2), pr.Results[0].Version)
-		require.Equal(t, pr.Results[1].Id, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"))
+		require.Equal(t, pr.Results[1].Id, apid.MustParse("cxr_testgmail0000001"))
 		require.Equal(t, uint64(2), pr.Results[1].Version)
-		require.Equal(t, pr.Results[2].Id, uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"))
+		require.Equal(t, pr.Results[2].Id, apid.MustParse("cxr_testgmail0000002"))
 		require.Equal(t, uint64(1), pr.Results[2].Version)
-		require.Equal(t, pr.Results[3].Id, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"))
+		require.Equal(t, pr.Results[3].Id, apid.MustParse("cxr_testgmail0000001"))
 		require.Equal(t, uint64(1), pr.Results[3].Version)
 
 		pr = db.ListConnectorVersionsBuilder().
@@ -99,15 +99,15 @@ INSERT INTO connector_versions
 			FetchPage(ctx)
 		require.NoError(t, pr.Error)
 		require.Len(t, pr.Results, 5)
-		require.Equal(t, uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), pr.Results[0].Id)
+		require.Equal(t, apid.MustParse("cxr_testgmail0000002"), pr.Results[0].Id)
 		require.Equal(t, uint64(1), pr.Results[0].Version)
-		require.Equal(t, uuid.MustParse("c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa"), pr.Results[1].Id)
+		require.Equal(t, apid.MustParse("cxr_testgmail0000003"), pr.Results[1].Id)
 		require.Equal(t, uint64(1), pr.Results[1].Version)
-		require.Equal(t, uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), pr.Results[2].Id)
+		require.Equal(t, apid.MustParse("cxr_testgmail0000002"), pr.Results[2].Id)
 		require.Equal(t, uint64(2), pr.Results[2].Version)
-		require.Equal(t, uuid.MustParse("c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa"), pr.Results[3].Id)
+		require.Equal(t, apid.MustParse("cxr_testgmail0000003"), pr.Results[3].Id)
 		require.Equal(t, uint64(2), pr.Results[3].Version)
-		require.Equal(t, uuid.MustParse("c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa"), pr.Results[4].Id)
+		require.Equal(t, apid.MustParse("cxr_testgmail0000003"), pr.Results[4].Id)
 		require.Equal(t, uint64(3), pr.Results[4].Version)
 	})
 
@@ -119,10 +119,10 @@ INSERT INTO connector_versions
 		sql := `
 INSERT INTO connector_versions
 (id,                                     version, namespace,            labels,                      state,     encrypted_definition, hash,    created_at,            updated_at,            deleted_at) VALUES
-('6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11', 1,       'root.prod',          '{"type":"gmail"}',          'primary', 'encrypted-def',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
-('8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64', 1,       'root.staging',       '{"type":"gmail"}',          'primary', 'encrypted-def',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
-('4a9f3c22-a8d5-423e-af53-e459f1d7c8da', 1,       'root.dev',           '{"type":"outlook"}',        'primary', 'encrypted-def',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
-('c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa', 1,       'root.prod.tenant1',  '{"type":"google_drive"}',   'primary', 'encrypted-def',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null);
+('cxr_testgmail0000001', 1,       'root.prod',          '{"type":"gmail"}',          'primary', 'encrypted-def',      'hash1', '2023-10-01 00:00:00', '2023-10-01 00:00:00', null),
+('cxr_testgmail0000002', 1,       'root.staging',       '{"type":"gmail"}',          'primary', 'encrypted-def',      'hash3', '2023-10-02 00:00:00', '2023-10-02 00:00:00', null),
+('cxr_testslack0000001', 1,       'root.dev',           '{"type":"outlook"}',        'primary', 'encrypted-def',      'hash5', '2023-10-03 00:00:00', '2023-10-03 00:00:00', null),
+('cxr_testgmail0000003', 1,       'root.prod.tenant1',  '{"type":"google_drive"}',   'primary', 'encrypted-def',      'hash7', '2023-10-04 00:00:00', '2023-10-04 00:00:00', null);
 `
 		_, err := rawDb.Exec(sql)
 		require.NoError(t, err)
@@ -142,7 +142,7 @@ INSERT INTO connector_versions
 				FetchPage(ctx)
 			require.NoError(t, pr.Error)
 			require.Len(t, pr.Results, 1)
-			require.Equal(t, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), pr.Results[0].Id)
+			require.Equal(t, apid.MustParse("cxr_testgmail0000001"), pr.Results[0].Id)
 		})
 
 		t.Run("single wildcard matcher", func(t *testing.T) {
@@ -152,8 +152,8 @@ INSERT INTO connector_versions
 				FetchPage(ctx)
 			require.NoError(t, pr.Error)
 			require.Len(t, pr.Results, 2)
-			require.Equal(t, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), pr.Results[0].Id)
-			require.Equal(t, uuid.MustParse("c5e6a111-e2bc-4cb8-9f00-df68e4ab71aa"), pr.Results[1].Id)
+			require.Equal(t, apid.MustParse("cxr_testgmail0000001"), pr.Results[0].Id)
+			require.Equal(t, apid.MustParse("cxr_testgmail0000003"), pr.Results[1].Id)
 		})
 
 		t.Run("multiple exact matchers (OR logic)", func(t *testing.T) {
@@ -163,8 +163,8 @@ INSERT INTO connector_versions
 				FetchPage(ctx)
 			require.NoError(t, pr.Error)
 			require.Len(t, pr.Results, 2)
-			require.Equal(t, uuid.MustParse("6f1f9c15-1a2b-4d0a-b3d8-966c073a1a11"), pr.Results[0].Id)
-			require.Equal(t, uuid.MustParse("8e9a7d67-3b4c-512d-9fb4-fd2d381bfa64"), pr.Results[1].Id)
+			require.Equal(t, apid.MustParse("cxr_testgmail0000001"), pr.Results[0].Id)
+			require.Equal(t, apid.MustParse("cxr_testgmail0000002"), pr.Results[1].Id)
 		})
 
 		t.Run("multiple wildcard matchers (OR logic)", func(t *testing.T) {
@@ -184,6 +184,17 @@ INSERT INTO connector_versions
 			require.Len(t, pr.Results, 0)
 		})
 	})
+	t.Run("validation rejects wrong prefix on id", func(t *testing.T) {
+		cv := &ConnectorVersion{
+			Id:                  apid.New(apid.PrefixActor), // wrong prefix
+			Version:             1,
+			Namespace:           "root",
+			State:               ConnectorVersionStateDraft,
+			Hash:                "hash",
+			EncryptedDefinition: "def",
+		}
+		require.Error(t, cv.Validate())
+	})
 	t.Run("UpsertConnectorVersion", func(t *testing.T) {
 		t.Run("creates a new connector version", func(t *testing.T) {
 			// Setup
@@ -192,7 +203,7 @@ INSERT INTO connector_versions
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			// Create a new connector version
-			connectorID := uuid.New()
+			connectorID := apid.New(apid.PrefixConnectorVersion)
 			cv := &ConnectorVersion{
 				Id:                  connectorID,
 				Version:             1,
@@ -228,7 +239,7 @@ INSERT INTO connector_versions
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			// Create a new connector version
-			connectorID := uuid.New()
+			connectorID := apid.New(apid.PrefixConnectorVersion)
 			cv := &ConnectorVersion{
 				Id:                  connectorID,
 				Version:             1,
@@ -257,7 +268,7 @@ INSERT INTO connector_versions
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			// Create a new connector version
-			connectorID := uuid.New()
+			connectorID := apid.New(apid.PrefixConnectorVersion)
 			cv := &ConnectorVersion{
 				Id:                  connectorID,
 				Version:             1,
@@ -292,7 +303,7 @@ INSERT INTO connector_versions
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			// Create a new connector version
-			connectorID := uuid.New()
+			connectorID := apid.New(apid.PrefixConnectorVersion)
 			cv := &ConnectorVersion{
 				Id:                  connectorID,
 				Version:             1,
@@ -331,7 +342,7 @@ INSERT INTO connector_versions
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			// Create connector Id
-			connectorID := uuid.New()
+			connectorID := apid.New(apid.PrefixConnectorVersion)
 
 			// Create version 1
 			cv1 := &ConnectorVersion{
@@ -383,7 +394,7 @@ INSERT INTO connector_versions
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			// Create connector Id
-			connectorID := uuid.New()
+			connectorID := apid.New(apid.PrefixConnectorVersion)
 
 			// Create a primary connector version
 			cv := &ConnectorVersion{
@@ -415,7 +426,7 @@ INSERT INTO connector_versions
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			// Create connector Id
-			connectorID := uuid.New()
+			connectorID := apid.New(apid.PrefixConnectorVersion)
 
 			// Create version 1 as primary
 			cv1 := &ConnectorVersion{
@@ -472,7 +483,7 @@ INSERT INTO connector_versions
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 			// Create connector Id
-			connectorID := uuid.New()
+			connectorID := apid.New(apid.PrefixConnectorVersion)
 
 			// Create version 1 as primary
 			cv1 := &ConnectorVersion{
@@ -527,7 +538,7 @@ INSERT INTO connector_versions
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-			connectorID := uuid.New()
+			connectorID := apid.New(apid.PrefixConnectorVersion)
 			cv := &ConnectorVersion{
 				Id:                  connectorID,
 				Version:             1,
@@ -554,7 +565,7 @@ INSERT INTO connector_versions
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-			err := db.SetConnectorVersionState(ctx, uuid.New(), 1, ConnectorVersionStatePrimary)
+			err := db.SetConnectorVersionState(ctx, apid.New(apid.PrefixConnectorVersion), 1, ConnectorVersionStatePrimary)
 			require.ErrorIs(t, err, ErrNotFound)
 		})
 
@@ -563,7 +574,7 @@ INSERT INTO connector_versions
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-			err := db.SetConnectorVersionState(ctx, uuid.New(), 1, ConnectorVersionState("invalid"))
+			err := db.SetConnectorVersionState(ctx, apid.New(apid.PrefixConnectorVersion), 1, ConnectorVersionState("invalid"))
 			require.Error(t, err)
 		})
 
@@ -572,7 +583,7 @@ INSERT INTO connector_versions
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-			connectorID := uuid.New()
+			connectorID := apid.New(apid.PrefixConnectorVersion)
 
 			// Create v1 as primary
 			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
@@ -610,7 +621,7 @@ INSERT INTO connector_versions
 			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
 			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-			connectorID := uuid.New()
+			connectorID := apid.New(apid.PrefixConnectorVersion)
 
 			// Create v1 as primary
 			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{

@@ -3,7 +3,7 @@ package core
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -11,7 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
-func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id uuid.UUID, version uint64, definition *cschema.Connector, labels map[string]string) (iface.ConnectorVersion, error) {
+func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, version uint64, definition *cschema.Connector, labels map[string]string) (iface.ConnectorVersion, error) {
 	existing, err := s.db.GetConnectorVersion(ctx, id, version)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
@@ -53,7 +53,7 @@ func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id uuid.UUID,
 	return s.getConnectorVersion(ctx, id, version)
 }
 
-func (s *service) GetOrCreateDraftConnectorVersion(ctx context.Context, id uuid.UUID) (iface.ConnectorVersion, error) {
+func (s *service) GetOrCreateDraftConnectorVersion(ctx context.Context, id apid.ID) (iface.ConnectorVersion, error) {
 	// Try to find an existing draft
 	existingDraft, err := s.db.GetConnectorVersionForState(ctx, id, database.ConnectorVersionStateDraft)
 	if err != nil && !errors.Is(err, database.ErrNotFound) {

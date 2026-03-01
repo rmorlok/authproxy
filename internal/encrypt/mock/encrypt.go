@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	uuid "github.com/google/uuid"
+	apid "github.com/rmorlok/authproxy/internal/apid"
 	encrypt "github.com/rmorlok/authproxy/internal/encrypt"
 )
 
@@ -37,10 +37,10 @@ func (m *MockConnectorVersion) EXPECT() *MockConnectorVersionMockRecorder {
 }
 
 // GetId mocks base method.
-func (m *MockConnectorVersion) GetId() uuid.UUID {
+func (m *MockConnectorVersion) GetId() apid.ID {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetId")
-	ret0, _ := ret[0].(uuid.UUID)
+	ret0, _ := ret[0].(apid.ID)
 	return ret0
 }
 
@@ -62,20 +62,6 @@ func (m *MockConnectorVersion) GetNamespace() string {
 func (mr *MockConnectorVersionMockRecorder) GetNamespace() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespace", reflect.TypeOf((*MockConnectorVersion)(nil).GetNamespace))
-}
-
-// GetType mocks base method.
-func (m *MockConnectorVersion) GetType() string {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "GetType")
-	ret0, _ := ret[0].(string)
-	return ret0
-}
-
-// GetType indicates an expected call of GetType.
-func (mr *MockConnectorVersionMockRecorder) GetType() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetType", reflect.TypeOf((*MockConnectorVersion)(nil).GetType))
 }
 
 // GetVersion mocks base method.
@@ -116,10 +102,10 @@ func (m *MockConnection) EXPECT() *MockConnectionMockRecorder {
 }
 
 // GetConnectorId mocks base method.
-func (m *MockConnection) GetConnectorId() uuid.UUID {
+func (m *MockConnection) GetConnectorId() apid.ID {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetConnectorId")
-	ret0, _ := ret[0].(uuid.UUID)
+	ret0, _ := ret[0].(apid.ID)
 	return ret0
 }
 
@@ -144,10 +130,10 @@ func (mr *MockConnectionMockRecorder) GetConnectorVersion() *gomock.Call {
 }
 
 // GetId mocks base method.
-func (m *MockConnection) GetId() uuid.UUID {
+func (m *MockConnection) GetId() apid.ID {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetId")
-	ret0, _ := ret[0].(uuid.UUID)
+	ret0, _ := ret[0].(apid.ID)
 	return ret0
 }
 

@@ -3,7 +3,7 @@ package request_log
 import (
 	"time"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/httpf"
 )
 
@@ -17,12 +17,12 @@ import (
 type LogRecord struct {
 	Namespace           string              `json:"namespace"`
 	Type                httpf.RequestType   `json:"type"`
-	RequestId           uuid.UUID           `json:"request_id"`
+	RequestId           apid.ID           `json:"request_id"`
 	CorrelationId       string              `json:"correlation_id,omitempty"`
 	Timestamp           time.Time           `json:"timestamp"`
 	MillisecondDuration MillisecondDuration `json:"duration"`
-	ConnectionId        uuid.UUID           `json:"connection_id,omitempty"`
-	ConnectorId         uuid.UUID           `json:"connector_id,omitempty"`
+	ConnectionId        apid.ID           `json:"connection_id,omitempty"`
+	ConnectorId         apid.ID           `json:"connector_id,omitempty"`
 	ConnectorVersion    uint64              `json:"connector_version,omitempty"`
 	Method              string              `json:"method"`
 	Host                string              `json:"host"`
@@ -41,7 +41,7 @@ type LogRecord struct {
 	FullRequestRecorded bool                `json:"full_request_recorded,omitempty"`
 }
 
-func (e *LogRecord) GetId() uuid.UUID {
+func (e *LogRecord) GetId() apid.ID {
 	return e.RequestId
 }
 

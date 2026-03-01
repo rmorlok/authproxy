@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	mockAsynq "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	mockLog "github.com/rmorlok/authproxy/internal/aplog/mock"
 	"github.com/rmorlok/authproxy/internal/apredis/mock"
@@ -36,8 +36,8 @@ func FullMockService(tb testing.TB, ctrl *gomock.Controller) (*service, *mockDb.
 }
 
 func TestGetConnectorVersionIdsForConnections(t *testing.T) {
-	u1 := uuid.MustParse("11111111-1111-1111-1111-111111111111")
-	u2 := uuid.MustParse("22222222-2222-2222-2222-222222222222")
+	u1 := apid.MustParse("cxr_test1111111111aa")
+	u2 := apid.MustParse("cxr_test2222222222aa")
 
 	tests := []struct {
 		name        string

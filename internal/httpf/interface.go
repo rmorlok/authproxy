@@ -1,12 +1,12 @@
 package httpf
 
 import (
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"gopkg.in/h2non/gentleman.v2"
 )
 
 type ConnectorVersion interface {
-	GetId() uuid.UUID
+	GetId() apid.ID
 	GetNamespace() string
 	GetVersion() uint64
 }
@@ -16,9 +16,9 @@ type GettableConnectorVersion interface {
 }
 
 type Connection interface {
-	GetId() uuid.UUID
+	GetId() apid.ID
 	GetNamespace() string
-	GetConnectorId() uuid.UUID
+	GetConnectorId() apid.ID
 	GetConnectorVersion() uint64
 }
 

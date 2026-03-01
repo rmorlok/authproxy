@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	encryptmock "github.com/rmorlok/authproxy/internal/encrypt/mock"
@@ -48,7 +48,7 @@ func TestVersionBuilder_WithConfig(t *testing.T) {
 	builder := newConnectorVersionBuilder(s)
 
 	// Create a test configuration
-	connectorID := uuid.New()
+	connectorID := apid.New(apid.PrefixActor)
 	c := &cschema.Connector{
 		Id:          connectorID,
 		Version:     1,
@@ -86,7 +86,7 @@ func TestVersionBuilder_WithId(t *testing.T) {
 	builder := newConnectorVersionBuilder(s)
 
 	// Create a test ID
-	connectorID := uuid.New()
+	connectorID := apid.New(apid.PrefixActor)
 
 	// Test
 	result := builder.WithId(connectorID)
@@ -156,7 +156,7 @@ func TestVersionBuilder_Build_Success(t *testing.T) {
 	builder := newConnectorVersionBuilder(s)
 
 	// Create a test configuration
-	connectorID := uuid.New()
+	connectorID := apid.New(apid.PrefixActor)
 	c := &cschema.Connector{
 		Id:          connectorID,
 		Version:     1,
@@ -220,7 +220,7 @@ func TestVersionBuilder_Build_EncryptError(t *testing.T) {
 	builder := newConnectorVersionBuilder(s)
 
 	// Create a test configuration
-	connectorID := uuid.New()
+	connectorID := apid.New(apid.PrefixActor)
 	c := &cschema.Connector{
 		Id:          connectorID,
 		Version:     1,

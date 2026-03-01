@@ -12,7 +12,7 @@ import (
 
 	"log/slog"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/httpf"
@@ -69,7 +69,7 @@ func (m *mockFullStore) Store(_ context.Context, log *FullLog) error {
 	return m.err
 }
 
-func (m *mockFullStore) GetFullLog(_ context.Context, _ string, _ uuid.UUID) (*FullLog, error) {
+func (m *mockFullStore) GetFullLog(_ context.Context, _ string, _ apid.ID) (*FullLog, error) {
 	return nil, nil
 }
 
@@ -136,7 +136,7 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 				ContentLength: int64(len([]byte(`{"other": "json"}`))),
 			},
 			expectedFullLog: &FullLog{
-				Id:            uuid.New(),
+				Id:            apid.New(apid.PrefixRequestLog),
 				CorrelationID: "some-value",
 				Timestamp:     time.Now(),
 				Full:          true,
@@ -195,7 +195,7 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 				ContentLength: int64(len([]byte(`{"other": "json"}`))),
 			},
 			expectedFullLog: &FullLog{
-				Id:            uuid.New(),
+				Id:            apid.New(apid.PrefixRequestLog),
 				CorrelationID: "some-value",
 				Timestamp:     time.Now(),
 				Full:          true,
@@ -254,7 +254,7 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 				ContentLength: int64(len([]byte(`{"other": "json"}`))),
 			},
 			expectedFullLog: &FullLog{
-				Id:            uuid.New(),
+				Id:            apid.New(apid.PrefixRequestLog),
 				CorrelationID: "some-value",
 				Timestamp:     time.Now(),
 				Full:          false,
@@ -301,7 +301,7 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 			},
 			roundTripErr: errors.New("network issue"),
 			expectedFullLog: &FullLog{
-				Id:            uuid.New(),
+				Id:            apid.New(apid.PrefixRequestLog),
 				CorrelationID: "some-value",
 				Timestamp:     time.Now(),
 				Full:          true,
@@ -350,7 +350,7 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 
 			ctx := apctx.
 				NewBuilderBackground().
-				WithFixedUuidGenerator(test.expectedFullLog.Id).
+				WithFixedIdGenerator(test.expectedFullLog.Id).
 				WithCorrelationID(test.expectedFullLog.CorrelationID).
 				WithFixedClock(test.expectedFullLog.Timestamp).
 				Build()
@@ -418,7 +418,7 @@ func TestRoundTripper_RoundTrip_TimesOutAtConfiguredValue(t *testing.T) {
 		ContentLength: 0, // Unset directly, must be inferred from the response size
 	}
 	expectedFullLog := &FullLog{
-		Id:               uuid.New(),
+		Id:               apid.New(apid.PrefixRequestLog),
 		CorrelationID:    "some-value",
 		Timestamp:        time.Now(),
 		InternalTimeout:  true,
@@ -470,7 +470,7 @@ func TestRoundTripper_RoundTrip_TimesOutAtConfiguredValue(t *testing.T) {
 
 	ctx := apctx.
 		NewBuilderBackground().
-		WithFixedUuidGenerator(expectedFullLog.Id).
+		WithFixedIdGenerator(expectedFullLog.Id).
 		WithCorrelationID(expectedFullLog.CorrelationID).
 		WithFixedClock(expectedFullLog.Timestamp).
 		Build()
@@ -524,7 +524,7 @@ func TestRoundTripper_RoundTrip_TimesOutAtContextCancel(t *testing.T) {
 		ContentLength: 0, // Unset directly, must be inferred from the response size
 	}
 	expectedFullLog := &FullLog{
-		Id:               uuid.New(),
+		Id:               apid.New(apid.PrefixRequestLog),
 		CorrelationID:    "some-value",
 		Timestamp:        time.Now(),
 		InternalTimeout:  false,
@@ -576,7 +576,7 @@ func TestRoundTripper_RoundTrip_TimesOutAtContextCancel(t *testing.T) {
 
 	ctx := apctx.
 		NewBuilderBackground().
-		WithFixedUuidGenerator(expectedFullLog.Id).
+		WithFixedIdGenerator(expectedFullLog.Id).
 		WithCorrelationID(expectedFullLog.CorrelationID).
 		WithFixedClock(expectedFullLog.Timestamp).
 		Build()

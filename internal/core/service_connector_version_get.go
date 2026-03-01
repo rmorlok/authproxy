@@ -3,18 +3,18 @@ package core
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 )
 
-func (s *service) GetConnectorVersion(ctx context.Context, id uuid.UUID, version uint64) (iface.ConnectorVersion, error) {
+func (s *service) GetConnectorVersion(ctx context.Context, id apid.ID, version uint64) (iface.ConnectorVersion, error) {
 	return s.getConnectorVersion(ctx, id, version)
 }
 
-func (s *service) getConnectorVersion(ctx context.Context, id uuid.UUID, version uint64) (*ConnectorVersion, error) {
+func (s *service) getConnectorVersion(ctx context.Context, id apid.ID, version uint64) (*ConnectorVersion, error) {
 	cv, err := s.db.GetConnectorVersion(ctx, id, version)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
@@ -74,7 +74,7 @@ func (s *service) GetConnectorVersions(ctx context.Context, requested []iface.Co
 	return wrappedResults, nil
 }
 
-func (s *service) GetConnectorVersionForState(ctx context.Context, id uuid.UUID, state database.ConnectorVersionState) (iface.ConnectorVersion, error) {
+func (s *service) GetConnectorVersionForState(ctx context.Context, id apid.ID, state database.ConnectorVersionState) (iface.ConnectorVersion, error) {
 	cv, err := s.db.GetConnectorVersionForState(ctx, id, state)
 	if err != nil {
 		return nil, err

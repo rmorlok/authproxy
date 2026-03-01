@@ -6,7 +6,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apasynq"
 	mockAsynq "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	mockLog "github.com/rmorlok/authproxy/internal/aplog/mock"
@@ -21,8 +21,8 @@ import (
 
 func TestTaskDisconnectConnection(t *testing.T) {
 	ctx := context.Background()
-	connectionId := uuid.New()
-	connectorId := uuid.New()
+	connectionId := apid.New(apid.PrefixActor)
+	connectorId := apid.New(apid.PrefixActor)
 
 	apiKeyConnector := &cschema.Connector{
 		Id:          connectorId,

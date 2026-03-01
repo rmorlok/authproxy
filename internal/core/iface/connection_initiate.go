@@ -3,14 +3,14 @@ package iface
 import (
 	"fmt"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hashicorp/go-multierror"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
 type InitiateConnectionRequest struct {
 	// Id of the connector to initiate the connector for
-	ConnectorId uuid.UUID `json:"connector_id"`
+	ConnectorId apid.ID `json:"connector_id"`
 
 	// Version of the connector to initiate connection for; if not specified defaults to the primary version.
 	ConnectorVersion uint64 `json:"connector_version,omitempty"`
@@ -26,7 +26,7 @@ type InitiateConnectionRequest struct {
 func (icr *InitiateConnectionRequest) Validate() error {
 	result := &multierror.Error{}
 
-	if icr.ConnectorId == uuid.Nil {
+	if icr.ConnectorId == apid.Nil {
 		result = multierror.Append(result, fmt.Errorf("connector_id is required"))
 	}
 
@@ -54,17 +54,17 @@ const (
 )
 
 type InitiateConnectionResponse interface {
-	GetId() uuid.UUID
+	GetId() apid.ID
 	GetType() InitiateConnectionResponseType
 }
 
 type InitiateConnectionRedirect struct {
-	Id          uuid.UUID                      `json:"id"`
+	Id          apid.ID                      `json:"id"`
 	Type        InitiateConnectionResponseType `json:"type"`
 	RedirectUrl string                         `json:"redirect_url"`
 }
 
-func (icr *InitiateConnectionRedirect) GetId() uuid.UUID {
+func (icr *InitiateConnectionRedirect) GetId() apid.ID {
 	return icr.Id
 }
 

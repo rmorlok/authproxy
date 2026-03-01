@@ -9,7 +9,7 @@ import (
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
-	uuid "github.com/google/uuid"
+	apid "github.com/rmorlok/authproxy/internal/apid"
 	request_log "github.com/rmorlok/authproxy/internal/request_log"
 )
 
@@ -37,7 +37,7 @@ func (m *MockLogRetriever) EXPECT() *MockLogRetrieverMockRecorder {
 }
 
 // GetFullLog mocks base method.
-func (m *MockLogRetriever) GetFullLog(ctx context.Context, id uuid.UUID) (*request_log.FullLog, error) {
+func (m *MockLogRetriever) GetFullLog(ctx context.Context, id apid.ID) (*request_log.FullLog, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "GetFullLog", ctx, id)
 	ret0, _ := ret[0].(*request_log.FullLog)

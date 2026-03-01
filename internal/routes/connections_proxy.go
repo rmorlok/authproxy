@@ -6,7 +6,7 @@ import (
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/apredis"
@@ -55,7 +55,7 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 	}
 
 	id := gctx.Param("id")
-	connectionUuid, err := uuid.Parse(id)
+	connectionUuid, err := apid.Parse(id)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
@@ -66,7 +66,7 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 		return
 	}
 
-	if connectionUuid == uuid.Nil {
+	if connectionUuid == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("connection id is required").

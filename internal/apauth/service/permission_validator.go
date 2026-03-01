@@ -5,14 +5,14 @@ import (
 	"fmt"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
 type hasId interface {
-	GetId() uuid.UUID
+	GetId() apid.ID
 }
 
 type hasNamespace interface {

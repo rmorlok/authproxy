@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/google/go-cmp/cmp"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -17,7 +17,7 @@ import (
 
 func TestConnectorRoundtrip(t *testing.T) {
 	// Create test UUID for consistent testing
-	testID := uuid.MustParse("12345678-1234-1234-1234-123456789012")
+	testID := apid.MustParse("cxr_test12345678abcd")
 	refreshInBackground := true
 	refreshDuration := common.HumanDuration{Duration: 5 * time.Minute}
 

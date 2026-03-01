@@ -9,11 +9,11 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/google/uuid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	jwt2 "github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -108,13 +108,13 @@ func (atu *AuthTestUtil) NewSignedRequestForActor(method, url string, body io.Re
 }
 
 func (atu *AuthTestUtil) claimsForActor(ctx context.Context, a core.Actor) *jwt2.AuthProxyClaims {
-	uuidGen := apctx.GetUuidGenerator(ctx)
+	idGen := apctx.GetIdGenerator(ctx)
 	claims := &jwt2.AuthProxyClaims{
 		RegisteredClaims: jwt.RegisteredClaims{
 			Issuer:   "test",
 			Subject:  a.ExternalId,
 			Audience: []string{string(atu.serviceId)},
-			ID:       uuidGen.NewString(),
+			ID:       idGen.NewString(apid.PrefixJwtId),
 		},
 		Namespace: a.Namespace,
 		Actor:     &a,
@@ -142,7 +142,7 @@ func (atu *AuthTestUtil) SignRequestHeaderAs(ctx context.Context, req *http.Requ
 
 func (atu *AuthTestUtil) SignRequestQueryAs(ctx context.Context, req *http.Request, a core.Actor) (*http.Request, error) {
 	claims := atu.claimsForActor(ctx, a)
-	claims.Nonce = util.ToPtr(uuid.New())
+	claims.Nonce = util.ToPtr(apid.New(apid.PrefixUsedNonce))
 	claims.ExpiresAt = &jwt.NumericDate{apctx.GetClock(ctx).Now().Add(time.Hour)}
 
 	tokenString, err := atu.s.Token(ctx, claims)

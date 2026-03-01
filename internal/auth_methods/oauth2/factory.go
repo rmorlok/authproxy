@@ -4,7 +4,7 @@ import (
 	"context"
 	"log/slog"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
@@ -48,7 +48,7 @@ func (f *factory) NewOAuth2(connection coreIface.Connection) OAuth2Connection {
 	)
 }
 
-func (f *factory) GetOAuth2State(ctx context.Context, actor IActorData, stateId uuid.UUID) (OAuth2Connection, error) {
+func (f *factory) GetOAuth2State(ctx context.Context, actor IActorData, stateId apid.ID) (OAuth2Connection, error) {
 	return getOAuth2State(
 		ctx,
 		f.cfg,

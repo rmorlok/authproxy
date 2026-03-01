@@ -3,7 +3,7 @@ package core
 import (
 	"context"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/core/iface"
@@ -13,7 +13,7 @@ import (
 )
 
 func (s *service) CreateConnectorVersion(ctx context.Context, namespace string, definition *cschema.Connector, labels map[string]string) (iface.ConnectorVersion, error) {
-	id := apctx.GetUuidGenerator(ctx).New()
+	id := apctx.GetIdGenerator(ctx).New(apid.PrefixConnectorVersion)
 
 	def := definition.Clone()
 	def.Id = id
@@ -40,7 +40,7 @@ func (s *service) CreateConnectorVersion(ctx context.Context, namespace string, 
 	return s.getConnectorVersion(ctx, id, 1)
 }
 
-func (s *service) CreateDraftConnectorVersion(ctx context.Context, id uuid.UUID, definition *cschema.Connector, labels map[string]string) (iface.ConnectorVersion, error) {
+func (s *service) CreateDraftConnectorVersion(ctx context.Context, id apid.ID, definition *cschema.Connector, labels map[string]string) (iface.ConnectorVersion, error) {
 	// Check for existing draft
 	existingDraft, err := s.db.GetConnectorVersionForState(ctx, id, database.ConnectorVersionStateDraft)
 	if err != nil && !errors.Is(err, database.ErrNotFound) {

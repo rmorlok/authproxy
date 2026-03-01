@@ -3,7 +3,7 @@ package core
 import (
 	"testing"
 
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/stretchr/testify/require"
 )
@@ -37,7 +37,7 @@ func TestRequestAuth_Allows(t *testing.T) {
 		{
 			name: "actor with matching permission",
 			ra: NewAuthenticatedRequestAuth(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -55,7 +55,7 @@ func TestRequestAuth_Allows(t *testing.T) {
 		{
 			name: "actor without matching permission",
 			ra: NewAuthenticatedRequestAuth(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -73,7 +73,7 @@ func TestRequestAuth_Allows(t *testing.T) {
 		{
 			name: "actor with wildcard namespace permission",
 			ra: NewAuthenticatedRequestAuth(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -91,7 +91,7 @@ func TestRequestAuth_Allows(t *testing.T) {
 		{
 			name: "actor with wildcard resource permission",
 			ra: NewAuthenticatedRequestAuth(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -109,7 +109,7 @@ func TestRequestAuth_Allows(t *testing.T) {
 		{
 			name: "actor with wildcard verb permission",
 			ra: NewAuthenticatedRequestAuth(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -127,7 +127,7 @@ func TestRequestAuth_Allows(t *testing.T) {
 		{
 			name: "actor with resource id restriction - allowed",
 			ra: NewAuthenticatedRequestAuth(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -147,7 +147,7 @@ func TestRequestAuth_Allows(t *testing.T) {
 		{
 			name: "actor with resource id restriction - denied",
 			ra: NewAuthenticatedRequestAuth(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -334,7 +334,7 @@ func TestRequestAuth_AllowsWithRequestPermissions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			ra := NewAuthenticatedRequestAuthWithPermissions(
 				&Actor{
-					Id:          uuid.New(),
+					Id:          apid.New(apid.PrefixActor),
 					ExternalId:  "user",
 					Permissions: tt.actorPermissions,
 				},
@@ -379,7 +379,7 @@ func TestRequestAuth_AllowsReason(t *testing.T) {
 		{
 			name: "actor permissions deny",
 			ra: NewAuthenticatedRequestAuth(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -399,7 +399,7 @@ func TestRequestAuth_AllowsReason(t *testing.T) {
 			name: "request permissions deny",
 			ra: NewAuthenticatedRequestAuthWithPermissions(
 				&Actor{
-					Id:         uuid.New(),
+					Id:         apid.New(apid.PrefixActor),
 					ExternalId: "user",
 					Permissions: []aschema.Permission{
 						{
@@ -426,7 +426,7 @@ func TestRequestAuth_AllowsReason(t *testing.T) {
 		{
 			name: "allowed - empty reason",
 			ra: NewAuthenticatedRequestAuth(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -482,7 +482,7 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 		{
 			name: "no permission verb",
 			ra: NewAuthenticatedRequestAuth(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -499,7 +499,7 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 		{
 			name: "no permission resource",
 			ra: NewAuthenticatedRequestAuth(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -516,7 +516,7 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 		{
 			name: "single permission",
 			ra: NewAuthenticatedRequestAuth(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -533,7 +533,7 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 		{
 			name: "multiple permissions",
 			ra: NewAuthenticatedRequestAuth(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -565,7 +565,7 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 		{
 			name: "request permissions no intersection - namespace",
 			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -605,7 +605,7 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 		{
 			name: "request permissions no intersection - verb",
 			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -645,7 +645,7 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 		{
 			name: "request permissions no intersection - resource",
 			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -685,7 +685,7 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 		{
 			name: "request permissions single intersection",
 			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -725,7 +725,7 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 		{
 			name: "request permissions multiple intersection",
 			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -770,7 +770,7 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 		{
 			name: "wildcard resource actor permissions",
 			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -810,7 +810,7 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 		{
 			name: "wildcard resource request permissions",
 			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -850,7 +850,7 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 		{
 			name: "wildcard verb actor permissions",
 			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -890,7 +890,7 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 		{
 			name: "wildcard verb request permissions",
 			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -930,7 +930,7 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 		{
 			name: "request permissions wildcard",
 			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -970,7 +970,7 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 		{
 			name: "actor and request permissions wildcard",
 			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{
@@ -1010,7 +1010,7 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 		{
 			name: "actor wildcard resolved to concrete",
 			ra: NewAuthenticatedRequestAuthWithPermissions(&Actor{
-				Id:         uuid.New(),
+				Id:         apid.New(apid.PrefixActor),
 				ExternalId: "user",
 				Permissions: []aschema.Permission{
 					{

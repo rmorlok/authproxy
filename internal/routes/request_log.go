@@ -5,7 +5,7 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/config"
@@ -31,9 +31,9 @@ type ListRequestsQuery struct {
 	Namespace                *string    `form:"namespace"`
 	RequestType              *string    `form:"request_type"`
 	CorrelationId            *string    `form:"correlation_id"`
-	ConnectionId             *uuid.UUID `form:"connection_id"`
+	ConnectionId             *apid.ID `form:"connection_id"`
 	ConnectorType            *string    `form:"connector_type"`
-	ConnectorId              *uuid.UUID `form:"connector_id"`
+	ConnectorId              *apid.ID `form:"connector_id"`
 	ConnectorVersion         *uint64    `form:"connector_version"`
 	Method                   *string    `form:"method"`
 	StatusCode               *int       `form:"status_code"`
@@ -161,18 +161,18 @@ func (r *RequestLogRoutes) get(gctx *gin.Context) {
 		return
 	}
 
-	logId, err := uuid.Parse(logIdStr)
+	logId, err := apid.Parse(logIdStr)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if logId == uuid.Nil {
+	if logId == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").

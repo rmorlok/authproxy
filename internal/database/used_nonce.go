@@ -6,7 +6,7 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 )
@@ -18,7 +18,7 @@ const UsedNoncesTable = "used_nonces"
 // when they are used there is a known time that they must be retained until so that the list of used nonces doesn't
 // grow infinitely.
 type UsedNonce struct {
-	Id          uuid.UUID
+	Id          apid.ID
 	RetainUntil time.Time
 	CreatedAt   time.Time
 }
@@ -47,7 +47,7 @@ func (n *UsedNonce) values() []any {
 	}
 }
 
-func (s *service) hasNonceBeenUsed(ctx context.Context, tx sq.BaseRunner, nonce uuid.UUID) (hasBeenUsed bool, err error) {
+func (s *service) hasNonceBeenUsed(ctx context.Context, tx sq.BaseRunner, nonce apid.ID) (hasBeenUsed bool, err error) {
 	var count int64
 	err = s.sq.
 		Select("COUNT(*)").
@@ -65,13 +65,13 @@ func (s *service) hasNonceBeenUsed(ctx context.Context, tx sq.BaseRunner, nonce 
 	return count > 0, nil
 }
 
-func (s *service) HasNonceBeenUsed(ctx context.Context, nonce uuid.UUID) (hasBeenUsed bool, err error) {
+func (s *service) HasNonceBeenUsed(ctx context.Context, nonce apid.ID) (hasBeenUsed bool, err error) {
 	return s.hasNonceBeenUsed(ctx, s.db, nonce)
 }
 
 func (s *service) CheckNonceValidAndMarkUsed(
 	ctx context.Context,
-	nonce uuid.UUID,
+	nonce apid.ID,
 	retainRecordUntil time.Time,
 ) (wasValid bool, err error) {
 

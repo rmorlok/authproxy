@@ -2,7 +2,7 @@ package routes
 
 import (
 	"github.com/gin-gonic/gin"
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/pkg/errors"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
@@ -30,7 +30,7 @@ type ActorsRoutes struct {
 }
 
 type ActorJson struct {
-	Id         uuid.UUID         `json:"id"`
+	Id         apid.ID         `json:"id"`
 	Namespace  string            `json:"namespace"`
 	ExternalId string            `json:"external_id"`
 	Labels     map[string]string `json:"labels,omitempty"`
@@ -211,19 +211,19 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 	val := auth.MustGetValidatorFromGinContext(gctx)
 	ctx := gctx.Request.Context()
 
-	id, err := uuid.Parse(gctx.Param("id"))
+	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithInternalErr(err).
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if id == uuid.Nil {
+	if id == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithInternalErr(err).
@@ -364,19 +364,19 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	id, err := uuid.Parse(gctx.Param("id"))
+	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithInternalErr(err).
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if id == uuid.Nil {
+	if id == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithInternalErr(err).
@@ -616,7 +616,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 
 	// Create the actor
 	actor := &database.Actor{
-		Id:         uuid.New(),
+		Id:         apid.New(apid.PrefixActor),
 		Namespace:  req.Namespace,
 		ExternalId: req.ExternalId,
 		Labels:     req.Labels,
@@ -687,19 +687,19 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	id, err := uuid.Parse(gctx.Param("id"))
+	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithInternalErr(err).
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if id == uuid.Nil {
+	if id == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
@@ -929,19 +929,19 @@ func (r *ActorsRoutes) getLabels(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	id, err := uuid.Parse(gctx.Param("id"))
+	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithInternalErr(err).
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if id == uuid.Nil {
+	if id == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
@@ -1013,19 +1013,19 @@ func (r *ActorsRoutes) getLabel(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	id, err := uuid.Parse(gctx.Param("id"))
+	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithInternalErr(err).
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if id == uuid.Nil {
+	if id == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
@@ -1120,19 +1120,19 @@ func (r *ActorsRoutes) putLabel(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	id, err := uuid.Parse(gctx.Param("id"))
+	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithInternalErr(err).
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if id == uuid.Nil {
+	if id == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").
@@ -1272,19 +1272,19 @@ func (r *ActorsRoutes) deleteLabel(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	id, err := uuid.Parse(gctx.Param("id"))
+	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithInternalErr(err).
-			WithResponseMsg("failed to parse id as UUID").
+			WithResponseMsg("invalid id format").
 			BuildStatusError().
 			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
 	}
 
-	if id == uuid.Nil {
+	if id == apid.Nil {
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusBadRequest().
 			WithResponseMsg("id is required").

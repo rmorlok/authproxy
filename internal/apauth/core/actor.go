@@ -1,12 +1,12 @@
 package core
 
 import (
-	"github.com/google/uuid"
+	"github.com/rmorlok/authproxy/internal/apid"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
 type IActorData interface {
-	GetId() uuid.UUID
+	GetId() apid.ID
 	GetExternalId() string
 	GetPermissions() []aschema.Permission
 	GetNamespace() string
@@ -19,14 +19,14 @@ type Actor struct {
 	// This version of the actor is deserialized from the JWT directly. The JSON annotations apply to
 	// how the JWT is structured.
 
-	Id          uuid.UUID            `json:"-"` // This is the database ID of the actor. It cannot be set in the JWT directly.
+	Id          apid.ID              `json:"-"` // This is the database ID of the actor. It cannot be set in the JWT directly.
 	ExternalId  string               `json:"external_id"`
 	Namespace   string               `json:"namespace,omitempty"`
 	Labels      map[string]string    `json:"labels,omitempty"`
 	Permissions []aschema.Permission `json:"permissions"`
 }
 
-func (a *Actor) GetId() uuid.UUID {
+func (a *Actor) GetId() apid.ID {
 	return a.Id
 }
 
