@@ -1,7 +1,6 @@
 package database
 
 import (
-	"context"
 	"testing"
 	"time"
 
@@ -13,17 +12,21 @@ import (
 )
 
 func TestPurgeSoftDeletedRecords(t *testing.T) {
-	now := time.Date(2024, time.January, 15, 12, 0, 0, 0, time.UTC)
-	clk := clock.NewFakeClock(now)
+	// Start the clock 60 days in the past
+	start := time.Date(2024, time.January, 15, 12, 0, 0, 0, time.UTC)
+	clk := clock.NewFakeClock(start)
 
-	setup := func(t *testing.T) (DB, context.Context, *clock.FakeClock) {
+	setup := func(t *testing.T) (DB, *clock.FakeClock) {
 		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
+
+		// Reset clock to start
+		*clk = *clock.NewFakeClock(start)
 
 		// Create namespace
 		require.NoError(t, db.EnsureNamespaceByPath(ctx, "root"))
 
-		// Create an actor and soft-delete it (deleted 60 days ago)
+		// Create and soft-delete an actor at time "start" (will be 60 days old)
 		actorOld := &Actor{
 			Id:         apid.New(apid.PrefixActor),
 			Namespace:  "root",
@@ -31,12 +34,11 @@ func TestPurgeSoftDeletedRecords(t *testing.T) {
 		}
 		require.NoError(t, db.CreateActor(ctx, actorOld))
 		require.NoError(t, db.DeleteActor(ctx, actorOld.Id))
-		// Backdate the deleted_at to 60 days ago
-		_, err := rawDb.Exec("UPDATE actors SET deleted_at = ? WHERE id = ?",
-			now.Add(-60*24*time.Hour).UTC().Format("2006-01-02 15:04:05"), actorOld.Id.String())
-		require.NoError(t, err)
 
-		// Create an actor and soft-delete it recently (5 days ago)
+		// Advance clock 55 days, then create and delete another actor (will be 5 days old at "now")
+		clk.Step(55 * 24 * time.Hour)
+		ctx = apctx.NewBuilderBackground().WithClock(clk).Build()
+
 		actorRecent := &Actor{
 			Id:         apid.New(apid.PrefixActor),
 			Namespace:  "root",
@@ -44,11 +46,11 @@ func TestPurgeSoftDeletedRecords(t *testing.T) {
 		}
 		require.NoError(t, db.CreateActor(ctx, actorRecent))
 		require.NoError(t, db.DeleteActor(ctx, actorRecent.Id))
-		_, err = rawDb.Exec("UPDATE actors SET deleted_at = ? WHERE id = ?",
-			now.Add(-5*24*time.Hour).UTC().Format("2006-01-02 15:04:05"), actorRecent.Id.String())
-		require.NoError(t, err)
 
-		// Create a live (non-deleted) actor
+		// Advance clock 5 more days to "now" (60 days from start), create a live actor
+		clk.Step(5 * 24 * time.Hour)
+		ctx = apctx.NewBuilderBackground().WithClock(clk).Build()
+
 		actorLive := &Actor{
 			Id:         apid.New(apid.PrefixActor),
 			Namespace:  "root",
@@ -60,11 +62,13 @@ func TestPurgeSoftDeletedRecords(t *testing.T) {
 		require.Equal(t, 3, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM actors"))
 		require.Equal(t, 2, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM actors WHERE deleted_at IS NOT NULL"))
 
-		return db, ctx, clk
+		return db, clk
 	}
 
 	t.Run("deletes records older than threshold", func(t *testing.T) {
-		db, ctx, _ := setup(t)
+		db, clk := setup(t)
+		now := clk.Now()
+		ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
 
 		// Purge records deleted more than 30 days ago
 		olderThan := now.Add(-30 * 24 * time.Hour)
@@ -74,9 +78,9 @@ func TestPurgeSoftDeletedRecords(t *testing.T) {
 	})
 
 	t.Run("preserves records newer than threshold", func(t *testing.T) {
-		db, ctx, _ := setup(t)
-		_, rawDb := MustApplyBlankTestDbConfig(t, nil) // just to get rawDb reference
-		_ = rawDb
+		db, clk := setup(t)
+		now := clk.Now()
+		ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
 
 		// Purge records deleted more than 30 days ago
 		olderThan := now.Add(-30 * 24 * time.Hour)
@@ -84,8 +88,6 @@ func TestPurgeSoftDeletedRecords(t *testing.T) {
 		require.NoError(t, err)
 
 		// The recently deleted actor (5 days) should still exist
-		// The live actor should still exist
-		// Only the 60-day-old actor should be gone
 		// We can verify by trying another purge with a much more recent threshold
 		olderThan2 := now.Add(-1 * 24 * time.Hour)
 		deleted2, err := db.PurgeSoftDeletedRecords(ctx, olderThan2)
@@ -94,7 +96,9 @@ func TestPurgeSoftDeletedRecords(t *testing.T) {
 	})
 
 	t.Run("preserves non-deleted records", func(t *testing.T) {
-		db, ctx, _ := setup(t)
+		db, clk := setup(t)
+		now := clk.Now()
+		ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
 
 		// Purge everything older than 1 day
 		olderThan := now.Add(-1 * 24 * time.Hour)
@@ -112,7 +116,7 @@ func TestPurgeSoftDeletedRecords(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig(t, nil)
 		ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
 
-		deleted, err := db.PurgeSoftDeletedRecords(ctx, now)
+		deleted, err := db.PurgeSoftDeletedRecords(ctx, clk.Now())
 		require.NoError(t, err)
 		require.Equal(t, int64(0), deleted)
 	})
