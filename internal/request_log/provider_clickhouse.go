@@ -135,6 +135,10 @@ func (s *clickhouseRecordStore) Migrate(ctx context.Context) error {
 	return nil
 }
 
+func (s *clickhouseRecordStore) Ping(ctx context.Context) bool {
+	return s.db.PingContext(ctx) == nil
+}
+
 var _ RecordStore = (*clickhouseRecordStore)(nil)
 
 // --- ClickHouse RecordRetriever ---

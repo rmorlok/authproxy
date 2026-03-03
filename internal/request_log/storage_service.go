@@ -55,6 +55,25 @@ func (ss *StorageService) GetFullLog(ctx context.Context, id apid.ID) (*FullLog,
 	return ss.fullStore.GetFullLog(ctx, log.Namespace, id)
 }
 
+// Ping checks if the storage backends are reachable.
+func (ss *StorageService) Ping(ctx context.Context) bool {
+	if p, ok := ss.store.(pingable); ok {
+		if !p.Ping(ctx) {
+			return false
+		}
+	}
+
+	if util.SameInstance(ss.store, ss.fullStore) {
+		return true
+	}
+
+	if p, ok := ss.fullStore.(pingable); ok {
+		return p.Ping(ctx)
+	}
+
+	return true
+}
+
 // Migrate runs any necessary schema migrations for the storage backend.
 func (ss *StorageService) Migrate(ctx context.Context) error {
 	ss.logger.Info("running request log migrations")

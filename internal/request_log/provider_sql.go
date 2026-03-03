@@ -168,6 +168,10 @@ func (s *sqlRecordStore) Migrate(ctx context.Context) error {
 	return nil
 }
 
+func (s *sqlRecordStore) Ping(ctx context.Context) bool {
+	return s.db.PingContext(ctx) == nil
+}
+
 var _ RecordStore = (*sqlRecordStore)(nil)
 
 // --- SQL RecordRetriever ---

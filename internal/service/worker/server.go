@@ -14,7 +14,6 @@ import (
 	authSync "github.com/rmorlok/authproxy/internal/apauth/tasks"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/aplog"
-	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/service"
@@ -53,48 +52,29 @@ func Serve(cfg config.C) {
 
 	dm.GetAsyncClient().Ping()
 
+	dm.RegisterDatabasePing()
+	dm.RegisterRedisPing()
+	dm.RegisterAsynqClientPing()
+	dm.RegisterLogStoragePing()
+	dm.RegisterPing("asynqServer", func(ctx context.Context) bool {
+		return asyncRunning && !asyncHasError
+	})
+
 	router.GET("/healthz", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 1*time.Second)
 		defer cancel()
 
-		dbChan := make(chan bool, 1)
-		redisChan := make(chan bool, 1)
-		asynqClientChan := make(chan bool, 1)
-
-		go func() {
-			dbChan <- dm.GetDatabase().Ping(ctx)
-		}()
-
-		go func() {
-			redisChan <- apredis.Ping(ctx, dm.GetRedisClient())
-		}()
-
-		go func() {
-			if err := dm.GetAsyncClient().Ping(); err != nil {
-				asynqClientChan <- false
-			} else {
-				asynqClientChan <- true
-			}
-		}()
-
-		dbOk := <-dbChan
-		redisOk := <-redisChan
-		asyncClientOk := <-asynqClientChan
-		everythingOk := dbOk && redisOk && asyncRunning && !asyncHasError && asyncClientOk
+		results, allOk := dm.RunPings(ctx)
 		status := http.StatusOK
-		if !everythingOk {
+		if !allOk {
 			status = http.StatusServiceUnavailable
 		}
 
-		c.PureJSON(status, gin.H{
-			"service":          "worker",
-			"db":               dbOk,
-			"redis":            redisOk,
-			"asynqServer":      asyncRunning && !asyncHasError,
-			"asynqClient":      asyncClientOk,
-			"asyncIsScheduler": asyncIsScheduler,
-			"ok":               everythingOk,
-		})
+		response := gin.H{"service": "worker", "ok": allOk, "asyncIsScheduler": asyncIsScheduler}
+		for k, v := range results {
+			response[k] = v
+		}
+		c.PureJSON(status, response)
 	})
 
 	dm.AutoMigrateAll()
