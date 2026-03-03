@@ -25,6 +25,7 @@ type DatabasePostgres struct {
 	Params                    map[string]string `json:"params,omitempty" yaml:"params,omitempty"`
 	AutoMigrate               bool              `json:"auto_migrate,omitempty" yaml:"auto_migrate,omitempty"`
 	AutoMigrationLockDuration *HumanDuration    `json:"auto_migration_lock_duration,omitempty" yaml:"auto_migration_lock_duration,omitempty"`
+	SoftDeleteRetention       *HumanDuration    `json:"soft_delete_retention,omitempty" yaml:"soft_delete_retention,omitempty"`
 }
 
 func (d *DatabasePostgres) GetProvider() DatabaseProvider {
@@ -45,6 +46,13 @@ func (d *DatabasePostgres) GetAutoMigrationLockDuration() time.Duration {
 	}
 
 	return d.AutoMigrationLockDuration.Duration
+}
+
+func (d *DatabasePostgres) GetSoftDeleteRetention() *time.Duration {
+	if d.SoftDeleteRetention == nil {
+		return nil
+	}
+	return &d.SoftDeleteRetention.Duration
 }
 
 func (d *DatabasePostgres) GetUri() string {

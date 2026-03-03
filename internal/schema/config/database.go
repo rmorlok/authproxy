@@ -20,6 +20,7 @@ type DatabaseImpl interface {
 	GetProvider() DatabaseProvider
 	GetAutoMigrate() bool
 	GetAutoMigrationLockDuration() time.Duration
+	GetSoftDeleteRetention() *time.Duration
 	GetUri() string
 	GetDsn() string
 	GetDriver() string
@@ -51,6 +52,25 @@ func (d *Database) GetAutoMigrationLockDuration() time.Duration {
 		return 2 * time.Minute
 	}
 	return d.InnerVal.GetAutoMigrationLockDuration()
+}
+
+const DefaultSoftDeleteRetention = 30 * 24 * time.Hour // 30 days
+
+func (d *Database) GetSoftDeleteRetention() *time.Duration {
+	if d == nil || d.InnerVal == nil {
+		return nil
+	}
+	return d.InnerVal.GetSoftDeleteRetention()
+}
+
+// GetSoftDeleteRetentionOrDefault returns the configured soft delete retention duration,
+// or 30 days if not configured.
+func (d *Database) GetSoftDeleteRetentionOrDefault() time.Duration {
+	r := d.GetSoftDeleteRetention()
+	if r == nil {
+		return DefaultSoftDeleteRetention
+	}
+	return *r
 }
 
 func (d *Database) GetUri() string {

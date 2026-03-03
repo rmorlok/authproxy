@@ -835,6 +835,21 @@ func (mr *MockDBMockRecorder) Ping(ctx interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Ping", reflect.TypeOf((*MockDB)(nil).Ping), ctx)
 }
 
+// PurgeSoftDeletedRecords mocks base method.
+func (m *MockDB) PurgeSoftDeletedRecords(ctx context.Context, olderThan time.Time) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PurgeSoftDeletedRecords", ctx, olderThan)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PurgeSoftDeletedRecords indicates an expected call of PurgeSoftDeletedRecords.
+func (mr *MockDBMockRecorder) PurgeSoftDeletedRecords(ctx, olderThan interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PurgeSoftDeletedRecords", reflect.TypeOf((*MockDB)(nil).PurgeSoftDeletedRecords), ctx, olderThan)
+}
+
 // PutActorLabels mocks base method.
 func (m *MockDB) PutActorLabels(ctx context.Context, id apid.ID, labels map[string]string) (*database.Actor, error) {
 	m.ctrl.T.Helper()
