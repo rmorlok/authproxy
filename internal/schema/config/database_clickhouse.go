@@ -58,6 +58,10 @@ func (d *DatabaseClickhouse) GetAutoMigrationLockDuration() time.Duration {
 	return d.AutoMigrationLockDuration.Duration
 }
 
+func (d *DatabaseClickhouse) GetSoftDeleteRetention() *time.Duration {
+	return nil
+}
+
 func (d *DatabaseClickhouse) GetAddresses(ctx context.Context) ([]string, error) {
 	if len(d.Addresses) > 0 {
 		return d.Addresses, nil

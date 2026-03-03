@@ -13,6 +13,7 @@ type DatabaseSqlite struct {
 	Path                      string           `json:"path" yaml:"path"`
 	AutoMigrate               bool             `json:"auto_migrate,omitempty" yaml:"auto_migrate,omitempty"`
 	AutoMigrationLockDuration *HumanDuration   `json:"auto_migration_lock_duration,omitempty" yaml:"auto_migration_lock_duration,omitempty"`
+	SoftDeleteRetention       *HumanDuration   `json:"soft_delete_retention,omitempty" yaml:"soft_delete_retention,omitempty"`
 }
 
 func (d *DatabaseSqlite) GetProvider() DatabaseProvider {
@@ -46,6 +47,13 @@ func (d *DatabaseSqlite) GetDsn() string {
 
 func (d *DatabaseSqlite) GetPlaceholderFormat() sq.PlaceholderFormat {
 	return sq.Question
+}
+
+func (d *DatabaseSqlite) GetSoftDeleteRetention() *time.Duration {
+	if d.SoftDeleteRetention == nil {
+		return nil
+	}
+	return &d.SoftDeleteRetention.Duration
 }
 
 func (d *DatabaseSqlite) Validate(vc *common.ValidationContext) error {

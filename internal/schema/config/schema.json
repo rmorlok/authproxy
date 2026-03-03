@@ -117,6 +117,9 @@
         "auto_migrate": { "type": "boolean" },
         "auto_migration_lock_duration": {
           "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "soft_delete_retention": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
         }
       },
       "required": ["provider", "path"],
@@ -161,6 +164,9 @@
           "type": "boolean"
         },
         "auto_migration_lock_duration": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "soft_delete_retention": {
           "$ref": "../common/schema.json#/$defs/HumanDuration"
         }
       },

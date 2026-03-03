@@ -12,6 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	authSync "github.com/rmorlok/authproxy/internal/apauth/tasks"
+	dbTasks "github.com/rmorlok/authproxy/internal/database/tasks"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"
@@ -141,6 +142,13 @@ func Serve(cfg config.C) {
 	)
 	adminSyncTaskHandler.RegisterTasks(mux)
 
+	dbTaskHandler := dbTasks.NewTaskHandler(
+		cfg,
+		dm.GetDatabase(),
+		logger,
+	)
+	dbTaskHandler.RegisterTasks(mux)
+
 	var wg sync.WaitGroup
 
 	wg.Add(1)
@@ -162,7 +170,8 @@ func Serve(cfg config.C) {
 	).
 		addRegistrar(oauth2TaskHandler).
 		addRegistrar(dm.GetCoreService()).
-		addRegistrar(adminSyncTaskHandler)
+		addRegistrar(adminSyncTaskHandler).
+		addRegistrar(dbTaskHandler)
 
 	wg.Add(1)
 	go func() {

@@ -126,6 +126,14 @@ type DB interface {
 	) error
 
 	/*
+	 *  Purge
+	 */
+
+	// PurgeSoftDeletedRecords hard-deletes all soft-deleted records where deleted_at is before olderThan.
+	// Returns the total number of records deleted across all tables.
+	PurgeSoftDeletedRecords(ctx context.Context, olderThan time.Time) (int64, error)
+
+	/*
 	 *  Nonces
 	 */
 
