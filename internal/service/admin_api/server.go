@@ -1,6 +1,7 @@
 package admin_api
 
 import (
+	"context"
 	"net/http"
 	"strings"
 	"sync"
@@ -91,11 +92,25 @@ func GetGinServer(
 		})
 	})
 
+	dm.RegisterDatabasePing()
+	dm.RegisterRedisPing()
+	dm.RegisterLogStoragePing()
+
 	healthChecker.GET("/healthz", func(c *gin.Context) {
-		c.PureJSON(http.StatusOK, gin.H{
-			"service": "admin-api",
-			"ok":      true,
-		})
+		ctx, cancel := context.WithTimeout(c.Request.Context(), 1*time.Second)
+		defer cancel()
+
+		results, allOk := dm.RunPings(ctx)
+		status := http.StatusOK
+		if !allOk {
+			status = http.StatusServiceUnavailable
+		}
+
+		response := gin.H{"service": "admin-api", "ok": allOk}
+		for k, v := range results {
+			response[k] = v
+		}
+		c.PureJSON(status, response)
 	})
 
 	routesConnectors := common_routes.NewConnectorsRoutes(

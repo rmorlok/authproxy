@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"log/slog"
+	"sync"
 	"time"
 
 	"github.com/hibiken/asynq"
@@ -22,6 +23,10 @@ import (
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
 
+// PingFunc is a function that checks the health of a dependency.
+// It returns true if the dependency is healthy.
+type PingFunc func(ctx context.Context) bool
+
 type DependencyManager struct {
 	serviceId         string
 	cfg               config.C
@@ -36,13 +41,88 @@ type DependencyManager struct {
 	asynqClient       apasynq.Client
 	asynqInspector    *asynq.Inspector
 	c                 coreIface.C
+	pings             map[string]PingFunc
 }
 
 func NewDependencyManager(serviceId string, cfg config.C) *DependencyManager {
 	return &DependencyManager{
 		serviceId: serviceId,
 		cfg:       cfg,
+		pings:     make(map[string]PingFunc),
 	}
+}
+
+// RegisterPing registers a named ping function for health checking.
+func (dm *DependencyManager) RegisterPing(name string, fn PingFunc) {
+	dm.pings[name] = fn
+}
+
+// RunPings runs all registered ping functions concurrently and returns
+// a map of results and whether all pings succeeded.
+func (dm *DependencyManager) RunPings(ctx context.Context) (map[string]bool, bool) {
+	results := make(map[string]bool, len(dm.pings))
+	if len(dm.pings) == 0 {
+		return results, true
+	}
+
+	type pingResult struct {
+		name string
+		ok   bool
+	}
+
+	var mu sync.Mutex
+	var wg sync.WaitGroup
+
+	for name, fn := range dm.pings {
+		wg.Add(1)
+		go func(name string, fn PingFunc) {
+			defer wg.Done()
+			ok := fn(ctx)
+			mu.Lock()
+			results[name] = ok
+			mu.Unlock()
+		}(name, fn)
+	}
+
+	wg.Wait()
+
+	allOk := true
+	for _, ok := range results {
+		if !ok {
+			allOk = false
+			break
+		}
+	}
+
+	return results, allOk
+}
+
+// RegisterDatabasePing registers a ping for the database.
+func (dm *DependencyManager) RegisterDatabasePing() {
+	dm.RegisterPing("db", func(ctx context.Context) bool {
+		return dm.GetDatabase().Ping(ctx)
+	})
+}
+
+// RegisterRedisPing registers a ping for Redis.
+func (dm *DependencyManager) RegisterRedisPing() {
+	dm.RegisterPing("redis", func(ctx context.Context) bool {
+		return apredis.Ping(ctx, dm.GetRedisClient())
+	})
+}
+
+// RegisterAsynqClientPing registers a ping for the Asynq client.
+func (dm *DependencyManager) RegisterAsynqClientPing() {
+	dm.RegisterPing("asynqClient", func(ctx context.Context) bool {
+		return dm.GetAsyncClient().Ping() == nil
+	})
+}
+
+// RegisterLogStoragePing registers a ping for the log storage service.
+func (dm *DependencyManager) RegisterLogStoragePing() {
+	dm.RegisterPing("logStorage", func(ctx context.Context) bool {
+		return dm.GetLogStorageService().Ping(ctx)
+	})
 }
 
 func (dm *DependencyManager) GetConfig() config.C {

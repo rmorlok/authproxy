@@ -12,7 +12,6 @@ import (
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/aplog"
-	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
 	common_routes "github.com/rmorlok/authproxy/internal/routes"
 	"github.com/rmorlok/authproxy/internal/service"
@@ -84,35 +83,25 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		})
 	})
 
+	dm.RegisterDatabasePing()
+	dm.RegisterRedisPing()
+	dm.RegisterLogStoragePing()
+
 	healthChecker.GET("/healthz", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 1*time.Second)
 		defer cancel()
 
-		dbChan := make(chan bool, 1)
-		redisChan := make(chan bool, 1)
-
-		go func() {
-			dbChan <- dm.GetDatabase().Ping(ctx)
-		}()
-
-		go func() {
-			redisChan <- apredis.Ping(ctx, dm.GetRedisClient())
-		}()
-
-		dbOk := <-dbChan
-		redisOk := <-redisChan
-		everythingOk := dbOk && redisOk
+		results, allOk := dm.RunPings(ctx)
 		status := http.StatusOK
-		if !everythingOk {
+		if !allOk {
 			status = http.StatusServiceUnavailable
 		}
 
-		c.PureJSON(status, gin.H{
-			"service": "api",
-			"db":      dbOk,
-			"redis":   redisOk,
-			"ok":      everythingOk,
-		})
+		response := gin.H{"service": "public", "ok": allOk}
+		for k, v := range results {
+			response[k] = v
+		}
+		c.PureJSON(status, response)
 	})
 
 	routesError := common_routes.NewErrorRoutes(dm.GetConfig())

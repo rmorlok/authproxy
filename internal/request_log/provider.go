@@ -20,6 +20,11 @@ type migratable interface {
 	Migrate(ctx context.Context) error
 }
 
+type pingable interface {
+	// Ping checks if the storage backend is reachable.
+	Ping(ctx context.Context) bool
+}
+
 // RecordRetriever handles querying LogRecord metadata from a storage backend.
 type RecordRetriever interface {
 	// GetRecord retrieves a single LogRecord by its request ID.
