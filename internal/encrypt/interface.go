@@ -37,8 +37,4 @@ type E interface {
 	// IsEncryptedWithCurrentKey checks whether a string-encrypted value was encrypted with the
 	// current key for the "global" scope.
 	IsEncryptedWithCurrentKey(base64Str string) bool
-
-	// SyncKeys reads key configuration and syncs encryption_key_versions records in the database.
-	// It populates internal caches used for encrypt/decrypt operations.
-	SyncKeys(ctx context.Context) error
 }

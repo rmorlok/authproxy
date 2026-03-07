@@ -18,7 +18,7 @@ type EncryptServiceTaskHandler struct {
 }
 
 func (h *EncryptServiceTaskHandler) RegisterTasks(mux *asynq.ServeMux) {
-	mux.HandleFunc(TaskTypeSyncKeys, h.handleSyncKeys)
+	mux.HandleFunc(TaskTypeSyncKeysToDatabase, h.handleSyncKeysToDatabase)
 	mux.HandleFunc(TaskTypeReencryptAll, h.handleReencryptAll)
 }
 
@@ -26,7 +26,7 @@ func (h *EncryptServiceTaskHandler) GetCronTasks() []*asynq.PeriodicTaskConfig {
 	return []*asynq.PeriodicTaskConfig{
 		{
 			Cronspec: "*/15 * * * *", // every 15 minutes
-			Task:     NewSyncKeysTask(),
+			Task:     NewSyncKeysToDatabaseTask(),
 		},
 	}
 }

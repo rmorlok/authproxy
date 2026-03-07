@@ -14,25 +14,14 @@ import (
 )
 
 const (
-	TaskTypeSyncKeys = "encrypt:sync_keys"
+	TaskTypeSyncKeysToDatabase = "encrypt:sync_keys_to_database"
 )
 
-func NewSyncKeysTask() *asynq.Task {
-	return asynq.NewTask(TaskTypeSyncKeys, nil)
+func NewSyncKeysToDatabaseTask() *asynq.Task {
+	return asynq.NewTask(TaskTypeSyncKeysToDatabase, nil)
 }
 
-func (h *EncryptServiceTaskHandler) handleSyncKeys(ctx context.Context, task *asynq.Task) error {
-	h.logger.Info("syncing encryption keys")
-
-	if err := h.enc.SyncKeys(ctx); err != nil {
-		h.logger.Error("failed to sync encryption keys", "error", err)
-		return err
-	}
-
-	h.logger.Info("encryption key sync complete")
-	return nil
-}
-func (s *EncryptServiceTaskHandler) syncKeyDataDatabase(
+func (h *EncryptServiceTaskHandler) syncKeyDataDatabase(
 	ctx context.Context,
 	scope string,
 	isCurrent bool,
@@ -44,7 +33,7 @@ func (s *EncryptServiceTaskHandler) syncKeyDataDatabase(
 	}
 
 	// Check if we already have a record for this provider+providerID+providerVersion
-	existing, err := s.db.ListEncryptionKeyVersionsForScope(ctx, scope)
+	existing, err := h.db.ListEncryptionKeyVersionsForScope(ctx, scope)
 	if err != nil {
 		return errors.Wrap(err, "failed to list existing encryption key versions")
 	}
@@ -64,7 +53,7 @@ func (s *EncryptServiceTaskHandler) syncKeyDataDatabase(
 
 		if found == nil {
 			// Create a new record
-			maxVersion, err := s.db.GetMaxOrderedVersionForScope(ctx, scope)
+			maxVersion, err := h.db.GetMaxOrderedVersionForScope(ctx, scope)
 			if err != nil {
 				return errors.Wrap(err, "failed to get max ordered version")
 			}
@@ -80,22 +69,22 @@ func (s *EncryptServiceTaskHandler) syncKeyDataDatabase(
 			}
 
 			if ver.IsCurrent && isCurrent {
-				if err := s.db.ClearCurrentFlagForScope(ctx, scope); err != nil {
+				if err := h.db.ClearCurrentFlagForScope(ctx, scope); err != nil {
 					return errors.Wrapf(err, "failed to clear current flag for scope %s", scope)
 				}
 			}
 
-			if err := s.db.CreateEncryptionKeyVersion(ctx, ekv); err != nil {
+			if err := h.db.CreateEncryptionKeyVersion(ctx, ekv); err != nil {
 				return errors.Wrapf(err, "failed to create encryption key version for index %d for scope %s", i, scope)
 			}
 
 			found = ekv
 		} else if (ver.IsCurrent && isCurrent) && !found.IsCurrent {
 			// This key should be current but isn't marked as such
-			if err := s.db.ClearCurrentFlagForScope(ctx, scope); err != nil {
+			if err := h.db.ClearCurrentFlagForScope(ctx, scope); err != nil {
 				return errors.Wrapf(err, "failed to clear current flag for scope %s", scope)
 			}
-			if err := s.db.SetEncryptionKeyVersionCurrentFlag(ctx, found.Id, true); err != nil {
+			if err := h.db.SetEncryptionKeyVersionCurrentFlag(ctx, found.Id, true); err != nil {
 				return errors.Wrapf(err, "failed to set current flag for scope %s for version %s", scope, found.Id)
 			}
 			found.IsCurrent = true
@@ -104,7 +93,7 @@ func (s *EncryptServiceTaskHandler) syncKeyDataDatabase(
 
 	// Remove any old versions that are no longer present
 	for ekv := range unused.All() {
-		if err := s.db.DeleteEncryptionKeyVersion(ctx, ekv.Id); err != nil {
+		if err := h.db.DeleteEncryptionKeyVersion(ctx, ekv.Id); err != nil {
 			return errors.Wrapf(err, "failed to delete encryption key version %s for scope %s", ekv.Id, scope)
 		}
 	}
@@ -112,10 +101,17 @@ func (s *EncryptServiceTaskHandler) syncKeyDataDatabase(
 	return nil
 }
 
+func (h *EncryptServiceTaskHandler) handleSyncKeysToDatabase(ctx context.Context, task *asynq.Task) error {
+	return h.SyncKeysToDatabase(ctx)
+}
+
 // SyncKeysToDatabase reads all configured keys and upserts encryption_key_versions records
-func (s *EncryptServiceTaskHandler) SyncKeysToDatabase(ctx context.Context) error {
+func (h *EncryptServiceTaskHandler) SyncKeysToDatabase(ctx context.Context) error {
+	h.logger.Info("syncing encryption keys to database")
+	defer h.logger.Info("syncing encryption keys to datbase complete")
+
 	m := apredis.NewMutex(
-		s.redis,
+		h.redis,
 		"encrypt:sync_keys",
 		apredis.MutexOptionLockFor(30*time.Second),
 		apredis.MutexOptionRetryFor(31*time.Second),
@@ -124,20 +120,21 @@ func (s *EncryptServiceTaskHandler) SyncKeysToDatabase(ctx context.Context) erro
 	)
 	err := m.Lock(context.Background())
 	if err != nil {
+		h.logger.Info("failed to establish redis lock")
 		return errors.Wrap(err, "failed to establish lock for encryption key sync")
 	}
 	defer m.Unlock(context.Background())
 
-	if s.cfg == nil || s.cfg.GetRoot() == nil {
+	if h.cfg == nil || h.cfg.GetRoot() == nil {
 		return errors.New("no configuration available")
 	}
 
-	sa := s.cfg.GetRoot().SystemAuth
+	sa := h.cfg.GetRoot().SystemAuth
 	if sa.GlobalAESKey == nil {
 		return errors.New("no global AES key configured")
 	}
 
-	err = s.syncKeyDataDatabase(ctx, "global", true, sa.GlobalAESKey)
+	err = h.syncKeyDataDatabase(ctx, "global", true, sa.GlobalAESKey)
 	if err != nil {
 		return errors.Wrap(err, "failed to sync global key data")
 	}

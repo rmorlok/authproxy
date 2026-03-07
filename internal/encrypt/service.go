@@ -89,8 +89,10 @@ func (s *service) getKeyForScope(scope string) (*sconfig.KeyData, error) {
 	return nil, fmt.Errorf("unknown scope %q", scope)
 }
 
-// SyncKeys reads all configured keys, upserts encryption_key_versions records, and populates caches.
-func (s *service) SyncKeys(ctx context.Context) error {
+// SyncKeysFromDbToMemory reads all keys from the database and loads the data into memory, with mapping
+// from scope to key id, as well as key id to the key for that data. This method is best-effort. It will
+// return a multi error for all errors, but still swap the memory caches with the successfully loaded data.
+func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 	if s == nil || s.cfg == nil || s.cfg.GetRoot() == nil {
 		return errors.New("no configuration available")
 	}
@@ -119,7 +121,7 @@ func (s *service) SyncKeys(ctx context.Context) error {
 		}
 	}()
 
-	err := s.db.EnumerateEncryptionKeyVersions(
+	_ = s.db.EnumerateEncryptionKeyVersions(
 		ctx,
 		func(ekvs []*database.EncryptionKeyVersion, lastPage bool) (stop bool, err error) {
 			for _, ekv := range ekvs {
@@ -141,12 +143,18 @@ func (s *service) SyncKeys(ctx context.Context) error {
 						merr = multierror.Append(merr, errors.Wrapf(err, "failed to get key version for scope '%q' for key version id %q", ekv.Scope, ekv.Id))
 						continue
 					}
+
+					newKeyCache[ekv.Id] = kvi.Data
 				}
 			}
+
+			return false, nil
 		},
 	)
 
 	s.mu.Lock()
+	s.keyCache = newKeyCache
+	s.currentKeyCache = newCurrentKeyCache
 	s.synced = true
 	s.mu.Unlock()
 
