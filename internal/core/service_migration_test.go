@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apasynq"
 	"github.com/rmorlok/authproxy/internal/apasynq/mock"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	apredis2 "github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
@@ -62,10 +62,10 @@ func TestMigration(t *testing.T) {
 			},
 		})
 
+		logger := slog.Default()
 		cfg, db, rawDb = database.MustApplyBlankTestDbConfigRaw(t, cfg)
 		cfg, r = apredis2.MustApplyTestConfig(cfg)
-		e := encrypt.NewEncryptService(cfg, db, slog.Default())
-		logger := slog.Default()
+		e := encrypt.NewEncryptService(cfg, db, logger)
 		ctrl := gomock.NewController(t)
 
 		asynqClient = mock.NewMockClient(ctrl)
