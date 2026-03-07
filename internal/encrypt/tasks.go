@@ -32,12 +32,14 @@ func (h *EncryptServiceTaskHandler) GetCronTasks() []*asynq.PeriodicTaskConfig {
 }
 
 func NewEncryptServiceTaskHandler(
+	cfg config.C,
 	db database.DB,
 	enc E,
 	redis apredis.Client,
 	logger *slog.Logger,
 ) *EncryptServiceTaskHandler {
 	return &EncryptServiceTaskHandler{
+		cfg:    cfg,
 		db:     db,
 		enc:    enc,
 		redis:  redis,

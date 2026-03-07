@@ -18,21 +18,6 @@ func MakeCursor(ctx context.Context, secretKey config.KeyDataType, c interface{}
 	return util.SecureEncryptedJsonValue(ver.Data, c)
 }
 
-// MakeCursorMultiKey constructs a cursor string encrypted with the primary key and prepends
-// a version prefix for multi-key support.
-func MakeCursorMultiKey(ctx context.Context, keys []*config.KeyData, c interface{}) (string, error) {
-	if len(keys) == 0 {
-		return "", errors.New("no keys provided for cursor encryption")
-	}
-
-	ver, err := keys[0].GetCurrentVersion(ctx)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to get primary key data to sign cursor")
-	}
-
-	return util.SecureEncryptedJsonValueVersioned(0, ver.Data, c)
-}
-
 // ParseCursor parses a cursor from the passed value. The passed valued should be generated from makeCursor
 func ParseCursor[C any](ctx context.Context, secretKey config.KeyDataType, c string) (*C, error) {
 	ver, err := secretKey.GetCurrentVersion(ctx)
@@ -40,23 +25,4 @@ func ParseCursor[C any](ctx context.Context, secretKey config.KeyDataType, c str
 		return nil, errors.Wrap(err, "failed to get secret key data to sign cursor")
 	}
 	return util.SecureDecryptedJsonValue[C](ver.Data, c)
-}
-
-// ParseCursorMultiKey parses a cursor that may be in versioned or legacy format,
-// trying all provided keys for legacy cursors.
-func ParseCursorMultiKey[C any](ctx context.Context, keys []*config.KeyData, c string) (*C, error) {
-	if len(keys) == 0 {
-		return nil, errors.New("no keys provided for cursor decryption")
-	}
-
-	keyDatas := make([][]byte, 0, len(keys))
-	for _, key := range keys {
-		ver, err := key.GetCurrentVersion(ctx)
-		if err != nil {
-			return nil, errors.Wrap(err, "failed to get key data for cursor decryption")
-		}
-		keyDatas = append(keyDatas, ver.Data)
-	}
-
-	return util.SecureDecryptedJsonValueMultiKey[C](keyDatas, c)
 }

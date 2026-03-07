@@ -99,6 +99,7 @@ func Serve(cfg config.C) {
 	})
 
 	dm.AutoMigrateAll()
+	defer dm.GetEncryptService().Shutdown()
 
 	ctx := context.Background()
 
@@ -142,18 +143,14 @@ func Serve(cfg config.C) {
 	)
 	adminSyncTaskHandler.RegisterTasks(mux)
 
-	reencryptTaskHandler := encrypt.NewReencryptTaskHandler(
+	encryptTaskHandler := encrypt.NewEncryptServiceTaskHandler(
+		dm.GetConfig(),
 		dm.GetDatabase(),
 		dm.GetEncryptService(),
+		dm.GetRedisClient(),
 		logger,
 	)
-	reencryptTaskHandler.RegisterTasks(mux)
-
-	syncKeysTaskHandler := encrypt.NewSyncKeysTaskHandler(
-		dm.GetEncryptService(),
-		logger,
-	)
-	syncKeysTaskHandler.RegisterTasks(mux)
+	encryptTaskHandler.RegisterTasks(mux)
 
 	var wg sync.WaitGroup
 
@@ -177,7 +174,7 @@ func Serve(cfg config.C) {
 		addRegistrar(oauth2TaskHandler).
 		addRegistrar(dm.GetCoreService()).
 		addRegistrar(adminSyncTaskHandler).
-		addRegistrar(syncKeysTaskHandler)
+		addRegistrar(encryptTaskHandler)
 
 	wg.Add(1)
 	go func() {

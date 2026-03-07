@@ -374,16 +374,26 @@ func (mr *MockEMockRecorder) IsEncryptedWithCurrentKey(base64Str interface{}) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsEncryptedWithCurrentKey", reflect.TypeOf((*MockE)(nil).IsEncryptedWithCurrentKey), base64Str)
 }
 
-// SyncKeys mocks base method.
-func (m *MockE) SyncKeys(ctx context.Context) error {
+// Start mocks base method.
+func (m *MockE) Start() {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SyncKeys", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
+	m.ctrl.Call(m, "Start")
 }
 
-// SyncKeys indicates an expected call of SyncKeys.
-func (mr *MockEMockRecorder) SyncKeys(ctx interface{}) *gomock.Call {
+// Start indicates an expected call of Start.
+func (mr *MockEMockRecorder) Start() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncKeys", reflect.TypeOf((*MockE)(nil).SyncKeys), ctx)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Start", reflect.TypeOf((*MockE)(nil).Start))
+}
+
+// Shutdown mocks base method.
+func (m *MockE) Shutdown() {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "Shutdown")
+}
+
+// Shutdown indicates an expected call of Shutdown.
+func (mr *MockEMockRecorder) Shutdown() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "Shutdown", reflect.TypeOf((*MockE)(nil).Shutdown))
 }

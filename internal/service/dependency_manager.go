@@ -172,7 +172,8 @@ func (dm *DependencyManager) AutoMigrateLogStorageService() {
 
 func (dm *DependencyManager) GetEncryptService() encrypt.E {
 	if dm.e == nil {
-		dm.e = encrypt.NewEncryptService(dm.GetConfig(), dm.GetDatabase())
+		dm.e = encrypt.NewEncryptService(dm.GetConfig(), dm.GetDatabase(), dm.GetLogger())
+		dm.e.Start()
 	}
 
 	return dm.e
@@ -307,20 +308,24 @@ func (dm *DependencyManager) AutoMigratePredefinedActors() {
 	}()
 }
 
-// AutoMigrateEncryptionKeys syncs encryption key versions from config into the database.
-// Uses a distributed Redis lock to ensure only one instance performs the migration.
-func (dm *DependencyManager) AutoMigrateEncryptionKeys() {
-	func() {
-		if err := dm.GetEncryptService().SyncKeys(context.Background()); err != nil {
-			panic(errors.Wrap(err, "failed to sync encryption keys"))
-		}
-	}()
+// AutoMigrateSyncKeysToDatabase syncs encryption key versions from config into the database.
+// Uses a Redis sentinel to avoid redundant runs across processes.
+func (dm *DependencyManager) AutoMigrateSyncKeysToDatabase() {
+	if err := encrypt.SyncKeysToDatabase(
+		context.Background(),
+		dm.GetConfig(),
+		dm.GetDatabase(),
+		dm.GetLogger(),
+		dm.GetRedisClient(),
+	); err != nil {
+		panic(errors.Wrap(err, "failed to sync encryption keys to database"))
+	}
 }
 
 func (dm *DependencyManager) AutoMigrateAll() {
 	dm.AutoMigrateDatabase()
 	dm.AutoMigrateLogStorageService()
-	dm.AutoMigrateEncryptionKeys()
+	dm.AutoMigrateSyncKeysToDatabase()
 	dm.AutoMigrateCore()
 	dm.AutoMigratePredefinedActors()
 }

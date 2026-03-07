@@ -179,6 +179,7 @@ func Serve(cfg config.C) {
 	}
 
 	defer dm.GetRedisClient().Close()
+	defer dm.GetEncryptService().Shutdown()
 
 	dm.AutoMigrateAll()
 

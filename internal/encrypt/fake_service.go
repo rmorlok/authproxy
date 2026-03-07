@@ -142,6 +142,6 @@ func (s *fakeService) IsEncryptedWithCurrentKey(base64Str string) bool {
 	return true
 }
 
-func (s *fakeService) SyncKeys(ctx context.Context) error {
-	return nil
-}
+func (s *fakeService) Start() {}
+
+func (s *fakeService) Shutdown() {}

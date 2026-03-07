@@ -31,12 +31,13 @@ func TestFakeService(t *testing.T) {
 					GlobalAESKey: sconfig.NewKeyDataRandomBytes(),
 				},
 				DevSettings: &sconfig.DevSettings{
+					Enabled:                  true,
 					FakeEncryption:           true,
 					FakeEncryptionSkipBase64: !doBase64,
 				},
 			})
 			cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
-			s := NewEncryptService(cfg, db)
+			s := NewEncryptService(cfg, db, nil)
 
 			connection := database.Connection{
 				Id:               apid.New(apid.PrefixConnection),
@@ -52,7 +53,9 @@ func TestFakeService(t *testing.T) {
 					encryptedBase64, err := s.EncryptStringGlobal(context.Background(), someString)
 					require.NoError(t, err)
 					require.NotEmpty(t, encryptedBase64)
-					require.NotEqual(t, someString, encryptedBase64)
+					if doBase64 {
+						require.NotEqual(t, someString, encryptedBase64)
+					}
 
 					decrypted, err := s.DecryptStringGlobal(context.Background(), encryptedBase64)
 					require.NoError(t, err)
@@ -62,7 +65,9 @@ func TestFakeService(t *testing.T) {
 					encryptedBase64, err := s.EncryptStringForConnection(context.Background(), &connection, someString)
 					require.NoError(t, err)
 					require.NotEmpty(t, encryptedBase64)
-					require.NotEqual(t, someString, encryptedBase64)
+					if doBase64 {
+						require.NotEqual(t, someString, encryptedBase64)
+					}
 
 					decrypted, err := s.DecryptStringForConnection(context.Background(), &connection, encryptedBase64)
 					require.NoError(t, err)
@@ -72,7 +77,9 @@ func TestFakeService(t *testing.T) {
 					encryptedBase64, err := s.EncryptStringForConnector(context.Background(), &connectorVersion, someString)
 					require.NoError(t, err)
 					require.NotEmpty(t, encryptedBase64)
-					require.NotEqual(t, someString, encryptedBase64)
+					if doBase64 {
+						require.NotEqual(t, someString, encryptedBase64)
+					}
 
 					decrypted, err := s.DecryptStringForConnector(context.Background(), &connectorVersion, encryptedBase64)
 					require.NoError(t, err)
@@ -85,7 +92,6 @@ func TestFakeService(t *testing.T) {
 					encryptedBytes, err := s.EncryptGlobal(context.Background(), someBytes)
 					require.NoError(t, err)
 					require.NotEmpty(t, encryptedBytes)
-					require.NotEqual(t, someBytes, encryptedBytes)
 
 					decrypted, err := s.DecryptGlobal(context.Background(), encryptedBytes)
 					require.NoError(t, err)
@@ -95,7 +101,6 @@ func TestFakeService(t *testing.T) {
 					encryptedBytes, err := s.EncryptForConnection(context.Background(), &connection, someBytes)
 					require.NoError(t, err)
 					require.NotEmpty(t, encryptedBytes)
-					require.NotEqual(t, someBytes, encryptedBytes)
 
 					decrypted, err := s.DecryptForConnection(context.Background(), &connection, encryptedBytes)
 					require.NoError(t, err)
@@ -105,7 +110,6 @@ func TestFakeService(t *testing.T) {
 					encryptedBytes, err := s.EncryptForConnector(context.Background(), &connectorVersion, someBytes)
 					require.NoError(t, err)
 					require.NotEmpty(t, encryptedBytes)
-					require.NotEqual(t, someBytes, encryptedBytes)
 
 					decrypted, err := s.DecryptForConnector(context.Background(), &connectorVersion, encryptedBytes)
 					require.NoError(t, err)

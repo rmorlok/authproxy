@@ -64,7 +64,7 @@ func TestMigration(t *testing.T) {
 
 		cfg, db, rawDb = database.MustApplyBlankTestDbConfigRaw(t, cfg)
 		cfg, r = apredis2.MustApplyTestConfig(cfg)
-		e := encrypt.NewEncryptService(cfg, db)
+		e := encrypt.NewEncryptService(cfg, db, slog.Default())
 		logger := slog.Default()
 		ctrl := gomock.NewController(t)
 

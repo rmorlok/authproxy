@@ -8,8 +8,10 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
+	"log/slog"
 	"strings"
 	"sync"
+	"time"
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
@@ -20,16 +22,22 @@ import (
 )
 
 const globalScope = "global"
+const memorySyncPeriod = 5 * time.Minute
+const maxInitialWait = 5 * time.Minute
 
 type service struct {
-	cfg config.C
-	db  database.DB
+	cfg    config.C
+	db     database.DB
+	logger *slog.Logger
 
 	mu              sync.RWMutex
 	keyDataCache    map[string]*sconfig.KeyData
 	keyCache        map[apid.ID][]byte // ekv_id → key bytes
 	currentKeyCache map[string]apid.ID // scope → current ekv_id
-	synced          bool
+
+	stopCh    chan struct{} // signal goroutine to stop
+	doneCh    chan struct{} // closed when goroutine exits
+	syncReady chan struct{} // closed after first successful sync
 }
 
 func NewTestEncryptService(
@@ -44,28 +52,44 @@ func NewTestEncryptService(
 		cfg.GetRoot().SystemAuth.GlobalAESKey = &sconfig.KeyData{InnerVal: &sconfig.KeyDataRandomBytes{}}
 	}
 
-	return cfg, NewEncryptService(cfg, db)
+	svc := NewEncryptService(cfg, db, slog.Default())
+
+	// For tests, sync keys to DB and memory synchronously without starting the goroutine.
+	if s, ok := svc.(*service); ok {
+		s.startForTest()
+	}
+
+	return cfg, svc
 }
 
 func NewEncryptService(
 	cfg config.C,
 	db database.DB,
+	logger *slog.Logger,
 ) E {
 	if cfg != nil && cfg.GetRoot().DevSettings.IsFakeEncryptionEnabled() {
 		doBase64Encode := !cfg.GetRoot().DevSettings.IsFakeEncryptionSkipBase64Enabled()
 		return NewFakeEncryptService(doBase64Encode)
 	}
 
+	if logger == nil {
+		logger = slog.Default()
+	}
+
 	return &service{
 		cfg:             cfg,
 		db:              db,
+		logger:          logger,
 		keyDataCache:    make(map[string]*sconfig.KeyData),
 		keyCache:        make(map[apid.ID][]byte),
 		currentKeyCache: make(map[string]apid.ID),
+		stopCh:          make(chan struct{}),
+		doneCh:          make(chan struct{}),
+		syncReady:       make(chan struct{}),
 	}
 }
 
-func (s *service) getKeyForScope(scope string) (*sconfig.KeyData, error) {
+func (s *service) getKeyForScope(ctx context.Context, scope string) (*sconfig.KeyData, error) {
 	s.mu.Lock()
 	keyData, ok := s.keyDataCache[scope]
 	s.mu.Unlock()
@@ -125,14 +149,16 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 		ctx,
 		func(ekvs []*database.EncryptionKeyVersion, lastPage bool) (stop bool, err error) {
 			for _, ekv := range ekvs {
-				newCurrentKeyCache[ekv.Scope] = ekv.Id
+				if ekv.IsCurrent {
+					newCurrentKeyCache[ekv.Scope] = ekv.Id
+				}
 
 				if data, ok := oldKeyCache[ekv.Id]; ok {
 					// The data for a given version is immutable, so we can just take old value
 					newKeyCache[ekv.Id] = data
 				} else {
 					// This is a new version, pull from the actual source
-					keyData, err := s.getKeyForScope(ekv.Scope)
+					keyData, err := s.getKeyForScope(ctx, ekv.Scope)
 					if err != nil {
 						merr = multierror.Append(merr, errors.Wrapf(err, "failed to get key for scope '%q' for key version id %q", ekv.Scope, ekv.Id))
 						continue
@@ -155,23 +181,114 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 	s.mu.Lock()
 	s.keyCache = newKeyCache
 	s.currentKeyCache = newCurrentKeyCache
-	s.synced = true
 	s.mu.Unlock()
 
 	return merr.ErrorOrNil()
 }
 
-// ensureSynced lazily syncs keys if not already done.
+// ensureSynced blocks until the background goroutine has completed its first successful sync,
+// or the context is cancelled.
 func (s *service) ensureSynced(ctx context.Context) error {
-	s.mu.RLock()
-	synced := s.synced
-	s.mu.RUnlock()
-
-	if synced {
+	select {
+	case <-s.syncReady:
 		return nil
+	default:
 	}
 
-	return s.SyncKeys(ctx)
+	// Not ready yet, block until ready or context cancelled.
+	select {
+	case <-s.syncReady:
+		return nil
+	case <-ctx.Done():
+		return ctx.Err()
+	}
+}
+
+// Start launches the background key sync goroutine.
+func (s *service) Start() {
+	go s.syncLoop()
+}
+
+// Shutdown stops the background key sync goroutine and waits for it to exit.
+func (s *service) Shutdown() {
+	close(s.stopCh)
+	<-s.doneCh
+}
+
+// startForTest performs a single synchronous sync and marks the service as ready,
+// without starting the background goroutine. Used by NewTestEncryptService.
+func (s *service) startForTest() {
+	ctx := context.Background()
+
+	// Sync keys from config to database
+	syncKeysToDatabase(ctx, s.cfg, s.db, s.logger, nil)
+
+	// Sync keys from database to memory
+	if err := s.syncKeysFromDbToMemory(ctx); err != nil {
+		s.logger.Warn("test encrypt service: failed to sync keys from db to memory", "error", err)
+	}
+
+	close(s.syncReady)
+	close(s.doneCh) // No goroutine to wait for
+}
+
+func (s *service) syncLoop() {
+	defer close(s.doneCh)
+
+	ctx := context.Background()
+	deadline := time.Now().Add(maxInitialWait)
+
+	// Initial sync with exponential backoff
+	backoff := 1 * time.Second
+	maxBackoff := 30 * time.Second
+
+	for {
+		if err := s.syncKeysFromDbToMemory(ctx); err != nil {
+			s.logger.Warn("encrypt service: initial key sync failed", "error", err)
+		}
+
+		// Check if global AES key is available
+		s.mu.RLock()
+		_, hasGlobal := s.currentKeyCache[globalScope]
+		s.mu.RUnlock()
+
+		if hasGlobal {
+			close(s.syncReady)
+			break
+		}
+
+		if time.Now().After(deadline) {
+			panic("encrypt service: failed to sync global AES key within 5 minutes")
+		}
+
+		s.logger.Info("encrypt service: global key not available yet, retrying", "backoff", backoff)
+
+		select {
+		case <-s.stopCh:
+			return
+		case <-time.After(backoff):
+		}
+
+		backoff = backoff * 2
+		if backoff > maxBackoff {
+			backoff = maxBackoff
+		}
+	}
+
+	// Periodic sync every 5 minutes
+	ticker := time.NewTicker(memorySyncPeriod)
+	defer ticker.Stop()
+
+	for {
+		select {
+		case <-s.stopCh:
+			return
+		case <-ticker.C:
+			if err := s.syncKeysFromDbToMemory(ctx); err != nil {
+				s.logger.Warn("encrypt service: periodic key sync failed", "error", err)
+			}
+		}
+	}
 }
 
 // getCurrentKeyID returns the current key ID for the given scope.
@@ -203,23 +320,23 @@ func (s *service) getKeyBytes(ctx context.Context, ekvID apid.ID) ([]byte, error
 	}
 
 	// We need to fetch the key data from the config-based providers
-	keyDatas := s.cfg.GetRoot().SystemAuth.GetGlobalAESKeys()
-	for _, kd := range keyDatas {
-		if kd == nil {
-			continue
-		}
-		ver, err := kd.GetCurrentVersion(ctx)
-		if err != nil {
-			continue
-		}
-		if string(ver.Provider) == ekv.Provider &&
-			ver.ProviderID == ekv.ProviderID &&
-			ver.ProviderVersion == ekv.ProviderVersion {
-			s.mu.Lock()
-			s.keyCache[ekvID] = ver.Data
-			s.mu.Unlock()
-			return ver.Data, nil
-		}
+	kd, err := s.getKeyForScope(ctx, ekv.Scope)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get key for scope '%q' for key version id %q", ekv.Scope, ekvID)
+	}
+
+	ver, err := kd.GetCurrentVersion(ctx)
+	if err != nil {
+		return nil, errors.Wrapf(err, "failed to get current key version for scope '%q' for key version id %q", ekv.Scope, ekvID)
+	}
+
+	if string(ver.Provider) == ekv.Provider &&
+		ver.ProviderID == ekv.ProviderID &&
+		ver.ProviderVersion == ekv.ProviderVersion {
+		s.mu.Lock()
+		s.keyCache[ekvID] = ver.Data
+		s.mu.Unlock()
+		return ver.Data, nil
 	}
 
 	return nil, fmt.Errorf("could not find key data for encryption key version %s (provider=%s, id=%s, version=%s)",

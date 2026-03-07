@@ -37,4 +37,10 @@ type E interface {
 	// IsEncryptedWithCurrentKey checks whether a string-encrypted value was encrypted with the
 	// current key for the "global" scope.
 	IsEncryptedWithCurrentKey(base64Str string) bool
+
+	// Start launches the background key sync goroutine.
+	Start()
+
+	// Shutdown stops the background key sync goroutine and waits for it to exit.
+	Shutdown()
 }
