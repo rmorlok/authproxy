@@ -48,6 +48,10 @@ func (kf *KeyDataFile) GetCurrentVersion(ctx context.Context) (KeyVersionInfo, e
 	}, nil
 }
 
+func (kf *KeyDataFile) GetVersion(ctx context.Context, version string) (KeyVersionInfo, error) {
+	return getVersionFromList(ctx, kf, version)
+}
+
 func (kf *KeyDataFile) ListVersions(ctx context.Context) ([]KeyVersionInfo, error) {
 	v, err := kf.GetCurrentVersion(ctx)
 	if err != nil {

@@ -52,6 +52,29 @@ func (ka *KeyDataAwsSecret) GetCurrentVersion(ctx context.Context) (KeyVersionIn
 	}, nil
 }
 
+func (ka *KeyDataAwsSecret) GetVersion(ctx context.Context, version string) (KeyVersionInfo, error) {
+	data, err := ka.fetchFromAWSWithVersion(ctx, &version)
+	if err != nil {
+		return KeyVersionInfo{}, err
+	}
+
+	providerID := ka.AwsSecretID
+	if ka.AwsSecretKey != "" {
+		providerID = ka.AwsSecretID + "/" + ka.AwsSecretKey
+	}
+
+	current, _ := ka.GetCurrentVersion(ctx)
+	isCurrent := current.ProviderVersion == DataHash(data)
+
+	return KeyVersionInfo{
+		Provider:        ProviderTypeAws,
+		ProviderID:      providerID,
+		ProviderVersion: version,
+		Data:            data,
+		IsCurrent:       isCurrent,
+	}, nil
+}
+
 func (ka *KeyDataAwsSecret) ListVersions(ctx context.Context) ([]KeyVersionInfo, error) {
 	v, err := ka.GetCurrentVersion(ctx)
 	if err != nil {
@@ -65,6 +88,10 @@ func (ka *KeyDataAwsSecret) GetProviderType() ProviderType {
 }
 
 func (ka *KeyDataAwsSecret) fetchFromAWS(ctx context.Context) ([]byte, error) {
+	return ka.fetchFromAWSWithVersion(ctx, nil)
+}
+
+func (ka *KeyDataAwsSecret) fetchFromAWSWithVersion(ctx context.Context, versionID *string) ([]byte, error) {
 	opts := []func(*awsconfig.LoadOptions) error{}
 
 	if ka.AwsRegion != "" {
@@ -88,6 +115,9 @@ func (ka *KeyDataAwsSecret) fetchFromAWS(ctx context.Context) ([]byte, error) {
 
 	input := &secretsmanager.GetSecretValueInput{
 		SecretId: &ka.AwsSecretID,
+	}
+	if versionID != nil {
+		input.VersionId = versionID
 	}
 
 	result, err := client.GetSecretValue(ctx, input)

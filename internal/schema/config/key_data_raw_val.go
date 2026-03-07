@@ -25,6 +25,10 @@ func (kb *KeyDataRawVal) GetCurrentVersion(ctx context.Context) (KeyVersionInfo,
 	}, nil
 }
 
+func (kb *KeyDataRawVal) GetVersion(ctx context.Context, version string) (KeyVersionInfo, error) {
+	return getVersionFromList(ctx, kb, version)
+}
+
 func (kb *KeyDataRawVal) ListVersions(ctx context.Context) ([]KeyVersionInfo, error) {
 	v, err := kb.GetCurrentVersion(ctx)
 	if err != nil {

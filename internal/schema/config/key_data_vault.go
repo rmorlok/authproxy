@@ -52,6 +52,29 @@ func (kv *KeyDataVault) GetCurrentVersion(ctx context.Context) (KeyVersionInfo, 
 	}, nil
 }
 
+func (kv *KeyDataVault) GetVersion(ctx context.Context, version string) (KeyVersionInfo, error) {
+	data, err := kv.fetchVersionFromVault(version)
+	if err != nil {
+		return KeyVersionInfo{}, err
+	}
+
+	key := kv.VaultKey
+	if key == "" {
+		key = "value"
+	}
+
+	current, _ := kv.GetCurrentVersion(ctx)
+	isCurrent := current.ProviderVersion == DataHash(data)
+
+	return KeyVersionInfo{
+		Provider:        ProviderTypeHashicorpVault,
+		ProviderID:      kv.VaultPath + "/" + key,
+		ProviderVersion: version,
+		Data:            data,
+		IsCurrent:       isCurrent,
+	}, nil
+}
+
 func (kv *KeyDataVault) ListVersions(ctx context.Context) ([]KeyVersionInfo, error) {
 	v, err := kv.GetCurrentVersion(ctx)
 	if err != nil {
@@ -114,6 +137,55 @@ func (kv *KeyDataVault) fetchFromVault() ([]byte, error) {
 	strVal, ok := val.(string)
 	if !ok {
 		return nil, fmt.Errorf("vault key %q at path %s is not a string", key, kv.VaultPath)
+	}
+
+	return []byte(strVal), nil
+}
+
+func (kv *KeyDataVault) fetchVersionFromVault(version string) ([]byte, error) {
+	config := vault.DefaultConfig()
+	config.Address = kv.VaultAddress
+
+	client, err := vault.NewClient(config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create vault client: %w", err)
+	}
+
+	token := kv.resolveToken()
+	if token != "" {
+		client.SetToken(token)
+	}
+
+	secret, err := client.Logical().ReadWithData(kv.VaultPath, map[string][]string{
+		"version": {version},
+	})
+	if err != nil {
+		return nil, fmt.Errorf("failed to read vault path %s version %s: %w", kv.VaultPath, version, err)
+	}
+
+	if secret == nil || secret.Data == nil {
+		return nil, fmt.Errorf("no data at vault path %s version %s", kv.VaultPath, version)
+	}
+
+	// KV v2 stores data under a "data" sub-key
+	data := secret.Data
+	if d, ok := data["data"].(map[string]interface{}); ok {
+		data = d
+	}
+
+	key := kv.VaultKey
+	if key == "" {
+		key = "value"
+	}
+
+	val, ok := data[key]
+	if !ok {
+		return nil, fmt.Errorf("key %q not found at vault path %s version %s", key, kv.VaultPath, version)
+	}
+
+	strVal, ok := val.(string)
+	if !ok {
+		return nil, fmt.Errorf("vault key %q at path %s version %s is not a string", key, kv.VaultPath, version)
 	}
 
 	return []byte(strVal), nil

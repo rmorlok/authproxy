@@ -32,6 +32,10 @@ func (kev *KeyDataEnvBase64Var) GetCurrentVersion(ctx context.Context) (KeyVersi
 	}, nil
 }
 
+func (kev *KeyDataEnvBase64Var) GetVersion(ctx context.Context, version string) (KeyVersionInfo, error) {
+	return getVersionFromList(ctx, kev, version)
+}
+
 func (kev *KeyDataEnvBase64Var) ListVersions(ctx context.Context) ([]KeyVersionInfo, error) {
 	v, err := kev.GetCurrentVersion(ctx)
 	if err != nil {

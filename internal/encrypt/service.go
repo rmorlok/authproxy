@@ -135,6 +135,12 @@ func (s *service) SyncKeys(ctx context.Context) error {
 						merr = multierror.Append(merr, errors.Wrapf(err, "failed to get key for scope '%q' for key version id %q", ekv.Scope, ekv.Id))
 						continue
 					}
+
+					kvi, err := keyData.GetVersion(ctx, ekv.ProviderVersion)
+					if err != nil {
+						merr = multierror.Append(merr, errors.Wrapf(err, "failed to get key version for scope '%q' for key version id %q", ekv.Scope, ekv.Id))
+						continue
+					}
 				}
 			}
 		},

@@ -36,6 +36,10 @@ func (kf *KeyDataRandomBytes) GetCurrentVersion(ctx context.Context) (KeyVersion
 	}, nil
 }
 
+func (kf *KeyDataRandomBytes) GetVersion(ctx context.Context, version string) (KeyVersionInfo, error) {
+	return getVersionFromList(ctx, kf, version)
+}
+
 func (kf *KeyDataRandomBytes) ListVersions(ctx context.Context) ([]KeyVersionInfo, error) {
 	v, err := kf.GetCurrentVersion(ctx)
 	if err != nil {

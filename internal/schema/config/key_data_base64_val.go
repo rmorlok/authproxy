@@ -28,6 +28,10 @@ func (kb *KeyDataBase64Val) GetCurrentVersion(ctx context.Context) (KeyVersionIn
 	}, nil
 }
 
+func (kb *KeyDataBase64Val) GetVersion(ctx context.Context, version string) (KeyVersionInfo, error) {
+	return getVersionFromList(ctx, kb, version)
+}
+
 func (kb *KeyDataBase64Val) ListVersions(ctx context.Context) ([]KeyVersionInfo, error) {
 	v, err := kb.GetCurrentVersion(ctx)
 	if err != nil {

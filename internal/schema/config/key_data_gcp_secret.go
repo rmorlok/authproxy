@@ -51,6 +51,26 @@ func (kg *KeyDataGcpSecret) GetCurrentVersion(ctx context.Context) (KeyVersionIn
 	}, nil
 }
 
+func (kg *KeyDataGcpSecret) GetVersion(ctx context.Context, version string) (KeyVersionInfo, error) {
+	data, err := kg.fetchVersionFromGCP(ctx, version)
+	if err != nil {
+		return KeyVersionInfo{}, err
+	}
+
+	currentVersion := kg.GcpSecretVersion
+	if currentVersion == "" {
+		currentVersion = "latest"
+	}
+
+	return KeyVersionInfo{
+		Provider:        ProviderTypeGcp,
+		ProviderID:      kg.secretResourceName(),
+		ProviderVersion: version,
+		Data:            data,
+		IsCurrent:       version == currentVersion,
+	}, nil
+}
+
 func (kg *KeyDataGcpSecret) ListVersions(ctx context.Context) ([]KeyVersionInfo, error) {
 	v, err := kg.GetCurrentVersion(ctx)
 	if err != nil {
@@ -93,20 +113,41 @@ func (kg *KeyDataGcpSecret) secretVersionName() string {
 }
 
 func (kg *KeyDataGcpSecret) fetchFromGCP(ctx context.Context) ([]byte, error) {
+	return kg.fetchVersionFromGCP(ctx, "")
+}
+
+func (kg *KeyDataGcpSecret) fetchVersionFromGCP(ctx context.Context, version string) ([]byte, error) {
 	client, err := secretmanager.NewClient(ctx)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create gcp secret manager client: %w", err)
 	}
 	defer client.Close()
 
+	versionName := kg.secretVersionName()
+	if version != "" {
+		versionName = kg.secretVersionNameFor(version)
+	}
+
 	result, err := client.AccessSecretVersion(ctx, &secretmanagerpb.AccessSecretVersionRequest{
-		Name: kg.secretVersionName(),
+		Name: versionName,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to access gcp secret %s: %w", kg.GcpSecretName, err)
+		return nil, fmt.Errorf("failed to access gcp secret %s version %s: %w", kg.GcpSecretName, version, err)
 	}
 
 	return result.Payload.Data, nil
+}
+
+func (kg *KeyDataGcpSecret) secretVersionNameFor(version string) string {
+	if len(kg.GcpSecretName) > 0 && kg.GcpSecretName[0] == 'p' {
+		return fmt.Sprintf("%s/versions/%s", kg.GcpSecretName, version)
+	}
+
+	if kg.GcpProject == "" {
+		return fmt.Sprintf("projects/-/secrets/%s/versions/%s", kg.GcpSecretName, version)
+	}
+
+	return fmt.Sprintf("projects/%s/secrets/%s/versions/%s", kg.GcpProject, kg.GcpSecretName, version)
 }
 
 var _ KeyDataType = (*KeyDataGcpSecret)(nil)
