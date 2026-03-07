@@ -95,9 +95,10 @@ func (kv *KeyDataVault) resolveToken() string {
 	return token
 }
 
-func (kv *KeyDataVault) fetchFromVault() ([]byte, error) {
+func (kv *KeyDataVault) newClient() (*vault.Client, error) {
 	config := vault.DefaultConfig()
 	config.Address = kv.VaultAddress
+	config.HttpClient.Transport = &vaultRetryTransport{base: config.HttpClient.Transport}
 
 	client, err := vault.NewClient(config)
 	if err != nil {
@@ -107,6 +108,15 @@ func (kv *KeyDataVault) fetchFromVault() ([]byte, error) {
 	token := kv.resolveToken()
 	if token != "" {
 		client.SetToken(token)
+	}
+
+	return client, nil
+}
+
+func (kv *KeyDataVault) fetchFromVault() ([]byte, error) {
+	client, err := kv.newClient()
+	if err != nil {
+		return nil, err
 	}
 
 	secret, err := client.Logical().Read(kv.VaultPath)
@@ -143,17 +153,9 @@ func (kv *KeyDataVault) fetchFromVault() ([]byte, error) {
 }
 
 func (kv *KeyDataVault) fetchVersionFromVault(version string) ([]byte, error) {
-	config := vault.DefaultConfig()
-	config.Address = kv.VaultAddress
-
-	client, err := vault.NewClient(config)
+	client, err := kv.newClient()
 	if err != nil {
-		return nil, fmt.Errorf("failed to create vault client: %w", err)
-	}
-
-	token := kv.resolveToken()
-	if token != "" {
-		client.SetToken(token)
+		return nil, err
 	}
 
 	secret, err := client.Logical().ReadWithData(kv.VaultPath, map[string][]string{
