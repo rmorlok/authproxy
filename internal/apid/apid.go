@@ -20,31 +20,32 @@ const (
 type Prefix string
 
 const (
-	PrefixActor            Prefix = "act_"
-	PrefixConnection       Prefix = "cxn_"
-	PrefixConnectorVersion Prefix = "cxr_"
-	PrefixOAuth2Token      Prefix = "tok_"
-	PrefixOauth2State      Prefix = "oas_"
-	PrefixNonce            Prefix = "non_"
-	PrefixRequestLog       Prefix = "req_"
-	PrefixCorrelation      Prefix = "cor_"
-	PrefixJwtId            Prefix = "jti_"
-
-	PrefixSession Prefix = "sess_"
+	PrefixActor                Prefix = "act_"
+	PrefixConnection           Prefix = "cxn_"
+	PrefixConnectorVersion     Prefix = "cxr_"
+	PrefixOAuth2Token          Prefix = "tok_"
+	PrefixOauth2State          Prefix = "oas_"
+	PrefixNonce                Prefix = "non_"
+	PrefixRequestLog           Prefix = "req_"
+	PrefixCorrelation          Prefix = "cor_"
+	PrefixJwtId                Prefix = "jti_"
+	PrefixEncryptionKeyVersion Prefix = "ekv_"
+	PrefixSession              Prefix = "sess_"
 )
 
 // validPrefixes is the set of all known prefixes for validation.
 var validPrefixes = map[Prefix]bool{
-	PrefixActor:            true,
-	PrefixConnection:       true,
-	PrefixConnectorVersion: true,
-	PrefixOAuth2Token:      true,
-	PrefixNonce:            true,
-	PrefixRequestLog:       true,
-	PrefixCorrelation:      true,
-	PrefixJwtId:            true,
-	PrefixOauth2State:      true,
-	PrefixSession:          true,
+	PrefixActor:                true,
+	PrefixConnection:           true,
+	PrefixConnectorVersion:     true,
+	PrefixOAuth2Token:          true,
+	PrefixNonce:                true,
+	PrefixRequestLog:           true,
+	PrefixCorrelation:          true,
+	PrefixJwtId:                true,
+	PrefixOauth2State:          true,
+	PrefixSession:              true,
+	PrefixEncryptionKeyVersion: true,
 }
 
 // ID is a prefixed identifier string. The zero value is Nil (empty string).

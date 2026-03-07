@@ -34,8 +34,11 @@ type E interface {
 	DecryptForConnector(ctx context.Context, connection ConnectorVersion, data []byte) ([]byte, error)
 	DecryptStringForConnector(ctx context.Context, connection ConnectorVersion, base64 string) (string, error)
 
-	// IsEncryptedWithPrimaryKey checks whether a string-encrypted value was encrypted with the
-	// primary (index 0) key. Values with "v1:0:" prefix are considered primary-key encrypted.
-	// Legacy values (no prefix) return false.
-	IsEncryptedWithPrimaryKey(base64Str string) bool
+	// IsEncryptedWithCurrentKey checks whether a string-encrypted value was encrypted with the
+	// current key for the "global" scope.
+	IsEncryptedWithCurrentKey(base64Str string) bool
+
+	// SyncKeys reads key configuration and syncs encryption_key_versions records in the database.
+	// It populates internal caches used for encrypt/decrypt operations.
+	SyncKeys(ctx context.Context) error
 }

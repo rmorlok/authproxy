@@ -59,11 +59,3 @@ func (c *config) GetGlobalKey() sconfig.KeyDataType {
 
 	return c.root.SystemAuth.GlobalAESKey
 }
-
-func (c *config) GetGlobalKeys() []*sconfig.KeyData {
-	if c == nil || c.root == nil {
-		return nil
-	}
-
-	return c.root.SystemAuth.GetGlobalAESKeys()
-}

@@ -55,10 +55,6 @@ func (r *Root) Validate() error {
 		result = multierror.Append(result, err)
 	}
 
-	if err := r.SystemAuth.ValidateGlobalAESKeys(); err != nil {
-		result = multierror.Append(result, vc.PushField("system_auth").NewError(err.Error()))
-	}
-
 	return result.ErrorOrNil()
 }
 
@@ -76,4 +72,3 @@ func (r *Root) MustGetService(serviceId ServiceId) Service {
 
 	panic(fmt.Sprintf("invalid service id %s", serviceId))
 }
-

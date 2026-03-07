@@ -138,6 +138,10 @@ func (s *fakeService) DecryptStringForConnector(ctx context.Context, cv Connecto
 	return string(decryptedData), nil
 }
 
-func (s *fakeService) IsEncryptedWithPrimaryKey(base64Str string) bool {
+func (s *fakeService) IsEncryptedWithCurrentKey(base64Str string) bool {
 	return true
+}
+
+func (s *fakeService) SyncKeys(ctx context.Context) error {
+	return nil
 }

@@ -13,21 +13,39 @@ type KeyDataRandomBytes struct {
 	bytesOnce sync.Once
 }
 
-func (kf *KeyDataRandomBytes) HasData(ctx context.Context) bool {
-	return true
-}
-
-func (kf *KeyDataRandomBytes) GetData(ctx context.Context) ([]byte, error) {
+func (kf *KeyDataRandomBytes) generateBytes() []byte {
 	kf.bytesOnce.Do(func() {
 		numBytes := 16
 		if kf.NumBytes > 0 {
 			numBytes = kf.NumBytes
 		}
-
 		kf.bytes = util.MustGenerateSecureRandomKey(numBytes)
 	})
+	return kf.bytes
+}
 
-	return kf.bytes, nil
+func (kf *KeyDataRandomBytes) GetCurrentVersion(ctx context.Context) (KeyVersionInfo, error) {
+	data := kf.generateBytes()
+	hash := DataHash(data)
+	return KeyVersionInfo{
+		Provider:        ProviderTypeRandom,
+		ProviderID:      hash,
+		ProviderVersion: hash,
+		Data:            data,
+		IsCurrent:       true,
+	}, nil
+}
+
+func (kf *KeyDataRandomBytes) ListVersions(ctx context.Context) ([]KeyVersionInfo, error) {
+	v, err := kf.GetCurrentVersion(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return []KeyVersionInfo{v}, nil
+}
+
+func (kf *KeyDataRandomBytes) GetProviderType() ProviderType {
+	return ProviderTypeRandom
 }
 
 func NewKeyDataRandomBytes() *KeyData {

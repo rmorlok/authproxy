@@ -20,11 +20,7 @@ type KeyDataAwsSecret struct {
 	cache cachedKeyFetcher
 }
 
-func (ka *KeyDataAwsSecret) HasData(ctx context.Context) bool {
-	return ka.AwsSecretID != ""
-}
-
-func (ka *KeyDataAwsSecret) GetData(ctx context.Context) ([]byte, error) {
+func (ka *KeyDataAwsSecret) GetCurrentVersion(ctx context.Context) (KeyVersionInfo, error) {
 	ka.cache.fetch = func() ([]byte, error) {
 		return ka.fetchFromAWS(ctx)
 	}
@@ -32,12 +28,40 @@ func (ka *KeyDataAwsSecret) GetData(ctx context.Context) ([]byte, error) {
 	if ka.CacheTTL != "" {
 		ttl, err := time.ParseDuration(ka.CacheTTL)
 		if err != nil {
-			return nil, fmt.Errorf("invalid cache_ttl for aws secret key data: %w", err)
+			return KeyVersionInfo{}, fmt.Errorf("invalid cache_ttl for aws secret key data: %w", err)
 		}
 		ka.cache.ttl = ttl
 	}
 
-	return ka.cache.get()
+	data, err := ka.cache.get()
+	if err != nil {
+		return KeyVersionInfo{}, err
+	}
+
+	providerID := ka.AwsSecretID
+	if ka.AwsSecretKey != "" {
+		providerID = ka.AwsSecretID + "/" + ka.AwsSecretKey
+	}
+
+	return KeyVersionInfo{
+		Provider:        ProviderTypeAws,
+		ProviderID:      providerID,
+		ProviderVersion: DataHash(data),
+		Data:            data,
+		IsCurrent:       true,
+	}, nil
+}
+
+func (ka *KeyDataAwsSecret) ListVersions(ctx context.Context) ([]KeyVersionInfo, error) {
+	v, err := ka.GetCurrentVersion(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return []KeyVersionInfo{v}, nil
+}
+
+func (ka *KeyDataAwsSecret) GetProviderType() ProviderType {
+	return ProviderTypeAws
 }
 
 func (ka *KeyDataAwsSecret) fetchFromAWS(ctx context.Context) ([]byte, error) {

@@ -360,16 +360,30 @@ func (mr *MockEMockRecorder) EncryptStringGlobal(ctx, data interface{}) *gomock.
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EncryptStringGlobal", reflect.TypeOf((*MockE)(nil).EncryptStringGlobal), ctx, data)
 }
 
-// IsEncryptedWithPrimaryKey mocks base method.
-func (m *MockE) IsEncryptedWithPrimaryKey(base64Str string) bool {
+// IsEncryptedWithCurrentKey mocks base method.
+func (m *MockE) IsEncryptedWithCurrentKey(base64Str string) bool {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "IsEncryptedWithPrimaryKey", base64Str)
+	ret := m.ctrl.Call(m, "IsEncryptedWithCurrentKey", base64Str)
 	ret0, _ := ret[0].(bool)
 	return ret0
 }
 
-// IsEncryptedWithPrimaryKey indicates an expected call of IsEncryptedWithPrimaryKey.
-func (mr *MockEMockRecorder) IsEncryptedWithPrimaryKey(base64Str interface{}) *gomock.Call {
+// IsEncryptedWithCurrentKey indicates an expected call of IsEncryptedWithCurrentKey.
+func (mr *MockEMockRecorder) IsEncryptedWithCurrentKey(base64Str interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsEncryptedWithPrimaryKey", reflect.TypeOf((*MockE)(nil).IsEncryptedWithPrimaryKey), base64Str)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "IsEncryptedWithCurrentKey", reflect.TypeOf((*MockE)(nil).IsEncryptedWithCurrentKey), base64Str)
+}
+
+// SyncKeys mocks base method.
+func (m *MockE) SyncKeys(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SyncKeys", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SyncKeys indicates an expected call of SyncKeys.
+func (mr *MockEMockRecorder) SyncKeys(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SyncKeys", reflect.TypeOf((*MockE)(nil).SyncKeys), ctx)
 }

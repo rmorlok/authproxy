@@ -238,6 +238,48 @@ func (m *MockDB) EXPECT() *MockDBMockRecorder {
 	return m.recorder
 }
 
+// BatchUpdateActorEncryptedKey mocks base method.
+func (m *MockDB) BatchUpdateActorEncryptedKey(ctx context.Context, updates []database.ActorEncryptedKeyUpdate) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchUpdateActorEncryptedKey", ctx, updates)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BatchUpdateActorEncryptedKey indicates an expected call of BatchUpdateActorEncryptedKey.
+func (mr *MockDBMockRecorder) BatchUpdateActorEncryptedKey(ctx, updates interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchUpdateActorEncryptedKey", reflect.TypeOf((*MockDB)(nil).BatchUpdateActorEncryptedKey), ctx, updates)
+}
+
+// BatchUpdateConnectorVersionEncryptedDefinition mocks base method.
+func (m *MockDB) BatchUpdateConnectorVersionEncryptedDefinition(ctx context.Context, updates []database.ConnectorVersionEncryptedDefinitionUpdate) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchUpdateConnectorVersionEncryptedDefinition", ctx, updates)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BatchUpdateConnectorVersionEncryptedDefinition indicates an expected call of BatchUpdateConnectorVersionEncryptedDefinition.
+func (mr *MockDBMockRecorder) BatchUpdateConnectorVersionEncryptedDefinition(ctx, updates interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchUpdateConnectorVersionEncryptedDefinition", reflect.TypeOf((*MockDB)(nil).BatchUpdateConnectorVersionEncryptedDefinition), ctx, updates)
+}
+
+// BatchUpdateOAuth2TokenEncryptedFields mocks base method.
+func (m *MockDB) BatchUpdateOAuth2TokenEncryptedFields(ctx context.Context, updates []database.OAuth2TokenEncryptedFieldsUpdate) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "BatchUpdateOAuth2TokenEncryptedFields", ctx, updates)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// BatchUpdateOAuth2TokenEncryptedFields indicates an expected call of BatchUpdateOAuth2TokenEncryptedFields.
+func (mr *MockDBMockRecorder) BatchUpdateOAuth2TokenEncryptedFields(ctx, updates interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchUpdateOAuth2TokenEncryptedFields", reflect.TypeOf((*MockDB)(nil).BatchUpdateOAuth2TokenEncryptedFields), ctx, updates)
+}
+
 // CheckNonceValidAndMarkUsed mocks base method.
 func (m *MockDB) CheckNonceValidAndMarkUsed(ctx context.Context, nonce apid.ID, retainRecordUntil time.Time) (bool, error) {
 	m.ctrl.T.Helper()
@@ -251,6 +293,20 @@ func (m *MockDB) CheckNonceValidAndMarkUsed(ctx context.Context, nonce apid.ID, 
 func (mr *MockDBMockRecorder) CheckNonceValidAndMarkUsed(ctx, nonce, retainRecordUntil interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CheckNonceValidAndMarkUsed", reflect.TypeOf((*MockDB)(nil).CheckNonceValidAndMarkUsed), ctx, nonce, retainRecordUntil)
+}
+
+// ClearCurrentFlagForScope mocks base method.
+func (m *MockDB) ClearCurrentFlagForScope(ctx context.Context, scope string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ClearCurrentFlagForScope", ctx, scope)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ClearCurrentFlagForScope indicates an expected call of ClearCurrentFlagForScope.
+func (mr *MockDBMockRecorder) ClearCurrentFlagForScope(ctx, scope interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearCurrentFlagForScope", reflect.TypeOf((*MockDB)(nil).ClearCurrentFlagForScope), ctx, scope)
 }
 
 // CreateActor mocks base method.
@@ -279,6 +335,20 @@ func (m *MockDB) CreateConnection(ctx context.Context, c *database.Connection) e
 func (mr *MockDBMockRecorder) CreateConnection(ctx, c interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateConnection", reflect.TypeOf((*MockDB)(nil).CreateConnection), ctx, c)
+}
+
+// CreateEncryptionKeyVersion mocks base method.
+func (m *MockDB) CreateEncryptionKeyVersion(ctx context.Context, ekv *database.EncryptionKeyVersion) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateEncryptionKeyVersion", ctx, ekv)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateEncryptionKeyVersion indicates an expected call of CreateEncryptionKeyVersion.
+func (mr *MockDBMockRecorder) CreateEncryptionKeyVersion(ctx, ekv interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateEncryptionKeyVersion", reflect.TypeOf((*MockDB)(nil).CreateEncryptionKeyVersion), ctx, ekv)
 }
 
 // CreateNamespace mocks base method.
@@ -367,6 +437,20 @@ func (mr *MockDBMockRecorder) DeleteConnectionLabels(ctx, id, keys interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteConnectionLabels", reflect.TypeOf((*MockDB)(nil).DeleteConnectionLabels), ctx, id, keys)
 }
 
+// DeleteEncryptionKeyVersion mocks base method.
+func (m *MockDB) DeleteEncryptionKeyVersion(ctx context.Context, id apid.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteEncryptionKeyVersion", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteEncryptionKeyVersion indicates an expected call of DeleteEncryptionKeyVersion.
+func (mr *MockDBMockRecorder) DeleteEncryptionKeyVersion(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteEncryptionKeyVersion", reflect.TypeOf((*MockDB)(nil).DeleteEncryptionKeyVersion), ctx, id)
+}
+
 // DeleteExpiredNonces mocks base method.
 func (m *MockDB) DeleteExpiredNonces(ctx context.Context) error {
 	m.ctrl.T.Helper()
@@ -438,48 +522,6 @@ func (mr *MockDBMockRecorder) EnsureNamespaceByPath(ctx, path interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnsureNamespaceByPath", reflect.TypeOf((*MockDB)(nil).EnsureNamespaceByPath), ctx, path)
 }
 
-// EnumerateOAuth2TokensExpiringWithin mocks base method.
-func (m *MockDB) EnumerateOAuth2TokensExpiringWithin(ctx context.Context, duration time.Duration, callback func([]*database.OAuth2TokenWithConnection, bool) (bool, error)) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnumerateOAuth2TokensExpiringWithin", ctx, duration, callback)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// EnumerateOAuth2TokensExpiringWithin indicates an expected call of EnumerateOAuth2TokensExpiringWithin.
-func (mr *MockDBMockRecorder) EnumerateOAuth2TokensExpiringWithin(ctx, duration, callback interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnumerateOAuth2TokensExpiringWithin", reflect.TypeOf((*MockDB)(nil).EnumerateOAuth2TokensExpiringWithin), ctx, duration, callback)
-}
-
-// EnumerateOAuth2Tokens mocks base method.
-func (m *MockDB) EnumerateOAuth2Tokens(ctx context.Context, callback func([]*database.OAuth2Token, bool) (bool, error)) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "EnumerateOAuth2Tokens", ctx, callback)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// EnumerateOAuth2Tokens indicates an expected call of EnumerateOAuth2Tokens.
-func (mr *MockDBMockRecorder) EnumerateOAuth2Tokens(ctx, callback interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnumerateOAuth2Tokens", reflect.TypeOf((*MockDB)(nil).EnumerateOAuth2Tokens), ctx, callback)
-}
-
-// BatchUpdateOAuth2TokenEncryptedFields mocks base method.
-func (m *MockDB) BatchUpdateOAuth2TokenEncryptedFields(ctx context.Context, updates []database.OAuth2TokenEncryptedFieldsUpdate) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BatchUpdateOAuth2TokenEncryptedFields", ctx, updates)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// BatchUpdateOAuth2TokenEncryptedFields indicates an expected call of BatchUpdateOAuth2TokenEncryptedFields.
-func (mr *MockDBMockRecorder) BatchUpdateOAuth2TokenEncryptedFields(ctx, updates interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchUpdateOAuth2TokenEncryptedFields", reflect.TypeOf((*MockDB)(nil).BatchUpdateOAuth2TokenEncryptedFields), ctx, updates)
-}
-
 // EnumerateActorsWithEncryptedKey mocks base method.
 func (m *MockDB) EnumerateActorsWithEncryptedKey(ctx context.Context, callback func([]*database.Actor, bool) (bool, error)) error {
 	m.ctrl.T.Helper()
@@ -494,18 +536,18 @@ func (mr *MockDBMockRecorder) EnumerateActorsWithEncryptedKey(ctx, callback inte
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnumerateActorsWithEncryptedKey", reflect.TypeOf((*MockDB)(nil).EnumerateActorsWithEncryptedKey), ctx, callback)
 }
 
-// BatchUpdateActorEncryptedKey mocks base method.
-func (m *MockDB) BatchUpdateActorEncryptedKey(ctx context.Context, updates []database.ActorEncryptedKeyUpdate) error {
+// EnumerateEncryptionKeyVersions mocks base method.
+func (m *MockDB) EnumerateEncryptionKeyVersions(ctx context.Context, callback func([]*database.EncryptionKeyVersion, bool) (bool, error)) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BatchUpdateActorEncryptedKey", ctx, updates)
+	ret := m.ctrl.Call(m, "EnumerateEncryptionKeyVersions", ctx, callback)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// BatchUpdateActorEncryptedKey indicates an expected call of BatchUpdateActorEncryptedKey.
-func (mr *MockDBMockRecorder) BatchUpdateActorEncryptedKey(ctx, updates interface{}) *gomock.Call {
+// EnumerateEncryptionKeyVersions indicates an expected call of EnumerateEncryptionKeyVersions.
+func (mr *MockDBMockRecorder) EnumerateEncryptionKeyVersions(ctx, callback interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchUpdateActorEncryptedKey", reflect.TypeOf((*MockDB)(nil).BatchUpdateActorEncryptedKey), ctx, updates)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnumerateEncryptionKeyVersions", reflect.TypeOf((*MockDB)(nil).EnumerateEncryptionKeyVersions), ctx, callback)
 }
 
 // EnumerateConnectorVersions mocks base method.
@@ -522,18 +564,32 @@ func (mr *MockDBMockRecorder) EnumerateConnectorVersions(ctx, callback interface
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnumerateConnectorVersions", reflect.TypeOf((*MockDB)(nil).EnumerateConnectorVersions), ctx, callback)
 }
 
-// BatchUpdateConnectorVersionEncryptedDefinition mocks base method.
-func (m *MockDB) BatchUpdateConnectorVersionEncryptedDefinition(ctx context.Context, updates []database.ConnectorVersionEncryptedDefinitionUpdate) error {
+// EnumerateOAuth2Tokens mocks base method.
+func (m *MockDB) EnumerateOAuth2Tokens(ctx context.Context, callback func([]*database.OAuth2Token, bool) (bool, error)) error {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "BatchUpdateConnectorVersionEncryptedDefinition", ctx, updates)
+	ret := m.ctrl.Call(m, "EnumerateOAuth2Tokens", ctx, callback)
 	ret0, _ := ret[0].(error)
 	return ret0
 }
 
-// BatchUpdateConnectorVersionEncryptedDefinition indicates an expected call of BatchUpdateConnectorVersionEncryptedDefinition.
-func (mr *MockDBMockRecorder) BatchUpdateConnectorVersionEncryptedDefinition(ctx, updates interface{}) *gomock.Call {
+// EnumerateOAuth2Tokens indicates an expected call of EnumerateOAuth2Tokens.
+func (mr *MockDBMockRecorder) EnumerateOAuth2Tokens(ctx, callback interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "BatchUpdateConnectorVersionEncryptedDefinition", reflect.TypeOf((*MockDB)(nil).BatchUpdateConnectorVersionEncryptedDefinition), ctx, updates)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnumerateOAuth2Tokens", reflect.TypeOf((*MockDB)(nil).EnumerateOAuth2Tokens), ctx, callback)
+}
+
+// EnumerateOAuth2TokensExpiringWithin mocks base method.
+func (m *MockDB) EnumerateOAuth2TokensExpiringWithin(ctx context.Context, duration time.Duration, callback func([]*database.OAuth2TokenWithConnection, bool) (bool, error)) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "EnumerateOAuth2TokensExpiringWithin", ctx, duration, callback)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// EnumerateOAuth2TokensExpiringWithin indicates an expected call of EnumerateOAuth2TokensExpiringWithin.
+func (mr *MockDBMockRecorder) EnumerateOAuth2TokensExpiringWithin(ctx, duration, callback interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnumerateOAuth2TokensExpiringWithin", reflect.TypeOf((*MockDB)(nil).EnumerateOAuth2TokensExpiringWithin), ctx, duration, callback)
 }
 
 // GetActor mocks base method.
@@ -654,6 +710,51 @@ func (m *MockDB) GetConnectorVersions(ctx context.Context, requested []database.
 func (mr *MockDBMockRecorder) GetConnectorVersions(ctx, requested interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersions", reflect.TypeOf((*MockDB)(nil).GetConnectorVersions), ctx, requested)
+}
+
+// GetCurrentEncryptionKeyVersionForScope mocks base method.
+func (m *MockDB) GetCurrentEncryptionKeyVersionForScope(ctx context.Context, scope string) (*database.EncryptionKeyVersion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetCurrentEncryptionKeyVersionForScope", ctx, scope)
+	ret0, _ := ret[0].(*database.EncryptionKeyVersion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetCurrentEncryptionKeyVersionForScope indicates an expected call of GetCurrentEncryptionKeyVersionForScope.
+func (mr *MockDBMockRecorder) GetCurrentEncryptionKeyVersionForScope(ctx, scope interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetCurrentEncryptionKeyVersionForScope", reflect.TypeOf((*MockDB)(nil).GetCurrentEncryptionKeyVersionForScope), ctx, scope)
+}
+
+// GetEncryptionKeyVersion mocks base method.
+func (m *MockDB) GetEncryptionKeyVersion(ctx context.Context, id apid.ID) (*database.EncryptionKeyVersion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetEncryptionKeyVersion", ctx, id)
+	ret0, _ := ret[0].(*database.EncryptionKeyVersion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetEncryptionKeyVersion indicates an expected call of GetEncryptionKeyVersion.
+func (mr *MockDBMockRecorder) GetEncryptionKeyVersion(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetEncryptionKeyVersion", reflect.TypeOf((*MockDB)(nil).GetEncryptionKeyVersion), ctx, id)
+}
+
+// GetMaxOrderedVersionForScope mocks base method.
+func (m *MockDB) GetMaxOrderedVersionForScope(ctx context.Context, scope string) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetMaxOrderedVersionForScope", ctx, scope)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetMaxOrderedVersionForScope indicates an expected call of GetMaxOrderedVersionForScope.
+func (mr *MockDBMockRecorder) GetMaxOrderedVersionForScope(ctx, scope interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetMaxOrderedVersionForScope", reflect.TypeOf((*MockDB)(nil).GetMaxOrderedVersionForScope), ctx, scope)
 }
 
 // GetNamespace mocks base method.
@@ -832,6 +933,21 @@ func (mr *MockDBMockRecorder) ListConnectorsFromCursor(ctx, cursor interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListConnectorsFromCursor", reflect.TypeOf((*MockDB)(nil).ListConnectorsFromCursor), ctx, cursor)
 }
 
+// ListEncryptionKeyVersionsForScope mocks base method.
+func (m *MockDB) ListEncryptionKeyVersionsForScope(ctx context.Context, scope string) ([]*database.EncryptionKeyVersion, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListEncryptionKeyVersionsForScope", ctx, scope)
+	ret0, _ := ret[0].([]*database.EncryptionKeyVersion)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListEncryptionKeyVersionsForScope indicates an expected call of ListEncryptionKeyVersionsForScope.
+func (mr *MockDBMockRecorder) ListEncryptionKeyVersionsForScope(ctx, scope interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListEncryptionKeyVersionsForScope", reflect.TypeOf((*MockDB)(nil).ListEncryptionKeyVersionsForScope), ctx, scope)
+}
+
 // ListNamespacesBuilder mocks base method.
 func (m *MockDB) ListNamespacesBuilder() database.ListNamespacesBuilder {
 	m.ctrl.T.Helper()
@@ -990,6 +1106,20 @@ func (m *MockDB) SetConnectorVersionState(ctx context.Context, id apid.ID, versi
 func (mr *MockDBMockRecorder) SetConnectorVersionState(ctx, id, version, state interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectorVersionState", reflect.TypeOf((*MockDB)(nil).SetConnectorVersionState), ctx, id, version, state)
+}
+
+// SetEncryptionKeyVersionCurrentFlag mocks base method.
+func (m *MockDB) SetEncryptionKeyVersionCurrentFlag(ctx context.Context, id apid.ID, isCurrent bool) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetEncryptionKeyVersionCurrentFlag", ctx, id, isCurrent)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetEncryptionKeyVersionCurrentFlag indicates an expected call of SetEncryptionKeyVersionCurrentFlag.
+func (mr *MockDBMockRecorder) SetEncryptionKeyVersionCurrentFlag(ctx, id, isCurrent interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetEncryptionKeyVersionCurrentFlag", reflect.TypeOf((*MockDB)(nil).SetEncryptionKeyVersionCurrentFlag), ctx, id, isCurrent)
 }
 
 // SetNamespaceState mocks base method.

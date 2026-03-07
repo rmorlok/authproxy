@@ -140,14 +140,17 @@ func TestService(t *testing.T) {
 	t.Run("versioned string prefix", func(t *testing.T) {
 		encryptedBase64, err := s.EncryptStringGlobal(context.Background(), someString)
 		require.NoError(t, err)
-		require.True(t, strings.HasPrefix(encryptedBase64, "v1:0:"), "expected versioned prefix")
-		require.True(t, s.IsEncryptedWithPrimaryKey(encryptedBase64))
+		require.True(t, strings.HasPrefix(encryptedBase64, string(apid.PrefixEncryptionKeyVersion)), "expected ekv_ prefix")
+		require.True(t, s.IsEncryptedWithCurrentKey(encryptedBase64))
 	})
 
-	t.Run("IsEncryptedWithPrimaryKey", func(t *testing.T) {
-		require.True(t, s.IsEncryptedWithPrimaryKey("v1:0:somedata"))
-		require.False(t, s.IsEncryptedWithPrimaryKey("v1:1:somedata"))
-		require.False(t, s.IsEncryptedWithPrimaryKey("somelegacydata"))
+	t.Run("IsEncryptedWithCurrentKey", func(t *testing.T) {
+		// Encrypt something to ensure keys are synced
+		encrypted, err := s.EncryptStringGlobal(context.Background(), someString)
+		require.NoError(t, err)
+		require.True(t, s.IsEncryptedWithCurrentKey(encrypted))
+		require.False(t, s.IsEncryptedWithCurrentKey("somelegacydata"))
+		require.False(t, s.IsEncryptedWithCurrentKey("v1:0:somedata"))
 	})
 }
 
@@ -169,14 +172,14 @@ func TestServiceMultiKey(t *testing.T) {
 
 		encrypted, err := s.EncryptStringGlobal(context.Background(), someString)
 		require.NoError(t, err)
-		require.True(t, strings.HasPrefix(encrypted, "v1:0:"))
+		require.True(t, strings.HasPrefix(encrypted, string(apid.PrefixEncryptionKeyVersion)))
 
 		decrypted, err := s.DecryptStringGlobal(context.Background(), encrypted)
 		require.NoError(t, err)
 		require.Equal(t, someString, decrypted)
 	})
 
-	t.Run("decrypt old key data after rotation", func(t *testing.T) {
+	t.Run("decrypt old key data after rotation with same db", func(t *testing.T) {
 		// First, encrypt with key1 as primary
 		cfg1 := config.FromRoot(&sconfig.Root{
 			SystemAuth: sconfig.SystemAuth{
@@ -188,35 +191,32 @@ func TestServiceMultiKey(t *testing.T) {
 
 		encrypted, err := s1.EncryptStringGlobal(context.Background(), someString)
 		require.NoError(t, err)
-		require.True(t, strings.HasPrefix(encrypted, "v1:0:"))
 
-		// Now rotate: key2 is primary, key1 is secondary
+		// Now rotate: key2 is primary, key1 is secondary, same database
 		cfg2 := config.FromRoot(&sconfig.Root{
 			SystemAuth: sconfig.SystemAuth{
 				GlobalAESKeys: []*sconfig.KeyData{key2, key1},
 			},
 		})
-		cfg2, db2 := database.MustApplyBlankTestDbConfig(t, cfg2)
-		s2 := NewEncryptService(cfg2, db2)
+		cfg2.GetRoot().Database = cfg1.GetRoot().Database
+		s2 := NewEncryptService(cfg2, db1)
 
-		// The old data has prefix "v1:0:" which means key index 0 (key1 in old config).
-		// After rotation, key index 0 is now key2. Attempting to decrypt with key2 should fail
-		// because the data was encrypted with key1.
-		_, err = s2.DecryptStringGlobal(context.Background(), encrypted)
-		require.Error(t, err, "versioned data encrypted with old key at shifted index should fail")
+		// Should succeed: the encrypted data has ekv_id that maps to key1 in the same db
+		decrypted, err := s2.DecryptStringGlobal(context.Background(), encrypted)
+		require.NoError(t, err)
+		require.Equal(t, someString, decrypted)
 
-		// IsEncryptedWithPrimaryKey returns true based on prefix alone (v1:0:)
-		// but the actual decryption will fail since the key at index 0 changed
-		require.True(t, s2.IsEncryptedWithPrimaryKey(encrypted))
+		// After rotation, IsEncryptedWithCurrentKey should return false because current is now key2
+		require.False(t, s2.IsEncryptedWithCurrentKey(encrypted))
 	})
 
 	t.Run("legacy format decryption tries all keys", func(t *testing.T) {
 		// Encrypt with key1 directly (simulating legacy format)
 		ctx := context.Background()
-		key1Data, err := key1.GetData(ctx)
+		key1Ver, err := key1.GetCurrentVersion(ctx)
 		require.NoError(t, err)
 
-		encryptedBytes, err := encryptWithKey(key1Data, []byte(someString))
+		encryptedBytes, err := encryptWithKey(key1Ver.Data, []byte(someString))
 		require.NoError(t, err)
 		legacyEncoded := base64.StdEncoding.EncodeToString(encryptedBytes)
 
@@ -234,8 +234,8 @@ func TestServiceMultiKey(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, someString, decrypted)
 
-		// It's not encrypted with primary key (no versioned prefix)
-		require.False(t, s.IsEncryptedWithPrimaryKey(legacyEncoded))
+		// It's not encrypted with current key (no versioned prefix)
+		require.False(t, s.IsEncryptedWithCurrentKey(legacyEncoded))
 	})
 
 	t.Run("bytes multi-key roundtrip", func(t *testing.T) {
@@ -251,14 +251,14 @@ func TestServiceMultiKey(t *testing.T) {
 		encrypted, err := s1.EncryptGlobal(context.Background(), someBytes)
 		require.NoError(t, err)
 
-		// Decrypt with key2 primary, key1 secondary (raw bytes try all keys)
+		// Decrypt with key2 primary, key1 secondary (raw bytes try all keys), same db
 		cfg2 := config.FromRoot(&sconfig.Root{
 			SystemAuth: sconfig.SystemAuth{
 				GlobalAESKeys: []*sconfig.KeyData{key2, key1},
 			},
 		})
-		cfg2, db2 := database.MustApplyBlankTestDbConfig(t, cfg2)
-		s2 := NewEncryptService(cfg2, db2)
+		cfg2.GetRoot().Database = cfg1.GetRoot().Database
+		s2 := NewEncryptService(cfg2, db1)
 
 		decrypted, err := s2.DecryptGlobal(context.Background(), encrypted)
 		require.NoError(t, err)

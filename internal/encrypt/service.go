@@ -8,27 +8,28 @@ import (
 	"encoding/base64"
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 	"sync"
 
+	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
 
-// versionedPrefix is the prefix for versioned encrypted strings.
-// Format: "v1:<keyIndex>:<base64>"
-const versionedPrefix = "v1:"
+const globalScope = "global"
 
 type service struct {
 	cfg config.C
 	db  database.DB
 
-	globalAESKeys    [][]byte
-	globalAESKeysErr error
-	globalAESKeysOnce sync.Once
+	mu              sync.RWMutex
+	keyDataCache    map[string]*sconfig.KeyData
+	keyCache        map[apid.ID][]byte // ekv_id → key bytes
+	currentKeyCache map[string]apid.ID // scope → current ekv_id
+	synced          bool
 }
 
 func NewTestEncryptService(
@@ -39,7 +40,7 @@ func NewTestEncryptService(
 		cfg = config.FromRoot(&sconfig.Root{})
 	}
 
-	if cfg.GetRoot().SystemAuth.GlobalAESKey == nil && len(cfg.GetRoot().SystemAuth.GlobalAESKeys) == 0 {
+	if cfg.GetRoot().SystemAuth.GlobalAESKey == nil {
 		cfg.GetRoot().SystemAuth.GlobalAESKey = &sconfig.KeyData{InnerVal: &sconfig.KeyDataRandomBytes{}}
 	}
 
@@ -56,52 +57,171 @@ func NewEncryptService(
 	}
 
 	return &service{
-		cfg: cfg,
-		db:  db,
+		cfg:             cfg,
+		db:              db,
+		keyDataCache:    make(map[string]*sconfig.KeyData),
+		keyCache:        make(map[apid.ID][]byte),
+		currentKeyCache: make(map[string]apid.ID),
 	}
 }
 
-// getGlobalAESKeys returns all configured AES keys. The primary key is at index 0.
-func (s *service) getGlobalAESKeys(ctx context.Context) ([][]byte, error) {
-	s.globalAESKeysOnce.Do(func() {
-		if s == nil || s.cfg == nil || s.cfg.GetRoot() == nil {
-			s.globalAESKeysErr = errors.New("no global AES key configured")
-			return
-		}
+func (s *service) getKeyForScope(scope string) (*sconfig.KeyData, error) {
+	s.mu.Lock()
+	keyData, ok := s.keyDataCache[scope]
+	s.mu.Unlock()
 
-		keyDatas := s.cfg.GetRoot().SystemAuth.GetGlobalAESKeys()
-		if len(keyDatas) == 0 {
-			s.globalAESKeysErr = errors.New("no global AES key configured")
-			return
-		}
+	if ok {
+		return keyData, nil
+	}
 
-		keys := make([][]byte, 0, len(keyDatas))
-		for i, kd := range keyDatas {
-			if kd == nil || !kd.HasData(ctx) {
-				s.globalAESKeysErr = fmt.Errorf("global AES key at index %d has no data", i)
-				return
-			}
-			data, err := kd.GetData(ctx)
-			if err != nil {
-				s.globalAESKeysErr = errors.Wrapf(err, "failed to get global AES key at index %d", i)
-				return
-			}
-			keys = append(keys, data)
-		}
+	if scope == globalScope {
+		keyData = s.cfg.GetRoot().SystemAuth.GlobalAESKey
+	}
 
-		s.globalAESKeys = keys
-	})
+	if keyData != nil {
+		s.mu.Lock()
+		s.keyDataCache[scope] = keyData
+		s.mu.Unlock()
 
-	return s.globalAESKeys, s.globalAESKeysErr
+		return keyData, nil
+	}
+
+	return nil, fmt.Errorf("unknown scope %q", scope)
 }
 
-// getPrimaryKey returns the primary (first) AES key.
-func (s *service) getPrimaryKey(ctx context.Context) ([]byte, error) {
-	keys, err := s.getGlobalAESKeys(ctx)
+// SyncKeys reads all configured keys, upserts encryption_key_versions records, and populates caches.
+func (s *service) SyncKeys(ctx context.Context) error {
+	if s == nil || s.cfg == nil || s.cfg.GetRoot() == nil {
+		return errors.New("no configuration available")
+	}
+
+	// Re-use the existing cached data because given id can never change value,
+	// but rather than making the cache permanent we transfer every time so that
+	// any values that no longer exist in the database will be removed from memory
+	var oldKeyCache map[apid.ID][]byte
+	var newKeyCache map[apid.ID][]byte
+	var newCurrentKeyCache map[string]apid.ID
+	var merr *multierror.Error
+
+	func() {
+		s.mu.Lock()
+		defer s.mu.Unlock()
+
+		// Reset so we re-pull key datas from database
+		s.keyDataCache = make(map[string]*sconfig.KeyData, len(s.keyDataCache))
+
+		oldKeyCache = make(map[apid.ID][]byte, len(s.keyCache))
+		newKeyCache = make(map[apid.ID][]byte, len(s.keyCache))
+		newCurrentKeyCache = make(map[string]apid.ID, len(s.currentKeyCache))
+
+		for id, data := range s.keyCache {
+			oldKeyCache[id] = data
+		}
+	}()
+
+	err := s.db.EnumerateEncryptionKeyVersions(
+		ctx,
+		func(ekvs []*database.EncryptionKeyVersion, lastPage bool) (stop bool, err error) {
+			for _, ekv := range ekvs {
+				newCurrentKeyCache[ekv.Scope] = ekv.Id
+
+				if data, ok := oldKeyCache[ekv.Id]; ok {
+					// The data for a given version is immutable, so we can just take old value
+					newKeyCache[ekv.Id] = data
+				} else {
+					// This is a new version, pull from the actual source
+					keyData, err := s.getKeyForScope(ekv.Scope)
+					if err != nil {
+						merr = multierror.Append(merr, errors.Wrapf(err, "failed to get key for scope '%q' for key version id %q", ekv.Scope, ekv.Id))
+						continue
+					}
+				}
+			}
+		},
+	)
+
+	s.mu.Lock()
+	s.synced = true
+	s.mu.Unlock()
+
+	return merr.ErrorOrNil()
+}
+
+// ensureSynced lazily syncs keys if not already done.
+func (s *service) ensureSynced(ctx context.Context) error {
+	s.mu.RLock()
+	synced := s.synced
+	s.mu.RUnlock()
+
+	if synced {
+		return nil
+	}
+
+	return s.SyncKeys(ctx)
+}
+
+// getCurrentKeyID returns the current key ID for the given scope.
+func (s *service) getCurrentKeyID(scope string) (apid.ID, error) {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	id, ok := s.currentKeyCache[scope]
+	if !ok {
+		return apid.Nil, fmt.Errorf("no current key for scope %q", scope)
+	}
+	return id, nil
+}
+
+// getKeyBytes returns the key bytes for the given ekv_id, falling back to DB if not cached.
+func (s *service) getKeyBytes(ctx context.Context, ekvID apid.ID) ([]byte, error) {
+	s.mu.RLock()
+	data, ok := s.keyCache[ekvID]
+	s.mu.RUnlock()
+
+	if ok {
+		return data, nil
+	}
+
+	// Fallback: load from DB and then fetch from provider
+	ekv, err := s.db.GetEncryptionKeyVersion(ctx, ekvID)
 	if err != nil {
-		return nil, err
+		return nil, errors.Wrapf(err, "failed to get encryption key version %s from database", ekvID)
 	}
-	return keys[0], nil
+
+	// We need to fetch the key data from the config-based providers
+	keyDatas := s.cfg.GetRoot().SystemAuth.GetGlobalAESKeys()
+	for _, kd := range keyDatas {
+		if kd == nil {
+			continue
+		}
+		ver, err := kd.GetCurrentVersion(ctx)
+		if err != nil {
+			continue
+		}
+		if string(ver.Provider) == ekv.Provider &&
+			ver.ProviderID == ekv.ProviderID &&
+			ver.ProviderVersion == ekv.ProviderVersion {
+			s.mu.Lock()
+			s.keyCache[ekvID] = ver.Data
+			s.mu.Unlock()
+			return ver.Data, nil
+		}
+	}
+
+	return nil, fmt.Errorf("could not find key data for encryption key version %s (provider=%s, id=%s, version=%s)",
+		ekvID, ekv.Provider, ekv.ProviderID, ekv.ProviderVersion)
+}
+
+// getAllKeyBytes returns all cached key bytes for trying decryption.
+func (s *service) getAllKeyBytes() [][]byte {
+	s.mu.RLock()
+	defer s.mu.RUnlock()
+
+	keys := make([][]byte, 0, len(s.keyCache))
+	for _, data := range s.keyCache {
+		keys = append(keys, data)
+	}
+	return keys
 }
 
 func encryptWithKey(key []byte, data []byte) ([]byte, error) {
@@ -162,14 +282,24 @@ func decryptWithAnyKey(keys [][]byte, data []byte) ([]byte, error) {
 	return nil, errors.Wrap(lastErr, "decryption failed with all keys")
 }
 
-// EncryptGlobal encrypts raw bytes with the primary key.
+// EncryptGlobal encrypts raw bytes with the current key.
 // For raw byte methods, no version prefix is added (used for ephemeral data like session cookies).
 func (s *service) EncryptGlobal(ctx context.Context, data []byte) ([]byte, error) {
-	key, err := s.getPrimaryKey(ctx)
+	if err := s.ensureSynced(ctx); err != nil {
+		return nil, err
+	}
+
+	keyID, err := s.getCurrentKeyID(globalScope)
 	if err != nil {
 		return nil, err
 	}
-	return encryptWithKey(key, data)
+
+	keyBytes, err := s.getKeyBytes(ctx, keyID)
+	if err != nil {
+		return nil, err
+	}
+
+	return encryptWithKey(keyBytes, data)
 }
 
 func (s *service) EncryptForConnection(ctx context.Context, connection Connection, data []byte) ([]byte, error) {
@@ -183,10 +313,11 @@ func (s *service) EncryptForConnector(ctx context.Context, connection ConnectorV
 // DecryptGlobal decrypts raw bytes by trying all keys.
 // For raw byte methods, there is no version prefix (used for ephemeral data).
 func (s *service) DecryptGlobal(ctx context.Context, data []byte) ([]byte, error) {
-	keys, err := s.getGlobalAESKeys(ctx)
-	if err != nil {
+	if err := s.ensureSynced(ctx); err != nil {
 		return nil, err
 	}
+
+	keys := s.getAllKeyBytes()
 	return decryptWithAnyKey(keys, data)
 }
 
@@ -198,21 +329,30 @@ func (s *service) DecryptForConnector(ctx context.Context, cv ConnectorVersion, 
 	return s.DecryptGlobal(ctx, data)
 }
 
-// EncryptStringGlobal encrypts a string with the primary key and returns a versioned string.
-// Output format: "v1:0:<base64>"
+// EncryptStringGlobal encrypts a string with the current key and returns a versioned string.
+// Output format: "<ekv_id>:<base64>"
 func (s *service) EncryptStringGlobal(ctx context.Context, data string) (string, error) {
-	key, err := s.getPrimaryKey(ctx)
+	if err := s.ensureSynced(ctx); err != nil {
+		return "", err
+	}
+
+	keyID, err := s.getCurrentKeyID(globalScope)
 	if err != nil {
 		return "", err
 	}
 
-	encryptedData, err := encryptWithKey(key, []byte(data))
+	keyBytes, err := s.getKeyBytes(ctx, keyID)
+	if err != nil {
+		return "", err
+	}
+
+	encryptedData, err := encryptWithKey(keyBytes, []byte(data))
 	if err != nil {
 		return "", err
 	}
 
 	encodedData := base64.StdEncoding.EncodeToString(encryptedData)
-	return fmt.Sprintf("%s0:%s", versionedPrefix, encodedData), nil
+	return fmt.Sprintf("%s:%s", keyID, encodedData), nil
 }
 
 func (s *service) EncryptStringForConnection(ctx context.Context, connection Connection, data string) (string, error) {
@@ -223,33 +363,27 @@ func (s *service) EncryptStringForConnector(ctx context.Context, cv ConnectorVer
 	return s.EncryptStringGlobal(ctx, data)
 }
 
-// DecryptStringGlobal decrypts a string that may be in versioned or legacy format.
-// Versioned format: "v1:<keyIndex>:<base64>"
-// Legacy format: "<base64>" (no prefix, tries all keys)
+// DecryptStringGlobal decrypts a string that may be in new format (<ekv_id>:<base64>)
+// or legacy formats ("v1:<keyIndex>:<base64>" or "<base64>").
 func (s *service) DecryptStringGlobal(ctx context.Context, base64Data string) (string, error) {
-	keys, err := s.getGlobalAESKeys(ctx)
-	if err != nil {
+	if err := s.ensureSynced(ctx); err != nil {
 		return "", err
 	}
 
-	if strings.HasPrefix(base64Data, versionedPrefix) {
-		// Versioned format: "v1:<keyIndex>:<base64>"
-		rest := base64Data[len(versionedPrefix):]
-		colonIdx := strings.Index(rest, ":")
+	// New format: "<ekv_id>:<base64>" where ekv_id starts with "ekv_"
+	if strings.HasPrefix(base64Data, string(apid.PrefixEncryptionKeyVersion)) {
+		colonIdx := strings.Index(base64Data, ":")
 		if colonIdx < 0 {
-			return "", errors.New("invalid versioned encrypted string: missing key index separator")
+			return "", errors.New("invalid encrypted string: missing separator after ekv_id")
 		}
 
-		keyIndexStr := rest[:colonIdx]
-		encodedData := rest[colonIdx+1:]
+		ekvIDStr := base64Data[:colonIdx]
+		encodedData := base64Data[colonIdx+1:]
 
-		keyIndex, err := strconv.Atoi(keyIndexStr)
+		ekvID := apid.ID(ekvIDStr)
+		keyBytes, err := s.getKeyBytes(ctx, ekvID)
 		if err != nil {
-			return "", errors.Wrap(err, "invalid key index in versioned encrypted string")
-		}
-
-		if keyIndex < 0 || keyIndex >= len(keys) {
-			return "", fmt.Errorf("key index %d out of range (have %d keys)", keyIndex, len(keys))
+			return "", errors.Wrapf(err, "failed to get key for ekv_id %s", ekvID)
 		}
 
 		decodedData, err := base64.StdEncoding.DecodeString(encodedData)
@@ -257,7 +391,31 @@ func (s *service) DecryptStringGlobal(ctx context.Context, base64Data string) (s
 			return "", errors.Wrap(err, "failed to decode base64 string")
 		}
 
-		decryptedData, err := decryptWithKey(keys[keyIndex], decodedData)
+		decryptedData, err := decryptWithKey(keyBytes, decodedData)
+		if err != nil {
+			return "", err
+		}
+
+		return string(decryptedData), nil
+	}
+
+	// Legacy v1 format: "v1:<keyIndex>:<base64>" - try all keys
+	if strings.HasPrefix(base64Data, "v1:") {
+		rest := base64Data[3:]
+		colonIdx := strings.Index(rest, ":")
+		if colonIdx < 0 {
+			return "", errors.New("invalid versioned encrypted string: missing key index separator")
+		}
+
+		encodedData := rest[colonIdx+1:]
+
+		decodedData, err := base64.StdEncoding.DecodeString(encodedData)
+		if err != nil {
+			return "", errors.Wrap(err, "failed to decode base64 string")
+		}
+
+		keys := s.getAllKeyBytes()
+		decryptedData, err := decryptWithAnyKey(keys, decodedData)
 		if err != nil {
 			return "", err
 		}
@@ -271,6 +429,7 @@ func (s *service) DecryptStringGlobal(ctx context.Context, base64Data string) (s
 		return "", errors.Wrap(err, "failed to decode base64 string")
 	}
 
+	keys := s.getAllKeyBytes()
 	decryptedData, err := decryptWithAnyKey(keys, decodedData)
 	if err != nil {
 		return "", err
@@ -287,8 +446,15 @@ func (s *service) DecryptStringForConnector(ctx context.Context, cv ConnectorVer
 	return s.DecryptStringGlobal(ctx, base64Data)
 }
 
-// IsEncryptedWithPrimaryKey checks whether a string value was encrypted with the primary key.
-// Only versioned strings with key index 0 return true.
-func (s *service) IsEncryptedWithPrimaryKey(base64Str string) bool {
-	return strings.HasPrefix(base64Str, "v1:0:")
+// IsEncryptedWithCurrentKey checks whether a string value was encrypted with the current key.
+func (s *service) IsEncryptedWithCurrentKey(base64Str string) bool {
+	s.mu.RLock()
+	currentID, ok := s.currentKeyCache[globalScope]
+	s.mu.RUnlock()
+
+	if !ok {
+		return false
+	}
+
+	return strings.HasPrefix(base64Str, string(currentID)+":")
 }

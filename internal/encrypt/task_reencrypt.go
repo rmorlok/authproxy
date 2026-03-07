@@ -3,7 +3,6 @@ package encrypt
 import (
 	"context"
 	"fmt"
-	"log/slog"
 
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -13,29 +12,11 @@ const (
 	TaskTypeReencryptAll = "encrypt:reencrypt_all"
 )
 
-type ReencryptTaskHandler struct {
-	db     database.DB
-	enc    E
-	logger *slog.Logger
-}
-
-func NewReencryptTaskHandler(db database.DB, enc E, logger *slog.Logger) *ReencryptTaskHandler {
-	return &ReencryptTaskHandler{
-		db:     db,
-		enc:    enc,
-		logger: logger,
-	}
-}
-
 func NewReencryptAllTask() *asynq.Task {
 	return asynq.NewTask(TaskTypeReencryptAll, nil)
 }
 
-func (h *ReencryptTaskHandler) RegisterTasks(mux *asynq.ServeMux) {
-	mux.HandleFunc(TaskTypeReencryptAll, h.handleReencryptAll)
-}
-
-func (h *ReencryptTaskHandler) handleReencryptAll(ctx context.Context, task *asynq.Task) error {
+func (h *EncryptServiceTaskHandler) handleReencryptAll(ctx context.Context, task *asynq.Task) error {
 	h.logger.Info("starting re-encryption of all encrypted data")
 
 	var totalProcessed, totalSkipped, totalErrors int
@@ -74,13 +55,13 @@ func (h *ReencryptTaskHandler) handleReencryptAll(ctx context.Context, task *asy
 	return nil
 }
 
-func (h *ReencryptTaskHandler) reencryptOAuth2Tokens(ctx context.Context) (processed, skipped, errs int) {
+func (h *EncryptServiceTaskHandler) reencryptOAuth2Tokens(ctx context.Context) (processed, skipped, errs int) {
 	err := h.db.EnumerateOAuth2Tokens(ctx, func(tokens []*database.OAuth2Token, lastPage bool) (stop bool, err error) {
 		var updates []database.OAuth2TokenEncryptedFieldsUpdate
 
 		for _, token := range tokens {
-			accessAlready := h.enc.IsEncryptedWithPrimaryKey(token.EncryptedAccessToken)
-			refreshAlready := h.enc.IsEncryptedWithPrimaryKey(token.EncryptedRefreshToken)
+			accessAlready := h.enc.IsEncryptedWithCurrentKey(token.EncryptedAccessToken)
+			refreshAlready := h.enc.IsEncryptedWithCurrentKey(token.EncryptedRefreshToken)
 
 			if accessAlready && refreshAlready {
 				skipped++
@@ -146,7 +127,7 @@ func (h *ReencryptTaskHandler) reencryptOAuth2Tokens(ctx context.Context) (proce
 	return
 }
 
-func (h *ReencryptTaskHandler) reencryptActorKeys(ctx context.Context) (processed, skipped, errs int) {
+func (h *EncryptServiceTaskHandler) reencryptActorKeys(ctx context.Context) (processed, skipped, errs int) {
 	err := h.db.EnumerateActorsWithEncryptedKey(ctx, func(actors []*database.Actor, lastPage bool) (stop bool, err error) {
 		var updates []database.ActorEncryptedKeyUpdate
 
@@ -158,7 +139,7 @@ func (h *ReencryptTaskHandler) reencryptActorKeys(ctx context.Context) (processe
 
 			encKey := *actor.EncryptedKey
 
-			if h.enc.IsEncryptedWithPrimaryKey(encKey) {
+			if h.enc.IsEncryptedWithCurrentKey(encKey) {
 				skipped++
 				continue
 			}
@@ -202,12 +183,12 @@ func (h *ReencryptTaskHandler) reencryptActorKeys(ctx context.Context) (processe
 	return
 }
 
-func (h *ReencryptTaskHandler) reencryptConnectorVersions(ctx context.Context) (processed, skipped, errs int) {
+func (h *EncryptServiceTaskHandler) reencryptConnectorVersions(ctx context.Context) (processed, skipped, errs int) {
 	err := h.db.EnumerateConnectorVersions(ctx, func(cvs []*database.ConnectorVersion, lastPage bool) (stop bool, err error) {
 		var updates []database.ConnectorVersionEncryptedDefinitionUpdate
 
 		for _, cv := range cvs {
-			if h.enc.IsEncryptedWithPrimaryKey(cv.EncryptedDefinition) {
+			if h.enc.IsEncryptedWithCurrentKey(cv.EncryptedDefinition) {
 				skipped++
 				continue
 			}

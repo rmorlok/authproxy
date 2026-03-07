@@ -90,7 +90,7 @@ func TestAuth_RoundtripGlobaleAESKey(t *testing.T) {
 		copiedClaims := deepcopy.Copy(&claims).(*jwt2.AuthProxyClaims)
 		copiedClaims.SystemSigned = true
 
-		tb := jwt2.NewJwtTokenBuilder().WithSecretKey(util.Must(cfg.GetRoot().SystemAuth.GlobalAESKey.GetData(testContext)))
+		tb := jwt2.NewJwtTokenBuilder().WithSecretKey(util.Must(cfg.GetRoot().SystemAuth.GlobalAESKey.GetCurrentVersion(testContext)).Data)
 		tok, err := tb.WithClaims(copiedClaims).TokenCtx(testContext)
 		require.NoError(t, err)
 		rtClaims, err := j.Parse(testContext, tok)
@@ -431,12 +431,12 @@ func TestAuth_Parse(t *testing.T) {
 			// (using GlobalAESKey) for an actor that also has an asymmetric key stored
 			// in the database. The parser should use GlobalAESKey for system-signed tokens,
 			// not the actor's asymmetric key.
-			globalAESKeyData, err := cfg.GetRoot().SystemAuth.GlobalAESKey.GetData(testContext)
+			globalAESKeyVer, err := cfg.GetRoot().SystemAuth.GlobalAESKey.GetCurrentVersion(testContext)
 			require.NoError(t, err)
 
 			token, err := jwt2.NewJwtTokenBuilder().
 				WithActorExternalId("bobdole").
-				WithSecretKey(globalAESKeyData).
+				WithSecretKey(globalAESKeyVer.Data).
 				WithSystemSigned().
 				WithAudience(string(sconfig.ServiceIdAdminApi)).
 				TokenCtx(testContext)

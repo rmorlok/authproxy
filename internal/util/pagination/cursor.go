@@ -11,11 +11,11 @@ import (
 // MakeCursor constructs a cursor string from the JSON encoding of the passed value. The cursor string is encrypted
 // and base64 encoded so that it cannot be manipulated in the client
 func MakeCursor(ctx context.Context, secretKey config.KeyDataType, c interface{}) (string, error) {
-	keyData, err := secretKey.GetData(ctx)
+	ver, err := secretKey.GetCurrentVersion(ctx)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get secret key data to sign cursor")
 	}
-	return util.SecureEncryptedJsonValue(keyData, c)
+	return util.SecureEncryptedJsonValue(ver.Data, c)
 }
 
 // MakeCursorMultiKey constructs a cursor string encrypted with the primary key and prepends
@@ -25,21 +25,21 @@ func MakeCursorMultiKey(ctx context.Context, keys []*config.KeyData, c interface
 		return "", errors.New("no keys provided for cursor encryption")
 	}
 
-	keyData, err := keys[0].GetData(ctx)
+	ver, err := keys[0].GetCurrentVersion(ctx)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get primary key data to sign cursor")
 	}
 
-	return util.SecureEncryptedJsonValueVersioned(0, keyData, c)
+	return util.SecureEncryptedJsonValueVersioned(0, ver.Data, c)
 }
 
 // ParseCursor parses a cursor from the passed value. The passed valued should be generated from makeCursor
 func ParseCursor[C any](ctx context.Context, secretKey config.KeyDataType, c string) (*C, error) {
-	keyData, err := secretKey.GetData(ctx)
+	ver, err := secretKey.GetCurrentVersion(ctx)
 	if err != nil {
 		return nil, errors.Wrap(err, "failed to get secret key data to sign cursor")
 	}
-	return util.SecureDecryptedJsonValue[C](keyData, c)
+	return util.SecureDecryptedJsonValue[C](ver.Data, c)
 }
 
 // ParseCursorMultiKey parses a cursor that may be in versioned or legacy format,
@@ -51,11 +51,11 @@ func ParseCursorMultiKey[C any](ctx context.Context, keys []*config.KeyData, c s
 
 	keyDatas := make([][]byte, 0, len(keys))
 	for _, key := range keys {
-		data, err := key.GetData(ctx)
+		ver, err := key.GetCurrentVersion(ctx)
 		if err != nil {
 			return nil, errors.Wrap(err, "failed to get key data for cursor decryption")
 		}
-		keyDatas = append(keyDatas, data)
+		keyDatas = append(keyDatas, ver.Data)
 	}
 
 	return util.SecureDecryptedJsonValueMultiKey[C](keyDatas, c)

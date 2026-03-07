@@ -20,11 +20,7 @@ type KeyDataVault struct {
 	cache cachedKeyFetcher
 }
 
-func (kv *KeyDataVault) HasData(ctx context.Context) bool {
-	return kv.VaultAddress != "" && kv.VaultPath != ""
-}
-
-func (kv *KeyDataVault) GetData(ctx context.Context) ([]byte, error) {
+func (kv *KeyDataVault) GetCurrentVersion(ctx context.Context) (KeyVersionInfo, error) {
 	kv.cache.fetch = func() ([]byte, error) {
 		return kv.fetchFromVault()
 	}
@@ -32,12 +28,40 @@ func (kv *KeyDataVault) GetData(ctx context.Context) ([]byte, error) {
 	if kv.CacheTTL != "" {
 		ttl, err := time.ParseDuration(kv.CacheTTL)
 		if err != nil {
-			return nil, fmt.Errorf("invalid cache_ttl for vault key data: %w", err)
+			return KeyVersionInfo{}, fmt.Errorf("invalid cache_ttl for vault key data: %w", err)
 		}
 		kv.cache.ttl = ttl
 	}
 
-	return kv.cache.get()
+	data, err := kv.cache.get()
+	if err != nil {
+		return KeyVersionInfo{}, err
+	}
+
+	key := kv.VaultKey
+	if key == "" {
+		key = "value"
+	}
+
+	return KeyVersionInfo{
+		Provider:        ProviderTypeHashicorpVault,
+		ProviderID:      kv.VaultPath + "/" + key,
+		ProviderVersion: DataHash(data),
+		Data:            data,
+		IsCurrent:       true,
+	}, nil
+}
+
+func (kv *KeyDataVault) ListVersions(ctx context.Context) ([]KeyVersionInfo, error) {
+	v, err := kv.GetCurrentVersion(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return []KeyVersionInfo{v}, nil
+}
+
+func (kv *KeyDataVault) GetProviderType() ProviderType {
+	return ProviderTypeHashicorpVault
 }
 
 func (kv *KeyDataVault) resolveToken() string {

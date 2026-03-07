@@ -173,6 +173,25 @@ type DB interface {
 	BatchUpdateConnectorVersionEncryptedDefinition(ctx context.Context, updates []ConnectorVersionEncryptedDefinitionUpdate) error
 
 	/*
+	 * Encryption Key Versions
+	 */
+
+	CreateEncryptionKeyVersion(ctx context.Context, ekv *EncryptionKeyVersion) error
+	GetEncryptionKeyVersion(ctx context.Context, id apid.ID) (*EncryptionKeyVersion, error)
+	GetCurrentEncryptionKeyVersionForScope(ctx context.Context, scope string) (*EncryptionKeyVersion, error)
+	ListEncryptionKeyVersionsForScope(ctx context.Context, scope string) ([]*EncryptionKeyVersion, error)
+	GetMaxOrderedVersionForScope(ctx context.Context, scope string) (int64, error)
+	ClearCurrentFlagForScope(ctx context.Context, scope string) error
+	DeleteEncryptionKeyVersion(ctx context.Context, id apid.ID) error
+	SetEncryptionKeyVersionCurrentFlag(ctx context.Context, id apid.ID, isCurrent bool) error
+
+	// EnumerateEncryptionKeyVersions enumerates all non-deleted encryption key versions in batches.
+	EnumerateEncryptionKeyVersions(
+		ctx context.Context,
+		callback func(ekvs []*EncryptionKeyVersion, lastPage bool) (stop bool, err error),
+	) error
+
+	/*
 	 *  Nonces
 	 */
 

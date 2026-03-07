@@ -21,19 +21,18 @@ func (tcv *TlsConfigVals) TlsConfig(ctx context.Context, s HttpServiceLike) (*tl
 		return nil, fmt.Errorf("tls config vals must have cert and key")
 	}
 
-	if !tcv.Cert.HasData(ctx) || !tcv.Key.HasData(ctx) {
-		return nil, fmt.Errorf("tls config vals must have cert and key data")
+	certVersion, err := tcv.Cert.GetCurrentVersion(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("tls cert key data not available: %w", err)
 	}
 
-	cert, err := tcv.Cert.GetData(ctx)
+	keyVersion, err := tcv.Key.GetCurrentVersion(ctx)
 	if err != nil {
-		return nil, err
+		return nil, fmt.Errorf("tls key data not available: %w", err)
 	}
 
-	key, err := tcv.Key.GetData(ctx)
-	if err != nil {
-		return nil, err
-	}
+	cert := certVersion.Data
+	key := keyVersion.Data
 
 	// Create certificate from byte slices
 	kp, err := tls.X509KeyPair(cert, key)

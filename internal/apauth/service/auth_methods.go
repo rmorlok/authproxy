@@ -139,7 +139,7 @@ func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (stri
 		return "", errors.New("some service ids in aud are invalid")
 	}
 
-	data, err := s.config.GetRoot().SystemAuth.GlobalAESKey.GetData(ctx)
+	ver, err := s.config.GetRoot().SystemAuth.GlobalAESKey.GetCurrentVersion(ctx)
 	if err != nil {
 		return "", errors.Wrap(err, "failed to get global aes key")
 	}
@@ -147,7 +147,7 @@ func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (stri
 	return jwt2.
 		NewJwtTokenBuilder().
 		WithClaims(&claimsClone).
-		WithSecretKey(data).
+		WithSecretKey(ver.Data).
 		WithSystemSigned().
 		TokenCtx(ctx)
 }

@@ -91,3 +91,20 @@ create table used_nonces
 
 create index idx_used_nonces_retain_until
     on used_nonces (retain_until);
+
+CREATE TABLE encryption_key_versions (
+    id               text primary key,
+    scope            text not null,
+    provider         text not null,
+    provider_id      text not null,
+    provider_version text not null,
+    ordered_version  integer not null,
+    is_current       boolean not null default false,
+    created_at       timestamptz not null,
+    updated_at       timestamptz not null,
+    deleted_at       timestamptz
+);
+
+CREATE INDEX idx_ekv_scope ON encryption_key_versions (deleted_at, scope);
+CREATE INDEX idx_ekv_scope_current ON encryption_key_versions (deleted_at, scope, is_current);
+CREATE UNIQUE INDEX idx_ekv_scope_ordered_version ON encryption_key_versions (scope, ordered_version);

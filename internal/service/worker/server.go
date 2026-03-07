@@ -149,6 +149,12 @@ func Serve(cfg config.C) {
 	)
 	reencryptTaskHandler.RegisterTasks(mux)
 
+	syncKeysTaskHandler := encrypt.NewSyncKeysTaskHandler(
+		dm.GetEncryptService(),
+		logger,
+	)
+	syncKeysTaskHandler.RegisterTasks(mux)
+
 	var wg sync.WaitGroup
 
 	wg.Add(1)
@@ -170,7 +176,8 @@ func Serve(cfg config.C) {
 	).
 		addRegistrar(oauth2TaskHandler).
 		addRegistrar(dm.GetCoreService()).
-		addRegistrar(adminSyncTaskHandler)
+		addRegistrar(adminSyncTaskHandler).
+		addRegistrar(syncKeysTaskHandler)
 
 	wg.Add(1)
 	go func() {

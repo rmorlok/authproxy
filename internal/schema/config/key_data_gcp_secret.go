@@ -19,11 +19,7 @@ type KeyDataGcpSecret struct {
 	cache cachedKeyFetcher
 }
 
-func (kg *KeyDataGcpSecret) HasData(ctx context.Context) bool {
-	return kg.GcpSecretName != ""
-}
-
-func (kg *KeyDataGcpSecret) GetData(ctx context.Context) ([]byte, error) {
+func (kg *KeyDataGcpSecret) GetCurrentVersion(ctx context.Context) (KeyVersionInfo, error) {
 	kg.cache.fetch = func() ([]byte, error) {
 		return kg.fetchFromGCP(ctx)
 	}
@@ -31,12 +27,50 @@ func (kg *KeyDataGcpSecret) GetData(ctx context.Context) ([]byte, error) {
 	if kg.CacheTTL != "" {
 		ttl, err := time.ParseDuration(kg.CacheTTL)
 		if err != nil {
-			return nil, fmt.Errorf("invalid cache_ttl for gcp secret key data: %w", err)
+			return KeyVersionInfo{}, fmt.Errorf("invalid cache_ttl for gcp secret key data: %w", err)
 		}
 		kg.cache.ttl = ttl
 	}
 
-	return kg.cache.get()
+	data, err := kg.cache.get()
+	if err != nil {
+		return KeyVersionInfo{}, err
+	}
+
+	version := kg.GcpSecretVersion
+	if version == "" {
+		version = "latest"
+	}
+
+	return KeyVersionInfo{
+		Provider:        ProviderTypeGcp,
+		ProviderID:      kg.secretResourceName(),
+		ProviderVersion: version,
+		Data:            data,
+		IsCurrent:       true,
+	}, nil
+}
+
+func (kg *KeyDataGcpSecret) ListVersions(ctx context.Context) ([]KeyVersionInfo, error) {
+	v, err := kg.GetCurrentVersion(ctx)
+	if err != nil {
+		return nil, err
+	}
+	return []KeyVersionInfo{v}, nil
+}
+
+func (kg *KeyDataGcpSecret) GetProviderType() ProviderType {
+	return ProviderTypeGcp
+}
+
+func (kg *KeyDataGcpSecret) secretResourceName() string {
+	if len(kg.GcpSecretName) > 0 && kg.GcpSecretName[0] == 'p' {
+		return kg.GcpSecretName
+	}
+	if kg.GcpProject == "" {
+		return fmt.Sprintf("projects/-/secrets/%s", kg.GcpSecretName)
+	}
+	return fmt.Sprintf("projects/%s/secrets/%s", kg.GcpProject, kg.GcpSecretName)
 }
 
 func (kg *KeyDataGcpSecret) secretVersionName() string {
