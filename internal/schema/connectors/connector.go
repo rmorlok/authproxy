@@ -67,6 +67,10 @@ type Connector struct {
 	// documentation for each struct for more details.
 	Auth *Auth `json:"auth" yaml:"auth"`
 
+	// RateLimiting configures how 429 rate limiting responses from the 3rd party are handled.
+	// If unset, default behavior is enabled (parse Retry-After header, 60s default backoff).
+	RateLimiting *RateLimiting `json:"rate_limiting,omitempty" yaml:"rate_limiting,omitempty"`
+
 	// Probes are a list of probes to run against connections of this connector type to validation the connection.
 	Probes []Probe `json:"probes,omitempty" yaml:"probes,omitempty"`
 
@@ -87,6 +91,10 @@ func (c *Connector) Clone() *Connector {
 
 	if c.Auth != nil {
 		clone.Auth = c.Auth.CloneValue()
+	}
+
+	if c.RateLimiting != nil {
+		clone.RateLimiting = c.RateLimiting.Clone()
 	}
 
 	if c.Labels != nil {
@@ -110,6 +118,12 @@ func (c *Connector) Validate(vc *common.ValidationContext) error {
 
 	if c.Namespace != nil {
 		if err := aschema.ValidateNamespacePath(*c.Namespace); err != nil {
+			result = multierror.Append(result, err)
+		}
+	}
+
+	if c.RateLimiting != nil {
+		if err := c.RateLimiting.Validate(vc.PushField("rate_limiting")); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}

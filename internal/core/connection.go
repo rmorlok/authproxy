@@ -9,6 +9,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
 // Connection is a wrapper for the lower level database equivalent that handles wiring up logic specified in this
@@ -83,5 +85,14 @@ func (c *connection) Logger() *slog.Logger {
 	return c.logger
 }
 
+func (c *connection) GetRateLimitConfig() *connectors.RateLimiting {
+	def := c.cv.GetDefinition()
+	if def == nil {
+		return nil
+	}
+	return def.RateLimiting
+}
+
 var _ iface.Connection = (*connection)(nil)
 var _ aplog.HasLogger = (*connection)(nil)
+var _ httpf.RateLimitConfigProvider = (*connection)(nil)

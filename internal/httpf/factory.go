@@ -30,9 +30,16 @@ func CreateFactory(
 	r apredis.Client,
 	requestLog RoundTripperFactory,
 	logger *slog.Logger,
+	additionalMiddlewares ...RoundTripperFactory,
 ) F {
-	// Order matters here to determine the order of middlewares
+	// Order matters here to determine the order of middlewares.
+	// Request logging is outermost so all requests (including rate-limited ones) are logged.
 	middlewares := []RoundTripperFactory{requestLog}
+	for _, m := range additionalMiddlewares {
+		if m != nil {
+			middlewares = append(middlewares, m)
+		}
+	}
 
 	return &clientFactory{
 		cfg:         cfg,
@@ -85,6 +92,10 @@ func (f *clientFactory) ForConnection(c Connection) F {
 	ri.Namespace = c.GetNamespace()
 	ri.ConnectorId = c.GetConnectorId()
 	ri.ConnectorVersion = c.GetConnectorVersion()
+
+	if rlp, ok := c.(RateLimitConfigProvider); ok {
+		ri.RateLimiting = rlp.GetRateLimitConfig()
+	}
 
 	return fp.ForRequestInfo(ri)
 }
