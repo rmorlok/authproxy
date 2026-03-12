@@ -2,6 +2,7 @@ package httpf
 
 import (
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/schema/connectors"
 	"gopkg.in/h2non/gentleman.v2"
 )
 
@@ -13,6 +14,12 @@ type ConnectorVersion interface {
 
 type GettableConnectorVersion interface {
 	GetConnectorVersionEntity() ConnectorVersion
+}
+
+// RateLimitConfigProvider is an optional interface that connections can implement to provide
+// rate limiting configuration from the connector definition.
+type RateLimitConfigProvider interface {
+	GetRateLimitConfig() *connectors.RateLimiting
 }
 
 type Connection interface {

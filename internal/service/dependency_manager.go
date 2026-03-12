@@ -19,6 +19,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/ratelimit"
 	"github.com/rmorlok/authproxy/internal/request_log"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
@@ -227,6 +228,11 @@ func (dm *DependencyManager) GetLogStorageService() *request_log.StorageService 
 	return dm.logStorageService
 }
 
+func (dm *DependencyManager) GetRateLimitFactory() *ratelimit.Factory {
+	store := ratelimit.NewStore(dm.GetRedisClient())
+	return ratelimit.NewFactory(store, dm.GetLogger())
+}
+
 func (dm *DependencyManager) GetHttpf() httpf.F {
 	if dm.httpf == nil {
 		dm.httpf = httpf.CreateFactory(
@@ -234,6 +240,7 @@ func (dm *DependencyManager) GetHttpf() httpf.F {
 			dm.GetRedisClient(),
 			dm.GetLogStorageService(),
 			dm.GetLogger(),
+			dm.GetRateLimitFactory(),
 		)
 	}
 
