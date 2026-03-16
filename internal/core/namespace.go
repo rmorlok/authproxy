@@ -4,6 +4,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -45,6 +46,10 @@ func (ns *Namespace) GetCreatedAt() time.Time {
 
 func (ns *Namespace) GetUpdatedAt() time.Time {
 	return ns.UpdatedAt
+}
+
+func (ns *Namespace) GetEncryptionKeyId() *apid.ID {
+	return ns.EncryptionKeyId
 }
 
 func (ns *Namespace) GetLabels() map[string]string {

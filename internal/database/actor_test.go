@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -441,7 +442,7 @@ func TestActor(t *testing.T) {
 		u := Actor{}
 		require.False(t, u.CanSelfSign())
 
-		encryptedKey := "some-encrypted-key"
+		encryptedKey := encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "some-encrypted-key"}
 		u.EncryptedKey = &encryptedKey
 		require.True(t, u.CanSelfSign())
 
@@ -782,7 +783,7 @@ func TestActor(t *testing.T) {
 		t.Run("stores and retrieves encrypted key", func(t *testing.T) {
 			setup(t)
 
-			encryptedKeyVal := "base64encodedencryptedkey123"
+			encryptedKeyVal := encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "base64encodedencryptedkey123"}
 			actor := &Actor{
 				Id:           apid.New(apid.PrefixActor),
 				Namespace:    "root",

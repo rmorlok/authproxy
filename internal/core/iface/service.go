@@ -3,9 +3,10 @@ package iface
 import (
 	"context"
 
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hibiken/asynq"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
+	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/rmorlok/authproxy/internal/tasks"
 )
@@ -120,11 +121,50 @@ type C interface {
 	// EnsureNamespaceAncestorPath ensures that the specified namespace path exists in the database.
 	EnsureNamespaceAncestorPath(ctx context.Context, targetNamespace string, labels map[string]string) (Namespace, error)
 
+	// SetNamespaceEncryptionKey sets the encryption key for a namespace.
+	SetNamespaceEncryptionKey(ctx context.Context, path string, ekId apid.ID) (Namespace, error)
+
+	// ClearNamespaceEncryptionKey clears the encryption key for a namespace (falls back to parent).
+	ClearNamespaceEncryptionKey(ctx context.Context, path string) (Namespace, error)
+
 	// ListNamespacesBuilder returns a builder to allow the caller to list namespaces matching certain criteria.
 	ListNamespacesBuilder() ListNamespacesBuilder
 
 	// ListNamespacesFromCursor continues listing namespaces from a cursor to support pagination.
 	ListNamespacesFromCursor(ctx context.Context, cursor string) (ListNamespacesExecutor, error)
+
+	/*
+	 *
+	 * Encryption Keys
+	 *
+	 */
+
+	// GetEncryptionKey returns an encryption key by ID.
+	GetEncryptionKey(ctx context.Context, id apid.ID) (EncryptionKey, error)
+
+	// CreateEncryptionKey creates a new encryption key.
+	CreateEncryptionKey(ctx context.Context, namespace string, keyData *cfgschema.KeyData, labels map[string]string) (EncryptionKey, error)
+
+	// DeleteEncryptionKey soft deletes an encryption key.
+	DeleteEncryptionKey(ctx context.Context, id apid.ID) error
+
+	// SetEncryptionKeyState sets the state of an encryption key.
+	SetEncryptionKeyState(ctx context.Context, id apid.ID, state database.EncryptionKeyState) error
+
+	// UpdateEncryptionKeyLabels replaces all labels on an encryption key.
+	UpdateEncryptionKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (EncryptionKey, error)
+
+	// PutEncryptionKeyLabels adds or updates the specified labels on an encryption key.
+	PutEncryptionKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (EncryptionKey, error)
+
+	// DeleteEncryptionKeyLabels removes the specified label keys from an encryption key.
+	DeleteEncryptionKeyLabels(ctx context.Context, id apid.ID, keys []string) (EncryptionKey, error)
+
+	// ListEncryptionKeysBuilder returns a builder to allow the caller to list encryption keys matching certain criteria.
+	ListEncryptionKeysBuilder() ListEncryptionKeysBuilder
+
+	// ListEncryptionKeysFromCursor continues listing encryption keys from a cursor to support pagination.
+	ListEncryptionKeysFromCursor(ctx context.Context, cursor string) (ListEncryptionKeysExecutor, error)
 
 	/*
 	 *

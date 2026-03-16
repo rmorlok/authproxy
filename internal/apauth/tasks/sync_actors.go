@@ -7,6 +7,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -81,7 +82,7 @@ func (s *service) syncConfiguredActors(ctx context.Context, actors []*sconfig.Co
 		expectedExternalIds[externalId] = true
 
 		// Serialize and encrypt the key
-		var encryptedKey *string
+		var encryptedKey *encfield.EncryptedField
 		if actor.Key != nil {
 			keyJson, err := json.Marshal(actor.Key)
 			if err != nil {

@@ -78,7 +78,7 @@ func (cv *ConnectorVersion) getDefinition() (*cschema.Connector, error) {
 	cv.defMu.RLock()
 	defer cv.defMu.RUnlock()
 	if cv.def == nil {
-		decrypted, err := cv.s.encrypt.DecryptStringForConnector(context.Background(), cv, cv.EncryptedDefinition)
+		decrypted, err := cv.s.encrypt.DecryptString(context.Background(), cv.ConnectorVersion.EncryptedDefinition)
 		if err != nil {
 			return nil, err
 		}
@@ -103,12 +103,12 @@ func (cv *ConnectorVersion) setDefinition(def *cschema.Connector) error {
 		return err
 	}
 
-	encrypted, err := cv.s.encrypt.EncryptStringForConnector(context.Background(), cv, string(jsonBytes))
+	encrypted, err := cv.s.encrypt.EncryptStringForEntity(context.Background(), cv, string(jsonBytes))
 	if err != nil {
 		return err
 	}
 	cv.Hash = def.Hash()
-	cv.EncryptedDefinition = encrypted
+	cv.ConnectorVersion.EncryptedDefinition = encrypted
 	cv.def = def
 
 	return nil

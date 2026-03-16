@@ -12,16 +12,20 @@ import LinkRoundedIcon from '@mui/icons-material/Link';
 import HttpRoundedIcon from '@mui/icons-material/Http';
 import PeopleRoundedIcon from '@mui/icons-material/PeopleRounded';
 import AssignmentRoundedIcon from '@mui/icons-material/AssignmentRounded';
+import KeyRoundedIcon from '@mui/icons-material/KeyRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
+import AccountTreeRoundedIcon from '@mui/icons-material/AccountTreeRounded';
 import InfoRoundedIcon from '@mui/icons-material/InfoRounded';
 import HelpRoundedIcon from '@mui/icons-material/HelpRounded';
 
 const mainListItems = [
   { text: 'Home', icon: <HomeRoundedIcon />, link: '/home' },
+  { text: 'Namespace', icon: <AccountTreeRoundedIcon />, link: '/namespace' },
   { text: 'Connectors', icon: <PowerRoundedIcon />, link: '/connectors' },
   { text: 'Connections', icon: <LinkRoundedIcon />, link: '/connections' },
   { text: 'Requests', icon: <HttpRoundedIcon />, link: '/requests' },
   { text: 'Tasks', icon: <AssignmentRoundedIcon />, link: '/tasks' },
+  { text: 'Encryption Keys', icon: <KeyRoundedIcon />, link: '/encryption-keys' },
   { text: 'Actors', icon: <PeopleRoundedIcon />, link: '/actors' },
 ];
 

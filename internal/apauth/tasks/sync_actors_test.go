@@ -150,7 +150,7 @@ func TestSyncActorsList(t *testing.T) {
 		require.NotNil(t, alice.EncryptedKey)
 
 		// Decrypt the key
-		decrypted, err := enc.DecryptStringGlobal(ctx, *alice.EncryptedKey)
+		decrypted, err := enc.DecryptString(ctx, *alice.EncryptedKey)
 		require.NoError(t, err)
 
 		// Parse the key JSON
@@ -326,7 +326,7 @@ func TestSyncConfiguredActorsExternalSource(t *testing.T) {
 		require.NotNil(t, bobdole.EncryptedKey)
 
 		// Decrypt the key
-		decrypted, err := enc.DecryptStringGlobal(ctx, *bobdole.EncryptedKey)
+		decrypted, err := enc.DecryptString(ctx, *bobdole.EncryptedKey)
 		require.NoError(t, err)
 
 		// Parse the key JSON

@@ -244,6 +244,34 @@ type SwaggerListNamespacesResponse struct {
 	Cursor string `json:"cursor,omitempty"`
 }
 
+// SwaggerEncryptionKeyJson is a simplified encryption key model for swagger documentation
+//
+//	@Description	Encryption key configuration
+type SwaggerEncryptionKeyJson struct {
+	// Encryption key ID
+	Id apid.ID `swaggertype:"string" json:"id" example:"ek_test550e8400abcde"`
+	// Namespace path
+	Namespace string `json:"namespace" example:"acme"`
+	// State (active, disabled)
+	State string `json:"state" example:"active"`
+	// Labels assigned to the encryption key
+	Labels map[string]string `json:"labels,omitempty"`
+	// Creation timestamp
+	CreatedAt time.Time `json:"created_at"`
+	// Last update timestamp
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// SwaggerListEncryptionKeysResponse is the response for list encryption keys
+//
+//	@Description	Paginated list of encryption keys
+type SwaggerListEncryptionKeysResponse struct {
+	// List of encryption keys
+	Items []SwaggerEncryptionKeyJson `json:"items"`
+	// Pagination cursor for next page
+	Cursor string `json:"cursor,omitempty"`
+}
+
 // SwaggerListRequestsResponse is the response for list request logs
 //
 //	@Description	Paginated list of request log entries

@@ -51,16 +51,16 @@ func (o *oAuth2Connection) revokeRefreshToken(ctx context.Context, token *databa
 		return nil
 	}
 
-	if token.EncryptedRefreshToken == "" {
+	if token.EncryptedRefreshToken.IsZero() {
 		return fmt.Errorf("token does not have refresh token")
 	}
 
-	refreshToken, err := o.encrypt.DecryptStringForConnection(ctx, o.connection, token.EncryptedRefreshToken)
+	refreshToken, err := o.encrypt.DecryptString(ctx, token.EncryptedRefreshToken)
 	if err != nil {
 		return err
 	}
 
-	accessToken, err := o.encrypt.DecryptStringForConnection(ctx, o.connection, token.EncryptedAccessToken)
+	accessToken, err := o.encrypt.DecryptString(ctx, token.EncryptedAccessToken)
 	if err != nil {
 		return err
 	}
@@ -118,11 +118,11 @@ func (o *oAuth2Connection) revokeAccessToken(ctx context.Context, token *databas
 		return err
 	}
 
-	if token.EncryptedAccessToken == "" {
-		return fmt.Errorf("token does not have refresh token")
+	if token.EncryptedAccessToken.IsZero() {
+		return fmt.Errorf("token does not have access token")
 	}
 
-	accessToken, err := o.encrypt.DecryptStringForConnection(ctx, o.connection, token.EncryptedAccessToken)
+	accessToken, err := o.encrypt.DecryptString(ctx, token.EncryptedAccessToken)
 	if err != nil {
 		return err
 	}

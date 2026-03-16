@@ -13,8 +13,21 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/util"
 )
+
+func init() {
+	RegisterEncryptedField(EncryptedFieldRegistration{
+		Table:          OAuth2TokensTable,
+		PrimaryKeyCols: []string{"id"},
+		EncryptedCols:  []string{"encrypted_refresh_token", "encrypted_access_token"},
+		JoinTable:      ConnectionsTable,
+		JoinLocalCol:   "connection_id",
+		JoinRemoteCol:  "id",
+		JoinNamespaceCol: "namespace",
+	})
+}
 
 const OAuth2TokensTable = "oauth2_tokens"
 
@@ -22,11 +35,12 @@ type OAuth2Token struct {
 	Id                    apid.ID
 	ConnectionId          apid.ID // Foreign key to Connection; not enforced by database
 	RefreshedFromId       *apid.ID
-	EncryptedRefreshToken string
-	EncryptedAccessToken  string
+	EncryptedRefreshToken encfield.EncryptedField
+	EncryptedAccessToken  encfield.EncryptedField
 	AccessTokenExpiresAt  *time.Time
 	Scopes                string
 	CreatedAt             time.Time
+	EncryptedAt           *time.Time
 	DeletedAt             *time.Time
 }
 
@@ -40,6 +54,7 @@ func (t *OAuth2Token) cols() []string {
 		"access_token_expires_at",
 		"scopes",
 		"created_at",
+		"encrypted_at",
 		"deleted_at",
 	}
 }
@@ -54,6 +69,7 @@ func (t *OAuth2Token) fields() []any {
 		&t.AccessTokenExpiresAt,
 		&t.Scopes,
 		&t.CreatedAt,
+		&t.EncryptedAt,
 		&t.DeletedAt,
 	}
 }
@@ -68,6 +84,7 @@ func (t *OAuth2Token) values() []any {
 		t.AccessTokenExpiresAt,
 		t.Scopes,
 		t.CreatedAt,
+		t.EncryptedAt,
 		t.DeletedAt,
 	}
 }
@@ -202,8 +219,8 @@ func (s *service) InsertOAuth2Token(
 	ctx context.Context,
 	connectionId apid.ID,
 	refreshedFrom *apid.ID,
-	encryptedRefreshToken string,
-	encryptedAccessToken string,
+	encryptedRefreshToken encfield.EncryptedField,
+	encryptedAccessToken encfield.EncryptedField,
 	accessTokenExpiresAt *time.Time,
 	scopes string,
 ) (*OAuth2Token, error) {

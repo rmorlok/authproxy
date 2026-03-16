@@ -7,6 +7,7 @@ import (
 	"github.com/gin-gonic/gin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
@@ -18,11 +19,12 @@ import (
 )
 
 type NamespaceJson struct {
-	Path      string                  `json:"path"`
-	State     database.NamespaceState `json:"state"`
-	Labels    map[string]string       `json:"labels,omitempty"`
-	CreatedAt time.Time               `json:"created_at"`
-	UpdatedAt time.Time               `json:"updated_at"`
+	Path            string                  `json:"path"`
+	State           database.NamespaceState `json:"state"`
+	EncryptionKeyId *string                 `json:"encryption_key_id,omitempty"`
+	Labels          map[string]string       `json:"labels,omitempty"`
+	CreatedAt       time.Time               `json:"created_at"`
+	UpdatedAt       time.Time               `json:"updated_at"`
 }
 
 type CreateNamespaceRequestJson struct {
@@ -44,12 +46,19 @@ type NamespaceLabelJson struct {
 }
 
 func NamespaceToJson(ns coreIface.Namespace) NamespaceJson {
+	var ekId *string
+	if ns.GetEncryptionKeyId() != nil {
+		s := string(*ns.GetEncryptionKeyId())
+		ekId = &s
+	}
+
 	return NamespaceJson{
-		Path:      ns.GetPath(),
-		State:     ns.GetState(),
-		Labels:    ns.GetLabels(),
-		CreatedAt: ns.GetCreatedAt(),
-		UpdatedAt: ns.GetUpdatedAt(),
+		Path:            ns.GetPath(),
+		State:           ns.GetState(),
+		EncryptionKeyId: ekId,
+		Labels:          ns.GetLabels(),
+		CreatedAt:       ns.GetCreatedAt(),
+		UpdatedAt:       ns.GetUpdatedAt(),
 	}
 }
 
@@ -819,6 +828,229 @@ func (r *NamespacesRoutes) deleteLabel(gctx *gin.Context) {
 	gctx.Status(http.StatusNoContent)
 }
 
+type SetNamespaceEncryptionKeyRequestJson struct {
+	EncryptionKeyId string `json:"encryption_key_id"`
+}
+
+type NamespaceEncryptionKeyJson struct {
+	EncryptionKeyId string `json:"encryption_key_id"`
+}
+
+func (r *NamespacesRoutes) getEncryptionKey(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	path := gctx.Param("path")
+
+	if path == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("path is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	ns, err := r.core.GetNamespace(ctx, path)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("namespace '%s' not found", path).
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
+		httpErr.WriteGinResponse(nil, gctx)
+		return
+	}
+
+	ekId := ns.GetEncryptionKeyId()
+	if ekId == nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsgf("namespace '%s' has no encryption key set", path).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, NamespaceEncryptionKeyJson{
+		EncryptionKeyId: string(*ekId),
+	})
+}
+
+func (r *NamespacesRoutes) setEncryptionKey(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	path := gctx.Param("path")
+
+	if path == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("path is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	var req SetNamespaceEncryptionKeyRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid request body").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if req.EncryptionKeyId == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("encryption_key_id is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Get the existing namespace for authorization check
+	ns, err := r.core.GetNamespace(ctx, path)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("namespace '%s' not found", path).
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
+		httpErr.WriteGinResponse(nil, gctx)
+		return
+	}
+
+	ns, err = r.core.SetNamespaceEncryptionKey(ctx, path, apid.ID(req.EncryptionKeyId))
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("encryption key '%s' not found", req.EncryptionKeyId).
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		var httpErr *api_common.HttpStatusError
+		if errors.As(err, &httpErr) {
+			httpErr.WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, NamespaceToJson(ns))
+}
+
+func (r *NamespacesRoutes) clearEncryptionKey(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	path := gctx.Param("path")
+
+	if path == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("path is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Get the existing namespace for authorization check
+	ns, err := r.core.GetNamespace(ctx, path)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			gctx.Status(http.StatusNoContent)
+			val.MarkValidated()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
+		httpErr.WriteGinResponse(nil, gctx)
+		return
+	}
+
+	_, err = r.core.ClearNamespaceEncryptionKey(ctx, path)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			gctx.Status(http.StatusNoContent)
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.Status(http.StatusNoContent)
+}
+
 func (r *NamespacesRoutes) Register(g gin.IRouter) {
 	g.GET(
 		"/namespaces",
@@ -897,6 +1129,36 @@ func (r *NamespacesRoutes) Register(g gin.IRouter) {
 			ForVerb("update").
 			Build(),
 		r.deleteLabel,
+	)
+	g.GET(
+		"/namespaces/:path/encryption-key",
+		r.authService.NewRequiredBuilder().
+			ForResource("namespaces").
+			ForIdField("path").
+			ForIdExtractor(func(ns interface{}) string { return ns.(coreIface.Namespace).GetPath() }).
+			ForVerb("get").
+			Build(),
+		r.getEncryptionKey,
+	)
+	g.PUT(
+		"/namespaces/:path/encryption-key",
+		r.authService.NewRequiredBuilder().
+			ForResource("namespaces").
+			ForIdField("path").
+			ForIdExtractor(func(ns interface{}) string { return ns.(coreIface.Namespace).GetPath() }).
+			ForVerb("update").
+			Build(),
+		r.setEncryptionKey,
+	)
+	g.DELETE(
+		"/namespaces/:path/encryption-key",
+		r.authService.NewRequiredBuilder().
+			ForResource("namespaces").
+			ForIdField("path").
+			ForIdExtractor(func(ns interface{}) string { return ns.(coreIface.Namespace).GetPath() }).
+			ForVerb("update").
+			Build(),
+		r.clearEncryptionKey,
 	)
 }
 

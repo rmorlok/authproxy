@@ -5,12 +5,13 @@ import (
 	"encoding/base64"
 	"encoding/json"
 	"errors"
-	"github.com/rmorlok/authproxy/internal/encrypt"
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hibiken/asynq"
+	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/encfield"
+	"github.com/rmorlok/authproxy/internal/encrypt"
 	mockEncrypt "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -67,17 +68,22 @@ func TestToSecureEncryptedString(t *testing.T) {
 	expectedJSON, err := json.Marshal(taskInfo)
 	require.NoError(t, err)
 
-	// Mock encrypted data
-	mockEncryptedData := []byte("encrypted-data")
+	// Mock encrypted field
+	mockEF := encfield.EncryptedField{
+		ID:   "ekv_mock",
+		Data: "encrypted-data",
+	}
 
-	// Expected base64 encoded result
-	expectedResult := base64.RawURLEncoding.EncodeToString(mockEncryptedData)
+	// Expected: the EncryptedField is JSON-marshaled, then base64-encoded
+	efJSON, err := json.Marshal(mockEF)
+	require.NoError(t, err)
+	expectedResult := base64.RawURLEncoding.EncodeToString(efJSON)
 
 	t.Run("successful encryption", func(t *testing.T) {
 		// Setup expectations
 		mockE.EXPECT().
 			EncryptGlobal(gomock.Any(), expectedJSON).
-			Return(mockEncryptedData, nil)
+			Return(mockEF, nil)
 
 		// Call the method
 		result, err := taskInfo.ToSecureEncryptedString(ctx, mockE)
@@ -91,7 +97,7 @@ func TestToSecureEncryptedString(t *testing.T) {
 		// Setup expectations for encryption error
 		mockE.EXPECT().
 			EncryptGlobal(gomock.Any(), gomock.Any()).
-			Return(nil, errors.New("encryption error"))
+			Return(encfield.EncryptedField{}, errors.New("encryption error"))
 
 		// Call the method
 		result, err := taskInfo.ToSecureEncryptedString(ctx, mockE)

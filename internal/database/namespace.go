@@ -12,6 +12,7 @@ import (
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apid"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -21,13 +22,14 @@ const NamespacesTable = "namespaces"
 
 // Namespace is the grouping of resources within AuthProxy.
 type Namespace struct {
-	Path      string
-	depth     uint64
-	State     NamespaceState
-	Labels    Labels
-	CreatedAt time.Time
-	UpdatedAt time.Time
-	DeletedAt *time.Time
+	Path            string
+	depth           uint64
+	State           NamespaceState
+	EncryptionKeyId *apid.ID
+	Labels          Labels
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DeletedAt       *time.Time
 }
 
 func (ns *Namespace) GetNamespace() string {
@@ -39,6 +41,7 @@ func (ns *Namespace) cols() []string {
 		"path",
 		"depth",
 		"state",
+		"encryption_key_id",
 		"labels",
 		"created_at",
 		"updated_at",
@@ -51,6 +54,7 @@ func (ns *Namespace) fields() []any {
 		&ns.Path,
 		&ns.depth,
 		&ns.State,
+		&ns.EncryptionKeyId,
 		&ns.Labels,
 		&ns.CreatedAt,
 		&ns.UpdatedAt,
@@ -63,6 +67,7 @@ func (ns *Namespace) values() []any {
 		ns.Path,
 		ns.depth,
 		ns.State,
+		ns.EncryptionKeyId,
 		ns.Labels,
 		ns.CreatedAt,
 		ns.UpdatedAt,
@@ -366,6 +371,66 @@ func (s *service) DeleteNamespace(ctx context.Context, path string) error {
 	}
 
 	return nil
+}
+
+func (s *service) SetNamespaceEncryptionKeyId(ctx context.Context, path string, ekId *apid.ID) (*Namespace, error) {
+	if ekId != nil {
+		ek, err := s.GetEncryptionKey(ctx, *ekId)
+		if err != nil {
+			return nil, errors.Wrap(err, "failed to look up encryption key")
+		}
+
+		prefixes := aschema.SplitNamespacePathToPrefixes(path)
+		// Strict ancestors: all prefixes except the last (self)
+		var strictAncestors []string
+		if len(prefixes) > 1 {
+			strictAncestors = prefixes[:len(prefixes)-1]
+		}
+
+		found := false
+		for _, ancestor := range strictAncestors {
+			if ek.Namespace == ancestor {
+				found = true
+				break
+			}
+		}
+
+		if !found {
+			if len(strictAncestors) == 0 {
+				return nil, api_common.NewHttpStatusErrorBuilder().
+					WithStatusBadRequest().
+					WithResponseMsgf("cannot assign encryption key to root namespace; encryption keys must belong to a strict ancestor namespace").
+					BuildStatusError()
+			}
+			return nil, api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithResponseMsgf("encryption key belongs to namespace '%s' which is not a strict ancestor of '%s'", ek.Namespace, path).
+				BuildStatusError()
+		}
+	}
+
+	now := apctx.GetClock(ctx).Now()
+	dbResult, err := s.sq.
+		Update(NamespacesTable).
+		Set("updated_at", now).
+		Set("encryption_key_id", ekId).
+		Where(sq.Eq{"path": path, "deleted_at": nil}).
+		RunWith(s.db).
+		Exec()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to set namespace encryption key")
+	}
+
+	affected, err := dbResult.RowsAffected()
+	if err != nil {
+		return nil, errors.Wrap(err, "failed to set namespace encryption key")
+	}
+
+	if affected == 0 {
+		return nil, ErrNotFound
+	}
+
+	return s.GetNamespace(ctx, path)
 }
 
 func (s *service) SetNamespaceState(ctx context.Context, path string, state NamespaceState) error {
@@ -751,6 +816,92 @@ func (s *service) DeleteNamespaceLabels(ctx context.Context, path string, keys [
 	return result, nil
 }
 
+// NamespaceEncryptionTarget holds the fields needed by the background job that computes
+// and caches the target encryption key version for each namespace.
+type NamespaceEncryptionTarget struct {
+	Path                         string
+	Depth                        uint64
+	EncryptionKeyId              *apid.ID
+	TargetEncryptionKeyVersionId *apid.ID
+}
+
+// NamespaceTargetEncryptionKeyVersionUpdate carries an update to set the target encryption
+// key version for a specific namespace.
+type NamespaceTargetEncryptionKeyVersionUpdate struct {
+	Path                         string
+	TargetEncryptionKeyVersionId apid.ID
+}
+
+func (s *service) EnumerateNamespaceEncryptionTargets(
+	ctx context.Context,
+	callback func(targets []NamespaceEncryptionTarget, lastPage bool) (updates []NamespaceTargetEncryptionKeyVersionUpdate, stop bool, err error),
+) error {
+	const pageSize = 100
+	offset := uint64(0)
+
+	for {
+		rows, err := s.sq.
+			Select("path", "depth", "encryption_key_id", "target_encryption_key_version_id").
+			From(NamespacesTable).
+			Where(sq.Eq{"deleted_at": nil}).
+			OrderBy("depth, path").
+			Limit(pageSize + 1).
+			Offset(offset).
+			RunWith(s.db).
+			Query()
+		if err != nil {
+			return err
+		}
+
+		var results []NamespaceEncryptionTarget
+		for rows.Next() {
+			var r NamespaceEncryptionTarget
+			if err := rows.Scan(&r.Path, &r.Depth, &r.EncryptionKeyId, &r.TargetEncryptionKeyVersionId); err != nil {
+				rows.Close()
+				return err
+			}
+			results = append(results, r)
+		}
+		rows.Close()
+
+		lastPage := len(results) <= pageSize
+		if len(results) > pageSize {
+			results = results[:pageSize]
+		}
+
+		updates, stop, err := callback(results, lastPage)
+		if err != nil {
+			return err
+		}
+
+		// Apply updates
+		if len(updates) > 0 {
+			now := apctx.GetClock(ctx).Now()
+			for _, u := range updates {
+				_, err := s.sq.
+					Update(NamespacesTable).
+					Set("target_encryption_key_version_id", u.TargetEncryptionKeyVersionId).
+					Set("target_encryption_key_version_updated_at", now).
+					Set("updated_at", now).
+					Where(sq.Eq{"path": u.Path}).
+					RunWith(s.db).
+					Exec()
+				if err != nil {
+					return errors.Wrapf(err, "failed to update target encryption key version for namespace '%s'", u.Path)
+				}
+			}
+		}
+
+		if stop || lastPage {
+			break
+		}
+
+		offset += pageSize
+	}
+
+	return nil
+}
+
 func (s *service) ListNamespacesBuilder() ListNamespacesBuilder {
 	return &listNamespacesFilters{
 		s:        s,
@@ -766,3 +917,4 @@ func (s *service) ListNamespacesFromCursor(ctx context.Context, cursor string) (
 
 	return b.FromCursor(ctx, cursor)
 }
+

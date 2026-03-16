@@ -1,4 +1,6 @@
 -- Note that go-migrate will refuse to actually migrate down at this revision, so it won't invoke this.
+drop table main.encryption_keys;
+
 drop index main.idx_actors_deleted_at;
 drop index main.idx_actors_email;
 drop table main.actors;

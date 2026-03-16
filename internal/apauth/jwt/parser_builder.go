@@ -277,14 +277,11 @@ func (pb *parserBuilder) getVerifyingKeyData(ctx context.Context, unverified *Au
 		return nil, nil, err
 	}
 
-	if !keyData.HasData(ctx) {
-		return nil, nil, errors.New("key data not available")
-	}
-
-	rawKeyData, err := keyData.GetData(ctx)
+	ver, err := keyData.GetCurrentVersion(ctx)
 	if err != nil {
 		return nil, nil, errors.Wrap(err, "failed to get key data")
 	}
+	rawKeyData := ver.Data
 
 	if isShared {
 		return rawKeyData, &jwt.SigningMethodHMAC{}, nil

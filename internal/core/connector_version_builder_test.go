@@ -4,9 +4,10 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	encryptmock "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/stretchr/testify/assert"
@@ -169,8 +170,8 @@ func TestVersionBuilder_Build_Success(t *testing.T) {
 
 	// Set up expectations for the encrypt service
 	mockEncrypt.EXPECT().
-		EncryptStringForConnector(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return("encrypted-data", nil)
+		EncryptStringForEntity(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-data"}, nil)
 
 	// Test
 	cv, err := builder.Build()
@@ -181,7 +182,7 @@ func TestVersionBuilder_Build_Success(t *testing.T) {
 	assert.Equal(t, connectorID, cv.Id)
 	assert.Equal(t, uint64(1), cv.Version)
 	assert.Equal(t, c.Hash(), cv.Hash)
-	assert.Equal(t, "encrypted-data", cv.EncryptedDefinition)
+	assert.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-data"}, cv.EncryptedDefinition)
 }
 
 func TestVersionBuilder_Build_NilConnector(t *testing.T) {
@@ -233,8 +234,8 @@ func TestVersionBuilder_Build_EncryptError(t *testing.T) {
 
 	// Set up expectations for the encrypt service with error
 	mockEncrypt.EXPECT().
-		EncryptStringForConnector(gomock.Any(), gomock.Any(), gomock.Any()).
-		Return("", errors.New("encryption error"))
+		EncryptStringForEntity(gomock.Any(), gomock.Any(), gomock.Any()).
+		Return(encfield.EncryptedField{}, errors.New("encryption error"))
 
 	// Test
 	cv, err := builder.Build()

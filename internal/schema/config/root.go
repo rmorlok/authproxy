@@ -72,4 +72,3 @@ func (r *Root) MustGetService(serviceId ServiceId) Service {
 
 	panic(fmt.Sprintf("invalid service id %s", serviceId))
 }
-

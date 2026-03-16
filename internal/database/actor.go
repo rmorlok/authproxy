@@ -10,10 +10,11 @@ import (
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hashicorp/go-multierror"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -72,6 +73,15 @@ func IsValidActorOrderByField[T string | ActorOrderByField](field T) bool {
 	}
 }
 
+func init() {
+	RegisterEncryptedField(EncryptedFieldRegistration{
+		Table:          ActorTable,
+		PrimaryKeyCols: []string{"id"},
+		EncryptedCols:  []string{"encrypted_key"},
+		NamespaceCol:   "namespace",
+	})
+}
+
 const ActorTable = "actors"
 
 // Actor is some entity taking action within the system.
@@ -81,9 +91,10 @@ type Actor struct {
 	ExternalId   string
 	Permissions  Permissions
 	Labels       Labels
-	EncryptedKey *string
+	EncryptedKey *encfield.EncryptedField
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
+	EncryptedAt  *time.Time
 	DeletedAt    *time.Time
 }
 
@@ -113,6 +124,7 @@ func (a *Actor) cols() []string {
 		"encrypted_key",
 		"created_at",
 		"updated_at",
+		"encrypted_at",
 		"deleted_at",
 	}
 }
@@ -127,6 +139,7 @@ func (a *Actor) fields() []any {
 		&a.EncryptedKey,
 		&a.CreatedAt,
 		&a.UpdatedAt,
+		&a.EncryptedAt,
 		&a.DeletedAt,
 	}
 }
@@ -141,6 +154,7 @@ func (a *Actor) values() []any {
 		a.EncryptedKey,
 		a.CreatedAt,
 		a.UpdatedAt,
+		a.EncryptedAt,
 		a.DeletedAt,
 	}
 }
@@ -180,12 +194,7 @@ func (a *Actor) sameAsData(d IActorData) bool {
 
 	// Handle extended fields via type assertion
 	if extended, ok := d.(IActorDataExtended); ok {
-		// Compare encrypted key
-		dEncryptedKey := extended.GetEncryptedKey()
-		if (a.EncryptedKey == nil) != (dEncryptedKey == nil) {
-			return false
-		}
-		if a.EncryptedKey != nil && dEncryptedKey != nil && *a.EncryptedKey != *dEncryptedKey {
+		if !a.EncryptedKey.Equal(extended.GetEncryptedKey()) {
 			return false
 		}
 	}
@@ -205,7 +214,7 @@ func (a *Actor) GetLabels() map[string]string {
 	return a.Labels
 }
 
-func (a *Actor) GetEncryptedKey() *string {
+func (a *Actor) GetEncryptedKey() *encfield.EncryptedField {
 	return a.EncryptedKey
 }
 

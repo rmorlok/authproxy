@@ -8,9 +8,9 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apasynq"
 	"github.com/rmorlok/authproxy/internal/apasynq/mock"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	apredis2 "github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
@@ -28,9 +28,9 @@ import (
 
 func displayNameExpr(cfg config.C) string {
 	if cfg.GetRoot().Database.GetProvider() == cfgschema.DatabaseProviderPostgres {
-		return "NULLIF(encrypted_definition, '')::jsonb ->> 'display_name'"
+		return "(NULLIF(encrypted_definition, '')::jsonb ->> 'd')::jsonb ->> 'display_name'"
 	}
-	return "json_extract(encrypted_definition, '$.display_name')"
+	return "json_extract(json_extract(encrypted_definition, '$.d'), '$.display_name')"
 }
 
 func withDisplayNameExpr(cfg config.C, query string) string {
@@ -62,10 +62,10 @@ func TestMigration(t *testing.T) {
 			},
 		})
 
+		logger := slog.Default()
 		cfg, db, rawDb = database.MustApplyBlankTestDbConfigRaw(t, cfg)
 		cfg, r = apredis2.MustApplyTestConfig(cfg)
-		e := encrypt.NewEncryptService(cfg, db)
-		logger := slog.Default()
+		e := encrypt.NewEncryptService(cfg, db, logger)
 		ctrl := gomock.NewController(t)
 
 		asynqClient = mock.NewMockClient(ctrl)

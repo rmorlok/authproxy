@@ -4,6 +4,7 @@ import (
 	"context"
 	"time"
 
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -11,6 +12,7 @@ import (
 type Namespace interface {
 	GetPath() string
 	GetState() database.NamespaceState
+	GetEncryptionKeyId() *apid.ID
 	GetCreatedAt() time.Time
 	GetUpdatedAt() time.Time
 	GetLabels() map[string]string

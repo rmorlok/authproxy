@@ -3,6 +3,7 @@ package tasks
 import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
@@ -13,7 +14,7 @@ type configuredActorData struct {
 	externalId   string
 	permissions  []aschema.Permission
 	labels       database.Labels
-	encryptedKey *string
+	encryptedKey *encfield.EncryptedField
 }
 
 func (a *configuredActorData) GetId() apid.ID {
@@ -36,7 +37,7 @@ func (a *configuredActorData) GetLabels() map[string]string {
 	return a.labels
 }
 
-func (a *configuredActorData) GetEncryptedKey() *string {
+func (a *configuredActorData) GetEncryptedKey() *encfield.EncryptedField {
 	return a.encryptedKey
 }
 

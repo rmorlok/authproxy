@@ -5,6 +5,7 @@ import (
 
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
@@ -92,6 +93,36 @@ func (s *service) DeleteNamespaceLabels(ctx context.Context, path string, keys [
 			return nil, ErrNotFound
 		}
 
+		return nil, err
+	}
+
+	return wrapNamespace(*ns, s), nil
+}
+
+func (s *service) SetNamespaceEncryptionKey(ctx context.Context, path string, ekId apid.ID) (iface.Namespace, error) {
+	// Validate the encryption key exists
+	_, err := s.GetEncryptionKey(ctx, ekId)
+	if err != nil {
+		return nil, err
+	}
+
+	ns, err := s.db.SetNamespaceEncryptionKeyId(ctx, path, &ekId)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+
+	return wrapNamespace(*ns, s), nil
+}
+
+func (s *service) ClearNamespaceEncryptionKey(ctx context.Context, path string) (iface.Namespace, error) {
+	ns, err := s.db.SetNamespaceEncryptionKeyId(ctx, path, nil)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNotFound
+		}
 		return nil, err
 	}
 

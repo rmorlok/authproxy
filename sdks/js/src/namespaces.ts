@@ -29,9 +29,18 @@ export interface NamespaceLabel {
 export interface Namespace {
   path: string;
   state: NamespaceState;
+  encryption_key_id?: string;
   labels?: Record<string, string>;
   created_at: string;
   updated_at: string;
+}
+
+export interface NamespaceEncryptionKeyResponse {
+  encryption_key_id: string;
+}
+
+export interface SetNamespaceEncryptionKeyRequest {
+  encryption_key_id: string;
 }
 
 export interface CreateNamespaceRequest {
@@ -126,6 +135,28 @@ export const deleteNamespaceLabel = (path: string, labelKey: string) => {
   return client.delete(`/api/v1/namespaces/${path}/labels/${labelKey}`);
 };
 
+/**
+ * Get the encryption key assigned to a namespace
+ */
+export const getNamespaceEncryptionKey = (path: string) => {
+  return client.get<NamespaceEncryptionKeyResponse>(`/api/v1/namespaces/${path}/encryption-key`);
+};
+
+/**
+ * Set the encryption key for a namespace
+ */
+export const setNamespaceEncryptionKey = (path: string, encryptionKeyId: string) => {
+  const request: SetNamespaceEncryptionKeyRequest = { encryption_key_id: encryptionKeyId };
+  return client.put<Namespace>(`/api/v1/namespaces/${path}/encryption-key`, request);
+};
+
+/**
+ * Clear the encryption key for a namespace (falls back to parent)
+ */
+export const clearNamespaceEncryptionKey = (path: string) => {
+  return client.delete(`/api/v1/namespaces/${path}/encryption-key`);
+};
+
 export const namespaces = {
   list: listNamespaces,
   create: createNamespace,
@@ -135,4 +166,7 @@ export const namespaces = {
   getLabel: getNamespaceLabel,
   putLabel: putNamespaceLabel,
   deleteLabel: deleteNamespaceLabel,
+  getEncryptionKey: getNamespaceEncryptionKey,
+  setEncryptionKey: setNamespaceEncryptionKey,
+  clearEncryptionKey: clearNamespaceEncryptionKey,
 };

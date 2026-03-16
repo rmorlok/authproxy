@@ -11,6 +11,7 @@ import (
 	mockCore "github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
 	database_mock "github.com/rmorlok/authproxy/internal/database/mock"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	encrypt_mock "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
@@ -31,9 +32,9 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 			responseBody: `{"access_token": "valid_access_token", "refresh_token": "valid_refresh_token", "scope": "read write", "expires_in": 3600}`,
 			wantErr:      "",
 			setupMocks: func(mdb *database_mock.MockDB, mencrypt *encrypt_mock.MockE) {
-				mencrypt.EXPECT().EncryptStringForConnection(gomock.Any(), gomock.Any(), "valid_access_token").Return("encrypted_access_token", nil)
-				mencrypt.EXPECT().EncryptStringForConnection(gomock.Any(), gomock.Any(), "valid_refresh_token").Return("encrypted_refresh_token", nil)
-				mdb.EXPECT().InsertOAuth2Token(gomock.Any(), gomock.Any(), nil, "encrypted_refresh_token", "encrypted_access_token", gomock.Any(), "read write").Return(&database.OAuth2Token{}, nil)
+				mencrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_access_token").Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted_access_token"}, nil)
+				mencrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_refresh_token").Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted_refresh_token"}, nil)
+				mdb.EXPECT().InsertOAuth2Token(gomock.Any(), gomock.Any(), nil, encfield.EncryptedField{ID: "ekv_test", Data: "encrypted_refresh_token"}, encfield.EncryptedField{ID: "ekv_test", Data: "encrypted_access_token"}, gomock.Any(), "read write").Return(&database.OAuth2Token{}, nil)
 			},
 		},
 		{
@@ -53,7 +54,7 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 			responseBody: `{"access_token": "valid_access_token"}`,
 			wantErr:      "failed to encrypt access token",
 			setupMocks: func(mdb *database_mock.MockDB, mencrypt *encrypt_mock.MockE) {
-				mencrypt.EXPECT().EncryptStringForConnection(gomock.Any(), gomock.Any(), "valid_access_token").Return("", errors.New("encryption failed"))
+				mencrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_access_token").Return(encfield.EncryptedField{}, errors.New("encryption failed"))
 			},
 		},
 		{
@@ -61,8 +62,8 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 			responseBody: `{"access_token": "valid_access_token", "refresh_token": "valid_refresh_token"}`,
 			wantErr:      "failed to encrypt refresh token",
 			setupMocks: func(mdb *database_mock.MockDB, mencrypt *encrypt_mock.MockE) {
-				mencrypt.EXPECT().EncryptStringForConnection(gomock.Any(), gomock.Any(), "valid_access_token").Return("encrypted_access_token", nil)
-				mencrypt.EXPECT().EncryptStringForConnection(gomock.Any(), gomock.Any(), "valid_refresh_token").Return("", errors.New("encryption failed"))
+				mencrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_access_token").Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted_access_token"}, nil)
+				mencrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_refresh_token").Return(encfield.EncryptedField{}, errors.New("encryption failed"))
 			},
 		},
 		{
@@ -70,8 +71,8 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 			responseBody: `{"access_token": "valid_access_token"}`,
 			wantErr:      "failed to insert oauth2 token",
 			setupMocks: func(mdb *database_mock.MockDB, mencrypt *encrypt_mock.MockE) {
-				mencrypt.EXPECT().EncryptStringForConnection(gomock.Any(), gomock.Any(), "valid_access_token").Return("encrypted_access_token", nil)
-				mdb.EXPECT().InsertOAuth2Token(gomock.Any(), gomock.Any(), nil, "", "encrypted_access_token", gomock.Any(), gomock.Any()).Return(nil, errors.New("insert failed"))
+				mencrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_access_token").Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted_access_token"}, nil)
+				mdb.EXPECT().InsertOAuth2Token(gomock.Any(), gomock.Any(), nil, encfield.EncryptedField{}, encfield.EncryptedField{ID: "ekv_test", Data: "encrypted_access_token"}, gomock.Any(), gomock.Any()).Return(nil, errors.New("insert failed"))
 			},
 		},
 	}

@@ -2,14 +2,17 @@ package encrypt
 
 import (
 	"context"
-	"encoding/base64"
+	"fmt"
 
-	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/encfield"
 )
 
 type fakeService struct {
 	doBase64Encode bool
 }
+
+var fakeEncryptionKeyVersionId = apid.ID("ekv_fake")
 
 // NewFakeEncryptService returns an encrypt service that does not encrypt or decrypt anything.
 func NewFakeEncryptService(doBase64Encode bool) E {
@@ -18,83 +21,56 @@ func NewFakeEncryptService(doBase64Encode bool) E {
 	}
 }
 
-func (s *fakeService) EncryptGlobal(ctx context.Context, data []byte) ([]byte, error) {
-	return data, nil
+// EncryptForKey encrypts data with the current version of the specified key.
+func (s *fakeService) EncryptForKey(ctx context.Context, ekId apid.ID, data []byte) (encfield.EncryptedField, error) {
+	return encfield.EncryptedField{
+		ID:   fakeEncryptionKeyVersionId,
+		Data: string(data),
+	}, nil
 }
 
-func (s *fakeService) EncryptForConnection(ctx context.Context, connection Connection, data []byte) ([]byte, error) {
+// EncryptStringForKey encrypts a string with the current version of the specified key.
+func (s *fakeService) EncryptStringForKey(ctx context.Context, ekId apid.ID, data string) (encfield.EncryptedField, error) {
+	return s.EncryptForKey(ctx, ekId, []byte(data))
+}
+
+// EncryptGlobal encrypts raw bytes with the current global key.
+func (s *fakeService) EncryptGlobal(ctx context.Context, data []byte) (encfield.EncryptedField, error) {
+	return s.EncryptForKey(ctx, globalEncryptionKeyID, data)
+}
+
+// EncryptStringGlobal encrypts a string with the current global key.
+func (s *fakeService) EncryptStringGlobal(ctx context.Context, data string) (encfield.EncryptedField, error) {
+	return s.EncryptGlobal(ctx, []byte(data))
+}
+
+func (s *fakeService) EncryptForNamespace(ctx context.Context, _ string, data []byte) (encfield.EncryptedField, error) {
 	return s.EncryptGlobal(ctx, data)
 }
 
-func (s *fakeService) EncryptForConnector(ctx context.Context, connection ConnectorVersion, data []byte) ([]byte, error) {
-	return s.EncryptGlobal(ctx, data)
+func (s *fakeService) EncryptStringForNamespace(ctx context.Context, namespacePath string, data string) (encfield.EncryptedField, error) {
+	return s.EncryptForNamespace(ctx, namespacePath, []byte(data))
 }
 
-func (s *fakeService) DecryptGlobal(ctx context.Context, data []byte) ([]byte, error) {
-	return data, nil
+func (s *fakeService) EncryptForEntity(ctx context.Context, entity NamespacedEntity, data []byte) (encfield.EncryptedField, error) {
+	return s.EncryptForNamespace(ctx, entity.GetNamespace(), data)
 }
 
-func (s *fakeService) DecryptForConnection(ctx context.Context, connection Connection, data []byte) ([]byte, error) {
-	return s.DecryptGlobal(ctx, data)
+func (s *fakeService) EncryptStringForEntity(ctx context.Context, entity NamespacedEntity, data string) (encfield.EncryptedField, error) {
+	return s.EncryptForEntity(ctx, entity, []byte(data))
 }
 
-func (s *fakeService) DecryptForConnector(ctx context.Context, cv ConnectorVersion, data []byte) ([]byte, error) {
-	return s.DecryptGlobal(ctx, data)
+// Decrypt decrypts an EncryptedField using the key ID embedded in the field.
+func (s *fakeService) Decrypt(ctx context.Context, ef encfield.EncryptedField) ([]byte, error) {
+	if ef.ID != fakeEncryptionKeyVersionId {
+		return nil, fmt.Errorf("fake encryption service can only decrypt data encrypted with fake key version")
+	}
+	return []byte(ef.Data), nil
 }
 
-func (s *fakeService) EncryptStringGlobal(ctx context.Context, data string) (string, error) {
-	encryptedData, err := s.EncryptGlobal(ctx, []byte(data))
-	if err != nil {
-		return "", err
-	}
-
-	if !s.doBase64Encode {
-		return string(encryptedData), nil
-	}
-
-	encodedData := base64.StdEncoding.EncodeToString(encryptedData)
-	return encodedData, nil
-}
-
-func (s *fakeService) EncryptStringForConnection(ctx context.Context, connection Connection, data string) (string, error) {
-	encryptedData, err := s.EncryptForConnection(ctx, connection, []byte(data))
-	if err != nil {
-		return "", err
-	}
-
-	if !s.doBase64Encode {
-		return string(encryptedData), nil
-	}
-
-	encodedData := base64.StdEncoding.EncodeToString(encryptedData)
-	return encodedData, nil
-}
-
-func (s *fakeService) EncryptStringForConnector(ctx context.Context, cv ConnectorVersion, data string) (string, error) {
-	encryptedData, err := s.EncryptForConnector(ctx, cv, []byte(data))
-	if err != nil {
-		return "", err
-	}
-
-	if !s.doBase64Encode {
-		return string(encryptedData), nil
-	}
-
-	encodedData := base64.StdEncoding.EncodeToString(encryptedData)
-	return encodedData, nil
-}
-
-func (s *fakeService) DecryptStringGlobal(ctx context.Context, base64Data string) (string, error) {
-	if !s.doBase64Encode {
-		return base64Data, nil
-	}
-
-	decodedData, err := base64.StdEncoding.DecodeString(base64Data)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to decode base64 string")
-	}
-
-	decryptedData, err := s.DecryptGlobal(ctx, decodedData)
+// DecryptString decrypts an EncryptedField using the key ID embedded in the field.
+func (s *fakeService) DecryptString(ctx context.Context, ef encfield.EncryptedField) (string, error) {
+	decryptedData, err := s.Decrypt(ctx, ef)
 	if err != nil {
 		return "", err
 	}
@@ -102,38 +78,23 @@ func (s *fakeService) DecryptStringGlobal(ctx context.Context, base64Data string
 	return string(decryptedData), nil
 }
 
-func (s *fakeService) DecryptStringForConnection(ctx context.Context, connection Connection, base64Data string) (string, error) {
-	if !s.doBase64Encode {
-		return base64Data, nil
+func (s *fakeService) ReEncryptField(ctx context.Context, ef encfield.EncryptedField, targetEkvId apid.ID) (encfield.EncryptedField, error) {
+	if ef.ID == targetEkvId {
+		return ef, nil
 	}
 
-	decodedData, err := base64.StdEncoding.DecodeString(base64Data)
+	plaintext, err := s.Decrypt(ctx, ef)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to decode base64 string")
+		return encfield.EncryptedField{}, err
 	}
 
-	decryptedData, err := s.DecryptForConnection(ctx, connection, decodedData)
-	if err != nil {
-		return "", err
-	}
-
-	return string(decryptedData), nil
+	return encfield.EncryptedField{ID: targetEkvId, Data: string(plaintext)}, nil
 }
 
-func (s *fakeService) DecryptStringForConnector(ctx context.Context, cv ConnectorVersion, base64Data string) (string, error) {
-	if !s.doBase64Encode {
-		return base64Data, nil
-	}
-
-	decodedData, err := base64.StdEncoding.DecodeString(base64Data)
-	if err != nil {
-		return "", errors.Wrap(err, "failed to decode base64 string")
-	}
-
-	decryptedData, err := s.DecryptForConnector(ctx, cv, decodedData)
-	if err != nil {
-		return "", err
-	}
-
-	return string(decryptedData), nil
+func (s *fakeService) SyncKeysFromDbToMemory(ctx context.Context) error {
+	return nil
 }
+
+func (s *fakeService) Start() {}
+
+func (s *fakeService) Shutdown() {}

@@ -5,8 +5,9 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hibiken/asynq"
+	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/encfield"
 )
 
 // TrackedVia allows for multiple backends for tracking tasks. For now, just asynq.
@@ -18,7 +19,7 @@ const (
 
 type TaskInfo struct {
 	TrackedVia TrackedVia `json:"tracked_via"`
-	ActorId    apid.ID  `json:"actor_id,omitempty"`
+	ActorId    apid.ID    `json:"actor_id,omitempty"`
 	AsynqId    string     `json:"asynq_id,omitempty"`
 	AsynqQueue string     `json:"asynq_queue,omitempty"`
 	AsynqType  string     `json:"asynq_type,omitempty"`
@@ -34,8 +35,8 @@ func (ti *TaskInfo) BindToActor(actor Actor) *TaskInfo {
 }
 
 type Encrypt interface {
-	EncryptGlobal(ctx context.Context, data []byte) ([]byte, error)
-	DecryptGlobal(ctx context.Context, data []byte) ([]byte, error)
+	EncryptGlobal(ctx context.Context, data []byte) (encfield.EncryptedField, error)
+	Decrypt(ctx context.Context, ef encfield.EncryptedField) ([]byte, error)
 }
 
 func (ti *TaskInfo) ToSecureEncryptedString(ctx context.Context, e Encrypt) (string, error) {
@@ -44,12 +45,17 @@ func (ti *TaskInfo) ToSecureEncryptedString(ctx context.Context, e Encrypt) (str
 		return "", err
 	}
 
-	encryptedData, err := e.EncryptGlobal(ctx, jsonData)
+	ef, err := e.EncryptGlobal(ctx, jsonData)
 	if err != nil {
 		return "", err
 	}
 
-	return base64.RawURLEncoding.EncodeToString(encryptedData), nil
+	efJSON, err := json.Marshal(ef)
+	if err != nil {
+		return "", err
+	}
+
+	return base64.RawURLEncoding.EncodeToString(efJSON), nil
 }
 
 func FromAsynqTask(task *asynq.TaskInfo) *TaskInfo {
@@ -66,12 +72,18 @@ func FromAsynqTask(task *asynq.TaskInfo) *TaskInfo {
 }
 
 func FromSecureEncryptedString(ctx context.Context, e Encrypt, s string) (*TaskInfo, error) {
-	encryptedData, err := base64.RawURLEncoding.DecodeString(s)
+	efJSON, err := base64.RawURLEncoding.DecodeString(s)
 	if err != nil {
 		return nil, err
 	}
 
-	decryptedData, err := e.DecryptGlobal(ctx, encryptedData)
+	var ef encfield.EncryptedField
+	err = json.Unmarshal(efJSON, &ef)
+	if err != nil {
+		return nil, err
+	}
+
+	decryptedData, err := e.Decrypt(ctx, ef)
 	if err != nil {
 		return nil, err
 	}
