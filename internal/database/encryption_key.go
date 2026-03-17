@@ -27,6 +27,10 @@ func init() {
 
 const EncryptionKeysTable = "encryption_keys"
 
+// GlobalEncryptionKeyID is the ID of the global encryption key created by migration. It is the root
+// of the encryption key hierarchy and must not be deleted.
+var GlobalEncryptionKeyID = apid.ID("ek_global")
+
 type EncryptionKeyState string
 
 const (
@@ -234,6 +238,10 @@ func (s *service) UpdateEncryptionKey(ctx context.Context, id apid.ID, updates m
 }
 
 func (s *service) DeleteEncryptionKey(ctx context.Context, id apid.ID) error {
+	if id == GlobalEncryptionKeyID {
+		return fmt.Errorf("cannot delete the global encryption key: %w", ErrProtected)
+	}
+
 	now := apctx.GetClock(ctx).Now()
 	dbResult, err := s.sq.
 		Update(EncryptionKeysTable).

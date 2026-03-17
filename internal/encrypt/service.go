@@ -28,7 +28,7 @@ const globalScope = "global"
 const memorySyncPeriod = 5 * time.Minute
 const maxInitialWait = 5 * time.Minute
 
-var globalEncryptionKeyID = apid.ID("ek_global")
+var globalEncryptionKeyID = database.GlobalEncryptionKeyID
 
 type service struct {
 	cfg    config.C
