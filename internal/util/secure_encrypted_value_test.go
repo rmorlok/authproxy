@@ -49,7 +49,7 @@ func TestSecureDecryptedJsonValue(t *testing.T) {
 		assert.NoError(t, err)
 
 		encryptedBytes := []byte(encrypted)
-		encryptedBytes[5] = 'x'
+		encryptedBytes[5] ^= 0xff
 
 		_, err = SecureDecryptedJsonValue[Foo](key, string(encryptedBytes))
 		assert.Error(t, err)
