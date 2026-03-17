@@ -11,8 +11,7 @@ import (
 func (n *noAuthConnection) ProxyRequest(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest) (*iface.ProxyResponse, error) {
 	r := n.httpf.
 		ForRequestType(reqType).
-		ForConnection(&n.c).
-		ForConnectorVersion(n.cv).
+		ForConnection(n.c).
 		New().
 		UseContext(ctx).
 		Request()

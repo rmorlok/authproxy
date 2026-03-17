@@ -32,7 +32,7 @@ func (c *connection) getProxyImpl() (iface.Proxy, error) {
 		}
 
 		if auth, ok := auth.Inner().(*config.AuthNoAuth); ok {
-			c.proxyImpl = no_auth.NewNoAuth(c.s.logger, c.s.httpf, auth, c.Connection, c.cv, def.RateLimiting)
+			c.proxyImpl = no_auth.NewNoAuth(c.s.logger, c.s.httpf, auth, c)
 			c.proxyImplErr = nil
 			return
 		}
