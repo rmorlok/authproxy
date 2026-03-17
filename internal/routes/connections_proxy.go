@@ -45,14 +45,7 @@ type ConnectionsProxyRoutes struct {
 // @Router			/connections/{id}/_proxy [post]
 func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
-	ra := auth.GetAuthFromGinContext(gctx)
-	if !ra.IsAuthenticated() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusUnauthorized().
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
-		return
-	}
+	val := auth.MustGetValidatorFromGinContext(gctx)
 
 	id := gctx.Param("id")
 	connectionUuid, err := apid.Parse(id)
@@ -63,6 +56,7 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
 		return
 	}
 
@@ -73,10 +67,9 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
 		return
 	}
-
-	// TODO: add security checking for ownership
 
 	conn, err := r.core.GetConnection(ctx, connectionUuid)
 	if err != nil {
@@ -86,6 +79,7 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 				WithResponseMsg("connection not found").
 				BuildStatusError().
 				WriteGinResponse(r.logger, gctx)
+			val.MarkErrorReturn()
 			return
 		}
 
@@ -94,6 +88,12 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 			WithInternalErr(err).
 			BuildStatusError().
 			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(conn); httpErr != nil {
+		httpErr.WriteGinResponse(r.logger, gctx)
 		return
 	}
 

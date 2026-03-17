@@ -1,11 +1,13 @@
 package apredis
 
 import (
+	"github.com/alicebob/miniredis/v2"
 	"github.com/rmorlok/authproxy/internal/config"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
 
-func MustApplyTestConfig(cfg config.C) (config.C, Client) {
+// mustApplyTestConfigInternal is the shared implementation that returns both the client and server.
+func mustApplyTestConfigInternal(cfg config.C) (config.C, Client, *miniredis.Miniredis) {
 	// Avoid shared singletons for test cases, while still going through wireup logic
 	miniredisServerPrevious := miniredisServer
 	miniredisClientPrevious := miniredisClient
@@ -42,5 +44,19 @@ func MustApplyTestConfig(cfg config.C) (config.C, Client) {
 		panic(err)
 	}
 
-	return cfg, r
+	// Capture server before defer restores the global
+	server := miniredisServer
+
+	return cfg, r, server
+}
+
+func MustApplyTestConfig(cfg config.C) (config.C, Client) {
+	cfg, client, _ := mustApplyTestConfigInternal(cfg)
+	return cfg, client
+}
+
+// MustApplyTestConfigWithServer is like MustApplyTestConfig but also returns the underlying
+// miniredis server, allowing tests to call FastForward to advance time for TTL expiry.
+func MustApplyTestConfigWithServer(cfg config.C) (config.C, Client, *miniredis.Miniredis) {
+	return mustApplyTestConfigInternal(cfg)
 }
