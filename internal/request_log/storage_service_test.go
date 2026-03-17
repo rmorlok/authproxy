@@ -3,6 +3,7 @@ package request_log
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"io"
 	"log/slog"
 	"net/http"
@@ -10,12 +11,27 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apblob"
+	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// noopEncryptor implements Encryptor using base64 encoding (no real encryption).
+type noopEncryptor struct{}
+
+func (noopEncryptor) EncryptForNamespace(_ context.Context, _ string, data []byte) (encfield.EncryptedField, error) {
+	return encfield.EncryptedField{
+		ID:   apid.ID("ekv_noop"),
+		Data: base64.StdEncoding.EncodeToString(data),
+	}, nil
+}
+
+func (noopEncryptor) Decrypt(_ context.Context, ef encfield.EncryptedField) ([]byte, error) {
+	return base64.StdEncoding.DecodeString(ef.Data)
+}
 
 type fakeTransport struct {
 	status      int
@@ -195,7 +211,7 @@ func TestNamespacePopulated(t *testing.T) {
 func TestGetFullLog_BlobStore(t *testing.T) {
 	logger := newNoopLogger()
 	blob := apblob.NewMemoryClient()
-	fullStore := NewBlobStore(blob, logger)
+	fullStore := NewBlobStore(blob, noopEncryptor{}, logger)
 
 	testId := apid.New(apid.PrefixRequestLog)
 	ns := "root.test"

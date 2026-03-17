@@ -217,6 +217,7 @@ func (dm *DependencyManager) GetLogStorageService() *request_log.StorageService 
 			ctx,
 			dm.GetConfigRoot().HttpLogging,
 			dm.GetConfigRoot().SystemAuth.GlobalAESKey,
+			dm.GetEncryptService(),
 			dm.GetLogger(),
 		)
 
