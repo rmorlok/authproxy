@@ -66,6 +66,9 @@ func (s *service) DeleteEncryptionKey(ctx context.Context, id apid.ID) error {
 		if errors.Is(err, database.ErrNotFound) {
 			return ErrNotFound
 		}
+		if errors.Is(err, database.ErrProtected) {
+			return err
+		}
 		return err
 	}
 	return nil

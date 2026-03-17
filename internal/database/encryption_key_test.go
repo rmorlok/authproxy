@@ -71,6 +71,20 @@ func TestEncryptionKey(t *testing.T) {
 		require.ErrorIs(t, err, ErrNotFound)
 	})
 
+	t.Run("DeleteGlobalKeyRejected", func(t *testing.T) {
+		_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
+		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		err := db.DeleteEncryptionKey(ctx, GlobalEncryptionKeyID)
+		require.ErrorIs(t, err, ErrProtected)
+
+		// Verify the global key still exists
+		ek, err := db.GetEncryptionKey(ctx, GlobalEncryptionKeyID)
+		require.NoError(t, err)
+		require.Equal(t, GlobalEncryptionKeyID, ek.Id)
+	})
+
 	t.Run("SetState", func(t *testing.T) {
 		_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)

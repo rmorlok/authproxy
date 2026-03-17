@@ -762,6 +762,26 @@ func TestEncryptionKeys(t *testing.T) {
 			require.Equal(t, http.StatusNotFound, w.Code)
 		})
 
+		t.Run("rejects deletion of ek_global", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodDelete,
+				fmt.Sprintf("/encryption-keys/%s", database.GlobalEncryptionKeyID),
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+
+			var errResp api_common.ErrorResponse
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &errResp))
+			require.Contains(t, errResp.Error, "global encryption key cannot be deleted")
+		})
+
 		t.Run("delete is idempotent", func(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(

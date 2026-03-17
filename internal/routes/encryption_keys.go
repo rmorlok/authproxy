@@ -504,6 +504,16 @@ func (r *EncryptionKeysRoutes) delete(gctx *gin.Context) {
 		return
 	}
 
+	if id == database.GlobalEncryptionKeyID {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("the global encryption key cannot be deleted").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
 	// Get existing key for authorization check
 	ek, err := r.core.GetEncryptionKey(ctx, id)
 	if err != nil {

@@ -16,3 +16,7 @@ var ErrDuplicate = errors.New("duplicate record")
 // ErrViolation is returned when a constraint in the database is violated (e.g. multiple rows with the same ID)
 // after an operation that should have been unique.
 var ErrViolation = errors.New("database constraint violation")
+
+// ErrProtected is returned when an operation is attempted on a protected resource that cannot be modified in
+// the requested way.
+var ErrProtected = errors.New("resource is protected")
