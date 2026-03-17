@@ -103,6 +103,7 @@ func NewStorageService(
 	ctx context.Context,
 	cfg *config.HttpLogging,
 	cursorKey config.KeyDataType,
+	encryptor Encryptor,
 	logger *slog.Logger,
 ) (*StorageService, error) {
 	logger = logger.With("service", "request_log")
@@ -112,7 +113,7 @@ func NewStorageService(
 	if err != nil {
 		return nil, err
 	}
-	fullStore := NewBlobStore(blobStore, logger)
+	fullStore := NewBlobStore(blobStore, encryptor, logger)
 
 	cc := captureConfig{}
 	cc.setFromConfig(cfg)
