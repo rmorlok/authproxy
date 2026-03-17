@@ -570,7 +570,7 @@ func (l *listNamespacesFilters) ForLabelSelector(selector string) ListNamespaces
 
 func (l *listNamespacesFilters) FromCursor(ctx context.Context, cursor string) (ListNamespacesExecutor, error) {
 	s := l.s
-	parsed, err := pagination.ParseCursor[listNamespacesFilters](ctx, s.secretKey, cursor)
+	parsed, err := pagination.ParseCursor[listNamespacesFilters](ctx, s.cursorEncryptor, cursor)
 
 	if err != nil {
 		return nil, err
@@ -664,7 +664,7 @@ func (l *listNamespacesFilters) fetchPage(ctx context.Context) pagination.PageRe
 	cursor := ""
 	hasMore := uint64(len(results)) > l.LimitVal
 	if hasMore {
-		cursor, err = pagination.MakeCursor(ctx, l.s.secretKey, l)
+		cursor, err = pagination.MakeCursor(ctx, l.s.cursorEncryptor, l)
 		if err != nil {
 			return pagination.PageResult[Namespace]{Error: err}
 		}

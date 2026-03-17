@@ -10,6 +10,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 type StorageService struct {
@@ -102,13 +103,13 @@ func (ss *StorageService) Migrate(ctx context.Context) error {
 func NewStorageService(
 	ctx context.Context,
 	cfg *config.HttpLogging,
-	cursorKey config.KeyDataType,
+	cursorEncryptor pagination.CursorEncryptor,
 	encryptor Encryptor,
 	logger *slog.Logger,
 ) (*StorageService, error) {
 	logger = logger.With("service", "request_log")
 	store := NewRecordStore(cfg.Database, logger)
-	retriever := NewRecordRetriever(cfg.Database, cursorKey, logger)
+	retriever := NewRecordRetriever(cfg.Database, cursorEncryptor, logger)
 	blobStore, err := apblob.NewFromConfig(ctx, cfg.BlobStorage)
 	if err != nil {
 		return nil, err

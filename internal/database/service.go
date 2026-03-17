@@ -13,29 +13,24 @@ import (
 	"github.com/mitchellh/go-homedir"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 // NewConnectionForRoot creates a new database connection from the specified configuration. The type of the database
 // returned will be determined by the configuration. Same as NewConnection.
 func NewConnectionForRoot(root *config.Root, logger *slog.Logger) (DB, error) {
-	secretKey := root.SystemAuth.GlobalAESKey
-
 	switch v := root.Database.InnerVal.(type) {
 	case *config.DatabaseSqlite:
-		return NewSqliteConnection(v, secretKey, logger)
+		return NewSqliteConnection(v, logger)
 	case *config.DatabasePostgres:
-		return NewPostgresConnection(v, secretKey, logger)
+		return NewPostgresConnection(v, logger)
 	default:
 		return nil, errors.New("database type not supported")
 	}
 }
 
 // NewSqliteConnection creates a new database connection to a SQLite database.
-//
-// Parameters:
-// - dbConfig: the configuration for the SQLite database
-// - secretKey: the AES key used to secure cursors
-func NewSqliteConnection(dbConfig *config.DatabaseSqlite, secretKey config.KeyDataType, l *slog.Logger) (DB, error) {
+func NewSqliteConnection(dbConfig *config.DatabaseSqlite, l *slog.Logger) (DB, error) {
 	path := dbConfig.Path
 	_, err := os.Stat(path)
 	if err != nil {
@@ -66,20 +61,16 @@ func NewSqliteConnection(dbConfig *config.DatabaseSqlite, secretKey config.KeyDa
 	}
 
 	return &service{
-		cfg:       dbConfig,
-		sq:        sq.StatementBuilder.PlaceholderFormat(dbConfig.GetPlaceholderFormat()),
-		db:        db,
-		secretKey: secretKey,
-		logger:    l,
+		cfg:             dbConfig,
+		sq:              sq.StatementBuilder.PlaceholderFormat(dbConfig.GetPlaceholderFormat()),
+		db:              db,
+		cursorEncryptor: pagination.NewRandomCursorEncryptor(),
+		logger:          l,
 	}, nil
 }
 
 // NewPostgresConnection creates a new database connection to a Postgres database.
-//
-// Parameters:
-// - dbConfig: the configuration for the Postgres database
-// - secretKey: the AES key used to secure cursors
-func NewPostgresConnection(dbConfig *config.DatabasePostgres, secretKey config.KeyDataType, l *slog.Logger) (DB, error) {
+func NewPostgresConnection(dbConfig *config.DatabasePostgres, l *slog.Logger) (DB, error) {
 	db, err := sql.Open("pgx", dbConfig.GetDsn())
 	if err != nil {
 		return nil, errors.Wrapf(err, "failed to open postgres database '%s'", dbConfig.GetDsn())
@@ -90,20 +81,24 @@ func NewPostgresConnection(dbConfig *config.DatabasePostgres, secretKey config.K
 	}
 
 	return &service{
-		cfg:       dbConfig,
-		sq:        sq.StatementBuilder.PlaceholderFormat(dbConfig.GetPlaceholderFormat()),
-		db:        db,
-		secretKey: secretKey,
-		logger:    l,
+		cfg:             dbConfig,
+		sq:              sq.StatementBuilder.PlaceholderFormat(dbConfig.GetPlaceholderFormat()),
+		db:              db,
+		cursorEncryptor: pagination.NewRandomCursorEncryptor(),
+		logger:          l,
 	}, nil
 }
 
 type service struct {
-	cfg       config.DatabaseImpl
-	sq        sq.StatementBuilderType
-	db        *sql.DB
-	secretKey config.KeyDataType // the AES key used to secure cursors
-	logger    *slog.Logger
+	cfg             config.DatabaseImpl
+	sq              sq.StatementBuilderType
+	db              *sql.DB
+	cursorEncryptor pagination.CursorEncryptor
+	logger          *slog.Logger
+}
+
+func (s *service) SetCursorEncryptor(e pagination.CursorEncryptor) {
+	s.cursorEncryptor = e
 }
 
 func (s *service) Ping(ctx context.Context) bool {

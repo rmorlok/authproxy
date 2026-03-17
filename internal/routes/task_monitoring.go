@@ -17,9 +17,10 @@ import (
 )
 
 type TaskMonitoringRoutes struct {
-	cfg       config.C
-	auth      auth.A
-	inspector apasynq.Inspector
+	cfg             config.C
+	auth            auth.A
+	inspector       apasynq.Inspector
+	cursorEncryptor pagination.CursorEncryptor
 }
 
 func NewTaskMonitoringRoutes(
@@ -28,9 +29,10 @@ func NewTaskMonitoringRoutes(
 	inspector apasynq.Inspector,
 ) *TaskMonitoringRoutes {
 	return &TaskMonitoringRoutes{
-		cfg:       cfg,
-		auth:      auth,
-		inspector: inspector,
+		cfg:             cfg,
+		auth:            auth,
+		inspector:       inspector,
+		cursorEncryptor: pagination.NewRandomCursorEncryptor(),
 	}
 }
 
@@ -411,7 +413,7 @@ func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
 	cursorStr := gctx.Query("cursor")
 
 	if cursorStr != "" {
-		parsed, err := pagination.ParseCursor[taskListCursor](ctx, r.cfg.GetGlobalKey(), cursorStr)
+		parsed, err := pagination.ParseCursor[taskListCursor](ctx, r.cursorEncryptor, cursorStr)
 		if err != nil {
 			api_common.NewHttpStatusErrorBuilder().
 				WithStatusBadRequest().
@@ -479,7 +481,7 @@ func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
 				Queue:    queue,
 				State:    state,
 			}
-			cursor, _ = pagination.MakeCursor(ctx, r.cfg.GetGlobalKey(), &nextCursor)
+			cursor, _ = pagination.MakeCursor(ctx, r.cursorEncryptor, &nextCursor)
 		}
 	}
 

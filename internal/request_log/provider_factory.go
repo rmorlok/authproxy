@@ -5,6 +5,7 @@ import (
 	"log/slog"
 
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 // NewRecordStore creates an RecordStore based on the HttpLogging configuration.
@@ -26,14 +27,14 @@ func NewRecordStore(database *config.Database, logger *slog.Logger) RecordStore 
 
 // NewRecordRetriever creates an RecordRetriever based on the HttpLogging configuration.
 // If no database config is specified, defaults to the Redis provider.
-func NewRecordRetriever(database *config.Database, cursorKey config.KeyDataType, logger *slog.Logger) RecordRetriever {
+func NewRecordRetriever(database *config.Database, cursorEncryptor pagination.CursorEncryptor, logger *slog.Logger) RecordRetriever {
 	provider := database.GetProvider()
 	switch provider {
 	case config.DatabaseProviderSqlite:
 	case config.DatabaseProviderPostgres:
-		return NewSqlRecordRetriever(database, cursorKey, logger)
+		return NewSqlRecordRetriever(database, cursorEncryptor, logger)
 	case config.DatabaseProviderClickhouse:
-		return NewClickhouseRecordRetriever(database, cursorKey, logger)
+		return NewClickhouseRecordRetriever(database, cursorEncryptor, logger)
 	default:
 		panic(fmt.Sprintf("unknown http logging database provider: %s", provider))
 	}

@@ -22,6 +22,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/ratelimit"
 	"github.com/rmorlok/authproxy/internal/request_log"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 // PingFunc is a function that checks the health of a dependency.
@@ -216,7 +217,7 @@ func (dm *DependencyManager) GetLogStorageService() *request_log.StorageService 
 		dm.logStorageService, err = request_log.NewStorageService(
 			ctx,
 			dm.GetConfigRoot().HttpLogging,
-			dm.GetConfigRoot().SystemAuth.GlobalAESKey,
+			pagination.NewRandomCursorEncryptor(),
 			dm.GetEncryptService(),
 			dm.GetLogger(),
 		)
@@ -262,6 +263,7 @@ func (dm *DependencyManager) GetEncryptService() encrypt.E {
 	if dm.e == nil {
 		dm.e = encrypt.NewEncryptService(dm.GetConfig(), dm.GetDatabase(), dm.GetLogger())
 		dm.e.Start()
+		dm.GetDatabase().SetCursorEncryptor(dm.e)
 	}
 
 	return dm.e

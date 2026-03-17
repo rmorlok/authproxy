@@ -144,13 +144,13 @@ var _ RecordStore = (*clickhouseRecordStore)(nil)
 // --- ClickHouse RecordRetriever ---
 
 type clickhouseRecordRetriever struct {
-	db        *sql.DB
-	cfg       *config.DatabaseClickhouse
-	cursorKey config.KeyDataType
-	logger    *slog.Logger
+	db              *sql.DB
+	cfg             *config.DatabaseClickhouse
+	cursorEncryptor pagination.CursorEncryptor
+	logger          *slog.Logger
 }
 
-func NewClickhouseRecordRetriever(cfg *config.Database, cursorKey config.KeyDataType, logger *slog.Logger) RecordRetriever {
+func NewClickhouseRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorEncryptor, logger *slog.Logger) RecordRetriever {
 	chCfg, ok := cfg.InnerVal.(*config.DatabaseClickhouse)
 	if !ok {
 		panic(fmt.Sprintf("expected *config.HttpLoggingDatabaseClickhouse, got %T", cfg))
@@ -165,7 +165,7 @@ func NewClickhouseRecordRetriever(cfg *config.Database, cursorKey config.KeyData
 	return &clickhouseRecordRetriever{
 		db:        db,
 		cfg:       chCfg,
-		cursorKey: cursorKey,
+		cursorEncryptor: cursorEncryptor,
 		logger:    logger.With("sub_component", "retriever"),
 	}
 }
@@ -196,7 +196,7 @@ func (r *clickhouseRecordRetriever) NewListRequestsBuilder() ListRequestBuilder 
 		sqlListRequestsBuilder: sqlListRequestsBuilder{
 			ListFilters:       ListFilters{LimitVal: 100},
 			db:                r.db,
-			cursorKey:         r.cursorKey,
+			cursorEncryptor:         r.cursorEncryptor,
 			placeholderFormat: sq.Question,
 			provider:          config.DatabaseProviderClickhouse,
 		},
@@ -208,7 +208,7 @@ func (r *clickhouseRecordRetriever) ListRequestsFromCursor(ctx context.Context, 
 		sqlListRequestsBuilder: sqlListRequestsBuilder{
 			ListFilters:       ListFilters{LimitVal: 100},
 			db:                r.db,
-			cursorKey:         r.cursorKey,
+			cursorEncryptor:         r.cursorEncryptor,
 			placeholderFormat: sq.Question,
 			provider:          config.DatabaseProviderClickhouse,
 		},
@@ -243,18 +243,18 @@ func (l *clickhouseListRequestsBuilder) buildQuery() sq.SelectBuilder {
 
 func (l *clickhouseListRequestsBuilder) fromCursor(ctx context.Context, cursor string) (ListRequestExecutor, error) {
 	db := l.db
-	cursorKey := l.cursorKey
+	cursorEncryptor := l.cursorEncryptor
 	pf := l.placeholderFormat
 	provider := l.provider
 
-	parsed, err := pagination.ParseCursor[clickhouseListRequestsBuilder](ctx, l.cursorKey, cursor)
+	parsed, err := pagination.ParseCursor[clickhouseListRequestsBuilder](ctx, l.cursorEncryptor, cursor)
 	if err != nil {
 		return nil, err
 	}
 
 	*l = *parsed
 	l.db = db
-	l.cursorKey = cursorKey
+	l.cursorEncryptor = cursorEncryptor
 	l.placeholderFormat = pf
 	l.provider = provider
 

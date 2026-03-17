@@ -787,7 +787,7 @@ func (l *listConnectorVersionsFilters) ForLabelSelector(selector string) ListCon
 
 func (l *listConnectorVersionsFilters) FromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error) {
 	s := l.s
-	parsed, err := pagination.ParseCursor[listConnectorVersionsFilters](ctx, s.secretKey, cursor)
+	parsed, err := pagination.ParseCursor[listConnectorVersionsFilters](ctx, s.cursorEncryptor, cursor)
 
 	if err != nil {
 		return nil, err
@@ -877,7 +877,7 @@ func (l *listConnectorVersionsFilters) fetchPage(ctx context.Context) pagination
 	cursor := ""
 	hasMore := uint64(len(results)) > l.LimitVal
 	if hasMore {
-		cursor, err = pagination.MakeCursor(ctx, l.s.secretKey, l)
+		cursor, err = pagination.MakeCursor(ctx, l.s.cursorEncryptor, l)
 		if err != nil {
 			return pagination.PageResult[ConnectorVersion]{Error: err}
 		}

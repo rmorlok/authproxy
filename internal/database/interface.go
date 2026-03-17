@@ -7,6 +7,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 type DeletedHandling bool
@@ -37,6 +38,7 @@ type IActorDataExtended interface {
 
 //go:generate mockgen -source=./interface.go -destination=./mock/db.go -package=mock
 type DB interface {
+	SetCursorEncryptor(e pagination.CursorEncryptor)
 	Migrate(ctx context.Context) error
 	Ping(ctx context.Context) bool
 

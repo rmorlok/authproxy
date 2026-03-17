@@ -21,6 +21,7 @@ import (
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 var postgresTestLimiter = make(chan struct{}, getEnvIntDefault("POSTGRES_TEST_MAX_PARALLEL", 4))
@@ -212,11 +213,11 @@ func mustApplyBlankPostgresTestDbConfig(t testing.TB, cfg config.C) (config.C, D
 	}}
 
 	db := &service{
-		cfg:       root.Database,
-		sq:        sq.StatementBuilder.PlaceholderFormat(root.Database.GetPlaceholderFormat()),
-		db:        rawDb,
-		secretKey: root.SystemAuth.GlobalAESKey,
-		logger:    root.GetRootLogger(),
+		cfg:             root.Database,
+		sq:              sq.StatementBuilder.PlaceholderFormat(root.Database.GetPlaceholderFormat()),
+		db:              rawDb,
+		cursorEncryptor: pagination.NewRandomCursorEncryptor(),
+		logger:          root.GetRootLogger(),
 	}
 
 	if err := db.CreateNamespace(context.Background(), &Namespace{

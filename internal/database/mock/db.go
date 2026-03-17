@@ -14,6 +14,7 @@ import (
 	database "github.com/rmorlok/authproxy/internal/database"
 	encfield "github.com/rmorlok/authproxy/internal/encfield"
 	auth "github.com/rmorlok/authproxy/internal/schema/auth"
+	pagination "github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 // MockIActorData is a mock of IActorData interface.
@@ -1272,6 +1273,18 @@ func (mr *MockDBMockRecorder) SetConnectorVersionState(ctx, id, version, state i
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectorVersionState", reflect.TypeOf((*MockDB)(nil).SetConnectorVersionState), ctx, id, version, state)
 }
 
+// SetCursorEncryptor mocks base method.
+func (m *MockDB) SetCursorEncryptor(e pagination.CursorEncryptor) {
+	m.ctrl.T.Helper()
+	m.ctrl.Call(m, "SetCursorEncryptor", e)
+}
+
+// SetCursorEncryptor indicates an expected call of SetCursorEncryptor.
+func (mr *MockDBMockRecorder) SetCursorEncryptor(e interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetCursorEncryptor", reflect.TypeOf((*MockDB)(nil).SetCursorEncryptor), e)
+}
+
 // SetEncryptionKeyState mocks base method.
 func (m *MockDB) SetEncryptionKeyState(ctx context.Context, id apid.ID, state database.EncryptionKeyState) error {
 	m.ctrl.T.Helper()
@@ -1300,20 +1313,6 @@ func (mr *MockDBMockRecorder) SetEncryptionKeyVersionCurrentFlag(ctx, id, isCurr
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetEncryptionKeyVersionCurrentFlag", reflect.TypeOf((*MockDB)(nil).SetEncryptionKeyVersionCurrentFlag), ctx, id, isCurrent)
 }
 
-// SetNamespaceState mocks base method.
-func (m *MockDB) SetNamespaceState(ctx context.Context, path string, state database.NamespaceState) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetNamespaceState", ctx, path, state)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetNamespaceState indicates an expected call of SetNamespaceState.
-func (mr *MockDBMockRecorder) SetNamespaceState(ctx, path, state interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNamespaceState", reflect.TypeOf((*MockDB)(nil).SetNamespaceState), ctx, path, state)
-}
-
 // SetNamespaceEncryptionKeyId mocks base method.
 func (m *MockDB) SetNamespaceEncryptionKeyId(ctx context.Context, path string, ekId *apid.ID) (*database.Namespace, error) {
 	m.ctrl.T.Helper()
@@ -1327,6 +1326,20 @@ func (m *MockDB) SetNamespaceEncryptionKeyId(ctx context.Context, path string, e
 func (mr *MockDBMockRecorder) SetNamespaceEncryptionKeyId(ctx, path, ekId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNamespaceEncryptionKeyId", reflect.TypeOf((*MockDB)(nil).SetNamespaceEncryptionKeyId), ctx, path, ekId)
+}
+
+// SetNamespaceState mocks base method.
+func (m *MockDB) SetNamespaceState(ctx context.Context, path string, state database.NamespaceState) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetNamespaceState", ctx, path, state)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetNamespaceState indicates an expected call of SetNamespaceState.
+func (mr *MockDBMockRecorder) SetNamespaceState(ctx, path, state interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNamespaceState", reflect.TypeOf((*MockDB)(nil).SetNamespaceState), ctx, path, state)
 }
 
 // UpdateConnectionLabels mocks base method.
