@@ -21,6 +21,7 @@ type RequestInfo struct {
 	ConnectorId      apid.ID
 	ConnectorVersion uint64
 	ConnectionId     apid.ID
+	Labels           map[string]string
 
 	// RateLimiting is the rate limiting configuration for the connector, if available.
 	// Nil means use default behavior (enabled with standard Retry-After parsing).

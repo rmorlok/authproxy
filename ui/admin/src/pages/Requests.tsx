@@ -15,6 +15,8 @@ import {
     RequestType, ListRequestsParams, listRequests
 } from '@authproxy/api';
 import dayjs from 'dayjs';
+import Chip from '@mui/material/Chip';
+import TextField from '@mui/material/TextField';
 import {HttpStatusChip, Duration} from '../util';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
 import RequestDetail from "../components/RequestDetail";
@@ -84,6 +86,24 @@ export const columns: (GridColDef<RequestEntryRecord> & {hideInitial?: boolean})
         headerName: 'Connector Version',
         sortable: false,
         hideInitial: true,
+    },
+    {
+        field: 'labels',
+        headerName: 'Labels',
+        sortable: false,
+        minWidth: 200,
+        hideInitial: true,
+        renderCell: (params) => {
+            const labels = params.value as Record<string, string> | undefined;
+            if (!labels || Object.keys(labels).length === 0) return null;
+            return (
+                <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                    {Object.entries(labels).map(([k, v]) => (
+                        <Chip key={k} label={`${k}=${v}`} size="small" variant="outlined" />
+                    ))}
+                </Stack>
+            );
+        },
     },
     {
         field: 'host',
@@ -200,6 +220,7 @@ export default function Requests() {
     const [pageSize, setPageSize] = useQueryState<number>('page_size', parseAsInteger.withDefault(defaultPageSize));
     const [typeFilter, setTypeFilter] = useQueryState<string>('type', parseAsStringLiteral(stateVals).withDefault('')); // empty = all
     const [sort, setSort] = useQueryState<string>('sort', parseAsString.withDefault(''));
+    const [labelSelector, setLabelSelector] = useQueryState<string>('label_selector', parseAsString.withDefault(''));
     const [requestId, setRequestId] = useQueryState<string>('id', parseAsString.withDefault(''));
 
     const [hasNextPage, setHasNextPage] = useState<boolean>(false);
@@ -277,6 +298,7 @@ export default function Requests() {
                 const params: ListRequestsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
                     namespace: ns + ".**",
                     request_type: (typeFilter as RequestType) || undefined,
+                    label_selector: labelSelector || undefined,
                     order_by: sort || undefined,
                     limit: pageSize,
                 };
@@ -312,7 +334,7 @@ export default function Requests() {
         // Reset cursors/cache and immediately fetch first page to ensure initial load
         resetPagination();
         fetchPage(1);
-    }, [ns, pageSize, sort, typeFilter]);
+    }, [ns, pageSize, sort, typeFilter, labelSelector]);
 
     useEffect(() => {
         fetchPage(page);
@@ -341,6 +363,14 @@ export default function Requests() {
                         ))}
                     </Select>
                 </FormControl>
+                <TextField
+                    size="small"
+                    label="Label Selector"
+                    placeholder="env=prod,team=api"
+                    value={labelSelector}
+                    onChange={(e) => setLabelSelector(e.target.value)}
+                    sx={{ minWidth: 260 }}
+                />
             </Stack>
 
             <Grid size={{xs: 12, lg: 12}}>
@@ -435,6 +465,7 @@ export default function Requests() {
                         return (
                             <RequestDetail
                                 requestId={requestId}
+                                record={rec}
                                 onClose={() => setRequestId('')}
                                 showOpenFullPage={true} />
                         );

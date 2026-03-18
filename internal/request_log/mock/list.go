@@ -33,6 +33,7 @@ type MockListRequestBuilderExecutor struct {
 	TimestampRange           []time.Time `json:"timestamp_range,omitempty"`
 	Path                     *string     `json:"path,omitempty"`
 	PathRegex                *string     `json:"path_regex,omitempty"`
+	LabelSelector            *string     `json:"label_selector,omitempty"`
 }
 
 func (l *MockListRequestBuilderExecutor) WithNamespaceMatcher(matcher string) request_log.ListRequestBuilder {
@@ -114,6 +115,11 @@ func (l *MockListRequestBuilderExecutor) WithTimestampRange(start, end time.Time
 }
 
 func (l *MockListRequestBuilderExecutor) WithParsedTimestampRange(r string) (request_log.ListRequestBuilder, error) {
+	return l, nil
+}
+
+func (l *MockListRequestBuilderExecutor) WithLabelSelector(selector string) (request_log.ListRequestBuilder, error) {
+	l.LabelSelector = util.ToPtr(selector)
 	return l, nil
 }
 

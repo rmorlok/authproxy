@@ -50,6 +50,12 @@ func NewFactoryWithMockingClient(ctrl *gomock.Controller) *MockF {
 
 	h.
 		EXPECT().
+		ForLabels(gomock.Any()).
+		Return(h).
+		AnyTimes()
+
+	h.
+		EXPECT().
 		New().
 		Return(cli).
 		AnyTimes()

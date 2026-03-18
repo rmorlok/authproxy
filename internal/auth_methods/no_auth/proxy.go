@@ -12,6 +12,7 @@ func (n *noAuthConnection) ProxyRequest(ctx context.Context, reqType httpf.Reque
 	r := n.httpf.
 		ForRequestType(reqType).
 		ForConnection(n.c).
+		ForLabels(req.Labels).
 		New().
 		UseContext(ctx).
 		Request()

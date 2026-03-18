@@ -17,6 +17,7 @@ import (
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -91,9 +92,14 @@ func (s *sqlRecordStore) StoreRecords(ctx context.Context, records []*LogRecord)
 			"internal_timeout",
 			"request_cancelled",
 			"full_request_recorded",
+			"labels",
 		)
 
 	for _, record := range records {
+		labelsVal, _ := record.Labels.Value()
+		if labelsVal == nil {
+			labelsVal = "{}"
+		}
 		builder = builder.Values(
 			record.RequestId.String(),
 			record.Namespace,
@@ -119,6 +125,7 @@ func (s *sqlRecordStore) StoreRecords(ctx context.Context, records []*LogRecord)
 			record.InternalTimeout,
 			record.RequestCancelled,
 			record.FullRequestRecorded,
+			labelsVal,
 		)
 	}
 
@@ -207,6 +214,7 @@ var entryRecordColumns = []string{
 	"request_http_version", "request_size_bytes", "request_mime_type",
 	"response_http_version", "response_size_bytes", "response_mime_type",
 	"internal_timeout", "request_cancelled", "full_request_recorded",
+	"labels",
 }
 
 func scanLogRecord(row interface{ Scan(dest ...any) error }) (*LogRecord, error) {
@@ -222,6 +230,7 @@ func scanLogRecord(row interface{ Scan(dest ...any) error }) (*LogRecord, error)
 		&er.RequestHttpVersion, &er.RequestSizeBytes, &er.RequestMimeType,
 		&er.ResponseHttpVersion, &er.ResponseSizeBytes, &er.ResponseMimeType,
 		&er.InternalTimeout, &er.RequestCancelled, &er.FullRequestRecorded,
+		&er.Labels,
 	)
 	if err != nil {
 		return nil, err
@@ -415,6 +424,15 @@ func (l *sqlListRequestsBuilder) WithParsedTimestampRange(r string) (ListRequest
 	return l, nil
 }
 
+func (l *sqlListRequestsBuilder) WithLabelSelector(selector string) (ListRequestBuilder, error) {
+	_, err := database.ParseLabelSelector(selector)
+	if err != nil {
+		return nil, err
+	}
+	l.ListFilters.SetLabelSelector(selector)
+	return l, nil
+}
+
 func (l *sqlListRequestsBuilder) buildQuery() sq.SelectBuilder {
 	builder := sq.Select(entryRecordColumns...).
 		From(entryRecordsTable).
@@ -490,6 +508,13 @@ func (l *sqlListRequestsBuilder) buildQuery() sq.SelectBuilder {
 			builder = builder.Where(sq.Like{"type": ct})
 		} else {
 			builder = builder.Where(sq.Eq{"type": ct})
+		}
+	}
+
+	if l.LabelSelector != nil {
+		selector, err := database.ParseLabelSelector(*l.LabelSelector)
+		if err == nil && len(selector) > 0 {
+			builder = selector.ApplyToSqlBuilderWithProvider(builder, "labels", l.provider)
 		}
 	}
 

@@ -37,6 +37,7 @@ export interface RequestEntryRecord {
     internal_timeout?: boolean; // If there was an internal timeout while capture full response size/body
     request_cancelled?: boolean; // If the caller cancelled the request before the full body was consumed
     full_request_recorded?: boolean; // If the full request body was recorded; This means you may be able to get the full request
+    labels?: Record<string, string>; // Labels associated with the request (merged from connection and per-request labels)
 }
 
 // RequestEntry is the full data for a single request. It contains header and body data.

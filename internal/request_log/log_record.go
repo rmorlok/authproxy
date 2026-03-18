@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 )
 
@@ -39,6 +40,7 @@ type LogRecord struct {
 	InternalTimeout     bool                `json:"internal_timeout,omitempty"`
 	RequestCancelled    bool                `json:"request_cancelled,omitempty"`
 	FullRequestRecorded bool                `json:"full_request_recorded,omitempty"`
+	Labels              database.Labels     `json:"labels,omitempty"`
 }
 
 func (e *LogRecord) GetId() apid.ID {

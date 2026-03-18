@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/stretchr/testify/require"
 )
@@ -46,5 +47,41 @@ func TestLogRecord(t *testing.T) {
 		err = json.Unmarshal(data, &result)
 		require.NoError(t, err)
 		require.Equal(t, val, result)
+	})
+
+	t.Run("it roundtrips as json with labels", func(t *testing.T) {
+		withLabels := val
+		withLabels.Labels = database.Labels{"env": "prod", "team": "api"}
+
+		data, err := json.Marshal(withLabels)
+		require.NoError(t, err)
+
+		// Verify labels appear in JSON
+		var raw map[string]interface{}
+		err = json.Unmarshal(data, &raw)
+		require.NoError(t, err)
+		labels := raw["labels"].(map[string]interface{})
+		require.Equal(t, "prod", labels["env"])
+		require.Equal(t, "api", labels["team"])
+
+		// Roundtrip
+		result := LogRecord{}
+		err = json.Unmarshal(data, &result)
+		require.NoError(t, err)
+		require.Equal(t, withLabels, result)
+	})
+
+	t.Run("labels omitted from json when nil", func(t *testing.T) {
+		noLabels := val
+		noLabels.Labels = nil
+
+		data, err := json.Marshal(noLabels)
+		require.NoError(t, err)
+
+		var raw map[string]interface{}
+		err = json.Unmarshal(data, &raw)
+		require.NoError(t, err)
+		_, hasLabels := raw["labels"]
+		require.False(t, hasLabels, "labels should be omitted from JSON when nil")
 	})
 }

@@ -11,15 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
-	"gopkg.in/h2non/gentleman.v2"
 )
-
-func (o *oAuth2Connection) newHttpClient(rt httpf.RequestType) *gentleman.Client {
-	return o.httpf.
-		ForRequestType(rt).
-		ForConnection(o.connection).
-		New()
-}
 
 type refreshMode int
 
@@ -66,7 +58,11 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 	}
 
 	// Prepare a refresh token request
-	client := o.newHttpClient(httpf.RequestTypeOAuth)
+
+	client := o.httpf.
+		ForRequestType(httpf.RequestTypeOAuth).
+		ForConnection(o.connection).
+		New()
 	refreshReq := client.
 		UseContext(ctx).
 		Request().
@@ -143,7 +139,11 @@ func (o *oAuth2Connection) ProxyRequest(ctx context.Context, reqType httpf.Reque
 		return nil, err
 	}
 
-	r := o.newHttpClient(reqType).
+	r := o.httpf.
+		ForRequestType(reqType).
+		ForConnection(o.connection).
+		ForLabels(req.Labels).
+		New().
 		UseContext(ctx).
 		Request().
 		SetHeader("Authorization", "Bearer "+accessToken)

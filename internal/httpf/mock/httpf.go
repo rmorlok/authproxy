@@ -180,6 +180,20 @@ func (mr *MockConnectionMockRecorder) GetId() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetId", reflect.TypeOf((*MockConnection)(nil).GetId))
 }
 
+// GetLabels mocks base method.
+func (m *MockConnection) GetLabels() map[string]string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLabels")
+	ret0, _ := ret[0].(map[string]string)
+	return ret0
+}
+
+// GetLabels indicates an expected call of GetLabels.
+func (mr *MockConnectionMockRecorder) GetLabels() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLabels", reflect.TypeOf((*MockConnection)(nil).GetLabels))
+}
+
 // GetNamespace mocks base method.
 func (m *MockConnection) GetNamespace() string {
 	m.ctrl.T.Helper()
@@ -215,6 +229,20 @@ func NewMockF(ctrl *gomock.Controller) *MockF {
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockF) EXPECT() *MockFMockRecorder {
 	return m.recorder
+}
+
+// ForLabels mocks base method.
+func (m *MockF) ForLabels(labels map[string]string) httpf.F {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ForLabels", labels)
+	ret0, _ := ret[0].(httpf.F)
+	return ret0
+}
+
+// ForLabels indicates an expected call of ForLabels.
+func (mr *MockFMockRecorder) ForLabels(labels interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ForLabels", reflect.TypeOf((*MockF)(nil).ForLabels), labels)
 }
 
 // ForConnection mocks base method.

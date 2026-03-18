@@ -41,6 +41,7 @@ type ListRequestsQuery struct {
 	TimestampRange           *string    `form:"timestamp_range"`
 	Path                     *string    `form:"path"`
 	PathRegex                *string    `form:"path_regex"`
+	LabelSelector            *string    `form:"label_selector"`
 }
 
 func (q *ListRequestsQuery) ApplyToBuilder(
@@ -118,6 +119,13 @@ func (q *ListRequestsQuery) ApplyToBuilder(
 
 	if q.PathRegex != nil {
 		b, err = b.WithPathRegex(*q.PathRegex)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if q.LabelSelector != nil {
+		b, err = b.WithLabelSelector(*q.LabelSelector)
 		if err != nil {
 			return nil, err
 		}

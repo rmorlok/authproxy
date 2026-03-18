@@ -58,7 +58,8 @@ func (s *clickhouseRecordStore) StoreRecords(ctx context.Context, records []*Log
 			"response_status_code, response_error, "+
 			"request_http_version, request_size_bytes, request_mime_type, "+
 			"response_http_version, response_size_bytes, response_mime_type, "+
-			"internal_timeout, request_cancelled, full_request_recorded) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			"internal_timeout, request_cancelled, full_request_recorded, "+
+			"labels) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		entryRecordsTable,
 	))
 	if err != nil {
@@ -69,6 +70,10 @@ func (s *clickhouseRecordStore) StoreRecords(ctx context.Context, records []*Log
 	defer stmt.Close()
 
 	for _, r := range records {
+		labelsVal, _ := r.Labels.Value()
+		if labelsVal == nil {
+			labelsVal = "{}"
+		}
 		_, err = stmt.ExecContext(ctx,
 			r.RequestId.String(), r.Namespace, string(r.Type), r.CorrelationId,
 			r.Timestamp.UnixMilli(), r.MillisecondDuration.Duration().Milliseconds(),
@@ -78,6 +83,7 @@ func (s *clickhouseRecordStore) StoreRecords(ctx context.Context, records []*Log
 			r.RequestHttpVersion, r.RequestSizeBytes, r.RequestMimeType,
 			r.ResponseHttpVersion, r.ResponseSizeBytes, r.ResponseMimeType,
 			r.InternalTimeout, r.RequestCancelled, r.FullRequestRecorded,
+			labelsVal,
 		)
 		if err != nil {
 			s.logger.Error("failed to insert record into clickhouse", "error", err, "entry_id", r.RequestId.String())
@@ -122,7 +128,8 @@ func (s *clickhouseRecordStore) Migrate(ctx context.Context) error {
 		response_mime_type String,
 		internal_timeout Bool,
 		request_cancelled Bool,
-		full_request_recorded Bool
+		full_request_recorded Bool,
+		labels String DEFAULT '{}'
 	) ENGINE = MergeTree()
 	ORDER BY (namespace, timestamp_ms, request_id)`, entryRecordsTable)
 
@@ -356,6 +363,14 @@ func (l *clickhouseListRequestsBuilder) WithTimestampRange(start, end time.Time)
 
 func (l *clickhouseListRequestsBuilder) WithParsedTimestampRange(r string) (ListRequestBuilder, error) {
 	_, err := l.sqlListRequestsBuilder.WithParsedTimestampRange(r)
+	if err != nil {
+		return nil, err
+	}
+	return l, nil
+}
+
+func (l *clickhouseListRequestsBuilder) WithLabelSelector(selector string) (ListRequestBuilder, error) {
+	_, err := l.sqlListRequestsBuilder.WithLabelSelector(selector)
 	if err != nil {
 		return nil, err
 	}

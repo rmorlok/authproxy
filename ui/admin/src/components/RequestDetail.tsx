@@ -25,7 +25,7 @@ import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import {Duration, HttpStatusChip} from '../util'
-import {getRequest, RequestEntry} from '@authproxy/api';
+import {getRequest, RequestEntry, RequestEntryRecord} from '@authproxy/api';
 import Chip from "@mui/material/Chip";
 
 function useRequest(id: string | undefined) {
@@ -314,11 +314,12 @@ function CopyButton({getText}: { getText: () => string }) {
 
 export interface RequestDetailProps {
     requestId: string;
+    record?: RequestEntryRecord;
     onClose?: () => void;
     showOpenFullPage?: boolean;
 }
 
-export default function RequestDetail({requestId, onClose, showOpenFullPage}: RequestDetailProps) {
+export default function RequestDetail({requestId, record, onClose, showOpenFullPage}: RequestDetailProps) {
     const {data, loading, error} = useRequest(requestId);
     const [tab, setTab] = useState(0);
     const [pretty, setPretty] = useState(true);
@@ -434,6 +435,18 @@ export default function RequestDetail({requestId, onClose, showOpenFullPage}: Re
                                         {typeof data.res.cl === 'number' && (
                                             <TableRow><TableCell>Response
                                                 Size</TableCell><TableCell>{data.res.cl} bytes</TableCell></TableRow>
+                                        )}
+                                        {record?.labels && Object.keys(record.labels).length > 0 && (
+                                            <TableRow>
+                                                <TableCell>Labels</TableCell>
+                                                <TableCell>
+                                                    <Stack direction="row" spacing={0.5} sx={{ flexWrap: 'wrap', gap: 0.5 }}>
+                                                        {Object.entries(record.labels).map(([k, v]) => (
+                                                            <Chip key={k} label={`${k}=${v}`} size="small" variant="outlined" />
+                                                        ))}
+                                                    </Stack>
+                                                </TableCell>
+                                            </TableRow>
                                         )}
                                     </TableBody>
                                 </Table>
