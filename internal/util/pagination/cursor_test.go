@@ -4,7 +4,6 @@ import (
 	"context"
 	"testing"
 
-	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/require"
 )
 
@@ -14,17 +13,15 @@ type FakeCursor struct {
 
 func TestCursorRoundTrip(t *testing.T) {
 	t.Parallel()
-	key := config.KeyDataValue{
-		Value: "0123456789abcdef0123456789abcdef",
-	}
+	enc := NewDefaultCursorEncryptor([]byte("0123456789abcdef0123456789abcdef"))
 
-	cursor, err := MakeCursor(context.Background(), &key, &FakeCursor{
+	cursor, err := MakeCursor(context.Background(), enc, &FakeCursor{
 		Value: "some-value",
 	})
 	require.NoError(t, err)
 	require.NotEmpty(t, cursor)
 
-	parsed, err := ParseCursor[FakeCursor](context.Background(), &key, cursor)
+	parsed, err := ParseCursor[FakeCursor](context.Background(), enc, cursor)
 	require.NoError(t, err)
 	require.Equal(t, "some-value", parsed.Value)
 }

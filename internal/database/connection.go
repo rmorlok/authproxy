@@ -394,7 +394,7 @@ func (l *listConnectionsFilters) ForLabelSelector(selector string) ListConnectio
 
 func (l *listConnectionsFilters) FromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error) {
 	s := l.s
-	parsed, err := pagination.ParseCursor[listConnectionsFilters](ctx, s.secretKey, cursor)
+	parsed, err := pagination.ParseCursor[listConnectionsFilters](ctx, s.cursorEncryptor, cursor)
 
 	if err != nil {
 		return nil, err
@@ -476,7 +476,7 @@ func (l *listConnectionsFilters) fetchPage(ctx context.Context) pagination.PageR
 	cursor := ""
 	hasMore := uint64(len(results)) > l.LimitVal
 	if hasMore {
-		cursor, err = pagination.MakeCursor(ctx, l.s.secretKey, l)
+		cursor, err = pagination.MakeCursor(ctx, l.s.cursorEncryptor, l)
 		if err != nil {
 			return pagination.PageResult[Connection]{Error: err}
 		}

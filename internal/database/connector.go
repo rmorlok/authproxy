@@ -155,7 +155,7 @@ func (l *listConnectorsFilters) ForLabelSelector(selector string) ListConnectors
 
 func (l *listConnectorsFilters) FromCursor(ctx context.Context, cursor string) (ListConnectorsExecutor, error) {
 	s := l.s
-	parsed, err := pagination.ParseCursor[listConnectorsFilters](ctx, s.secretKey, cursor)
+	parsed, err := pagination.ParseCursor[listConnectorsFilters](ctx, s.cursorEncryptor, cursor)
 
 	if err != nil {
 		return nil, err
@@ -305,7 +305,7 @@ cvc.versions as total_versions
 	cursor := ""
 	hasMore := uint64(len(connectors)) > l.LimitVal
 	if hasMore {
-		cursor, err = pagination.MakeCursor(ctx, l.s.secretKey, l)
+		cursor, err = pagination.MakeCursor(ctx, l.s.cursorEncryptor, l)
 		if err != nil {
 			return pagination.PageResult[Connector]{Error: err}
 		}

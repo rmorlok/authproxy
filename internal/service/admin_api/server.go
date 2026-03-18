@@ -156,6 +156,7 @@ func GetGinServer(
 		dm.GetConfig(),
 		authService,
 		dm.GetAsyncInspector(),
+		dm.GetEncryptService(),
 	)
 
 	api := server.Group("/api/v1")

@@ -522,7 +522,7 @@ func (l *listEncryptionKeysFilters) ForLabelSelector(selector string) ListEncryp
 
 func (l *listEncryptionKeysFilters) FromCursor(ctx context.Context, cursor string) (ListEncryptionKeysExecutor, error) {
 	s := l.s
-	parsed, err := pagination.ParseCursor[listEncryptionKeysFilters](ctx, s.secretKey, cursor)
+	parsed, err := pagination.ParseCursor[listEncryptionKeysFilters](ctx, s.cursorEncryptor, cursor)
 	if err != nil {
 		return nil, err
 	}
@@ -602,7 +602,7 @@ func (l *listEncryptionKeysFilters) fetchPage(ctx context.Context) pagination.Pa
 	cursor := ""
 	hasMore := uint64(len(results)) > l.LimitVal
 	if hasMore {
-		cursor, err = pagination.MakeCursor(ctx, l.s.secretKey, l)
+		cursor, err = pagination.MakeCursor(ctx, l.s.cursorEncryptor, l)
 		if err != nil {
 			return pagination.PageResult[EncryptionKey]{Error: err}
 		}

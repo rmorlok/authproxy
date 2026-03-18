@@ -178,13 +178,13 @@ var _ RecordStore = (*sqlRecordStore)(nil)
 
 type sqlRecordRetriever struct {
 	db                *sql.DB
-	cursorKey         config.KeyDataType
+	cursorEncryptor   pagination.CursorEncryptor
 	logger            *slog.Logger
 	provider          config.DatabaseProvider
 	placeholderFormat sq.PlaceholderFormat
 }
 
-func NewSqlRecordRetriever(cfg *config.Database, cursorKey config.KeyDataType, logger *slog.Logger) RecordRetriever {
+func NewSqlRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorEncryptor, logger *slog.Logger) RecordRetriever {
 	db, err := sql.Open(cfg.GetDriver(), cfg.GetDsn())
 	if err != nil {
 		panic(errors.Wrap(err, "failed to open http logging database for retrieval"))
@@ -192,7 +192,7 @@ func NewSqlRecordRetriever(cfg *config.Database, cursorKey config.KeyDataType, l
 
 	return &sqlRecordRetriever{
 		db:                db,
-		cursorKey:         cursorKey,
+		cursorEncryptor:   cursorEncryptor,
 		logger:            logger.With("sub_component", "retriever"),
 		provider:          cfg.GetProvider(),
 		placeholderFormat: cfg.GetPlaceholderFormat(),
@@ -262,7 +262,7 @@ func (r *sqlRecordRetriever) NewListRequestsBuilder() ListRequestBuilder {
 	return &sqlListRequestsBuilder{
 		ListFilters:       ListFilters{LimitVal: 100},
 		db:                r.db,
-		cursorKey:         r.cursorKey,
+		cursorEncryptor:         r.cursorEncryptor,
 		placeholderFormat: r.placeholderFormat,
 		provider:          r.provider,
 	}
@@ -272,7 +272,7 @@ func (r *sqlRecordRetriever) ListRequestsFromCursor(ctx context.Context, cursor 
 	b := &sqlListRequestsBuilder{
 		ListFilters:       ListFilters{LimitVal: 100},
 		db:                r.db,
-		cursorKey:         r.cursorKey,
+		cursorEncryptor:         r.cursorEncryptor,
 		placeholderFormat: r.placeholderFormat,
 		provider:          r.provider,
 	}
@@ -300,10 +300,10 @@ var sqlOrderByColumns = map[RequestOrderByField]string{
 
 type sqlListRequestsBuilder struct {
 	ListFilters
-	db                *sql.DB                 `json:"-"`
-	cursorKey         config.KeyDataType      `json:"-"`
-	placeholderFormat sq.PlaceholderFormat    `json:"-"`
-	provider          config.DatabaseProvider `json:"-"`
+	db                *sql.DB                    `json:"-"`
+	cursorEncryptor   pagination.CursorEncryptor `json:"-"`
+	placeholderFormat sq.PlaceholderFormat        `json:"-"`
+	provider          config.DatabaseProvider     `json:"-"`
 }
 
 func (l *sqlListRequestsBuilder) addError(e error) ListRequestBuilder {
@@ -520,18 +520,18 @@ func (l *sqlListRequestsBuilder) buildQuery() sq.SelectBuilder {
 
 func (l *sqlListRequestsBuilder) fromCursor(ctx context.Context, cursor string) (ListRequestExecutor, error) {
 	db := l.db
-	cursorKey := l.cursorKey
+	cursorEncryptor := l.cursorEncryptor
 	pf := l.placeholderFormat
 	provider := l.provider
 
-	parsed, err := pagination.ParseCursor[sqlListRequestsBuilder](ctx, l.cursorKey, cursor)
+	parsed, err := pagination.ParseCursor[sqlListRequestsBuilder](ctx, l.cursorEncryptor, cursor)
 	if err != nil {
 		return nil, err
 	}
 
 	*l = *parsed
 	l.db = db
-	l.cursorKey = cursorKey
+	l.cursorEncryptor = cursorEncryptor
 	l.placeholderFormat = pf
 	l.provider = provider
 
@@ -578,7 +578,7 @@ func (l *sqlListRequestsBuilder) FetchPage(ctx context.Context) pagination.PageR
 	cursorStr := ""
 	hasMore := int32(len(entries)) > limit
 	if hasMore {
-		cursorStr, err = pagination.MakeCursor(ctx, l.cursorKey, l)
+		cursorStr, err = pagination.MakeCursor(ctx, l.cursorEncryptor, l)
 		if err != nil {
 			return pagination.PageResult[*LogRecord]{Error: err}
 		}

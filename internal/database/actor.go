@@ -620,7 +620,7 @@ func (l *listActorsFilters) ForLabelSelector(selector string) ListActorsBuilder 
 
 func (l *listActorsFilters) FromCursor(ctx context.Context, cursor string) (ListActorsExecutor, error) {
 	s := l.s
-	parsed, err := pagination.ParseCursor[listActorsFilters](ctx, s.secretKey, cursor)
+	parsed, err := pagination.ParseCursor[listActorsFilters](ctx, s.cursorEncryptor, cursor)
 
 	if err != nil {
 		return nil, err
@@ -698,7 +698,7 @@ func (l *listActorsFilters) fetchPage(ctx context.Context) pagination.PageResult
 	cursor := ""
 	hasMore := uint64(len(results)) > l.LimitVal
 	if hasMore {
-		cursor, err = pagination.MakeCursor(ctx, l.s.secretKey, l)
+		cursor, err = pagination.MakeCursor(ctx, l.s.cursorEncryptor, l)
 		if err != nil {
 			return pagination.PageResult[*Actor]{Error: err}
 		}
