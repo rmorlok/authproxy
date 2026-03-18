@@ -232,7 +232,7 @@ func (s *service) queryReEncryptionPage(
 		qualifiedCol := reg.Table + "." + ec
 		var jsonIdExpr string
 		if s.cfg.GetProvider() == config.DatabaseProviderPostgres {
-			jsonIdExpr = fmt.Sprintf("COALESCE(%s::jsonb ->> 'id', '')", qualifiedCol)
+			jsonIdExpr = fmt.Sprintf("COALESCE(%s ->> 'id', '')", qualifiedCol)
 		} else {
 			jsonIdExpr = fmt.Sprintf("COALESCE(json_extract(%s, '$.id'), '')", qualifiedCol)
 		}

@@ -60,7 +60,11 @@ func (l Labels) Value() (driver.Value, error) {
 		return nil, nil
 	}
 
-	return json.Marshal(l)
+	b, err := json.Marshal(l)
+	if err != nil {
+		return nil, err
+	}
+	return string(b), nil
 }
 
 // Scan implements the sql.Scanner interface for Labels
