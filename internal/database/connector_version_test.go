@@ -475,6 +475,59 @@ INSERT INTO connector_versions
 			require.NotNil(t, savedCV1)
 			assert.Equal(t, ConnectorVersionStateActive, savedCV1.State)
 		})
+		t.Run("upsert does not update soft-deleted version", func(t *testing.T) {
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			connectorID := apid.New(apid.PrefixConnectorVersion)
+			cv := &ConnectorVersion{
+				Id:                  connectorID,
+				Version:             1,
+				Namespace:           sconfig.RootNamespace,
+				State:               ConnectorVersionStateDraft,
+				Labels:              Labels{"type": "test_connector"},
+				Hash:                "test_hash",
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "test_encrypted_definition"},
+			}
+
+			err := db.UpsertConnectorVersion(ctx, cv)
+			require.NoError(t, err)
+
+			// Soft-delete the version via raw SQL
+			_, err = rawDb.Exec("UPDATE connector_versions SET deleted_at = ? WHERE id = ? AND version = ?", now, connectorID.String(), 1)
+			require.NoError(t, err)
+
+			// Upserting a new version 2 should work — the soft-deleted v1 should not count toward max version
+			cv2 := &ConnectorVersion{
+				Id:                  connectorID,
+				Version:             1,
+				Namespace:           sconfig.RootNamespace,
+				State:               ConnectorVersionStateDraft,
+				Labels:              Labels{"type": "updated_connector"},
+				Hash:                "new_hash",
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "new_encrypted_definition"},
+			}
+
+			// This will fail due to UNIQUE constraint on (id, version), which is expected —
+			// the important thing is that UpsertConnectorVersion does NOT attempt to update
+			// the soft-deleted row (it treats it as non-existent and goes down the insert path)
+			err = db.UpsertConnectorVersion(ctx, cv2)
+			require.Error(t, err)
+
+			// Verify the soft-deleted row was not modified
+			type cvResult struct {
+				Labels    string
+				Hash      string
+				DeletedAt *time.Time
+			}
+			var result cvResult
+			err = rawDb.QueryRow("SELECT labels, hash, deleted_at FROM connector_versions WHERE id = ? AND version = ?", connectorID.String(), 1).Scan(&result.Labels, &result.Hash, &result.DeletedAt)
+			require.NoError(t, err)
+			assert.NotNil(t, result.DeletedAt, "soft-deleted row should still have deleted_at set")
+			assert.Equal(t, "test_hash", result.Hash, "soft-deleted row should not have been updated")
+		})
+
 		t.Run("refuses to skip version numbers", func(t *testing.T) {
 			// This test simulates what UpsertConnectorVersion does when setting a new primary version
 
@@ -615,6 +668,34 @@ INSERT INTO connector_versions
 			v1, err := db.GetConnectorVersion(ctx, connectorID, 1)
 			require.NoError(t, err)
 			assert.Equal(t, ConnectorVersionStateActive, v1.State)
+		})
+
+		t.Run("returns not found for soft-deleted version", func(t *testing.T) {
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			connectorID := apid.New(apid.PrefixConnectorVersion)
+			cv := &ConnectorVersion{
+				Id:                  connectorID,
+				Version:             1,
+				Namespace:           sconfig.RootNamespace,
+				State:               ConnectorVersionStateDraft,
+				Labels:              Labels{"type": "test_connector"},
+				Hash:                "test_hash",
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "test_encrypted_definition"},
+			}
+
+			err := db.UpsertConnectorVersion(ctx, cv)
+			require.NoError(t, err)
+
+			// Soft-delete via raw SQL (no DeleteConnectorVersion function exists)
+			_, err = rawDb.Exec("UPDATE connector_versions SET deleted_at = ? WHERE id = ? AND version = ?", now, connectorID.String(), 1)
+			require.NoError(t, err)
+
+			// Attempting to set state on a soft-deleted version should return ErrNotFound
+			err = db.SetConnectorVersionState(ctx, connectorID, 1, ConnectorVersionStatePrimary)
+			require.ErrorIs(t, err, ErrNotFound)
 		})
 
 		t.Run("archives existing draft when forcing new draft", func(t *testing.T) {

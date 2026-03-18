@@ -341,7 +341,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 		existingNamespace, _, err := sqlh.ScanWithDefault(sqb.
 			Select("namespace").
 			From(ConnectorVersionsTable).
-			Where(sq.Eq{"id": cv.Id, "version": cv.Version}).
+			Where(sq.Eq{"id": cv.Id, "version": cv.Version, "deleted_at": nil}).
 			QueryRowContext(ctx),
 			cv.Namespace)
 
@@ -356,7 +356,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 		exitingState, defaultUsed, err := sqlh.ScanWithDefault(sqb.
 			Select("state").
 			From(ConnectorVersionsTable).
-			Where(sq.Eq{"id": cv.Id, "version": cv.Version}).
+			Where(sq.Eq{"id": cv.Id, "version": cv.Version, "deleted_at": nil}).
 			QueryRowContext(ctx),
 			ConnectorVersionStateDraft)
 
@@ -376,7 +376,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				Set("labels", cv.Labels).
 				Set("encrypted_definition", cv.EncryptedDefinition).
 				Set("updated_at", apctx.GetClock(ctx).Now()).
-				Where(sq.Eq{"id": cv.Id, "version": cv.Version}).
+				Where(sq.Eq{"id": cv.Id, "version": cv.Version, "deleted_at": nil}).
 				Exec()
 			if err != nil {
 				return err
@@ -398,7 +398,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 			err := sqb.
 				Select("COALESCE(MAX(version), 0)").
 				From(ConnectorVersionsTable).
-				Where(sq.Eq{"id": cv.Id}).
+				Where(sq.Eq{"id": cv.Id, "deleted_at": nil}).
 				QueryRowContext(ctx).
 				Scan(&maxVersion)
 
@@ -469,7 +469,7 @@ func (s *service) SetConnectorVersionState(ctx context.Context, id apid.ID, vers
 			Update(ConnectorVersionsTable).
 			Set("updated_at", now).
 			Set("state", state).
-			Where(sq.Eq{"id": id, "version": version}).
+			Where(sq.Eq{"id": id, "version": version, "deleted_at": nil}).
 			Exec()
 		if err != nil {
 			return errors.Wrap(err, "failed to set connector version state")

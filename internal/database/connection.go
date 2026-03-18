@@ -247,7 +247,7 @@ func (s *service) SetConnectionState(ctx context.Context, id apid.ID, state Conn
 		Update(ConnectionsTable).
 		Set("updated_at", now).
 		Set("state", state).
-		Where(sq.Eq{"id": id}).
+		Where(sq.Eq{"id": id, "deleted_at": nil}).
 		RunWith(s.db).
 		Exec()
 	if err != nil {

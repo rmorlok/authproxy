@@ -213,6 +213,29 @@ func TestConnections(t *testing.T) {
 			},
 		})
 	})
+	t.Run("set connection state returns not found for soft-deleted connection", func(t *testing.T) {
+		_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		u := apid.New(apid.PrefixConnection)
+		err := db.CreateConnection(ctx, &Connection{
+			Id:               u,
+			Namespace:        "root.some-namespace",
+			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+		})
+		assert.NoError(t, err)
+
+		// Soft-delete the connection
+		err = db.DeleteConnection(ctx, u)
+		assert.NoError(t, err)
+
+		// Attempting to set state on a soft-deleted connection should return ErrNotFound
+		err = db.SetConnectionState(ctx, u, ConnectionStateReady)
+		assert.ErrorIs(t, err, ErrNotFound)
+	})
 
 	t.Run("list connections", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig(t, nil)

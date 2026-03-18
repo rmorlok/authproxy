@@ -359,6 +359,24 @@ INSERT INTO namespaces
 		require.Equal(t, sconfig.RootNamespace, sconfig.RootNamespace)
 		require.Equal(t, NamespaceStateDestroying, retrieved.State)
 	})
+	t.Run("SetNamespaceState returns not found for soft-deleted namespace", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig(t, nil)
+		now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		// Verify the root namespace exists
+		retrieved, err := db.GetNamespace(ctx, sconfig.RootNamespace)
+		require.NoError(t, err)
+		require.Equal(t, sconfig.RootNamespace, retrieved.Path)
+
+		// Soft-delete the namespace
+		err = db.DeleteNamespace(ctx, sconfig.RootNamespace)
+		require.NoError(t, err)
+
+		// Attempting to set state on a soft-deleted namespace should return ErrNotFound
+		err = db.SetNamespaceState(ctx, sconfig.RootNamespace, NamespaceStateDestroying)
+		require.ErrorIs(t, err, ErrNotFound)
+	})
 	t.Run("normalize", func(t *testing.T) {
 		val := Namespace{
 			Path:  "root.prod.12345",

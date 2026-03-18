@@ -439,7 +439,7 @@ func (s *service) SetNamespaceState(ctx context.Context, path string, state Name
 		Update(NamespacesTable).
 		Set("updated_at", now).
 		Set("state", state).
-		Where(sq.Eq{"path": path}).
+		Where(sq.Eq{"path": path, "deleted_at": nil}).
 		RunWith(s.db).
 		Exec()
 	if err != nil {
