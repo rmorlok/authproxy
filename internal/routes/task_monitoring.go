@@ -27,12 +27,13 @@ func NewTaskMonitoringRoutes(
 	cfg config.C,
 	auth auth.A,
 	inspector apasynq.Inspector,
+	cursorEncryptor pagination.CursorEncryptor,
 ) *TaskMonitoringRoutes {
 	return &TaskMonitoringRoutes{
 		cfg:             cfg,
 		auth:            auth,
 		inspector:       inspector,
-		cursorEncryptor: pagination.NewRandomCursorEncryptor(),
+		cursorEncryptor: cursorEncryptor,
 	}
 }
 

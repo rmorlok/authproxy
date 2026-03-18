@@ -17,6 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/require"
 )
@@ -34,7 +35,7 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
 
 		inspector := mock.NewMockInspector(ctrl)
-		routes := NewTaskMonitoringRoutes(cfg, auth, inspector)
+		routes := NewTaskMonitoringRoutes(cfg, auth, inspector, pagination.NewRandomCursorEncryptor())
 
 		r := api_common.GinForTest(nil)
 		routes.Register(r)
