@@ -52,6 +52,8 @@ type ProxyRequest struct {
 	Method string `json:"method" example:"GET"`
 	// HTTP headers
 	Headers map[string]string `json:"headers,omitempty"`
+	// Optional labels to attach to this request's log entry (merged with connection labels; request labels override)
+	Labels map[string]string `json:"labels,omitempty"`
 	// Raw body bytes (base64 encoded if binary)
 	BodyRaw []byte `json:"body_raw,omitempty"`
 	// JSON body (alternative to body_raw)
@@ -170,6 +172,8 @@ type SwaggerRequestLogEntry struct {
 	Path string `json:"path" example:"/v1/users"`
 	// HTTP response status code
 	ResponseStatusCode int `json:"response_status_code" example:"200"`
+	// Labels associated with the request (merged from connection and per-request labels)
+	Labels map[string]string `json:"labels,omitempty"`
 }
 
 // SwaggerListConnectionResponse is the response for list connections

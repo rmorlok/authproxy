@@ -4139,6 +4139,12 @@ const docTemplateadmin_api = `{
                         "description": "Filter by path regex",
                         "name": "path_regex",
                         "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by label selector (e.g., 'env=prod,team=api')",
+                        "name": "label_selector",
+                        "in": "query"
                     }
                 ],
                 "responses": {
@@ -4608,6 +4614,13 @@ const docTemplateadmin_api = `{
                 },
                 "headers": {
                     "description": "HTTP headers",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "labels": {
+                    "description": "Optional labels to attach to this request's log entry (merged with connection labels; request labels override)",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
@@ -5164,6 +5177,13 @@ const docTemplateadmin_api = `{
                     "description": "Target host",
                     "type": "string",
                     "example": "api.example.com"
+                },
+                "labels": {
+                    "description": "Labels associated with the request (merged from connection and per-request labels)",
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
                 },
                 "method": {
                     "description": "HTTP method",
