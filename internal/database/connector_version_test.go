@@ -1,6 +1,10 @@
 package database
 
 import (
+	"fmt"
+	"testing"
+	"time"
+
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/encfield"
@@ -10,8 +14,6 @@ import (
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
-	"testing"
-	"time"
 )
 
 func TestConnectorVersions(t *testing.T) {
@@ -495,7 +497,7 @@ INSERT INTO connector_versions
 			require.NoError(t, err)
 
 			// Soft-delete the version via raw SQL
-			_, err = rawDb.Exec("UPDATE connector_versions SET deleted_at = ? WHERE id = ? AND version = ?", now, connectorID.String(), 1)
+			_, err = rawDb.Exec(fmt.Sprintf("UPDATE connector_versions SET deleted_at = '%s' WHERE id = '%s' AND version = 1", now.Format("2006-01-02 15:04:05"), connectorID.String()))
 			require.NoError(t, err)
 
 			// Upserting a new version 2 should work — the soft-deleted v1 should not count toward max version
@@ -522,7 +524,7 @@ INSERT INTO connector_versions
 				DeletedAt *time.Time
 			}
 			var result cvResult
-			err = rawDb.QueryRow("SELECT labels, hash, deleted_at FROM connector_versions WHERE id = ? AND version = ?", connectorID.String(), 1).Scan(&result.Labels, &result.Hash, &result.DeletedAt)
+			err = rawDb.QueryRow(fmt.Sprintf("SELECT labels, hash, deleted_at FROM connector_versions WHERE id = '%s' AND version = 1", connectorID.String())).Scan(&result.Labels, &result.Hash, &result.DeletedAt)
 			require.NoError(t, err)
 			assert.NotNil(t, result.DeletedAt, "soft-deleted row should still have deleted_at set")
 			assert.Equal(t, "test_hash", result.Hash, "soft-deleted row should not have been updated")
@@ -690,7 +692,7 @@ INSERT INTO connector_versions
 			require.NoError(t, err)
 
 			// Soft-delete via raw SQL (no DeleteConnectorVersion function exists)
-			_, err = rawDb.Exec("UPDATE connector_versions SET deleted_at = ? WHERE id = ? AND version = ?", now, connectorID.String(), 1)
+			_, err = rawDb.Exec(fmt.Sprintf("UPDATE connector_versions SET deleted_at = '%s' WHERE id = '%s' AND version = 1", now.Format("2006-01-02 15:04:05"), connectorID.String()))
 			require.NoError(t, err)
 
 			// Attempting to set state on a soft-deleted version should return ErrNotFound
