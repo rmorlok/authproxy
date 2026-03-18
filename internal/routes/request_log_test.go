@@ -376,4 +376,153 @@ func TestRequestLogRoutes(t *testing.T) {
 			require.Equal(t, http.StatusOK, w.Code)
 		})
 	})
+
+	t.Run("list with label_selector", func(t *testing.T) {
+		tu := setup(t, nil)
+
+		t.Run("passes label_selector to builder", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/request-log?label_selector=env%3Dprod%2Cteam%3Dapi",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "request-log", "list"),
+			)
+			require.NoError(t, err)
+
+			id := apid.MustParse("req_test550e8400abcde")
+			b := mock.MockListRequestBuilderExecutor{
+				ReturnResults: pagination.PageResult[*request_log.LogRecord]{
+					Results: []*request_log.LogRecord{
+						{
+							Namespace:          "root",
+							Type:               httpf.RequestTypeProxy,
+							RequestId:          id,
+							Method:             "GET",
+							Path:               "/api/test",
+							ResponseStatusCode: 200,
+							Labels:             database.Labels{"env": "prod", "team": "api"},
+						},
+					},
+				},
+			}
+
+			tu.MockRetriever.EXPECT().
+				NewListRequestsBuilder().
+				Return(&b)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ListRequestsResponseJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Len(t, resp.Items, 1)
+			require.Equal(t, id, resp.Items[0].RequestId)
+
+			// Verify the label_selector was passed to the builder
+			require.NotNil(t, b.LabelSelector)
+			require.Equal(t, "env=prod,team=api", *b.LabelSelector)
+		})
+
+		t.Run("results include labels in JSON response", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/request-log",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "request-log", "list"),
+			)
+			require.NoError(t, err)
+
+			id := apid.MustParse("req_test550e8400abcde")
+			b := mock.MockListRequestBuilderExecutor{
+				ReturnResults: pagination.PageResult[*request_log.LogRecord]{
+					Results: []*request_log.LogRecord{
+						{
+							Namespace:          "root",
+							Type:               httpf.RequestTypeProxy,
+							RequestId:          id,
+							Method:             "GET",
+							Path:               "/api/test",
+							ResponseStatusCode: 200,
+							Labels:             database.Labels{"env": "prod", "region": "us-east"},
+						},
+					},
+				},
+			}
+
+			tu.MockRetriever.EXPECT().
+				NewListRequestsBuilder().
+				Return(&b)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			// Verify labels are present in the JSON response
+			var raw map[string]interface{}
+			err = json.Unmarshal(w.Body.Bytes(), &raw)
+			require.NoError(t, err)
+
+			items := raw["items"].([]interface{})
+			require.Len(t, items, 1)
+
+			item := items[0].(map[string]interface{})
+			labels := item["labels"].(map[string]interface{})
+			require.Equal(t, "prod", labels["env"])
+			require.Equal(t, "us-east", labels["region"])
+		})
+
+		t.Run("results without labels omit labels from JSON", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/request-log",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "request-log", "list"),
+			)
+			require.NoError(t, err)
+
+			id := apid.MustParse("req_test550e8400abcde")
+			b := mock.MockListRequestBuilderExecutor{
+				ReturnResults: pagination.PageResult[*request_log.LogRecord]{
+					Results: []*request_log.LogRecord{
+						{
+							Namespace:          "root",
+							Type:               httpf.RequestTypeProxy,
+							RequestId:          id,
+							Method:             "GET",
+							Path:               "/api/test",
+							ResponseStatusCode: 200,
+						},
+					},
+				},
+			}
+
+			tu.MockRetriever.EXPECT().
+				NewListRequestsBuilder().
+				Return(&b)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			// Verify labels key is omitted when nil
+			var raw map[string]interface{}
+			err = json.Unmarshal(w.Body.Bytes(), &raw)
+			require.NoError(t, err)
+
+			items := raw["items"].([]interface{})
+			require.Len(t, items, 1)
+
+			item := items[0].(map[string]interface{})
+			_, hasLabels := item["labels"]
+			require.False(t, hasLabels, "labels should be omitted from JSON when nil")
+		})
+	})
 }

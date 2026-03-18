@@ -93,11 +93,42 @@ func (f *clientFactory) ForConnection(c Connection) F {
 	ri.ConnectorId = c.GetConnectorId()
 	ri.ConnectorVersion = c.GetConnectorVersion()
 
+	if connLabels := c.GetLabels(); len(connLabels) > 0 {
+		ri.Labels = make(map[string]string, len(connLabels))
+		for k, v := range connLabels {
+			ri.Labels[k] = v
+		}
+	}
+
 	if rlp, ok := c.(RateLimitConfigProvider); ok {
 		ri.RateLimiting = rlp.GetRateLimitConfig()
 	}
 
 	return fp.ForRequestInfo(ri)
+}
+
+func (f *clientFactory) ForLabels(labels map[string]string) F {
+	if len(labels) == 0 {
+		return f
+	}
+
+	ri := f.requestInfo
+	if ri.Labels == nil {
+		ri.Labels = make(map[string]string, len(labels))
+	} else {
+		// Copy existing labels so we don't mutate shared state
+		newLabels := make(map[string]string, len(ri.Labels)+len(labels))
+		for k, v := range ri.Labels {
+			newLabels[k] = v
+		}
+		ri.Labels = newLabels
+	}
+	// Request labels override connection labels
+	for k, v := range labels {
+		ri.Labels[k] = v
+	}
+
+	return f.ForRequestInfo(ri)
 }
 
 func (f *clientFactory) New() *gentleman.Client {

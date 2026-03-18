@@ -141,25 +141,32 @@ func (s LabelSelector) ApplyToSqlBuilderWithProvider(q sq.SelectBuilder, labelsC
 		case LabelOperatorEqual:
 			if provider == config.DatabaseProviderPostgres {
 				q = q.Where(sq.Expr(fmt.Sprintf("(%s ->> ?) = ?", labelsExpr), r.Key, r.Value))
+			} else if provider == config.DatabaseProviderClickhouse {
+				q = q.Where(sq.Expr(fmt.Sprintf("JSONExtractString(%s, ?) = ?", labelsColumn), r.Key, r.Value))
 			} else {
 				q = q.Where(sq.Expr(fmt.Sprintf("json_extract(%s, %s) = ?", labelsColumn, sqlitePathExpr), r.Key, r.Value))
 			}
 		case LabelOperatorNotEqual:
-			// For inequality, we need to handle the case where the key doesn't exist
 			if provider == config.DatabaseProviderPostgres {
 				q = q.Where(sq.Expr(fmt.Sprintf("(NOT jsonb_exists(%s, ?) OR (%s ->> ?) != ?)", labelsExpr, labelsExpr), r.Key, r.Key, r.Value))
+			} else if provider == config.DatabaseProviderClickhouse {
+				q = q.Where(sq.Expr(fmt.Sprintf("(JSONExtractString(%s, ?) = '' OR JSONExtractString(%s, ?) != ?)", labelsColumn, labelsColumn), r.Key, r.Key, r.Value))
 			} else {
 				q = q.Where(sq.Expr(fmt.Sprintf("(json_extract(%s, %s) IS NULL OR json_extract(%s, %s) != ?)", labelsColumn, sqlitePathExpr, labelsColumn, sqlitePathExpr), r.Key, r.Key, r.Value))
 			}
 		case LabelOperatorExists:
 			if provider == config.DatabaseProviderPostgres {
 				q = q.Where(sq.Expr(fmt.Sprintf("jsonb_exists(%s, ?)", labelsExpr), r.Key))
+			} else if provider == config.DatabaseProviderClickhouse {
+				q = q.Where(sq.Expr(fmt.Sprintf("JSONExtractString(%s, ?) != ''", labelsColumn), r.Key))
 			} else {
 				q = q.Where(sq.Expr(fmt.Sprintf("json_extract(%s, %s) IS NOT NULL", labelsColumn, sqlitePathExpr), r.Key))
 			}
 		case LabelOperatorNotExists:
 			if provider == config.DatabaseProviderPostgres {
 				q = q.Where(sq.Expr(fmt.Sprintf("NOT jsonb_exists(%s, ?)", labelsExpr), r.Key))
+			} else if provider == config.DatabaseProviderClickhouse {
+				q = q.Where(sq.Expr(fmt.Sprintf("JSONExtractString(%s, ?) = ''", labelsColumn), r.Key))
 			} else {
 				q = q.Where(sq.Expr(fmt.Sprintf("json_extract(%s, %s) IS NULL", labelsColumn, sqlitePathExpr), r.Key))
 			}

@@ -80,6 +80,7 @@ type ListRequestBuilder interface {
 	WithPathRegex(r string) (ListRequestBuilder, error)
 	WithTimestampRange(start, end time.Time) ListRequestBuilder
 	WithParsedTimestampRange(r string) (ListRequestBuilder, error)
+	WithLabelSelector(selector string) (ListRequestBuilder, error)
 }
 
 // ListFilters holds the filter, pagination, and ordering data for list requests.
@@ -102,6 +103,7 @@ type ListFilters struct {
 	Path                     *string           `json:"path,omitempty"`
 	PathRegex                *string           `json:"path_regex,omitempty"`
 	NamespaceMatchers        []string          `json:"namespace_matchers,omitempty"`
+	LabelSelector            *string           `json:"label_selector,omitempty"`
 	Errors                   *multierror.Error `json:"-"`
 }
 
@@ -208,4 +210,8 @@ func (l *ListFilters) SetPathRegex(r string) error {
 
 func (l *ListFilters) SetTimestampRange(start, end time.Time) {
 	l.TimestampRange = []time.Time{start, end}
+}
+
+func (l *ListFilters) SetLabelSelector(selector string) {
+	l.LabelSelector = util.ToPtr(selector)
 }

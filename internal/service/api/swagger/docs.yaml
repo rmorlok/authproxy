@@ -159,6 +159,12 @@ definitions:
           type: string
         description: HTTP headers
         type: object
+      labels:
+        additionalProperties:
+          type: string
+        description: Optional labels to attach to this request's log entry (merged
+          with connection labels; request labels override)
+        type: object
       method:
         description: HTTP method
         example: GET
@@ -562,6 +568,12 @@ definitions:
         description: Target host
         example: api.example.com
         type: string
+      labels:
+        additionalProperties:
+          type: string
+        description: Labels associated with the request (merged from connection and
+          per-request labels)
+        type: object
       method:
         description: HTTP method
         example: GET
@@ -3331,6 +3343,10 @@ paths:
       - description: Filter by path regex
         in: query
         name: path_regex
+        type: string
+      - description: Filter by label selector (e.g., 'env=prod,team=api')
+        in: query
+        name: label_selector
         type: string
       produces:
       - application/json

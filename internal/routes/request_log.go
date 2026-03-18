@@ -41,6 +41,7 @@ type ListRequestsQuery struct {
 	TimestampRange           *string    `form:"timestamp_range"`
 	Path                     *string    `form:"path"`
 	PathRegex                *string    `form:"path_regex"`
+	LabelSelector            *string    `form:"label_selector"`
 }
 
 func (q *ListRequestsQuery) ApplyToBuilder(
@@ -118,6 +119,13 @@ func (q *ListRequestsQuery) ApplyToBuilder(
 
 	if q.PathRegex != nil {
 		b, err = b.WithPathRegex(*q.PathRegex)
+		if err != nil {
+			return nil, err
+		}
+	}
+
+	if q.LabelSelector != nil {
+		b, err = b.WithLabelSelector(*q.LabelSelector)
 		if err != nil {
 			return nil, err
 		}
@@ -233,6 +241,7 @@ func (r *RequestLogRoutes) get(gctx *gin.Context) {
 // @Param			timestamp_range		query		string	false	"Filter by timestamp range"
 // @Param			path				query		string	false	"Filter by exact path"
 // @Param			path_regex			query		string	false	"Filter by path regex"
+// @Param			label_selector		query		string	false	"Filter by label selector (e.g., 'env=prod,team=api')"
 // @Success		200					{object}	SwaggerListRequestsResponse
 // @Failure		400					{object}	ErrorResponse
 // @Failure		401					{object}	ErrorResponse

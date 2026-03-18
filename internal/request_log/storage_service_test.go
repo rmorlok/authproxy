@@ -208,6 +208,57 @@ func TestNamespacePopulated(t *testing.T) {
 	require.Equal(t, "root.myns", logs[0].Namespace)
 }
 
+func TestLabelsPopulatedFromRequestInfo(t *testing.T) {
+	ss, store, fullStore := newTestStorageService(true)
+
+	ft := &fakeTransport{status: 200, respBody: "ok", readReqBody: true}
+	ri := httpf.RequestInfo{
+		Type:      httpf.RequestTypeProxy,
+		Namespace: "root.myns",
+		Labels:    map[string]string{"env": "prod", "team": "api"},
+	}
+	rt := ss.NewRoundTripper(ri, ft)
+
+	req, _ := http.NewRequest("GET", "http://example.com/test", nil)
+	resp, err := rt.RoundTrip(req)
+	require.NoError(t, err)
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+
+	// Wait for async storage
+	fullStore.waitForStore(t, 2*time.Second)
+
+	// Labels should be populated in the record
+	records := store.getRecords()
+	require.Equal(t, 1, len(records))
+	require.Equal(t, map[string]string{"env": "prod", "team": "api"}, map[string]string(records[0].Labels))
+}
+
+func TestNilLabelsNotPopulated(t *testing.T) {
+	ss, store, fullStore := newTestStorageService(true)
+
+	ft := &fakeTransport{status: 200, respBody: "ok", readReqBody: true}
+	ri := httpf.RequestInfo{
+		Type:      httpf.RequestTypeProxy,
+		Namespace: "root.myns",
+	}
+	rt := ss.NewRoundTripper(ri, ft)
+
+	req, _ := http.NewRequest("GET", "http://example.com/test", nil)
+	resp, err := rt.RoundTrip(req)
+	require.NoError(t, err)
+	io.Copy(io.Discard, resp.Body)
+	resp.Body.Close()
+
+	// Wait for async storage
+	fullStore.waitForStore(t, 2*time.Second)
+
+	// Labels should be nil/empty
+	records := store.getRecords()
+	require.Equal(t, 1, len(records))
+	require.True(t, len(records[0].Labels) == 0)
+}
+
 func TestGetFullLog_BlobStore(t *testing.T) {
 	logger := newNoopLogger()
 	blob := apblob.NewMemoryClient()

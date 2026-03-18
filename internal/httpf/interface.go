@@ -27,6 +27,7 @@ type Connection interface {
 	GetNamespace() string
 	GetConnectorId() apid.ID
 	GetConnectorVersion() uint64
+	GetLabels() map[string]string
 }
 
 //go:generate mockgen -source=./interface.go -destination=./mock/httpf.go -package=mock
@@ -36,4 +37,5 @@ type F interface {
 	ForRequestType(rt RequestType) F
 	ForConnectorVersion(cv ConnectorVersion) F
 	ForConnection(cv Connection) F
+	ForLabels(labels map[string]string) F
 }

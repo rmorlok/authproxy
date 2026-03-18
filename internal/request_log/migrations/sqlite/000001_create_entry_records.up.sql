@@ -22,7 +22,8 @@ CREATE TABLE IF NOT EXISTS http_log_entry_records (
     response_mime_type TEXT NOT NULL DEFAULT '',
     internal_timeout BOOLEAN NOT NULL DEFAULT FALSE,
     request_cancelled BOOLEAN NOT NULL DEFAULT FALSE,
-    full_request_recorded BOOLEAN NOT NULL DEFAULT FALSE
+    full_request_recorded BOOLEAN NOT NULL DEFAULT FALSE,
+    labels TEXT NOT NULL DEFAULT '{}'
 );
 
 CREATE INDEX IF NOT EXISTS idx_entry_records_namespace ON http_log_entry_records (namespace);

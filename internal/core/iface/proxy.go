@@ -7,6 +7,7 @@ import (
 	"strings"
 
 	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"gopkg.in/h2non/gentleman.v2"
 )
@@ -15,6 +16,7 @@ type ProxyRequest struct {
 	URL      string            `json:"url"`
 	Method   string            `json:"method"`
 	Headers  map[string]string `json:"headers"`
+	Labels   map[string]string `json:"labels,omitempty"`
 	BodyRaw  []byte            `json:"body_raw,omitempty"`
 	BodyJson interface{}       `json:"body_json,omitempty"`
 }
@@ -64,6 +66,12 @@ func (r *ProxyRequest) Validate() error {
 	if (r.Method == http.MethodPut || r.Method == http.MethodPost || r.Method == http.MethodPatch) &&
 		r.BodyJson == nil && r.BodyRaw == nil {
 		errors = append(errors, "either body_raw or body_json is must be specified")
+	}
+
+	if r.Labels != nil {
+		if err := database.Labels(r.Labels).Validate(); err != nil {
+			errors = append(errors, "invalid labels: "+err.Error())
+		}
 	}
 
 	if len(errors) > 0 {
