@@ -17,6 +17,7 @@ Migration files live in two parallel directories:
 | `datetime` | `timestamptz` |
 | `integer` (0/1) | `boolean` |
 | `text` | `text` |
+| `text` (JSON data) | `jsonb` |
 
 Migrations are embedded via `//go:embed migrations/**/*.sql` in `migrate.go` and applied automatically at startup using `golang-migrate`.
 
@@ -50,7 +51,7 @@ The re-encryption registry (`reencrypt_registry.go`) tracks which tables/columns
 
 SQLite and PostgreSQL have different JSON functions. When writing raw SQL expressions involving JSON:
 - **SQLite:** `json_extract(col, '$.key')`
-- **PostgreSQL:** `col::jsonb ->> 'key'`
+- **PostgreSQL:** `col ->> 'key'` (columns storing JSON use native `jsonb` type, no cast needed)
 
 Use `s.cfg.GetProvider()` to branch:
 ```go

@@ -39,7 +39,11 @@ func (p Permissions) Value() (driver.Value, error) {
 		return nil, nil
 	}
 
-	return json.Marshal(p)
+	b, err := json.Marshal(p)
+	if err != nil {
+		return nil, err
+	}
+	return string(b), nil
 }
 
 // Scan implements the sql.Scanner interface for Permissions

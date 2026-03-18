@@ -28,7 +28,7 @@ import (
 
 func displayNameExpr(cfg config.C) string {
 	if cfg.GetRoot().Database.GetProvider() == cfgschema.DatabaseProviderPostgres {
-		return "(NULLIF(encrypted_definition, '')::jsonb ->> 'd')::jsonb ->> 'display_name'"
+		return "(encrypted_definition ->> 'd')::jsonb ->> 'display_name'"
 	}
 	return "json_extract(json_extract(encrypted_definition, '$.d'), '$.display_name')"
 }

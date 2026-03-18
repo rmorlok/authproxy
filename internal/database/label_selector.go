@@ -135,9 +135,6 @@ func (s LabelSelector) String() string {
 
 func (s LabelSelector) ApplyToSqlBuilderWithProvider(q sq.SelectBuilder, labelsColumn string, provider config.DatabaseProvider) sq.SelectBuilder {
 	labelsExpr := labelsColumn
-	if provider == config.DatabaseProviderPostgres {
-		labelsExpr = fmt.Sprintf("NULLIF(%s, '')::jsonb", labelsColumn)
-	}
 	sqlitePathExpr := fmt.Sprintf("'$.\"' || ? || '\"'")
 	for _, r := range s {
 		switch r.Operator {
