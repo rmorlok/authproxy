@@ -87,7 +87,7 @@ http_logging:
     database: authproxy
   blob_storage:
     provider: s3
-    endpoint: http://localhost:9002
+    endpoint: http://localhost:9000
     region: us-east-1
     bucket: authproxy-request-logs
     credentials:
