@@ -880,6 +880,19 @@ func (r *NamespacesRoutes) deleteLabel(gctx *gin.Context) {
 	gctx.Status(http.StatusNoContent)
 }
 
+// @Summary		Get all annotations for a namespace
+// @Description	Get all annotations associated with a specific namespace
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path	path		string	true	"Namespace path"
+// @Success		200		{object}	map[string]string
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path}/annotations [get]
 func (r *NamespacesRoutes) getAnnotations(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -931,6 +944,20 @@ func (r *NamespacesRoutes) getAnnotations(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, annotations)
 }
 
+// @Summary		Get a specific annotation for a namespace
+// @Description	Get a specific annotation value by key for a namespace
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path		path		string	true	"Namespace path"
+// @Param			annotation	path		string	true	"Annotation key"
+// @Success		200			{object}	SwaggerNamespaceAnnotationJson
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		404			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path}/annotations/{annotation} [get]
 func (r *NamespacesRoutes) getAnnotation(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -1003,6 +1030,22 @@ func (r *NamespacesRoutes) getAnnotation(gctx *gin.Context) {
 	})
 }
 
+// @Summary		Set an annotation for a namespace
+// @Description	Set or update a specific annotation value by key for a namespace
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path		path		string									true	"Namespace path"
+// @Param			annotation	path		string									true	"Annotation key"
+// @Param			request		body		SwaggerPutNamespaceAnnotationRequest	true	"Annotation value"
+// @Success		200			{object}	SwaggerNamespaceAnnotationJson
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		403			{object}	ErrorResponse
+// @Failure		404			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path}/annotations/{annotation} [put]
 func (r *NamespacesRoutes) putAnnotation(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -1111,6 +1154,20 @@ func (r *NamespacesRoutes) putAnnotation(gctx *gin.Context) {
 	})
 }
 
+// @Summary		Delete an annotation from a namespace
+// @Description	Delete a specific annotation by key from a namespace
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path		path	string	true	"Namespace path"
+// @Param			annotation	path	string	true	"Annotation key"
+// @Success		204			"No Content"
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		403			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path}/annotations/{annotation} [delete]
 func (r *NamespacesRoutes) deleteAnnotation(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)

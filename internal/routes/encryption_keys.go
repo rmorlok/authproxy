@@ -969,6 +969,19 @@ func (r *EncryptionKeysRoutes) deleteLabel(gctx *gin.Context) {
 	gctx.Status(http.StatusNoContent)
 }
 
+// @Summary		Get all annotations for an encryption key
+// @Description	Get all annotations associated with a specific encryption key
+// @Tags			encryption_keys
+// @Accept			json
+// @Produce		json
+// @Param			id	path		string	true	"Encryption key ID"
+// @Success		200		{object}	map[string]string
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/encryption-keys/{id}/annotations [get]
 func (r *EncryptionKeysRoutes) getAnnotations(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -1020,6 +1033,20 @@ func (r *EncryptionKeysRoutes) getAnnotations(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, annotations)
 }
 
+// @Summary		Get a specific annotation for an encryption key
+// @Description	Get a specific annotation value by key for an encryption key
+// @Tags			encryption_keys
+// @Accept			json
+// @Produce		json
+// @Param			id			path		string	true	"Encryption key ID"
+// @Param			annotation	path		string	true	"Annotation key"
+// @Success		200			{object}	SwaggerEncryptionKeyAnnotationJson
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		404			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/encryption-keys/{id}/annotations/{annotation} [get]
 func (r *EncryptionKeysRoutes) getAnnotation(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -1092,6 +1119,21 @@ func (r *EncryptionKeysRoutes) getAnnotation(gctx *gin.Context) {
 	})
 }
 
+// @Summary		Set an annotation for an encryption key
+// @Description	Set or update a specific annotation value by key for an encryption key
+// @Tags			encryption_keys
+// @Accept			json
+// @Produce		json
+// @Param			id			path		string										true	"Encryption key ID"
+// @Param			annotation	path		string										true	"Annotation key"
+// @Param			request		body		SwaggerPutEncryptionKeyAnnotationRequest	true	"Annotation value"
+// @Success		200			{object}	SwaggerEncryptionKeyAnnotationJson
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		404			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/encryption-keys/{id}/annotations/{annotation} [put]
 func (r *EncryptionKeysRoutes) putAnnotation(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
@@ -1209,6 +1251,19 @@ func (r *EncryptionKeysRoutes) putAnnotation(gctx *gin.Context) {
 	})
 }
 
+// @Summary		Delete an annotation from an encryption key
+// @Description	Delete a specific annotation by key from an encryption key
+// @Tags			encryption_keys
+// @Accept			json
+// @Produce		json
+// @Param			id			path	string	true	"Encryption key ID"
+// @Param			annotation	path	string	true	"Annotation key"
+// @Success		204			"No Content"
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/encryption-keys/{id}/annotations/{annotation} [delete]
 func (r *EncryptionKeysRoutes) deleteAnnotation(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
