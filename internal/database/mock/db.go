@@ -381,6 +381,21 @@ func (mr *MockDBMockRecorder) DeleteActor(ctx, id interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteActor", reflect.TypeOf((*MockDB)(nil).DeleteActor), ctx, id)
 }
 
+// DeleteActorAnnotations mocks base method.
+func (m *MockDB) DeleteActorAnnotations(ctx context.Context, id apid.ID, keys []string) (*database.Actor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteActorAnnotations", ctx, id, keys)
+	ret0, _ := ret[0].(*database.Actor)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteActorAnnotations indicates an expected call of DeleteActorAnnotations.
+func (mr *MockDBMockRecorder) DeleteActorAnnotations(ctx, id, keys interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteActorAnnotations", reflect.TypeOf((*MockDB)(nil).DeleteActorAnnotations), ctx, id, keys)
+}
+
 // DeleteActorLabels mocks base method.
 func (m *MockDB) DeleteActorLabels(ctx context.Context, id apid.ID, keys []string) (*database.Actor, error) {
 	m.ctrl.T.Helper()
@@ -424,6 +439,21 @@ func (mr *MockDBMockRecorder) DeleteConnection(ctx, id interface{}) *gomock.Call
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteConnection", reflect.TypeOf((*MockDB)(nil).DeleteConnection), ctx, id)
 }
 
+// DeleteConnectionAnnotations mocks base method.
+func (m *MockDB) DeleteConnectionAnnotations(ctx context.Context, id apid.ID, keys []string) (*database.Connection, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteConnectionAnnotations", ctx, id, keys)
+	ret0, _ := ret[0].(*database.Connection)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteConnectionAnnotations indicates an expected call of DeleteConnectionAnnotations.
+func (mr *MockDBMockRecorder) DeleteConnectionAnnotations(ctx, id, keys interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteConnectionAnnotations", reflect.TypeOf((*MockDB)(nil).DeleteConnectionAnnotations), ctx, id, keys)
+}
+
 // DeleteConnectionLabels mocks base method.
 func (m *MockDB) DeleteConnectionLabels(ctx context.Context, id apid.ID, keys []string) (*database.Connection, error) {
 	m.ctrl.T.Helper()
@@ -451,6 +481,21 @@ func (m *MockDB) DeleteEncryptionKey(ctx context.Context, id apid.ID) error {
 func (mr *MockDBMockRecorder) DeleteEncryptionKey(ctx, id interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteEncryptionKey", reflect.TypeOf((*MockDB)(nil).DeleteEncryptionKey), ctx, id)
+}
+
+// DeleteEncryptionKeyAnnotations mocks base method.
+func (m *MockDB) DeleteEncryptionKeyAnnotations(ctx context.Context, id apid.ID, keys []string) (*database.EncryptionKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteEncryptionKeyAnnotations", ctx, id, keys)
+	ret0, _ := ret[0].(*database.EncryptionKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteEncryptionKeyAnnotations indicates an expected call of DeleteEncryptionKeyAnnotations.
+func (mr *MockDBMockRecorder) DeleteEncryptionKeyAnnotations(ctx, id, keys interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteEncryptionKeyAnnotations", reflect.TypeOf((*MockDB)(nil).DeleteEncryptionKeyAnnotations), ctx, id, keys)
 }
 
 // DeleteEncryptionKeyLabels mocks base method.
@@ -522,6 +567,21 @@ func (m *MockDB) DeleteNamespace(ctx context.Context, path string) error {
 func (mr *MockDBMockRecorder) DeleteNamespace(ctx, path interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNamespace", reflect.TypeOf((*MockDB)(nil).DeleteNamespace), ctx, path)
+}
+
+// DeleteNamespaceAnnotations mocks base method.
+func (m *MockDB) DeleteNamespaceAnnotations(ctx context.Context, path string, keys []string) (*database.Namespace, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteNamespaceAnnotations", ctx, path, keys)
+	ret0, _ := ret[0].(*database.Namespace)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteNamespaceAnnotations indicates an expected call of DeleteNamespaceAnnotations.
+func (mr *MockDBMockRecorder) DeleteNamespaceAnnotations(ctx, path, keys interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteNamespaceAnnotations", reflect.TypeOf((*MockDB)(nil).DeleteNamespaceAnnotations), ctx, path, keys)
 }
 
 // DeleteNamespaceLabels mocks base method.
@@ -1185,6 +1245,21 @@ func (mr *MockDBMockRecorder) PurgeSoftDeletedRecords(ctx, olderThan interface{}
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PurgeSoftDeletedRecords", reflect.TypeOf((*MockDB)(nil).PurgeSoftDeletedRecords), ctx, olderThan)
 }
 
+// PutActorAnnotations mocks base method.
+func (m *MockDB) PutActorAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*database.Actor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutActorAnnotations", ctx, id, annotations)
+	ret0, _ := ret[0].(*database.Actor)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PutActorAnnotations indicates an expected call of PutActorAnnotations.
+func (mr *MockDBMockRecorder) PutActorAnnotations(ctx, id, annotations interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutActorAnnotations", reflect.TypeOf((*MockDB)(nil).PutActorAnnotations), ctx, id, annotations)
+}
+
 // PutActorLabels mocks base method.
 func (m *MockDB) PutActorLabels(ctx context.Context, id apid.ID, labels map[string]string) (*database.Actor, error) {
 	m.ctrl.T.Helper()
@@ -1198,6 +1273,21 @@ func (m *MockDB) PutActorLabels(ctx context.Context, id apid.ID, labels map[stri
 func (mr *MockDBMockRecorder) PutActorLabels(ctx, id, labels interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutActorLabels", reflect.TypeOf((*MockDB)(nil).PutActorLabels), ctx, id, labels)
+}
+
+// PutConnectionAnnotations mocks base method.
+func (m *MockDB) PutConnectionAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*database.Connection, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutConnectionAnnotations", ctx, id, annotations)
+	ret0, _ := ret[0].(*database.Connection)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PutConnectionAnnotations indicates an expected call of PutConnectionAnnotations.
+func (mr *MockDBMockRecorder) PutConnectionAnnotations(ctx, id, annotations interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutConnectionAnnotations", reflect.TypeOf((*MockDB)(nil).PutConnectionAnnotations), ctx, id, annotations)
 }
 
 // PutConnectionLabels mocks base method.
@@ -1215,6 +1305,21 @@ func (mr *MockDBMockRecorder) PutConnectionLabels(ctx, id, labels interface{}) *
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutConnectionLabels", reflect.TypeOf((*MockDB)(nil).PutConnectionLabels), ctx, id, labels)
 }
 
+// PutEncryptionKeyAnnotations mocks base method.
+func (m *MockDB) PutEncryptionKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*database.EncryptionKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutEncryptionKeyAnnotations", ctx, id, annotations)
+	ret0, _ := ret[0].(*database.EncryptionKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PutEncryptionKeyAnnotations indicates an expected call of PutEncryptionKeyAnnotations.
+func (mr *MockDBMockRecorder) PutEncryptionKeyAnnotations(ctx, id, annotations interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutEncryptionKeyAnnotations", reflect.TypeOf((*MockDB)(nil).PutEncryptionKeyAnnotations), ctx, id, annotations)
+}
+
 // PutEncryptionKeyLabels mocks base method.
 func (m *MockDB) PutEncryptionKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (*database.EncryptionKey, error) {
 	m.ctrl.T.Helper()
@@ -1228,6 +1333,21 @@ func (m *MockDB) PutEncryptionKeyLabels(ctx context.Context, id apid.ID, labels 
 func (mr *MockDBMockRecorder) PutEncryptionKeyLabels(ctx, id, labels interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutEncryptionKeyLabels", reflect.TypeOf((*MockDB)(nil).PutEncryptionKeyLabels), ctx, id, labels)
+}
+
+// PutNamespaceAnnotations mocks base method.
+func (m *MockDB) PutNamespaceAnnotations(ctx context.Context, path string, annotations map[string]string) (*database.Namespace, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutNamespaceAnnotations", ctx, path, annotations)
+	ret0, _ := ret[0].(*database.Namespace)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PutNamespaceAnnotations indicates an expected call of PutNamespaceAnnotations.
+func (mr *MockDBMockRecorder) PutNamespaceAnnotations(ctx, path, annotations interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutNamespaceAnnotations", reflect.TypeOf((*MockDB)(nil).PutNamespaceAnnotations), ctx, path, annotations)
 }
 
 // PutNamespaceLabels mocks base method.
@@ -1342,6 +1462,21 @@ func (mr *MockDBMockRecorder) SetNamespaceState(ctx, path, state interface{}) *g
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNamespaceState", reflect.TypeOf((*MockDB)(nil).SetNamespaceState), ctx, path, state)
 }
 
+// UpdateConnectionAnnotations mocks base method.
+func (m *MockDB) UpdateConnectionAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*database.Connection, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateConnectionAnnotations", ctx, id, annotations)
+	ret0, _ := ret[0].(*database.Connection)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateConnectionAnnotations indicates an expected call of UpdateConnectionAnnotations.
+func (mr *MockDBMockRecorder) UpdateConnectionAnnotations(ctx, id, annotations interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateConnectionAnnotations", reflect.TypeOf((*MockDB)(nil).UpdateConnectionAnnotations), ctx, id, annotations)
+}
+
 // UpdateConnectionLabels mocks base method.
 func (m *MockDB) UpdateConnectionLabels(ctx context.Context, id apid.ID, labels map[string]string) (*database.Connection, error) {
 	m.ctrl.T.Helper()
@@ -1372,6 +1507,21 @@ func (mr *MockDBMockRecorder) UpdateEncryptionKey(ctx, id, updates interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateEncryptionKey", reflect.TypeOf((*MockDB)(nil).UpdateEncryptionKey), ctx, id, updates)
 }
 
+// UpdateEncryptionKeyAnnotations mocks base method.
+func (m *MockDB) UpdateEncryptionKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*database.EncryptionKey, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateEncryptionKeyAnnotations", ctx, id, annotations)
+	ret0, _ := ret[0].(*database.EncryptionKey)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateEncryptionKeyAnnotations indicates an expected call of UpdateEncryptionKeyAnnotations.
+func (mr *MockDBMockRecorder) UpdateEncryptionKeyAnnotations(ctx, id, annotations interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateEncryptionKeyAnnotations", reflect.TypeOf((*MockDB)(nil).UpdateEncryptionKeyAnnotations), ctx, id, annotations)
+}
+
 // UpdateEncryptionKeyLabels mocks base method.
 func (m *MockDB) UpdateEncryptionKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (*database.EncryptionKey, error) {
 	m.ctrl.T.Helper()
@@ -1385,6 +1535,21 @@ func (m *MockDB) UpdateEncryptionKeyLabels(ctx context.Context, id apid.ID, labe
 func (mr *MockDBMockRecorder) UpdateEncryptionKeyLabels(ctx, id, labels interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateEncryptionKeyLabels", reflect.TypeOf((*MockDB)(nil).UpdateEncryptionKeyLabels), ctx, id, labels)
+}
+
+// UpdateNamespaceAnnotations mocks base method.
+func (m *MockDB) UpdateNamespaceAnnotations(ctx context.Context, path string, annotations map[string]string) (*database.Namespace, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateNamespaceAnnotations", ctx, path, annotations)
+	ret0, _ := ret[0].(*database.Namespace)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateNamespaceAnnotations indicates an expected call of UpdateNamespaceAnnotations.
+func (mr *MockDBMockRecorder) UpdateNamespaceAnnotations(ctx, path, annotations interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateNamespaceAnnotations", reflect.TypeOf((*MockDB)(nil).UpdateNamespaceAnnotations), ctx, path, annotations)
 }
 
 // UpdateNamespaceLabels mocks base method.

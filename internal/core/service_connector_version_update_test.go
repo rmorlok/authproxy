@@ -58,7 +58,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 			DisplayName: "Updated",
 		}
 
-		result, err := s.UpdateDraftConnectorVersion(ctx, id, 2, definition, newLabels)
+		result, err := s.UpdateDraftConnectorVersion(ctx, id, 2, definition, newLabels, nil)
 		require.NoError(t, err)
 		require.Equal(t, id, result.GetId())
 		require.Equal(t, uint64(2), result.GetVersion())
@@ -104,7 +104,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 			DisplayName: "Test",
 		}
 
-		result, err := s.UpdateDraftConnectorVersion(ctx, id, 1, definition, nil)
+		result, err := s.UpdateDraftConnectorVersion(ctx, id, 1, definition, nil, nil)
 		require.NoError(t, err)
 		require.Equal(t, "kept", result.GetLabels()["env"])
 	})
@@ -120,7 +120,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 			GetConnectorVersion(gomock.Any(), id, uint64(1)).
 			Return(nil, database.ErrNotFound)
 
-		_, err := s.UpdateDraftConnectorVersion(ctx, id, 1, &cschema.Connector{DisplayName: "Test"}, nil)
+		_, err := s.UpdateDraftConnectorVersion(ctx, id, 1, &cschema.Connector{DisplayName: "Test"}, nil, nil)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrNotFound)
 	})
@@ -136,7 +136,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 			GetConnectorVersion(gomock.Any(), id, uint64(1)).
 			Return(nil, errors.New("connection refused"))
 
-		_, err := s.UpdateDraftConnectorVersion(ctx, id, 1, &cschema.Connector{DisplayName: "Test"}, nil)
+		_, err := s.UpdateDraftConnectorVersion(ctx, id, 1, &cschema.Connector{DisplayName: "Test"}, nil, nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to get connector version")
 	})
@@ -156,7 +156,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 				State:   database.ConnectorVersionStatePrimary,
 			}, nil)
 
-		_, err := s.UpdateDraftConnectorVersion(ctx, id, 1, &cschema.Connector{DisplayName: "Test"}, nil)
+		_, err := s.UpdateDraftConnectorVersion(ctx, id, 1, &cschema.Connector{DisplayName: "Test"}, nil, nil)
 		require.Error(t, err)
 		require.ErrorIs(t, err, ErrNotDraft)
 	})
@@ -185,7 +185,7 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 			UpsertConnectorVersion(gomock.Any(), gomock.Any()).
 			Return(errors.New("write failed"))
 
-		_, err := s.UpdateDraftConnectorVersion(ctx, id, 1, &cschema.Connector{DisplayName: "Test"}, nil)
+		_, err := s.UpdateDraftConnectorVersion(ctx, id, 1, &cschema.Connector{DisplayName: "Test"}, nil, nil)
 		require.Error(t, err)
 		require.Contains(t, err.Error(), "failed to upsert connector version")
 	})

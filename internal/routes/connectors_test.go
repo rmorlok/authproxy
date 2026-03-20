@@ -1682,4 +1682,542 @@ func TestConnectors(t *testing.T) {
 			require.Equal(t, database.ConnectorVersionStatePrimary, resp.State)
 		})
 	})
+
+	t.Run("annotations", func(t *testing.T) {
+		connectorId := apid.MustParse("cxr_test0000000000001")
+
+		t.Run("get annotations", func(t *testing.T) {
+			t.Run("unauthorized", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("/connectors/%s/annotations", connectorId), nil)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusUnauthorized, w.Code)
+			})
+
+			t.Run("not found", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors/cxr_nonexistent00099/annotations",
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNotFound, w.Code)
+			})
+
+			t.Run("valid", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/annotations", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "get"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp map[string]string
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.NotNil(t, resp)
+			})
+		})
+
+		t.Run("get annotation", func(t *testing.T) {
+			t.Run("valid", func(t *testing.T) {
+				tu := setup(t, nil)
+
+				// First create a connector with annotations via POST
+				createBody, _ := json.Marshal(CreateConnectorRequestJson{
+					Namespace:   "root",
+					Definition:  cschema.Connector{DisplayName: "Annotated Connector"},
+					Annotations: map[string]string{"my-annotation": "some-value"},
+				})
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPost,
+					"/connectors",
+					bytes.NewReader(createBody),
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				req.Header.Set("Content-Type", "application/json")
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusCreated, w.Code)
+
+				var created ConnectorVersionJson
+				err = json.Unmarshal(w.Body.Bytes(), &created)
+				require.NoError(t, err)
+
+				// Force the connector version to primary so it is visible via the connector-level routes
+				w = httptest.NewRecorder()
+				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPut,
+					fmt.Sprintf("/connectors/%s/versions/%d/_force_state", created.Id, created.Version),
+					util.JsonToReader(ForceConnectorVersionStateRequestJson{State: database.ConnectorVersionStatePrimary}),
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				// Now get the annotation
+				w = httptest.NewRecorder()
+				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/annotations/my-annotation", created.Id),
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "get"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp ConnectorAnnotationJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Equal(t, "my-annotation", resp.Key)
+				require.Equal(t, "some-value", resp.Value)
+			})
+
+			t.Run("annotation not found", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/annotations/nonexistent", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "get"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNotFound, w.Code)
+			})
+		})
+
+		t.Run("put annotation", func(t *testing.T) {
+			t.Run("valid", func(t *testing.T) {
+				tu := setup(t, nil)
+				body := PutConnectorAnnotationRequestJson{Value: "production"}
+				jsonBody, _ := json.Marshal(body)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPut,
+					fmt.Sprintf("/connectors/%s/annotations/env", connectorId),
+					bytes.NewReader(jsonBody),
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				req.Header.Set("Content-Type", "application/json")
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp ConnectorAnnotationJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Equal(t, "env", resp.Key)
+				require.Equal(t, "production", resp.Value)
+			})
+
+			t.Run("valid - creates draft and sets annotation", func(t *testing.T) {
+				tu := setup(t, nil)
+				body := PutConnectorAnnotationRequestJson{Value: "my-description"}
+				jsonBody, _ := json.Marshal(body)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPut,
+					fmt.Sprintf("/connectors/%s/annotations/description", connectorId),
+					bytes.NewReader(jsonBody),
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				req.Header.Set("Content-Type", "application/json")
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp ConnectorAnnotationJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Equal(t, "description", resp.Key)
+				require.Equal(t, "my-description", resp.Value)
+
+				// Verify the draft version has the annotation
+				w = httptest.NewRecorder()
+				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/versions/2", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var versionResp ConnectorVersionJson
+				err = json.Unmarshal(w.Body.Bytes(), &versionResp)
+				require.NoError(t, err)
+				require.Equal(t, "my-description", versionResp.Annotations["description"])
+			})
+		})
+
+		t.Run("delete annotation", func(t *testing.T) {
+			t.Run("valid", func(t *testing.T) {
+				tu := setup(t, nil)
+
+				// First put an annotation
+				body := PutConnectorAnnotationRequestJson{Value: "to-delete"}
+				jsonBody, _ := json.Marshal(body)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPut,
+					fmt.Sprintf("/connectors/%s/annotations/temp", connectorId),
+					bytes.NewReader(jsonBody),
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				req.Header.Set("Content-Type", "application/json")
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				// Now delete it
+				w = httptest.NewRecorder()
+				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodDelete,
+					fmt.Sprintf("/connectors/%s/annotations/temp", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNoContent, w.Code)
+			})
+
+			t.Run("valid - creates draft and removes annotation", func(t *testing.T) {
+				tu := setup(t, nil)
+
+				// First put an annotation so it exists (this creates draft version 2)
+				body := PutConnectorAnnotationRequestJson{Value: "will-be-removed"}
+				jsonBody, _ := json.Marshal(body)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPut,
+					fmt.Sprintf("/connectors/%s/annotations/removeme", connectorId),
+					bytes.NewReader(jsonBody),
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				req.Header.Set("Content-Type", "application/json")
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				// Delete the annotation (reuses draft version 2)
+				w = httptest.NewRecorder()
+				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodDelete,
+					fmt.Sprintf("/connectors/%s/annotations/removeme", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNoContent, w.Code)
+
+				// Verify the draft version no longer has the annotation
+				w = httptest.NewRecorder()
+				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/versions/2", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var versionResp ConnectorVersionJson
+				err = json.Unmarshal(w.Body.Bytes(), &versionResp)
+				require.NoError(t, err)
+				_, exists := versionResp.Annotations["removeme"]
+				require.False(t, exists)
+			})
+		})
+	})
+
+	t.Run("version annotations", func(t *testing.T) {
+		connectorId := apid.MustParse("cxr_test0000000000001")
+
+		t.Run("get version annotations", func(t *testing.T) {
+			t.Run("valid", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/versions/1/annotations", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp map[string]string
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.NotNil(t, resp)
+			})
+		})
+
+		t.Run("get version annotation", func(t *testing.T) {
+			t.Run("valid", func(t *testing.T) {
+				tu := setup(t, nil)
+
+				// First create a draft version and put an annotation on it
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPost,
+					fmt.Sprintf("/connectors/%s/versions", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusCreated, w.Code)
+
+				var createResp ConnectorVersionJson
+				err = json.Unmarshal(w.Body.Bytes(), &createResp)
+				require.NoError(t, err)
+				draftVersion := createResp.Version
+
+				// Put an annotation on the draft
+				body := PutConnectorAnnotationRequestJson{Value: "draft-value"}
+				jsonBody, _ := json.Marshal(body)
+				w = httptest.NewRecorder()
+				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPut,
+					fmt.Sprintf("/connectors/%s/versions/%d/annotations/info", connectorId, draftVersion),
+					bytes.NewReader(jsonBody),
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				req.Header.Set("Content-Type", "application/json")
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				// Now get the annotation
+				w = httptest.NewRecorder()
+				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/versions/%d/annotations/info", connectorId, draftVersion),
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp ConnectorAnnotationJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Equal(t, "info", resp.Key)
+				require.Equal(t, "draft-value", resp.Value)
+			})
+
+			t.Run("annotation not found", func(t *testing.T) {
+				tu := setup(t, nil)
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/versions/1/annotations/nonexistent", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connectors", "list/versions"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNotFound, w.Code)
+			})
+		})
+
+		t.Run("put version annotation", func(t *testing.T) {
+			t.Run("valid", func(t *testing.T) {
+				tu := setup(t, nil)
+
+				// First create a draft version
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPost,
+					fmt.Sprintf("/connectors/%s/versions", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusCreated, w.Code)
+
+				var createResp ConnectorVersionJson
+				err = json.Unmarshal(w.Body.Bytes(), &createResp)
+				require.NoError(t, err)
+				draftVersion := createResp.Version
+
+				// Put an annotation on the draft version
+				body := PutConnectorAnnotationRequestJson{Value: "staging"}
+				jsonBody, _ := json.Marshal(body)
+				w = httptest.NewRecorder()
+				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPut,
+					fmt.Sprintf("/connectors/%s/versions/%d/annotations/env", connectorId, draftVersion),
+					bytes.NewReader(jsonBody),
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				req.Header.Set("Content-Type", "application/json")
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp ConnectorAnnotationJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Equal(t, "env", resp.Key)
+				require.Equal(t, "staging", resp.Value)
+			})
+		})
+
+		t.Run("delete version annotation", func(t *testing.T) {
+			t.Run("valid", func(t *testing.T) {
+				tu := setup(t, nil)
+
+				// First create a draft version
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPost,
+					fmt.Sprintf("/connectors/%s/versions", connectorId),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusCreated, w.Code)
+
+				var createResp ConnectorVersionJson
+				err = json.Unmarshal(w.Body.Bytes(), &createResp)
+				require.NoError(t, err)
+				draftVersion := createResp.Version
+
+				// Put an annotation on the draft
+				body := PutConnectorAnnotationRequestJson{Value: "to-delete"}
+				jsonBody, _ := json.Marshal(body)
+				w = httptest.NewRecorder()
+				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPut,
+					fmt.Sprintf("/connectors/%s/versions/%d/annotations/temp", connectorId, draftVersion),
+					bytes.NewReader(jsonBody),
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				req.Header.Set("Content-Type", "application/json")
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				// Delete the annotation from the draft version
+				w = httptest.NewRecorder()
+				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodDelete,
+					fmt.Sprintf("/connectors/%s/versions/%d/annotations/temp", connectorId, draftVersion),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNoContent, w.Code)
+
+				// Verify the annotation is gone
+				w = httptest.NewRecorder()
+				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					fmt.Sprintf("/connectors/%s/versions/%d/annotations", connectorId, draftVersion),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var annotations map[string]string
+				err = json.Unmarshal(w.Body.Bytes(), &annotations)
+				require.NoError(t, err)
+				_, exists := annotations["temp"]
+				require.False(t, exists)
+			})
+		})
+	})
 }

@@ -77,6 +77,10 @@ func (c *connection) GetLabels() map[string]string {
 	return c.Labels
 }
 
+func (c *connection) GetAnnotations() map[string]string {
+	return c.Annotations
+}
+
 func (c *connection) GetConnectorVersionEntity() iface.ConnectorVersion {
 	return c.cv
 }

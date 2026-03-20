@@ -127,6 +127,7 @@ type ConnectorVersion struct {
 	Hash                string
 	EncryptedDefinition encfield.EncryptedField
 	Labels              Labels
+	Annotations         Annotations
 	CreatedAt           time.Time
 	UpdatedAt           time.Time
 	EncryptedAt         *time.Time
@@ -142,6 +143,7 @@ func (cv *ConnectorVersion) cols() []string {
 		"hash",
 		"encrypted_definition",
 		"labels",
+		"annotations",
 		"created_at",
 		"updated_at",
 		"encrypted_at",
@@ -158,6 +160,7 @@ func (cv *ConnectorVersion) fields() []any {
 		&cv.Hash,
 		&cv.EncryptedDefinition,
 		&cv.Labels,
+		&cv.Annotations,
 		&cv.CreatedAt,
 		&cv.UpdatedAt,
 		&cv.EncryptedAt,
@@ -174,6 +177,7 @@ func (cv *ConnectorVersion) values() []any {
 		cv.Hash,
 		cv.EncryptedDefinition,
 		cv.Labels,
+		cv.Annotations,
 		cv.CreatedAt,
 		cv.UpdatedAt,
 		cv.EncryptedAt,
@@ -226,6 +230,10 @@ func (cv *ConnectorVersion) Validate() error {
 
 	if err := cv.Labels.Validate(); err != nil {
 		result = multierror.Append(result, errors.Wrap(err, "invalid connector version labels"))
+	}
+
+	if err := cv.Annotations.Validate(); err != nil {
+		result = multierror.Append(result, errors.Wrap(err, "invalid connector version annotations"))
 	}
 
 	return result.ErrorOrNil()
@@ -374,6 +382,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 			result, err := sqb.Update(ConnectorVersionsTable).
 				Set("state", cv.State).
 				Set("labels", cv.Labels).
+				Set("annotations", cv.Annotations).
 				Set("encrypted_definition", cv.EncryptedDefinition).
 				Set("updated_at", apctx.GetClock(ctx).Now()).
 				Where(sq.Eq{"id": cv.Id, "version": cv.Version, "deleted_at": nil}).

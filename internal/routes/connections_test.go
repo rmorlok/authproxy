@@ -1259,4 +1259,398 @@ func TestConnections(t *testing.T) {
 			require.Equal(t, http.StatusForbidden, w.Code)
 		})
 	})
+
+	t.Run("get connection annotations", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+		u := apid.New(apid.PrefixConnection)
+		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
+			Id:               u,
+			Namespace:        sconfig.RootNamespace,
+			ConnectorId:      connectorId,
+			ConnectorVersion: connectorVersion,
+			State:            database.ConnectionStateCreated,
+			Annotations:      database.Annotations{"note": "important", "owner": "team-a"},
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/connections/"+u.String()+"/annotations", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/"+apid.New(apid.PrefixConnection).String()+"/annotations",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("success with annotations", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/"+u.String()+"/annotations",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp map[string]string
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Equal(t, "important", resp["note"])
+			require.Equal(t, "team-a", resp["owner"])
+		})
+
+		t.Run("success with empty annotations", func(t *testing.T) {
+			noAnnotationsId := apid.New(apid.PrefixConnection)
+			err := tu.Db.CreateConnection(context.Background(), &database.Connection{
+				Id:               noAnnotationsId,
+				Namespace:        sconfig.RootNamespace,
+				ConnectorId:      connectorId,
+				ConnectorVersion: connectorVersion,
+				State:            database.ConnectionStateCreated,
+			})
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/"+noAnnotationsId.String()+"/annotations",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp map[string]string
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Empty(t, resp)
+		})
+	})
+
+	t.Run("get connection annotation", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+		u := apid.New(apid.PrefixConnection)
+		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
+			Id:               u,
+			Namespace:        sconfig.RootNamespace,
+			ConnectorId:      connectorId,
+			ConnectorVersion: connectorVersion,
+			State:            database.ConnectionStateCreated,
+			Annotations:      database.Annotations{"note": "important"},
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/connections/"+u.String()+"/annotations/note", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/"+apid.New(apid.PrefixConnection).String()+"/annotations/note",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("annotation not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/"+u.String()+"/annotations/nonexistent",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("success", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/"+u.String()+"/annotations/note",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ConnectionAnnotationJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Equal(t, "note", resp.Key)
+			require.Equal(t, "important", resp.Value)
+		})
+	})
+
+	t.Run("put connection annotation", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+		u := apid.New(apid.PrefixConnection)
+		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
+			Id:               u,
+			Namespace:        sconfig.RootNamespace,
+			ConnectorId:      connectorId,
+			ConnectorVersion: connectorVersion,
+			State:            database.ConnectionStateCreated,
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPut, "/connections/"+u.String()+"/annotations/note", util.JsonToReader(map[string]interface{}{"value": "important"}))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden with non-matching resource id", func(t *testing.T) {
+			otherResourceId := apid.New(apid.PrefixConnection)
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/connections/"+u.String()+"/annotations/note",
+				util.JsonToReader(map[string]interface{}{"value": "important"}),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "update", otherResourceId.String()),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/connections/"+apid.New(apid.PrefixConnection).String()+"/annotations/note",
+				util.JsonToReader(map[string]interface{}{"value": "important"}),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("bad request invalid JSON", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/connections/"+u.String()+"/annotations/note",
+				util.JsonToReader("{invalid json}"),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("success add new annotation", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/connections/"+u.String()+"/annotations/note",
+				util.JsonToReader(map[string]interface{}{"value": "important"}),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ConnectionAnnotationJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Equal(t, "note", resp.Key)
+			require.Equal(t, "important", resp.Value)
+
+			// Verify in database
+			conn, err := tu.Db.GetConnection(context.Background(), u)
+			require.NoError(t, err)
+			require.Equal(t, "important", conn.Annotations["note"])
+		})
+
+		t.Run("success preserves other annotations", func(t *testing.T) {
+			// Add another annotation first
+			_, err := tu.Db.PutConnectionAnnotations(context.Background(), u, map[string]string{"owner": "team-a"})
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/connections/"+u.String()+"/annotations/note",
+				util.JsonToReader(map[string]interface{}{"value": "updated"}),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			// Verify both annotations in database
+			conn, err := tu.Db.GetConnection(context.Background(), u)
+			require.NoError(t, err)
+			require.Equal(t, "updated", conn.Annotations["note"])
+			require.Equal(t, "team-a", conn.Annotations["owner"])
+		})
+	})
+
+	t.Run("delete connection annotation", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+		u := apid.New(apid.PrefixConnection)
+		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
+			Id:               u,
+			Namespace:        sconfig.RootNamespace,
+			ConnectorId:      connectorId,
+			ConnectorVersion: connectorVersion,
+			State:            database.ConnectionStateCreated,
+			Annotations:      database.Annotations{"note": "important", "owner": "team-a"},
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodDelete, "/connections/"+u.String()+"/annotations/note", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden with non-matching resource id", func(t *testing.T) {
+			otherResourceId := apid.New(apid.PrefixConnection)
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodDelete,
+				"/connections/"+u.String()+"/annotations/note",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "update", otherResourceId.String()),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("not found returns 204", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodDelete,
+				"/connections/"+apid.New(apid.PrefixConnection).String()+"/annotations/note",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNoContent, w.Code)
+		})
+
+		t.Run("success delete", func(t *testing.T) {
+			// Create a fresh connection with annotations for this test
+			deleteTestId := apid.New(apid.PrefixConnection)
+			err := tu.Db.CreateConnection(context.Background(), &database.Connection{
+				Id:               deleteTestId,
+				Namespace:        sconfig.RootNamespace,
+				ConnectorId:      connectorId,
+				ConnectorVersion: connectorVersion,
+				State:            database.ConnectionStateCreated,
+				Annotations:      database.Annotations{"to-delete": "value", "to-keep": "value2"},
+			})
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodDelete,
+				"/connections/"+deleteTestId.String()+"/annotations/to-delete",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNoContent, w.Code)
+
+			// Verify the annotation is deleted but other annotations remain
+			conn, err := tu.Db.GetConnection(context.Background(), deleteTestId)
+			require.NoError(t, err)
+			_, exists := conn.Annotations["to-delete"]
+			require.False(t, exists)
+			require.Equal(t, "value2", conn.Annotations["to-keep"])
+		})
+	})
 }

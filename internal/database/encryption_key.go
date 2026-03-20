@@ -73,6 +73,7 @@ type EncryptionKey struct {
 	EncryptedKeyData *encfield.EncryptedField
 	State            EncryptionKeyState
 	Labels           Labels
+	Annotations      Annotations
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	EncryptedAt      *time.Time
@@ -90,6 +91,7 @@ func (ek *EncryptionKey) cols() []string {
 		"encrypted_key_data",
 		"state",
 		"labels",
+		"annotations",
 		"created_at",
 		"updated_at",
 		"encrypted_at",
@@ -104,6 +106,7 @@ func (ek *EncryptionKey) fields() []any {
 		&ek.EncryptedKeyData,
 		&ek.State,
 		&ek.Labels,
+		&ek.Annotations,
 		&ek.CreatedAt,
 		&ek.UpdatedAt,
 		&ek.EncryptedAt,
@@ -118,6 +121,7 @@ func (ek *EncryptionKey) values() []any {
 		ek.EncryptedKeyData,
 		ek.State,
 		ek.Labels,
+		ek.Annotations,
 		ek.CreatedAt,
 		ek.UpdatedAt,
 		ek.EncryptedAt,
@@ -150,6 +154,10 @@ func (ek *EncryptionKey) Validate() error {
 
 	if err := ek.Labels.Validate(); err != nil {
 		result = multierror.Append(result, errors.Wrap(err, "invalid labels"))
+	}
+
+	if err := ek.Annotations.Validate(); err != nil {
+		result = multierror.Append(result, errors.Wrap(err, "invalid annotations"))
 	}
 
 	return result.ErrorOrNil()
@@ -430,6 +438,147 @@ func (s *service) DeleteEncryptionKeyLabels(ctx context.Context, id apid.ID, key
 		}
 
 		ek.Labels = remainingLabels
+		ek.UpdatedAt = now
+		result = &ek
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// UpdateEncryptionKeyAnnotations replaces all annotations on an encryption key within a single transaction.
+func (s *service) UpdateEncryptionKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*EncryptionKey, error) {
+	if id.IsNil() {
+		return nil, errors.New("encryption key id is required")
+	}
+
+	if annotations != nil {
+		if err := ValidateAnnotations(annotations); err != nil {
+			return nil, errors.Wrap(err, "invalid annotations")
+		}
+	}
+
+	var result *EncryptionKey
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		var ek EncryptionKey
+		err := s.sq.
+			Select(ek.cols()...).
+			From(EncryptionKeysTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).QueryRow().
+			Scan(ek.fields()...)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		now, err := s.updateAnnotationsInTableTx(ctx, tx, EncryptionKeysTable, sq.Eq{"id": id, "deleted_at": nil}, Annotations(annotations))
+		if err != nil {
+			return err
+		}
+
+		ek.Annotations = annotations
+		ek.UpdatedAt = now
+		result = &ek
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// PutEncryptionKeyAnnotations adds or updates the specified annotations on an encryption key within a single transaction.
+func (s *service) PutEncryptionKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*EncryptionKey, error) {
+	if id.IsNil() {
+		return nil, errors.New("encryption key id is required")
+	}
+
+	if len(annotations) == 0 {
+		return s.GetEncryptionKey(ctx, id)
+	}
+
+	if err := ValidateAnnotations(annotations); err != nil {
+		return nil, errors.Wrap(err, "invalid annotations")
+	}
+
+	var result *EncryptionKey
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		var ek EncryptionKey
+		err := s.sq.
+			Select(ek.cols()...).
+			From(EncryptionKeysTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).QueryRow().
+			Scan(ek.fields()...)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		mergedAnnotations, now, err := s.putAnnotationsInTableTx(ctx, tx, EncryptionKeysTable, sq.Eq{"id": id, "deleted_at": nil}, annotations)
+		if err != nil {
+			return err
+		}
+
+		ek.Annotations = mergedAnnotations
+		ek.UpdatedAt = now
+		result = &ek
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// DeleteEncryptionKeyAnnotations removes the specified annotation keys from an encryption key within a single transaction.
+func (s *service) DeleteEncryptionKeyAnnotations(ctx context.Context, id apid.ID, keys []string) (*EncryptionKey, error) {
+	if id.IsNil() {
+		return nil, errors.New("encryption key id is required")
+	}
+
+	if len(keys) == 0 {
+		return s.GetEncryptionKey(ctx, id)
+	}
+
+	var result *EncryptionKey
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		var ek EncryptionKey
+		err := s.sq.
+			Select(ek.cols()...).
+			From(EncryptionKeysTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).QueryRow().
+			Scan(ek.fields()...)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		remainingAnnotations, now, err := s.deleteAnnotationsInTableTx(ctx, tx, EncryptionKeysTable, sq.Eq{"id": id, "deleted_at": nil}, keys)
+		if err != nil {
+			return err
+		}
+
+		ek.Annotations = remainingAnnotations
 		ek.UpdatedAt = now
 		result = &ek
 		return nil

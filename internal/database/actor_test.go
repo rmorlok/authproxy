@@ -1100,4 +1100,287 @@ func TestActor(t *testing.T) {
 			require.True(t, updated.UpdatedAt.After(originalUpdatedAt))
 		})
 	})
+
+	t.Run("PutActorAnnotations", func(t *testing.T) {
+		t.Run("add annotations to actor without annotations", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:         apid.New(apid.PrefixActor),
+				Namespace:  "root",
+				ExternalId: "put-annotations-1",
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.PutActorAnnotations(ctx, actor.Id, map[string]string{
+				"description": "test actor",
+				"owner":       "team-backend",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "test actor", updated.Annotations["description"])
+			require.Equal(t, "team-backend", updated.Annotations["owner"])
+
+			// Verify in database
+			retrieved, err := db.GetActor(ctx, actor.Id)
+			require.NoError(t, err)
+			require.Equal(t, "test actor", retrieved.Annotations["description"])
+			require.Equal(t, "team-backend", retrieved.Annotations["owner"])
+		})
+
+		t.Run("add annotations to actor with existing annotations", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:          apid.New(apid.PrefixActor),
+				Namespace:   "root",
+				ExternalId:  "put-annotations-2",
+				Annotations: Annotations{"existing": "value"},
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.PutActorAnnotations(ctx, actor.Id, map[string]string{
+				"new": "annotation",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "value", updated.Annotations["existing"])
+			require.Equal(t, "annotation", updated.Annotations["new"])
+		})
+
+		t.Run("update existing annotation", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:          apid.New(apid.PrefixActor),
+				Namespace:   "root",
+				ExternalId:  "put-annotations-3",
+				Annotations: Annotations{"description": "old description"},
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.PutActorAnnotations(ctx, actor.Id, map[string]string{
+				"description": "new description",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "new description", updated.Annotations["description"])
+		})
+
+		t.Run("multiple annotations at once", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:          apid.New(apid.PrefixActor),
+				Namespace:   "root",
+				ExternalId:  "put-annotations-4",
+				Annotations: Annotations{"keep": "this"},
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.PutActorAnnotations(ctx, actor.Id, map[string]string{
+				"ann1": "value1",
+				"ann2": "value2",
+				"ann3": "value3",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "this", updated.Annotations["keep"])
+			require.Equal(t, "value1", updated.Annotations["ann1"])
+			require.Equal(t, "value2", updated.Annotations["ann2"])
+			require.Equal(t, "value3", updated.Annotations["ann3"])
+		})
+
+		t.Run("empty annotations map returns current actor", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:          apid.New(apid.PrefixActor),
+				Namespace:   "root",
+				ExternalId:  "put-annotations-5",
+				Annotations: Annotations{"existing": "value"},
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.PutActorAnnotations(ctx, actor.Id, map[string]string{})
+			require.NoError(t, err)
+			require.Equal(t, "value", updated.Annotations["existing"])
+		})
+
+		t.Run("actor not found", func(t *testing.T) {
+			setup(t)
+
+			_, err := db.PutActorAnnotations(ctx, apid.New(apid.PrefixActor), map[string]string{"key": "value"})
+			require.ErrorIs(t, err, ErrNotFound)
+		})
+
+		t.Run("nil id returns error", func(t *testing.T) {
+			setup(t)
+
+			_, err := db.PutActorAnnotations(ctx, apid.Nil, map[string]string{"key": "value"})
+			require.Error(t, err)
+		})
+
+		t.Run("invalid annotation key returns error", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:         apid.New(apid.PrefixActor),
+				Namespace:  "root",
+				ExternalId: "put-annotations-6",
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			_, err := db.PutActorAnnotations(ctx, actor.Id, map[string]string{
+				"": "empty key",
+			})
+			require.Error(t, err)
+		})
+
+		t.Run("updates timestamp", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:         apid.New(apid.PrefixActor),
+				Namespace:  "root",
+				ExternalId: "put-annotations-7",
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			originalActor, _ := db.GetActor(ctx, actor.Id)
+			originalUpdatedAt := originalActor.UpdatedAt
+
+			clk.Step(time.Hour)
+
+			updated, err := db.PutActorAnnotations(ctx, actor.Id, map[string]string{"new": "annotation"})
+			require.NoError(t, err)
+			require.True(t, updated.UpdatedAt.After(originalUpdatedAt))
+		})
+	})
+
+	t.Run("DeleteActorAnnotations", func(t *testing.T) {
+		t.Run("delete single annotation", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:          apid.New(apid.PrefixActor),
+				Namespace:   "root",
+				ExternalId:  "delete-annotations-1",
+				Annotations: Annotations{"description": "test", "owner": "backend"},
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.DeleteActorAnnotations(ctx, actor.Id, []string{"description"})
+			require.NoError(t, err)
+			_, exists := updated.Annotations["description"]
+			require.False(t, exists)
+			require.Equal(t, "backend", updated.Annotations["owner"])
+
+			retrieved, err := db.GetActor(ctx, actor.Id)
+			require.NoError(t, err)
+			_, exists = retrieved.Annotations["description"]
+			require.False(t, exists)
+			require.Equal(t, "backend", retrieved.Annotations["owner"])
+		})
+
+		t.Run("delete multiple annotations", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:          apid.New(apid.PrefixActor),
+				Namespace:   "root",
+				ExternalId:  "delete-annotations-2",
+				Annotations: Annotations{"a": "1", "b": "2", "c": "3", "d": "4"},
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.DeleteActorAnnotations(ctx, actor.Id, []string{"a", "c"})
+			require.NoError(t, err)
+			require.Len(t, updated.Annotations, 2)
+			_, existsA := updated.Annotations["a"]
+			_, existsC := updated.Annotations["c"]
+			require.False(t, existsA)
+			require.False(t, existsC)
+			require.Equal(t, "2", updated.Annotations["b"])
+			require.Equal(t, "4", updated.Annotations["d"])
+		})
+
+		t.Run("delete non-existent annotation is no-op", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:          apid.New(apid.PrefixActor),
+				Namespace:   "root",
+				ExternalId:  "delete-annotations-3",
+				Annotations: Annotations{"existing": "value"},
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.DeleteActorAnnotations(ctx, actor.Id, []string{"nonexistent"})
+			require.NoError(t, err)
+			require.Equal(t, "value", updated.Annotations["existing"])
+		})
+
+		t.Run("delete from actor without annotations", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:         apid.New(apid.PrefixActor),
+				Namespace:  "root",
+				ExternalId: "delete-annotations-4",
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.DeleteActorAnnotations(ctx, actor.Id, []string{"any"})
+			require.NoError(t, err)
+			require.Empty(t, updated.Annotations)
+		})
+
+		t.Run("empty keys slice returns current actor", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:          apid.New(apid.PrefixActor),
+				Namespace:   "root",
+				ExternalId:  "delete-annotations-5",
+				Annotations: Annotations{"existing": "value"},
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			updated, err := db.DeleteActorAnnotations(ctx, actor.Id, []string{})
+			require.NoError(t, err)
+			require.Equal(t, "value", updated.Annotations["existing"])
+		})
+
+		t.Run("actor not found", func(t *testing.T) {
+			setup(t)
+
+			_, err := db.DeleteActorAnnotations(ctx, apid.New(apid.PrefixActor), []string{"key"})
+			require.ErrorIs(t, err, ErrNotFound)
+		})
+
+		t.Run("nil id returns error", func(t *testing.T) {
+			setup(t)
+
+			_, err := db.DeleteActorAnnotations(ctx, apid.Nil, []string{"key"})
+			require.Error(t, err)
+		})
+
+		t.Run("updates timestamp", func(t *testing.T) {
+			setup(t)
+
+			actor := &Actor{
+				Id:          apid.New(apid.PrefixActor),
+				Namespace:   "root",
+				ExternalId:  "delete-annotations-6",
+				Annotations: Annotations{"to-delete": "value"},
+			}
+			require.NoError(t, db.CreateActor(ctx, actor))
+
+			originalActor, _ := db.GetActor(ctx, actor.Id)
+			originalUpdatedAt := originalActor.UpdatedAt
+
+			clk.Step(time.Hour)
+
+			updated, err := db.DeleteActorAnnotations(ctx, actor.Id, []string{"to-delete"})
+			require.NoError(t, err)
+			require.True(t, updated.UpdatedAt.After(originalUpdatedAt))
+		})
+	})
 }

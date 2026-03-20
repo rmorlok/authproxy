@@ -22,6 +22,7 @@ type Connection struct {
 	UpdatedAt        time.Time
 	DeletedAt        *time.Time
 	Labels           map[string]string
+	Annotations      map[string]string
 }
 
 func (m *Connection) GetId() apid.ID {
@@ -75,6 +76,10 @@ func (m *Connection) GetProbe(probeId string) (iface.Probe, error) {
 
 func (m *Connection) GetProbes() []iface.Probe {
 	return nil
+}
+
+func (m *Connection) GetAnnotations() map[string]string {
+	return m.Annotations
 }
 
 func (m *Connection) ProxyRequest(

@@ -52,6 +52,10 @@ func (ek *EncryptionKey) GetLabels() map[string]string {
 	return ek.Labels
 }
 
+func (ek *EncryptionKey) GetAnnotations() map[string]string {
+	return ek.Annotations
+}
+
 func (ek *EncryptionKey) Logger() *slog.Logger {
 	return ek.logger
 }

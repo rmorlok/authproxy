@@ -1092,6 +1092,471 @@ INSERT INTO namespaces
 		})
 	})
 
+	t.Run("UpdateNamespaceAnnotations", func(t *testing.T) {
+		t.Run("set annotations on namespace without annotations", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:  "root.updannot1",
+				State: NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			updated, err := db.UpdateNamespaceAnnotations(ctx, "root.updannot1", map[string]string{
+				"env":  "prod",
+				"team": "backend",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "prod", updated.Annotations["env"])
+			require.Equal(t, "backend", updated.Annotations["team"])
+
+			// Verify in database
+			retrieved, err := db.GetNamespace(ctx, "root.updannot1")
+			require.NoError(t, err)
+			require.Equal(t, "prod", retrieved.Annotations["env"])
+			require.Equal(t, "backend", retrieved.Annotations["team"])
+		})
+
+		t.Run("replaces all existing annotations", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:        "root.updannot2",
+				State:       NamespaceStateActive,
+				Annotations: Annotations{"old": "value", "also-old": "value2"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.UpdateNamespaceAnnotations(ctx, "root.updannot2", map[string]string{
+				"new": "annotation",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "annotation", updated.Annotations["new"])
+			_, existsOld := updated.Annotations["old"]
+			require.False(t, existsOld)
+			_, existsAlsoOld := updated.Annotations["also-old"]
+			require.False(t, existsAlsoOld)
+
+			// Verify in database
+			retrieved, err := db.GetNamespace(ctx, "root.updannot2")
+			require.NoError(t, err)
+			require.Len(t, retrieved.Annotations, 1)
+			require.Equal(t, "annotation", retrieved.Annotations["new"])
+		})
+
+		t.Run("clear annotations with empty map", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:        "root.updannot3",
+				State:       NamespaceStateActive,
+				Annotations: Annotations{"old": "value"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.UpdateNamespaceAnnotations(ctx, "root.updannot3", map[string]string{})
+			require.NoError(t, err)
+			require.Empty(t, updated.Annotations)
+
+			// Verify in database
+			retrieved, err := db.GetNamespace(ctx, "root.updannot3")
+			require.NoError(t, err)
+			require.Empty(t, retrieved.Annotations)
+		})
+
+		t.Run("nil annotations clears annotations", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:        "root.updannot4",
+				State:       NamespaceStateActive,
+				Annotations: Annotations{"old": "value"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.UpdateNamespaceAnnotations(ctx, "root.updannot4", nil)
+			require.NoError(t, err)
+			require.Nil(t, updated.Annotations)
+		})
+
+		t.Run("namespace not found", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			_, err := db.UpdateNamespaceAnnotations(ctx, "root.nonexistent", map[string]string{"key": "value"})
+			require.ErrorIs(t, err, ErrNotFound)
+		})
+
+		t.Run("empty path returns error", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			_, err := db.UpdateNamespaceAnnotations(ctx, "", map[string]string{"key": "value"})
+			require.Error(t, err)
+		})
+
+		t.Run("invalid annotation key returns error", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:  "root.updannot5",
+				State: NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			_, err = db.UpdateNamespaceAnnotations(ctx, "root.updannot5", map[string]string{
+				"": "empty key",
+			})
+			require.Error(t, err)
+		})
+
+		t.Run("updates timestamp", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			clk := clock.NewFakeClock(now)
+			ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:  "root.updannot6",
+				State: NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			original, err := db.GetNamespace(ctx, "root.updannot6")
+			require.NoError(t, err)
+			originalUpdatedAt := original.UpdatedAt
+
+			clk.Step(time.Hour)
+
+			updated, err := db.UpdateNamespaceAnnotations(ctx, "root.updannot6", map[string]string{"new": "annotation"})
+			require.NoError(t, err)
+			require.True(t, updated.UpdatedAt.After(originalUpdatedAt))
+		})
+	})
+
+	t.Run("PutNamespaceAnnotations", func(t *testing.T) {
+		t.Run("add annotations to namespace without annotations", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:  "root.putannot1",
+				State: NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			updated, err := db.PutNamespaceAnnotations(ctx, "root.putannot1", map[string]string{
+				"env":  "prod",
+				"team": "backend",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "prod", updated.Annotations["env"])
+			require.Equal(t, "backend", updated.Annotations["team"])
+
+			// Verify in database
+			retrieved, err := db.GetNamespace(ctx, "root.putannot1")
+			require.NoError(t, err)
+			require.Equal(t, "prod", retrieved.Annotations["env"])
+			require.Equal(t, "backend", retrieved.Annotations["team"])
+		})
+
+		t.Run("add annotations to namespace with existing annotations", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:        "root.putannot2",
+				State:       NamespaceStateActive,
+				Annotations: Annotations{"existing": "value"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.PutNamespaceAnnotations(ctx, "root.putannot2", map[string]string{
+				"new": "annotation",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "value", updated.Annotations["existing"])
+			require.Equal(t, "annotation", updated.Annotations["new"])
+		})
+
+		t.Run("update existing annotation", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:        "root.putannot3",
+				State:       NamespaceStateActive,
+				Annotations: Annotations{"env": "dev"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.PutNamespaceAnnotations(ctx, "root.putannot3", map[string]string{
+				"env": "prod",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "prod", updated.Annotations["env"])
+		})
+
+		t.Run("multiple annotations at once", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:        "root.putannot4",
+				State:       NamespaceStateActive,
+				Annotations: Annotations{"keep": "this"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.PutNamespaceAnnotations(ctx, "root.putannot4", map[string]string{
+				"annot1": "value1",
+				"annot2": "value2",
+				"annot3": "value3",
+			})
+			require.NoError(t, err)
+			require.Equal(t, "this", updated.Annotations["keep"])
+			require.Equal(t, "value1", updated.Annotations["annot1"])
+			require.Equal(t, "value2", updated.Annotations["annot2"])
+			require.Equal(t, "value3", updated.Annotations["annot3"])
+		})
+
+		t.Run("empty annotations map returns current namespace", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:        "root.putannot5",
+				State:       NamespaceStateActive,
+				Annotations: Annotations{"existing": "value"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.PutNamespaceAnnotations(ctx, "root.putannot5", map[string]string{})
+			require.NoError(t, err)
+			require.Equal(t, "value", updated.Annotations["existing"])
+		})
+
+		t.Run("namespace not found", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			_, err := db.PutNamespaceAnnotations(ctx, "root.nonexistent", map[string]string{"key": "value"})
+			require.ErrorIs(t, err, ErrNotFound)
+		})
+
+		t.Run("empty path returns error", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			_, err := db.PutNamespaceAnnotations(ctx, "", map[string]string{"key": "value"})
+			require.Error(t, err)
+		})
+
+		t.Run("invalid annotation key returns error", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:  "root.putannot6",
+				State: NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			_, err = db.PutNamespaceAnnotations(ctx, "root.putannot6", map[string]string{
+				"": "empty key",
+			})
+			require.Error(t, err)
+		})
+
+		t.Run("updates timestamp", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			clk := clock.NewFakeClock(now)
+			ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:  "root.putannot7",
+				State: NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			original, err := db.GetNamespace(ctx, "root.putannot7")
+			require.NoError(t, err)
+			originalUpdatedAt := original.UpdatedAt
+
+			// Advance the clock
+			clk.Step(time.Hour)
+
+			updated, err := db.PutNamespaceAnnotations(ctx, "root.putannot7", map[string]string{"new": "annotation"})
+			require.NoError(t, err)
+			require.True(t, updated.UpdatedAt.After(originalUpdatedAt))
+		})
+	})
+
+	t.Run("DeleteNamespaceAnnotations", func(t *testing.T) {
+		t.Run("delete single annotation", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:        "root.delannot1",
+				State:       NamespaceStateActive,
+				Annotations: Annotations{"env": "prod", "team": "backend"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.DeleteNamespaceAnnotations(ctx, "root.delannot1", []string{"env"})
+			require.NoError(t, err)
+			_, exists := updated.Annotations["env"]
+			require.False(t, exists)
+			require.Equal(t, "backend", updated.Annotations["team"])
+
+			// Verify in database
+			retrieved, err := db.GetNamespace(ctx, "root.delannot1")
+			require.NoError(t, err)
+			_, exists = retrieved.Annotations["env"]
+			require.False(t, exists)
+			require.Equal(t, "backend", retrieved.Annotations["team"])
+		})
+
+		t.Run("delete multiple annotations", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:        "root.delannot2",
+				State:       NamespaceStateActive,
+				Annotations: Annotations{"a": "1", "b": "2", "c": "3", "d": "4"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.DeleteNamespaceAnnotations(ctx, "root.delannot2", []string{"a", "c"})
+			require.NoError(t, err)
+			require.Len(t, updated.Annotations, 2)
+			_, existsA := updated.Annotations["a"]
+			_, existsC := updated.Annotations["c"]
+			require.False(t, existsA)
+			require.False(t, existsC)
+			require.Equal(t, "2", updated.Annotations["b"])
+			require.Equal(t, "4", updated.Annotations["d"])
+		})
+
+		t.Run("delete non-existent annotation is no-op", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:        "root.delannot3",
+				State:       NamespaceStateActive,
+				Annotations: Annotations{"existing": "value"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.DeleteNamespaceAnnotations(ctx, "root.delannot3", []string{"nonexistent"})
+			require.NoError(t, err)
+			require.Equal(t, "value", updated.Annotations["existing"])
+		})
+
+		t.Run("delete from namespace without annotations", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:  "root.delannot4",
+				State: NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			updated, err := db.DeleteNamespaceAnnotations(ctx, "root.delannot4", []string{"any"})
+			require.NoError(t, err)
+			require.Empty(t, updated.Annotations)
+		})
+
+		t.Run("empty keys slice returns current namespace", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:        "root.delannot5",
+				State:       NamespaceStateActive,
+				Annotations: Annotations{"existing": "value"},
+			})
+			require.NoError(t, err)
+
+			updated, err := db.DeleteNamespaceAnnotations(ctx, "root.delannot5", []string{})
+			require.NoError(t, err)
+			require.Equal(t, "value", updated.Annotations["existing"])
+		})
+
+		t.Run("namespace not found", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			_, err := db.DeleteNamespaceAnnotations(ctx, "root.nonexistent", []string{"key"})
+			require.ErrorIs(t, err, ErrNotFound)
+		})
+
+		t.Run("empty path returns error", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			_, err := db.DeleteNamespaceAnnotations(ctx, "", []string{"key"})
+			require.Error(t, err)
+		})
+
+		t.Run("updates timestamp", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			clk := clock.NewFakeClock(now)
+			ctx := apctx.NewBuilderBackground().WithClock(clk).Build()
+
+			err := db.CreateNamespace(ctx, &Namespace{
+				Path:        "root.delannot6",
+				State:       NamespaceStateActive,
+				Annotations: Annotations{"to-delete": "value"},
+			})
+			require.NoError(t, err)
+
+			original, err := db.GetNamespace(ctx, "root.delannot6")
+			require.NoError(t, err)
+			originalUpdatedAt := original.UpdatedAt
+
+			// Advance the clock
+			clk.Step(time.Hour)
+
+			updated, err := db.DeleteNamespaceAnnotations(ctx, "root.delannot6", []string{"to-delete"})
+			require.NoError(t, err)
+			require.True(t, updated.UpdatedAt.After(originalUpdatedAt))
+		})
+	})
+
 	t.Run("CreateNamespaceWithEncryptionKeyId", func(t *testing.T) {
 		t.Run("round-trips encryption key id through create and get", func(t *testing.T) {
 			_, db := MustApplyBlankTestDbConfig(t, nil)

@@ -56,6 +56,10 @@ func (ns *Namespace) GetLabels() map[string]string {
 	return ns.Labels
 }
 
+func (ns *Namespace) GetAnnotations() map[string]string {
+	return ns.Annotations
+}
+
 func (ns *Namespace) Logger() *slog.Logger {
 	return ns.logger
 }

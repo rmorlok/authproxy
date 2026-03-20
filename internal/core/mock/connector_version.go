@@ -20,8 +20,9 @@ type ConnectorVersion struct {
 	Hash       string
 	CreatedAt  time.Time
 	UpdatedAt  time.Time
-	Labels     map[string]string
-	Definition *cschema.Connector
+	Labels      map[string]string
+	Annotations map[string]string
+	Definition  *cschema.Connector
 }
 
 func (m *ConnectorVersion) GetId() apid.ID {
@@ -58,6 +59,10 @@ func (m *ConnectorVersion) GetUpdatedAt() time.Time {
 
 func (m *ConnectorVersion) GetLabels() map[string]string {
 	return m.Labels
+}
+
+func (m *ConnectorVersion) GetAnnotations() map[string]string {
+	return m.Annotations
 }
 
 func (m *ConnectorVersion) GetDefinition() *cschema.Connector {

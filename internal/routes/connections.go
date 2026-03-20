@@ -75,26 +75,28 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 }
 
 type ConnectionJson struct {
-	Id        apid.ID                `json:"id" swaggertype:"string"`
-	Namespace string                   `json:"namespace"`
-	Labels    map[string]string        `json:"labels,omitempty"`
-	State     database.ConnectionState `json:"state"`
-	Connector ConnectorJson            `json:"connector"`
-	CreatedAt time.Time                `json:"created_at"`
-	UpdatedAt time.Time                `json:"updated_at"`
+	Id          apid.ID                `json:"id" swaggertype:"string"`
+	Namespace   string                   `json:"namespace"`
+	Labels      map[string]string        `json:"labels,omitempty"`
+	Annotations map[string]string        `json:"annotations,omitempty"`
+	State       database.ConnectionState `json:"state"`
+	Connector   ConnectorJson            `json:"connector"`
+	CreatedAt   time.Time                `json:"created_at"`
+	UpdatedAt   time.Time                `json:"updated_at"`
 }
 
 func ConnectionToJson(conn coreIface.Connection) ConnectionJson {
 	connector := ConnectorVersionToConnectorJson(conn.GetConnectorVersionEntity())
 
 	return ConnectionJson{
-		Id:        conn.GetId(),
-		Namespace: conn.GetNamespace(),
-		Labels:    conn.GetLabels(),
-		State:     conn.GetState(),
-		Connector: connector,
-		CreatedAt: conn.GetCreatedAt(),
-		UpdatedAt: conn.GetUpdatedAt(),
+		Id:          conn.GetId(),
+		Namespace:   conn.GetNamespace(),
+		Labels:      conn.GetLabels(),
+		Annotations: conn.GetAnnotations(),
+		State:       conn.GetState(),
+		Connector:   connector,
+		CreatedAt:   conn.GetCreatedAt(),
+		UpdatedAt:   conn.GetUpdatedAt(),
 	}
 }
 
@@ -518,7 +520,8 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 }
 
 type UpdateConnectionRequestJson struct {
-	Labels map[string]string `json:"labels"`
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
 }
 
 type PutConnectionLabelRequestJson struct {
@@ -526,6 +529,15 @@ type PutConnectionLabelRequestJson struct {
 }
 
 type ConnectionLabelJson struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+type PutConnectionAnnotationRequestJson struct {
+	Value string `json:"value"`
+}
+
+type ConnectionAnnotationJson struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
 }
@@ -1086,6 +1098,431 @@ func (r *ConnectionsRoutes) deleteLabel(gctx *gin.Context) {
 	gctx.Status(http.StatusNoContent)
 }
 
+// @Summary		Get all annotations for a connection
+// @Description	Get all annotations associated with a specific connection
+// @Tags			connections
+// @Accept			json
+// @Produce		json
+// @Param			id	path		string	true	"Connection UUID"
+// @Success		200	{object}	map[string]string
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		404	{object}	ErrorResponse
+// @Failure		500	{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/annotations [get]
+func (r *ConnectionsRoutes) getAnnotations(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := apid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid id format").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == apid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	c, err := r.core.GetConnection(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("connection not found").
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if c == nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsg("connection not found").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		httpErr.WriteGinResponse(nil, gctx)
+		return
+	}
+
+	annotations := c.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+
+	gctx.PureJSON(http.StatusOK, annotations)
+}
+
+// @Summary		Get a specific annotation for a connection
+// @Description	Get a specific annotation value by key for a connection
+// @Tags			connections
+// @Accept			json
+// @Produce		json
+// @Param			id			path		string	true	"Connection UUID"
+// @Param			annotation	path		string	true	"Annotation key"
+// @Success		200			{object}	SwaggerConnectionAnnotationJson
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		404			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/annotations/{annotation} [get]
+func (r *ConnectionsRoutes) getAnnotation(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := apid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid id format").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == apid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	annotationKey := gctx.Param("annotation")
+	if annotationKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("annotation key is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	c, err := r.core.GetConnection(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("connection not found").
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if c == nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsg("connection not found").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		httpErr.WriteGinResponse(nil, gctx)
+		return
+	}
+
+	annotations := c.GetAnnotations()
+	value, exists := annotations[annotationKey]
+	if !exists {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsgf("annotation '%s' not found", annotationKey).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, ConnectionAnnotationJson{
+		Key:   annotationKey,
+		Value: value,
+	})
+}
+
+// @Summary		Set an annotation for a connection
+// @Description	Set or update a specific annotation value by key for a connection
+// @Tags			connections
+// @Accept			json
+// @Produce		json
+// @Param			id			path		string									true	"Connection UUID"
+// @Param			annotation	path		string									true	"Annotation key"
+// @Param			request		body		SwaggerPutConnectionAnnotationRequest	true	"Annotation value"
+// @Success		200			{object}	SwaggerConnectionAnnotationJson
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		403			{object}	ErrorResponse
+// @Failure		404			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/annotations/{annotation} [put]
+func (r *ConnectionsRoutes) putAnnotation(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := apid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid id format").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == apid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	annotationKey := gctx.Param("annotation")
+	if annotationKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("annotation key is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if err := database.ValidateAnnotationKey(annotationKey); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid annotation key: %s", err.Error()).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	var req PutConnectionAnnotationRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid request body").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	c, err := r.core.GetConnection(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("connection not found").
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if c == nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsg("connection not found").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		httpErr.WriteGinResponse(nil, gctx)
+		return
+	}
+
+	updatedConn, err := r.db.PutConnectionAnnotations(ctx, id, map[string]string{annotationKey: req.Value})
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("connection not found").
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, ConnectionAnnotationJson{
+		Key:   annotationKey,
+		Value: updatedConn.Annotations[annotationKey],
+	})
+}
+
+// @Summary		Delete an annotation from a connection
+// @Description	Delete a specific annotation by key from a connection
+// @Tags			connections
+// @Accept			json
+// @Produce		json
+// @Param			id			path	string	true	"Connection UUID"
+// @Param			annotation	path	string	true	"Annotation key"
+// @Success		204			"No Content"
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		403			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/annotations/{annotation} [delete]
+func (r *ConnectionsRoutes) deleteAnnotation(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := apid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid id format").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == apid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	annotationKey := gctx.Param("annotation")
+	if annotationKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("annotation key is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	c, err := r.core.GetConnection(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			gctx.Status(http.StatusNoContent)
+			val.MarkValidated()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if c == nil {
+		gctx.Status(http.StatusNoContent)
+		val.MarkValidated()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		httpErr.WriteGinResponse(nil, gctx)
+		return
+	}
+
+	_, err = r.db.DeleteConnectionAnnotations(ctx, id, []string{annotationKey})
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			gctx.Status(http.StatusNoContent)
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.Status(http.StatusNoContent)
+}
+
 func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 	g.POST(
 		"/connections/_initiate",
@@ -1174,6 +1611,42 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 			ForIdField("id").
 			Build(),
 		r.deleteLabel,
+	)
+	g.GET(
+		"/connections/:id/annotations",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("get").
+			ForIdField("id").
+			Build(),
+		r.getAnnotations,
+	)
+	g.GET(
+		"/connections/:id/annotations/:annotation",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("get").
+			ForIdField("id").
+			Build(),
+		r.getAnnotation,
+	)
+	g.PUT(
+		"/connections/:id/annotations/:annotation",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("update").
+			ForIdField("id").
+			Build(),
+		r.putAnnotation,
+	)
+	g.DELETE(
+		"/connections/:id/annotations/:annotation",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("update").
+			ForIdField("id").
+			Build(),
+		r.deleteAnnotation,
 	)
 }
 

@@ -212,13 +212,14 @@ func (l *listConnectorsFilters) fetchPage(ctx context.Context) pagination.PageRe
 rr.id as id,
 rr.namespace as namespace,
 rr.labels as labels,
+rr.annotations as annotations,
 rr.version as version,
 rr.state as state,
 rr.encrypted_definition as encrypted_definition,
 rr.created_at as created_at,
 rr.updated_at as updated_at,
 rr.deleted_at as deleted_at,
-cvc.states as states, 
+cvc.states as states,
 cvc.versions as total_versions
 `).
 		With("ranked_rows", sq.Expr(rankedRowsCTE)).
@@ -284,6 +285,7 @@ cvc.versions as total_versions
 			&c.Id,
 			&c.Namespace,
 			&c.Labels,
+			&c.Annotations,
 			&c.Version,
 			&c.State,
 			&c.EncryptedDefinition,

@@ -17,6 +17,7 @@ type Namespace struct {
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	Labels          map[string]string
+	Annotations     map[string]string
 }
 
 func (m *Namespace) GetPath() string {
@@ -41,6 +42,10 @@ func (m *Namespace) GetEncryptionKeyId() *apid.ID {
 
 func (m *Namespace) GetLabels() map[string]string {
 	return m.Labels
+}
+
+func (m *Namespace) GetAnnotations() map[string]string {
+	return m.Annotations
 }
 
 var _ iface.Namespace = (*Namespace)(nil)
