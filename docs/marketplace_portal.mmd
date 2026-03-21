@@ -1,0 +1,38 @@
+sequenceDiagram
+    actor User
+    participant host as Host Application
+    participant SPA as Single Page App
+    participant public as AuthProxy Public
+
+    User->>host: Navigate to marketplace
+
+    host->>host: Generate nonce JWT for actor
+
+    host->>SPA: 302 http://spa/?auth_token=...
+
+    SPA->>SPA: ...loads...
+
+    SPA->>public: POST /session/_initiate Header: auth_token
+
+    rect rgb(255, 230, 230)
+        Note over SPA,public: Session Failure
+        public-->>SPA: session cookie, config JSON, including login redirect
+        SPA->>host: 302 login url from config
+        host->>host: handle login, start redirect process over
+    end
+
+    public-->>SPA: session cookie, config JSON
+
+    SPA->>public: GET /api/connectors
+
+    public->>SPA: connectors json
+
+    SPA->>public: GET /api/connections
+
+    public->>SPA: connections json
+
+    SPA->>SPA: connect / disconnect / configure connections
+
+    User->>SPA: navigate from portal
+
+    SPA->>public: POST /session/_terminate
