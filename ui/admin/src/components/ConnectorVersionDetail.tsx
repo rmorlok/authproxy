@@ -25,6 +25,7 @@ import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import ToggleButton from '@mui/material/ToggleButton';
 import ToggleButtonGroup from '@mui/material/ToggleButtonGroup';
 import {connectors, ConnectorVersion, ConnectorVersionState} from '@authproxy/api';
+import AnnotationsEditor from "./AnnotationsEditor";
 import YAML from 'yaml';
 import {StateChip} from "./StateChip";
 import CodeMirror from "@uiw/react-codemirror";
@@ -265,6 +266,29 @@ export default function ConnectorVersionDetail(
                     <Typography variant="body1">{cv.version}</Typography>
                 </Box>
             </Stack>
+
+            <AnnotationsEditor
+                annotations={cv.annotations}
+                readOnly={cv.state !== ConnectorVersionState.DRAFT}
+                onPut={async (key, value) => {
+                    await connectors.putVersionAnnotation(cv.id, cv.version, key, value);
+                    if (connectorId && version) {
+                        fetchConnectorVersion();
+                    } else {
+                        const res = await connectors.getVersion(cv.id, cv.version);
+                        setCv(res.data);
+                    }
+                }}
+                onDelete={async (key) => {
+                    await connectors.deleteVersionAnnotation(cv.id, cv.version, key);
+                    if (connectorId && version) {
+                        fetchConnectorVersion();
+                    } else {
+                        const res = await connectors.getVersion(cv.id, cv.version);
+                        setCv(res.data);
+                    }
+                }}
+            />
 
             <Box sx={{mt: 1, mb: 1}}>
                 <ToggleButtonGroup

@@ -10,6 +10,7 @@ import ConnectorDetail from "./pages/ConnectorDetail";
 import ConnectionDetail from "./pages/ConnectionDetail";
 import ConnectorVersionDetail from "./pages/ConnectorVersionDetail";
 import ActorsPage from "./pages/Actors";
+import ActorDetailPage from "./pages/ActorDetail";
 import EncryptionKeysPage from "./pages/EncryptionKeys";
 import EncryptionKeyDetail from "./pages/EncryptionKeyDetail";
 import TasksPage from "./pages/Tasks";
@@ -133,6 +134,20 @@ export const router = createBrowserRouter([
                 path: 'actors',
                 element: <ActorsPage />,
                 handle: { title: 'Actors' }
+            },
+            {
+                path: 'actors/:id',
+                element: <ActorDetailPage />,
+                handle: [
+                    {
+                        title: 'Actors',
+                        path: (_params: Params<string>) => `/actors`,
+                    },
+                    {
+                        attr: 'id',
+                        path: (params: Params<string>) => `/actors/${params.id}`,
+                    },
+                ],
             },
             {
                 path: 'tasks',

@@ -24,6 +24,7 @@ import dayjs from 'dayjs';
 import Tooltip from '@mui/material/Tooltip';
 import {Connection, connections, ConnectionState, canBeDisconnected} from '@authproxy/api';
 import { Link } from "react-router-dom";
+import AnnotationsEditor from "./AnnotationsEditor";
 
 function StateChip({state}: { state: ConnectionState }) {
   const colors: Record<ConnectionState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -239,6 +240,31 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
           </Box>
         </Stack>
       </Box>
+
+      <Box>
+        <Typography variant="subtitle2" color="text.secondary">Labels</Typography>
+        {conn.labels && Object.keys(conn.labels).length > 0 ? (
+          <Stack direction="row" spacing={0.5} flexWrap="wrap" sx={{mt: 0.5}}>
+            {Object.entries(conn.labels).map(([key, value]) => (
+              <Chip key={key} label={`${key}: ${value}`} size="small" variant="outlined"/>
+            ))}
+          </Stack>
+        ) : (
+          <Typography variant="body2" color="text.secondary">No labels</Typography>
+        )}
+      </Box>
+
+      <AnnotationsEditor
+        annotations={conn.annotations}
+        onPut={async (key, value) => {
+          await connections.putAnnotation(conn.id, key, value);
+          fetchConnection();
+        }}
+        onDelete={async (key) => {
+          await connections.deleteAnnotation(conn.id, key);
+          fetchConnection();
+        }}
+      />
 
       {/* Disconnect confirmation dialog */}
       <Dialog open={confirmDisconnectOpen} onClose={() => !actionLoading && setConfirmDisconnectOpen(false)}>

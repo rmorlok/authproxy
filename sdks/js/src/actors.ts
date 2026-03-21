@@ -5,6 +5,7 @@ import { ListResponse } from './common';
 
 export interface UpdateActorRequest {
     labels?: Record<string, string>;
+    annotations?: Record<string, string>;
 }
 
 export interface PutActorLabelRequest {
@@ -16,10 +17,20 @@ export interface ActorLabel {
   value: string;
 }
 
+export interface PutActorAnnotationRequest {
+  value: string;
+}
+
+export interface ActorAnnotation {
+  key: string;
+  value: string;
+}
+
 export interface Actor {
   id: string;
   namespace: string;
   labels?: Record<string, string>;
+  annotations?: Record<string, string>;
   external_id: string;
   created_at: string;
   updated_at: string;
@@ -29,6 +40,7 @@ export interface CreateActorRequest {
     namespace: string;
     external_id: string;
     labels?: Record<string, string>;
+    annotations?: Record<string, string>;
 }
 
 /**
@@ -142,6 +154,34 @@ export const deleteActorLabel = (id: string, labelKey: string) => {
   return client.delete(`/api/v1/actors/${id}/labels/${labelKey}`);
 };
 
+/**
+ * Get all annotations for a specific actor by ID (uuid)
+ */
+export const getActorAnnotations = (id: string) => {
+  return client.get<Record<string, string>>(`/api/v1/actors/${id}/annotations`);
+};
+
+/**
+ * Get a specific annotation for an actor by ID (uuid) and annotation key
+ */
+export const getActorAnnotation = (id: string, annotationKey: string) => {
+  return client.get<ActorAnnotation>(`/api/v1/actors/${id}/annotations/${annotationKey}`);
+};
+
+/**
+ * Set a specific annotation for an actor by ID (uuid) and annotation key
+ */
+export const putActorAnnotation = (id: string, annotationKey: string, value: string) => {
+  return client.put<ActorAnnotation>(`/api/v1/actors/${id}/annotations/${annotationKey}`, { value });
+};
+
+/**
+ * Delete a specific annotation for an actor by ID (uuid) and annotation key
+ */
+export const deleteActorAnnotation = (id: string, annotationKey: string) => {
+  return client.delete(`/api/v1/actors/${id}/annotations/${annotationKey}`);
+};
+
 export const actors = {
   list: listActors,
   create: createActor,
@@ -156,4 +196,8 @@ export const actors = {
   getLabel: getActorLabel,
   putLabel: putActorLabel,
   deleteLabel: deleteActorLabel,
+  getAnnotations: getActorAnnotations,
+  getAnnotation: getActorAnnotation,
+  putAnnotation: putActorAnnotation,
+  deleteAnnotation: deleteActorAnnotation,
 };

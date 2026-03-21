@@ -9,6 +9,7 @@ import {
 } from '@authproxy/api';
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsString} from 'nuqs'
+import {useNavigate} from 'react-router-dom';
 
 export const columns: GridColDef<Actor>[] = [
     {
@@ -71,6 +72,7 @@ export const columns: GridColDef<Actor>[] = [
 ];
 
 export default function Actors() {
+    const navigate = useNavigate();
     const defaultPageSize = 20;
 
     const [rows, setRows] = useState<Actor[]>([]);
@@ -194,6 +196,8 @@ export default function Actors() {
                     getRowClassName={(params) =>
                         params.indexRelativeToCurrentPage % 2 === 0 ? 'even' : 'odd'
                     }
+                    onRowClick={(params) => navigate(`/actors/${params.row.id}`)}
+                    sx={{cursor: 'pointer'}}
                     loading={loading}
                     sortingMode="server"
                     onSortModelChange={handleSortModelChange}

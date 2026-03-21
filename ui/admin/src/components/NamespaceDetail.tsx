@@ -27,6 +27,7 @@ import {
   encryptionKeys,
   NAMESPACE_PATH_SEPARATOR,
 } from '@authproxy/api';
+import AnnotationsEditor from "./AnnotationsEditor";
 
 function StateChip({state}: { state: NamespaceState }) {
   const colors: Record<string, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -200,6 +201,18 @@ export default function NamespaceDetail({namespacePath}: { namespacePath: string
           <Typography variant="body2" color="text.secondary">No labels</Typography>
         )}
       </Box>
+
+      <AnnotationsEditor
+        annotations={ns.annotations}
+        onPut={async (key, value) => {
+          await namespaces.putAnnotation(namespacePath, key, value);
+          fetchNamespace();
+        }}
+        onDelete={async (key) => {
+          await namespaces.deleteAnnotation(namespacePath, key);
+          fetchNamespace();
+        }}
+      />
 
       <Box>
         <Typography variant="subtitle2" color="text.secondary">Encryption Key</Typography>

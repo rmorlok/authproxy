@@ -13,6 +13,7 @@ export interface EncryptionKey {
   namespace: string;
   state: EncryptionKeyState;
   labels?: Record<string, string>;
+  annotations?: Record<string, string>;
   created_at: string;
   updated_at: string;
 }
@@ -21,11 +22,13 @@ export interface CreateEncryptionKeyRequest {
     namespace: string;
     key_data?: Record<string, unknown>;
     labels?: Record<string, string>;
+    annotations?: Record<string, string>;
 }
 
 export interface UpdateEncryptionKeyRequest {
     state?: EncryptionKeyState;
     labels?: Record<string, string>;
+    annotations?: Record<string, string>;
 }
 
 export interface ListEncryptionKeysParams {
@@ -43,6 +46,15 @@ export interface EncryptionKeyLabel {
 }
 
 export interface PutEncryptionKeyLabelRequest {
+  value: string;
+}
+
+export interface PutEncryptionKeyAnnotationRequest {
+  value: string;
+}
+
+export interface EncryptionKeyAnnotation {
+  key: string;
   value: string;
 }
 
@@ -109,6 +121,34 @@ export const deleteEncryptionKeyLabel = (id: string, labelKey: string) => {
   return client.delete(`/api/v1/encryption-keys/${id}/labels/${labelKey}`);
 };
 
+/**
+ * Get all annotations for a specific encryption key
+ */
+export const getEncryptionKeyAnnotations = (id: string) => {
+  return client.get<Record<string, string>>(`/api/v1/encryption-keys/${id}/annotations`);
+};
+
+/**
+ * Get a specific annotation for an encryption key
+ */
+export const getEncryptionKeyAnnotation = (id: string, annotationKey: string) => {
+  return client.get<EncryptionKeyAnnotation>(`/api/v1/encryption-keys/${id}/annotations/${annotationKey}`);
+};
+
+/**
+ * Set a specific annotation for an encryption key
+ */
+export const putEncryptionKeyAnnotation = (id: string, annotationKey: string, value: string) => {
+  return client.put<EncryptionKeyAnnotation>(`/api/v1/encryption-keys/${id}/annotations/${annotationKey}`, { value });
+};
+
+/**
+ * Delete a specific annotation from an encryption key
+ */
+export const deleteEncryptionKeyAnnotation = (id: string, annotationKey: string) => {
+  return client.delete(`/api/v1/encryption-keys/${id}/annotations/${annotationKey}`);
+};
+
 export const encryptionKeys = {
   list: listEncryptionKeys,
   create: createEncryptionKey,
@@ -119,4 +159,8 @@ export const encryptionKeys = {
   getLabel: getEncryptionKeyLabel,
   putLabel: putEncryptionKeyLabel,
   deleteLabel: deleteEncryptionKeyLabel,
+  getAnnotations: getEncryptionKeyAnnotations,
+  getAnnotation: getEncryptionKeyAnnotation,
+  putAnnotation: putEncryptionKeyAnnotation,
+  deleteAnnotation: deleteEncryptionKeyAnnotation,
 };
