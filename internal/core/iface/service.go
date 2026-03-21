@@ -60,15 +60,15 @@ type C interface {
 	ListConnectorVersionsFromCursor(ctx context.Context, cursor string) (ListConnectorVersionsExecutor, error)
 
 	// CreateConnectorVersion creates a new connector with version 1 in draft state.
-	CreateConnectorVersion(ctx context.Context, namespace string, definition *cschema.Connector, labels map[string]string) (ConnectorVersion, error)
+	CreateConnectorVersion(ctx context.Context, namespace string, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (ConnectorVersion, error)
 
 	// CreateDraftConnectorVersion creates a new draft version for an existing connector.
 	// Returns ErrDraftAlreadyExists if a draft version already exists.
-	CreateDraftConnectorVersion(ctx context.Context, id apid.ID, definition *cschema.Connector, labels map[string]string) (ConnectorVersion, error)
+	CreateDraftConnectorVersion(ctx context.Context, id apid.ID, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (ConnectorVersion, error)
 
 	// UpdateDraftConnectorVersion updates an existing draft version.
 	// Returns ErrNotDraft if the version is not in draft state.
-	UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, version uint64, definition *cschema.Connector, labels map[string]string) (ConnectorVersion, error)
+	UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, version uint64, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (ConnectorVersion, error)
 
 	// GetOrCreateDraftConnectorVersion returns the existing draft version, or creates a new one by cloning the latest version.
 	GetOrCreateDraftConnectorVersion(ctx context.Context, id apid.ID) (ConnectorVersion, error)
@@ -118,6 +118,15 @@ type C interface {
 	// DeleteNamespaceLabels removes the specified label keys from a namespace.
 	DeleteNamespaceLabels(ctx context.Context, path string, keys []string) (Namespace, error)
 
+	// UpdateNamespaceAnnotations replaces all annotations on a namespace.
+	UpdateNamespaceAnnotations(ctx context.Context, path string, annotations map[string]string) (Namespace, error)
+
+	// PutNamespaceAnnotations adds or updates the specified annotations on a namespace.
+	PutNamespaceAnnotations(ctx context.Context, path string, annotations map[string]string) (Namespace, error)
+
+	// DeleteNamespaceAnnotations removes the specified annotation keys from a namespace.
+	DeleteNamespaceAnnotations(ctx context.Context, path string, keys []string) (Namespace, error)
+
 	// EnsureNamespaceAncestorPath ensures that the specified namespace path exists in the database.
 	EnsureNamespaceAncestorPath(ctx context.Context, targetNamespace string, labels map[string]string) (Namespace, error)
 
@@ -159,6 +168,15 @@ type C interface {
 
 	// DeleteEncryptionKeyLabels removes the specified label keys from an encryption key.
 	DeleteEncryptionKeyLabels(ctx context.Context, id apid.ID, keys []string) (EncryptionKey, error)
+
+	// UpdateEncryptionKeyAnnotations replaces all annotations on an encryption key.
+	UpdateEncryptionKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (EncryptionKey, error)
+
+	// PutEncryptionKeyAnnotations adds or updates the specified annotations on an encryption key.
+	PutEncryptionKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (EncryptionKey, error)
+
+	// DeleteEncryptionKeyAnnotations removes the specified annotation keys from an encryption key.
+	DeleteEncryptionKeyAnnotations(ctx context.Context, id apid.ID, keys []string) (EncryptionKey, error)
 
 	// ListEncryptionKeysBuilder returns a builder to allow the caller to list encryption keys matching certain criteria.
 	ListEncryptionKeysBuilder() ListEncryptionKeysBuilder

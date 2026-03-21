@@ -74,6 +74,10 @@ func (cv *ConnectorVersion) GetLabels() map[string]string {
 	return cv.ConnectorVersion.Labels
 }
 
+func (cv *ConnectorVersion) GetAnnotations() map[string]string {
+	return cv.ConnectorVersion.Annotations
+}
+
 func (cv *ConnectorVersion) getDefinition() (*cschema.Connector, error) {
 	cv.defMu.RLock()
 	defer cv.defMu.RUnlock()

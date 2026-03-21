@@ -24,6 +24,7 @@ type Connection interface {
 	GetUpdatedAt() time.Time
 	GetDeletedAt() *time.Time
 	GetLabels() map[string]string
+	GetAnnotations() map[string]string
 
 	/*
 	 * Nested entities

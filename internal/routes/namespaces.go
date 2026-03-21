@@ -23,17 +23,20 @@ type NamespaceJson struct {
 	State           database.NamespaceState `json:"state"`
 	EncryptionKeyId *string                 `json:"encryption_key_id,omitempty"`
 	Labels          map[string]string       `json:"labels,omitempty"`
+	Annotations     map[string]string       `json:"annotations,omitempty"`
 	CreatedAt       time.Time               `json:"created_at"`
 	UpdatedAt       time.Time               `json:"updated_at"`
 }
 
 type CreateNamespaceRequestJson struct {
-	Path   string            `json:"path"`
-	Labels map[string]string `json:"labels"`
+	Path        string            `json:"path"`
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
 }
 
 type UpdateNamespaceRequestJson struct {
-	Labels map[string]string `json:"labels"`
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
 }
 
 type PutNamespaceLabelRequestJson struct {
@@ -41,6 +44,15 @@ type PutNamespaceLabelRequestJson struct {
 }
 
 type NamespaceLabelJson struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
+type PutNamespaceAnnotationRequestJson struct {
+	Value string `json:"value"`
+}
+
+type NamespaceAnnotationJson struct {
 	Key   string `json:"key"`
 	Value string `json:"value"`
 }
@@ -57,6 +69,7 @@ func NamespaceToJson(ns coreIface.Namespace) NamespaceJson {
 		State:           ns.GetState(),
 		EncryptionKeyId: ekId,
 		Labels:          ns.GetLabels(),
+		Annotations:     ns.GetAnnotations(),
 		CreatedAt:       ns.GetCreatedAt(),
 		UpdatedAt:       ns.GetUpdatedAt(),
 	}
@@ -400,6 +413,20 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 		}
 	}
 
+	// Validate annotations if provided
+	if req.Annotations != nil {
+		if err := database.Annotations(req.Annotations).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid annotations: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
 	// Get the existing namespace for authorization check
 	ns, err := r.core.GetNamespace(ctx, path)
 	if err != nil {
@@ -431,6 +458,31 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 	// Only update labels if provided in the request
 	if req.Labels != nil {
 		ns, err = r.core.UpdateNamespaceLabels(ctx, path, req.Labels)
+		if err != nil {
+			if errors.Is(err, core.ErrNotFound) {
+				api_common.NewHttpStatusErrorBuilder().
+					WithStatusNotFound().
+					WithResponseMsgf("namespace '%s' not found", path).
+					WithInternalErr(err).
+					BuildStatusError().
+					WriteGinResponse(nil, gctx)
+				val.MarkErrorReturn()
+				return
+			}
+
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusInternalServerError().
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
+	// Only update annotations if provided in the request
+	if req.Annotations != nil {
+		ns, err = r.core.UpdateNamespaceAnnotations(ctx, path, req.Annotations)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
 				api_common.NewHttpStatusErrorBuilder().
@@ -828,6 +880,366 @@ func (r *NamespacesRoutes) deleteLabel(gctx *gin.Context) {
 	gctx.Status(http.StatusNoContent)
 }
 
+// @Summary		Get all annotations for a namespace
+// @Description	Get all annotations associated with a specific namespace
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path	path		string	true	"Namespace path"
+// @Success		200		{object}	map[string]string
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path}/annotations [get]
+func (r *NamespacesRoutes) getAnnotations(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	path := gctx.Param("path")
+
+	if path == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("path is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	ns, err := r.core.GetNamespace(ctx, path)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("namespace '%s' not found", path).
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
+		httpErr.WriteGinResponse(nil, gctx)
+		return
+	}
+
+	annotations := ns.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+
+	gctx.PureJSON(http.StatusOK, annotations)
+}
+
+// @Summary		Get a specific annotation for a namespace
+// @Description	Get a specific annotation value by key for a namespace
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path		path		string	true	"Namespace path"
+// @Param			annotation	path		string	true	"Annotation key"
+// @Success		200			{object}	SwaggerNamespaceAnnotationJson
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		404			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path}/annotations/{annotation} [get]
+func (r *NamespacesRoutes) getAnnotation(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	path := gctx.Param("path")
+
+	if path == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("path is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	annotationKey := gctx.Param("annotation")
+	if annotationKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("annotation key is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	ns, err := r.core.GetNamespace(ctx, path)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("namespace '%s' not found", path).
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
+		httpErr.WriteGinResponse(nil, gctx)
+		return
+	}
+
+	annotations := ns.GetAnnotations()
+	value, exists := annotations[annotationKey]
+	if !exists {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsgf("annotation '%s' not found", annotationKey).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, NamespaceAnnotationJson{
+		Key:   annotationKey,
+		Value: value,
+	})
+}
+
+// @Summary		Set an annotation for a namespace
+// @Description	Set or update a specific annotation value by key for a namespace
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path		path		string									true	"Namespace path"
+// @Param			annotation	path		string									true	"Annotation key"
+// @Param			request		body		SwaggerPutNamespaceAnnotationRequest	true	"Annotation value"
+// @Success		200			{object}	SwaggerNamespaceAnnotationJson
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		403			{object}	ErrorResponse
+// @Failure		404			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path}/annotations/{annotation} [put]
+func (r *NamespacesRoutes) putAnnotation(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	path := gctx.Param("path")
+
+	if path == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("path is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	annotationKey := gctx.Param("annotation")
+	if annotationKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("annotation key is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Validate annotation key
+	if err := database.ValidateAnnotationKey(annotationKey); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid annotation key: %s", err.Error()).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	var req PutNamespaceAnnotationRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid request body").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Get the existing namespace for authorization check
+	ns, err := r.core.GetNamespace(ctx, path)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("namespace '%s' not found", path).
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
+		httpErr.WriteGinResponse(nil, gctx)
+		return
+	}
+
+	// Use transactional PutNamespaceAnnotations to update
+	updatedNs, err := r.core.PutNamespaceAnnotations(ctx, path, map[string]string{annotationKey: req.Value})
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("namespace '%s' not found", path).
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, NamespaceAnnotationJson{
+		Key:   annotationKey,
+		Value: updatedNs.GetAnnotations()[annotationKey],
+	})
+}
+
+// @Summary		Delete an annotation from a namespace
+// @Description	Delete a specific annotation by key from a namespace
+// @Tags			namespaces
+// @Accept			json
+// @Produce		json
+// @Param			path		path	string	true	"Namespace path"
+// @Param			annotation	path	string	true	"Annotation key"
+// @Success		204			"No Content"
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		403			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/namespaces/{path}/annotations/{annotation} [delete]
+func (r *NamespacesRoutes) deleteAnnotation(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	path := gctx.Param("path")
+
+	if path == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("path is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	annotationKey := gctx.Param("annotation")
+	if annotationKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("annotation key is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Get the existing namespace for authorization check
+	ns, err := r.core.GetNamespace(ctx, path)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			// Namespace doesn't exist, return 204 (idempotent delete)
+			gctx.Status(http.StatusNoContent)
+			val.MarkValidated()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
+		httpErr.WriteGinResponse(nil, gctx)
+		return
+	}
+
+	// Use transactional DeleteNamespaceAnnotations to delete
+	_, err = r.core.DeleteNamespaceAnnotations(ctx, path, []string{annotationKey})
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			// Namespace was deleted between the check and the update, return 204
+			gctx.Status(http.StatusNoContent)
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.Status(http.StatusNoContent)
+}
+
 type SetNamespaceEncryptionKeyRequestJson struct {
 	EncryptionKeyId string `json:"encryption_key_id"`
 }
@@ -1129,6 +1541,46 @@ func (r *NamespacesRoutes) Register(g gin.IRouter) {
 			ForVerb("update").
 			Build(),
 		r.deleteLabel,
+	)
+	g.GET(
+		"/namespaces/:path/annotations",
+		r.authService.NewRequiredBuilder().
+			ForResource("namespaces").
+			ForIdField("path").
+			ForIdExtractor(func(ns interface{}) string { return ns.(coreIface.Namespace).GetPath() }).
+			ForVerb("get").
+			Build(),
+		r.getAnnotations,
+	)
+	g.GET(
+		"/namespaces/:path/annotations/:annotation",
+		r.authService.NewRequiredBuilder().
+			ForResource("namespaces").
+			ForIdField("path").
+			ForIdExtractor(func(ns interface{}) string { return ns.(coreIface.Namespace).GetPath() }).
+			ForVerb("get").
+			Build(),
+		r.getAnnotation,
+	)
+	g.PUT(
+		"/namespaces/:path/annotations/:annotation",
+		r.authService.NewRequiredBuilder().
+			ForResource("namespaces").
+			ForIdField("path").
+			ForIdExtractor(func(ns interface{}) string { return ns.(coreIface.Namespace).GetPath() }).
+			ForVerb("update").
+			Build(),
+		r.putAnnotation,
+	)
+	g.DELETE(
+		"/namespaces/:path/annotations/:annotation",
+		r.authService.NewRequiredBuilder().
+			ForResource("namespaces").
+			ForIdField("path").
+			ForIdExtractor(func(ns interface{}) string { return ns.(coreIface.Namespace).GetPath() }).
+			ForVerb("update").
+			Build(),
+		r.deleteAnnotation,
 	)
 	g.GET(
 		"/namespaces/:path/encryption-key",

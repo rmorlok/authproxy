@@ -1168,4 +1168,564 @@ func TestNamespaces(t *testing.T) {
 			require.False(t, exists)
 		})
 	})
+
+	t.Run("update namespace with annotations", func(t *testing.T) {
+		tu, done := setup(t, context.Background(), nil)
+		defer done()
+
+		t.Run("success - update annotations", func(t *testing.T) {
+			err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+				Path:  "root.patchannot",
+				State: database.NamespaceStateActive,
+			})
+			require.NoError(t, err)
+
+			body := `{"annotations": {"description": "my namespace", "owner": "teamA"}}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				"/namespaces/root.patchannot",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp NamespaceJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "root.patchannot", resp.Path)
+			require.Equal(t, "my namespace", resp.Annotations["description"])
+			require.Equal(t, "teamA", resp.Annotations["owner"])
+
+			// Verify in database
+			ns, err := tu.Db.GetNamespace(context.Background(), "root.patchannot")
+			require.NoError(t, err)
+			require.Equal(t, "my namespace", ns.Annotations["description"])
+			require.Equal(t, "teamA", ns.Annotations["owner"])
+		})
+
+		t.Run("success - annotations unchanged when not provided", func(t *testing.T) {
+			err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+				Path:        "root.unchangedannot",
+				State:       database.NamespaceStateActive,
+				Annotations: database.Annotations{"old": "value"},
+			})
+			require.NoError(t, err)
+
+			body := `{}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				"/namespaces/root.unchangedannot",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp NamespaceJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, map[string]string{"old": "value"}, resp.Annotations)
+
+			// Verify in database
+			ns, err := tu.Db.GetNamespace(context.Background(), "root.unchangedannot")
+			require.NoError(t, err)
+			require.Equal(t, database.Annotations{"old": "value"}, ns.Annotations)
+		})
+
+		t.Run("success - replaces annotations entirely", func(t *testing.T) {
+			err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+				Path:        "root.replaceannot",
+				State:       database.NamespaceStateActive,
+				Annotations: database.Annotations{"old-key": "old-value", "another": "annotation"},
+			})
+			require.NoError(t, err)
+
+			body := `{"annotations": {"new-key": "new-value"}}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				"/namespaces/root.replaceannot",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp NamespaceJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Len(t, resp.Annotations, 1)
+			require.Equal(t, "new-value", resp.Annotations["new-key"])
+
+			// Verify old annotations are gone
+			ns, err := tu.Db.GetNamespace(context.Background(), "root.replaceannot")
+			require.NoError(t, err)
+			require.Len(t, ns.Annotations, 1)
+			require.Equal(t, "new-value", ns.Annotations["new-key"])
+			_, exists := ns.Annotations["old-key"]
+			require.False(t, exists)
+		})
+	})
+
+	t.Run("get annotations", func(t *testing.T) {
+		tu, done := setup(t, context.Background(), nil)
+		defer done()
+
+		// Create a namespace with annotations
+		err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+			Path:        "root.annotated",
+			State:       database.NamespaceStateActive,
+			Annotations: database.Annotations{"description": "test ns", "owner": "teamB"},
+		})
+		require.NoError(t, err)
+
+		// Create a namespace without annotations
+		err = tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+			Path:  "root.noannots",
+			State: database.NamespaceStateActive,
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/namespaces/root.annotated/annotations", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/namespaces/root.nonexistent/annotations",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("success", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/namespaces/root.annotated/annotations",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp map[string]string
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "test ns", resp["description"])
+			require.Equal(t, "teamB", resp["owner"])
+		})
+
+		t.Run("success - empty annotations", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/namespaces/root.noannots/annotations",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp map[string]string
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Empty(t, resp)
+		})
+	})
+
+	t.Run("get annotation", func(t *testing.T) {
+		tu, done := setup(t, context.Background(), nil)
+		defer done()
+
+		// Create a namespace with annotations
+		err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+			Path:        "root.annotated",
+			State:       database.NamespaceStateActive,
+			Annotations: database.Annotations{"env": "staging"},
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/namespaces/root.annotated/annotations/env", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("namespace not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/namespaces/root.nonexistent/annotations/env",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("annotation not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/namespaces/root.annotated/annotations/nonexistent",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("success", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/namespaces/root.annotated/annotations/env",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp NamespaceAnnotationJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "env", resp.Key)
+			require.Equal(t, "staging", resp.Value)
+		})
+	})
+
+	t.Run("put annotation", func(t *testing.T) {
+		tu, done := setup(t, context.Background(), nil)
+		defer done()
+
+		err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+			Path:  "root.putannot",
+			State: database.NamespaceStateActive,
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			body := `{"value": "production"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPut, "/namespaces/root.putannot/annotations/env", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden with wrong verb", func(t *testing.T) {
+			body := `{"value": "production"}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/namespaces/root.putannot/annotations/env",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "namespaces", "get"), // Wrong verb
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("namespace not found", func(t *testing.T) {
+			body := `{"value": "production"}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/namespaces/root.nonexistent/annotations/env",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("bad request - invalid JSON", func(t *testing.T) {
+			body := `{invalid json}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/namespaces/root.putannot/annotations/env",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("success - add new annotation", func(t *testing.T) {
+			body := `{"value": "production"}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/namespaces/root.putannot/annotations/env",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp NamespaceAnnotationJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "env", resp.Key)
+			require.Equal(t, "production", resp.Value)
+
+			// Verify in database
+			ns, err := tu.Db.GetNamespace(context.Background(), "root.putannot")
+			require.NoError(t, err)
+			require.Equal(t, "production", ns.Annotations["env"])
+		})
+
+		t.Run("success - update existing annotation", func(t *testing.T) {
+			err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+				Path:        "root.updateannot",
+				State:       database.NamespaceStateActive,
+				Annotations: database.Annotations{"version": "v1"},
+			})
+			require.NoError(t, err)
+
+			body := `{"value": "v2"}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/namespaces/root.updateannot/annotations/version",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp NamespaceAnnotationJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "version", resp.Key)
+			require.Equal(t, "v2", resp.Value)
+
+			// Verify in database
+			ns, err := tu.Db.GetNamespace(context.Background(), "root.updateannot")
+			require.NoError(t, err)
+			require.Equal(t, "v2", ns.Annotations["version"])
+		})
+
+		t.Run("success - preserves other annotations", func(t *testing.T) {
+			err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+				Path:        "root.preserveannot",
+				State:       database.NamespaceStateActive,
+				Annotations: database.Annotations{"env": "dev", "team": "platform"},
+			})
+			require.NoError(t, err)
+
+			body := `{"value": "staging"}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/namespaces/root.preserveannot/annotations/env",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			// Verify both annotations in database
+			ns, err := tu.Db.GetNamespace(context.Background(), "root.preserveannot")
+			require.NoError(t, err)
+			require.Equal(t, "staging", ns.Annotations["env"])
+			require.Equal(t, "platform", ns.Annotations["team"])
+		})
+	})
+
+	t.Run("delete annotation", func(t *testing.T) {
+		tu, done := setup(t, context.Background(), nil)
+		defer done()
+
+		// Create a namespace with annotations
+		err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+			Path:        "root.deleteannot",
+			State:       database.NamespaceStateActive,
+			Annotations: database.Annotations{"env": "prod", "team": "backend"},
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodDelete, "/namespaces/root.deleteannot/annotations/env", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden with wrong verb", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodDelete,
+				"/namespaces/root.deleteannot/annotations/env",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "namespaces", "get"), // Wrong verb
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("namespace not found returns 204", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodDelete,
+				"/namespaces/root.nonexistent/annotations/env",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNoContent, w.Code)
+		})
+
+		t.Run("success - delete annotation", func(t *testing.T) {
+			err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+				Path:        "root.deleteoneannot",
+				State:       database.NamespaceStateActive,
+				Annotations: database.Annotations{"to-delete": "value", "to-keep": "value2"},
+			})
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodDelete,
+				"/namespaces/root.deleteoneannot/annotations/to-delete",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNoContent, w.Code)
+
+			// Verify the annotation is deleted but other annotations remain
+			ns, err := tu.Db.GetNamespace(context.Background(), "root.deleteoneannot")
+			require.NoError(t, err)
+			_, exists := ns.Annotations["to-delete"]
+			require.False(t, exists)
+			require.Equal(t, "value2", ns.Annotations["to-keep"])
+		})
+
+		t.Run("success - delete is idempotent", func(t *testing.T) {
+			err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
+				Path:        "root.idempotentannot",
+				State:       database.NamespaceStateActive,
+				Annotations: database.Annotations{"annotation": "value"},
+			})
+			require.NoError(t, err)
+
+			// Delete the annotation twice
+			for i := 0; i < 2; i++ {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodDelete,
+					"/namespaces/root.idempotentannot/annotations/annotation",
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNoContent, w.Code)
+			}
+
+			// Verify the annotation is deleted
+			ns, err := tu.Db.GetNamespace(context.Background(), "root.idempotentannot")
+			require.NoError(t, err)
+			_, exists := ns.Annotations["annotation"]
+			require.False(t, exists)
+		})
+	})
 }

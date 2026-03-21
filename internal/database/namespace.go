@@ -27,6 +27,7 @@ type Namespace struct {
 	State           NamespaceState
 	EncryptionKeyId *apid.ID
 	Labels          Labels
+	Annotations     Annotations
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 	DeletedAt       *time.Time
@@ -43,6 +44,7 @@ func (ns *Namespace) cols() []string {
 		"state",
 		"encryption_key_id",
 		"labels",
+		"annotations",
 		"created_at",
 		"updated_at",
 		"deleted_at",
@@ -56,6 +58,7 @@ func (ns *Namespace) fields() []any {
 		&ns.State,
 		&ns.EncryptionKeyId,
 		&ns.Labels,
+		&ns.Annotations,
 		&ns.CreatedAt,
 		&ns.UpdatedAt,
 		&ns.DeletedAt,
@@ -69,6 +72,7 @@ func (ns *Namespace) values() []any {
 		ns.State,
 		ns.EncryptionKeyId,
 		ns.Labels,
+		ns.Annotations,
 		ns.CreatedAt,
 		ns.UpdatedAt,
 		ns.DeletedAt,
@@ -96,6 +100,10 @@ func (ns *Namespace) Validate() error {
 
 	if err := ns.Labels.Validate(); err != nil {
 		result = multierror.Append(result, errors.Wrap(err, "invalid namespace labels"))
+	}
+
+	if err := ns.Annotations.Validate(); err != nil {
+		result = multierror.Append(result, errors.Wrap(err, "invalid namespace annotations"))
 	}
 
 	return result.ErrorOrNil()
@@ -804,6 +812,120 @@ func (s *service) DeleteNamespaceLabels(ctx context.Context, path string, keys [
 		}
 
 		ns.Labels = remainingLabels
+		ns.UpdatedAt = now
+		result = ns
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// UpdateNamespaceAnnotations replaces all annotations on a namespace within a single transaction.
+func (s *service) UpdateNamespaceAnnotations(ctx context.Context, path string, annotations map[string]string) (*Namespace, error) {
+	if path == "" {
+		return nil, errors.New("namespace path is required")
+	}
+
+	if annotations != nil {
+		if err := ValidateAnnotations(annotations); err != nil {
+			return nil, errors.Wrap(err, "invalid annotations")
+		}
+	}
+
+	var result *Namespace
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		ns, err := s.getNamespaceByPath(ctx, tx, path)
+		if err != nil {
+			return err
+		}
+
+		now, err := s.updateAnnotationsInTableTx(ctx, tx, NamespacesTable, sq.Eq{"path": path, "deleted_at": nil}, Annotations(annotations))
+		if err != nil {
+			return err
+		}
+
+		ns.Annotations = annotations
+		ns.UpdatedAt = now
+		result = ns
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// PutNamespaceAnnotations adds or updates the specified annotations on a namespace within a single transaction.
+func (s *service) PutNamespaceAnnotations(ctx context.Context, path string, annotations map[string]string) (*Namespace, error) {
+	if path == "" {
+		return nil, errors.New("namespace path is required")
+	}
+
+	if len(annotations) == 0 {
+		return s.GetNamespace(ctx, path)
+	}
+
+	if err := ValidateAnnotations(annotations); err != nil {
+		return nil, errors.Wrap(err, "invalid annotations")
+	}
+
+	var result *Namespace
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		ns, err := s.getNamespaceByPath(ctx, tx, path)
+		if err != nil {
+			return err
+		}
+
+		mergedAnnotations, now, err := s.putAnnotationsInTableTx(ctx, tx, NamespacesTable, sq.Eq{"path": path, "deleted_at": nil}, annotations)
+		if err != nil {
+			return err
+		}
+
+		ns.Annotations = mergedAnnotations
+		ns.UpdatedAt = now
+		result = ns
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// DeleteNamespaceAnnotations removes the specified annotation keys from a namespace within a single transaction.
+func (s *service) DeleteNamespaceAnnotations(ctx context.Context, path string, keys []string) (*Namespace, error) {
+	if path == "" {
+		return nil, errors.New("namespace path is required")
+	}
+
+	if len(keys) == 0 {
+		return s.GetNamespace(ctx, path)
+	}
+
+	var result *Namespace
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		ns, err := s.getNamespaceByPath(ctx, tx, path)
+		if err != nil {
+			return err
+		}
+
+		remainingAnnotations, now, err := s.deleteAnnotationsInTableTx(ctx, tx, NamespacesTable, sq.Eq{"path": path, "deleted_at": nil}, keys)
+		if err != nil {
+			return err
+		}
+
+		ns.Annotations = remainingAnnotations
 		ns.UpdatedAt = now
 		result = ns
 		return nil

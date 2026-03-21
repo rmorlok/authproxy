@@ -1483,4 +1483,339 @@ func TestActorsRoutes(t *testing.T) {
 			require.False(t, exists)
 		})
 	})
+
+	t.Run("get annotations", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		// Create an actor with annotations
+		a := createActor(t, tu.Db, "annotations-actor", "root")
+		_, err := tu.Db.PutActorAnnotations(context.Background(), a.Id, map[string]string{"env": "prod", "team": "backend"})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+a.Id.String()+"/annotations", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+apid.New(apid.PrefixActor).String()+"/annotations", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("success", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+a.Id.String()+"/annotations", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp map[string]string
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "prod", resp["env"])
+			require.Equal(t, "backend", resp["team"])
+		})
+
+		t.Run("success - empty annotations", func(t *testing.T) {
+			actorNoAnnotations := createActor(t, tu.Db, "no-annotations-actor", "root")
+
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+actorNoAnnotations.Id.String()+"/annotations", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp map[string]string
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Empty(t, resp)
+		})
+	})
+
+	t.Run("get annotation", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		// Create an actor with annotations
+		a := createActor(t, tu.Db, "get-annotation-actor", "root")
+		_, err := tu.Db.PutActorAnnotations(context.Background(), a.Id, map[string]string{"env": "staging"})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+a.Id.String()+"/annotations/env", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("actor not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+apid.New(apid.PrefixActor).String()+"/annotations/env", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("annotation not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+a.Id.String()+"/annotations/nonexistent", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("success", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/actors/"+a.Id.String()+"/annotations/env", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ActorAnnotationJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "env", resp.Key)
+			require.Equal(t, "staging", resp.Value)
+		})
+	})
+
+	t.Run("put annotation", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		a := createActor(t, tu.Db, "put-annotation-actor", "root")
+
+		t.Run("unauthorized", func(t *testing.T) {
+			body := `{"value": "production"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPut, "/actors/"+a.Id.String()+"/annotations/env", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden with wrong verb", func(t *testing.T) {
+			body := `{"value": "production"}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				"/actors/"+a.Id.String()+"/annotations/env",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "actors", "get"), // Wrong verb
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("actor not found", func(t *testing.T) {
+			body := `{"value": "production"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPut, "/actors/"+apid.New(apid.PrefixActor).String()+"/annotations/env", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("bad request - invalid JSON", func(t *testing.T) {
+			body := `{invalid json}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPut, "/actors/"+a.Id.String()+"/annotations/env", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("success - add new annotation", func(t *testing.T) {
+			body := `{"value": "production"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPut, "/actors/"+a.Id.String()+"/annotations/env", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ActorAnnotationJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "env", resp.Key)
+			require.Equal(t, "production", resp.Value)
+
+			// Verify in database
+			updatedActor, err := tu.Db.GetActor(context.Background(), a.Id)
+			require.NoError(t, err)
+			require.Equal(t, "production", updatedActor.Annotations["env"])
+		})
+
+		t.Run("success - update existing annotation", func(t *testing.T) {
+			// First set an annotation
+			actorWithAnnotation := createActor(t, tu.Db, "update-existing-annotation", "root")
+			_, err := tu.Db.PutActorAnnotations(context.Background(), actorWithAnnotation.Id, map[string]string{"version": "v1"})
+			require.NoError(t, err)
+
+			// Update the annotation
+			body := `{"value": "v2"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPut, "/actors/"+actorWithAnnotation.Id.String()+"/annotations/version", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ActorAnnotationJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "version", resp.Key)
+			require.Equal(t, "v2", resp.Value)
+
+			// Verify in database
+			updatedActor, err := tu.Db.GetActor(context.Background(), actorWithAnnotation.Id)
+			require.NoError(t, err)
+			require.Equal(t, "v2", updatedActor.Annotations["version"])
+		})
+
+		t.Run("success - preserves other annotations", func(t *testing.T) {
+			// First set multiple annotations
+			actorMultiAnnotation := createActor(t, tu.Db, "multi-annotation-actor", "root")
+			_, err := tu.Db.PutActorAnnotations(context.Background(), actorMultiAnnotation.Id, map[string]string{"env": "dev", "team": "platform"})
+			require.NoError(t, err)
+
+			// Update one annotation
+			body := `{"value": "staging"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPut, "/actors/"+actorMultiAnnotation.Id.String()+"/annotations/env", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			// Verify both annotations in database
+			updatedActor, err := tu.Db.GetActor(context.Background(), actorMultiAnnotation.Id)
+			require.NoError(t, err)
+			require.Equal(t, "staging", updatedActor.Annotations["env"])
+			require.Equal(t, "platform", updatedActor.Annotations["team"])
+		})
+	})
+
+	t.Run("delete annotation", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		a := createActor(t, tu.Db, "delete-annotation-actor", "root")
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodDelete, "/actors/"+a.Id.String()+"/annotations/env", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden with wrong verb", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodDelete,
+				"/actors/"+a.Id.String()+"/annotations/env",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "actors", "get"), // Wrong verb
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("actor not found returns 204", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodDelete, "/actors/"+apid.New(apid.PrefixActor).String()+"/annotations/env", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNoContent, w.Code)
+		})
+
+		t.Run("success - delete annotation", func(t *testing.T) {
+			// Create actor with annotation to delete
+			actorToDelete := createActor(t, tu.Db, "actor-delete-one-annotation", "root")
+			_, err := tu.Db.PutActorAnnotations(context.Background(), actorToDelete.Id, map[string]string{"to-delete": "value", "to-keep": "value2"})
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodDelete, "/actors/"+actorToDelete.Id.String()+"/annotations/to-delete", nil)
+			require.NoError(t, err)
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNoContent, w.Code)
+
+			// Verify the annotation is deleted but other annotations remain
+			updatedActor, err := tu.Db.GetActor(context.Background(), actorToDelete.Id)
+			require.NoError(t, err)
+			_, exists := updatedActor.Annotations["to-delete"]
+			require.False(t, exists)
+			require.Equal(t, "value2", updatedActor.Annotations["to-keep"])
+		})
+
+		t.Run("success - delete is idempotent", func(t *testing.T) {
+			actorIdempotent := createActor(t, tu.Db, "actor-idempotent-delete-annotation", "root")
+			_, err := tu.Db.PutActorAnnotations(context.Background(), actorIdempotent.Id, map[string]string{"annotation": "value"})
+			require.NoError(t, err)
+
+			// Delete the annotation twice
+			for i := 0; i < 2; i++ {
+				w := httptest.NewRecorder()
+				req, err := http.NewRequest(http.MethodDelete, "/actors/"+actorIdempotent.Id.String()+"/annotations/annotation", nil)
+				require.NoError(t, err)
+				req = authenticate(t, tu, req)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNoContent, w.Code)
+			}
+
+			// Verify the annotation is deleted
+			updatedActor, err := tu.Db.GetActor(context.Background(), actorIdempotent.Id)
+			require.NoError(t, err)
+			_, exists := updatedActor.Annotations["annotation"]
+			require.False(t, exists)
+		})
+	})
 }

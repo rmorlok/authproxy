@@ -99,6 +99,45 @@ func (s *service) DeleteNamespaceLabels(ctx context.Context, path string, keys [
 	return wrapNamespace(*ns, s), nil
 }
 
+func (s *service) UpdateNamespaceAnnotations(ctx context.Context, path string, annotations map[string]string) (iface.Namespace, error) {
+	ns, err := s.db.UpdateNamespaceAnnotations(ctx, path, annotations)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+
+		return nil, err
+	}
+
+	return wrapNamespace(*ns, s), nil
+}
+
+func (s *service) PutNamespaceAnnotations(ctx context.Context, path string, annotations map[string]string) (iface.Namespace, error) {
+	ns, err := s.db.PutNamespaceAnnotations(ctx, path, annotations)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+
+		return nil, err
+	}
+
+	return wrapNamespace(*ns, s), nil
+}
+
+func (s *service) DeleteNamespaceAnnotations(ctx context.Context, path string, keys []string) (iface.Namespace, error) {
+	ns, err := s.db.DeleteNamespaceAnnotations(ctx, path, keys)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+
+		return nil, err
+	}
+
+	return wrapNamespace(*ns, s), nil
+}
+
 func (s *service) SetNamespaceEncryptionKey(ctx context.Context, path string, ekId apid.ID) (iface.Namespace, error) {
 	// Validate the encryption key exists
 	_, err := s.GetEncryptionKey(ctx, ekId)

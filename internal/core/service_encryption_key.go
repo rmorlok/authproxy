@@ -118,6 +118,39 @@ func (s *service) DeleteEncryptionKeyLabels(ctx context.Context, id apid.ID, key
 	return wrapEncryptionKey(*ek, s), nil
 }
 
+func (s *service) UpdateEncryptionKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (iface.EncryptionKey, error) {
+	ek, err := s.db.UpdateEncryptionKeyAnnotations(ctx, id, annotations)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return wrapEncryptionKey(*ek, s), nil
+}
+
+func (s *service) PutEncryptionKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (iface.EncryptionKey, error) {
+	ek, err := s.db.PutEncryptionKeyAnnotations(ctx, id, annotations)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return wrapEncryptionKey(*ek, s), nil
+}
+
+func (s *service) DeleteEncryptionKeyAnnotations(ctx context.Context, id apid.ID, keys []string) (iface.EncryptionKey, error) {
+	ek, err := s.db.DeleteEncryptionKeyAnnotations(ctx, id, keys)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			return nil, ErrNotFound
+		}
+		return nil, err
+	}
+	return wrapEncryptionKey(*ek, s), nil
+}
+
 type listEncryptionKeyWrapper struct {
 	l database.ListEncryptionKeysBuilder
 	e database.ListEncryptionKeysExecutor

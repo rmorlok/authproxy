@@ -15,6 +15,7 @@ import {Connector, connectors, ConnectorVersion} from '@authproxy/api';
 import {Link, useNavigate} from 'react-router-dom';
 import {StateChip} from "./StateChip";
 import ConnectorVersionDetail from "./ConnectorVersionDetail";
+import AnnotationsEditor from "./AnnotationsEditor";
 
 export default function ConnectorDetail({connectorId, initialVersion}: { connectorId: string, initialVersion?: number }) {
   const [loading, setLoading] = useState(true);
@@ -134,6 +135,13 @@ export default function ConnectorDetail({connectorId, initialVersion}: { connect
           <Typography variant="body1">{conn.version}</Typography>
         </Box>
       </Stack>
+
+      <AnnotationsEditor
+        annotations={conn.annotations}
+        readOnly
+        onPut={async () => {}}
+        onDelete={async () => {}}
+      />
 
       <Stack direction={{xs: 'column', sm: 'row'}} spacing={4}>
         <Box>

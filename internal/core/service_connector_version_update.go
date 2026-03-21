@@ -11,7 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
-func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, version uint64, definition *cschema.Connector, labels map[string]string) (iface.ConnectorVersion, error) {
+func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, version uint64, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (iface.ConnectorVersion, error) {
 	existing, err := s.db.GetConnectorVersion(ctx, id, version)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
@@ -44,6 +44,12 @@ func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, v
 		cv.ConnectorVersion.Labels = labels
 	} else {
 		cv.ConnectorVersion.Labels = existing.Labels
+	}
+
+	if annotations != nil {
+		cv.ConnectorVersion.Annotations = annotations
+	} else {
+		cv.ConnectorVersion.Annotations = existing.Annotations
 	}
 
 	if err := s.db.UpsertConnectorVersion(ctx, &cv.ConnectorVersion); err != nil {
@@ -102,6 +108,7 @@ func (s *service) GetOrCreateDraftConnectorVersion(ctx context.Context, id apid.
 	}
 
 	cv.ConnectorVersion.Labels = latest.Labels
+	cv.ConnectorVersion.Annotations = latest.Annotations
 
 	if err := s.db.UpsertConnectorVersion(ctx, &cv.ConnectorVersion); err != nil {
 		return nil, errors.Wrap(err, "failed to upsert connector version")

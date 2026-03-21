@@ -2,8 +2,19 @@ basePath: /api/v1
 definitions:
   github_com_rmorlok_authproxy_internal_schema_config.KeyData:
     type: object
+  routes.ActorAnnotationJson:
+    properties:
+      key:
+        type: string
+      value:
+        type: string
+    type: object
   routes.ActorJson:
     properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
       created_at:
         type: string
       external_id:
@@ -26,8 +37,19 @@ definitions:
       value:
         type: string
     type: object
+  routes.ConnectorAnnotationJson:
+    properties:
+      key:
+        type: string
+      value:
+        type: string
+    type: object
   routes.CreateActorRequestJson:
     properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
       external_id:
         type: string
       labels:
@@ -50,6 +72,10 @@ definitions:
     type: object
   routes.CreateNamespaceRequestJson:
     properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
       labels:
         additionalProperties:
           type: string
@@ -194,7 +220,17 @@ definitions:
         example: 200
         type: integer
     type: object
+  routes.PutActorAnnotationRequestJson:
+    properties:
+      value:
+        type: string
+    type: object
   routes.PutActorLabelRequestJson:
+    properties:
+      value:
+        type: string
+    type: object
+  routes.PutConnectorAnnotationRequestJson:
     properties:
       value:
         type: string
@@ -209,9 +245,26 @@ definitions:
       value:
         type: string
     type: object
+  routes.SwaggerConnectionAnnotationJson:
+    description: Connection annotation key-value pair
+    properties:
+      key:
+        description: Annotation key
+        example: description
+        type: string
+      value:
+        description: Annotation value
+        example: Primary production connection
+        type: string
+    type: object
   routes.SwaggerConnectionJson:
     description: Connection to an external service
     properties:
+      annotations:
+        additionalProperties:
+          type: string
+        description: Annotations assigned to the connection
+        type: object
       connector:
         allOf:
         - $ref: '#/definitions/routes.SwaggerConnectorJson'
@@ -256,6 +309,11 @@ definitions:
   routes.SwaggerConnectorJson:
     description: Connector definition for external service integration
     properties:
+      annotations:
+        additionalProperties:
+          type: string
+        description: Annotations assigned to the connector
+        type: object
       created_at:
         description: Creation timestamp
         type: string
@@ -319,6 +377,11 @@ definitions:
   routes.SwaggerConnectorVersionJson:
     description: Detailed connector version information
     properties:
+      annotations:
+        additionalProperties:
+          type: string
+        description: Annotations assigned to the connector version
+        type: object
       created_at:
         description: Creation timestamp
         type: string
@@ -352,6 +415,11 @@ definitions:
   routes.SwaggerCreateConnectorRequest:
     description: Request to create a new connector
     properties:
+      annotations:
+        additionalProperties:
+          type: string
+        description: Annotations to set on the connector
+        type: object
       definition:
         description: Connector definition (full schema)
       labels:
@@ -367,6 +435,12 @@ definitions:
   routes.SwaggerCreateConnectorVersionRequest:
     description: Request to create a new draft connector version
     properties:
+      annotations:
+        additionalProperties:
+          type: string
+        description: Annotations to set on the new version (optional - nil copies
+          from latest)
+        type: object
       definition:
         description: Connector definition (optional - nil copies from latest version)
       labels:
@@ -387,9 +461,26 @@ definitions:
         description: Task ID for tracking the disconnect operation
         type: string
     type: object
+  routes.SwaggerEncryptionKeyAnnotationJson:
+    description: Encryption key annotation key-value pair
+    properties:
+      key:
+        description: Annotation key
+        example: description
+        type: string
+      value:
+        description: Annotation value
+        example: Primary encryption key
+        type: string
+    type: object
   routes.SwaggerEncryptionKeyJson:
     description: Encryption key configuration
     properties:
+      annotations:
+        additionalProperties:
+          type: string
+        description: Annotations assigned to the encryption key
+        type: object
       created_at:
         description: Creation timestamp
         type: string
@@ -506,9 +597,26 @@ definitions:
         description: Total count of matching records (if requested)
         type: integer
     type: object
+  routes.SwaggerNamespaceAnnotationJson:
+    description: Namespace annotation key-value pair
+    properties:
+      key:
+        description: Annotation key
+        example: description
+        type: string
+      value:
+        description: Annotation value
+        example: Production namespace
+        type: string
+    type: object
   routes.SwaggerNamespaceJson:
     description: Namespace for organizing resources
     properties:
+      annotations:
+        additionalProperties:
+          type: string
+        description: Annotations assigned to the namespace
+        type: object
       created_at:
         description: Creation timestamp
         type: string
@@ -529,6 +637,14 @@ definitions:
         description: Last update timestamp
         type: string
     type: object
+  routes.SwaggerPutConnectionAnnotationRequest:
+    description: Request to set an annotation value
+    properties:
+      value:
+        description: Annotation value
+        example: Primary production connection
+        type: string
+    type: object
   routes.SwaggerPutConnectionLabelRequest:
     description: Request to set a label value
     properties:
@@ -543,6 +659,22 @@ definitions:
       value:
         description: Label value
         example: production
+        type: string
+    type: object
+  routes.SwaggerPutEncryptionKeyAnnotationRequest:
+    description: Request to set an encryption key annotation value
+    properties:
+      value:
+        description: Annotation value
+        example: Primary encryption key
+        type: string
+    type: object
+  routes.SwaggerPutNamespaceAnnotationRequest:
+    description: Request to set a namespace annotation value
+    properties:
+      value:
+        description: Annotation value
+        example: Production namespace
         type: string
     type: object
   routes.SwaggerRequestLogEntry:
@@ -609,6 +741,11 @@ definitions:
   routes.SwaggerUpdateConnectionRequest:
     description: Request to update a connection's labels
     properties:
+      annotations:
+        additionalProperties:
+          type: string
+        description: Annotations to set on the connection (replaces all existing annotations)
+        type: object
       labels:
         additionalProperties:
           type: string
@@ -618,6 +755,11 @@ definitions:
   routes.SwaggerUpdateConnectorRequest:
     description: Request to update a connector or connector version
     properties:
+      annotations:
+        additionalProperties:
+          type: string
+        description: Annotations to set on the connector (optional - nil keeps existing)
+        type: object
       definition:
         description: Connector definition (full schema, optional - nil keeps existing)
       labels:
@@ -647,6 +789,10 @@ definitions:
     - TaskStateActive
   routes.UpdateActorRequestJson:
     properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
       labels:
         additionalProperties:
           type: string
@@ -654,6 +800,10 @@ definitions:
     type: object
   routes.UpdateEncryptionKeyRequestJson:
     properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
       labels:
         additionalProperties:
           type: string
@@ -663,6 +813,10 @@ definitions:
     type: object
   routes.UpdateNamespaceRequestJson:
     properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
       labels:
         additionalProperties:
           type: string
@@ -895,6 +1049,185 @@ paths:
       security:
       - BearerAuth: []
       summary: Update actor by UUID
+      tags:
+      - actors
+  /actors/{id}/annotations:
+    get:
+      consumes:
+      - application/json
+      description: Get all annotations for an actor by ID
+      parameters:
+      - description: Actor UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all annotations for an actor
+      tags:
+      - actors
+  /actors/{id}/annotations/{annotation}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific annotation by key from an actor
+      parameters:
+      - description: Actor UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete an annotation from an actor
+      tags:
+      - actors
+    get:
+      consumes:
+      - application/json
+      description: Get a specific annotation value by key for an actor
+      parameters:
+      - description: Actor UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.ActorAnnotationJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a specific annotation for an actor
+      tags:
+      - actors
+    put:
+      consumes:
+      - application/json
+      description: Set or update a specific annotation value by key for an actor
+      parameters:
+      - description: Actor UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      - description: Annotation value
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.PutActorAnnotationRequestJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.ActorAnnotationJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set an annotation for an actor
       tags:
       - actors
   /actors/{id}/labels:
@@ -1526,6 +1859,185 @@ paths:
       summary: Proxy request through connection
       tags:
       - proxy
+  /connections/{id}/annotations:
+    get:
+      consumes:
+      - application/json
+      description: Get all annotations associated with a specific connection
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all annotations for a connection
+      tags:
+      - connections
+  /connections/{id}/annotations/{annotation}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific annotation by key from a connection
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete an annotation from a connection
+      tags:
+      - connections
+    get:
+      consumes:
+      - application/json
+      description: Get a specific annotation value by key for a connection
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerConnectionAnnotationJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a specific annotation for a connection
+      tags:
+      - connections
+    put:
+      consumes:
+      - application/json
+      description: Set or update a specific annotation value by key for a connection
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      - description: Annotation value
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.SwaggerPutConnectionAnnotationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerConnectionAnnotationJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set an annotation for a connection
+      tags:
+      - connections
   /connections/{id}/labels:
     get:
       consumes:
@@ -1883,6 +2395,187 @@ paths:
       security:
       - BearerAuth: []
       summary: Update connector
+      tags:
+      - connectors
+  /connectors/{id}/annotations:
+    get:
+      consumes:
+      - application/json
+      description: Get all annotations associated with a connector's latest version
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all annotations for a connector
+      tags:
+      - connectors
+  /connectors/{id}/annotations/{annotation}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific annotation from a connector's draft version,
+        creating one if needed
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete an annotation from a connector
+      tags:
+      - connectors
+    get:
+      consumes:
+      - application/json
+      description: Get a specific annotation value by key for a connector
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.ConnectorAnnotationJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a specific annotation for a connector
+      tags:
+      - connectors
+    put:
+      consumes:
+      - application/json
+      description: Set or update a specific annotation value by key for a connector's
+        draft version, creating one if needed
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      - description: Annotation value
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.PutConnectorAnnotationRequestJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.ConnectorAnnotationJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set an annotation for a connector
       tags:
       - connectors
   /connectors/{id}/labels:
@@ -2332,6 +3025,216 @@ paths:
       summary: Force connector version state
       tags:
       - connectors
+  /connectors/{id}/versions/{version}/annotations:
+    get:
+      consumes:
+      - application/json
+      description: Get all annotations associated with a specific version of a connector
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Version number
+        in: path
+        name: version
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all annotations for a connector version
+      tags:
+      - connectors
+  /connectors/{id}/versions/{version}/annotations/{annotation}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific annotation from a specific draft version of a
+        connector
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Version number
+        in: path
+        name: version
+        required: true
+        type: integer
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete an annotation from a connector version
+      tags:
+      - connectors
+    get:
+      consumes:
+      - application/json
+      description: Get a specific annotation value by key for a specific version of
+        a connector
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Version number
+        in: path
+        name: version
+        required: true
+        type: integer
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.ConnectorAnnotationJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a specific annotation for a connector version
+      tags:
+      - connectors
+    put:
+      consumes:
+      - application/json
+      description: Set or update a specific annotation value by key for a specific
+        draft version of a connector
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Version number
+        in: path
+        name: version
+        required: true
+        type: integer
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      - description: Annotation value
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.PutConnectorAnnotationRequestJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.ConnectorAnnotationJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "409":
+          description: Conflict
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set an annotation for a connector version
+      tags:
+      - connectors
   /connectors/{id}/versions/{version}/labels:
     get:
       consumes:
@@ -2744,6 +3647,178 @@ paths:
       summary: Update encryption key
       tags:
       - encryption_keys
+  /encryption-keys/{id}/annotations:
+    get:
+      consumes:
+      - application/json
+      description: Get all annotations associated with a specific encryption key
+      parameters:
+      - description: Encryption key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all annotations for an encryption key
+      tags:
+      - encryption_keys
+  /encryption-keys/{id}/annotations/{annotation}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific annotation by key from an encryption key
+      parameters:
+      - description: Encryption key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete an annotation from an encryption key
+      tags:
+      - encryption_keys
+    get:
+      consumes:
+      - application/json
+      description: Get a specific annotation value by key for an encryption key
+      parameters:
+      - description: Encryption key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerEncryptionKeyAnnotationJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a specific annotation for an encryption key
+      tags:
+      - encryption_keys
+    put:
+      consumes:
+      - application/json
+      description: Set or update a specific annotation value by key for an encryption
+        key
+      parameters:
+      - description: Encryption key ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      - description: Annotation value
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.SwaggerPutEncryptionKeyAnnotationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerEncryptionKeyAnnotationJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set an annotation for an encryption key
+      tags:
+      - encryption_keys
   /encryption-keys/{id}/labels:
     get:
       consumes:
@@ -3093,6 +4168,185 @@ paths:
       security:
       - BearerAuth: []
       summary: Update namespace
+      tags:
+      - namespaces
+  /namespaces/{path}/annotations:
+    get:
+      consumes:
+      - application/json
+      description: Get all annotations associated with a specific namespace
+      parameters:
+      - description: Namespace path
+        in: path
+        name: path
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all annotations for a namespace
+      tags:
+      - namespaces
+  /namespaces/{path}/annotations/{annotation}:
+    delete:
+      consumes:
+      - application/json
+      description: Delete a specific annotation by key from a namespace
+      parameters:
+      - description: Namespace path
+        in: path
+        name: path
+        required: true
+        type: string
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete an annotation from a namespace
+      tags:
+      - namespaces
+    get:
+      consumes:
+      - application/json
+      description: Get a specific annotation value by key for a namespace
+      parameters:
+      - description: Namespace path
+        in: path
+        name: path
+        required: true
+        type: string
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerNamespaceAnnotationJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a specific annotation for a namespace
+      tags:
+      - namespaces
+    put:
+      consumes:
+      - application/json
+      description: Set or update a specific annotation value by key for a namespace
+      parameters:
+      - description: Namespace path
+        in: path
+        name: path
+        required: true
+        type: string
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      - description: Annotation value
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.SwaggerPutNamespaceAnnotationRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerNamespaceAnnotationJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set an annotation for a namespace
       tags:
       - namespaces
   /namespaces/{path}/labels:

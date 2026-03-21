@@ -19,12 +19,13 @@ import (
 )
 
 type EncryptionKeyJson struct {
-	Id        apid.ID                     `json:"id"`
-	Namespace string                      `json:"namespace"`
-	State     database.EncryptionKeyState `json:"state"`
-	Labels    map[string]string           `json:"labels,omitempty"`
-	CreatedAt time.Time                   `json:"created_at"`
-	UpdatedAt time.Time                   `json:"updated_at"`
+	Id          apid.ID                     `json:"id"`
+	Namespace   string                      `json:"namespace"`
+	State       database.EncryptionKeyState `json:"state"`
+	Labels      map[string]string           `json:"labels,omitempty"`
+	Annotations map[string]string           `json:"annotations,omitempty"`
+	CreatedAt   time.Time                   `json:"created_at"`
+	UpdatedAt   time.Time                   `json:"updated_at"`
 }
 
 type CreateEncryptionKeyRequestJson struct {
@@ -34,8 +35,9 @@ type CreateEncryptionKeyRequestJson struct {
 }
 
 type UpdateEncryptionKeyRequestJson struct {
-	State  *database.EncryptionKeyState `json:"state,omitempty"`
-	Labels *map[string]string           `json:"labels,omitempty"`
+	State       *database.EncryptionKeyState `json:"state,omitempty"`
+	Labels      *map[string]string           `json:"labels,omitempty"`
+	Annotations *map[string]string           `json:"annotations,omitempty"`
 }
 
 type ListEncryptionKeysRequestQueryParams struct {
@@ -61,14 +63,24 @@ type EncryptionKeyLabelJson struct {
 	Value string `json:"value"`
 }
 
+type PutEncryptionKeyAnnotationRequestJson struct {
+	Value string `json:"value"`
+}
+
+type EncryptionKeyAnnotationJson struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 func EncryptionKeyToJson(ek coreIface.EncryptionKey) EncryptionKeyJson {
 	return EncryptionKeyJson{
-		Id:        ek.GetId(),
-		Namespace: ek.GetNamespace(),
-		State:     ek.GetState(),
-		Labels:    ek.GetLabels(),
-		CreatedAt: ek.GetCreatedAt(),
-		UpdatedAt: ek.GetUpdatedAt(),
+		Id:          ek.GetId(),
+		Namespace:   ek.GetNamespace(),
+		State:       ek.GetState(),
+		Labels:      ek.GetLabels(),
+		Annotations: ek.GetAnnotations(),
+		CreatedAt:   ek.GetCreatedAt(),
+		UpdatedAt:   ek.GetUpdatedAt(),
 	}
 }
 
@@ -377,6 +389,20 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 		}
 	}
 
+	// Validate annotations if provided
+	if req.Annotations != nil {
+		if err := database.Annotations(*req.Annotations).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid annotations: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
 	// Get existing key for authorization check
 	ek, err := r.core.GetEncryptionKey(ctx, id)
 	if err != nil {
@@ -430,6 +456,29 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 
 	if req.Labels != nil {
 		_, err = r.core.UpdateEncryptionKeyLabels(ctx, id, *req.Labels)
+		if err != nil {
+			if errors.Is(err, core.ErrNotFound) {
+				api_common.NewHttpStatusErrorBuilder().
+					WithStatusNotFound().
+					WithResponseMsgf("encryption key '%s' not found", id).
+					WithInternalErr(err).
+					BuildStatusError().
+					WriteGinResponse(nil, gctx)
+				val.MarkErrorReturn()
+				return
+			}
+
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusInternalServerError().
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+		}
+	}
+
+	if req.Annotations != nil {
+		_, err = r.core.UpdateEncryptionKeyAnnotations(ctx, id, *req.Annotations)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
 				api_common.NewHttpStatusErrorBuilder().
@@ -920,6 +969,370 @@ func (r *EncryptionKeysRoutes) deleteLabel(gctx *gin.Context) {
 	gctx.Status(http.StatusNoContent)
 }
 
+// @Summary		Get all annotations for an encryption key
+// @Description	Get all annotations associated with a specific encryption key
+// @Tags			encryption_keys
+// @Accept			json
+// @Produce		json
+// @Param			id	path		string	true	"Encryption key ID"
+// @Success		200		{object}	map[string]string
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/encryption-keys/{id}/annotations [get]
+func (r *EncryptionKeysRoutes) getAnnotations(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id := apid.ID(gctx.Param("id"))
+
+	if id.IsNil() {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	ek, err := r.core.GetEncryptionKey(ctx, id)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("encryption key '%s' not found", id).
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
+		httpErr.WriteGinResponse(nil, gctx)
+		return
+	}
+
+	annotations := ek.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+
+	gctx.PureJSON(http.StatusOK, annotations)
+}
+
+// @Summary		Get a specific annotation for an encryption key
+// @Description	Get a specific annotation value by key for an encryption key
+// @Tags			encryption_keys
+// @Accept			json
+// @Produce		json
+// @Param			id			path		string	true	"Encryption key ID"
+// @Param			annotation	path		string	true	"Annotation key"
+// @Success		200			{object}	SwaggerEncryptionKeyAnnotationJson
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		404			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/encryption-keys/{id}/annotations/{annotation} [get]
+func (r *EncryptionKeysRoutes) getAnnotation(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id := apid.ID(gctx.Param("id"))
+
+	if id.IsNil() {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	annotationKey := gctx.Param("annotation")
+	if annotationKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("annotation key is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	ek, err := r.core.GetEncryptionKey(ctx, id)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("encryption key '%s' not found", id).
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
+		httpErr.WriteGinResponse(nil, gctx)
+		return
+	}
+
+	annotations := ek.GetAnnotations()
+	value, exists := annotations[annotationKey]
+	if !exists {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsgf("annotation '%s' not found", annotationKey).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, EncryptionKeyAnnotationJson{
+		Key:   annotationKey,
+		Value: value,
+	})
+}
+
+// @Summary		Set an annotation for an encryption key
+// @Description	Set or update a specific annotation value by key for an encryption key
+// @Tags			encryption_keys
+// @Accept			json
+// @Produce		json
+// @Param			id			path		string										true	"Encryption key ID"
+// @Param			annotation	path		string										true	"Annotation key"
+// @Param			request		body		SwaggerPutEncryptionKeyAnnotationRequest	true	"Annotation value"
+// @Success		200			{object}	SwaggerEncryptionKeyAnnotationJson
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		404			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/encryption-keys/{id}/annotations/{annotation} [put]
+func (r *EncryptionKeysRoutes) putAnnotation(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id := apid.ID(gctx.Param("id"))
+
+	if id.IsNil() {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	annotationKey := gctx.Param("annotation")
+	if annotationKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("annotation key is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if err := database.ValidateAnnotationKey(annotationKey); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid annotation key: %s", err.Error()).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	var req PutEncryptionKeyAnnotationRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid request body").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if err := database.ValidateAnnotationValue(req.Value); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid annotation value: %s", err.Error()).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Get existing key for authorization check
+	ek, err := r.core.GetEncryptionKey(ctx, id)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("encryption key '%s' not found", id).
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
+		httpErr.WriteGinResponse(nil, gctx)
+		return
+	}
+
+	updatedEk, err := r.core.PutEncryptionKeyAnnotations(ctx, id, map[string]string{annotationKey: req.Value})
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsgf("encryption key '%s' not found", id).
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, EncryptionKeyAnnotationJson{
+		Key:   annotationKey,
+		Value: updatedEk.GetAnnotations()[annotationKey],
+	})
+}
+
+// @Summary		Delete an annotation from an encryption key
+// @Description	Delete a specific annotation by key from an encryption key
+// @Tags			encryption_keys
+// @Accept			json
+// @Produce		json
+// @Param			id			path	string	true	"Encryption key ID"
+// @Param			annotation	path	string	true	"Annotation key"
+// @Success		204			"No Content"
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/encryption-keys/{id}/annotations/{annotation} [delete]
+func (r *EncryptionKeysRoutes) deleteAnnotation(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id := apid.ID(gctx.Param("id"))
+
+	if id.IsNil() {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	annotationKey := gctx.Param("annotation")
+	if annotationKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("annotation key is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Get existing key for authorization check
+	ek, err := r.core.GetEncryptionKey(ctx, id)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			gctx.Status(http.StatusNoContent)
+			val.MarkValidated()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
+		httpErr.WriteGinResponse(nil, gctx)
+		return
+	}
+
+	_, err = r.core.DeleteEncryptionKeyAnnotations(ctx, id, []string{annotationKey})
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			gctx.Status(http.StatusNoContent)
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.Status(http.StatusNoContent)
+}
+
 func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 	g.GET(
 		"/encryption-keys",
@@ -1008,6 +1421,46 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 			ForVerb("update").
 			Build(),
 		r.deleteLabel,
+	)
+	g.GET(
+		"/encryption-keys/:id/annotations",
+		r.authService.NewRequiredBuilder().
+			ForResource("encryption_keys").
+			ForIdField("id").
+			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }).
+			ForVerb("get").
+			Build(),
+		r.getAnnotations,
+	)
+	g.GET(
+		"/encryption-keys/:id/annotations/:annotation",
+		r.authService.NewRequiredBuilder().
+			ForResource("encryption_keys").
+			ForIdField("id").
+			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }).
+			ForVerb("get").
+			Build(),
+		r.getAnnotation,
+	)
+	g.PUT(
+		"/encryption-keys/:id/annotations/:annotation",
+		r.authService.NewRequiredBuilder().
+			ForResource("encryption_keys").
+			ForIdField("id").
+			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }).
+			ForVerb("update").
+			Build(),
+		r.putAnnotation,
+	)
+	g.DELETE(
+		"/encryption-keys/:id/annotations/:annotation",
+		r.authService.NewRequiredBuilder().
+			ForResource("encryption_keys").
+			ForIdField("id").
+			ForIdExtractor(func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }).
+			ForVerb("update").
+			Build(),
+		r.deleteAnnotation,
 	)
 }
 

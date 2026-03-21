@@ -30,22 +30,25 @@ type ActorsRoutes struct {
 }
 
 type ActorJson struct {
-	Id         apid.ID         `json:"id" swaggertype:"string"`
-	Namespace  string            `json:"namespace"`
-	ExternalId string            `json:"external_id"`
-	Labels     map[string]string `json:"labels,omitempty"`
-	CreatedAt  time.Time         `json:"created_at"`
-	UpdatedAt  time.Time         `json:"updated_at"`
+	Id          apid.ID           `json:"id" swaggertype:"string"`
+	Namespace   string            `json:"namespace"`
+	ExternalId  string            `json:"external_id"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
 }
 
 type CreateActorRequestJson struct {
-	ExternalId string            `json:"external_id"`
-	Namespace  string            `json:"namespace"`
-	Labels     map[string]string `json:"labels,omitempty"`
+	ExternalId  string            `json:"external_id"`
+	Namespace   string            `json:"namespace"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 type UpdateActorRequestJson struct {
-	Labels map[string]string `json:"labels"`
+	Labels      map[string]string `json:"labels"`
+	Annotations map[string]string `json:"annotations"`
 }
 
 type PutActorLabelRequestJson struct {
@@ -57,14 +60,24 @@ type ActorLabelJson struct {
 	Value string `json:"value"`
 }
 
+type PutActorAnnotationRequestJson struct {
+	Value string `json:"value"`
+}
+
+type ActorAnnotationJson struct {
+	Key   string `json:"key"`
+	Value string `json:"value"`
+}
+
 func DatabaseActorToJson(a *database.Actor) ActorJson {
 	return ActorJson{
-		Id:         a.Id,
-		Namespace:  a.GetNamespace(),
-		Labels:     a.GetLabels(),
-		ExternalId: a.ExternalId,
-		CreatedAt:  a.CreatedAt,
-		UpdatedAt:  a.UpdatedAt,
+		Id:          a.Id,
+		Namespace:   a.GetNamespace(),
+		Labels:      a.GetLabels(),
+		Annotations: a.GetAnnotations(),
+		ExternalId:  a.ExternalId,
+		CreatedAt:   a.CreatedAt,
+		UpdatedAt:   a.UpdatedAt,
 	}
 }
 
@@ -1357,6 +1370,439 @@ func (r *ActorsRoutes) deleteLabel(gctx *gin.Context) {
 	gctx.Status(http.StatusNoContent)
 }
 
+// @Summary		Get all annotations for an actor
+// @Description	Get all annotations for an actor by ID
+// @Tags			actors
+// @Accept			json
+// @Produce		json
+// @Param			id	path		string	true	"Actor UUID"
+// @Success		200	{object}	map[string]string
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		404	{object}	ErrorResponse
+// @Failure		500	{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/actors/{id}/annotations [get]
+func (r *ActorsRoutes) getAnnotations(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := apid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid id format").
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == apid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	actor, err := r.db.GetActor(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("actor not found").
+				BuildStatusError().
+				WriteGinResponse(r.logger, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if actor == nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsg("actor not found").
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
+		httpErr.WriteGinResponse(r.logger, gctx)
+		return
+	}
+
+	annotations := actor.GetAnnotations()
+	if annotations == nil {
+		annotations = make(map[string]string)
+	}
+
+	gctx.PureJSON(http.StatusOK, annotations)
+}
+
+// @Summary		Get a specific annotation for an actor
+// @Description	Get a specific annotation value by key for an actor
+// @Tags			actors
+// @Accept			json
+// @Produce		json
+// @Param			id			path		string	true	"Actor UUID"
+// @Param			annotation	path		string	true	"Annotation key"
+// @Success		200			{object}	ActorAnnotationJson
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		404			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/actors/{id}/annotations/{annotation} [get]
+func (r *ActorsRoutes) getAnnotation(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := apid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid id format").
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == apid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	annotationKey := gctx.Param("annotation")
+	if annotationKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("annotation key is required").
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	actor, err := r.db.GetActor(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("actor not found").
+				BuildStatusError().
+				WriteGinResponse(r.logger, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if actor == nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsg("actor not found").
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
+		httpErr.WriteGinResponse(r.logger, gctx)
+		return
+	}
+
+	annotations := actor.GetAnnotations()
+	value, exists := annotations[annotationKey]
+	if !exists {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsgf("annotation '%s' not found", annotationKey).
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, ActorAnnotationJson{
+		Key:   annotationKey,
+		Value: value,
+	})
+}
+
+// @Summary		Set an annotation for an actor
+// @Description	Set or update a specific annotation value by key for an actor
+// @Tags			actors
+// @Accept			json
+// @Produce		json
+// @Param			id			path		string							true	"Actor UUID"
+// @Param			annotation	path		string							true	"Annotation key"
+// @Param			request		body		PutActorAnnotationRequestJson	true	"Annotation value"
+// @Success		200			{object}	ActorAnnotationJson
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		403			{object}	ErrorResponse
+// @Failure		404			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/actors/{id}/annotations/{annotation} [put]
+func (r *ActorsRoutes) putAnnotation(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := apid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid id format").
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == apid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	annotationKey := gctx.Param("annotation")
+	if annotationKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("annotation key is required").
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Validate annotation key
+	if err := database.ValidateAnnotationKey(annotationKey); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsgf("invalid annotation key: %s", err.Error()).
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	var req PutActorAnnotationRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid request body").
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Get the existing actor for authorization check
+	actor, err := r.db.GetActor(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("actor not found").
+				BuildStatusError().
+				WriteGinResponse(r.logger, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if actor == nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusNotFound().
+			WithResponseMsg("actor not found").
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
+		httpErr.WriteGinResponse(r.logger, gctx)
+		return
+	}
+
+	// Use transactional PutActorAnnotations to update
+	updatedActor, err := r.db.PutActorAnnotations(ctx, id, map[string]string{annotationKey: req.Value})
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("actor not found").
+				BuildStatusError().
+				WriteGinResponse(r.logger, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, ActorAnnotationJson{
+		Key:   annotationKey,
+		Value: updatedActor.Annotations[annotationKey],
+	})
+}
+
+// @Summary		Delete an annotation from an actor
+// @Description	Delete a specific annotation by key from an actor
+// @Tags			actors
+// @Accept			json
+// @Produce		json
+// @Param			id			path	string	true	"Actor UUID"
+// @Param			annotation	path	string	true	"Annotation key"
+// @Success		204			"No Content"
+// @Failure		400			{object}	ErrorResponse
+// @Failure		401			{object}	ErrorResponse
+// @Failure		403			{object}	ErrorResponse
+// @Failure		500			{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/actors/{id}/annotations/{annotation} [delete]
+func (r *ActorsRoutes) deleteAnnotation(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := apid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid id format").
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == apid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	annotationKey := gctx.Param("annotation")
+	if annotationKey == "" {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("annotation key is required").
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Get the existing actor for authorization check
+	actor, err := r.db.GetActor(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			// Actor doesn't exist, return 204 (idempotent delete)
+			gctx.Status(http.StatusNoContent)
+			val.MarkValidated()
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if actor == nil {
+		// Actor doesn't exist, return 204 (idempotent delete)
+		gctx.Status(http.StatusNoContent)
+		val.MarkValidated()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
+		httpErr.WriteGinResponse(r.logger, gctx)
+		return
+	}
+
+	// Use transactional DeleteActorAnnotations to delete
+	_, err = r.db.DeleteActorAnnotations(ctx, id, []string{annotationKey})
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			// Actor was deleted between the check and the update, return 204
+			gctx.Status(http.StatusNoContent)
+			return
+		}
+
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(r.logger, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.Status(http.StatusNoContent)
+}
+
 func (r *ActorsRoutes) Register(g gin.IRouter) {
 	g.GET(
 		"/actors",
@@ -1469,6 +1915,42 @@ func (r *ActorsRoutes) Register(g gin.IRouter) {
 			ForVerb("update").
 			Build(),
 		r.deleteLabel,
+	)
+	g.GET(
+		"/actors/:id/annotations",
+		r.auth.NewRequiredBuilder().
+			ForResource("actors").
+			ForIdField("id").
+			ForVerb("get").
+			Build(),
+		r.getAnnotations,
+	)
+	g.GET(
+		"/actors/:id/annotations/:annotation",
+		r.auth.NewRequiredBuilder().
+			ForResource("actors").
+			ForIdField("id").
+			ForVerb("get").
+			Build(),
+		r.getAnnotation,
+	)
+	g.PUT(
+		"/actors/:id/annotations/:annotation",
+		r.auth.NewRequiredBuilder().
+			ForResource("actors").
+			ForIdField("id").
+			ForVerb("update").
+			Build(),
+		r.putAnnotation,
+	)
+	g.DELETE(
+		"/actors/:id/annotations/:annotation",
+		r.auth.NewRequiredBuilder().
+			ForResource("actors").
+			ForIdField("id").
+			ForVerb("update").
+			Build(),
+		r.deleteAnnotation,
 	)
 }
 

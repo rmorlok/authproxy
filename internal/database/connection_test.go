@@ -637,6 +637,166 @@ func TestConnections(t *testing.T) {
 		})
 	})
 
+	t.Run("put connection annotations", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig(t, nil)
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		connectorId := apid.New(apid.PrefixConnectorVersion)
+		u := apid.New(apid.PrefixConnection)
+		err := db.CreateConnection(ctx, &Connection{
+			Id:               u,
+			Namespace:        "root.some-namespace",
+			ConnectorId:      connectorId,
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+			Annotations:      Annotations{"existing": "value"},
+		})
+		assert.NoError(t, err)
+
+		t.Run("merge with existing", func(t *testing.T) {
+			newNow := time.Date(1955, time.November, 6, 6, 29, 0, 0, time.UTC)
+			ctx2 := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(newNow)).Build()
+
+			c, err := db.PutConnectionAnnotations(ctx2, u, map[string]string{"new": "annotation"})
+			assert.NoError(t, err)
+			assert.NotNil(t, c)
+			assert.Equal(t, "value", c.Annotations["existing"])
+			assert.Equal(t, "annotation", c.Annotations["new"])
+			assert.Equal(t, newNow, c.UpdatedAt)
+		})
+
+		t.Run("add new annotation", func(t *testing.T) {
+			c, err := db.PutConnectionAnnotations(ctx, u, map[string]string{"another": "one"})
+			assert.NoError(t, err)
+			assert.NotNil(t, c)
+			assert.Equal(t, "one", c.Annotations["another"])
+			assert.Equal(t, "value", c.Annotations["existing"])
+			assert.Equal(t, "annotation", c.Annotations["new"])
+		})
+
+		t.Run("no-op for empty", func(t *testing.T) {
+			c, err := db.PutConnectionAnnotations(ctx, u, map[string]string{})
+			assert.NoError(t, err)
+			assert.NotNil(t, c)
+			assert.Equal(t, u, c.Id)
+		})
+
+		t.Run("not found", func(t *testing.T) {
+			c, err := db.PutConnectionAnnotations(ctx, apid.New(apid.PrefixConnection), map[string]string{"key": "val"})
+			assert.ErrorIs(t, err, ErrNotFound)
+			assert.Nil(t, c)
+		})
+	})
+
+	t.Run("delete connection annotations", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig(t, nil)
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		connectorId := apid.New(apid.PrefixConnectorVersion)
+		u := apid.New(apid.PrefixConnection)
+		err := db.CreateConnection(ctx, &Connection{
+			Id:               u,
+			Namespace:        "root.some-namespace",
+			ConnectorId:      connectorId,
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+			Annotations:      Annotations{"env": "prod", "team": "backend", "version": "v1"},
+		})
+		assert.NoError(t, err)
+
+		t.Run("delete existing key", func(t *testing.T) {
+			newNow := time.Date(1955, time.November, 6, 6, 29, 0, 0, time.UTC)
+			ctx2 := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(newNow)).Build()
+
+			c, err := db.DeleteConnectionAnnotations(ctx2, u, []string{"version"})
+			assert.NoError(t, err)
+			assert.NotNil(t, c)
+			assert.Equal(t, "prod", c.Annotations["env"])
+			assert.Equal(t, "backend", c.Annotations["team"])
+			_, exists := c.Annotations["version"]
+			assert.False(t, exists)
+			assert.Equal(t, newNow, c.UpdatedAt)
+		})
+
+		t.Run("ignore missing keys", func(t *testing.T) {
+			c, err := db.DeleteConnectionAnnotations(ctx, u, []string{"nonexistent"})
+			assert.NoError(t, err)
+			assert.NotNil(t, c)
+			assert.Equal(t, "prod", c.Annotations["env"])
+			assert.Equal(t, "backend", c.Annotations["team"])
+		})
+
+		t.Run("no-op for empty", func(t *testing.T) {
+			c, err := db.DeleteConnectionAnnotations(ctx, u, []string{})
+			assert.NoError(t, err)
+			assert.NotNil(t, c)
+			assert.Equal(t, u, c.Id)
+		})
+
+		t.Run("not found", func(t *testing.T) {
+			c, err := db.DeleteConnectionAnnotations(ctx, apid.New(apid.PrefixConnection), []string{"env"})
+			assert.ErrorIs(t, err, ErrNotFound)
+			assert.Nil(t, c)
+		})
+	})
+
+	t.Run("update connection annotations", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig(t, nil)
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		connectorId := apid.New(apid.PrefixConnectorVersion)
+		u := apid.New(apid.PrefixConnection)
+		err := db.CreateConnection(ctx, &Connection{
+			Id:               u,
+			Namespace:        "root.some-namespace",
+			ConnectorId:      connectorId,
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+			Annotations:      Annotations{"old": "value", "other": "data"},
+		})
+		assert.NoError(t, err)
+
+		t.Run("replace all", func(t *testing.T) {
+			newNow := time.Date(1955, time.November, 6, 6, 29, 0, 0, time.UTC)
+			ctx2 := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(newNow)).Build()
+
+			c, err := db.UpdateConnectionAnnotations(ctx2, u, map[string]string{"new": "annotations"})
+			assert.NoError(t, err)
+			assert.NotNil(t, c)
+			assert.Equal(t, map[string]string{"new": "annotations"}, map[string]string(c.Annotations))
+			_, exists := c.Annotations["old"]
+			assert.False(t, exists)
+			assert.Equal(t, newNow, c.UpdatedAt)
+		})
+
+		t.Run("clear with empty", func(t *testing.T) {
+			c, err := db.UpdateConnectionAnnotations(ctx, u, map[string]string{})
+			assert.NoError(t, err)
+			assert.NotNil(t, c)
+			assert.Empty(t, c.Annotations)
+		})
+
+		t.Run("clear with nil", func(t *testing.T) {
+			// First put some annotations back
+			_, err := db.PutConnectionAnnotations(ctx, u, map[string]string{"temp": "val"})
+			assert.NoError(t, err)
+
+			c, err := db.UpdateConnectionAnnotations(ctx, u, nil)
+			assert.NoError(t, err)
+			assert.NotNil(t, c)
+			assert.Nil(t, c.Annotations)
+		})
+
+		t.Run("not found", func(t *testing.T) {
+			c, err := db.UpdateConnectionAnnotations(ctx, apid.New(apid.PrefixConnection), map[string]string{"key": "val"})
+			assert.ErrorIs(t, err, ErrNotFound)
+			assert.Nil(t, c)
+		})
+	})
+
 	t.Run("enumerate connections", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)

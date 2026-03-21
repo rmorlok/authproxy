@@ -18,6 +18,7 @@ type ConnectorVersion interface {
 	GetCreatedAt() time.Time
 	GetUpdatedAt() time.Time
 	GetLabels() map[string]string
+	GetAnnotations() map[string]string
 	GetDefinition() *cschema.Connector
 	SetState(ctx context.Context, state database.ConnectorVersionState) error
 }

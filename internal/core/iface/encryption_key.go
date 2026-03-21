@@ -14,6 +14,7 @@ type EncryptionKey interface {
 	GetNamespace() string
 	GetState() database.EncryptionKeyState
 	GetLabels() map[string]string
+	GetAnnotations() map[string]string
 	GetCreatedAt() time.Time
 	GetUpdatedAt() time.Time
 }

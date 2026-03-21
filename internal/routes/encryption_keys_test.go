@@ -1193,4 +1193,571 @@ func TestEncryptionKeys(t *testing.T) {
 			require.False(t, exists)
 		})
 	})
+
+	t.Run("update encryption key with annotations", func(t *testing.T) {
+		tu, done := setup(t, context.Background(), nil)
+		defer done()
+
+		created := createKey(t, tu, "root", nil)
+
+		t.Run("success - update annotations", func(t *testing.T) {
+			body := `{"annotations": {"description": "primary key", "owner": "team-a"}}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp EncryptionKeyJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "primary key", resp.Annotations["description"])
+			require.Equal(t, "team-a", resp.Annotations["owner"])
+		})
+
+		t.Run("success - annotations unchanged when not provided", func(t *testing.T) {
+			body := `{}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp EncryptionKeyJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "primary key", resp.Annotations["description"])
+			require.Equal(t, "team-a", resp.Annotations["owner"])
+		})
+
+		t.Run("success - update annotations replaces all", func(t *testing.T) {
+			body := `{"annotations": {"new-key": "new-value"}}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp EncryptionKeyJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, map[string]string{"new-key": "new-value"}, resp.Annotations)
+		})
+	})
+
+	t.Run("get annotations", func(t *testing.T) {
+		tu, done := setup(t, context.Background(), nil)
+		defer done()
+
+		created := createKey(t, tu, "root", nil)
+
+		// Set some annotations via PATCH
+		body := `{"annotations": {"description": "test key", "owner": "backend"}}`
+		w := httptest.NewRecorder()
+		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodPatch,
+			fmt.Sprintf("/encryption-keys/%s", created.Id),
+			bytes.NewBufferString(body),
+			"root",
+			"some-actor",
+			aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		withoutAnnotations := createKey(t, tu, "root", nil)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("/encryption-keys/%s/annotations", created.Id), nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("not found", func(t *testing.T) {
+			fakeId := apid.New(apid.PrefixEncryptionKey)
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				fmt.Sprintf("/encryption-keys/%s/annotations", fakeId),
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("success", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				fmt.Sprintf("/encryption-keys/%s/annotations", created.Id),
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp map[string]string
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "test key", resp["description"])
+			require.Equal(t, "backend", resp["owner"])
+		})
+
+		t.Run("success - empty annotations", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				fmt.Sprintf("/encryption-keys/%s/annotations", withoutAnnotations.Id),
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp map[string]string
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Empty(t, resp)
+		})
+	})
+
+	t.Run("get annotation", func(t *testing.T) {
+		tu, done := setup(t, context.Background(), nil)
+		defer done()
+
+		created := createKey(t, tu, "root", nil)
+
+		// Set an annotation
+		body := `{"annotations": {"description": "staging key"}}`
+		w := httptest.NewRecorder()
+		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodPatch,
+			fmt.Sprintf("/encryption-keys/%s", created.Id),
+			bytes.NewBufferString(body),
+			"root",
+			"some-actor",
+			aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, fmt.Sprintf("/encryption-keys/%s/annotations/description", created.Id), nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("key not found", func(t *testing.T) {
+			fakeId := apid.New(apid.PrefixEncryptionKey)
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				fmt.Sprintf("/encryption-keys/%s/annotations/description", fakeId),
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("annotation not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				fmt.Sprintf("/encryption-keys/%s/annotations/nonexistent", created.Id),
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("success", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				fmt.Sprintf("/encryption-keys/%s/annotations/description", created.Id),
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp EncryptionKeyAnnotationJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "description", resp.Key)
+			require.Equal(t, "staging key", resp.Value)
+		})
+	})
+
+	t.Run("put annotation", func(t *testing.T) {
+		tu, done := setup(t, context.Background(), nil)
+		defer done()
+
+		created := createKey(t, tu, "root", nil)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			body := `{"value": "my description"}`
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPut, fmt.Sprintf("/encryption-keys/%s/annotations/description", created.Id), bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden with wrong verb", func(t *testing.T) {
+			body := `{"value": "my description"}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				fmt.Sprintf("/encryption-keys/%s/annotations/description", created.Id),
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "encryption_keys", "get"), // Wrong verb
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("key not found", func(t *testing.T) {
+			fakeId := apid.New(apid.PrefixEncryptionKey)
+			body := `{"value": "my description"}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				fmt.Sprintf("/encryption-keys/%s/annotations/description", fakeId),
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("bad request - invalid JSON", func(t *testing.T) {
+			body := `{invalid json}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				fmt.Sprintf("/encryption-keys/%s/annotations/description", created.Id),
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("success - add new annotation", func(t *testing.T) {
+			body := `{"value": "primary encryption key"}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				fmt.Sprintf("/encryption-keys/%s/annotations/description", created.Id),
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp EncryptionKeyAnnotationJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "description", resp.Key)
+			require.Equal(t, "primary encryption key", resp.Value)
+
+			// Verify in database
+			got, err := tu.Db.GetEncryptionKey(context.Background(), created.Id)
+			require.NoError(t, err)
+			require.Equal(t, "primary encryption key", got.Annotations["description"])
+		})
+
+		t.Run("success - update existing annotation", func(t *testing.T) {
+			body := `{"value": "updated description"}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				fmt.Sprintf("/encryption-keys/%s/annotations/description", created.Id),
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp EncryptionKeyAnnotationJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Equal(t, "description", resp.Key)
+			require.Equal(t, "updated description", resp.Value)
+		})
+
+		t.Run("success - preserves other annotations", func(t *testing.T) {
+			ekWithAnnotations := createKey(t, tu, "root", nil)
+
+			// Set two annotations
+			body := `{"annotations": {"description": "key desc", "owner": "platform"}}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				fmt.Sprintf("/encryption-keys/%s", ekWithAnnotations.Id),
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			// Update only one annotation via PUT
+			body = `{"value": "updated desc"}`
+			w = httptest.NewRecorder()
+			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPut,
+				fmt.Sprintf("/encryption-keys/%s/annotations/description", ekWithAnnotations.Id),
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			// Verify both annotations in database
+			got, err := tu.Db.GetEncryptionKey(context.Background(), ekWithAnnotations.Id)
+			require.NoError(t, err)
+			require.Equal(t, "updated desc", got.Annotations["description"])
+			require.Equal(t, "platform", got.Annotations["owner"])
+		})
+	})
+
+	t.Run("delete annotation", func(t *testing.T) {
+		tu, done := setup(t, context.Background(), nil)
+		defer done()
+
+		created := createKey(t, tu, "root", nil)
+
+		// Set annotations
+		body := `{"annotations": {"description": "prod key", "owner": "backend"}}`
+		w := httptest.NewRecorder()
+		req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodPatch,
+			fmt.Sprintf("/encryption-keys/%s", created.Id),
+			bytes.NewBufferString(body),
+			"root",
+			"some-actor",
+			aschema.AllPermissions(),
+		)
+		require.NoError(t, err)
+		req.Header.Set("Content-Type", "application/json")
+		tu.Gin.ServeHTTP(w, req)
+		require.Equal(t, http.StatusOK, w.Code)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodDelete, fmt.Sprintf("/encryption-keys/%s/annotations/description", created.Id), nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden with wrong verb", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodDelete,
+				fmt.Sprintf("/encryption-keys/%s/annotations/description", created.Id),
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "encryption_keys", "get"), // Wrong verb
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("key not found returns 204", func(t *testing.T) {
+			fakeId := apid.New(apid.PrefixEncryptionKey)
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodDelete,
+				fmt.Sprintf("/encryption-keys/%s/annotations/description", fakeId),
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNoContent, w.Code)
+		})
+
+		t.Run("success - delete annotation", func(t *testing.T) {
+			ekToDelete := createKey(t, tu, "root", nil)
+
+			// Set annotations
+			body := `{"annotations": {"to-delete": "value", "to-keep": "value2"}}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				fmt.Sprintf("/encryption-keys/%s", ekToDelete.Id),
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			w = httptest.NewRecorder()
+			req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodDelete,
+				fmt.Sprintf("/encryption-keys/%s/annotations/to-delete", ekToDelete.Id),
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNoContent, w.Code)
+
+			// Verify the annotation is deleted but other annotations remain
+			got, err := tu.Db.GetEncryptionKey(context.Background(), ekToDelete.Id)
+			require.NoError(t, err)
+			_, exists := got.Annotations["to-delete"]
+			require.False(t, exists)
+			require.Equal(t, "value2", got.Annotations["to-keep"])
+		})
+
+		t.Run("success - delete is idempotent", func(t *testing.T) {
+			ekIdempotent := createKey(t, tu, "root", nil)
+
+			// Set an annotation
+			body := `{"annotations": {"annotation": "value"}}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				fmt.Sprintf("/encryption-keys/%s", ekIdempotent.Id),
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			for i := 0; i < 2; i++ {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodDelete,
+					fmt.Sprintf("/encryption-keys/%s/annotations/annotation", ekIdempotent.Id),
+					nil,
+					"root",
+					"some-actor",
+					aschema.AllPermissions(),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusNoContent, w.Code)
+			}
+
+			// Verify the annotation is deleted
+			got, err := tu.Db.GetEncryptionKey(context.Background(), ekIdempotent.Id)
+			require.NoError(t, err)
+			_, exists := got.Annotations["annotation"]
+			require.False(t, exists)
+		})
+	})
 }

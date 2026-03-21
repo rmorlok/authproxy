@@ -137,6 +137,66 @@ func TestEncryptionKey(t *testing.T) {
 		require.Empty(t, updated.Labels)
 	})
 
+	t.Run("Annotations", func(t *testing.T) {
+		_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
+		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		ek := &EncryptionKey{
+			Id:          apid.New(apid.PrefixEncryptionKey),
+			Namespace:   "root",
+			State:       EncryptionKeyStateActive,
+			Annotations: Annotations{"description": "test key"},
+		}
+		require.NoError(t, db.CreateEncryptionKey(ctx, ek))
+
+		// Verify annotations persisted on create
+		got, err := db.GetEncryptionKey(ctx, ek.Id)
+		require.NoError(t, err)
+		require.Equal(t, Annotations{"description": "test key"}, got.Annotations)
+
+		// PutAnnotations - merges with existing
+		later := now.Add(time.Hour)
+		ctx = apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(later)).Build()
+		updated, err := db.PutEncryptionKeyAnnotations(ctx, ek.Id, map[string]string{"owner": "team-a"})
+		require.NoError(t, err)
+		require.Equal(t, "test key", updated.Annotations["description"])
+		require.Equal(t, "team-a", updated.Annotations["owner"])
+
+		// UpdateAnnotations (full replace)
+		updated, err = db.UpdateEncryptionKeyAnnotations(ctx, ek.Id, map[string]string{"new-annotation": "value"})
+		require.NoError(t, err)
+		require.Equal(t, Annotations{"new-annotation": "value"}, updated.Annotations)
+
+		// DeleteAnnotations
+		updated, err = db.DeleteEncryptionKeyAnnotations(ctx, ek.Id, []string{"new-annotation"})
+		require.NoError(t, err)
+		require.Empty(t, updated.Annotations)
+
+		// PutAnnotations on key with no annotations
+		ek2 := &EncryptionKey{
+			Id:        apid.New(apid.PrefixEncryptionKey),
+			Namespace: "root",
+			State:     EncryptionKeyStateActive,
+		}
+		require.NoError(t, db.CreateEncryptionKey(ctx, ek2))
+
+		updated, err = db.PutEncryptionKeyAnnotations(ctx, ek2.Id, map[string]string{"note": "hello"})
+		require.NoError(t, err)
+		require.Equal(t, "hello", updated.Annotations["note"])
+
+		// Not found errors
+		fakeId := apid.New(apid.PrefixEncryptionKey)
+		_, err = db.PutEncryptionKeyAnnotations(ctx, fakeId, map[string]string{"k": "v"})
+		require.ErrorIs(t, err, ErrNotFound)
+
+		_, err = db.UpdateEncryptionKeyAnnotations(ctx, fakeId, map[string]string{"k": "v"})
+		require.ErrorIs(t, err, ErrNotFound)
+
+		_, err = db.DeleteEncryptionKeyAnnotations(ctx, fakeId, []string{"k"})
+		require.ErrorIs(t, err, ErrNotFound)
+	})
+
 	t.Run("ListBuilder", func(t *testing.T) {
 		_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)

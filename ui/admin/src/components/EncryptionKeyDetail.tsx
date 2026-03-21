@@ -24,6 +24,7 @@ import dayjs from 'dayjs';
 import Tooltip from '@mui/material/Tooltip';
 import {EncryptionKey, encryptionKeys, EncryptionKeyState} from '@authproxy/api';
 import { useNavigate } from "react-router-dom";
+import AnnotationsEditor from "./AnnotationsEditor";
 
 function StateChip({state}: { state: EncryptionKeyState }) {
   const colors: Record<EncryptionKeyState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
@@ -221,6 +222,18 @@ export default function EncryptionKeyDetail({encryptionKeyId}: { encryptionKeyId
           <Typography variant="body2" color="text.secondary">No labels</Typography>
         )}
       </Box>
+
+      <AnnotationsEditor
+        annotations={ek.annotations}
+        onPut={async (key, value) => {
+          await encryptionKeys.putAnnotation(ek.id, key, value);
+          fetchKey();
+        }}
+        onDelete={async (key) => {
+          await encryptionKeys.deleteAnnotation(ek.id, key);
+          fetchKey();
+        }}
+      />
 
       {/* Change state dialog */}
       <Dialog open={changeStateOpen} onClose={() => !actionLoading && setChangeStateOpen(false)} fullWidth maxWidth="sm">

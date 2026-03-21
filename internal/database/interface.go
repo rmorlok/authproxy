@@ -55,6 +55,9 @@ type DB interface {
 	UpdateNamespaceLabels(ctx context.Context, path string, labels map[string]string) (*Namespace, error)
 	PutNamespaceLabels(ctx context.Context, path string, labels map[string]string) (*Namespace, error)
 	DeleteNamespaceLabels(ctx context.Context, path string, keys []string) (*Namespace, error)
+	UpdateNamespaceAnnotations(ctx context.Context, path string, annotations map[string]string) (*Namespace, error)
+	PutNamespaceAnnotations(ctx context.Context, path string, annotations map[string]string) (*Namespace, error)
+	DeleteNamespaceAnnotations(ctx context.Context, path string, keys []string) (*Namespace, error)
 	ListNamespacesBuilder() ListNamespacesBuilder
 	ListNamespacesFromCursor(ctx context.Context, cursor string) (ListNamespacesExecutor, error)
 	EnumerateNamespaceEncryptionTargets(
@@ -73,6 +76,8 @@ type DB interface {
 	DeleteActor(ctx context.Context, id apid.ID) error
 	PutActorLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Actor, error)
 	DeleteActorLabels(ctx context.Context, id apid.ID, keys []string) (*Actor, error)
+	PutActorAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*Actor, error)
+	DeleteActorAnnotations(ctx context.Context, id apid.ID, keys []string) (*Actor, error)
 	ListActorsBuilder() ListActorsBuilder
 	ListActorsFromCursor(ctx context.Context, cursor string) (ListActorsExecutor, error)
 
@@ -105,6 +110,9 @@ type DB interface {
 	UpdateConnectionLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Connection, error)
 	PutConnectionLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Connection, error)
 	DeleteConnectionLabels(ctx context.Context, id apid.ID, keys []string) (*Connection, error)
+	UpdateConnectionAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*Connection, error)
+	PutConnectionAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*Connection, error)
+	DeleteConnectionAnnotations(ctx context.Context, id apid.ID, keys []string) (*Connection, error)
 	ListConnectionsBuilder() ListConnectionsBuilder
 	ListConnectionsFromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error)
 
@@ -145,6 +153,9 @@ type DB interface {
 	UpdateEncryptionKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (*EncryptionKey, error)
 	PutEncryptionKeyLabels(ctx context.Context, id apid.ID, labels map[string]string) (*EncryptionKey, error)
 	DeleteEncryptionKeyLabels(ctx context.Context, id apid.ID, keys []string) (*EncryptionKey, error)
+	UpdateEncryptionKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*EncryptionKey, error)
+	PutEncryptionKeyAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*EncryptionKey, error)
+	DeleteEncryptionKeyAnnotations(ctx context.Context, id apid.ID, keys []string) (*EncryptionKey, error)
 	ListEncryptionKeysBuilder() ListEncryptionKeysBuilder
 	ListEncryptionKeysFromCursor(ctx context.Context, cursor string) (ListEncryptionKeysExecutor, error)
 

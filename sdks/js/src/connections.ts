@@ -13,6 +13,7 @@ export enum ConnectionState {
 
 export interface UpdateConnectionRequest {
     labels?: Record<string, string>;
+    annotations?: Record<string, string>;
 }
 
 export interface PutConnectionLabelRequest {
@@ -24,12 +25,22 @@ export interface ConnectionLabel {
     value: string;
 }
 
+export interface PutConnectionAnnotationRequest {
+    value: string;
+}
+
+export interface ConnectionAnnotation {
+    key: string;
+    value: string;
+}
+
 export interface Connection {
     id: string;
     namespace: string;
     connector: Connector;
     state: ConnectionState;
     labels?: Record<string, string>;
+    annotations?: Record<string, string>;
     created_at: string;
     updated_at: string;
 }
@@ -174,6 +185,34 @@ export const deleteConnectionLabel = (id: string, labelKey: string) => {
     return client.delete(`/api/v1/connections/${id}/labels/${labelKey}`);
 };
 
+/**
+ * Get all annotations for a specific connection by ID (uuid)
+ */
+export const getConnectionAnnotations = (id: string) => {
+    return client.get<Record<string, string>>(`/api/v1/connections/${id}/annotations`);
+};
+
+/**
+ * Get a specific annotation for a connection by ID (uuid) and annotation key
+ */
+export const getConnectionAnnotation = (id: string, annotationKey: string) => {
+    return client.get<ConnectionAnnotation>(`/api/v1/connections/${id}/annotations/${annotationKey}`);
+};
+
+/**
+ * Set a specific annotation for a connection by ID (uuid) and annotation key
+ */
+export const putConnectionAnnotation = (id: string, annotationKey: string, value: string) => {
+    return client.put<ConnectionAnnotation>(`/api/v1/connections/${id}/annotations/${annotationKey}`, { value });
+};
+
+/**
+ * Delete a specific annotation for a connection by ID (uuid) and annotation key
+ */
+export const deleteConnectionAnnotation = (id: string, annotationKey: string) => {
+    return client.delete(`/api/v1/connections/${id}/annotations/${annotationKey}`);
+};
+
 export const connections = {
     list: listConnections,
     get: getConnection,
@@ -185,4 +224,8 @@ export const connections = {
     getLabel: getConnectionLabel,
     putLabel: putConnectionLabel,
     deleteLabel: deleteConnectionLabel,
+    getAnnotations: getConnectionAnnotations,
+    getAnnotation: getConnectionAnnotation,
+    putAnnotation: putConnectionAnnotation,
+    deleteAnnotation: deleteConnectionAnnotation,
 };

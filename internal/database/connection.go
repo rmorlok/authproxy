@@ -47,6 +47,7 @@ type Connection struct {
 	ConnectorId      apid.ID
 	ConnectorVersion uint64
 	Labels           Labels
+	Annotations      Annotations
 	CreatedAt        time.Time
 	UpdatedAt        time.Time
 	DeletedAt        *time.Time
@@ -60,6 +61,7 @@ func (c *Connection) cols() []string {
 		"connector_id",
 		"connector_version",
 		"labels",
+		"annotations",
 		"created_at",
 		"updated_at",
 		"deleted_at",
@@ -74,6 +76,7 @@ func (c *Connection) fields() []any {
 		&c.ConnectorId,
 		&c.ConnectorVersion,
 		&c.Labels,
+		&c.Annotations,
 		&c.CreatedAt,
 		&c.UpdatedAt,
 		&c.DeletedAt,
@@ -88,6 +91,7 @@ func (c *Connection) values() []any {
 		c.ConnectorId,
 		c.ConnectorVersion,
 		c.Labels,
+		c.Annotations,
 		c.CreatedAt,
 		c.UpdatedAt,
 		c.DeletedAt,
@@ -143,6 +147,10 @@ func (c *Connection) Validate() error {
 
 	if err := c.Labels.Validate(); err != nil {
 		result = multierror.Append(result, errors.Wrap(err, "invalid connection labels"))
+	}
+
+	if err := c.Annotations.Validate(); err != nil {
+		result = multierror.Append(result, errors.Wrap(err, "invalid connection annotations"))
 	}
 
 	return result.ErrorOrNil()
@@ -601,6 +609,150 @@ func (s *service) PutConnectionLabels(ctx context.Context, id apid.ID, labels ma
 		}
 
 		conn.Labels = mergedLabels
+		conn.UpdatedAt = now
+		result = &conn
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// UpdateConnectionAnnotations replaces all annotations on a connection within a single transaction.
+func (s *service) UpdateConnectionAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*Connection, error) {
+	if id == apid.Nil {
+		return nil, errors.New("connection id is required")
+	}
+
+	if annotations != nil {
+		if err := ValidateAnnotations(annotations); err != nil {
+			return nil, errors.Wrap(err, "invalid annotations")
+		}
+	}
+
+	var result *Connection
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		var conn Connection
+		err := s.sq.
+			Select(conn.cols()...).
+			From(ConnectionsTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).
+			QueryRow().
+			Scan(conn.fields()...)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		now, err := s.updateAnnotationsInTableTx(ctx, tx, ConnectionsTable, sq.Eq{"id": id, "deleted_at": nil}, Annotations(annotations))
+		if err != nil {
+			return err
+		}
+
+		conn.Annotations = annotations
+		conn.UpdatedAt = now
+		result = &conn
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// PutConnectionAnnotations adds or updates the specified annotations on a connection within a single transaction.
+func (s *service) PutConnectionAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*Connection, error) {
+	if id == apid.Nil {
+		return nil, errors.New("connection id is required")
+	}
+
+	if len(annotations) == 0 {
+		return s.GetConnection(ctx, id)
+	}
+
+	if err := ValidateAnnotations(annotations); err != nil {
+		return nil, errors.Wrap(err, "invalid annotations")
+	}
+
+	var result *Connection
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		var conn Connection
+		err := s.sq.
+			Select(conn.cols()...).
+			From(ConnectionsTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).
+			QueryRow().
+			Scan(conn.fields()...)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		mergedAnnotations, now, err := s.putAnnotationsInTableTx(ctx, tx, ConnectionsTable, sq.Eq{"id": id, "deleted_at": nil}, annotations)
+		if err != nil {
+			return err
+		}
+
+		conn.Annotations = mergedAnnotations
+		conn.UpdatedAt = now
+		result = &conn
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// DeleteConnectionAnnotations removes the specified annotation keys from a connection within a single transaction.
+func (s *service) DeleteConnectionAnnotations(ctx context.Context, id apid.ID, keys []string) (*Connection, error) {
+	if id == apid.Nil {
+		return nil, errors.New("connection id is required")
+	}
+
+	if len(keys) == 0 {
+		return s.GetConnection(ctx, id)
+	}
+
+	var result *Connection
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		var conn Connection
+		err := s.sq.
+			Select(conn.cols()...).
+			From(ConnectionsTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).
+			QueryRow().
+			Scan(conn.fields()...)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		remainingAnnotations, now, err := s.deleteAnnotationsInTableTx(ctx, tx, ConnectionsTable, sq.Eq{"id": id, "deleted_at": nil}, keys)
+		if err != nil {
+			return err
+		}
+
+		conn.Annotations = remainingAnnotations
 		conn.UpdatedAt = now
 		result = &conn
 		return nil

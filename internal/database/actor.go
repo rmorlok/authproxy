@@ -95,6 +95,7 @@ type Actor struct {
 	ExternalId   string
 	Permissions  Permissions
 	Labels       Labels
+	Annotations  Annotations
 	EncryptedKey *encfield.EncryptedField
 	CreatedAt    time.Time
 	UpdatedAt    time.Time
@@ -125,6 +126,7 @@ func (a *Actor) cols() []string {
 		"external_id",
 		"permissions",
 		"labels",
+		"annotations",
 		"encrypted_key",
 		"created_at",
 		"updated_at",
@@ -140,6 +142,7 @@ func (a *Actor) fields() []any {
 		&a.ExternalId,
 		&a.Permissions,
 		&a.Labels,
+		&a.Annotations,
 		&a.EncryptedKey,
 		&a.CreatedAt,
 		&a.UpdatedAt,
@@ -155,6 +158,7 @@ func (a *Actor) values() []any {
 		a.ExternalId,
 		a.Permissions,
 		a.Labels,
+		a.Annotations,
 		a.EncryptedKey,
 		a.CreatedAt,
 		a.UpdatedAt,
@@ -218,6 +222,10 @@ func (a *Actor) GetLabels() map[string]string {
 	return a.Labels
 }
 
+func (a *Actor) GetAnnotations() map[string]string {
+	return a.Annotations
+}
+
 func (a *Actor) GetEncryptedKey() *encfield.EncryptedField {
 	return a.EncryptedKey
 }
@@ -254,6 +262,10 @@ func (a *Actor) validate() error {
 
 	if err := a.Labels.Validate(); err != nil {
 		result = multierror.Append(result, errors.Wrap(err, "invalid actor labels"))
+	}
+
+	if err := a.Annotations.Validate(); err != nil {
+		result = multierror.Append(result, errors.Wrap(err, "invalid actor annotations"))
 	}
 
 	return result.ErrorOrNil()
@@ -792,6 +804,104 @@ func (s *service) PutActorLabels(ctx context.Context, id apid.ID, labels map[str
 		}
 
 		actor.Labels = mergedLabels
+		actor.UpdatedAt = now
+		result = &actor
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// PutActorAnnotations adds or updates the specified annotations on an actor within a single transaction.
+// Existing annotations not in the provided map are preserved.
+func (s *service) PutActorAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*Actor, error) {
+	if id == apid.Nil {
+		return nil, errors.New("actor id is required")
+	}
+
+	if len(annotations) == 0 {
+		return s.GetActor(ctx, id)
+	}
+
+	if err := ValidateAnnotations(annotations); err != nil {
+		return nil, errors.Wrap(err, "invalid annotations")
+	}
+
+	var result *Actor
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		var actor Actor
+		err := s.sq.
+			Select(actor.cols()...).
+			From(ActorTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).
+			QueryRow().
+			Scan(actor.fields()...)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		mergedAnnotations, now, err := s.putAnnotationsInTableTx(ctx, tx, ActorTable, sq.Eq{"id": id, "deleted_at": nil}, annotations)
+		if err != nil {
+			return err
+		}
+
+		actor.Annotations = mergedAnnotations
+		actor.UpdatedAt = now
+		result = &actor
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
+// DeleteActorAnnotations removes the specified annotation keys from an actor within a single transaction.
+// Keys that don't exist are ignored.
+func (s *service) DeleteActorAnnotations(ctx context.Context, id apid.ID, keys []string) (*Actor, error) {
+	if id == apid.Nil {
+		return nil, errors.New("actor id is required")
+	}
+
+	if len(keys) == 0 {
+		return s.GetActor(ctx, id)
+	}
+
+	var result *Actor
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		var actor Actor
+		err := s.sq.
+			Select(actor.cols()...).
+			From(ActorTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).
+			QueryRow().
+			Scan(actor.fields()...)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		remainingAnnotations, now, err := s.deleteAnnotationsInTableTx(ctx, tx, ActorTable, sq.Eq{"id": id, "deleted_at": nil}, keys)
+		if err != nil {
+			return err
+		}
+
+		actor.Annotations = remainingAnnotations
 		actor.UpdatedAt = now
 		result = &actor
 		return nil

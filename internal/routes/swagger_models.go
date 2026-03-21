@@ -84,6 +84,8 @@ type SwaggerConnectionJson struct {
 	Namespace string `json:"namespace" example:"acme"`
 	// Labels assigned to the connection
 	Labels map[string]string `json:"labels,omitempty"`
+	// Annotations assigned to the connection
+	Annotations map[string]string `json:"annotations,omitempty"`
 	// Connection state (pending, connected, disconnecting, disconnected, error)
 	State string `json:"state" example:"connected"`
 	// Connector information
@@ -118,6 +120,8 @@ type SwaggerConnectorJson struct {
 	Logo string `json:"logo,omitempty" example:"https://example.com/logo.png"`
 	// Labels assigned to the connector
 	Labels map[string]string `json:"labels,omitempty"`
+	// Annotations assigned to the connector
+	Annotations map[string]string `json:"annotations,omitempty"`
 	// Creation timestamp
 	CreatedAt time.Time `json:"created_at"`
 	// Last update timestamp
@@ -134,6 +138,8 @@ type SwaggerNamespaceJson struct {
 	State string `json:"state" example:"active"`
 	// Labels assigned to the namespace
 	Labels map[string]string `json:"labels,omitempty"`
+	// Annotations assigned to the namespace
+	Annotations map[string]string `json:"annotations,omitempty"`
 	// Creation timestamp
 	CreatedAt time.Time `json:"created_at"`
 	// Last update timestamp
@@ -222,6 +228,8 @@ type SwaggerConnectorVersionJson struct {
 	Definition interface{} `json:"definition"`
 	// Labels assigned to the connector
 	Labels map[string]string `json:"labels,omitempty"`
+	// Annotations assigned to the connector version
+	Annotations map[string]string `json:"annotations,omitempty"`
 	// Creation timestamp
 	CreatedAt time.Time `json:"created_at"`
 	// Last update timestamp
@@ -260,6 +268,8 @@ type SwaggerEncryptionKeyJson struct {
 	State string `json:"state" example:"active"`
 	// Labels assigned to the encryption key
 	Labels map[string]string `json:"labels,omitempty"`
+	// Annotations assigned to the encryption key
+	Annotations map[string]string `json:"annotations,omitempty"`
 	// Creation timestamp
 	CreatedAt time.Time `json:"created_at"`
 	// Last update timestamp
@@ -298,6 +308,8 @@ type SwaggerCreateConnectorRequest struct {
 	Definition interface{} `json:"definition"`
 	// Labels to set on the connector
 	Labels map[string]string `json:"labels,omitempty"`
+	// Annotations to set on the connector
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // SwaggerUpdateConnectorRequest is the request to update a connector or connector version
@@ -308,6 +320,8 @@ type SwaggerUpdateConnectorRequest struct {
 	Definition interface{} `json:"definition,omitempty"`
 	// Labels to set on the connector (optional - nil keeps existing)
 	Labels *map[string]string `json:"labels,omitempty"`
+	// Annotations to set on the connector (optional - nil keeps existing)
+	Annotations *map[string]string `json:"annotations,omitempty"`
 }
 
 // SwaggerCreateConnectorVersionRequest is the request to create a new connector version
@@ -318,6 +332,8 @@ type SwaggerCreateConnectorVersionRequest struct {
 	Definition interface{} `json:"definition,omitempty"`
 	// Labels to set on the new version (optional - nil copies from latest)
 	Labels *map[string]string `json:"labels,omitempty"`
+	// Annotations to set on the new version (optional - nil copies from latest)
+	Annotations *map[string]string `json:"annotations,omitempty"`
 }
 
 // SwaggerForceStateRequest is the request to force a connection state
@@ -342,6 +358,8 @@ type SwaggerForceConnectorVersionStateRequest struct {
 type SwaggerUpdateConnectionRequest struct {
 	// Labels to set on the connection (replaces all existing labels)
 	Labels map[string]string `json:"labels,omitempty"`
+	// Annotations to set on the connection (replaces all existing annotations)
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 // SwaggerPutConnectionLabelRequest is the request to set a single label on a connection
@@ -360,6 +378,78 @@ type SwaggerConnectionLabelJson struct {
 	Key string `json:"key" example:"env"`
 	// Label value
 	Value string `json:"value" example:"production"`
+}
+
+// SwaggerConnectionAnnotationJson is a single connection annotation key-value pair
+//
+//	@Description	Connection annotation key-value pair
+type SwaggerConnectionAnnotationJson struct {
+	// Annotation key
+	Key string `json:"key" example:"description"`
+	// Annotation value
+	Value string `json:"value" example:"Primary production connection"`
+}
+
+// SwaggerPutConnectionAnnotationRequest is the request to set a single annotation on a connection
+//
+//	@Description	Request to set an annotation value
+type SwaggerPutConnectionAnnotationRequest struct {
+	// Annotation value
+	Value string `json:"value" example:"Primary production connection"`
+}
+
+// SwaggerNamespaceAnnotationJson is a single namespace annotation key-value pair
+//
+//	@Description	Namespace annotation key-value pair
+type SwaggerNamespaceAnnotationJson struct {
+	// Annotation key
+	Key string `json:"key" example:"description"`
+	// Annotation value
+	Value string `json:"value" example:"Production namespace"`
+}
+
+// SwaggerPutNamespaceAnnotationRequest is the request to set a single annotation on a namespace
+//
+//	@Description	Request to set a namespace annotation value
+type SwaggerPutNamespaceAnnotationRequest struct {
+	// Annotation value
+	Value string `json:"value" example:"Production namespace"`
+}
+
+// SwaggerEncryptionKeyAnnotationJson is a single encryption key annotation key-value pair
+//
+//	@Description	Encryption key annotation key-value pair
+type SwaggerEncryptionKeyAnnotationJson struct {
+	// Annotation key
+	Key string `json:"key" example:"description"`
+	// Annotation value
+	Value string `json:"value" example:"Primary encryption key"`
+}
+
+// SwaggerPutEncryptionKeyAnnotationRequest is the request to set a single annotation on an encryption key
+//
+//	@Description	Request to set an encryption key annotation value
+type SwaggerPutEncryptionKeyAnnotationRequest struct {
+	// Annotation value
+	Value string `json:"value" example:"Primary encryption key"`
+}
+
+// SwaggerConnectorAnnotationJson is a single connector annotation key-value pair
+//
+//	@Description	Connector annotation key-value pair
+type SwaggerConnectorAnnotationJson struct {
+	// Annotation key
+	Key string `json:"key" example:"description"`
+	// Annotation value
+	Value string `json:"value" example:"Salesforce CRM connector"`
+}
+
+// SwaggerPutConnectorAnnotationRequest is the request to set a single annotation on a connector
+//
+//	@Description	Request to set a connector annotation value
+type SwaggerPutConnectorAnnotationRequest struct {
+	// Annotation value
+	Value string `json:"value" example:"Salesforce CRM connector"`
 }
 
 // SwaggerPutConnectorLabelRequest is the request to set a single label on a connector

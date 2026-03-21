@@ -9,6 +9,7 @@ export interface ConnectorVersion {
     state: ConnectorVersionState;
     definition: Record<string, any>; // eslint-disable-line @typescript-eslint/no-explicit-any
     labels?: Record<string, string>;
+    annotations?: Record<string, string>;
     created_at: string;
     updated_at: string;
 }
@@ -24,10 +25,20 @@ export interface Connector {
     status_page_url?: string;
     logo: string;
     labels?: Record<string, string>;
+    annotations?: Record<string, string>;
     created_at: string;
     updated_at: string;
     versions: number;
     states: ConnectorVersionState[];
+}
+
+export interface PutConnectorAnnotationRequest {
+    value: string;
+}
+
+export interface ConnectorAnnotation {
+    key: string;
+    value: string;
 }
 
 export enum ConnectorVersionState {
@@ -106,10 +117,74 @@ export const forceConnectorVersionState = (id: string, version: number, state: C
     );
 };
 
+/**
+ * Get all annotations for a specific connector
+ */
+export const getConnectorAnnotations = (id: string) => {
+    return client.get<Record<string, string>>(`/api/v1/connectors/${id}/annotations`);
+};
+
+/**
+ * Get a specific annotation for a connector
+ */
+export const getConnectorAnnotation = (id: string, annotationKey: string) => {
+    return client.get<ConnectorAnnotation>(`/api/v1/connectors/${id}/annotations/${annotationKey}`);
+};
+
+/**
+ * Set a specific annotation for a connector
+ */
+export const putConnectorAnnotation = (id: string, annotationKey: string, value: string) => {
+    return client.put<ConnectorAnnotation>(`/api/v1/connectors/${id}/annotations/${annotationKey}`, { value });
+};
+
+/**
+ * Delete a specific annotation from a connector
+ */
+export const deleteConnectorAnnotation = (id: string, annotationKey: string) => {
+    return client.delete(`/api/v1/connectors/${id}/annotations/${annotationKey}`);
+};
+
+/**
+ * Get all annotations for a specific connector version
+ */
+export const getConnectorVersionAnnotations = (id: string, version: number) => {
+    return client.get<Record<string, string>>(`/api/v1/connectors/${id}/versions/${version}/annotations`);
+};
+
+/**
+ * Get a specific annotation for a connector version
+ */
+export const getConnectorVersionAnnotation = (id: string, version: number, annotationKey: string) => {
+    return client.get<ConnectorAnnotation>(`/api/v1/connectors/${id}/versions/${version}/annotations/${annotationKey}`);
+};
+
+/**
+ * Set a specific annotation for a connector version
+ */
+export const putConnectorVersionAnnotation = (id: string, version: number, annotationKey: string, value: string) => {
+    return client.put<ConnectorAnnotation>(`/api/v1/connectors/${id}/versions/${version}/annotations/${annotationKey}`, { value });
+};
+
+/**
+ * Delete a specific annotation from a connector version
+ */
+export const deleteConnectorVersionAnnotation = (id: string, version: number, annotationKey: string) => {
+    return client.delete(`/api/v1/connectors/${id}/versions/${version}/annotations/${annotationKey}`);
+};
+
 export const connectors = {
     list: listConnectors,
     get: getConnector,
     listVersions: listConnectorVersions,
     getVersion: getConnectorVersion,
     force_version_state: forceConnectorVersionState,
+    getAnnotations: getConnectorAnnotations,
+    getAnnotation: getConnectorAnnotation,
+    putAnnotation: putConnectorAnnotation,
+    deleteAnnotation: deleteConnectorAnnotation,
+    getVersionAnnotations: getConnectorVersionAnnotations,
+    getVersionAnnotation: getConnectorVersionAnnotation,
+    putVersionAnnotation: putConnectorVersionAnnotation,
+    deleteVersionAnnotation: deleteConnectorVersionAnnotation,
 };
