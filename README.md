@@ -1,10 +1,232 @@
 # AuthProxy
 
-AuthProxy is an open source, embeddable integration platform-as-a-service (iPaaS). It offloads the work of managing
-the connection lifecycle to 3rd party systems so your application can call to those systems using an authenticating
-proxy and stay focussed on the business logic of your product.
+AuthProxy is an open-source, embeddable integration platform-as-a-service (iPaaS). It manages the full connection lifecycle to third-party systems, allowing your application to call external APIs through an authenticating proxy while keeping credentials centralized, auditable, and secure.
 
-![marketplace-connectors.jpg](docs/images/marketplace-connectors.jpg)
+Instead of scattering OAuth tokens and API keys across your application, AuthProxy acts as a single control plane for all outbound integrations. Your application makes requests through the proxy, and AuthProxy handles credential injection, token refresh, and request logging transparently.
+
+Embeddable connector marketplace UI:
+![marketplace-connectors.jpg](docs/images/marketplace-connect.gif)
+
+Pre-built admin UI for managing connectors and connections:
+![admin-ui.jpg](docs/images/admin-walkthrough.gif)
+
+## Key Concepts
+
+### Authenticating Proxy
+
+At its core, AuthProxy is an HTTP proxy that sits between your application and external APIs. When your application needs to call a third-party service, it sends the request to AuthProxy, which:
+
+1. Looks up the connection and its stored credentials
+2. Injects the appropriate authentication (OAuth2 bearer token, API key, etc.)
+3. Forwards the request to the external service
+4. Returns the response to your application
+5. Logs the request for auditability
+
+If an OAuth2 access token has expired, AuthProxy automatically refreshes it using the stored refresh token before forwarding the request. Your application never needs to handle token lifecycle management.
+
+```mermaid
+sequenceDiagram
+    participant App as Your Application
+    participant AP as AuthProxy
+    participant API as External API
+
+    App->>AP: POST /connections/{id}/_proxy (no credentials)
+    AP->>AP: Look up connection, inject auth
+    AP->>API: POST /api/resource (with Bearer token)
+    API-->>AP: 200 OK
+    AP->>AP: Log request/response
+    AP-->>App: 200 OK
+```
+
+### Connectors and Connections
+
+A **connector** defines how to authenticate with a specific external service. It is a declarative specification that includes the authentication method (OAuth2, API key, or no auth), required scopes, token endpoints, and validation probes. Connectors are defined in YAML configuration and stored as immutable, versioned records.
+
+A **connection** is a runtime instance of an authenticated session with an external service. When a user authorizes access through the OAuth2 flow (or provides an API key), AuthProxy creates a connection that stores the encrypted credentials. Connections are owned by actors and scoped to namespaces.
+
+Supported authentication methods:
+
+- **OAuth2**: Full authorization code flow with automatic token refresh and revocation
+- **API Key**: Injected as a header, query parameter, or request body field
+- **No Auth**: Pass-through proxy for services that don't require authentication
+
+### Connector Versioning
+
+Connector definitions are **immutable once published**. When you need to change a connector's configuration (e.g., adding new OAuth scopes or updating an endpoint), you create a new version rather than modifying the existing one. This ensures that live connections are never disrupted by configuration changes.
+
+Each connector version progresses through a lifecycle:
+
+- **Draft**: Being developed. Not available for new connections.
+- **Primary**: The published version used for new connections. Existing connections on older versions are upgraded when possible.
+- **Active**: A previously primary version that still has connections that haven't been upgraded.
+- **Archived**: An old version with no remaining active connections.
+
+This versioning model enables progressive rollout: you can publish a new version, let connections migrate gradually, and roll back by promoting an older version to primary if issues arise.
+
+### Namespaces and Access Control
+
+AuthProxy uses a **hierarchical namespace model** for organizing resources and controlling access. Rather than assigning ownership directly to resources, access is controlled through namespace-scoped permissions.
+
+Namespaces are dot-separated paths that form a tree:
+
+```
+root
+root.team-alpha
+root.team-alpha.project-1
+root.team-beta
+```
+
+Each team or user gets a nested namespace. Permissions granted at a parent namespace cascade to children, so an administrator with access to `root.team-alpha` automatically has access to `root.team-alpha.project-1`.
+
+Permissions are defined as a combination of **namespace**, **resources**, and **verbs**:
+
+```json
+{
+  "namespace": "root.team-alpha.**",
+  "resources": ["connections"],
+  "verbs": ["get", "list", "proxy"]
+}
+```
+
+Wildcards (`*`) are supported for resources and verbs. The `**` suffix on namespaces matches all descendants.
+
+### JWT Authentication and Scoped Tokens
+
+AuthProxy uses JWTs for authentication with a flexible model designed for **least-privilege access**. Actors (users or service accounts) have a set of permissions stored in the database, but each JWT issued can carry a **subset** of those permissions.
+
+This per-token scoping is particularly useful for **agent-based workflows**. When an AI agent or automated process acts on behalf of a user, you can issue a JWT that includes only the specific permissions the agent needs, even though the user may have broader access. This limits the blast radius if a token is compromised and enforces the principle of least privilege.
+
+```yaml
+# Full user permissions
+permissions:
+  - namespace: "root.team-alpha.**"
+    resources: ["*"]
+    verbs: ["*"]
+
+# Scoped JWT for an agent acting on behalf of this user
+permissions:
+  - namespace: "root.team-alpha.project-1"
+    resources: ["connections"]
+    resource_ids: ["conn_abc123"]
+    verbs: ["proxy"]
+```
+
+### Developer-First Authentication
+
+AuthProxy is built with a developer-first orientation. Developers can register local SSH keys or private keys to sign JWTs directly, enabling self-signed requests to a deployed AuthProxy server without needing a separate authentication flow.
+
+This means:
+
+- **Local development**: Developers can interact with a deployed AuthProxy instance using their own SSH key, without needing shared secrets or a running auth server.
+- **CLI tooling**: The `authproxy` CLI reads a private key path from `~/.authproxy.yaml` and signs requests automatically.
+- **Agent integration**: Automated agents can use dedicated key pairs to authenticate, with permissions controlled by their actor configuration.
+
+The system supports both **actor-signed tokens** (asymmetric, using the actor's private key) and **system-signed tokens** (symmetric HMAC, used for internal service-to-service communication).
+
+### Application-Level Encryption
+
+AuthProxy employs **application-level encryption** (ALE) for all sensitive data. OAuth tokens, API keys, and connector definitions are encrypted before they reach any data store — whether that's the primary database, Redis, or object storage. Direct access to the database does not provide a path to view credentials; an attacker with a database dump sees only ciphertext.
+
+All encrypted values use AES-GCM and are stored in a self-describing format that embeds the encryption key version ID alongside the ciphertext:
+
+```json
+{"id": "ekv_abc123", "d": "base64-encoded-ciphertext"}
+```
+
+This means the system can always determine which key encrypted a given value without external metadata.
+
+#### Namespace-Scoped Keys
+
+Encryption keys follow the same hierarchical namespace model as the rest of AuthProxy. A global AES key (configured at startup) serves as the root, and each namespace can optionally define its own encryption key. When encrypting data for a namespace, the system resolves the key by walking up the namespace tree:
+
+```
+root.tenant-a.app1  →  root.tenant-a  →  root  →  global key
+```
+
+The first namespace with an assigned encryption key is used. Child namespaces inherit their parent's key unless they explicitly set their own. This enables **per-tenant key isolation**: a customer can bring their own encryption key so that their data is cryptographically separated from other tenants, even within a shared database.
+
+Keys can be sourced from external secret managers including AWS Secrets Manager, GCP Secret Manager, HashiCorp Vault, environment variables, or the filesystem — allowing customers to retain control of their key material.
+
+#### Automatic Key Rotation and Re-encryption
+
+Key rotation is fully automatic. When a key is rotated in the external provider (e.g., a new version is created in AWS Secrets Manager), AuthProxy detects the change through a periodic sync process and begins using the new version for all new encryptions immediately.
+
+A background re-encryption task then scans all tables with encrypted columns, compares each field's key version against the namespace's target version, and re-encrypts any mismatched fields with the current key. This happens in batches with no downtime and no application changes required.
+
+The same mechanism handles **namespace-level key changes**. If a namespace's encryption key is reassigned — for example, migrating a tenant to their own dedicated key — all data within that namespace is automatically re-encrypted with the new key. Old key versions are retained for decryption during the transition and can be removed once re-encryption is complete.
+
+### Embeddable Marketplace
+
+AuthProxy includes a **marketplace UI** that can be embedded in your host application. This React-based single-page application provides a ready-made interface for users to browse available connectors, establish connections, and manage their integrations.
+
+The marketplace uses a **delegated session model**: your host application generates a short-lived nonce JWT for the current user and redirects to the marketplace SPA. The SPA exchanges this token for a session with AuthProxy. If validation fails, the user is redirected back to your application's login flow.
+
+```mermaid
+sequenceDiagram
+    participant User
+    participant Host as Host Application
+    participant SPA as Marketplace SPA
+    participant AP as AuthProxy Public
+
+    User->>Host: Navigate to marketplace
+    Host->>Host: Generate nonce JWT for actor
+    Host->>SPA: Redirect with auth token
+    SPA->>AP: POST /session/_initiate
+    AP-->>SPA: Session cookie + config
+    SPA->>AP: GET /api/connectors
+    SPA->>AP: GET /api/connections
+    SPA->>SPA: User manages connections
+```
+
+This keeps AuthProxy's session lifecycle decoupled from your application's authentication system while providing a seamless user experience.
+
+### Request Logging and Auditability
+
+Every request proxied through AuthProxy is logged with comprehensive metadata for auditability:
+
+- HTTP method, URL, status code, and duration
+- Request and response size and content types
+- Connection, connector, and connector version references
+- Namespace and correlation IDs for tracing
+- Custom labels for filtering
+
+AuthProxy can optionally record **full request and response bodies**, which is configurable per-connector or globally. This is invaluable for building and debugging integrations, as you can replay exactly what was sent and received. Body recording respects configurable size limits, content type filters, and sensitive data redaction rules.
+
+Request logs are stored in a pluggable backend (SQLite, PostgreSQL, or ClickHouse) with full bodies stored in object storage (MinIO/S3).
+
+### Labels and Annotations
+
+AuthProxy provides a **Kubernetes-style label system** on all major resources (namespaces, actors, connections, connectors, and request logs). Labels are key-value pairs that follow a structured format:
+
+```
+app.example.com/tenant-id: "tenant-123"
+app.example.com/environment: "production"
+```
+
+Labels serve as a **lightweight integration layer** between AuthProxy and your host application. Instead of maintaining a separate mapping table to associate AuthProxy resources with your application's data model, you can attach labels directly to AuthProxy resources and query them using label selectors.
+
+Use cases include:
+
+- **Tenant mapping**: Tag connections with your application's tenant or user IDs
+- **Environment tagging**: Distinguish production, staging, and development connections
+- **Connector discovery**: Find connector versions matching specific criteria
+- **Request filtering**: Search audit logs by custom dimensions
+- **Workflow tracking**: Mark connections with pipeline or workflow identifiers
+
+Labels support Kubernetes-style selector syntax for querying, making it easy to find resources matching complex criteria.
+
+## Architecture
+
+AuthProxy runs as multiple independent services that can be started together or separately:
+
+| Service | Default Port | Purpose |
+|---------|-------------|---------|
+| **public** | 8080 | OAuth callbacks, marketplace SPA, session management |
+| **api** | 8081 | Core API for application integration and proxying |
+| **admin-api** | 8082 | Administrative API with UI for managing connectors and connections |
+| **worker** | 8083 (health) | Background task processor (token refresh, connection upgrades) |
+
+All services share the same database and Redis instance. The separation allows independent scaling and different security contexts (e.g., the public service handles OAuth callbacks that must be internet-accessible, while the API service can be internal).
 
 ## Running Locally
 
@@ -317,3 +539,11 @@ admin_private_key_path: /path/to/private/key
 server:
   api: http://localhost:8081
 ```
+
+## Related Projects
+
+See [RELATED.md](RELATED.md) for a list of related products in the API integration space.
+
+## License
+
+AuthProxy is open source. See [LICENSE](LICENSE) for details.
