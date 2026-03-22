@@ -121,8 +121,6 @@ jobs:
         image: clickhouse/clickhouse-server:latest
         ports:
           - 8124:8123
-        volumes:
-          - ${{ github.workspace }}/dev_config/clickhouse/users.xml:/etc/clickhouse-server/users.d/authproxy-user.xml
     steps:
     - uses: actions/checkout@v4
 
@@ -148,8 +146,10 @@ jobs:
           -e MC_HOST_minio=http://minioadmin:minioadmin@localhost:9003 \
           minio/mc mb --ignore-existing minio/authproxy-request-logs
 
-    - name: Create ClickHouse database
+    - name: Set up ClickHouse
       run: |
+        curl -sf "http://localhost:8124/" --data "CREATE USER IF NOT EXISTS authproxy IDENTIFIED BY 'authproxy'"
+        curl -sf "http://localhost:8124/" --data "GRANT ALL ON *.* TO authproxy"
         curl -sf "http://localhost:8124/" --data "CREATE DATABASE IF NOT EXISTS authproxy"
 
     - name: Integration Tests
