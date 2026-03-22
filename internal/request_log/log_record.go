@@ -18,12 +18,12 @@ import (
 type LogRecord struct {
 	Namespace           string              `json:"namespace"`
 	Type                httpf.RequestType   `json:"type"`
-	RequestId           apid.ID           `json:"request_id"`
+	RequestId           apid.ID             `json:"request_id"`
 	CorrelationId       string              `json:"correlation_id,omitempty"`
 	Timestamp           time.Time           `json:"timestamp"`
 	MillisecondDuration MillisecondDuration `json:"duration"`
-	ConnectionId        apid.ID           `json:"connection_id,omitempty"`
-	ConnectorId         apid.ID           `json:"connector_id,omitempty"`
+	ConnectionId        apid.ID             `json:"connection_id,omitempty"`
+	ConnectorId         apid.ID             `json:"connector_id,omitempty"`
 	ConnectorVersion    uint64              `json:"connector_version,omitempty"`
 	Method              string              `json:"method"`
 	Host                string              `json:"host"`

@@ -2,9 +2,10 @@ package core
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -105,11 +106,11 @@ func (s *service) getConnectionForDb(ctx context.Context, dbConn *database.Conne
 	if err != nil {
 		if errors.Is(err, ErrNotFound) {
 			logger.Error("connector is missing for connector version", "error", err)
-			return nil, errors.Wrap(err, "connector is missing for connector version")
+			return nil, fmt.Errorf("connector is missing for connector version: %w", err)
 		}
 
 		logger.Error("failed to get connector for connection", "error", err)
-		return nil, errors.Wrap(err, "failed to get connector for connection")
+		return nil, fmt.Errorf("failed to get connector for connection: %w", err)
 	}
 
 	return wrapConnection(dbConn, cv, s), nil

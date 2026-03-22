@@ -3,12 +3,12 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
@@ -153,11 +153,11 @@ func (ek *EncryptionKey) Validate() error {
 	}
 
 	if err := ek.Labels.Validate(); err != nil {
-		result = multierror.Append(result, errors.Wrap(err, "invalid labels"))
+		result = multierror.Append(result, fmt.Errorf("invalid labels: %w", err))
 	}
 
 	if err := ek.Annotations.Validate(); err != nil {
-		result = multierror.Append(result, errors.Wrap(err, "invalid annotations"))
+		result = multierror.Append(result, fmt.Errorf("invalid annotations: %w", err))
 	}
 
 	return result.ErrorOrNil()
@@ -201,12 +201,12 @@ func (s *service) CreateEncryptionKey(ctx context.Context, ek *EncryptionKey) er
 		RunWith(s.db).
 		Exec()
 	if err != nil {
-		return errors.Wrap(err, "failed to create encryption key")
+		return fmt.Errorf("failed to create encryption key: %w", err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "failed to create encryption key")
+		return fmt.Errorf("failed to create encryption key: %w", err)
 	}
 
 	if affected == 0 {
@@ -230,12 +230,12 @@ func (s *service) UpdateEncryptionKey(ctx context.Context, id apid.ID, updates m
 
 	dbResult, err := q.RunWith(s.db).Exec()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to update encryption key")
+		return nil, fmt.Errorf("failed to update encryption key: %w", err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to update encryption key")
+		return nil, fmt.Errorf("failed to update encryption key: %w", err)
 	}
 
 	if affected == 0 {
@@ -259,12 +259,12 @@ func (s *service) DeleteEncryptionKey(ctx context.Context, id apid.ID) error {
 		RunWith(s.db).
 		Exec()
 	if err != nil {
-		return errors.Wrap(err, "failed to soft delete encryption key")
+		return fmt.Errorf("failed to soft delete encryption key: %w", err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "failed to soft delete encryption key")
+		return fmt.Errorf("failed to soft delete encryption key: %w", err)
 	}
 
 	if affected == 0 {
@@ -273,7 +273,7 @@ func (s *service) DeleteEncryptionKey(ctx context.Context, id apid.ID) error {
 
 	// Soft-delete all associated encryption key versions
 	if err := s.DeleteEncryptionKeyVersionsForEncryptionKey(ctx, id); err != nil {
-		return errors.Wrap(err, "failed to delete encryption key versions for encryption key")
+		return fmt.Errorf("failed to delete encryption key versions for encryption key: %w", err)
 	}
 
 	return nil
@@ -293,12 +293,12 @@ func (s *service) SetEncryptionKeyState(ctx context.Context, id apid.ID, state E
 		RunWith(s.db).
 		Exec()
 	if err != nil {
-		return errors.Wrap(err, "failed to set encryption key state")
+		return fmt.Errorf("failed to set encryption key state: %w", err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "failed to set encryption key state")
+		return fmt.Errorf("failed to set encryption key state: %w", err)
 	}
 
 	if affected == 0 {
@@ -316,7 +316,7 @@ func (s *service) UpdateEncryptionKeyLabels(ctx context.Context, id apid.ID, lab
 
 	if labels != nil {
 		if err := ValidateLabels(labels); err != nil {
-			return nil, errors.Wrap(err, "invalid labels")
+			return nil, fmt.Errorf("invalid labels: %w", err)
 		}
 	}
 
@@ -367,7 +367,7 @@ func (s *service) PutEncryptionKeyLabels(ctx context.Context, id apid.ID, labels
 	}
 
 	if err := ValidateLabels(labels); err != nil {
-		return nil, errors.Wrap(err, "invalid labels")
+		return nil, fmt.Errorf("invalid labels: %w", err)
 	}
 
 	var result *EncryptionKey
@@ -458,7 +458,7 @@ func (s *service) UpdateEncryptionKeyAnnotations(ctx context.Context, id apid.ID
 
 	if annotations != nil {
 		if err := ValidateAnnotations(annotations); err != nil {
-			return nil, errors.Wrap(err, "invalid annotations")
+			return nil, fmt.Errorf("invalid annotations: %w", err)
 		}
 	}
 
@@ -508,7 +508,7 @@ func (s *service) PutEncryptionKeyAnnotations(ctx context.Context, id apid.ID, a
 	}
 
 	if err := ValidateAnnotations(annotations); err != nil {
-		return nil, errors.Wrap(err, "invalid annotations")
+		return nil, fmt.Errorf("invalid annotations: %w", err)
 	}
 
 	var result *EncryptionKey
@@ -823,7 +823,7 @@ func (s *service) EnumerateEncryptionKeysInDependencyOrder(
 		RunWith(s.db).
 		Query()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to query encryption keys")
+		return nil, fmt.Errorf("failed to query encryption keys: %w", err)
 	}
 
 	allKeys := make(map[apid.ID]*EncryptionKey)
@@ -831,7 +831,7 @@ func (s *service) EnumerateEncryptionKeysInDependencyOrder(
 		var ek EncryptionKey
 		if err := rows.Scan(ek.fields()...); err != nil {
 			rows.Close()
-			return nil, errors.Wrap(err, "failed to scan encryption key")
+			return nil, fmt.Errorf("failed to scan encryption key: %w", err)
 		}
 		allKeys[ek.Id] = &ek
 	}
@@ -849,7 +849,7 @@ func (s *service) EnumerateEncryptionKeysInDependencyOrder(
 		RunWith(s.db).
 		Query()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to query encryption key versions")
+		return nil, fmt.Errorf("failed to query encryption key versions: %w", err)
 	}
 
 	ekvToEK := make(map[apid.ID]apid.ID) // ekv ID -> encryption key ID
@@ -857,7 +857,7 @@ func (s *service) EnumerateEncryptionKeysInDependencyOrder(
 		var ekvID, ekID apid.ID
 		if err := ekvRows.Scan(&ekvID, &ekID); err != nil {
 			ekvRows.Close()
-			return nil, errors.Wrap(err, "failed to scan encryption key version")
+			return nil, fmt.Errorf("failed to scan encryption key version: %w", err)
 		}
 		ekvToEK[ekvID] = ekID
 	}
@@ -913,4 +913,3 @@ func (s *service) EnumerateEncryptionKeysInDependencyOrder(
 
 	return orphans, nil
 }
-

@@ -2,6 +2,7 @@ package worker
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"os"
 	"os/signal"
@@ -10,7 +11,6 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"
 )
@@ -89,7 +89,7 @@ func (s *scheduler) start(ctx context.Context) error {
 	)
 
 	if err != nil {
-		return errors.Wrap(err, "error creating periodic task manager")
+		return fmt.Errorf("error creating periodic task manager: %w", err)
 	}
 
 	err = s.mgr.Start()

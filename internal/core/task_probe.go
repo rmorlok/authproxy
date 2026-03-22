@@ -3,11 +3,11 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hibiken/asynq"
-	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -25,7 +25,7 @@ func newProbeTask(connectionId apid.ID, probeId string) (*asynq.Task, error) {
 
 type probeTaskPayload struct {
 	ConnectionId apid.ID `json:"connection_id"`
-	ProbeId      string    `json:"probe_id"`
+	ProbeId      string  `json:"probe_id"`
 }
 
 func skipTaskErrorIfProbeIsPeriodic(p iface.Probe, err error) error {

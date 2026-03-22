@@ -1,17 +1,18 @@
 package connectors
 
 import (
+	"time"
+
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/schema/common"
-	"time"
 )
 
 const (
-	DefaultMaxRetryAfter        = 15 * time.Minute
-	DefaultDefaultRetryAfter    = 60 * time.Second
-	DefaultBackoffInitial       = 1 * time.Second
-	DefaultBackoffMultiplier    = 2.0
-	DefaultBackoffMaxInterval   = 5 * time.Minute
+	DefaultMaxRetryAfter         = 15 * time.Minute
+	DefaultDefaultRetryAfter     = 60 * time.Second
+	DefaultBackoffInitial        = 1 * time.Second
+	DefaultBackoffMultiplier     = 2.0
+	DefaultBackoffMaxInterval    = 5 * time.Minute
 	DefaultBackoffJitterFraction = 0.1
 )
 

@@ -3,16 +3,17 @@ package routes
 import (
 	"encoding/json"
 	"errors"
-	"github.com/rmorlok/authproxy/internal/api_common"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
+	"github.com/rmorlok/authproxy/internal/api_common"
+
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
-	"github.com/rmorlok/authproxy/internal/apid"
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"

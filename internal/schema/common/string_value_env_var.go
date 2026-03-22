@@ -2,9 +2,8 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"os"
-
-	"github.com/pkg/errors"
 )
 
 type StringValueEnvVar struct {
@@ -25,7 +24,7 @@ func (kev *StringValueEnvVar) GetValue(ctx context.Context) (string, error) {
 			return *kev.Default, nil
 		}
 
-		return "", errors.Errorf("environment variable '%s' does not have value", kev.EnvVar)
+		return "", fmt.Errorf("environment variable '%s' does not have value", kev.EnvVar)
 	}
 	return val, nil
 }

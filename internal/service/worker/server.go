@@ -12,11 +12,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	authSync "github.com/rmorlok/authproxy/internal/apauth/tasks"
-	dbTasks "github.com/rmorlok/authproxy/internal/database/tasks"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/config"
+	dbTasks "github.com/rmorlok/authproxy/internal/database/tasks"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/service"
 )

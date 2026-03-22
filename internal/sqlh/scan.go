@@ -2,8 +2,7 @@ package sqlh
 
 import (
 	"database/sql"
-
-	"github.com/pkg/errors"
+	"errors"
 )
 
 // RowScanner is the interface that wraps the Scan method.

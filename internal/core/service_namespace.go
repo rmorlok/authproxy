@@ -2,8 +2,8 @@ package core
 
 import (
 	"context"
+	"errors"
 
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"

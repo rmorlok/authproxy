@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"regexp"
 	"strings"
@@ -12,7 +13,6 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 )
 
@@ -117,10 +117,10 @@ func ValidateLabelKey(key string) error {
 	// Validate prefix if present
 	if prefix != "" {
 		if len(prefix) > LabelKeyPrefixMaxLength {
-			return errors.Errorf("label key prefix exceeds maximum length of %d characters", LabelKeyPrefixMaxLength)
+			return fmt.Errorf("label key prefix exceeds maximum length of %d characters", LabelKeyPrefixMaxLength)
 		}
 		if !labelKeyPrefixRegex.MatchString(prefix) {
-			return errors.Errorf("label key prefix %q is not a valid DNS subdomain", prefix)
+			return fmt.Errorf("label key prefix %q is not a valid DNS subdomain", prefix)
 		}
 	}
 
@@ -129,10 +129,10 @@ func ValidateLabelKey(key string) error {
 		return errors.New("label key name cannot be empty")
 	}
 	if len(name) > LabelKeyNameMaxLength {
-		return errors.Errorf("label key name exceeds maximum length of %d characters", LabelKeyNameMaxLength)
+		return fmt.Errorf("label key name exceeds maximum length of %d characters", LabelKeyNameMaxLength)
 	}
 	if !labelKeyNameRegex.MatchString(name) {
-		return errors.Errorf("label key name %q must start and end with alphanumeric and contain only alphanumeric, '-', '_', or '.'", name)
+		return fmt.Errorf("label key name %q must start and end with alphanumeric and contain only alphanumeric, '-', '_', or '.'", name)
 	}
 
 	return nil
@@ -143,11 +143,11 @@ func ValidateLabelKey(key string) error {
 // - if non-empty: must start and end with alphanumeric, may contain alphanumeric, '-', '_', '.'
 func ValidateLabelValue(value string) error {
 	if len(value) > LabelValueMaxLength {
-		return errors.Errorf("label value exceeds maximum length of %d characters", LabelValueMaxLength)
+		return fmt.Errorf("label value exceeds maximum length of %d characters", LabelValueMaxLength)
 	}
 
 	if value != "" && !labelValueRegex.MatchString(value) {
-		return errors.Errorf("label value %q must start and end with alphanumeric and contain only alphanumeric, '-', '_', or '.'", value)
+		return fmt.Errorf("label value %q must start and end with alphanumeric and contain only alphanumeric, '-', '_', or '.'", value)
 	}
 
 	return nil
@@ -158,10 +158,10 @@ func ValidateLabels(labels map[string]string) error {
 	var result *multierror.Error
 	for key, value := range labels {
 		if err := ValidateLabelKey(key); err != nil {
-			result = multierror.Append(result, errors.Wrapf(err, "invalid label key %q", key))
+			result = multierror.Append(result, fmt.Errorf("invalid label key %q: %w", key, err))
 		}
 		if err := ValidateLabelValue(value); err != nil {
-			result = multierror.Append(result, errors.Wrapf(err, "invalid label value for key %q", key))
+			result = multierror.Append(result, fmt.Errorf("invalid label value for key %q: %w", key, err))
 		}
 	}
 
@@ -178,10 +178,10 @@ func (l Labels) Validate() error {
 
 	for key, value := range l {
 		if err := ValidateLabelKey(key); err != nil {
-			result = multierror.Append(result, errors.Wrapf(err, "invalid label key %q", key))
+			result = multierror.Append(result, fmt.Errorf("invalid label key %q: %w", key, err))
 		}
 		if err := ValidateLabelValue(value); err != nil {
-			result = multierror.Append(result, errors.Wrapf(err, "invalid label value for key %q", key))
+			result = multierror.Append(result, fmt.Errorf("invalid label value for key %q: %w", key, err))
 		}
 	}
 
@@ -253,12 +253,12 @@ func (s *service) putLabelsInTableTx(ctx context.Context, tx *sql.Tx, table stri
 		RunWith(tx).
 		Exec()
 	if err != nil {
-		return nil, time.Time{}, errors.Wrapf(err, "failed to put labels in %s", table)
+		return nil, time.Time{}, fmt.Errorf("failed to put labels in %s: %w", table, err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return nil, time.Time{}, errors.Wrapf(err, "failed to put labels in %s", table)
+		return nil, time.Time{}, fmt.Errorf("failed to put labels in %s: %w", table, err)
 	}
 
 	if affected == 0 {
@@ -302,12 +302,12 @@ func (s *service) deleteLabelsInTableTx(ctx context.Context, tx *sql.Tx, table s
 		RunWith(tx).
 		Exec()
 	if err != nil {
-		return nil, time.Time{}, errors.Wrapf(err, "failed to delete labels in %s", table)
+		return nil, time.Time{}, fmt.Errorf("failed to delete labels in %s: %w", table, err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return nil, time.Time{}, errors.Wrapf(err, "failed to delete labels in %s", table)
+		return nil, time.Time{}, fmt.Errorf("failed to delete labels in %s: %w", table, err)
 	}
 
 	if affected == 0 {
@@ -330,12 +330,12 @@ func (s *service) updateLabelsInTableTx(ctx context.Context, tx *sql.Tx, table s
 		RunWith(tx).
 		Exec()
 	if err != nil {
-		return time.Time{}, errors.Wrapf(err, "failed to update labels in %s", table)
+		return time.Time{}, fmt.Errorf("failed to update labels in %s: %w", table, err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return time.Time{}, errors.Wrapf(err, "failed to update labels in %s", table)
+		return time.Time{}, fmt.Errorf("failed to update labels in %s: %w", table, err)
 	}
 
 	if affected == 0 {

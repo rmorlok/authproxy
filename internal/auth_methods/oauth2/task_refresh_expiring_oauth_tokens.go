@@ -3,8 +3,8 @@ package oauth2
 import (
 	"context"
 
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hibiken/asynq"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/config"

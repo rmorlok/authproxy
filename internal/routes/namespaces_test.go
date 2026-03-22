@@ -4,11 +4,12 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"github.com/rmorlok/authproxy/internal/api_common"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
+
+	"github.com/rmorlok/authproxy/internal/api_common"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"

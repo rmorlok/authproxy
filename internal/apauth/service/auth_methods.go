@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
@@ -17,7 +18,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/config"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/pkg/errors"
 )
 
 // keyForToken loads an appropriate key to sign or verify a given token. This accounts for the
@@ -40,7 +40,7 @@ func (s *service) keyForToken(ctx context.Context, claims *jwt2.AuthProxyClaims)
 				// Actor does not exist. Fall back to JWT signing key
 				return s.config.GetRoot().SystemAuth.JwtSigningKey, nil
 			}
-			return nil, errors.Wrap(err, "failed to get actor")
+			return nil, fmt.Errorf("failed to get actor: %w", err)
 		}
 		cache.Put(actor)
 	}
@@ -53,13 +53,13 @@ func (s *service) keyForToken(ctx context.Context, claims *jwt2.AuthProxyClaims)
 	// Decrypt the key JSON
 	decrypted, err := s.encrypt.DecryptString(ctx, *actor.EncryptedKey)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to decrypt actor key")
+		return nil, fmt.Errorf("failed to decrypt actor key: %w", err)
 	}
 
 	// Unmarshal to *config.Key
 	var key config.Key
 	if err := json.Unmarshal([]byte(decrypted), &key); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal actor key")
+		return nil, fmt.Errorf("failed to unmarshal actor key: %w", err)
 	}
 
 	return &key, nil
@@ -93,7 +93,7 @@ func (s *service) keyForActorSignedToken(ctx context.Context, claims *jwt2.AuthP
 					},
 				}, nil
 			}
-			return nil, errors.Wrap(err, "failed to get actor")
+			return nil, fmt.Errorf("failed to get actor: %w", err)
 		}
 		cache.Put(actor)
 	}
@@ -110,13 +110,13 @@ func (s *service) keyForActorSignedToken(ctx context.Context, claims *jwt2.AuthP
 	// Decrypt the key JSON
 	decrypted, err := s.encrypt.DecryptString(ctx, *actor.EncryptedKey)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to decrypt actor key")
+		return nil, fmt.Errorf("failed to decrypt actor key: %w", err)
 	}
 
 	// Unmarshal to *config.Key
 	var key config.Key
 	if err := json.Unmarshal([]byte(decrypted), &key); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal actor key")
+		return nil, fmt.Errorf("failed to unmarshal actor key: %w", err)
 	}
 
 	return &key, nil
@@ -132,7 +132,7 @@ func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (stri
 
 	audiences, err := claimsClone.GetAudience()
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get aud")
+		return "", fmt.Errorf("failed to get aud: %w", err)
 	}
 
 	if !config.AllValidServiceIds(audiences) {
@@ -141,7 +141,7 @@ func (s *service) Token(ctx context.Context, claims *jwt2.AuthProxyClaims) (stri
 
 	ver, err := s.config.GetRoot().SystemAuth.GlobalAESKey.GetCurrentVersion(ctx)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to get global aes key")
+		return "", fmt.Errorf("failed to get global aes key: %w", err)
 	}
 
 	return jwt2.
@@ -167,7 +167,7 @@ func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProx
 				// the actor's private key. Look up the actor's public key to verify.
 				key, err := s.keyForActorSignedToken(ctx, unverified)
 				if err != nil {
-					return nil, false, errors.Wrap(err, "failed to get key")
+					return nil, false, fmt.Errorf("failed to get key: %w", err)
 				}
 
 				if pk, ok := key.InnerVal.(*config.KeyPublicPrivate); ok {
@@ -181,7 +181,7 @@ func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProx
 			// For non-self-signed tokens, use keyForToken
 			key, err := s.keyForToken(ctx, unverified)
 			if err != nil {
-				return nil, false, errors.Wrap(err, "failed to get key")
+				return nil, false, fmt.Errorf("failed to get key: %w", err)
 			}
 
 			if pk, ok := key.InnerVal.(*config.KeyPublicPrivate); ok {
@@ -196,7 +196,7 @@ func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProx
 		}).
 		ParseCtx(ctx, tokenString)
 	if err != nil {
-		return nil, errors.Wrap(err, "can't parse token")
+		return nil, fmt.Errorf("can't parse token: %w", err)
 	}
 
 	found := false
@@ -208,9 +208,9 @@ func (s *service) Parse(ctx context.Context, tokenString string) (*jwt2.AuthProx
 	}
 	if !found {
 		if len(claims.Audience) > 0 {
-			return nil, errors.Errorf("aud '%s' not valid for service '%s'", strings.Join(claims.Audience, ","), s.service.GetId())
+			return nil, fmt.Errorf("aud '%s' not valid for service '%s'", strings.Join(claims.Audience, ","), s.service.GetId())
 		}
-		return nil, errors.Errorf("aud not specified for service '%s'", s.service.GetId())
+		return nil, fmt.Errorf("aud not specified for service '%s'", s.service.GetId())
 	}
 
 	return claims, s.validate(ctx, claims)
@@ -272,7 +272,7 @@ func getJwtTokenFromHeader(r *http.Request) (token string, hasValue bool, err er
 	if tokenHeader := r.Header.Get(JwtHeaderKey); tokenHeader != "" {
 		tokenString, err := extractTokenFromBearer(tokenHeader)
 		if err != nil {
-			return "", true, errors.Wrap(err, "failed to extract token from authorization header")
+			return "", true, fmt.Errorf("failed to extract token from authorization header: %w", err)
 		}
 
 		if tokenString != "" {
@@ -328,7 +328,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 			return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
 				WithStatusUnauthorized().
 				WithResponseMsg("invalid token").
-				WithInternalErr(errors.Wrap(err, "failed to get token")).
+				WithInternalErr(fmt.Errorf("failed to get token: %w", err)).
 				Build()
 		}
 
@@ -354,7 +354,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 				return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
 					WithStatusUnauthorized().
 					WithResponseMsg("failed to verify jwt details").
-					WithInternalErr(errors.Wrap(err, "can't check nonce")).
+					WithInternalErr(fmt.Errorf("can't check nonce: %w", err)).
 					Build()
 			}
 
@@ -380,13 +380,13 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 						return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
 							WithStatusUnauthorized().
 							WithResponseMsg("actor does not exist").
-							WithInternalErr(errors.Errorf("actor '%s' not found", claims.Subject)).
+							WithInternalErr(fmt.Errorf("actor '%s' not found", claims.Subject)).
 							Build()
 					}
 					return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
 						WithStatusInternalServerError().
 						WithResponseMsg("database error").
-						WithInternalErr(errors.Wrap(err, "failed to get actor")).
+						WithInternalErr(fmt.Errorf("failed to get actor: %w", err)).
 						Build()
 				}
 				cache.Put(actor)
@@ -399,7 +399,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 				return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
 					WithStatusInternalServerError().
 					WithResponseMsg("database error").
-					WithInternalErr(errors.Wrap(err, "failed to upsert actor")).
+					WithInternalErr(fmt.Errorf("failed to upsert actor: %w", err)).
 					Build()
 			}
 			cache.Put(actor)
@@ -414,7 +414,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 		return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
 			WithStatusUnauthorized().
 			WithResponseMsg("failed to establish auth from session").
-			WithInternalErr(errors.Wrap(err, "failed to establish auth from session")).
+			WithInternalErr(fmt.Errorf("failed to establish auth from session: %w", err)).
 			Build()
 	}
 

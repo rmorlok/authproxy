@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"embed"
+	"errors"
 	"fmt"
 	"log/slog"
 	"regexp"
@@ -15,7 +16,6 @@ import (
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
@@ -43,7 +43,7 @@ type sqlRecordStore struct {
 func NewSqlRecordStore(cfg *config.Database, logger *slog.Logger) RecordStore {
 	db, err := sql.Open(cfg.GetDriver(), cfg.GetDsn())
 	if err != nil {
-		panic(errors.Wrap(err, "failed to open http logging database"))
+		panic(fmt.Errorf("failed to open http logging database: %w", err))
 	}
 
 	return &sqlRecordStore{
@@ -131,12 +131,12 @@ func (s *sqlRecordStore) StoreRecords(ctx context.Context, records []*LogRecord)
 
 	query, args, err := builder.ToSql()
 	if err != nil {
-		return errors.Wrap(err, "failed to build insert query")
+		return fmt.Errorf("failed to build insert query: %w", err)
 	}
 
 	_, err = s.db.ExecContext(ctx, query, args...)
 	if err != nil {
-		return errors.Wrap(err, "failed to insert entry records")
+		return fmt.Errorf("failed to insert entry records: %w", err)
 	}
 
 	return nil
@@ -149,12 +149,12 @@ func (s *sqlRecordStore) Migrate(ctx context.Context) error {
 
 	d, err := iofs.New(httpLogMigrationsFs, fmt.Sprintf("migrations/%s", provider))
 	if err != nil {
-		return errors.Wrapf(err, "failed to load http log migrations for '%s'", provider)
+		return fmt.Errorf("failed to load http log migrations for '%s': %w", provider, err)
 	}
 
 	m, err := migrate.NewWithSourceInstance("iofs", d, s.uri)
 	if err != nil {
-		return errors.Wrap(err, "failed to setup http log migrations")
+		return fmt.Errorf("failed to setup http log migrations: %w", err)
 	}
 	defer func() {
 		sourceErr, dbErr := m.Close()
@@ -169,7 +169,7 @@ func (s *sqlRecordStore) Migrate(ctx context.Context) error {
 			s.logger.Info("no http log migrations required")
 			return nil
 		}
-		return errors.Wrap(err, "failed to migrate http log database")
+		return fmt.Errorf("failed to migrate http log database: %w", err)
 	}
 
 	return nil
@@ -194,7 +194,7 @@ type sqlRecordRetriever struct {
 func NewSqlRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorEncryptor, logger *slog.Logger) RecordRetriever {
 	db, err := sql.Open(cfg.GetDriver(), cfg.GetDsn())
 	if err != nil {
-		panic(errors.Wrap(err, "failed to open http logging database for retrieval"))
+		panic(fmt.Errorf("failed to open http logging database for retrieval: %w", err))
 	}
 
 	return &sqlRecordRetriever{
@@ -252,7 +252,7 @@ func (r *sqlRecordRetriever) GetRecord(ctx context.Context, id apid.ID) (*LogRec
 		Where(sq.Eq{"request_id": id.String()}).
 		ToSql()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build select query")
+		return nil, fmt.Errorf("failed to build select query: %w", err)
 	}
 
 	row := r.db.QueryRowContext(ctx, query, args...)
@@ -261,7 +261,7 @@ func (r *sqlRecordRetriever) GetRecord(ctx context.Context, id apid.ID) (*LogRec
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
-		return nil, errors.Wrap(err, "failed to get entry record")
+		return nil, fmt.Errorf("failed to get entry record: %w", err)
 	}
 
 	return er, nil
@@ -271,7 +271,7 @@ func (r *sqlRecordRetriever) NewListRequestsBuilder() ListRequestBuilder {
 	return &sqlListRequestsBuilder{
 		ListFilters:       ListFilters{LimitVal: 100},
 		db:                r.db,
-		cursorEncryptor:         r.cursorEncryptor,
+		cursorEncryptor:   r.cursorEncryptor,
 		placeholderFormat: r.placeholderFormat,
 		provider:          r.provider,
 	}
@@ -281,7 +281,7 @@ func (r *sqlRecordRetriever) ListRequestsFromCursor(ctx context.Context, cursor 
 	b := &sqlListRequestsBuilder{
 		ListFilters:       ListFilters{LimitVal: 100},
 		db:                r.db,
-		cursorEncryptor:         r.cursorEncryptor,
+		cursorEncryptor:   r.cursorEncryptor,
 		placeholderFormat: r.placeholderFormat,
 		provider:          r.provider,
 	}
@@ -311,8 +311,8 @@ type sqlListRequestsBuilder struct {
 	ListFilters
 	db                *sql.DB                    `json:"-"`
 	cursorEncryptor   pagination.CursorEncryptor `json:"-"`
-	placeholderFormat sq.PlaceholderFormat        `json:"-"`
-	provider          config.DatabaseProvider     `json:"-"`
+	placeholderFormat sq.PlaceholderFormat       `json:"-"`
+	provider          config.DatabaseProvider    `json:"-"`
 }
 
 func (l *sqlListRequestsBuilder) addError(e error) ListRequestBuilder {
@@ -575,12 +575,12 @@ func (l *sqlListRequestsBuilder) FetchPage(ctx context.Context) pagination.PageR
 	builder := l.buildQuery()
 	query, args, err := builder.ToSql()
 	if err != nil {
-		return pagination.PageResult[*LogRecord]{Error: errors.Wrap(err, "failed to build list query")}
+		return pagination.PageResult[*LogRecord]{Error: fmt.Errorf("failed to build list query: %w", err)}
 	}
 
 	rows, err := l.db.QueryContext(ctx, query, args...)
 	if err != nil {
-		return pagination.PageResult[*LogRecord]{Error: errors.Wrap(err, "failed to execute list query")}
+		return pagination.PageResult[*LogRecord]{Error: fmt.Errorf("failed to execute list query: %w", err)}
 	}
 	defer rows.Close()
 
@@ -588,7 +588,7 @@ func (l *sqlListRequestsBuilder) FetchPage(ctx context.Context) pagination.PageR
 	for rows.Next() {
 		er, err := scanLogRecord(rows)
 		if err != nil {
-			return pagination.PageResult[*LogRecord]{Error: errors.Wrap(err, "failed to scan entry record")}
+			return pagination.PageResult[*LogRecord]{Error: fmt.Errorf("failed to scan entry record: %w", err)}
 		}
 		entries = append(entries, er)
 	}

@@ -69,10 +69,10 @@ func TestAnnotations(t *testing.T) {
 	t.Run("ValidateAnnotations", func(t *testing.T) {
 		t.Run("valid annotations", func(t *testing.T) {
 			annotations := Annotations{
-				"app":                    "my application description",
-				"example.com/note":       "this can be any string value with spaces & symbols!",
-				"example.com/config":     `{"key": "value"}`,
-				"example.com/empty":      "",
+				"app":                "my application description",
+				"example.com/note":   "this can be any string value with spaces & symbols!",
+				"example.com/config": `{"key": "value"}`,
+				"example.com/empty":  "",
 			}
 			require.NoError(t, ValidateAnnotations(annotations))
 		})

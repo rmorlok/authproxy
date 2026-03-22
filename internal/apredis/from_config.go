@@ -2,8 +2,8 @@ package apredis
 
 import (
 	"context"
+	"errors"
 
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 

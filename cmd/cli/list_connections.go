@@ -1,10 +1,10 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 
 	"github.com/go-resty/resty/v2"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/cmd/cli/config"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	routes2 "github.com/rmorlok/authproxy/internal/routes"

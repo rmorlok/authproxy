@@ -2,10 +2,10 @@ package config
 
 import (
 	"context"
+	"fmt"
 
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
-	pkgerrors "github.com/pkg/errors"
 )
 
 // AwsCredentialsAccessKey provides explicit access key credentials for S3-compatible storage.
@@ -25,11 +25,11 @@ func (c *AwsCredentialsAccessKey) GetAwsConfigLoadOptions(ctx context.Context) (
 	if c.AccessKeyID != nil && c.SecretAccessKey != nil {
 		accessKey, err := c.AccessKeyID.GetValue(ctx)
 		if err != nil {
-			return nil, pkgerrors.Wrap(err, "failed to resolve blob storage access key ID")
+			return nil, fmt.Errorf("failed to resolve blob storage access key ID: %w", err)
 		}
 		secretKey, err := c.SecretAccessKey.GetValue(ctx)
 		if err != nil {
-			return nil, pkgerrors.Wrap(err, "failed to resolve blob storage secret access key")
+			return nil, fmt.Errorf("failed to resolve blob storage secret access key: %w", err)
 		}
 		opts = append(opts, awsconfig.WithCredentialsProvider(
 			credentials.NewStaticCredentialsProvider(accessKey, secretKey, ""),

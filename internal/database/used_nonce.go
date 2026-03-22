@@ -3,10 +3,11 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
+	"fmt"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 )
@@ -53,7 +54,7 @@ func (s *service) hasNonceBeenUsed(ctx context.Context, tx sq.BaseRunner, nonce 
 	}
 
 	if err := nonce.ValidatePrefix(apid.PrefixNonce); err != nil {
-		return false, errors.Wrap(err, "invalid nonce")
+		return false, fmt.Errorf("invalid nonce: %w", err)
 	}
 
 	var count int64
@@ -87,7 +88,7 @@ func (s *service) CheckNonceValidAndMarkUsed(
 	}
 
 	if err := nonce.ValidatePrefix(apid.PrefixNonce); err != nil {
-		return false, errors.Wrap(err, "invalid nonce")
+		return false, fmt.Errorf("invalid nonce: %w", err)
 	}
 
 	err = s.transaction(func(tx *sql.Tx) error {
@@ -115,14 +116,14 @@ func (s *service) CheckNonceValidAndMarkUsed(
 			Exec()
 		if err != nil {
 			wasValid = false
-			return errors.Wrap(err, "failed to mark nonce as used")
+			return fmt.Errorf("failed to mark nonce as used: %w", err)
 
 		}
 
 		affected, err := dbResult.RowsAffected()
 		if err != nil {
 			wasValid = false
-			return errors.Wrap(err, "failed to mark nonce as used")
+			return fmt.Errorf("failed to mark nonce as used: %w", err)
 		}
 
 		if affected != 1 {
@@ -152,7 +153,7 @@ func (s *service) DeleteExpiredNonces(ctx context.Context) (err error) {
 		Exec()
 
 	if err != nil {
-		return errors.Wrap(err, "failed to delete expired nonces")
+		return fmt.Errorf("failed to delete expired nonces: %w", err)
 	}
 
 	return nil

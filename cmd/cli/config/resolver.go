@@ -7,7 +7,6 @@ import (
 	"strings"
 
 	"github.com/mitchellh/go-homedir"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/spf13/cobra"
@@ -71,7 +70,7 @@ func (j *Resolver) resolveRoot() (*Root, error) {
 		configPath, err = homedir.Expand(configPath)
 		if err != nil {
 			if explicitConfig {
-				return nil, errors.Wrapf(err, "invalid config file path '%s'", j.configFile)
+				return nil, fmt.Errorf("invalid config file path '%s': %w", j.configFile, err)
 			} else {
 				// Was not explicitly configured, so ignore
 				return nil, nil
@@ -82,7 +81,7 @@ func (j *Resolver) resolveRoot() (*Root, error) {
 	_, err = os.Stat(configPath)
 	if err != nil {
 		if explicitConfig {
-			return nil, errors.Wrapf(err, "config file '%s' does not exist", j.configFile)
+			return nil, fmt.Errorf("config file '%s' does not exist: %w", j.configFile, err)
 		} else {
 			// Ignore
 			return nil, nil
@@ -91,12 +90,12 @@ func (j *Resolver) resolveRoot() (*Root, error) {
 
 	content, err := os.ReadFile(configPath)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to read config file '%s'", j.configFile)
+		return nil, fmt.Errorf("failed to read config file '%s': %w", j.configFile, err)
 	}
 
 	root, err := UnmarshallYamlRoot(content)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse yaml config file '%s'", j.configFile)
+		return nil, fmt.Errorf("failed to parse yaml config file '%s': %w", j.configFile, err)
 	}
 
 	j.root = root
@@ -119,7 +118,7 @@ func (j *Resolver) ResolveBuilder() (jwt.TokenBuilder, error) {
 	if j.admin && actorId == "" {
 		u, err := user.Current()
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to retrieve current user to sign admin jwt")
+			return nil, fmt.Errorf("failed to retrieve current user to sign admin jwt: %w", err)
 		}
 
 		actorId = u.Username

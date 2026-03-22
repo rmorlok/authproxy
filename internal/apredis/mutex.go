@@ -2,10 +2,10 @@ package apredis
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/bsm/redislock"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 )
 
@@ -156,7 +156,7 @@ func (m *mutex) opts() *redislock.Options {
 
 func (m *mutex) Lock(ctx context.Context) error {
 	if m.lock != nil {
-		return errors.Errorf("mutex '%s' already locked", m.key)
+		return fmt.Errorf("mutex '%s' already locked", m.key)
 	}
 
 	if m.lockContextCancellation != nil {
@@ -172,7 +172,7 @@ func (m *mutex) Lock(ctx context.Context) error {
 
 func (m *mutex) Extend(ctx context.Context, d time.Duration) error {
 	if m.lock == nil {
-		return errors.Errorf("mutex '%s' not locked", m.key)
+		return fmt.Errorf("mutex '%s' not locked", m.key)
 	}
 
 	err := m.lock.Refresh(ctx, d, m.opts())
@@ -186,7 +186,7 @@ func (m *mutex) Extend(ctx context.Context, d time.Duration) error {
 
 func (m *mutex) Unlock(ctx context.Context) error {
 	if m.lock == nil {
-		return errors.Errorf("mutex '%s' not locked", m.key)
+		return fmt.Errorf("mutex '%s' not locked", m.key)
 	}
 
 	return m.lock.Release(ctx)

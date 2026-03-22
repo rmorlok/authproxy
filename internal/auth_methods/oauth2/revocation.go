@@ -2,10 +2,10 @@ package oauth2
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/url"
 
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 )
@@ -96,7 +96,7 @@ func (o *oAuth2Connection) revokeRefreshToken(ctx context.Context, token *databa
 		Send()
 
 	if err != nil {
-		return errors.Wrap(err, "failed to post to revoke refresh token")
+		return fmt.Errorf("failed to post to revoke refresh token: %w", err)
 	}
 
 	if resp.StatusCode != 200 {
@@ -158,7 +158,7 @@ func (o *oAuth2Connection) revokeAccessToken(ctx context.Context, token *databas
 		Send()
 
 	if err != nil {
-		return errors.Wrap(err, "failed to post to revoke refresh token")
+		return fmt.Errorf("failed to post to revoke refresh token: %w", err)
 	}
 
 	if resp.StatusCode != 200 {

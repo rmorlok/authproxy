@@ -7,11 +7,11 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"golang.org/x/crypto/ssh"
@@ -197,7 +197,7 @@ func loadPublicKeyFromPEMOrOpenSSH(keyData []byte) (interface{}, jwt.SigningMeth
 		// Parse the DER-encoded RSA public key
 		publicKey, err := x509.ParsePKCS1PublicKey(block.Bytes)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "failed to parse RSA public key")
+			return nil, nil, fmt.Errorf("failed to parse RSA public key: %w", err)
 		}
 
 		return publicKey, jwt.SigningMethodRS256, nil
@@ -205,7 +205,7 @@ func loadPublicKeyFromPEMOrOpenSSH(keyData []byte) (interface{}, jwt.SigningMeth
 		// Parse the EC public key
 		publicKey, err := x509.ParsePKIXPublicKey(block.Bytes)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "failed to parse EC public key")
+			return nil, nil, fmt.Errorf("failed to parse EC public key: %w", err)
 		}
 
 		return signingKeyMethodFromParsedPublicKey(publicKey)
@@ -213,7 +213,7 @@ func loadPublicKeyFromPEMOrOpenSSH(keyData []byte) (interface{}, jwt.SigningMeth
 		// Parse an unencrypted public key (PKCS#8 encoded)
 		publicKey, err := x509.ParsePKIXPublicKey(block.Bytes)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "failed to parse public key")
+			return nil, nil, fmt.Errorf("failed to parse public key: %w", err)
 		}
 
 		return signingKeyMethodFromParsedPublicKey(publicKey)
@@ -279,7 +279,7 @@ func (pb *parserBuilder) getVerifyingKeyData(ctx context.Context, unverified *Au
 
 	ver, err := keyData.GetCurrentVersion(ctx)
 	if err != nil {
-		return nil, nil, errors.Wrap(err, "failed to get key data")
+		return nil, nil, fmt.Errorf("failed to get key data: %w", err)
 	}
 	rawKeyData := ver.Data
 
@@ -312,13 +312,13 @@ func (pb *parserBuilder) ParseCtx(ctx context.Context, token string) (*AuthProxy
 
 		key, _, err := pb.getVerifyingKeyData(ctx, unverifiedClaims)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to get key for token")
+			return nil, fmt.Errorf("failed to get key for token: %w", err)
 		}
 
 		return key, nil
 	})
 	if err != nil {
-		return nil, errors.Wrap(err, "can't parse token")
+		return nil, fmt.Errorf("can't parse token: %w", err)
 	}
 
 	claims, ok := parsed.Claims.(*AuthProxyClaims)

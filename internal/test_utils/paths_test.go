@@ -1,9 +1,10 @@
 package test_utils
 
 import (
-	"github.com/stretchr/testify/assert"
 	"os"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
 
 func TestTestDataPath(t *testing.T) {

@@ -2,12 +2,12 @@ package database
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"sync"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
@@ -150,7 +150,7 @@ func (s *service) EnumerateFieldsRequiringReEncryption(
 		for {
 			targets, totalRows, err := s.queryReEncryptionPage(ctx, reg, pageSize, offset)
 			if err != nil {
-				return errors.Wrapf(err, "failed to query re-encryption page for table %s", reg.Table)
+				return fmt.Errorf("failed to query re-encryption page for table %s: %w", reg.Table, err)
 			}
 
 			lastPageForTable := totalRows <= pageSize
@@ -344,7 +344,7 @@ func (s *service) BatchUpdateReEncryptedFields(ctx context.Context, updates []Re
 			RunWith(s.db).
 			Exec()
 		if err != nil {
-			return errors.Wrapf(err, "failed to update re-encrypted field %s.%s", u.Table, u.FieldColumn)
+			return fmt.Errorf("failed to update re-encrypted field %s.%s: %w", u.Table, u.FieldColumn, err)
 		}
 	}
 

@@ -5,8 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hibiken/asynq"
+	"github.com/rmorlok/authproxy/internal/apid"
 )
 
 const taskTypeRefreshOAuthToken = "oauth2:refresh_oauth_token"

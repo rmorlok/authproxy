@@ -22,14 +22,14 @@ import (
 )
 
 type reencryptTestEnv struct {
-	ctx          context.Context
-	cfg          config.C
-	db           database.DB
-	rawDb        *sql.DB
-	enc          E
-	logger       *slog.Logger
-	globalEKVID  apid.ID
-	globalKeyV1  []byte
+	ctx         context.Context
+	cfg         config.C
+	db          database.DB
+	rawDb       *sql.DB
+	enc         E
+	logger      *slog.Logger
+	globalEKVID apid.ID
+	globalKeyV1 []byte
 }
 
 func setupReencryptTest(t *testing.T) reencryptTestEnv {

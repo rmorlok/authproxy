@@ -4,6 +4,8 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/http/cookiejar"
@@ -13,11 +15,10 @@ import (
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	apredis2 "github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
@@ -279,11 +280,11 @@ func (ts *TestSetup) MustGetValidActorWithKey(ctx context.Context) database.Acto
 		actorKey := ts.MustGetValidSigningTokenForConfiguredActor()
 		keyJson, err := json.Marshal(actorKey)
 		if err != nil {
-			panic(errors.Wrap(err, "failed to marshal actor key"))
+			panic(fmt.Errorf("failed to marshal actor key: %w", err))
 		}
 		encryptedKey, err := ts.Enc.EncryptStringGlobal(ctx, string(keyJson))
 		if err != nil {
-			panic(errors.Wrap(err, "failed to encrypt actor key"))
+			panic(fmt.Errorf("failed to encrypt actor key: %w", err))
 		}
 
 		a = &database.Actor{

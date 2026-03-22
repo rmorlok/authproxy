@@ -3,6 +3,7 @@ package request_log
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"log/slog"
 	"strings"
@@ -10,7 +11,6 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	sq "github.com/Masterminds/squirrel"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
@@ -31,7 +31,7 @@ func NewClickhouseRecordStore(cfg *config.Database, logger *slog.Logger) RecordS
 
 	opts, err := chCfg.ToClickhouseOptions()
 	if err != nil {
-		panic(errors.Wrap(err, "failed to convert clickhouse config to options"))
+		panic(fmt.Errorf("failed to convert clickhouse config to options: %w", err))
 	}
 
 	db := clickhouse.OpenDB(opts)
@@ -135,7 +135,7 @@ func (s *clickhouseRecordStore) Migrate(ctx context.Context) error {
 
 	_, err := s.db.ExecContext(ctx, ddl)
 	if err != nil {
-		return errors.Wrap(err, "failed to create clickhouse table")
+		return fmt.Errorf("failed to create clickhouse table: %w", err)
 	}
 
 	s.logger.Info("clickhouse http log migrations complete")
@@ -165,15 +165,15 @@ func NewClickhouseRecordRetriever(cfg *config.Database, cursorEncryptor paginati
 
 	options, err := chCfg.ToClickhouseOptions()
 	if err != nil {
-		panic(errors.Wrap(err, "failed to convert clickhouse config to options"))
+		panic(fmt.Errorf("failed to convert clickhouse config to options: %w", err))
 	}
 
 	db := clickhouse.OpenDB(options)
 	return &clickhouseRecordRetriever{
-		db:        db,
-		cfg:       chCfg,
+		db:              db,
+		cfg:             chCfg,
 		cursorEncryptor: cursorEncryptor,
-		logger:    logger.With("sub_component", "retriever"),
+		logger:          logger.With("sub_component", "retriever"),
 	}
 }
 
@@ -183,7 +183,7 @@ func (r *clickhouseRecordRetriever) GetRecord(ctx context.Context, id apid.ID) (
 		Where(sq.Eq{"request_id": id.String()}).
 		ToSql()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build select query")
+		return nil, fmt.Errorf("failed to build select query: %w", err)
 	}
 
 	row := r.db.QueryRowContext(ctx, query, args...)
@@ -192,7 +192,7 @@ func (r *clickhouseRecordRetriever) GetRecord(ctx context.Context, id apid.ID) (
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
-		return nil, errors.Wrap(err, "failed to get entry record from clickhouse")
+		return nil, fmt.Errorf("failed to get entry record from clickhouse: %w", err)
 	}
 
 	return er, nil
@@ -203,7 +203,7 @@ func (r *clickhouseRecordRetriever) NewListRequestsBuilder() ListRequestBuilder 
 		sqlListRequestsBuilder: sqlListRequestsBuilder{
 			ListFilters:       ListFilters{LimitVal: 100},
 			db:                r.db,
-			cursorEncryptor:         r.cursorEncryptor,
+			cursorEncryptor:   r.cursorEncryptor,
 			placeholderFormat: sq.Question,
 			provider:          config.DatabaseProviderClickhouse,
 		},
@@ -215,7 +215,7 @@ func (r *clickhouseRecordRetriever) ListRequestsFromCursor(ctx context.Context, 
 		sqlListRequestsBuilder: sqlListRequestsBuilder{
 			ListFilters:       ListFilters{LimitVal: 100},
 			db:                r.db,
-			cursorEncryptor:         r.cursorEncryptor,
+			cursorEncryptor:   r.cursorEncryptor,
 			placeholderFormat: sq.Question,
 			provider:          config.DatabaseProviderClickhouse,
 		},

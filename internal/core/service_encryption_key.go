@@ -3,8 +3,9 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -39,12 +40,12 @@ func (s *service) CreateEncryptionKey(ctx context.Context, namespace string, key
 
 	keyDataBytes, err := json.Marshal(keyData)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal key data to JSON")
+		return nil, fmt.Errorf("failed to marshal key data to JSON: %w", err)
 	}
 
 	ef, err := s.encrypt.EncryptStringGlobal(ctx, string(keyDataBytes))
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to encrypt key data")
+		return nil, fmt.Errorf("failed to encrypt key data: %w", err)
 	}
 	ek.EncryptedKeyData = &ef
 

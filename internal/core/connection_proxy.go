@@ -2,9 +2,9 @@ package core
 
 import (
 	"context"
+	"errors"
 	"net/http"
 
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/auth_methods/no_auth"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/httpf"

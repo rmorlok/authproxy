@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hashicorp/go-multierror"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 

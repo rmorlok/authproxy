@@ -3,13 +3,13 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"time"
 
 	"fmt"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
@@ -19,12 +19,12 @@ import (
 
 func init() {
 	RegisterEncryptedField(EncryptedFieldRegistration{
-		Table:          OAuth2TokensTable,
-		PrimaryKeyCols: []string{"id"},
-		EncryptedCols:  []string{"encrypted_refresh_token", "encrypted_access_token"},
-		JoinTable:      ConnectionsTable,
-		JoinLocalCol:   "connection_id",
-		JoinRemoteCol:  "id",
+		Table:            OAuth2TokensTable,
+		PrimaryKeyCols:   []string{"id"},
+		EncryptedCols:    []string{"encrypted_refresh_token", "encrypted_access_token"},
+		JoinTable:        ConnectionsTable,
+		JoinLocalCol:     "connection_id",
+		JoinRemoteCol:    "id",
 		JoinNamespaceCol: "namespace",
 	})
 }
@@ -144,7 +144,7 @@ func (s *service) GetOAuth2Token(
 		Scan(result.fields()...)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			return nil, errors.Wrap(ErrNotFound, "no OAuth2 token found for connection Id")
+			return nil, fmt.Errorf("no OAuth2 token found for connection Id: %w", ErrNotFound)
 		}
 
 		return nil, err
@@ -165,12 +165,12 @@ func (s *service) DeleteOAuth2Token(
 		RunWith(s.db).
 		Exec()
 	if err != nil {
-		return errors.Wrap(err, "failed to soft delete oauth token")
+		return fmt.Errorf("failed to soft delete oauth token: %w", err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "failed to soft delete oauth token")
+		return fmt.Errorf("failed to soft delete oauth token: %w", err)
 	}
 
 	if affected == 0 {
@@ -178,7 +178,7 @@ func (s *service) DeleteOAuth2Token(
 	}
 
 	if affected > 1 {
-		return errors.Wrap(ErrViolation, "multiple oauth tokens were soft deleted")
+		return fmt.Errorf("multiple oauth tokens were soft deleted: %w", ErrViolation)
 	}
 
 	return nil
@@ -202,12 +202,12 @@ func (s *service) DeleteAllOAuth2TokensForConnection(
 		RunWith(s.db).
 		Exec()
 	if err != nil {
-		return errors.Wrap(err, "failed to soft delete oauth tokens for connection")
+		return fmt.Errorf("failed to soft delete oauth tokens for connection: %w", err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "failed to soft delete oauth tokens for connection")
+		return fmt.Errorf("failed to soft delete oauth tokens for connection: %w", err)
 	}
 
 	logger.Info("deleted oauth tokens for connection", "affected", affected)
@@ -244,12 +244,12 @@ func (s *service) InsertOAuth2Token(
 			RunWith(tx).
 			Exec()
 		if err != nil {
-			return errors.Wrap(err, "failed to soft delete old oauth tokens as part of inserting new token")
+			return fmt.Errorf("failed to soft delete old oauth tokens as part of inserting new token: %w", err)
 		}
 
 		affected, err := dbResult.RowsAffected()
 		if err != nil {
-			return errors.Wrap(err, "failed to soft delete old oauth tokens as part of inserting new token")
+			return fmt.Errorf("failed to soft delete old oauth tokens as part of inserting new token: %w", err)
 		}
 
 		logger.Info("deleted previous oauth tokens for connection as part of inserting new", "affected", affected)
@@ -277,12 +277,12 @@ func (s *service) InsertOAuth2Token(
 			RunWith(tx).
 			Exec()
 		if err != nil {
-			return errors.Wrap(err, "failed to create oauth token")
+			return fmt.Errorf("failed to create oauth token: %w", err)
 		}
 
 		affected, err = result.RowsAffected()
 		if err != nil {
-			return errors.Wrap(err, "failed to create oauth token")
+			return fmt.Errorf("failed to create oauth token: %w", err)
 		}
 
 		if affected == 0 {

@@ -11,7 +11,6 @@ import (
 	"os"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/cmd/cli/config"
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
@@ -135,7 +134,7 @@ func cmdRawProxy() *cobra.Command {
 
 			proxyToUrl, err := url.Parse(baseUrl)
 			if err != nil {
-				return errors.Wrap(err, "invalid proxyTo value")
+				return fmt.Errorf("invalid proxyTo value: %w", err)
 			}
 
 			log.Printf("Setting up raw-proxy to the host: %s", proxyTo)

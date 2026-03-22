@@ -1,6 +1,5 @@
 package config
 
-
 type RedisProvider string
 
 const (

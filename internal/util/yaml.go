@@ -2,8 +2,8 @@ package util
 
 import (
 	"encoding/json"
+	"fmt"
 
-	"github.com/pkg/errors"
 	"gopkg.in/yaml.v3"
 )
 
@@ -11,12 +11,12 @@ import (
 func YamlBytesToJSON(yamlData []byte) ([]byte, error) {
 	var v interface{}
 	if err := yaml.Unmarshal(yamlData, &v); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal YAML")
+		return nil, fmt.Errorf("failed to unmarshal YAML: %w", err)
 	}
 	// YAML numbers default to int/float; ensure JSON-encodable
 	j, err := json.Marshal(v)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to marshal to JSON")
+		return nil, fmt.Errorf("failed to marshal to JSON: %w", err)
 	}
 
 	return j, nil

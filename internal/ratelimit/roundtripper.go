@@ -208,8 +208,8 @@ func (rt *RoundTripper) syntheticTooManyRequests(retryAfter time.Duration) *http
 	return &http.Response{
 		StatusCode: http.StatusTooManyRequests,
 		Header: http.Header{
-			"Content-Type":          {"application/json"},
-			"Retry-After":          {strconv.Itoa(retryAfterSeconds)},
+			"Content-Type":            {"application/json"},
+			"Retry-After":             {strconv.Itoa(retryAfterSeconds)},
 			"X-Authproxy-Ratelimited": {"true"},
 		},
 		Body:          io.NopCloser(bytes.NewBufferString(body)),

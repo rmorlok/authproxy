@@ -1,9 +1,8 @@
 package pagination
 
 import (
+	"errors"
 	"strings"
-
-	"github.com/pkg/errors"
 )
 
 type OrderBy string

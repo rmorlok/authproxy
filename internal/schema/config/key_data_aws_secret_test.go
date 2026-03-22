@@ -14,7 +14,7 @@ import (
 
 // mockSMClient implements awsSecretsManagerClient for testing.
 type mockSMClient struct {
-	getSecretValue      func(ctx context.Context, params *secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error)
+	getSecretValue       func(ctx context.Context, params *secretsmanager.GetSecretValueInput) (*secretsmanager.GetSecretValueOutput, error)
 	listSecretVersionIds func(ctx context.Context, params *secretsmanager.ListSecretVersionIdsInput) (*secretsmanager.ListSecretVersionIdsOutput, error)
 }
 

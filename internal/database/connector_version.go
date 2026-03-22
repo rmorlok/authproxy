@@ -5,12 +5,12 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
@@ -213,7 +213,7 @@ func (cv *ConnectorVersion) Validate() error {
 	}
 
 	if err := ValidateNamespacePath(cv.Namespace); err != nil {
-		result = multierror.Append(result, errors.Wrap(err, "invalid connector namespace path"))
+		result = multierror.Append(result, fmt.Errorf("invalid connector namespace path: %w", err))
 	}
 
 	if !IsValidConnectorVersionState(cv.State) {
@@ -229,11 +229,11 @@ func (cv *ConnectorVersion) Validate() error {
 	}
 
 	if err := cv.Labels.Validate(); err != nil {
-		result = multierror.Append(result, errors.Wrap(err, "invalid connector version labels"))
+		result = multierror.Append(result, fmt.Errorf("invalid connector version labels: %w", err))
 	}
 
 	if err := cv.Annotations.Validate(); err != nil {
-		result = multierror.Append(result, errors.Wrap(err, "invalid connector version annotations"))
+		result = multierror.Append(result, fmt.Errorf("invalid connector version annotations: %w", err))
 	}
 
 	return result.ErrorOrNil()
@@ -398,7 +398,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 
 			if count != 1 {
 				logger.Error("expected to update 1 row for connector version", "got", count)
-				return errors.Errorf("expected to update 1 row for connector version, got %d", count)
+				return fmt.Errorf("expected to update 1 row for connector version, got %d", count)
 			}
 		} else {
 			// No existing row at this version. Need to verify if there are existing rows, the new version is
@@ -481,12 +481,12 @@ func (s *service) SetConnectorVersionState(ctx context.Context, id apid.ID, vers
 			Where(sq.Eq{"id": id, "version": version, "deleted_at": nil}).
 			Exec()
 		if err != nil {
-			return errors.Wrap(err, "failed to set connector version state")
+			return fmt.Errorf("failed to set connector version state: %w", err)
 		}
 
 		affected, err := dbResult.RowsAffected()
 		if err != nil {
-			return errors.Wrap(err, "failed to set connector version state")
+			return fmt.Errorf("failed to set connector version state: %w", err)
 		}
 
 		if affected == 0 {
@@ -494,7 +494,7 @@ func (s *service) SetConnectorVersionState(ctx context.Context, id apid.ID, vers
 		}
 
 		if affected > 1 {
-			return errors.Wrap(ErrViolation, "multiple connector versions had state updated")
+			return fmt.Errorf("multiple connector versions had state updated: %w", ErrViolation)
 		}
 
 		if state == ConnectorVersionStatePrimary {
@@ -508,7 +508,7 @@ func (s *service) SetConnectorVersionState(ctx context.Context, id apid.ID, vers
 				}).
 				Exec()
 			if err != nil {
-				return errors.Wrap(err, "failed to demote existing primary connector version")
+				return fmt.Errorf("failed to demote existing primary connector version: %w", err)
 			}
 		}
 
@@ -523,7 +523,7 @@ func (s *service) SetConnectorVersionState(ctx context.Context, id apid.ID, vers
 				}).
 				Exec()
 			if err != nil {
-				return errors.Wrap(err, "failed to archive existing draft connector version")
+				return fmt.Errorf("failed to archive existing draft connector version: %w", err)
 			}
 		}
 
@@ -717,7 +717,7 @@ type listConnectorVersionsFilters struct {
 	Offset            uint64                        `json:"offset"`
 	StatesVal         []ConnectorVersionState       `json:"states,omitempty"`
 	NamespaceMatchers []string                      `json:"namespace_matchers,omitempty"`
-	IdsVal            []apid.ID                   `json:"ids,omitempty"`
+	IdsVal            []apid.ID                     `json:"ids,omitempty"`
 	VersionsVal       []uint64                      `json:"versions,omitempty"`
 	OrderByFieldVal   *ConnectorVersionOrderByField `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy           `json:"order_by"`

@@ -2,12 +2,12 @@ package service
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"sync"
 	"time"
 
 	"github.com/hibiken/asynq"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apasynq"
 	"github.com/rmorlok/authproxy/internal/apauth/tasks"
 	authSync "github.com/rmorlok/authproxy/internal/apauth/tasks"
@@ -199,7 +199,7 @@ func (dm *DependencyManager) AutoMigrateDatabase() {
 			)
 			err := m.Lock(context.Background())
 			if err != nil {
-				panic(errors.Wrap(err, "failed to establish lock for database migration"))
+				panic(fmt.Errorf("failed to establish lock for database migration: %w", err))
 			}
 			defer m.Unlock(context.Background())
 
@@ -358,7 +358,7 @@ func (dm *DependencyManager) AutoMigratePredefinedActors() {
 		task := authSync.NewSyncActorsExternalSourceTask()
 		_, err := dm.GetAsyncClient().Enqueue(task)
 		if err != nil {
-			panic(errors.Wrap(err, "failed to enqueue sync actors external source task"))
+			panic(fmt.Errorf("failed to enqueue sync actors external source task: %w", err))
 		}
 
 		return
@@ -380,7 +380,7 @@ func (dm *DependencyManager) AutoMigratePredefinedActors() {
 		)
 		err := m.Lock(context.Background())
 		if err != nil {
-			panic(errors.Wrap(err, "failed to establish lock for admin users migration"))
+			panic(fmt.Errorf("failed to establish lock for admin users migration: %w", err))
 		}
 		defer m.Unlock(context.Background())
 
@@ -393,7 +393,7 @@ func (dm *DependencyManager) AutoMigratePredefinedActors() {
 		)
 
 		if err := svc.SyncActorList(context.Background()); err != nil {
-			panic(errors.Wrap(err, "failed to sync actors from config list"))
+			panic(fmt.Errorf("failed to sync actors from config list: %w", err))
 		}
 	}()
 }
@@ -408,7 +408,7 @@ func (dm *DependencyManager) AutoMigrateSyncKeysToDatabase() {
 		dm.GetLogger(),
 		dm.GetRedisClient(),
 	); err != nil {
-		panic(errors.Wrap(err, "failed to sync encryption keys to database"))
+		panic(fmt.Errorf("failed to sync encryption keys to database: %w", err))
 	}
 }
 

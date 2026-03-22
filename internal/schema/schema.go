@@ -4,10 +4,10 @@ import (
 	"bytes"
 	"embed"
 	"encoding/json"
+	"fmt"
 	"io/fs"
 	"sync"
 
-	"github.com/pkg/errors"
 	jsonschemav5 "github.com/santhosh-tekuri/jsonschema/v5"
 )
 
@@ -39,19 +39,19 @@ func loadSchemasOnce() error {
 
 			schemaBytes, err := schemaFs.ReadFile(path)
 			if err != nil {
-				return errors.Wrapf(err, "failed to read schema file '%s'", path)
+				return fmt.Errorf("failed to read schema file '%s': %w", path, err)
 			}
 
 			var schemaId schemaIdStruct
 			if err := json.Unmarshal(schemaBytes, &schemaId); err != nil {
-				return errors.Wrapf(err, "failed to parse json for '%s'", path)
+				return fmt.Errorf("failed to parse json for '%s': %w", path, err)
 			}
 
 			return schemaCompiler.AddResource(schemaId.Id, bytes.NewReader(schemaBytes))
 		})
 
 		if err != nil {
-			schemaErr = errors.Wrap(err, "failed to walk schema embed to load config schemas")
+			schemaErr = fmt.Errorf("failed to walk schema embed to load config schemas: %w", err)
 		}
 	})
 
@@ -77,7 +77,7 @@ func CompileSchema(schemaId string) (*jsonschemav5.Schema, error) {
 
 	compiled, err := schemaCompiler.Compile(schemaId)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to compile schema '%s'", schemaId)
+		return nil, fmt.Errorf("failed to compile schema '%s': %w", schemaId, err)
 	}
 
 	compileMutex.Lock()

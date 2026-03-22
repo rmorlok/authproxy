@@ -5,9 +5,8 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hibiken/asynq"
-	"github.com/pkg/errors"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/database"
 )
@@ -45,7 +44,7 @@ func (s *service) disconnectConnection(ctx context.Context, t *asynq.Task) error
 
 	conn, err := s.getConnection(ctx, p.ConnectionId)
 	if err != nil {
-		return errors.Wrap(err, "failed to get connection to disconnect connection")
+		return fmt.Errorf("failed to get connection to disconnect connection: %w", err)
 	}
 
 	revokeOps := conn.getRevokeCredentialsOperations()
@@ -55,7 +54,7 @@ func (s *service) disconnectConnection(ctx context.Context, t *asynq.Task) error
 			err = op(ctx)
 			if err != nil {
 				logger.Error("failed to revoke credentials", "error", err)
-				return errors.Wrap(err, "failed to revoke credentials")
+				return fmt.Errorf("failed to revoke credentials: %w", err)
 			}
 		}
 	}

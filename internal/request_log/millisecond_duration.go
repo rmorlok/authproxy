@@ -2,10 +2,9 @@ package request_log
 
 import (
 	"encoding/json"
+	"fmt"
 	"strconv"
 	"time"
-
-	"github.com/pkg/errors"
 )
 
 // MillisecondDuration is a wrapper around time.Duration for JSON marshaling as milliseconds
@@ -38,7 +37,7 @@ func (d MillisecondDuration) String() string {
 // time.Duration format.
 func parseMillisecondDuration(s string) (MillisecondDuration, error) {
 	if dur, err := time.ParseDuration(s + "ms"); err != nil {
-		return MillisecondDuration(0), errors.Wrap(err, "failed to parse duration")
+		return MillisecondDuration(0), fmt.Errorf("failed to parse duration: %w", err)
 	} else {
 		return MillisecondDuration(dur), nil
 	}

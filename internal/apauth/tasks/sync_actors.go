@@ -3,8 +3,8 @@ package tasks
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encfield"
@@ -59,7 +59,7 @@ func (s *service) SyncConfiguredActorsExternalSource(ctx context.Context) error 
 				s.logger.Info("another sync is in progress, skipping this run")
 				return nil
 			}
-			return errors.Wrap(err, "failed to acquire sync lock")
+			return fmt.Errorf("failed to acquire sync lock: %w", err)
 		}
 		defer func() {
 			if err := m.Unlock(ctx); err != nil {
@@ -86,12 +86,12 @@ func (s *service) syncConfiguredActors(ctx context.Context, actors []*sconfig.Co
 		if actor.Key != nil {
 			keyJson, err := json.Marshal(actor.Key)
 			if err != nil {
-				return errors.Wrapf(err, "failed to marshal key for actor %s", actor.ExternalId)
+				return fmt.Errorf("failed to marshal key for actor %s: %w", actor.ExternalId, err)
 			}
 
 			encrypted, err := s.encrypt.EncryptStringGlobal(ctx, string(keyJson))
 			if err != nil {
-				return errors.Wrapf(err, "failed to encrypt key for actor %s", actor.ExternalId)
+				return fmt.Errorf("failed to encrypt key for actor %s: %w", actor.ExternalId, err)
 			}
 			encryptedKey = &encrypted
 		}
@@ -116,7 +116,7 @@ func (s *service) syncConfiguredActors(ctx context.Context, actors []*sconfig.Co
 		// Upsert the actor
 		_, err := s.db.UpsertActor(ctx, actorData)
 		if err != nil {
-			return errors.Wrapf(err, "failed to upsert actor %s", actor.ExternalId)
+			return fmt.Errorf("failed to upsert actor %s: %w", actor.ExternalId, err)
 		}
 
 		s.logger.Debug("synced configured actor", "external_id", externalId)
@@ -131,7 +131,7 @@ func (s *service) syncConfiguredActors(ctx context.Context, actors []*sconfig.Co
 				if dbActor.Labels[LabelConfiguredActorSyncSource] == sourceLabel && !expectedExternalIds[dbActor.ExternalId] {
 					s.logger.Info("deleting stale configured actor", "external_id", dbActor.ExternalId)
 					if err := s.db.DeleteActor(ctx, dbActor.Id); err != nil {
-						return false, errors.Wrapf(err, "failed to delete stale actor %s", dbActor.ExternalId)
+						return false, fmt.Errorf("failed to delete stale actor %s: %w", dbActor.ExternalId, err)
 					}
 				}
 			}
@@ -139,7 +139,7 @@ func (s *service) syncConfiguredActors(ctx context.Context, actors []*sconfig.Co
 		})
 
 	if err != nil {
-		return errors.Wrap(err, "failed to enumerate and cleanup stale actors")
+		return fmt.Errorf("failed to enumerate and cleanup stale actors: %w", err)
 	}
 
 	s.logger.Info("configured actor sync completed", "source", sourceLabel, "count", len(actors))
