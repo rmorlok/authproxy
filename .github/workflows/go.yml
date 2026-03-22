@@ -122,7 +122,9 @@ jobs:
         ports:
           - 8124:8123
         env:
-          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: 1
+          CLICKHOUSE_DB: authproxy
+          CLICKHOUSE_USER: authproxy
+          CLICKHOUSE_PASSWORD: authproxy
         options: >-
           --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
           --health-interval 5s
@@ -152,12 +154,6 @@ jobs:
         docker run --rm --network host \
           -e MC_HOST_minio=http://minioadmin:minioadmin@localhost:9003 \
           minio/mc mb --ignore-existing minio/authproxy-request-logs
-
-    - name: Set up ClickHouse
-      run: |
-        curl -sf "http://localhost:8124/" --data "CREATE USER IF NOT EXISTS authproxy IDENTIFIED BY 'authproxy'"
-        curl -sf "http://localhost:8124/" --data "GRANT ALL ON *.* TO authproxy"
-        curl -sf "http://localhost:8124/" --data "CREATE DATABASE IF NOT EXISTS authproxy"
 
     - name: Integration Tests
       working-directory: integration_tests
