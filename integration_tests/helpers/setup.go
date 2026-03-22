@@ -142,6 +142,14 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 	// Create dependency manager and run migrations
 	serviceId := string(opts.Service)
 	dm := service.NewDependencyManager(serviceId, cfg)
+
+	// Clear the Redis sentinel that gates encrypt key sync. Each test gets an
+	// isolated database via pgtestdb, but they share the same Redis. Without
+	// this, only the first test syncs keys; subsequent tests skip the sync
+	// (sentinel says "recently done") and the encrypt service panics waiting
+	// for a global AES key that was never written to the new database.
+	dm.GetRedisClient().Del(context.Background(), "encrypt:last_key_sync_time")
+
 	dm.AutoMigrateAll()
 
 	// Get the appropriate server
