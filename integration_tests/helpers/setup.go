@@ -124,6 +124,12 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 	cfg, err := config.LoadConfig(configPath)
 	require.NoError(t, err, "failed to load integration test config from %s", configPath)
 
+	// Create an isolated database for this test using pgtestdb.
+	// This ensures each test gets a fresh, clean database.
+	// MustApplyBlankTestDbConfig reads connection info from POSTGRES_TEST_* env vars
+	// and updates cfg.GetRoot().Database to point at the new isolated database.
+	cfg, _ = database.MustApplyBlankTestDbConfig(t, cfg)
+
 	// Merge test-specific connectors into config
 	if len(opts.Connectors) > 0 {
 		cfgRoot := cfg.GetRoot()

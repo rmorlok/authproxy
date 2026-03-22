@@ -157,4 +157,12 @@ jobs:
 
     - name: Integration Tests
       working-directory: integration_tests
+      env:
+        AUTH_PROXY_TEST_DATABASE_PROVIDER: postgres
+        POSTGRES_TEST_HOST: localhost
+        POSTGRES_TEST_PORT: "5433"
+        POSTGRES_TEST_USER: postgres
+        POSTGRES_TEST_PASSWORD: postgres
+        POSTGRES_TEST_DATABASE: authproxy_integration
+        POSTGRES_TEST_OPTIONS: sslmode=disable
       run: go test -tags integration -v -timeout 10m ./...
