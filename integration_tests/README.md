@@ -1,48 +1,83 @@
 # Integration Tests
 
-End-to-end tests that exercise AuthProxy features against a fully wired service stack (database, Redis, HTTP routing, encryption, auth) — all running in-process with no external dependencies.
+End-to-end tests that exercise AuthProxy features against real infrastructure (Postgres, Redis, ClickHouse, MinIO) with a full authproxy server.
+
+## Prerequisites
+
+Start the test infrastructure:
+
+```bash
+cd integration_tests
+docker compose up -d
+```
+
+Wait for all services to be healthy:
+
+```bash
+docker compose ps
+```
 
 ## Running
 
 ```bash
 # Run all integration tests
-go test -tags integration -v ./integration_tests/...
+cd integration_tests
+go test -tags integration -v ./...
+
+# Run proxy tests only
+go test -tags integration -v ./proxy/...
+
+# Run Terraform provider tests only
+go test -tags integration -v ./terraform/...
 
 # Run a specific test
-go test -tags integration -v -run TestRateLimiting429 ./integration_tests/...
+go test -tags integration -v -run TestRateLimiting429 ./proxy/...
 ```
 
 Integration tests use the `integration` build tag so they are excluded from `go test ./...`.
 
+## Teardown
+
+```bash
+docker compose down -v
+```
+
 ## Architecture
 
-Tests run entirely in-process using:
+This is a separate Go module (`integration_tests/go.mod`) that depends on the main authproxy module via a `replace` directive. Tests run against real infrastructure:
 
-- **SQLite (in-memory)** via `database.MustApplyBlankTestDbConfig`
-- **miniredis** (in-process Redis) via `apredis.MustApplyTestConfigWithServer`
-- **Mock asynq** for background task enqueuing
-- **Real gin router** with production route handlers
+- **Postgres 16** on port 5433 (avoids conflicts with local dev on 5432)
+- **Redis Stack** on port 6380 (avoids conflicts with local dev on 6379)
+- **ClickHouse** on port 8124 (avoids conflicts with local dev on 8123)
+- **MinIO** on port 9003 (avoids conflicts with local dev on 9000/9002)
 
-No Docker, no network services, no ports to manage. Each test gets a fresh, isolated environment.
+Each test gets a full authproxy server started in-process using `service.DependencyManager` and the real `GetGinServer()` functions. The server connects to the Docker services above.
 
-### Time control
+### Configuration
 
-miniredis does not expire keys based on wall-clock time. Use `env.RedisServer.FastForward(duration)` to advance Redis time and trigger TTL expiry, rather than `time.Sleep`.
+Test configuration is in `config/integration.yaml`. It points at the Docker services and uses development keys from `dev_config/keys/`.
 
 ## Directory structure
 
 ```
 integration_tests/
 ├── README.md
-├── helpers/                  # Shared test infrastructure
-│   ├── setup.go              # IntegrationTestEnv creation and helpers
-│   ├── testserver.go         # In-process configurable HTTP test servers
-│   ├── noop_roundtripper.go  # No-op request log middleware
-│   └── util.go               # Small utilities (JSON marshaling, etc.)
-├── testservers/              # Standalone test server binaries
-│   └── ratelimit429/         # Configurable 429-returning server
-│       └── main.go
-└── *_test.go                 # Test files (must have //go:build integration)
+├── go.mod                       # Separate Go module
+├── docker-compose.yml           # Test infrastructure
+├── config/
+│   └── integration.yaml         # AuthProxy config for tests
+├── helpers/                     # Shared test infrastructure
+│   ├── setup.go                 # IntegrationTestEnv creation and helpers
+│   ├── testserver.go            # In-process configurable HTTP test servers
+│   ├── noop_roundtripper.go     # No-op request log middleware
+│   └── util.go                  # Small utilities (JSON marshaling, etc.)
+├── proxy/                       # Proxy/rate-limiting tests
+│   └── ratelimit_test.go
+├── terraform/                   # Terraform provider acceptance tests
+│   └── *_test.go
+└── testservers/                 # Standalone test server binaries
+    └── ratelimit429/
+        └── main.go
 ```
 
 ## Writing a new test
@@ -54,60 +89,48 @@ All test files must start with the build tag:
 ```go
 //go:build integration
 
-package integration_tests
+package mypackage
 ```
 
 ### 2. Set up the environment
 
-Use `helpers.Setup` to create a fully wired environment. Pass connector definitions in `SetupOptions`:
+Use `helpers.Setup` to create a fully wired environment:
 
 ```go
+// For admin API tests (CRUD management, Terraform provider)
 env := helpers.Setup(t, helpers.SetupOptions{
+    Service:         helpers.ServiceTypeAdminAPI,
+    StartHTTPServer: true,
+})
+defer env.Cleanup()
+// Use env.ServerURL and env.BearerToken for HTTP requests
+
+// For proxy tests (in-process gin)
+env := helpers.Setup(t, helpers.SetupOptions{
+    Service: helpers.ServiceTypeAPI,
     Connectors: []sconfig.Connector{
         helpers.NewNoAuthConnector(connectorID, "my-test", nil),
     },
 })
 defer env.Cleanup()
+// Use env.Gin with httptest.ResponseRecorder
 ```
 
-`Setup` handles: config, database migration, Redis, auth, encryption, HTTP client factory (with rate limiting middleware), core service, connector migration to DB, and gin route registration.
+### 3. Make requests
 
-### 3. Create connections and make requests
-
+For in-process proxy testing:
 ```go
-// Create a connection in the database
 connectionID := env.CreateConnection(t, connectorID, 1)
-
-// Make a proxy request through the full stack
 w := env.DoProxyRequest(t, connectionID, "http://target/path", "GET")
 ```
 
-### 4. Parse proxy responses
-
-The proxy endpoint returns HTTP 200 with the upstream status code inside the JSON body:
-
+For real HTTP requests (when StartHTTPServer is true):
 ```go
-type proxyResponse struct {
-    StatusCode int               `json:"status_code"`
-    Headers    map[string]string `json:"headers"`
-    BodyRaw    []byte            `json:"body_raw"`
-    BodyJson   interface{}       `json:"body_json"`
-}
+req, _ := http.NewRequest("GET", env.ServerURL+"/api/v1/namespaces", nil)
+req.Header.Set("Authorization", "Bearer "+env.BearerToken)
+resp, _ := http.DefaultClient.Do(req)
 ```
-
-### 5. Test servers
-
-For tests that need a real upstream HTTP server, create an in-process test server:
-
-```go
-ts := helpers.NewRateLimitTestServer(t)  // auto-cleaned up via t.Cleanup
-ts.SetReturn429("5")                      // toggle 429 with Retry-After header
-ts.SetReturn200()                         // toggle back to 200
-ts.GetRequestCount()                      // verify which requests reached upstream
-```
-
-The `testservers/` directory contains standalone binaries of these servers for use outside tests or as reference implementations.
 
 ## CI
 
-Integration tests run as a separate job in `.github/workflows/go.yml` under `integration-test`. They require no services or Docker containers since everything runs in-process.
+Integration tests run as a separate job in `.github/workflows/go.yml` with real service containers (Postgres, Redis, ClickHouse, MinIO).
