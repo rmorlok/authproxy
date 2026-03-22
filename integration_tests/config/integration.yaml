@@ -12,8 +12,7 @@ admin_api:
   port: 0  # random port
 
 worker:
-  health_check_port:
-    default: 0  # random port
+  health_check_port: 0
   cron_sync_interval: 1m
 
 tasks:
@@ -76,10 +75,8 @@ http_logging:
     bucket: authproxy-request-logs
     credentials:
       type: access_key
-      access_key_id:
-        default: minioadmin
-      secret_access_key:
-        default: minioadmin
+      access_key_id: minioadmin
+      secret_access_key: minioadmin
     force_path_style: true
     prefix: "integration-test/"
 
