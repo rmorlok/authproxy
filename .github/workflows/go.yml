@@ -123,18 +123,6 @@ jobs:
           - 8124:8123
         volumes:
           - ${{ github.workspace }}/dev_config/clickhouse/users.xml:/etc/clickhouse-server/users.d/authproxy-user.xml
-      minio:
-        image: minio/minio:latest
-        ports:
-          - 9003:9000
-        env:
-          MINIO_ROOT_USER: minioadmin
-          MINIO_ROOT_PASSWORD: minioadmin
-        options: >-
-          --health-cmd "mc ready local"
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 10
     steps:
     - uses: actions/checkout@v4
 
@@ -142,6 +130,17 @@ jobs:
       uses: actions/setup-go@v4
       with:
         go-version: '1.24'
+
+    - name: Start MinIO
+      run: |
+        docker run -d --name minio -p 9003:9000 \
+          -e MINIO_ROOT_USER=minioadmin \
+          -e MINIO_ROOT_PASSWORD=minioadmin \
+          minio/minio:latest server /data
+        for i in $(seq 1 30); do
+          curl -sf http://localhost:9003/minio/health/live && break
+          sleep 1
+        done
 
     - name: Create MinIO bucket
       run: |
