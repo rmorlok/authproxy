@@ -165,4 +165,5 @@ jobs:
         POSTGRES_TEST_PASSWORD: postgres
         POSTGRES_TEST_DATABASE: authproxy_integration
         POSTGRES_TEST_OPTIONS: sslmode=disable
+        TF_ACC: "1"
       run: go test -tags integration -v -timeout 10m ./...
