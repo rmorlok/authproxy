@@ -2,10 +2,11 @@ package oauth2
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/url"
 	"strings"
 
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -30,17 +31,17 @@ func (o *oAuth2Connection) getPublicRedirectUrl(ctx context.Context, stateId api
 		WithSecretConfigKeyData(ctx, o.cfg.GetRoot().SystemAuth.GlobalAESKey)
 
 	if err != nil {
-		return "", errors.Wrap(err, "failed to create token builder to sign redirect jwt")
+		return "", fmt.Errorf("failed to create token builder to sign redirect jwt: %w", err)
 	}
 
 	tokenString, err := tb.TokenCtx(ctx)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to create generate temporary auth token")
+		return "", fmt.Errorf("failed to create generate temporary auth token: %w", err)
 	}
 
 	u, err := url.Parse(o.cfg.GetRoot().Public.GetBaseUrl())
 	if err != nil {
-		return "", errors.Wrap(err, "failed to parse base url for oauth2 return")
+		return "", fmt.Errorf("failed to parse base url for oauth2 return: %w", err)
 	}
 
 	query := u.Query()
@@ -57,25 +58,25 @@ func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor IActorData
 	cv := o.connection.GetConnectorVersionEntity()
 
 	if !o.auth.ClientId.HasValue(ctx) {
-		return "", errors.Errorf("client id does not have value for connector %s", cv.GetId())
+		return "", fmt.Errorf("client id does not have value for connector %s", cv.GetId())
 	}
 
 	clientId, err := o.auth.ClientId.GetValue(ctx)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to get client id for connector %s", cv.GetId())
+		return "", fmt.Errorf("failed to get client id for connector %s: %w", cv.GetId(), err)
 	}
 
 	if o.auth.Authorization.Endpoint == "" {
-		return "", errors.Errorf("no authorization endpoint for connector %s", cv.GetId())
+		return "", fmt.Errorf("no authorization endpoint for connector %s", cv.GetId())
 	}
 
 	if o.state == nil {
-		return "", errors.Errorf("must have existing state stored to redis")
+		return "", fmt.Errorf("must have existing state stored to redis")
 	}
 
 	callbackUrl, err := o.getPublicCallbackUrl()
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to get public callback url")
+		return "", fmt.Errorf("failed to get public callback url: %w", err)
 	}
 
 	scopes := util.Map(o.auth.Scopes, func(s config.Scope) string {
@@ -84,7 +85,7 @@ func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor IActorData
 
 	authUrl3p, err := url.Parse(o.auth.Authorization.Endpoint)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to parse authorization endpoint for connector %s", cv.GetId())
+		return "", fmt.Errorf("failed to parse authorization endpoint for connector %s: %w", cv.GetId(), err)
 	}
 
 	query := authUrl3p.Query()
@@ -121,7 +122,7 @@ func (o *oAuth2Connection) SetStateAndGeneratePublicUrl(
 
 	redirectUrl, err := o.getPublicRedirectUrl(ctx, stateId, actor)
 	if err != nil {
-		return "", errors.Wrapf(err, "failed to get public redirect url")
+		return "", fmt.Errorf("failed to get public redirect url: %w", err)
 	}
 
 	return redirectUrl, nil

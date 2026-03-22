@@ -2,10 +2,11 @@ package oauth2
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"strings"
 	"time"
 
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -30,7 +31,7 @@ func (o *oAuth2Connection) createDbTokenFromResponse(ctx context.Context, resp *
 	jsonResp := tokenResponse{}
 	err := resp.JSON(&jsonResp)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to parse token response")
+		return nil, fmt.Errorf("failed to parse token response: %w", err)
 	}
 
 	if jsonResp.AccessToken == "" {
@@ -39,7 +40,7 @@ func (o *oAuth2Connection) createDbTokenFromResponse(ctx context.Context, resp *
 
 	encryptedAccessToken, err := o.encrypt.EncryptStringForEntity(ctx, o.connection, jsonResp.AccessToken)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to encrypt access token")
+		return nil, fmt.Errorf("failed to encrypt access token: %w", err)
 	}
 
 	var encryptedRefreshToken encfield.EncryptedField
@@ -48,7 +49,7 @@ func (o *oAuth2Connection) createDbTokenFromResponse(ctx context.Context, resp *
 	if jsonResp.RefreshToken != "" {
 		encryptedRefreshToken, err = o.encrypt.EncryptStringForEntity(ctx, o.connection, jsonResp.RefreshToken)
 		if err != nil {
-			return nil, errors.Wrapf(err, "failed to encrypt refresh token")
+			return nil, fmt.Errorf("failed to encrypt refresh token: %w", err)
 		}
 	} else if refreshFrom != nil {
 		encryptedRefreshToken = refreshFrom.EncryptedRefreshToken
@@ -79,7 +80,7 @@ func (o *oAuth2Connection) createDbTokenFromResponse(ctx context.Context, resp *
 		scopes,
 	)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to insert oauth2 token")
+		return nil, fmt.Errorf("failed to insert oauth2 token: %w", err)
 	}
 
 	return token, nil

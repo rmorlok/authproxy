@@ -3,9 +3,8 @@ package common
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"os"
-
-	"github.com/pkg/errors"
 )
 
 type StringValueEnvVarBase64 struct {
@@ -24,13 +23,13 @@ func (kev *StringValueEnvVarBase64) GetValue(ctx context.Context) (string, error
 		if kev.Default != nil {
 			val = *kev.Default
 		} else {
-			return "", errors.Errorf("environment variable '%s' does not have value", kev.EnvVar)
+			return "", fmt.Errorf("environment variable '%s' does not have value", kev.EnvVar)
 		}
 	}
 
 	decodedBytes, err := base64.StdEncoding.DecodeString(val)
 	if err != nil {
-		return "", errors.Wrapf(err, "environment variable '%s' value is not valid base64", kev.EnvVar)
+		return "", fmt.Errorf("environment variable '%s' value is not valid base64: %w", kev.EnvVar, err)
 	}
 
 	return string(decodedBytes), nil

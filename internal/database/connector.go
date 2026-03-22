@@ -5,8 +5,8 @@ import (
 	"fmt"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hashicorp/go-multierror"
+	"github.com/rmorlok/authproxy/internal/apid"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -77,7 +77,7 @@ type listConnectorsFilters struct {
 	StatesVal         []ConnectorVersionState `json:"states,omitempty"`
 	NamespaceMatchers []string                `json:"namespace_matchers,omitempty"`
 	TypeVal           []string                `json:"types,omitempty"`
-	IdsVal            []apid.ID             `json:"ids,omitempty"`
+	IdsVal            []apid.ID               `json:"ids,omitempty"`
 	OrderByFieldVal   *ConnectorOrderByField  `json:"order_by_field"`
 	OrderByVal        *pagination.OrderBy     `json:"order_by"`
 	IncludeDeletedVal bool                    `json:"include_deleted,omitempty"`

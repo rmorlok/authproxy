@@ -2,9 +2,10 @@ package oauth2
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/url"
 
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
@@ -20,7 +21,7 @@ func (o *oAuth2Connection) getPublicCallbackUrl() (string, error) {
 
 	u, err := url.Parse(o.cfg.GetRoot().Public.GetBaseUrl())
 	if err != nil {
-		return "", errors.Wrap(err, "failed to parse base url for oauth2 return")
+		return "", fmt.Errorf("failed to parse base url for oauth2 return: %w", err)
 	}
 
 	u.Path += "/oauth2/callback"
@@ -41,7 +42,7 @@ func (o *oAuth2Connection) CallbackFrom3rdParty(ctx context.Context, query url.V
 
 	callbackUrl, err := o.getPublicCallbackUrl()
 	if err != nil {
-		return errorRedirectPage, errors.Wrapf(err, "failed to get public callback url")
+		return errorRedirectPage, fmt.Errorf("failed to get public callback url: %w", err)
 	}
 
 	c := o.httpf.
@@ -52,12 +53,12 @@ func (o *oAuth2Connection) CallbackFrom3rdParty(ctx context.Context, query url.V
 
 	clientId, err := o.auth.ClientId.GetValue(ctx)
 	if err != nil {
-		return errorRedirectPage, errors.Wrapf(err, "failed to get client id for connector")
+		return errorRedirectPage, fmt.Errorf("failed to get client id for connector: %w", err)
 	}
 
 	clientSecret, err := o.auth.ClientSecret.GetValue(ctx)
 	if err != nil {
-		return errorRedirectPage, errors.Wrapf(err, "failed to get client id for connector")
+		return errorRedirectPage, fmt.Errorf("failed to get client id for connector: %w", err)
 	}
 
 	req := c.Request().
@@ -87,16 +88,16 @@ func (o *oAuth2Connection) CallbackFrom3rdParty(ctx context.Context, query url.V
 		Send()
 
 	if err != nil {
-		return errorRedirectPage, errors.Wrapf(err, "failed to post to exchange authorization code for access token")
+		return errorRedirectPage, fmt.Errorf("failed to post to exchange authorization code for access token: %w", err)
 	}
 
 	if resp.StatusCode != 200 {
-		return errorRedirectPage, errors.Errorf("received status code %d from exchange authorization code for access token", resp.StatusCode)
+		return errorRedirectPage, fmt.Errorf("received status code %d from exchange authorization code for access token", resp.StatusCode)
 	}
 
 	_, err = o.createDbTokenFromResponse(ctx, resp, nil)
 	if err != nil {
-		return errorRedirectPage, errors.Wrapf(err, "failed to create db token from response")
+		return errorRedirectPage, fmt.Errorf("failed to create db token from response: %w", err)
 	}
 
 	return o.state.ReturnToUrl, nil

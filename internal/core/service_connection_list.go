@@ -2,8 +2,8 @@ package core
 
 import (
 	"context"
+	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -58,7 +58,7 @@ func (l *listConnectionsWrapper) convertPageResult(ctx context.Context, result p
 			connections = append(connections, wrapConnection(&r, cv, l.s))
 		} else {
 			return pagination.PageResult[iface.Connection]{
-				Error: errors.Errorf("could not find connector version %s:%d", r.ConnectorId, r.ConnectorVersion),
+				Error: fmt.Errorf("could not find connector version %s:%d", r.ConnectorId, r.ConnectorVersion),
 			}
 		}
 	}

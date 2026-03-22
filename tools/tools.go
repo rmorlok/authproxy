@@ -2,5 +2,7 @@
 
 package tools
 
-import _ "github.com/swaggo/swag/cmd/swag"
-import _ "github.com/golang/mock/mockgen"
+import (
+	_ "github.com/golang/mock/mockgen"
+	_ "github.com/swaggo/swag/cmd/swag"
+)

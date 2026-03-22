@@ -51,7 +51,7 @@ func syncKeyVersionsForKeyToDatabase(
 	if err != nil {
 		return errors.Wrapf(err, "failed to get %s key versions", encryptionKeyId)
 	}
-	
+
 	existing, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, encryptionKeyId)
 	if err != nil {
 		return errors.Wrap(err, "failed to list existing encryption key versions")

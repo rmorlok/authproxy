@@ -2,10 +2,10 @@ package apredis
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
 	"github.com/alicebob/miniredis/v2"
-	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
@@ -30,7 +30,7 @@ func NewMiniredis(redisConfig *config.RedisMiniredis) (Client, error) {
 			// Create a new instance of miniredis for testing purposes
 			miniredisServer, err = miniredis.Run()
 			if err != nil {
-				miniredisErr = errors.Wrap(err, "failed to start miniredis server")
+				miniredisErr = fmt.Errorf("failed to start miniredis server: %w", err)
 			}
 
 			// Configure the Redis client to use the miniredis instance
@@ -43,7 +43,7 @@ func NewMiniredis(redisConfig *config.RedisMiniredis) (Client, error) {
 			_, err = miniredisClient.Ping(context.Background()).Result()
 			if err != nil {
 				miniredisServer.Close()
-				miniredisErr = errors.Wrap(err, "failed to connect to miniredis client")
+				miniredisErr = fmt.Errorf("failed to connect to miniredis client: %w", err)
 			}
 		}
 	}

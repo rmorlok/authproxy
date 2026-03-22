@@ -9,7 +9,6 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	jwt2 "github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/apctx"
@@ -132,7 +131,7 @@ func (atu *AuthTestUtil) SignRequestHeaderAs(ctx context.Context, req *http.Requ
 
 	tokenString, err := atu.s.Token(ctx, claims)
 	if err != nil {
-		return req, errors.Wrap(err, "failed to generate jwt")
+		return req, fmt.Errorf("failed to generate jwt: %w", err)
 	}
 
 	req.Header.Set(JwtHeaderKey, fmt.Sprintf("Bearer %s", tokenString))
@@ -147,7 +146,7 @@ func (atu *AuthTestUtil) SignRequestQueryAs(ctx context.Context, req *http.Reque
 
 	tokenString, err := atu.s.Token(ctx, claims)
 	if err != nil {
-		return req, errors.Wrap(err, "failed to generate jwt")
+		return req, fmt.Errorf("failed to generate jwt: %w", err)
 	}
 
 	q := req.URL.Query()

@@ -6,7 +6,6 @@ import (
 	"strings"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
@@ -52,10 +51,10 @@ func ParseLabelSelector(selector string) (LabelSelector, error) {
 			key := strings.TrimSpace(opParts[0])
 			val := strings.TrimSpace(opParts[1])
 			if err := ValidateLabelKey(key); err != nil {
-				return nil, errors.Wrapf(err, "invalid label key in selector %q", part)
+				return nil, fmt.Errorf("invalid label key in selector %q: %w", part, err)
 			}
 			if err := ValidateLabelValue(val); err != nil {
-				return nil, errors.Wrapf(err, "invalid label value in selector %q", part)
+				return nil, fmt.Errorf("invalid label value in selector %q: %w", part, err)
 			}
 			requirements = append(requirements, LabelRequirement{
 				Key:      key,
@@ -67,10 +66,10 @@ func ParseLabelSelector(selector string) (LabelSelector, error) {
 			key := strings.TrimSpace(opParts[0])
 			val := strings.TrimSpace(opParts[1])
 			if err := ValidateLabelKey(key); err != nil {
-				return nil, errors.Wrapf(err, "invalid label key in selector %q", part)
+				return nil, fmt.Errorf("invalid label key in selector %q: %w", part, err)
 			}
 			if err := ValidateLabelValue(val); err != nil {
-				return nil, errors.Wrapf(err, "invalid label value in selector %q", part)
+				return nil, fmt.Errorf("invalid label value in selector %q: %w", part, err)
 			}
 			requirements = append(requirements, LabelRequirement{
 				Key:      key,
@@ -82,10 +81,10 @@ func ParseLabelSelector(selector string) (LabelSelector, error) {
 			key := strings.TrimSpace(opParts[0])
 			val := strings.TrimSpace(opParts[1])
 			if err := ValidateLabelKey(key); err != nil {
-				return nil, errors.Wrapf(err, "invalid label key in selector %q", part)
+				return nil, fmt.Errorf("invalid label key in selector %q: %w", part, err)
 			}
 			if err := ValidateLabelValue(val); err != nil {
-				return nil, errors.Wrapf(err, "invalid label value in selector %q", part)
+				return nil, fmt.Errorf("invalid label value in selector %q: %w", part, err)
 			}
 			requirements = append(requirements, LabelRequirement{
 				Key:      key,
@@ -95,7 +94,7 @@ func ParseLabelSelector(selector string) (LabelSelector, error) {
 		} else if strings.HasPrefix(part, "!") {
 			key := strings.TrimSpace(part[1:])
 			if err := ValidateLabelKey(key); err != nil {
-				return nil, errors.Wrapf(err, "invalid label key in selector %q", part)
+				return nil, fmt.Errorf("invalid label key in selector %q: %w", part, err)
 			}
 			requirements = append(requirements, LabelRequirement{
 				Key:      key,
@@ -104,7 +103,7 @@ func ParseLabelSelector(selector string) (LabelSelector, error) {
 		} else {
 			key := strings.TrimSpace(part)
 			if err := ValidateLabelKey(key); err != nil {
-				return nil, errors.Wrapf(err, "invalid label key in selector %q", part)
+				return nil, fmt.Errorf("invalid label key in selector %q: %w", part, err)
 			}
 			requirements = append(requirements, LabelRequirement{
 				Key:      key,

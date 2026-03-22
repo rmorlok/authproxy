@@ -12,14 +12,14 @@ import (
 )
 
 type ConnectorVersion struct {
-	Id         apid.ID
-	Namespace  string
-	Version    uint64
-	State      database.ConnectorVersionState
-	Type       string
-	Hash       string
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	Id          apid.ID
+	Namespace   string
+	Version     uint64
+	State       database.ConnectorVersionState
+	Type        string
+	Hash        string
+	CreatedAt   time.Time
+	UpdatedAt   time.Time
 	Labels      map[string]string
 	Annotations map[string]string
 	Definition  *cschema.Connector

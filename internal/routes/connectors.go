@@ -1,15 +1,15 @@
 package routes
 
 import (
+	"errors"
 	"net/http"
 	"strconv"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/pkg/errors"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	connIface "github.com/rmorlok/authproxy/internal/core/iface"
@@ -21,19 +21,19 @@ import (
 )
 
 type ConnectorJson struct {
-	Id          apid.ID                      `json:"id" swaggertype:"string"`
-	Version     uint64                         `json:"version"`
-	Namespace   string                         `json:"namespace"`
-	State       database.ConnectorVersionState `json:"state"`
+	Id            apid.ID                        `json:"id" swaggertype:"string"`
+	Version       uint64                         `json:"version"`
+	Namespace     string                         `json:"namespace"`
+	State         database.ConnectorVersionState `json:"state"`
 	DisplayName   string                         `json:"display_name"`
 	Highlight     string                         `json:"highlight,omitempty"`
 	Description   string                         `json:"description"`
-	StatusPageUrl string `json:"status_page_url,omitempty"`
-	Logo          string `json:"logo"`
-	Labels      map[string]string              `json:"labels,omitempty"`
-	Annotations map[string]string              `json:"annotations,omitempty"`
-	CreatedAt   time.Time                      `json:"created_at"`
-	UpdatedAt   time.Time                      `json:"updated_at"`
+	StatusPageUrl string                         `json:"status_page_url,omitempty"`
+	Logo          string                         `json:"logo"`
+	Labels        map[string]string              `json:"labels,omitempty"`
+	Annotations   map[string]string              `json:"annotations,omitempty"`
+	CreatedAt     time.Time                      `json:"created_at"`
+	UpdatedAt     time.Time                      `json:"updated_at"`
 
 	Versions int64                           `json:"versions,omitempty"`
 	States   database.ConnectorVersionStates `json:"states,omitempty"`
@@ -85,7 +85,7 @@ type ListConnectorsResponseJson struct {
 }
 
 type ConnectorVersionJson struct {
-	Id          apid.ID                      `json:"id" swaggertype:"string"`
+	Id          apid.ID                        `json:"id" swaggertype:"string"`
 	Version     uint64                         `json:"version"`
 	Namespace   string                         `json:"namespace"`
 	State       database.ConnectorVersionState `json:"state"`

@@ -97,7 +97,7 @@ func TestEncryptedField_Equal(t *testing.T) {
 	ef1 = &EncryptedField{ID: "ekv_abc", Data: "data"}
 	assert.False(t, ef2.Equal(ef1))
 	assert.False(t, ef1.Equal(nil))
-	
+
 	ef2 = &EncryptedField{ID: "ekv_abc", Data: "data"}
 	assert.True(t, ef1.Equal(ef2))
 

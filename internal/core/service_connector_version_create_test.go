@@ -3,12 +3,12 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encfield"

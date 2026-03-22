@@ -3,13 +3,13 @@ package api_common
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 )
 
@@ -315,9 +315,9 @@ func (b *httpStatusErrorBuilder) WithWrappedInternalErr(err error, msg string) H
 			b.err.Status = errStatusError.Status
 			b.err.InternalErr = err
 		}
-		b.err.InternalErr = errors.Wrap(b.err.InternalErr, msg)
+		b.err.InternalErr = fmt.Errorf("%s: %w", msg, b.err.InternalErr)
 	} else {
-		b.err.InternalErr = errors.Wrap(err, msg)
+		b.err.InternalErr = fmt.Errorf("%s: %w", msg, err)
 	}
 
 	return b

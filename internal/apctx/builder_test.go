@@ -14,7 +14,7 @@ type testIdGenerator struct {
 	s string
 }
 
-func (g *testIdGenerator) New(prefix apid.Prefix) apid.ID  { return apid.ID(g.s) }
+func (g *testIdGenerator) New(prefix apid.Prefix) apid.ID      { return apid.ID(g.s) }
 func (g *testIdGenerator) NewString(prefix apid.Prefix) string { return g.s }
 
 func TestBuilder(t *testing.T) {

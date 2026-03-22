@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
@@ -73,7 +72,7 @@ func (o *oAuth2Connection) RecordCancelSessionAfterAuth(ctx context.Context, sho
 
 	result := o.r.Set(ctx, getStateRedisKey(o.state.Id), o.state, ttl)
 	if result.Err() != nil {
-		return errors.Wrapf(result.Err(), "failed to set state in redis for session status for connection %s", o.connection.GetId())
+		return fmt.Errorf("failed to set state in redis for session status for connection %s: %w", o.connection.GetId(), result.Err())
 	}
 
 	return nil

@@ -3,8 +3,8 @@ package iface
 import (
 	"fmt"
 
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hashicorp/go-multierror"
+	"github.com/rmorlok/authproxy/internal/apid"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
@@ -59,7 +59,7 @@ type InitiateConnectionResponse interface {
 }
 
 type InitiateConnectionRedirect struct {
-	Id          apid.ID                      `json:"id"`
+	Id          apid.ID                        `json:"id"`
 	Type        InitiateConnectionResponseType `json:"type"`
 	RedirectUrl string                         `json:"redirect_url"`
 }

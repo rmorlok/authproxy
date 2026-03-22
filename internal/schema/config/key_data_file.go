@@ -2,10 +2,10 @@ package config
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/mitchellh/go-homedir"
-	"github.com/pkg/errors"
 )
 
 type KeyDataFile struct {
@@ -21,7 +21,7 @@ func (kf *KeyDataFile) resolvePath() (string, error) {
 		}
 
 		if _, err := os.Stat(expanded); err != nil {
-			return "", errors.Errorf("key file '%s' does not exist", kf.Path)
+			return "", fmt.Errorf("key file '%s' does not exist", kf.Path)
 		}
 		path = expanded
 	}

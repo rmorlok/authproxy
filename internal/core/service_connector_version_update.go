@@ -2,9 +2,10 @@ package core
 
 import (
 	"context"
+	"errors"
+	"fmt"
 
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
@@ -17,7 +18,7 @@ func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, v
 		if errors.Is(err, database.ErrNotFound) {
 			return nil, ErrNotFound
 		}
-		return nil, errors.Wrap(err, "failed to get connector version")
+		return nil, fmt.Errorf("failed to get connector version: %w", err)
 	}
 
 	if existing.State != database.ConnectorVersionStateDraft {
@@ -37,7 +38,7 @@ func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, v
 		WithState(database.ConnectorVersionStateDraft).
 		Build()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build connector version")
+		return nil, fmt.Errorf("failed to build connector version: %w", err)
 	}
 
 	if labels != nil {
@@ -53,7 +54,7 @@ func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, v
 	}
 
 	if err := s.db.UpsertConnectorVersion(ctx, &cv.ConnectorVersion); err != nil {
-		return nil, errors.Wrap(err, "failed to upsert connector version")
+		return nil, fmt.Errorf("failed to upsert connector version: %w", err)
 	}
 
 	return s.getConnectorVersion(ctx, id, version)
@@ -63,7 +64,7 @@ func (s *service) GetOrCreateDraftConnectorVersion(ctx context.Context, id apid.
 	// Try to find an existing draft
 	existingDraft, err := s.db.GetConnectorVersionForState(ctx, id, database.ConnectorVersionStateDraft)
 	if err != nil && !errors.Is(err, database.ErrNotFound) {
-		return nil, errors.Wrap(err, "failed to check for existing draft")
+		return nil, fmt.Errorf("failed to check for existing draft: %w", err)
 	}
 	if existingDraft != nil {
 		wrapped := wrapConnectorVersion(*existingDraft, s)
@@ -80,14 +81,14 @@ func (s *service) GetOrCreateDraftConnectorVersion(ctx context.Context, id apid.
 		if errors.Is(err, database.ErrNotFound) {
 			return nil, ErrNotFound
 		}
-		return nil, errors.Wrap(err, "failed to get latest connector version")
+		return nil, fmt.Errorf("failed to get latest connector version: %w", err)
 	}
 
 	// Decrypt and clone the latest definition
 	wrapped := wrapConnectorVersion(*latest, s)
 	latestDef, err := wrapped.getDefinition()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to decrypt latest version definition")
+		return nil, fmt.Errorf("failed to decrypt latest version definition: %w", err)
 	}
 	def := latestDef.Clone()
 
@@ -104,14 +105,14 @@ func (s *service) GetOrCreateDraftConnectorVersion(ctx context.Context, id apid.
 		WithState(database.ConnectorVersionStateDraft).
 		Build()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to build connector version")
+		return nil, fmt.Errorf("failed to build connector version: %w", err)
 	}
 
 	cv.ConnectorVersion.Labels = latest.Labels
 	cv.ConnectorVersion.Annotations = latest.Annotations
 
 	if err := s.db.UpsertConnectorVersion(ctx, &cv.ConnectorVersion); err != nil {
-		return nil, errors.Wrap(err, "failed to upsert connector version")
+		return nil, fmt.Errorf("failed to upsert connector version: %w", err)
 	}
 
 	return s.getConnectorVersion(ctx, id, newVersion)

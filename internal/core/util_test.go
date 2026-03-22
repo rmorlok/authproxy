@@ -4,8 +4,8 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
-	"github.com/rmorlok/authproxy/internal/apid"
 	mockAsynq "github.com/rmorlok/authproxy/internal/apasynq/mock"
+	"github.com/rmorlok/authproxy/internal/apid"
 	mockLog "github.com/rmorlok/authproxy/internal/aplog/mock"
 	"github.com/rmorlok/authproxy/internal/apredis/mock"
 	"github.com/rmorlok/authproxy/internal/core/iface"

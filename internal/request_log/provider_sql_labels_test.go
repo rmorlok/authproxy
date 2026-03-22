@@ -79,17 +79,17 @@ func newTestSqlRecordStoreAndRetriever(t *testing.T) (*sqlRecordStore, *sqlRecor
 
 func makeTestLogRecord(namespace string, labels database.Labels) *LogRecord {
 	return &LogRecord{
-		RequestId:          apid.New(apid.PrefixRequestLog),
-		Namespace:          namespace,
-		Type:               httpf.RequestTypeProxy,
-		Timestamp:          time.Now().UTC().Truncate(time.Millisecond),
+		RequestId:           apid.New(apid.PrefixRequestLog),
+		Namespace:           namespace,
+		Type:                httpf.RequestTypeProxy,
+		Timestamp:           time.Now().UTC().Truncate(time.Millisecond),
 		MillisecondDuration: MillisecondDuration(100 * time.Millisecond),
-		Method:             "GET",
-		Host:               "example.com",
-		Scheme:             "https",
-		Path:               "/api/test",
-		ResponseStatusCode: 200,
-		Labels:             labels,
+		Method:              "GET",
+		Host:                "example.com",
+		Scheme:              "https",
+		Path:                "/api/test",
+		ResponseStatusCode:  200,
+		Labels:              labels,
 	}
 }
 

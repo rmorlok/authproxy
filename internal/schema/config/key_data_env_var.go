@@ -2,9 +2,8 @@ package config
 
 import (
 	"context"
+	"fmt"
 	"os"
-
-	"github.com/pkg/errors"
 )
 
 type KeyDataEnvVar struct {
@@ -14,7 +13,7 @@ type KeyDataEnvVar struct {
 func (kev *KeyDataEnvVar) GetCurrentVersion(ctx context.Context) (KeyVersionInfo, error) {
 	val, present := os.LookupEnv(kev.EnvVar)
 	if !present || len(val) == 0 {
-		return KeyVersionInfo{}, errors.Errorf("environment variable '%s' does not have value", kev.EnvVar)
+		return KeyVersionInfo{}, fmt.Errorf("environment variable '%s' does not have value", kev.EnvVar)
 	}
 	data := []byte(val)
 	return KeyVersionInfo{

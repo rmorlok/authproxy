@@ -1,0 +1,12 @@
+linters:
+  disable-all: true
+  enable:
+    - depguard
+
+linters-settings:
+  depguard:
+    rules:
+      pkg-errors:
+        deny:
+          - pkg: "github.com/pkg/errors"
+            desc: "Use fmt.Errorf(\"...: %w\", err) or standard errors package instead"

@@ -1,14 +1,14 @@
 package routes
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/pkg/errors"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
@@ -108,7 +108,7 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 		if err != nil {
 			api_common.NewHttpStatusErrorBuilder().
 				WithStatusInternalServerError().
-				WithInternalErr(errors.Wrap(err, "failed to establish gin session")).
+				WithInternalErr(fmt.Errorf("failed to establish gin session: %w", err)).
 				BuildStatusError().
 				WriteGinResponse(r.logger, gctx)
 			return
@@ -154,7 +154,7 @@ func (r *SessionRoutes) terminate(gctx *gin.Context) {
 		logger.Error("failed to end gin session", "error", err)
 		api_common.NewHttpStatusErrorBuilder().
 			WithStatusInternalServerError().
-			WithInternalErr(errors.Wrap(err, "failed to end gin session")).
+			WithInternalErr(fmt.Errorf("failed to end gin session: %w", err)).
 			BuildStatusError().
 			WriteGinResponse(r.logger, gctx)
 		return

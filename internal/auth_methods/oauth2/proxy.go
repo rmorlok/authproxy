@@ -2,11 +2,11 @@ package oauth2
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/url"
 
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -87,7 +87,7 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 
 	newToken, err := o.createDbTokenFromResponse(ctx, refreshResp, token)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to refresh token")
+		return nil, fmt.Errorf("failed to refresh token: %w", err)
 	}
 
 	return newToken, nil

@@ -4,13 +4,13 @@ import (
 	"context"
 	"encoding"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"time"
 
-	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
@@ -21,11 +21,11 @@ import (
 )
 
 type state struct {
-	Id                     apid.ID `json:"id"`
-	ActorId                apid.ID `json:"actor_id"`
-	ConnectorId            apid.ID `json:"connector_id"`
+	Id                     apid.ID   `json:"id"`
+	ActorId                apid.ID   `json:"actor_id"`
+	ConnectorId            apid.ID   `json:"connector_id"`
 	ConnectorVersion       uint64    `json:"connector_version"`
-	ConnectionId           apid.ID `json:"connection_id"`
+	ConnectionId           apid.ID   `json:"connection_id"`
 	ReturnToUrl            string    `json:"return_to"`
 	CancelSessionAfterAuth bool      `json:"cancel_session_after_auth"`
 	ExpiresAt              time.Time `json:"expires_at"`
@@ -67,7 +67,7 @@ func (o *oAuth2Connection) saveStateToRedis(ctx context.Context, actor IActorDat
 	}
 	result := o.r.Set(ctx, getStateRedisKey(stateId), s, ttl)
 	if result.Err() != nil {
-		return errors.Wrapf(result.Err(), "failed to set state in redis for connection %s", o.connection.GetId())
+		return fmt.Errorf("failed to set state in redis for connection %s: %w", o.connection.GetId(), result.Err())
 	}
 
 	o.state = s
@@ -95,39 +95,39 @@ func getOAuth2State(
 	result := r.Get(ctx, getStateRedisKey(stateId))
 
 	if result.Err() != nil {
-		return nil, errors.Wrapf(result.Err(), "failed to get oauth state from redis for id %s", stateId.String())
+		return nil, fmt.Errorf("failed to get oauth state from redis for id %s: %w", stateId.String(), result.Err())
 	}
 
 	var s state
 	if err := result.Scan(&s); err != nil {
-		return nil, errors.Wrap(err, "failed to parse state from redis value")
+		return nil, fmt.Errorf("failed to parse state from redis value: %w", err)
 	}
 
 	if !s.IsValid() {
-		return nil, errors.Errorf("state %s is invalid", stateId.String())
+		return nil, fmt.Errorf("state %s is invalid", stateId.String())
 	}
 
 	if s.ExpiresAt.Before(apctx.GetClock(ctx).Now()) {
-		return nil, errors.Errorf("state %s has expired", stateId.String())
+		return nil, fmt.Errorf("state %s has expired", stateId.String())
 	}
 
 	if s.ActorId != actor.GetId() {
-		return nil, errors.Errorf("actor id %s does not match state actor id %s", actor.GetId(), s.ActorId)
+		return nil, fmt.Errorf("actor id %s does not match state actor id %s", actor.GetId(), s.ActorId)
 	}
 
 	connection, err := core.GetConnection(ctx, s.ConnectionId)
 	if err != nil {
 		if errors.Is(err, coreIface.ErrNotFound) {
-			return nil, errors.Errorf("connection %s not found for state %s", s.ConnectionId.String(), stateId.String())
+			return nil, fmt.Errorf("connection %s not found for state %s", s.ConnectionId.String(), stateId.String())
 		}
 
-		return nil, errors.Wrapf(err, "failed to get connection %s for state %s", s.ConnectionId.String(), stateId.String())
+		return nil, fmt.Errorf("failed to get connection %s for state %s: %w", s.ConnectionId.String(), stateId.String(), err)
 	}
 
 	cv := connection.GetConnectorVersionEntity()
 	connector := cv.GetDefinition()
 	if connector.Auth.GetType() != sconfig.AuthTypeOAuth2 {
-		return nil, errors.Errorf("connector %s is not an oauth2 connector", s.ConnectorId)
+		return nil, fmt.Errorf("connector %s is not an oauth2 connector", s.ConnectorId)
 	}
 
 	// TODO: add actor auth validation once connections get ownership
@@ -137,7 +137,7 @@ func getOAuth2State(
 
 	deleteResult := r.Del(ctx, getStateRedisKey(stateId))
 	if deleteResult.Err() != nil {
-		return nil, errors.Wrapf(result.Err(), "failed to delete oauth state from redis for id %s", stateId.String())
+		return nil, fmt.Errorf("failed to delete oauth state from redis for id %s: %w", stateId.String(), result.Err())
 	}
 
 	return o, nil

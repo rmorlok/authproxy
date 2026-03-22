@@ -2,10 +2,9 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"strconv"
-
-	"github.com/pkg/errors"
 )
 
 type IntegerValueEnvVar struct {
@@ -26,12 +25,12 @@ func (kev *IntegerValueEnvVar) GetValue(ctx context.Context) (int64, error) {
 			return *kev.Default, nil
 		}
 
-		return 0, errors.Errorf("environment variable '%s' does not have value", kev.EnvVar)
+		return 0, fmt.Errorf("environment variable '%s' does not have value", kev.EnvVar)
 	}
 
 	val, err := strconv.ParseInt(strVal, 10, 64)
 	if err != nil {
-		return 0, errors.Wrapf(err, "failed to parse environment variable '%s' with value '%s' as int64", kev.EnvVar, strVal)
+		return 0, fmt.Errorf("failed to parse environment variable '%s' with value '%s' as int64: %w", kev.EnvVar, strVal, err)
 	}
 
 	return val, nil

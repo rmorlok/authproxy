@@ -1,14 +1,14 @@
 package iface
 
 import (
-	stderrors "errors"
+	"errors"
+	"fmt"
 
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/database"
 )
 
 var ErrNotFound = database.ErrNotFound
-var ErrConnectionNotFound = errors.Wrap(ErrNotFound, "connection not found")
+var ErrConnectionNotFound = fmt.Errorf("connection not found: %w", ErrNotFound)
 var ErrProtected = database.ErrProtected
-var ErrDraftAlreadyExists = stderrors.New("a draft version already exists")
-var ErrNotDraft = stderrors.New("version is not a draft")
+var ErrDraftAlreadyExists = errors.New("a draft version already exists")
+var ErrNotDraft = errors.New("version is not a draft")

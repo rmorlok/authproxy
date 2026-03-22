@@ -3,6 +3,7 @@ package request_log
 import (
 	"bytes"
 	"context"
+	"errors"
 	"io"
 	"net/http"
 	"net/url"
@@ -12,9 +13,8 @@ import (
 
 	"log/slog"
 
-	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
@@ -337,12 +337,12 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 				fullStore: fullStore,
 				logger:    logger,
 				captureConfig: captureConfig{
-					recordFullRequest:   test.recordFullRequest,
-					maxFullRequestSize:  test.maxFullRequestSize,
-					maxFullResponseSize: test.maxFullResponseSize,
-					expiration:          time.Minute,
+					recordFullRequest:     test.recordFullRequest,
+					maxFullRequestSize:    test.maxFullRequestSize,
+					maxFullResponseSize:   test.maxFullResponseSize,
+					expiration:            time.Minute,
 					fullRequestExpiration: time.Minute,
-					maxResponseWait:     5 * 60 * time.Second,
+					maxResponseWait:       5 * 60 * time.Second,
 				},
 				requestInfo: httpf.RequestInfo{},
 				transport:   mockTransport,

@@ -3,9 +3,8 @@ package config
 import (
 	"context"
 	"encoding/base64"
+	"fmt"
 	"os"
-
-	"github.com/pkg/errors"
 )
 
 type KeyDataEnvBase64Var struct {
@@ -15,12 +14,12 @@ type KeyDataEnvBase64Var struct {
 func (kev *KeyDataEnvBase64Var) GetCurrentVersion(ctx context.Context) (KeyVersionInfo, error) {
 	val, present := os.LookupEnv(kev.EnvVar)
 	if !present || len(val) == 0 {
-		return KeyVersionInfo{}, errors.Errorf("environment variable '%s' does not have value", kev.EnvVar)
+		return KeyVersionInfo{}, fmt.Errorf("environment variable '%s' does not have value", kev.EnvVar)
 	}
 
 	decodedBytes, err := base64.StdEncoding.DecodeString(val)
 	if err != nil {
-		return KeyVersionInfo{}, errors.Wrapf(err, "environment variable '%s' value is not valid base64", kev.EnvVar)
+		return KeyVersionInfo{}, fmt.Errorf("environment variable '%s' value is not valid base64: %w", kev.EnvVar, err)
 	}
 
 	return KeyVersionInfo{

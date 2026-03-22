@@ -2,10 +2,10 @@ package common
 
 import (
 	"context"
+	"fmt"
 	"os"
 
 	"github.com/mitchellh/go-homedir"
-	"github.com/pkg/errors"
 )
 
 type StringValueFile struct {
@@ -39,7 +39,7 @@ func (kf *StringValueFile) GetValue(ctx context.Context) (string, error) {
 		}
 
 		if _, err := os.Stat(path); err != nil {
-			return "", errors.Errorf("key file '%s' does not exist", kf.Path)
+			return "", fmt.Errorf("key file '%s' does not exist", kf.Path)
 		}
 	}
 

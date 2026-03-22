@@ -1,6 +1,7 @@
 package main
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"strings"
@@ -9,7 +10,6 @@ import (
 	"github.com/fatih/color"
 	"github.com/gin-gonic/gin"
 	"github.com/joho/godotenv"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/encrypt"
@@ -36,12 +36,12 @@ func loadConfig() error {
 	var err error
 	cfg, err = config.LoadConfig(cfgFile)
 	if err != nil {
-		return errors.Wrapf(err, "failed to load configuration from '%s'", cfgFile)
+		return fmt.Errorf("failed to load configuration from '%s': %w", cfgFile, err)
 	}
 
 	err = cfg.Validate()
 	if err != nil {
-		return errors.Wrapf(err, "invalid configuration")
+		return fmt.Errorf("invalid configuration: %w", err)
 	}
 
 	return nil
@@ -147,7 +147,7 @@ func cmdReencrypt() *cobra.Command {
 			task := encrypt.NewReencryptAllTask()
 			info, err := dm.GetAsyncClient().Enqueue(task)
 			if err != nil {
-				return errors.Wrap(err, "failed to enqueue reencrypt task")
+				return fmt.Errorf("failed to enqueue reencrypt task: %w", err)
 			}
 			fmt.Printf("Re-encryption task enqueued: id=%s queue=%s\n", info.ID, info.Queue)
 			return nil

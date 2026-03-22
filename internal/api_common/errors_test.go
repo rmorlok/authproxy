@@ -2,6 +2,8 @@ package api_common
 
 import (
 	"context"
+	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"regexp"
@@ -9,7 +11,6 @@ import (
 	"testing"
 
 	"github.com/gin-gonic/gin"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/stretchr/testify/require"
 )
@@ -232,11 +233,11 @@ func TestHttpStatusErrorBuilder(t *testing.T) {
 		{
 			"with recursively nested internal http status error",
 			func(b HttpStatusErrorBuilder) *HttpStatusError {
-				return b.WithInternalErr(errors.Wrapf(&HttpStatusError{
+				return b.WithInternalErr(fmt.Errorf("outer: %w", &HttpStatusError{
 					ResponseMsg: "ResponseMsg",
 					InternalErr: errors.New("InternalErr"),
 					Status:      http.StatusTeapot,
-				}, "outer")).BuildStatusError()
+				})).BuildStatusError()
 			},
 			&HttpStatusError{
 				ResponseMsg: "ResponseMsg",
@@ -287,10 +288,10 @@ func TestAsHttpStatusError(t *testing.T) {
 		},
 		{
 			"status error wrapped",
-			errors.Wrap(&HttpStatusError{
+			fmt.Errorf("wrapped: %w", &HttpStatusError{
 				Status:      http.StatusBadRequest,
 				ResponseMsg: "response message",
-			}, "wrapped"),
+			}),
 			&HttpStatusError{
 				Status:      http.StatusBadRequest,
 				ResponseMsg: "response message",

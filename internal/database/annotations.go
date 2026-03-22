@@ -5,12 +5,12 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 )
 
@@ -82,7 +82,7 @@ func ValidateAnnotations(annotations map[string]string) error {
 	totalSize := 0
 	for key, value := range annotations {
 		if err := ValidateAnnotationKey(key); err != nil {
-			result = multierror.Append(result, errors.Wrapf(err, "invalid annotation key %q", key))
+			result = multierror.Append(result, fmt.Errorf("invalid annotation key %q: %w", key, err))
 		}
 		totalSize += len(key) + len(value)
 	}
@@ -168,12 +168,12 @@ func (s *service) putAnnotationsInTableTx(ctx context.Context, tx *sql.Tx, table
 		RunWith(tx).
 		Exec()
 	if err != nil {
-		return nil, time.Time{}, errors.Wrapf(err, "failed to put annotations in %s", table)
+		return nil, time.Time{}, fmt.Errorf("failed to put annotations in %s: %w", table, err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return nil, time.Time{}, errors.Wrapf(err, "failed to put annotations in %s", table)
+		return nil, time.Time{}, fmt.Errorf("failed to put annotations in %s: %w", table, err)
 	}
 
 	if affected == 0 {
@@ -217,12 +217,12 @@ func (s *service) deleteAnnotationsInTableTx(ctx context.Context, tx *sql.Tx, ta
 		RunWith(tx).
 		Exec()
 	if err != nil {
-		return nil, time.Time{}, errors.Wrapf(err, "failed to delete annotations in %s", table)
+		return nil, time.Time{}, fmt.Errorf("failed to delete annotations in %s: %w", table, err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return nil, time.Time{}, errors.Wrapf(err, "failed to delete annotations in %s", table)
+		return nil, time.Time{}, fmt.Errorf("failed to delete annotations in %s: %w", table, err)
 	}
 
 	if affected == 0 {
@@ -245,12 +245,12 @@ func (s *service) updateAnnotationsInTableTx(ctx context.Context, tx *sql.Tx, ta
 		RunWith(tx).
 		Exec()
 	if err != nil {
-		return time.Time{}, errors.Wrapf(err, "failed to update annotations in %s", table)
+		return time.Time{}, fmt.Errorf("failed to update annotations in %s: %w", table, err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return time.Time{}, errors.Wrapf(err, "failed to update annotations in %s", table)
+		return time.Time{}, fmt.Errorf("failed to update annotations in %s: %w", table, err)
 	}
 
 	if affected == 0 {

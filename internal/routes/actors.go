@@ -1,11 +1,12 @@
 package routes
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
-	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/pkg/errors"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"

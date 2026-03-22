@@ -3,12 +3,12 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -129,7 +129,7 @@ func (s *service) CreateEncryptionKeyVersion(ctx context.Context, ekv *Encryptio
 		Exec()
 
 	if err != nil {
-		return errors.Wrap(err, "failed to create encryption key version")
+		return fmt.Errorf("failed to create encryption key version: %w", err)
 	}
 
 	return nil
@@ -153,7 +153,7 @@ func (s *service) GetEncryptionKeyVersion(ctx context.Context, id apid.ID) (*Enc
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
-		return nil, errors.Wrap(err, "failed to get encryption key version")
+		return nil, fmt.Errorf("failed to get encryption key version: %w", err)
 	}
 
 	return &result, nil
@@ -191,7 +191,7 @@ func (s *service) GetCurrentEncryptionKeyVersionForEncryptionKey(ctx context.Con
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrNotFound
 		}
-		return nil, errors.Wrap(err, "failed to get current encryption key version for encryption key")
+		return nil, fmt.Errorf("failed to get current encryption key version for encryption key: %w", err)
 	}
 
 	return &result, nil
@@ -212,7 +212,7 @@ func (s *service) ListEncryptionKeyVersionsForEncryptionKey(ctx context.Context,
 		Query()
 
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to list encryption key versions")
+		return nil, fmt.Errorf("failed to list encryption key versions: %w", err)
 	}
 	defer rows.Close()
 
@@ -220,7 +220,7 @@ func (s *service) ListEncryptionKeyVersionsForEncryptionKey(ctx context.Context,
 	for rows.Next() {
 		var ekv EncryptionKeyVersion
 		if err := rows.Scan(ekv.fields()...); err != nil {
-			return nil, errors.Wrap(err, "failed to scan encryption key version")
+			return nil, fmt.Errorf("failed to scan encryption key version: %w", err)
 		}
 		results = append(results, &ekv)
 	}
@@ -243,7 +243,7 @@ func (s *service) GetMaxOrderedVersionForEncryptionKey(ctx context.Context, encr
 		Scan(&maxVersion)
 
 	if err != nil {
-		return 0, errors.Wrap(err, "failed to get max ordered version")
+		return 0, fmt.Errorf("failed to get max ordered version: %w", err)
 	}
 
 	if !maxVersion.Valid {
@@ -269,7 +269,7 @@ func (s *service) ClearCurrentFlagForEncryptionKey(ctx context.Context, encrypti
 		Exec()
 
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to clear current flag for encryption key %s", encryptionKeyId))
+		return fmt.Errorf(fmt.Sprintf("failed to clear current flag for encryption key %s", encryptionKeyId), err)
 	}
 
 	return nil
@@ -330,12 +330,12 @@ func (s *service) DeleteEncryptionKeyVersion(ctx context.Context, id apid.ID) er
 		Exec()
 
 	if err != nil {
-		return errors.Wrap(err, "failed to delete encryption key version")
+		return fmt.Errorf("failed to delete encryption key version: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "failed to get rows affected")
+		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
 	if rowsAffected == 0 {
 		return ErrNotFound
@@ -353,7 +353,7 @@ func (s *service) DeleteEncryptionKeyVersionsForEncryptionKey(ctx context.Contex
 		Exec()
 
 	if err != nil {
-		return errors.Wrap(err, "failed to delete encryption key versions for encryption key")
+		return fmt.Errorf("failed to delete encryption key versions for encryption key: %w", err)
 	}
 
 	return nil
@@ -375,12 +375,12 @@ func (s *service) SetEncryptionKeyVersionCurrentFlag(ctx context.Context, id api
 		Exec()
 
 	if err != nil {
-		return errors.Wrap(err, "failed to set encryption key version current flag")
+		return fmt.Errorf("failed to set encryption key version current flag: %w", err)
 	}
 
 	rowsAffected, err := result.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "failed to get rows affected")
+		return fmt.Errorf("failed to get rows affected: %w", err)
 	}
 	if rowsAffected == 0 {
 		return ErrNotFound

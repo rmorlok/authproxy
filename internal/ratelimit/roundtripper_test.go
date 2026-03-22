@@ -7,6 +7,8 @@ import (
 	"testing"
 	"time"
 
+	"log/slog"
+
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
@@ -14,7 +16,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
-	"log/slog"
 )
 
 type mockTransport struct {

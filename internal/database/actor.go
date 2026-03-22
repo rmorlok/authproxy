@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"database/sql/driver"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"slices"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
@@ -246,7 +246,7 @@ func (a *Actor) validate() error {
 	}
 
 	if err := ValidateNamespacePath(a.Namespace); err != nil {
-		result = multierror.Append(result, errors.Wrap(err, "invalid actor namespace"))
+		result = multierror.Append(result, fmt.Errorf("invalid actor namespace: %w", err))
 	}
 
 	if a.ExternalId == "" {
@@ -261,11 +261,11 @@ func (a *Actor) validate() error {
 	}
 
 	if err := a.Labels.Validate(); err != nil {
-		result = multierror.Append(result, errors.Wrap(err, "invalid actor labels"))
+		result = multierror.Append(result, fmt.Errorf("invalid actor labels: %w", err))
 	}
 
 	if err := a.Annotations.Validate(); err != nil {
-		result = multierror.Append(result, errors.Wrap(err, "invalid actor annotations"))
+		result = multierror.Append(result, fmt.Errorf("invalid actor annotations: %w", err))
 	}
 
 	return result.ErrorOrNil()
@@ -351,7 +351,7 @@ func (s *service) CreateActor(ctx context.Context, a *Actor) error {
 		}
 
 		if count > 0 {
-			return errors.Wrap(ErrDuplicate, "actor already exists")
+			return fmt.Errorf("actor already exists: %w", ErrDuplicate)
 		}
 
 		err = s.sq.
@@ -368,7 +368,7 @@ func (s *service) CreateActor(ctx context.Context, a *Actor) error {
 		}
 
 		if count == 0 {
-			return errors.Wrap(ErrNamespaceDoesNotExist, "actor namespace does not exist")
+			return fmt.Errorf("actor namespace does not exist: %w", ErrNamespaceDoesNotExist)
 		}
 
 		cpy := *a
@@ -420,7 +420,7 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 		}
 
 		if err := ValidateNamespacePath(d.GetNamespace()); err != nil {
-			return nil, errors.Wrap(err, "invalid actor namespace")
+			return nil, fmt.Errorf("invalid actor namespace: %w", err)
 		}
 	}
 
@@ -464,12 +464,12 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 					RunWith(tx).
 					Exec()
 				if err != nil {
-					return errors.Wrap(err, "failed to create actor on upsert")
+					return fmt.Errorf("failed to create actor on upsert: %w", err)
 				}
 
 				affected, err := dbResult.RowsAffected()
 				if err != nil {
-					return errors.Wrap(err, "failed to create actor on upsert")
+					return fmt.Errorf("failed to create actor on upsert: %w", err)
 				}
 
 				if affected == 0 {
@@ -500,12 +500,12 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 				RunWith(tx).
 				Exec()
 			if err != nil {
-				return errors.Wrap(err, "failed to update existing actor")
+				return fmt.Errorf("failed to update existing actor: %w", err)
 			}
 
 			affected, err := dbResult.RowsAffected()
 			if err != nil {
-				return errors.Wrap(err, "failed to update existing actor")
+				return fmt.Errorf("failed to update existing actor: %w", err)
 			}
 
 			if affected == 0 {
@@ -535,12 +535,12 @@ func (s *service) DeleteActor(ctx context.Context, id apid.ID) error {
 		RunWith(s.db).
 		Exec()
 	if err != nil {
-		return errors.Wrap(err, "failed to soft delete actor")
+		return fmt.Errorf("failed to soft delete actor: %w", err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "failed to soft delete actor")
+		return fmt.Errorf("failed to soft delete actor: %w", err)
 	}
 
 	if affected == 0 {
@@ -548,7 +548,7 @@ func (s *service) DeleteActor(ctx context.Context, id apid.ID) error {
 	}
 
 	if affected > 1 {
-		return errors.Wrap(ErrViolation, "multiple actors were soft deleted")
+		return fmt.Errorf("multiple actors were soft deleted: %w", ErrViolation)
 	}
 
 	return nil
@@ -777,7 +777,7 @@ func (s *service) PutActorLabels(ctx context.Context, id apid.ID, labels map[str
 	}
 
 	if err := ValidateLabels(labels); err != nil {
-		return nil, errors.Wrap(err, "invalid labels")
+		return nil, fmt.Errorf("invalid labels: %w", err)
 	}
 
 	var result *Actor
@@ -828,7 +828,7 @@ func (s *service) PutActorAnnotations(ctx context.Context, id apid.ID, annotatio
 	}
 
 	if err := ValidateAnnotations(annotations); err != nil {
-		return nil, errors.Wrap(err, "invalid annotations")
+		return nil, fmt.Errorf("invalid annotations: %w", err)
 	}
 
 	var result *Actor

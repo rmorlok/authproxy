@@ -2,9 +2,8 @@ package apredis
 
 import (
 	"context"
+	"fmt"
 	"log"
-
-	"github.com/pkg/errors"
 )
 
 func Ping(ctx context.Context, c Client) bool {
@@ -15,7 +14,7 @@ func Ping(ctx context.Context, c Client) bool {
 
 	_, err := c.Ping(ctx).Result()
 	if err != nil {
-		log.Println(errors.Wrap(err, "failed to connect to redis server"))
+		log.Println(fmt.Errorf("failed to connect to redis server: %w", err))
 		return false
 	}
 

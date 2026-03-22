@@ -24,9 +24,9 @@ type MockListRequestBuilderExecutor struct {
 	Namespaces               []string    `json:"namespaces,omitempty"`
 	RequestType              *string     `json:"request_type,omitempty"`
 	CorrelationId            *string     `json:"correlation_id,omitempty"`
-	ConnectionId             *apid.ID  `json:"connection_id,omitempty"`
+	ConnectionId             *apid.ID    `json:"connection_id,omitempty"`
 	ConnectorType            *string     `json:"connector_type,omitempty"`
-	ConnectorId              *apid.ID  `json:"connector_id,omitempty"`
+	ConnectorId              *apid.ID    `json:"connector_id,omitempty"`
 	ConnectorVersion         *uint64     `json:"connector_version,omitempty"`
 	Method                   *string     `json:"method,omitempty"`
 	StatusCodeRangeInclusive []int       `json:"status_code_range,omitempty"`

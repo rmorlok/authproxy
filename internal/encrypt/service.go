@@ -13,8 +13,8 @@ import (
 	"sync"
 	"time"
 
+	"github.com/go-faster/errors"
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -137,26 +137,26 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 				// Value in database would be nil if this is the global key.
 				keyData = s.cfg.GetRoot().SystemAuth.GlobalAESKey
 			} else if key.EncryptedKeyData == nil || key.EncryptedKeyData.IsZero() {
-				merr = multierror.Append(merr, errors.Wrapf(err, "invalid encryption key data for key %q", key.Id))
+				merr = multierror.Append(merr, fmt.Errorf("invalid encryption key data for key %q: %w", key.Id, err))
 				continue
 			} else {
 				// Because we are enumerating in dependency order, the parent key should have already been loaded.
 				// We can look up the ekv from the cache that has been stored to get the data to decrypt this key.
 				ekv, ok := newEkvToVersionInfoCache[key.EncryptedKeyData.ID]
 				if !ok {
-					merr = multierror.Append(merr, errors.Wrapf(err, "encryption key version %s not found in cache for key %q", key.EncryptedKeyData.ID, key.Id))
+					merr = multierror.Append(merr, fmt.Errorf("encryption key version %s not found in cache for key %q: %w", key.EncryptedKeyData.ID, key.Id, err))
 					continue
 				}
 
 				keyDataBytes, err := decryptFieldWithBytes(ekv.Data, *key.EncryptedKeyData)
 				if err != nil {
-					merr = multierror.Append(merr, errors.Wrapf(err, "failed to decrypt encryption key %q data for with ekv %q", key.Id, key.EncryptedKeyData.ID))
+					merr = multierror.Append(merr, fmt.Errorf("failed to decrypt encryption key %q data for with ekv %q: %w", key.Id, key.EncryptedKeyData.ID, err))
 					continue
 				}
 
 				var kd sconfig.KeyData
 				if err := json.Unmarshal(keyDataBytes, &kd); err != nil {
-					merr = multierror.Append(merr, errors.Wrapf(err, "failed to unmarshal encryption key data for key %q", key.Id))
+					merr = multierror.Append(merr, fmt.Errorf("failed to unmarshal encryption key data for key %q: %w", key.Id, err))
 					continue
 				}
 
@@ -183,7 +183,7 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 						} else {
 							kvi, err := keyData.GetVersion(ctx, ekv.ProviderVersion)
 							if err != nil {
-								merr = multierror.Append(merr, errors.Wrapf(err, "failed to get key version for encryption key %q for key version id %q", ekv.EncryptionKeyId, ekv.Id))
+								merr = multierror.Append(merr, fmt.Errorf("failed to get key version for encryption key %q for key version id %q: %w", ekv.EncryptionKeyId, ekv.Id, err))
 								continue
 							}
 
@@ -394,17 +394,17 @@ func (s *service) getAllKeyBytes() [][]byte {
 func encryptWithKey(key []byte, data []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create AES cipher")
+		return nil, fmt.Errorf("failed to create AES cipher: %w", err)
 	}
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create GCM")
+		return nil, fmt.Errorf("failed to create GCM: %w", err)
 	}
 
 	nonce := make([]byte, gcm.NonceSize())
 	if _, err := io.ReadFull(rand.Reader, nonce); err != nil {
-		return nil, errors.Wrap(err, "failed to generate nonce")
+		return nil, fmt.Errorf("failed to generate nonce: %w", err)
 	}
 
 	encryptedData := gcm.Seal(nonce, nonce, data, nil)
@@ -414,12 +414,12 @@ func encryptWithKey(key []byte, data []byte) ([]byte, error) {
 func decryptWithKey(key []byte, data []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create AES cipher")
+		return nil, fmt.Errorf("failed to create AES cipher: %w", err)
 	}
 
 	gcm, err := cipher.NewGCM(block)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to create GCM")
+		return nil, fmt.Errorf("failed to create GCM: %w", err)
 	}
 
 	nonceSize := gcm.NonceSize()
@@ -430,7 +430,7 @@ func decryptWithKey(key []byte, data []byte) ([]byte, error) {
 	nonce, ciphertext := data[:nonceSize], data[nonceSize:]
 	decryptedData, err := gcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		return nil, errors.Wrap(err, "decryption failed")
+		return nil, fmt.Errorf("decryption failed: %w", err)
 	}
 
 	return decryptedData, nil
@@ -446,7 +446,7 @@ func decryptWithAnyKey(keys [][]byte, data []byte) ([]byte, error) {
 		}
 		lastErr = err
 	}
-	return nil, errors.Wrap(lastErr, "decryption failed with all keys")
+	return nil, fmt.Errorf("decryption failed with all keys: %w", lastErr)
 }
 
 // EncryptForKey encrypts data with the current version of the specified key. The caller is assumed to
@@ -525,7 +525,7 @@ func (s *service) EncryptStringForEntity(ctx context.Context, entity NamespacedE
 func decryptFieldWithBytes(keyBytes []byte, ef encfield.EncryptedField) ([]byte, error) {
 	decodedData, err := base64.StdEncoding.DecodeString(ef.Data)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to decode base64 string")
+		return nil, fmt.Errorf("failed to decode base64 string: %w", err)
 	}
 
 	decryptedData, err := decryptWithKey(keyBytes, decodedData)
@@ -545,7 +545,7 @@ func (s *service) decrypt(ef encfield.EncryptedField) ([]byte, error) {
 
 	keyBytes, err := s.getKeyVersionBytes(ef.ID)
 	if err != nil {
-		return nil, errors.Wrapf(err, "failed to get key for ekv_id %s", ef.ID)
+		return nil, fmt.Errorf("failed to get key for ekv_id %s: %w", ef.ID, err)
 	}
 
 	return decryptFieldWithBytes(keyBytes, ef)

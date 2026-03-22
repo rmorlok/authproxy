@@ -3,13 +3,13 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -91,7 +91,7 @@ func (ns *Namespace) Validate() error {
 	result := &multierror.Error{}
 
 	if err := ValidateNamespacePath(ns.Path); err != nil {
-		result = multierror.Append(result, errors.Wrap(err, "invalid namespace path"))
+		result = multierror.Append(result, fmt.Errorf("invalid namespace path: %w", err))
 	}
 
 	if !IsValidNamespaceState(ns.State) {
@@ -99,11 +99,11 @@ func (ns *Namespace) Validate() error {
 	}
 
 	if err := ns.Labels.Validate(); err != nil {
-		result = multierror.Append(result, errors.Wrap(err, "invalid namespace labels"))
+		result = multierror.Append(result, fmt.Errorf("invalid namespace labels: %w", err))
 	}
 
 	if err := ns.Annotations.Validate(); err != nil {
-		result = multierror.Append(result, errors.Wrap(err, "invalid namespace annotations"))
+		result = multierror.Append(result, fmt.Errorf("invalid namespace annotations: %w", err))
 	}
 
 	return result.ErrorOrNil()
@@ -262,7 +262,7 @@ func (s *service) createNamespace(ctx context.Context, tx *sql.Tx, ns *Namespace
 	if err != nil && !errors.Is(err, ErrNotFound) {
 		return err
 	} else if err == nil {
-		return errors.Errorf("cannot create namespace '%s' because it already exists", ns.Path)
+		return fmt.Errorf("cannot create namespace '%s' because it already exists", ns.Path)
 	}
 
 	// Update the state so that we are always bound by the parent namespace state
@@ -279,12 +279,12 @@ func (s *service) createNamespace(ctx context.Context, tx *sql.Tx, ns *Namespace
 		RunWith(tx).
 		Exec()
 	if err != nil {
-		return errors.Wrap(err, "failed to create namespace")
+		return fmt.Errorf("failed to create namespace: %w", err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "failed to create namespace")
+		return fmt.Errorf("failed to create namespace: %w", err)
 	}
 
 	if affected == 0 {
@@ -362,12 +362,12 @@ func (s *service) DeleteNamespace(ctx context.Context, path string) error {
 		RunWith(s.db).
 		Exec()
 	if err != nil {
-		return errors.Wrap(err, "failed to soft delete namespace")
+		return fmt.Errorf("failed to soft delete namespace: %w", err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "failed to soft delete namespace")
+		return fmt.Errorf("failed to soft delete namespace: %w", err)
 	}
 
 	if affected == 0 {
@@ -375,7 +375,7 @@ func (s *service) DeleteNamespace(ctx context.Context, path string) error {
 	}
 
 	if affected > 1 {
-		return errors.Wrap(ErrViolation, "multiple namespaces were soft deleted")
+		return fmt.Errorf("multiple namespaces were soft deleted: %w", ErrViolation)
 	}
 
 	return nil
@@ -385,7 +385,7 @@ func (s *service) SetNamespaceEncryptionKeyId(ctx context.Context, path string, 
 	if ekId != nil {
 		ek, err := s.GetEncryptionKey(ctx, *ekId)
 		if err != nil {
-			return nil, errors.Wrap(err, "failed to look up encryption key")
+			return nil, fmt.Errorf("failed to look up encryption key: %w", err)
 		}
 
 		prefixes := aschema.SplitNamespacePathToPrefixes(path)
@@ -426,12 +426,12 @@ func (s *service) SetNamespaceEncryptionKeyId(ctx context.Context, path string, 
 		RunWith(s.db).
 		Exec()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to set namespace encryption key")
+		return nil, fmt.Errorf("failed to set namespace encryption key: %w", err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to set namespace encryption key")
+		return nil, fmt.Errorf("failed to set namespace encryption key: %w", err)
 	}
 
 	if affected == 0 {
@@ -451,20 +451,20 @@ func (s *service) SetNamespaceState(ctx context.Context, path string, state Name
 		RunWith(s.db).
 		Exec()
 	if err != nil {
-		return errors.Wrap(err, "failed to soft delete namespace")
+		return fmt.Errorf("failed to soft delete namespace: %w", err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "failed to soft delete namespace")
+		return fmt.Errorf("failed to soft delete namespace: %w", err)
 	}
 
 	if affected == 0 {
-		return errors.Wrap(ErrNotFound, "failed to set namespace state")
+		return fmt.Errorf("failed to set namespace state: %w", ErrNotFound)
 	}
 
 	if affected > 1 {
-		return errors.Wrap(ErrViolation, "multiple namespaces were soft deleted")
+		return fmt.Errorf("multiple namespaces were soft deleted: %w", ErrViolation)
 	}
 
 	return nil
@@ -716,7 +716,7 @@ func (s *service) UpdateNamespaceLabels(ctx context.Context, path string, labels
 
 	if labels != nil {
 		if err := ValidateLabels(labels); err != nil {
-			return nil, errors.Wrap(err, "invalid labels")
+			return nil, fmt.Errorf("invalid labels: %w", err)
 		}
 	}
 
@@ -758,7 +758,7 @@ func (s *service) PutNamespaceLabels(ctx context.Context, path string, labels ma
 	}
 
 	if err := ValidateLabels(labels); err != nil {
-		return nil, errors.Wrap(err, "invalid labels")
+		return nil, fmt.Errorf("invalid labels: %w", err)
 	}
 
 	var result *Namespace
@@ -832,7 +832,7 @@ func (s *service) UpdateNamespaceAnnotations(ctx context.Context, path string, a
 
 	if annotations != nil {
 		if err := ValidateAnnotations(annotations); err != nil {
-			return nil, errors.Wrap(err, "invalid annotations")
+			return nil, fmt.Errorf("invalid annotations: %w", err)
 		}
 	}
 
@@ -873,7 +873,7 @@ func (s *service) PutNamespaceAnnotations(ctx context.Context, path string, anno
 	}
 
 	if err := ValidateAnnotations(annotations); err != nil {
-		return nil, errors.Wrap(err, "invalid annotations")
+		return nil, fmt.Errorf("invalid annotations: %w", err)
 	}
 
 	var result *Namespace
@@ -1009,7 +1009,7 @@ func (s *service) EnumerateNamespaceEncryptionTargets(
 					RunWith(s.db).
 					Exec()
 				if err != nil {
-					return errors.Wrapf(err, "failed to update target encryption key version for namespace '%s'", u.Path)
+					return fmt.Errorf("failed to update target encryption key version for namespace '%s': %w", u.Path, err)
 				}
 			}
 		}
@@ -1039,4 +1039,3 @@ func (s *service) ListNamespacesFromCursor(ctx context.Context, cursor string) (
 
 	return b.FromCursor(ctx, cursor)
 }
-

@@ -7,13 +7,13 @@ import (
 	"crypto/rsa"
 	"crypto/x509"
 	"encoding/pem"
+	"errors"
 	"fmt"
 	"os"
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/mitchellh/go-homedir"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -250,7 +250,7 @@ func loadPrivateKeyFromPEMOrOpenSSH(keyData []byte) (interface{}, jwt.SigningMet
 		// Parse the DER-encoded RSA private key
 		privateKey, err := x509.ParsePKCS1PrivateKey(block.Bytes)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "failed to parse RSA private key")
+			return nil, nil, fmt.Errorf("failed to parse RSA private key: %w", err)
 		}
 
 		return privateKey, jwt.SigningMethodRS256, nil
@@ -258,7 +258,7 @@ func loadPrivateKeyFromPEMOrOpenSSH(keyData []byte) (interface{}, jwt.SigningMet
 		// Parse the EC private key
 		privateKey, err := x509.ParseECPrivateKey(block.Bytes)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "failed to parse EC private key")
+			return nil, nil, fmt.Errorf("failed to parse EC private key: %w", err)
 		}
 
 		return signingKeyMethodFromParsedPrivateKey(privateKey)
@@ -266,7 +266,7 @@ func loadPrivateKeyFromPEMOrOpenSSH(keyData []byte) (interface{}, jwt.SigningMet
 		// Parse an unencrypted private key (PKCS#8 encoded)
 		privateKey, err := x509.ParsePKCS8PrivateKey(block.Bytes)
 		if err != nil {
-			return nil, nil, errors.Wrapf(err, "failed to parse private key")
+			return nil, nil, fmt.Errorf("failed to parse private key: %w", err)
 		}
 
 		return signingKeyMethodFromParsedPrivateKey(privateKey)
@@ -343,12 +343,12 @@ func (tb *tokenBuilder) getSigningKeyDataAndMethod() (interface{}, jwt.SigningMe
 
 	_, err = os.Stat(path)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "invalid %s key path", pathType)
+		return nil, nil, fmt.Errorf("invalid %s key path: %w", pathType, err)
 	}
 
 	keyData, err := os.ReadFile(path)
 	if err != nil {
-		return nil, nil, errors.Wrapf(err, "error reading %s key", pathType)
+		return nil, nil, fmt.Errorf("error reading %s key: %w", pathType, err)
 	}
 
 	if isPrivate {
@@ -379,7 +379,7 @@ func (tb *tokenBuilder) TokenCtx(ctx context.Context) (string, error) {
 	token := jwt.NewWithClaims(signingMethdod, claims)
 	tokenString, err := token.SignedString(keyData)
 	if err != nil {
-		return "", errors.Wrap(err, "error signing jwt")
+		return "", fmt.Errorf("error signing jwt: %w", err)
 	}
 
 	return tokenString, nil

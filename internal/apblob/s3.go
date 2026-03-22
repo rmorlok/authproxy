@@ -3,13 +3,14 @@ package apblob
 import (
 	"bytes"
 	"context"
+	"errors"
+	"fmt"
 	"io"
 
 	"github.com/aws/aws-sdk-go-v2/aws"
 	awsconfig "github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
 	"github.com/aws/aws-sdk-go-v2/service/s3/types"
-	pkgerrors "github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
@@ -23,12 +24,12 @@ type s3Client struct {
 func NewS3Client(ctx context.Context, cfg *config.BlobStorageS3) (Client, error) {
 	opts, err := cfg.GetAwsConfigLoadOptions(ctx)
 	if err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to get AWS config load options for blob storage")
+		return nil, fmt.Errorf("failed to get AWS config load options for blob storage: %w", err)
 	}
 
 	awsCfg, err := awsconfig.LoadDefaultConfig(ctx, opts...)
 	if err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to load AWS config for blob storage")
+		return nil, fmt.Errorf("failed to load AWS config for blob storage: %w", err)
 	}
 
 	s3Opts := cfg.GetS3Options()
@@ -56,7 +57,7 @@ func (c *s3Client) Put(ctx context.Context, input PutInput) error {
 
 	_, err := c.client.PutObject(ctx, s3Input)
 	if err != nil {
-		return pkgerrors.Wrap(err, "failed to put blob to S3")
+		return fmt.Errorf("failed to put blob to S3: %w", err)
 	}
 
 	return nil
@@ -71,21 +72,21 @@ func (c *s3Client) Get(ctx context.Context, key string) ([]byte, error) {
 	result, err := c.client.GetObject(ctx, input)
 	if err != nil {
 		var nsk *types.NoSuchKey
-		if pkgerrors.As(err, &nsk) {
+		if errors.As(err, &nsk) {
 			return nil, ErrBlobNotFound
 		}
 		// Also check for the generic not found case (some S3-compatible stores)
 		var notFound *types.NotFound
-		if pkgerrors.As(err, &notFound) {
+		if errors.As(err, &notFound) {
 			return nil, ErrBlobNotFound
 		}
-		return nil, pkgerrors.Wrap(err, "failed to get blob from S3")
+		return nil, fmt.Errorf("failed to get blob from S3: %w", err)
 	}
 	defer result.Body.Close()
 
 	data, err := io.ReadAll(result.Body)
 	if err != nil {
-		return nil, pkgerrors.Wrap(err, "failed to read blob body from S3")
+		return nil, fmt.Errorf("failed to read blob body from S3: %w", err)
 	}
 
 	return data, nil
@@ -99,7 +100,7 @@ func (c *s3Client) Delete(ctx context.Context, key string) error {
 
 	_, err := c.client.DeleteObject(ctx, input)
 	if err != nil {
-		return pkgerrors.Wrap(err, "failed to delete blob from S3")
+		return fmt.Errorf("failed to delete blob from S3: %w", err)
 	}
 
 	return nil

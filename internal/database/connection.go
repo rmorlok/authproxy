@@ -3,14 +3,14 @@ package database
 import (
 	"context"
 	"database/sql"
+	"errors"
 	"fmt"
 	"time"
 
 	sq "github.com/Masterminds/squirrel"
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/hashicorp/go-multierror"
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -126,7 +126,7 @@ func (c *Connection) Validate() error {
 	}
 
 	if err := ValidateNamespacePath(c.Namespace); err != nil {
-		result = multierror.Append(result, errors.Wrap(err, "invalid connection namespace path"))
+		result = multierror.Append(result, fmt.Errorf("invalid connection namespace path: %w", err))
 	}
 
 	if !IsValidConnectionState(c.State) {
@@ -146,11 +146,11 @@ func (c *Connection) Validate() error {
 	}
 
 	if err := c.Labels.Validate(); err != nil {
-		result = multierror.Append(result, errors.Wrap(err, "invalid connection labels"))
+		result = multierror.Append(result, fmt.Errorf("invalid connection labels: %w", err))
 	}
 
 	if err := c.Annotations.Validate(); err != nil {
-		result = multierror.Append(result, errors.Wrap(err, "invalid connection annotations"))
+		result = multierror.Append(result, fmt.Errorf("invalid connection annotations: %w", err))
 	}
 
 	return result.ErrorOrNil()
@@ -222,12 +222,12 @@ func (s *service) DeleteConnection(ctx context.Context, id apid.ID) error {
 		RunWith(s.db).
 		Exec()
 	if err != nil {
-		return errors.Wrap(err, "failed to soft delete connection")
+		return fmt.Errorf("failed to soft delete connection: %w", err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "failed to soft delete connection")
+		return fmt.Errorf("failed to soft delete connection: %w", err)
 	}
 
 	if affected == 0 {
@@ -259,12 +259,12 @@ func (s *service) SetConnectionState(ctx context.Context, id apid.ID, state Conn
 		RunWith(s.db).
 		Exec()
 	if err != nil {
-		return errors.Wrap(err, "failed to soft delete connection")
+		return fmt.Errorf("failed to soft delete connection: %w", err)
 	}
 
 	affected, err := dbResult.RowsAffected()
 	if err != nil {
-		return errors.Wrap(err, "failed to soft delete connection")
+		return fmt.Errorf("failed to soft delete connection: %w", err)
 	}
 
 	if affected == 0 {
@@ -272,7 +272,7 @@ func (s *service) SetConnectionState(ctx context.Context, id apid.ID, state Conn
 	}
 
 	if affected > 1 {
-		return errors.Wrap(ErrViolation, "multiple connections had state updated")
+		return fmt.Errorf("multiple connections had state updated: %w", ErrViolation)
 	}
 
 	return nil
@@ -528,7 +528,7 @@ func (s *service) UpdateConnectionLabels(ctx context.Context, id apid.ID, labels
 
 	if labels != nil {
 		if err := ValidateLabels(labels); err != nil {
-			return nil, errors.Wrap(err, "invalid labels")
+			return nil, fmt.Errorf("invalid labels: %w", err)
 		}
 	}
 
@@ -581,7 +581,7 @@ func (s *service) PutConnectionLabels(ctx context.Context, id apid.ID, labels ma
 	}
 
 	if err := ValidateLabels(labels); err != nil {
-		return nil, errors.Wrap(err, "invalid labels")
+		return nil, fmt.Errorf("invalid labels: %w", err)
 	}
 
 	var result *Connection
@@ -629,7 +629,7 @@ func (s *service) UpdateConnectionAnnotations(ctx context.Context, id apid.ID, a
 
 	if annotations != nil {
 		if err := ValidateAnnotations(annotations); err != nil {
-			return nil, errors.Wrap(err, "invalid annotations")
+			return nil, fmt.Errorf("invalid annotations: %w", err)
 		}
 	}
 
@@ -680,7 +680,7 @@ func (s *service) PutConnectionAnnotations(ctx context.Context, id apid.ID, anno
 	}
 
 	if err := ValidateAnnotations(annotations); err != nil {
-		return nil, errors.Wrap(err, "invalid annotations")
+		return nil, fmt.Errorf("invalid annotations: %w", err)
 	}
 
 	var result *Connection

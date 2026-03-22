@@ -2,9 +2,9 @@ package apredis
 
 import (
 	"context"
+	"fmt"
 	"sync"
 
-	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
@@ -25,7 +25,7 @@ func NewRedis(ctx context.Context, redisConfig *config.RedisReal) (Client, error
 
 			cfg, err := redisConfig.ToRedisOptions(ctx)
 			if err != nil {
-				redisErr = errors.Wrap(err, "failed to convert redis config to redis options")
+				redisErr = fmt.Errorf("failed to convert redis config to redis options: %w", err)
 				return
 			}
 
@@ -35,7 +35,7 @@ func NewRedis(ctx context.Context, redisConfig *config.RedisReal) (Client, error
 			// Test the connection to ensure it's working
 			_, err = redisClient.Ping(context.Background()).Result()
 			if err != nil {
-				redisErr = errors.Wrap(err, "failed to connect to real Redis server")
+				redisErr = fmt.Errorf("failed to connect to real Redis server: %w", err)
 				return
 			}
 		})

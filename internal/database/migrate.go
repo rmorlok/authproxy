@@ -3,13 +3,13 @@ package database
 import (
 	"context"
 	"embed"
+	"errors"
 	"fmt"
 
 	"github.com/golang-migrate/migrate/v4"
 	_ "github.com/golang-migrate/migrate/v4/database/postgres"
 	_ "github.com/golang-migrate/migrate/v4/database/sqlite3"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
-	"github.com/pkg/errors"
 )
 
 //go:embed migrations/**/*.sql
@@ -24,12 +24,12 @@ func (s *service) Migrate(ctx context.Context) error {
 
 	d, err := iofs.New(migrationsFs, fmt.Sprintf("migrations/%s", s.cfg.GetProvider()))
 	if err != nil {
-		return errors.Wrapf(err, "failed to load database migrations for '%s'", s.cfg.GetProvider())
+		return fmt.Errorf("failed to load database migrations for '%s': %w", s.cfg.GetProvider(), err)
 	}
 
 	m, err := migrate.NewWithSourceInstance("iofs", d, s.cfg.GetUri())
 	if err != nil {
-		return errors.Wrap(err, "failed setup database migrations")
+		return fmt.Errorf("failed setup database migrations: %w", err)
 	}
 	defer func() {
 		sourceErr, dbErr := m.Close()
@@ -45,7 +45,7 @@ func (s *service) Migrate(ctx context.Context) error {
 			return nil
 		}
 
-		return errors.Wrap(err, "failed to migrate database")
+		return fmt.Errorf("failed to migrate database: %w", err)
 	}
 
 	return nil

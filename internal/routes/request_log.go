@@ -5,9 +5,9 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/rmorlok/authproxy/internal/apid"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/request_log"
@@ -28,20 +28,20 @@ type ListRequestsQuery struct {
 	/*
 	 * Filters
 	 */
-	Namespace                *string    `form:"namespace"`
-	RequestType              *string    `form:"request_type"`
-	CorrelationId            *string    `form:"correlation_id"`
+	Namespace                *string  `form:"namespace"`
+	RequestType              *string  `form:"request_type"`
+	CorrelationId            *string  `form:"correlation_id"`
 	ConnectionId             *apid.ID `form:"connection_id" swaggertype:"string"`
-	ConnectorType            *string    `form:"connector_type"`
+	ConnectorType            *string  `form:"connector_type"`
 	ConnectorId              *apid.ID `form:"connector_id" swaggertype:"string"`
-	ConnectorVersion         *uint64    `form:"connector_version"`
-	Method                   *string    `form:"method"`
-	StatusCode               *int       `form:"status_code"`
-	StatusCodeRangeInclusive *string    `form:"status_code_range"`
-	TimestampRange           *string    `form:"timestamp_range"`
-	Path                     *string    `form:"path"`
-	PathRegex                *string    `form:"path_regex"`
-	LabelSelector            *string    `form:"label_selector"`
+	ConnectorVersion         *uint64  `form:"connector_version"`
+	Method                   *string  `form:"method"`
+	StatusCode               *int     `form:"status_code"`
+	StatusCodeRangeInclusive *string  `form:"status_code_range"`
+	TimestampRange           *string  `form:"timestamp_range"`
+	Path                     *string  `form:"path"`
+	PathRegex                *string  `form:"path_regex"`
+	LabelSelector            *string  `form:"label_selector"`
 }
 
 func (q *ListRequestsQuery) ApplyToBuilder(

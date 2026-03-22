@@ -1,11 +1,12 @@
 package routes
 
 import (
+	"errors"
+
 	"github.com/gin-gonic/gin"
-	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/pkg/errors"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/config"
@@ -75,7 +76,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 }
 
 type ConnectionJson struct {
-	Id          apid.ID                `json:"id" swaggertype:"string"`
+	Id          apid.ID                  `json:"id" swaggertype:"string"`
 	Namespace   string                   `json:"namespace"`
 	Labels      map[string]string        `json:"labels,omitempty"`
 	Annotations map[string]string        `json:"annotations,omitempty"`

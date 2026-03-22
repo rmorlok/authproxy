@@ -1,14 +1,15 @@
 package routes
 
 import (
+	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/pkg/errors"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/config"
@@ -58,7 +59,7 @@ func (r *Oauth2Routes) callback(gctx *gin.Context) {
 
 	stateUUID, err := apid.Parse(gctx.Query("state"))
 	if err != nil {
-		err = errors.Wrap(err, "failed to parse state param to UUID")
+		err = fmt.Errorf("failed to parse state param to UUID: %w", err)
 		logger.Error(err.Error(), "error", err)
 		api_common.AddGinDebugHeaderError(gctx, err)
 		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
@@ -69,7 +70,7 @@ func (r *Oauth2Routes) callback(gctx *gin.Context) {
 
 	oauthState, err := r.oauthf.GetOAuth2State(ctx, ra.MustGetActor(), stateUUID) // Get the OAuth2 state
 	if err != nil {
-		err = errors.Wrap(err, "failed to get oauth2 state")
+		err = fmt.Errorf("failed to get oauth2 state: %w", err)
 		logger.Error(err.Error(), "error", err)
 		api_common.AddGinDebugHeaderError(gctx, err)
 		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
@@ -81,7 +82,7 @@ func (r *Oauth2Routes) callback(gctx *gin.Context) {
 	if oauthState.CancelSessionAfterAuth() {
 		err = r.authService.EndGinSession(gctx, ra)
 		if err != nil {
-			err = errors.Wrap(err, "failed to end gin session")
+			err = fmt.Errorf("failed to end gin session: %w", err)
 			logger.Error(err.Error(), "error", err)
 			api_common.AddGinDebugHeaderError(gctx, err)
 			r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
@@ -93,7 +94,7 @@ func (r *Oauth2Routes) callback(gctx *gin.Context) {
 
 	redirectUrl, err := oauthState.CallbackFrom3rdParty(ctx, gctx.Request.URL.Query())
 	if err != nil {
-		err = errors.Wrap(err, "failed to handle oauth2 callback")
+		err = fmt.Errorf("failed to handle oauth2 callback: %w", err)
 		logger.Error(err.Error(), "error", err)
 		api_common.AddGinDebugHeaderError(gctx, err)
 		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
@@ -129,7 +130,7 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 		shouldCancelSession = true
 		err := r.authService.EstablishGinSession(gctx, ra)
 		if err != nil {
-			err = errors.Wrap(err, "failed to establish gin session")
+			err = fmt.Errorf("failed to establish gin session: %w", err)
 			logger.Error(err.Error(), "error", err)
 			api_common.AddGinDebugHeaderError(gctx, err)
 			r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
@@ -141,7 +142,7 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 
 	var req RedirectParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		err = errors.Wrap(err, "failed to bind redirect params")
+		err = fmt.Errorf("failed to bind redirect params: %w", err)
 		logger.Error(err.Error(), "error", err)
 		api_common.AddGinDebugHeaderError(gctx, err)
 		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
@@ -161,7 +162,7 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 
 	stateId, err := apid.Parse(req.StateId)
 	if err != nil {
-		err = errors.Wrap(err, "failed to parse state_id")
+		err = fmt.Errorf("failed to parse state_id: %w", err)
 		logger.Error(err.Error(), "error", err)
 		api_common.AddGinDebugHeaderError(gctx, err)
 		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
@@ -172,7 +173,7 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 
 	o2, err := r.oauthf.GetOAuth2State(ctx, ra.MustGetActor(), stateId)
 	if err != nil {
-		err = errors.Wrap(err, "failed to get oauth2 state")
+		err = fmt.Errorf("failed to get oauth2 state: %w", err)
 		logger.Error(err.Error(), "error", err)
 		api_common.AddGinDebugHeaderError(gctx, err)
 		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
@@ -183,7 +184,7 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 
 	err = o2.RecordCancelSessionAfterAuth(ctx, shouldCancelSession)
 	if err != nil {
-		err = errors.Wrap(err, "failed to record cancel session after auth")
+		err = fmt.Errorf("failed to record cancel session after auth: %w", err)
 		logger.Error(err.Error(), "error", err)
 		api_common.AddGinDebugHeaderError(gctx, err)
 		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
@@ -194,7 +195,7 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 
 	redirectUrl, err := o2.GenerateAuthUrl(ctx, ra.MustGetActor())
 	if err != nil {
-		err = errors.Wrap(err, "failed to generate oauth2 redirect url")
+		err = fmt.Errorf("failed to generate oauth2 redirect url: %w", err)
 		logger.Error(err.Error(), "error", err)
 		api_common.AddGinDebugHeaderError(gctx, err)
 		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{

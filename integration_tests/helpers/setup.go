@@ -7,14 +7,14 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/alicebob/miniredis/v2"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
-	"github.com/rmorlok/authproxy/internal/api_common"
-	"github.com/rmorlok/authproxy/internal/apid"
 	asynqmock "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
+	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
-	"github.com/alicebob/miniredis/v2"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
@@ -32,15 +32,15 @@ import (
 
 // IntegrationTestEnv holds all the components needed for an integration test.
 type IntegrationTestEnv struct {
-	Gin            *gin.Engine
-	Cfg            config.C
-	AuthUtil       *auth2.AuthTestUtil
-	Db             database.DB
-	Core           coreIface.C
-	Redis          apredis.Client
-	RedisServer    *miniredis.Miniredis
-	Logger         *slog.Logger
-	Cleanup        func()
+	Gin         *gin.Engine
+	Cfg         config.C
+	AuthUtil    *auth2.AuthTestUtil
+	Db          database.DB
+	Core        coreIface.C
+	Redis       apredis.Client
+	RedisServer *miniredis.Miniredis
+	Logger      *slog.Logger
+	Cleanup     func()
 }
 
 // SetupOptions configures how the integration test environment is created.

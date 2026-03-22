@@ -2,9 +2,9 @@ package config
 
 import (
 	"encoding/json"
+	"fmt"
 	"os"
 
-	"github.com/pkg/errors"
 	"github.com/rmorlok/authproxy/internal/schema"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -19,21 +19,21 @@ func LoadConfig(path string) (C, error) {
 
 	schema, err := schema.CompileSchema(schema.SchemaIdConfig)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to read config schema")
+		return nil, fmt.Errorf("failed to read config schema: %w", err)
 	}
 
 	configJsonBytes, err := util.YamlBytesToJSON(content)
 	if err != nil {
-		return nil, errors.Wrap(err, "failed to convert YAML to JSON for config schema validation")
+		return nil, fmt.Errorf("failed to convert YAML to JSON for config schema validation: %w", err)
 	}
 
 	var configAsParsedJson interface{}
 	if err := json.Unmarshal(configJsonBytes, &configAsParsedJson); err != nil {
-		return nil, errors.Wrap(err, "failed to unmarshal config JSON for config schema validation")
+		return nil, fmt.Errorf("failed to unmarshal config JSON for config schema validation: %w", err)
 	}
 
 	if err := schema.Validate(configAsParsedJson); err != nil {
-		return nil, errors.Wrap(err, "config schema validation failed")
+		return nil, fmt.Errorf("config schema validation failed: %w", err)
 	}
 
 	var root sconfig.Root

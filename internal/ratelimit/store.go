@@ -11,8 +11,8 @@ import (
 )
 
 const (
-	redisKeyPrefix         = "ratelimit:"
-	blockedKeyPrefix       = redisKeyPrefix + "blocked:"
+	redisKeyPrefix          = "ratelimit:"
+	blockedKeyPrefix        = redisKeyPrefix + "blocked:"
 	consecutive429KeyPrefix = redisKeyPrefix + "429count:"
 	// consecutiveCountTTL is how long the consecutive 429 counter persists without activity.
 	consecutiveCountTTL = 1 * time.Hour

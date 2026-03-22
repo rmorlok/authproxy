@@ -4,11 +4,12 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/pkg/errors"
 	"github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
@@ -69,17 +70,17 @@ type sessionId struct {
 func (s *sessionId) GetSessionCookieId(e Encrypt) (string, error) {
 	data, err := json.Marshal(s)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to marshal session id")
+		return "", fmt.Errorf("failed to marshal session id: %w", err)
 	}
 
 	ef, err := e.EncryptGlobal(context.Background(), data)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to encrypt session id")
+		return "", fmt.Errorf("failed to encrypt session id: %w", err)
 	}
 
 	efJSON, err := json.Marshal(ef)
 	if err != nil {
-		return "", errors.Wrap(err, "failed to marshal encrypted field")
+		return "", fmt.Errorf("failed to marshal encrypted field: %w", err)
 	}
 
 	return base64.RawURLEncoding.EncodeToString(efJSON), nil
@@ -88,24 +89,24 @@ func (s *sessionId) GetSessionCookieId(e Encrypt) (string, error) {
 func fromSessionCookieId(val string, e Encrypt) (sessionId, error) {
 	efJSON, err := base64.RawURLEncoding.DecodeString(val)
 	if err != nil {
-		return sessionId{}, errors.Wrap(err, "failed to decode session id")
+		return sessionId{}, fmt.Errorf("failed to decode session id: %w", err)
 	}
 
 	var ef encfield.EncryptedField
 	err = json.Unmarshal(efJSON, &ef)
 	if err != nil {
-		return sessionId{}, errors.Wrap(err, "failed to unmarshal encrypted field")
+		return sessionId{}, fmt.Errorf("failed to unmarshal encrypted field: %w", err)
 	}
 
 	decrypted, err := e.Decrypt(context.Background(), ef)
 	if err != nil {
-		return sessionId{}, errors.Wrap(err, "failed to decrypt session id")
+		return sessionId{}, fmt.Errorf("failed to decrypt session id: %w", err)
 	}
 
 	var sid sessionId
 	err = json.Unmarshal(decrypted, &sid)
 	if err != nil {
-		return sessionId{}, errors.Wrap(err, "failed to unmarshal session id")
+		return sessionId{}, fmt.Errorf("failed to unmarshal session id: %w", err)
 	}
 
 	return sid, nil
@@ -134,18 +135,18 @@ func (s *service) establishAuthFromSession(
 			return fromJwt, nil
 		}
 		// If there is another error, return it
-		return fromJwt, errors.Wrap(err, "failed to read session cookie")
+		return fromJwt, fmt.Errorf("failed to read session cookie: %w", err)
 	}
 
 	// Parse the session cookie ID from the cookie's value
 	sessionCookieId, err := fromSessionCookieId(sessionCookie.Value, s.encrypt)
 	if err != nil || sessionCookieId.Id.IsNil() {
-		return fromJwt, errors.Wrap(err, "invalid session ID in cookie")
+		return fromJwt, fmt.Errorf("invalid session ID in cookie: %w", err)
 	}
 
 	sess, err := s.tryReadSessionFromRedis(ctx, sessionCookieId.Id)
 	if err != nil {
-		return fromJwt, errors.Wrap(err, "failed to read session from redis")
+		return fromJwt, fmt.Errorf("failed to read session from redis: %w", err)
 	}
 
 	if sess == nil {
@@ -155,12 +156,12 @@ func (s *service) establishAuthFromSession(
 
 	// Sanity check
 	if sess.Id != sessionCookieId.Id {
-		return core.NewUnauthenticatedRequestAuth(), errors.Errorf("session id mismatch: %s != %s", sess.Id.String(), sessionCookieId.Id.String())
+		return core.NewUnauthenticatedRequestAuth(), fmt.Errorf("session id mismatch: %s != %s", sess.Id.String(), sessionCookieId.Id.String())
 	}
 
 	// Sanity check to avoid session hijacking in redis
 	if sess.ActorId != sessionCookieId.ActorId {
-		return core.NewUnauthenticatedRequestAuth(), errors.Errorf("session actor mismatch: %s != %s", sess.ActorId.String(), sessionCookieId.ActorId.String())
+		return core.NewUnauthenticatedRequestAuth(), fmt.Errorf("session actor mismatch: %s != %s", sess.ActorId.String(), sessionCookieId.ActorId.String())
 	}
 
 	if fromJwt.IsAuthenticated() {
@@ -170,7 +171,7 @@ func (s *service) establishAuthFromSession(
 			// re-establish session if it wants it.
 			err = s.deleteSessionFromRedis(ctx, sessionCookieId.Id)
 			if err != nil {
-				return core.NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to delete session from redis")
+				return core.NewUnauthenticatedRequestAuth(), fmt.Errorf("failed to delete session from redis: %w", err)
 			}
 
 			return fromJwt, nil
@@ -218,14 +219,14 @@ func (s *service) establishAuthFromSession(
 	if actor == nil {
 		actor, err = s.db.GetActor(ctx, sess.ActorId)
 		if err != nil {
-			return core.NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to get actor from database")
+			return core.NewUnauthenticatedRequestAuth(), fmt.Errorf("failed to get actor from database: %w", err)
 		}
 		cache.Put(actor)
 	}
 
 	err = s.extendSession(ctx, sess, w)
 	if err != nil {
-		return core.NewUnauthenticatedRequestAuth(), errors.Wrap(err, "failed to extend session")
+		return core.NewUnauthenticatedRequestAuth(), fmt.Errorf("failed to extend session: %w", err)
 	}
 
 	return core.NewAuthenticatedRequestAuthWithSession(actor, &sess.Id), nil
@@ -240,12 +241,12 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 	}
 
 	if !s.service.SupportsSession() {
-		return errors.Errorf("server %s does not support session", s.service.GetId())
+		return fmt.Errorf("server %s does not support session", s.service.GetId())
 	}
 
 	sessionService, ok := s.service.(config.HttpServiceWithSession)
 	if !ok {
-		return errors.Errorf("server %s is misconfigured; it inidicates it supports session but does not implement appropriate interfaces", s.service.GetId())
+		return fmt.Errorf("server %s is misconfigured; it inidicates it supports session but does not implement appropriate interfaces", s.service.GetId())
 	}
 
 	var err error
@@ -255,7 +256,7 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 		sessId := *ra.GetSessionId()
 		sess, err = s.tryReadSessionFromRedis(ctx, sessId)
 		if err != nil {
-			return errors.Wrap(err, "failed to read session from redis")
+			return fmt.Errorf("failed to read session from redis: %w", err)
 		}
 
 		if sess != nil {
@@ -263,7 +264,7 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 			if sess.ActorId != ra.GetActor().Id {
 				err = s.deleteSessionFromRedis(ctx, sessId)
 				if err != nil {
-					return errors.Wrap(err, "failed to delete session from redis")
+					return fmt.Errorf("failed to delete session from redis: %w", err)
 				}
 				sess = nil
 			}
@@ -280,11 +281,11 @@ func (s *service) EstablishSession(ctx context.Context, w http.ResponseWriter, r
 
 	err = s.extendSession(ctx, sess, w)
 	if err != nil {
-		return errors.Wrap(err, "failed to establish session")
+		return fmt.Errorf("failed to establish session: %w", err)
 	}
 
 	if s.setSessionCookie(ctx, w, *sess) != nil {
-		return errors.Wrap(err, "failed to set session cookie")
+		return fmt.Errorf("failed to set session cookie: %w", err)
 	}
 
 	ra.SetSessionId(&sess.Id)
@@ -307,7 +308,7 @@ func (s *service) extendSession(ctx context.Context, sess *session, w http.Respo
 
 	// Write the session to Redis
 	if _, err := pipe.Exec(ctx); err != nil {
-		return errors.Wrap(err, "failed to write session to redis")
+		return fmt.Errorf("failed to write session to redis: %w", err)
 	}
 
 	// Pass down the new XSRF token
@@ -326,7 +327,7 @@ func (s *service) setSessionCookie(ctx context.Context, w http.ResponseWriter, s
 	sessId := sess.GetSessionId()
 	val, err := sessId.GetSessionCookieId(s.encrypt)
 	if err != nil {
-		return errors.Wrap(err, "failed to get session cookie id")
+		return fmt.Errorf("failed to get session cookie id: %w", err)
 	}
 
 	http.SetCookie(w, &http.Cookie{
@@ -349,7 +350,7 @@ func (s *service) EndSession(ctx context.Context, w http.ResponseWriter, ra *cor
 	if ra.IsSession() {
 		err := s.deleteSessionFromRedis(ctx, *ra.GetSessionId())
 		if err != nil {
-			return errors.Wrap(err, "failed to delete session from redis")
+			return fmt.Errorf("failed to delete session from redis: %w", err)
 		}
 	}
 
@@ -391,7 +392,7 @@ func (s *service) deleteSessionFromRedis(ctx context.Context, sessionId apid.ID)
 			// Key does not exist, this is not an error
 			return nil
 		}
-		return errors.Wrap(err, "failed to delete session key from redis")
+		return fmt.Errorf("failed to delete session key from redis: %w", err)
 	}
 
 	return nil
@@ -412,16 +413,16 @@ func (s *service) tryReadSessionFromRedis(ctx context.Context, sessionId apid.ID
 			return nil, nil
 		}
 
-		return nil, errors.Wrapf(err, "failed to get session from redis for id %s", sessionId.String())
+		return nil, fmt.Errorf("failed to get session from redis for id %s: %w", sessionId.String(), err)
 	}
 
 	var sess session
 	if err := jsonData.Scan(&sess); err != nil {
-		return nil, errors.Wrap(err, "failed to parse session from redis value")
+		return nil, fmt.Errorf("failed to parse session from redis value: %w", err)
 	}
 
 	if !sess.IsValid() {
-		return nil, errors.Errorf("session %s is invalid", sessionId.String())
+		return nil, fmt.Errorf("session %s is invalid", sessionId.String())
 	}
 
 	if sess.IsExpired(ctx) {
@@ -430,7 +431,7 @@ func (s *service) tryReadSessionFromRedis(ctx context.Context, sessionId apid.ID
 	}
 
 	if sess.ValidXsrfValues, err = xsrfData.Result(); err != nil {
-		return nil, errors.Wrap(err, "failed to get XSRF values from redis")
+		return nil, fmt.Errorf("failed to get XSRF values from redis: %w", err)
 	}
 
 	return &sess, nil
