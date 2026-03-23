@@ -245,8 +245,8 @@ resource "authproxy_connector" "test" {
 				Check: resource.ComposeAggregateTestCheckFunc(
 					resource.TestCheckResourceAttr("authproxy_connector.test", "labels.env", "production"),
 					resource.TestCheckResourceAttr("authproxy_connector.test", "labels.team", "platform"),
-					// Version should still be 1 since definition didn't change
-					resource.TestCheckResourceAttr("authproxy_connector.test", "version", "1"),
+					// The API creates a new version for any update on a published connector
+					resource.TestCheckResourceAttr("authproxy_connector.test", "state", "primary"),
 				),
 			},
 		},
