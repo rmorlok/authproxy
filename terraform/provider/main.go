@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/terraform/provider/internal/provider"
 )
 
+// version is set via ldflags at build time.
 var version = "dev"
 
 func main() {
