@@ -8,7 +8,6 @@ import (
 	"github.com/hashicorp/terraform-plugin-framework/resource"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/booldefault"
-	"github.com/hashicorp/terraform-plugin-framework/resource/schema/int64planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/planmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/resource/schema/stringplanmodifier"
 	"github.com/hashicorp/terraform-plugin-framework/types"
@@ -81,9 +80,6 @@ func (r *ConnectorResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			"version": schema.Int64Attribute{
 				Description: "The current version number.",
 				Computed:    true,
-				PlanModifiers: []planmodifier.Int64{
-					int64planmodifier.UseStateForUnknown(),
-				},
 			},
 			"state": schema.StringAttribute{
 				Description: "The current version state (draft, primary, active, archived).",
@@ -240,13 +236,26 @@ func (r *ConnectorResource) Update(ctx context.Context, req resource.UpdateReque
 			return
 		}
 	} else {
-		// Only labels changed: update current version
-		currentVersion := uint64(state.Version.ValueInt64())
+		// Only labels changed: use connector-level PATCH which handles
+		// draft creation internally (version-level PATCH requires draft state).
 		updateReq := client.UpdateConnectorRequest{Labels: &labels}
-		cv, err = r.client.UpdateConnectorVersion(ctx, id, currentVersion, updateReq)
+		cv, err = r.client.UpdateConnector(ctx, id, updateReq)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update connector labels", err.Error())
 			return
+		}
+
+		if plan.Publish.ValueBool() && cv.State == "draft" {
+			err = r.client.ForceConnectorVersionState(ctx, id, cv.Version, "primary")
+			if err != nil {
+				resp.Diagnostics.AddError("Failed to promote version after label update", err.Error())
+				return
+			}
+			cv, err = r.client.GetConnectorVersion(ctx, id, cv.Version)
+			if err != nil {
+				resp.Diagnostics.AddError("Failed to read connector version after promotion", err.Error())
+				return
+			}
 		}
 	}
 

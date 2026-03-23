@@ -76,6 +76,12 @@ func (c *Client) GetConnectorVersion(ctx context.Context, id string, version uin
 	return &cv, err
 }
 
+func (c *Client) UpdateConnector(ctx context.Context, id string, req UpdateConnectorRequest) (*ConnectorVersion, error) {
+	var cv ConnectorVersion
+	err := c.patch(ctx, fmt.Sprintf("/api/v1/connectors/%s", id), req, &cv)
+	return &cv, err
+}
+
 func (c *Client) UpdateConnectorVersion(ctx context.Context, id string, version uint64, req UpdateConnectorRequest) (*ConnectorVersion, error) {
 	var cv ConnectorVersion
 	err := c.patch(ctx, fmt.Sprintf("/api/v1/connectors/%s/versions/%d", id, version), req, &cv)
