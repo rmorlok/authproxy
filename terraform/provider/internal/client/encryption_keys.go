@@ -16,8 +16,9 @@ type EncryptionKey struct {
 }
 
 type CreateEncryptionKeyRequest struct {
-	Namespace string            `json:"namespace"`
-	Labels    map[string]string `json:"labels,omitempty"`
+	Namespace string                 `json:"namespace"`
+	Labels    map[string]string      `json:"labels,omitempty"`
+	KeyData   map[string]interface{} `json:"key_data"`
 }
 
 type UpdateEncryptionKeyRequest struct {

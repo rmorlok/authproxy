@@ -13,7 +13,7 @@ const minimalConnectorDefinition = `{
   "display_name": "Test Connector",
   "description": "A test connector for integration tests",
   "auth": {
-    "type": "no_auth"
+    "type": "no-auth"
   }
 }`
 
@@ -21,7 +21,7 @@ const updatedConnectorDefinition = `{
   "display_name": "Test Connector Updated",
   "description": "An updated test connector",
   "auth": {
-    "type": "no_auth"
+    "type": "no-auth"
   }
 }`
 
@@ -47,7 +47,7 @@ resource "authproxy_connector" "test" {
     display_name = "Test Connector"
     description  = "A test connector for integration tests"
     auth = {
-      type = "no_auth"
+      type = "no-auth"
     }
   })
 }
@@ -75,7 +75,7 @@ resource "authproxy_connector" "test" {
     display_name = "Test Connector Updated"
     description  = "An updated test connector"
     auth = {
-      type = "no_auth"
+      type = "no-auth"
     }
   })
 }
@@ -111,7 +111,7 @@ resource "authproxy_connector" "test" {
     display_name = "Draft Connector"
     description  = "A draft connector"
     auth = {
-      type = "no_auth"
+      type = "no-auth"
     }
   })
 }
@@ -149,7 +149,7 @@ resource "authproxy_connector" "test" {
     display_name = "Transitioning Connector"
     description  = "Will be promoted"
     auth = {
-      type = "no_auth"
+      type = "no-auth"
     }
   })
 }
@@ -173,7 +173,7 @@ resource "authproxy_connector" "test" {
     display_name = "Transitioning Connector"
     description  = "Will be promoted"
     auth = {
-      type = "no_auth"
+      type = "no-auth"
     }
   })
 }
@@ -208,7 +208,7 @@ resource "authproxy_connector" "test" {
     display_name = "Labeled Connector"
     description  = "Connector with labels"
     auth = {
-      type = "no_auth"
+      type = "no-auth"
     }
   })
   labels = {
@@ -233,7 +233,7 @@ resource "authproxy_connector" "test" {
     display_name = "Labeled Connector"
     description  = "Connector with labels"
     auth = {
-      type = "no_auth"
+      type = "no-auth"
     }
   })
   labels = {
@@ -273,7 +273,7 @@ resource "authproxy_connector" "test" {
     display_name = "Import Test Connector"
     description  = "For import testing"
     auth = {
-      type = "no_auth"
+      type = "no-auth"
     }
   })
 }
@@ -307,7 +307,7 @@ resource "authproxy_connector" "test" {
     display_name = "DataSource Test Connector"
     description  = "For data source testing"
     auth = {
-      type = "no_auth"
+      type = "no-auth"
     }
   })
 }

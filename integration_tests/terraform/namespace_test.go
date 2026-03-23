@@ -35,6 +35,7 @@ resource "authproxy_namespace" "test" {
 				ResourceName:      "authproxy_namespace.test",
 				ImportState:        true,
 				ImportStateVerify:  true,
+				ImportStateId:      "root.tf-test-ns",
 			},
 			// Update labels
 			{

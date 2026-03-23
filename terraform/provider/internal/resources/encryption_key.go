@@ -92,6 +92,7 @@ func (r *EncryptionKeyResource) Create(ctx context.Context, req resource.CreateR
 	ek, err := r.client.CreateEncryptionKey(ctx, client.CreateEncryptionKeyRequest{
 		Namespace: plan.Namespace.ValueString(),
 		Labels:    labels,
+		KeyData:   map[string]interface{}{"random": true},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create encryption key", err.Error())
