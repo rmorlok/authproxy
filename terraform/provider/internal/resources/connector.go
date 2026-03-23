@@ -290,6 +290,14 @@ func (r *ConnectorResource) ImportState(ctx context.Context, req resource.Import
 	resp.Diagnostics.Append(resp.State.SetAttribute(ctx, pathAttr("publish"), true)...)
 }
 
+// connectorMetadataFields are fields the API adds to the definition response
+// that are not part of the user-provided definition. These must be stripped
+// before storing the definition in state to avoid "inconsistent result" errors.
+var connectorMetadataFields = []string{
+	"id", "version", "namespace", "state", "logo",
+	"labels", "created_at", "updated_at",
+}
+
 func setConnectorState(model *ConnectorResourceModel, cv *client.ConnectorVersion) {
 	model.Id = types.StringValue(cv.Id)
 	model.Namespace = types.StringValue(cv.Namespace)
@@ -300,7 +308,21 @@ func setConnectorState(model *ConnectorResourceModel, cv *client.ConnectorVersio
 	model.UpdatedAt = types.StringValue(cv.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
 
 	if cv.Definition != nil {
-		model.Definition = jsontypes.NewNormalizedValue(string(cv.Definition))
+		// Strip metadata fields that the API adds but aren't part of the
+		// user-provided definition.
+		var defMap map[string]json.RawMessage
+		if err := json.Unmarshal(cv.Definition, &defMap); err == nil {
+			for _, field := range connectorMetadataFields {
+				delete(defMap, field)
+			}
+			if cleaned, err := json.Marshal(defMap); err == nil {
+				model.Definition = jsontypes.NewNormalizedValue(string(cleaned))
+			} else {
+				model.Definition = jsontypes.NewNormalizedValue(string(cv.Definition))
+			}
+		} else {
+			model.Definition = jsontypes.NewNormalizedValue(string(cv.Definition))
+		}
 	}
 
 	// Extract display_name from definition

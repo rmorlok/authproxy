@@ -32,10 +32,11 @@ resource "authproxy_namespace" "test" {
 			},
 			// Import
 			{
-				ResourceName:      "authproxy_namespace.test",
-				ImportState:        true,
-				ImportStateVerify:  true,
-				ImportStateId:      "root.tf-test-ns",
+				ResourceName:                         "authproxy_namespace.test",
+				ImportState:                          true,
+				ImportStateVerify:                     true,
+				ImportStateId:                         "root.tf-test-ns",
+				ImportStateVerifyIdentifierAttribute:  "path",
 			},
 			// Update labels
 			{
