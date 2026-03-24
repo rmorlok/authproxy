@@ -10,7 +10,22 @@ AuthProxy is an open-source, embeddable integration platform-as-a-service (iPaaS
 
 ### Backend (Go)
 
-**Start Dependencies:**
+**Start Dependencies (Docker Compose — recommended):**
+```bash
+# Start all data stores (PostgreSQL, Redis, MinIO, ClickHouse)
+docker compose up -d
+
+# Or start full stack including AuthProxy server
+docker compose --profile server up -d
+```
+
+**Reset Data Environment:**
+```bash
+# Tear down all containers, volumes, and networks to start fresh
+./scripts/teardown-docker.sh
+```
+
+**Start Dependencies (Manual — alternative):**
 ```bash
 # Create network
 docker network create authproxy

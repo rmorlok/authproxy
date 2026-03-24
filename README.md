@@ -274,6 +274,14 @@ docker compose --profile server --profile tools down
 
 Add `-v` to also remove data volumes.
 
+**Reset the data environment** (tear down everything and start fresh):
+
+```bash
+./scripts/teardown-docker.sh
+```
+
+This stops all Docker containers (both docker-compose and manually-started), removes all data volumes, and cleans up the network. The next `docker compose up -d` will recreate everything from scratch.
+
 ### Manual Setup
 
 If you prefer to manage dependencies yourself:
