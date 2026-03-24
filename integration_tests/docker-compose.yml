@@ -37,12 +37,14 @@ services:
     image: clickhouse/clickhouse-server:latest
     ports:
       - "8124:8123"
-    volumes:
-      - ../dev_config/clickhouse/users.xml:/etc/clickhouse-server/users.d/authproxy-user.xml:ro
+    environment:
+      CLICKHOUSE_DB: authproxy
+      CLICKHOUSE_USER: authproxy
+      CLICKHOUSE_PASSWORD: authproxy
     tmpfs:
       - /var/lib/clickhouse
     healthcheck:
-      test: ["CMD-SHELL", "clickhouse-client --query 'SELECT 1'"]
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"]
       interval: 3s
       timeout: 3s
       retries: 10
