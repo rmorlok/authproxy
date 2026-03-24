@@ -44,6 +44,24 @@ services:
     networks:
       - authproxy
     command: server /data --console-address ":9001"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  minio-init:
+    image: minio/mc:latest
+    depends_on:
+      minio:
+        condition: service_healthy
+    entrypoint: >
+      /bin/sh -c "
+      mc alias set minio http://minio:9000 minioadmin minioadmin &&
+      mc mb --ignore-existing minio/authproxy-request-logs
+      "
+    networks:
+      - authproxy
 
   clickhouse:
     image: clickhouse/clickhouse-server:latest
