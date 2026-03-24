@@ -1,0 +1,96 @@
+# Integration test configuration.
+# Points at Docker services started by ../docker-compose.yml with non-default ports.
+# Keys are loaded from dev_config/keys/ (relative to repo root).
+
+public:
+  port: 0  # random port
+
+api:
+  port: 0  # random port
+
+admin_api:
+  port: 0  # random port
+
+worker:
+  health_check_port: 0
+  cron_sync_interval: 1m
+
+tasks:
+  default_retention: 24h
+
+host_application:
+  initiate_session_url: http://127.0.0.1:8888/login-redirect
+
+marketplace:
+  base_url: http://localhost:5173
+
+system_auth:
+  jwt_signing_key:
+    public_key:
+      path: ./dev_config/keys/system.pub
+    private_key:
+      path: ./dev_config/keys/system
+  actors:
+    keys_path: ./dev_config/keys/admin
+    permissions:
+      - namespace: root.**
+        resources:
+          - "*"
+        verbs:
+          - "*"
+  global_aes_key:
+    path: ./dev_config/keys/global_aes.key
+
+error_pages:
+  internal_error: https://example.com/500.html
+
+database:
+  provider: postgres
+  auto_migrate: true
+  host: localhost
+  port: 5433
+  user: postgres
+  password: postgres
+  database: authproxy_integration
+  sslmode: disable
+
+logging:
+  type: tint
+  level: warn
+
+http_logging:
+  full_request_recording: always
+  database:
+    provider: clickhouse
+    auto_migrate: true
+    user: authproxy
+    password: authproxy
+    addresses:
+      - localhost:8124
+    database: authproxy
+  blob_storage:
+    provider: s3
+    endpoint: http://localhost:9003
+    region: us-east-1
+    bucket: authproxy-request-logs
+    credentials:
+      type: access_key
+      access_key_id: minioadmin
+      secret_access_key: minioadmin
+    force_path_style: true
+    prefix: "integration-test/"
+
+redis:
+  provider: redis
+  address: localhost:6380
+
+oauth:
+  round_trip_ttl: 60m
+
+connectors:
+  auto_migrate: true
+  auto_migration_lock_duration: 30s
+  identifying_labels:
+    - type
+    - env
+  load_from_list: []

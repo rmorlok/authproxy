@@ -151,13 +151,14 @@ func mustApplyBlankPostgresTestDbConfig(t testing.TB, cfg config.C) (config.C, D
 	defer func() { <-postgresTestLimiter }()
 
 	adminConfig := pgtestdb.Config{
-		DriverName: "pgx",
-		User:       util.GetEnvDefault("POSTGRES_TEST_USER", "postgres"),
-		Password:   util.GetEnvDefault("POSTGRES_TEST_PASSWORD", "postgres"),
-		Host:       util.GetEnvDefault("POSTGRES_TEST_HOST", "localhost"),
-		Port:       util.GetEnvDefault("POSTGRES_TEST_PORT", "5432"),
-		Database:   util.GetEnvDefault("POSTGRES_TEST_DATABASE", "postgres"),
-		Options:    util.GetEnvDefault("POSTGRES_TEST_OPTIONS", "sslmode=disable"),
+		DriverName:                  "pgx",
+		User:                        util.GetEnvDefault("POSTGRES_TEST_USER", "postgres"),
+		Password:                    util.GetEnvDefault("POSTGRES_TEST_PASSWORD", "postgres"),
+		Host:                        util.GetEnvDefault("POSTGRES_TEST_HOST", "localhost"),
+		Port:                        util.GetEnvDefault("POSTGRES_TEST_PORT", "5432"),
+		Database:                    util.GetEnvDefault("POSTGRES_TEST_DATABASE", "postgres"),
+		Options:                     util.GetEnvDefault("POSTGRES_TEST_OPTIONS", "sslmode=disable"),
+		ForceTerminateConnections:   true,
 	}
 
 	migrator := golangmigrator.New(

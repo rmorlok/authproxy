@@ -1,6 +1,6 @@
 //go:build integration
 
-package integration_tests
+package proxy
 
 import (
 	"encoding/json"
@@ -84,10 +84,9 @@ func TestRateLimiting429(t *testing.T) {
 		assert.Equal(t, "true", resp.Headers["X-Authproxy-Ratelimited"],
 			"should have authproxy rate limit header")
 
-		// Step 4: Configure upstream back to 200 and advance miniredis time to expire the backoff
+		// Step 4: Configure upstream back to 200 and wait for the backoff to expire
 		ts.SetReturn200()
-
-		env.RedisServer.FastForward(3 * time.Second)
+		time.Sleep(3 * time.Second)
 
 		// This request should now go through to the upstream
 		w = env.DoProxyRequest(t, connectionID, ts.BaseURL+"/test", "GET")
@@ -173,8 +172,8 @@ func TestRateLimiting429(t *testing.T) {
 		assert.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
 		assert.Equal(t, "true", resp.Headers["X-Authproxy-Ratelimited"])
 
-		// Advance miniredis time to expire the 1-second retry-after
-		env.RedisServer.FastForward(2 * time.Second)
+		// Wait for the 1-second retry-after to expire
+		time.Sleep(2 * time.Second)
 
 		// Should be unblocked now
 		w = env.DoProxyRequest(t, connectionID, ts.BaseURL+"/test", "GET")

@@ -2,6 +2,7 @@ package service
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -137,6 +138,25 @@ func (atu *AuthTestUtil) SignRequestHeaderAs(ctx context.Context, req *http.Requ
 	req.Header.Set(JwtHeaderKey, fmt.Sprintf("Bearer %s", tokenString))
 
 	return req, nil
+}
+
+// NewAuthTestUtil creates an AuthTestUtil from an existing auth service.
+func NewAuthTestUtil(cfg config.C, authService A, serviceId sconfig.ServiceId) *AuthTestUtil {
+	return &AuthTestUtil{cfg: cfg, s: authService.(*service), serviceId: serviceId}
+}
+
+// GenerateBearerToken creates a signed JWT bearer token string for the given actor identity.
+func (atu *AuthTestUtil) GenerateBearerToken(ctx context.Context, externalId, namespace string, permissions []aschema.Permission) (string, error) {
+	claims := atu.claimsForActor(ctx, core.Actor{
+		ExternalId:  externalId,
+		Namespace:   namespace,
+		Permissions: permissions,
+	})
+	if claims == nil {
+		return "", errors.New("failed to create claims for actor")
+	}
+
+	return atu.s.Token(ctx, claims)
 }
 
 func (atu *AuthTestUtil) SignRequestQueryAs(ctx context.Context, req *http.Request, a core.Actor) (*http.Request, error) {
