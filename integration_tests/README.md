@@ -20,15 +20,15 @@ docker compose ps
 ## Running
 
 ```bash
-# Run all integration tests
+# Run all integration tests (TF_ACC=1 enables Terraform acceptance tests)
 cd integration_tests
-go test -tags integration -v ./...
+TF_ACC=1 go test -tags integration -v ./...
 
 # Run proxy tests only
 go test -tags integration -v ./proxy/...
 
-# Run Terraform provider tests only
-go test -tags integration -v ./terraform/...
+# Run Terraform provider tests only (TF_ACC=1 required)
+TF_ACC=1 go test -tags integration -v ./terraform/...
 
 # Run a specific test
 go test -tags integration -v -run TestRateLimiting429 ./proxy/...
