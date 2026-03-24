@@ -1128,4 +1128,113 @@ func TestAuth(t *testing.T) {
 			require.Equal(t, 1, ts.GetPingCount())
 		})
 	})
+
+	t.Run("stale session cookie after encryption key rotation", func(t *testing.T) {
+		// This test verifies the fix for GitHub issue #108: after a data environment
+		// reset, encryption keys are recreated. The browser still has the old session
+		// cookie which can't be decrypted with the new keys. The system should clear the
+		// stale cookie instead of returning an error, so that subsequent requests succeed.
+
+		t.Run("required auth clears stale cookie and returns unauthorized", func(t *testing.T) {
+			ts := NewTestGinServerBuilder(t).
+				WithGetPingRequiredAuthRoute("/ping").
+				Build()
+
+			// Inject a stale session cookie that cannot be decrypted (simulates key rotation)
+			ts.CookieJar.SetCookies(
+				util.Must(url.Parse("http://example.com")),
+				[]*http.Cookie{{
+					Name:  sessionCookieName,
+					Value: "dGhpcy1pcy1ub3QtYS12YWxpZC1lbmNyeXB0ZWQtc2Vzc2lvbg", // garbage base64
+				}},
+			)
+
+			// First request: stale cookie is present, should get 401 but cookie gets cleared
+			_, statusCode, _ := ts.GET(ctx, "/ping")
+			require.Equal(t, http.StatusUnauthorized, statusCode)
+
+			// Verify the cookie was cleared (MaxAge=-1 causes the jar to remove it)
+			cookies := ts.CookieJar.Cookies(util.Must(url.Parse("http://example.com")))
+			hasSessionCookie := false
+			for _, c := range cookies {
+				if c.Name == sessionCookieName {
+					hasSessionCookie = true
+				}
+			}
+			require.False(t, hasSessionCookie, "stale session cookie should have been cleared")
+
+			// Second request: no stale cookie, clean 401 (no error, just unauthenticated)
+			_, statusCode, _ = ts.GET(ctx, "/ping")
+			require.Equal(t, http.StatusUnauthorized, statusCode)
+		})
+
+		t.Run("optional auth clears stale cookie and allows access", func(t *testing.T) {
+			ts := NewTestGinServerBuilder(t).
+				WithGetPingOptionalAuthRoute("/ping").
+				Build()
+
+			// Inject a stale session cookie
+			ts.CookieJar.SetCookies(
+				util.Must(url.Parse("http://example.com")),
+				[]*http.Cookie{{
+					Name:  sessionCookieName,
+					Value: "dGhpcy1pcy1ub3QtYS12YWxpZC1lbmNyeXB0ZWQtc2Vzc2lvbg",
+				}},
+			)
+
+			// Request with stale cookie on optional auth route should succeed (not error)
+			resp, statusCode, debugHeader := ts.GET(ctx, "/ping")
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 1, ts.GetPingCount())
+		})
+
+		t.Run("stale cookie cleared then new session established", func(t *testing.T) {
+			ts := NewTestGinServerBuilder(t).
+				WithRequiredAuthRoute(http.MethodGet, "/initiate-session", func(gctx *gin.Context, auth A) {
+					ra := GetAuthFromGinContext(gctx)
+					err := auth.EstablishGinSession(gctx, ra)
+					if err != nil {
+						api_common.NewHttpStatusErrorBuilder().
+							WithInternalErr(err).
+							BuildStatusError().
+							WriteGinResponse(nil, gctx)
+						return
+					}
+					gctx.PureJSON(http.StatusOK, gin.H{"ok": true})
+				}).
+				WithGetPingRequiredAuthRoute("/ping").
+				Build()
+
+			// Inject a stale session cookie
+			ts.CookieJar.SetCookies(
+				util.Must(url.Parse("http://example.com")),
+				[]*http.Cookie{{
+					Name:  sessionCookieName,
+					Value: "dGhpcy1pcy1ub3QtYS12YWxpZC1lbmNyeXB0ZWQtc2Vzc2lvbg",
+				}},
+			)
+
+			// First request clears the stale cookie
+			_, statusCode, _ := ts.GET(ctx, "/ping")
+			require.Equal(t, http.StatusUnauthorized, statusCode)
+
+			// Now authenticate with JWT and establish a new session
+			s := jwt.NewJwtTokenBuilder().
+				WithActorExternalId(ts.MustGetValidUser(ctx).ExternalId).
+				WithServiceId(ts.Service).
+				MustWithConfigKey(ctx, ts.MustGetValidSigningTokenForUser()).
+				MustSignerCtx(ctx)
+
+			resp, statusCode, debugHeader := ts.GET(ctx, s.SignUrlQuery("/initiate-session"))
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+
+			// Session works - can access without JWT
+			resp, statusCode, debugHeader = ts.GET(ctx, "/ping")
+			require.Equal(t, http.StatusOK, statusCode, debugHeader)
+			require.Equal(t, gin.H{"ok": true}, resp)
+			require.Equal(t, 1, ts.GetPingCount())
+		})
+	})
 }

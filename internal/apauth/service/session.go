@@ -138,10 +138,14 @@ func (s *service) establishAuthFromSession(
 		return fromJwt, fmt.Errorf("failed to read session cookie: %w", err)
 	}
 
-	// Parse the session cookie ID from the cookie's value
+	// Parse the session cookie ID from the cookie's value. If decryption fails (e.g. encryption keys
+	// were rotated after a data environment reset), clear the stale cookie so subsequent requests can
+	// establish a fresh session instead of failing repeatedly.
 	sessionCookieId, err := fromSessionCookieId(sessionCookie.Value, s.encrypt)
 	if err != nil || sessionCookieId.Id.IsNil() {
-		return fromJwt, fmt.Errorf("invalid session ID in cookie: %w", err)
+		s.logger.Warn("failed to parse session cookie, clearing stale cookie", "error", err)
+		s.clearSessionCookie(w)
+		return fromJwt, nil
 	}
 
 	sess, err := s.tryReadSessionFromRedis(ctx, sessionCookieId.Id)
@@ -344,6 +348,22 @@ func (s *service) setSessionCookie(ctx context.Context, w http.ResponseWriter, s
 	return nil
 }
 
+// clearSessionCookie writes a Set-Cookie header that expires the session cookie.
+func (s *service) clearSessionCookie(w http.ResponseWriter) {
+	sessionService := s.service.(config.HttpServiceWithSession)
+	http.SetCookie(w, &http.Cookie{
+		Name:     sessionCookieName,
+		Value:    "",
+		HttpOnly: false,
+		Path:     "/",
+		Domain:   sessionService.CookieDomain(),
+		MaxAge:   -1,
+		Expires:  time.Unix(0, 0),
+		Secure:   s.service.IsHttps(),
+		SameSite: http.SameSiteLaxMode,
+	})
+}
+
 // EndSession terminates a session that is in progress by clearing the session information from redis and clearing
 // session id cookies on the response.
 func (s *service) EndSession(ctx context.Context, w http.ResponseWriter, ra *core.RequestAuth) error {
@@ -354,19 +374,7 @@ func (s *service) EndSession(ctx context.Context, w http.ResponseWriter, ra *cor
 		}
 	}
 
-	sessionService := s.service.(config.HttpServiceWithSession)
-	sessionCookie := http.Cookie{
-		Name:     sessionCookieName,
-		Value:    "",
-		HttpOnly: false,
-		Path:     "/",
-		Domain:   sessionService.CookieDomain(),
-		MaxAge:   -1,
-		Expires:  time.Unix(0, 0),
-		Secure:   s.service.IsHttps(),
-		SameSite: http.SameSiteLaxMode,
-	}
-	http.SetCookie(w, &sessionCookie)
+	s.clearSessionCookie(w)
 
 	return nil
 }
