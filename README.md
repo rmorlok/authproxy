@@ -42,7 +42,7 @@ sequenceDiagram
 
 A **connector** defines how to authenticate with a specific external service. It is a declarative specification that includes the authentication method (OAuth2, API key, or no auth), required scopes, token endpoints, and validation probes. Connectors are defined in YAML configuration and stored as immutable, versioned records.
 
-A **connection** is a runtime instance of an authenticated session with an external service. When a user authorizes access through the OAuth2 flow (or provides an API key), AuthProxy creates a connection that stores the encrypted credentials. Connections are owned by actors and scoped to namespaces.
+A **connection** is a runtime instance of an authenticated session with an external service. When a user authorizes access through the OAuth2 flow (or provides an API key), AuthProxy creates a connection that stores the encrypted credentials.
 
 Supported authentication methods:
 
@@ -107,11 +107,11 @@ permissions:
 permissions:
   - namespace: "root.team-alpha.project-1"
     resources: ["connections"]
-    resource_ids: ["conn_abc123"]
+    resource_ids: ["cxn_abc123"]
     verbs: ["proxy"]
 ```
 
-### Developer-First Authentication
+### Dev Env Authentication
 
 AuthProxy is built with a developer-first orientation. Developers can register local SSH keys or private keys to sign JWTs directly, enabling self-signed requests to a deployed AuthProxy server without needing a separate authentication flow.
 
@@ -125,7 +125,7 @@ The system supports both **actor-signed tokens** (asymmetric, using the actor's 
 
 ### Application-Level Encryption
 
-AuthProxy employs **application-level encryption** (ALE) for all sensitive data. OAuth tokens, API keys, and connector definitions are encrypted before they reach any data store — whether that's the primary database, Redis, or object storage. Direct access to the database does not provide a path to view credentials; an attacker with a database dump sees only ciphertext.
+AuthProxy employs **application-level encryption** (ALE) for all sensitive data. OAuth tokens, API keys, and connector definitions are encrypted before they reach any data store — whether that's the primary database, Redis, or object storage. Direct access to the database does not provide a path to view credentials or other sensitive data; an attacker with a database dump sees only ciphertext.
 
 All encrypted values use AES-GCM and are stored in a self-describing format that embeds the encryption key version ID alongside the ciphertext:
 
