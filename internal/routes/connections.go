@@ -75,6 +75,70 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, resp)
 }
 
+// @Summary		Submit connection form
+// @Description	Submit form data for a connection setup step
+// @Tags			connections
+// @Accept			json
+// @Produce		json
+// @Param			id		path		string					true	"Connection ID"
+// @Param			request	body		SubmitConnectionRequest	true	"Form submission data"
+// @Success		200		{object}	InitiateConnectionComplete
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		501		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/_submit [post]
+func (r *ConnectionsRoutes) submit(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := apid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid id format").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == apid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	var req coreIface.SubmitConnectionRequest
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	resp, err := r.core.SubmitConnection(ctx, id, req)
+	if err != nil {
+		api_common.HttpStatusErrorBuilderFromError(err).
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, resp)
+}
+
 type ConnectionJson struct {
 	Id          apid.ID                  `json:"id" swaggertype:"string"`
 	Namespace   string                   `json:"namespace"`
@@ -1549,6 +1613,15 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 			ForIdField("id").
 			Build(),
 		r.get,
+	)
+	g.POST(
+		"/connections/:id/_submit",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("update").
+			ForIdField("id").
+			Build(),
+		r.submit,
 	)
 	g.POST(
 		"/connections/:id/_disconnect",

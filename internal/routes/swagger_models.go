@@ -42,6 +42,38 @@ type InitiateConnectionRedirect struct {
 	RedirectUrl string `json:"redirect_url" example:"https://oauth.provider.com/authorize?..."`
 }
 
+// InitiateConnectionForm represents the response when a connection requires form input.
+//
+//	@Description	Form response for connection initiation
+type InitiateConnectionForm struct {
+	// Connection UUID
+	Id apid.ID `swaggertype:"string" json:"id" example:"req_test550e8400abcde"`
+	// Response type (always "form")
+	Type string `json:"type" example:"form"`
+	// JSON Schema defining the form fields
+	JsonSchema interface{} `json:"json_schema"`
+	// UI Schema for JSON Forms rendering
+	UiSchema interface{} `json:"ui_schema"`
+}
+
+// InitiateConnectionComplete represents the response when a connection setup is complete.
+//
+//	@Description	Completion response for connection initiation
+type InitiateConnectionComplete struct {
+	// Connection UUID
+	Id apid.ID `swaggertype:"string" json:"id" example:"req_test550e8400abcde"`
+	// Response type (always "complete")
+	Type string `json:"type" example:"complete"`
+}
+
+// SubmitConnectionRequest represents a form data submission for a connection setup step.
+//
+//	@Description	Form submission data
+type SubmitConnectionRequest struct {
+	// Form data matching the JSON Schema provided in the form response
+	Data interface{} `json:"data"`
+}
+
 // ProxyRequest represents a request to proxy through a connection.
 //
 //	@Description	Request to proxy an HTTP request through a connection

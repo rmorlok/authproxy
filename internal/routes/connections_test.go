@@ -1654,4 +1654,66 @@ func TestConnections(t *testing.T) {
 			require.Equal(t, "value2", conn.Annotations["to-keep"])
 		})
 	})
+
+	t.Run("submit connection form", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		connId := apid.New(apid.PrefixConnection)
+		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
+			Id:               connId,
+			Namespace:        sconfig.RootNamespace,
+			ConnectorId:      connectorId,
+			ConnectorVersion: connectorVersion,
+			State:            database.ConnectionStateCreated,
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPost, "/connections/"+connId.String()+"/_submit", util.JsonToReader(map[string]interface{}{
+				"data": map[string]interface{}{"key": "value"},
+			}))
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("bad request - invalid id", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connections/not-a-valid-id/_submit",
+				util.JsonToReader(map[string]interface{}{
+					"data": map[string]interface{}{"key": "value"},
+				}),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("not implemented", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connections/"+connId.String()+"/_submit",
+				util.JsonToReader(map[string]interface{}{
+					"data": map[string]interface{}{"key": "value"},
+				}),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotImplemented, w.Code)
+		})
+	})
 }
