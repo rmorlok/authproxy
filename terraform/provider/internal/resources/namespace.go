@@ -23,6 +23,7 @@ type NamespaceResourceModel struct {
 	State           types.String `tfsdk:"state"`
 	EncryptionKeyId types.String `tfsdk:"encryption_key_id"`
 	Labels          types.Map    `tfsdk:"labels"`
+	Annotations     types.Map    `tfsdk:"annotations"`
 	CreatedAt       types.String `tfsdk:"created_at"`
 	UpdatedAt       types.String `tfsdk:"updated_at"`
 }
@@ -60,6 +61,12 @@ func (r *NamespaceResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 				Computed:    true,
 				ElementType: types.StringType,
 			},
+			"annotations": schema.MapAttribute{
+				Description: "Annotations for the namespace.",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+			},
 			"created_at": schema.StringAttribute{
 				Computed: true,
 			},
@@ -89,9 +96,15 @@ func (r *NamespaceResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
+	annotations := extractAnnotations(ctx, plan.Annotations, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	ns, err := r.client.CreateNamespace(ctx, client.CreateNamespaceRequest{
-		Path:   plan.Path.ValueString(),
-		Labels: labels,
+		Path:        plan.Path.ValueString(),
+		Labels:      labels,
+		Annotations: annotations,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create namespace", err.Error())
@@ -135,8 +148,14 @@ func (r *NamespaceResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
+	annotations := extractAnnotations(ctx, plan.Annotations, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	ns, err := r.client.UpdateNamespace(ctx, plan.Path.ValueString(), client.UpdateNamespaceRequest{
-		Labels: labels,
+		Labels:      labels,
+		Annotations: annotations,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update namespace", err.Error())
@@ -173,6 +192,7 @@ func setNamespaceState(model *NamespaceResourceModel, ns *client.Namespace) {
 		model.EncryptionKeyId = types.StringNull()
 	}
 	model.Labels = labelsToMap(ns.Labels)
+	model.Annotations = annotationsToMap(ns.Annotations)
 	model.CreatedAt = types.StringValue(ns.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
 	model.UpdatedAt = types.StringValue(ns.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
 }

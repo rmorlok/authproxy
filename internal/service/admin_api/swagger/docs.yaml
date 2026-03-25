@@ -61,6 +61,10 @@ definitions:
     type: object
   routes.CreateEncryptionKeyRequestJson:
     properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
       key_data:
         $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_config.KeyData'
       labels:

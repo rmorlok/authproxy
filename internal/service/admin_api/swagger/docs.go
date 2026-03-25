@@ -6165,6 +6165,12 @@ const docTemplateadmin_api = `{
         "routes.CreateEncryptionKeyRequestJson": {
             "type": "object",
             "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
                 "key_data": {
                     "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_config.KeyData"
                 },

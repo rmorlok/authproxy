@@ -24,6 +24,7 @@ type ConnectorDataSourceModel struct {
 	Description types.String `tfsdk:"description"`
 	Logo        types.String `tfsdk:"logo"`
 	Labels      types.Map    `tfsdk:"labels"`
+	Annotations types.Map    `tfsdk:"annotations"`
 	CreatedAt   types.String `tfsdk:"created_at"`
 	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
@@ -48,6 +49,7 @@ func (d *ConnectorDataSource) Schema(_ context.Context, _ datasource.SchemaReque
 			"description":  schema.StringAttribute{Computed: true},
 			"logo":         schema.StringAttribute{Computed: true},
 			"labels":       schema.MapAttribute{Computed: true, ElementType: types.StringType},
+			"annotations":  schema.MapAttribute{Computed: true, ElementType: types.StringType},
 			"created_at":   schema.StringAttribute{Computed: true},
 			"updated_at":   schema.StringAttribute{Computed: true},
 		},
@@ -81,6 +83,7 @@ func (d *ConnectorDataSource) Read(ctx context.Context, req datasource.ReadReque
 	config.Description = types.StringValue(conn.Description)
 	config.Logo = types.StringValue(conn.Logo)
 	config.Labels = labelsToMap(conn.Labels)
+	config.Annotations = annotationsToMap(conn.Annotations)
 	config.CreatedAt = types.StringValue(conn.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
 	config.UpdatedAt = types.StringValue(conn.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
 

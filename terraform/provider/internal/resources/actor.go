@@ -19,12 +19,13 @@ type ActorResource struct {
 }
 
 type ActorResourceModel struct {
-	Id         types.String `tfsdk:"id"`
-	Namespace  types.String `tfsdk:"namespace"`
-	ExternalId types.String `tfsdk:"external_id"`
-	Labels     types.Map    `tfsdk:"labels"`
-	CreatedAt  types.String `tfsdk:"created_at"`
-	UpdatedAt  types.String `tfsdk:"updated_at"`
+	Id          types.String `tfsdk:"id"`
+	Namespace   types.String `tfsdk:"namespace"`
+	ExternalId  types.String `tfsdk:"external_id"`
+	Labels      types.Map    `tfsdk:"labels"`
+	Annotations types.Map    `tfsdk:"annotations"`
+	CreatedAt   types.String `tfsdk:"created_at"`
+	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
 
 func NewActorResource() resource.Resource {
@@ -66,6 +67,12 @@ func (r *ActorResource) Schema(_ context.Context, _ resource.SchemaRequest, resp
 				Computed:    true,
 				ElementType: types.StringType,
 			},
+			"annotations": schema.MapAttribute{
+				Description: "Annotations for the actor.",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+			},
 			"created_at": schema.StringAttribute{Computed: true},
 			"updated_at": schema.StringAttribute{Computed: true},
 		},
@@ -91,10 +98,16 @@ func (r *ActorResource) Create(ctx context.Context, req resource.CreateRequest, 
 		return
 	}
 
+	annotations := extractAnnotations(ctx, plan.Annotations, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	a, err := r.client.CreateActor(ctx, client.CreateActorRequest{
-		ExternalId: plan.ExternalId.ValueString(),
-		Namespace:  plan.Namespace.ValueString(),
-		Labels:     labels,
+		ExternalId:  plan.ExternalId.ValueString(),
+		Namespace:   plan.Namespace.ValueString(),
+		Labels:      labels,
+		Annotations: annotations,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create actor", err.Error())
@@ -138,8 +151,14 @@ func (r *ActorResource) Update(ctx context.Context, req resource.UpdateRequest, 
 		return
 	}
 
+	annotations := extractAnnotations(ctx, plan.Annotations, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	a, err := r.client.UpdateActor(ctx, plan.Id.ValueString(), client.UpdateActorRequest{
-		Labels: labels,
+		Labels:      labels,
+		Annotations: annotations,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to update actor", err.Error())
@@ -172,6 +191,7 @@ func setActorState(model *ActorResourceModel, a *client.Actor) {
 	model.Namespace = types.StringValue(a.Namespace)
 	model.ExternalId = types.StringValue(a.ExternalId)
 	model.Labels = labelsToMap(a.Labels)
+	model.Annotations = annotationsToMap(a.Annotations)
 	model.CreatedAt = types.StringValue(a.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
 	model.UpdatedAt = types.StringValue(a.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
 }

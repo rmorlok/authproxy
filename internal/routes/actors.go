@@ -628,12 +628,27 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 		return
 	}
 
+	// Validate annotations if provided
+	if req.Annotations != nil {
+		if err := database.Annotations(req.Annotations).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid annotations: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(r.logger, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
 	// Create the actor
 	actor := &database.Actor{
-		Id:         apid.New(apid.PrefixActor),
-		Namespace:  req.Namespace,
-		ExternalId: req.ExternalId,
-		Labels:     req.Labels,
+		Id:          apid.New(apid.PrefixActor),
+		Namespace:   req.Namespace,
+		ExternalId:  req.ExternalId,
+		Labels:      req.Labels,
+		Annotations: req.Annotations,
 	}
 
 	if err := r.db.CreateActor(ctx, actor); err != nil {
@@ -749,6 +764,20 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 		}
 	}
 
+	// Validate annotations if provided
+	if req.Annotations != nil {
+		if err := database.Annotations(req.Annotations).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid annotations: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(r.logger, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
 	// Get the existing actor
 	existingActor, err := r.db.GetActor(ctx, id)
 	if err != nil {
@@ -791,7 +820,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 		existingActor.Labels = req.Labels
 	}
 
-	// Use UpsertActor to update
+	// Use UpsertActor to update (handles labels, permissions, etc. but not annotations)
 	updatedActor, err := r.db.UpsertActor(ctx, existingActor)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
@@ -801,6 +830,20 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
+	}
+
+	// Update annotations separately since UpsertActor doesn't handle them
+	if req.Annotations != nil {
+		updatedActor, err = r.db.UpdateActorAnnotations(ctx, updatedActor.Id, req.Annotations)
+		if err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusInternalServerError().
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(r.logger, gctx)
+			val.MarkErrorReturn()
+			return
+		}
 	}
 
 	gctx.PureJSON(http.StatusOK, DatabaseActorToJson(updatedActor))
@@ -869,6 +912,20 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 		}
 	}
 
+	// Validate annotations if provided
+	if req.Annotations != nil {
+		if err := database.Annotations(req.Annotations).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid annotations: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(r.logger, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
 	// Get the existing actor
 	existingActor, err := r.db.GetActorByExternalId(ctx, namespace, externalId)
 	if err != nil {
@@ -911,7 +968,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 		existingActor.Labels = req.Labels
 	}
 
-	// Use UpsertActor to update
+	// Use UpsertActor to update (handles labels, permissions, etc. but not annotations)
 	updatedActor, err := r.db.UpsertActor(ctx, existingActor)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
@@ -921,6 +978,20 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
+	}
+
+	// Update annotations separately since UpsertActor doesn't handle them
+	if req.Annotations != nil {
+		updatedActor, err = r.db.UpdateActorAnnotations(ctx, updatedActor.Id, req.Annotations)
+		if err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusInternalServerError().
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(r.logger, gctx)
+			val.MarkErrorReturn()
+			return
+		}
 	}
 
 	gctx.PureJSON(http.StatusOK, DatabaseActorToJson(updatedActor))

@@ -1246,6 +1246,20 @@ func (mr *MockDBMockRecorder) PurgeSoftDeletedRecords(ctx, olderThan interface{}
 }
 
 // PutActorAnnotations mocks base method.
+func (m *MockDB) UpdateActorAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*database.Actor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateActorAnnotations", ctx, id, annotations)
+	ret0, _ := ret[0].(*database.Actor)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateActorAnnotations indicates an expected call of UpdateActorAnnotations.
+func (mr *MockDBMockRecorder) UpdateActorAnnotations(ctx, id, annotations interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateActorAnnotations", reflect.TypeOf((*MockDB)(nil).UpdateActorAnnotations), ctx, id, annotations)
+}
+
 func (m *MockDB) PutActorAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*database.Actor, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PutActorAnnotations", ctx, id, annotations)

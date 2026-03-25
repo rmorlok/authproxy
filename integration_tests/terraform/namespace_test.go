@@ -59,6 +59,68 @@ resource "authproxy_namespace" "test" {
 	})
 }
 
+func TestAccNamespace_annotations(t *testing.T) {
+	env := testSetup(t)
+	providerCfg := testProviderConfig(env)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories(),
+		Steps: []resource.TestStep{
+			// Step 1: Create with annotations
+			{
+				Config: providerCfg + `
+resource "authproxy_namespace" "test" {
+  path = "root.tf-test-ns-annot"
+  annotations = {
+    description = "A namespace with annotations"
+    owner       = "team-infra"
+  }
+}
+`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authproxy_namespace.test", "path", "root.tf-test-ns-annot"),
+					resource.TestCheckResourceAttr("authproxy_namespace.test", "annotations.description", "A namespace with annotations"),
+					resource.TestCheckResourceAttr("authproxy_namespace.test", "annotations.owner", "team-infra"),
+				),
+			},
+			// Step 2: Update annotations
+			{
+				Config: providerCfg + `
+resource "authproxy_namespace" "test" {
+  path = "root.tf-test-ns-annot"
+  annotations = {
+    description = "Updated namespace description"
+    region      = "us-west-2"
+  }
+}
+`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authproxy_namespace.test", "annotations.description", "Updated namespace description"),
+					resource.TestCheckResourceAttr("authproxy_namespace.test", "annotations.region", "us-west-2"),
+				),
+			},
+			// Step 3: Use both labels and annotations together
+			{
+				Config: providerCfg + `
+resource "authproxy_namespace" "test" {
+  path = "root.tf-test-ns-annot"
+  labels = {
+    env = "staging"
+  }
+  annotations = {
+    description = "Namespace with both labels and annotations"
+  }
+}
+`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authproxy_namespace.test", "labels.env", "staging"),
+					resource.TestCheckResourceAttr("authproxy_namespace.test", "annotations.description", "Namespace with both labels and annotations"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccNamespaceDataSource(t *testing.T) {
 	env := testSetup(t)
 	providerCfg := testProviderConfig(env)

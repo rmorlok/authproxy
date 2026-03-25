@@ -61,6 +61,80 @@ resource "authproxy_encryption_key" "test" {
 	})
 }
 
+func TestAccEncryptionKey_annotations(t *testing.T) {
+	env := testSetup(t)
+	providerCfg := testProviderConfig(env)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories(),
+		Steps: []resource.TestStep{
+			// Step 1: Create with annotations
+			{
+				Config: providerCfg + `
+resource "authproxy_namespace" "test" {
+  path = "root.tf-test-ek-annot"
+}
+
+resource "authproxy_encryption_key" "test" {
+  namespace = authproxy_namespace.test.path
+  annotations = {
+    description = "Primary encryption key"
+    rotation    = "90d"
+  }
+}
+`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("authproxy_encryption_key.test", "id"),
+					resource.TestCheckResourceAttr("authproxy_encryption_key.test", "annotations.description", "Primary encryption key"),
+					resource.TestCheckResourceAttr("authproxy_encryption_key.test", "annotations.rotation", "90d"),
+				),
+			},
+			// Step 2: Update annotations
+			{
+				Config: providerCfg + `
+resource "authproxy_namespace" "test" {
+  path = "root.tf-test-ek-annot"
+}
+
+resource "authproxy_encryption_key" "test" {
+  namespace = authproxy_namespace.test.path
+  annotations = {
+    description = "Updated encryption key description"
+    managed-by  = "terraform"
+  }
+}
+`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authproxy_encryption_key.test", "annotations.description", "Updated encryption key description"),
+					resource.TestCheckResourceAttr("authproxy_encryption_key.test", "annotations.managed-by", "terraform"),
+				),
+			},
+			// Step 3: Use both labels and annotations together
+			{
+				Config: providerCfg + `
+resource "authproxy_namespace" "test" {
+  path = "root.tf-test-ek-annot"
+}
+
+resource "authproxy_encryption_key" "test" {
+  namespace = authproxy_namespace.test.path
+  labels = {
+    env = "test"
+  }
+  annotations = {
+    description = "Key with both labels and annotations"
+  }
+}
+`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authproxy_encryption_key.test", "labels.env", "test"),
+					resource.TestCheckResourceAttr("authproxy_encryption_key.test", "annotations.description", "Key with both labels and annotations"),
+				),
+			},
+		},
+	})
+}
+
 func TestAccEncryptionKeyDataSource(t *testing.T) {
 	env := testSetup(t)
 	providerCfg := testProviderConfig(env)

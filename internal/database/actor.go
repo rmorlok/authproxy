@@ -816,6 +816,55 @@ func (s *service) PutActorLabels(ctx context.Context, id apid.ID, labels map[str
 	return result, nil
 }
 
+// UpdateActorAnnotations replaces all annotations on an actor within a single transaction.
+// If annotations is nil, all annotations are removed.
+func (s *service) UpdateActorAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*Actor, error) {
+	if id == apid.Nil {
+		return nil, errors.New("actor id is required")
+	}
+
+	if annotations != nil {
+		if err := ValidateAnnotations(annotations); err != nil {
+			return nil, fmt.Errorf("invalid annotations: %w", err)
+		}
+	}
+
+	var result *Actor
+
+	err := s.transaction(func(tx *sql.Tx) error {
+		var actor Actor
+		err := s.sq.
+			Select(actor.cols()...).
+			From(ActorTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).
+			QueryRow().
+			Scan(actor.fields()...)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return ErrNotFound
+			}
+			return err
+		}
+
+		now, err := s.updateAnnotationsInTableTx(ctx, tx, ActorTable, sq.Eq{"id": id, "deleted_at": nil}, Annotations(annotations))
+		if err != nil {
+			return err
+		}
+
+		actor.Annotations = annotations
+		actor.UpdatedAt = now
+		result = &actor
+		return nil
+	})
+
+	if err != nil {
+		return nil, err
+	}
+
+	return result, nil
+}
+
 // PutActorAnnotations adds or updates the specified annotations on an actor within a single transaction.
 // Existing annotations not in the provided map are preserved.
 func (s *service) PutActorAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*Actor, error) {

@@ -76,6 +76,7 @@ type DB interface {
 	DeleteActor(ctx context.Context, id apid.ID) error
 	PutActorLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Actor, error)
 	DeleteActorLabels(ctx context.Context, id apid.ID, keys []string) (*Actor, error)
+	UpdateActorAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*Actor, error)
 	PutActorAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*Actor, error)
 	DeleteActorAnnotations(ctx context.Context, id apid.ID, keys []string) (*Actor, error)
 	ListActorsBuilder() ListActorsBuilder

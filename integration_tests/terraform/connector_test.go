@@ -253,6 +253,105 @@ resource "authproxy_connector" "test" {
 	})
 }
 
+// TestAccConnector_annotations tests creating and updating connector annotations.
+func TestAccConnector_annotations(t *testing.T) {
+	env := testSetup(t)
+	providerCfg := testProviderConfig(env)
+
+	resource.Test(t, resource.TestCase{
+		ProtoV6ProviderFactories: testAccProtoV6ProviderFactories(),
+		Steps: []resource.TestStep{
+			// Step 1: Create with annotations
+			{
+				Config: providerCfg + `
+resource "authproxy_namespace" "test" {
+  path = "root.tf-test-connector-annot"
+}
+
+resource "authproxy_connector" "test" {
+  namespace  = authproxy_namespace.test.path
+  definition = jsonencode({
+    display_name = "Annotated Connector"
+    description  = "Connector with annotations"
+    auth = {
+      type = "no-auth"
+    }
+  })
+  annotations = {
+    description = "A detailed description of this connector"
+    owner       = "team-platform"
+  }
+}
+`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttrSet("authproxy_connector.test", "id"),
+					resource.TestCheckResourceAttr("authproxy_connector.test", "annotations.description", "A detailed description of this connector"),
+					resource.TestCheckResourceAttr("authproxy_connector.test", "annotations.owner", "team-platform"),
+					resource.TestCheckResourceAttr("authproxy_connector.test", "state", "primary"),
+				),
+			},
+			// Step 2: Update annotations only (no definition change)
+			{
+				Config: providerCfg + `
+resource "authproxy_namespace" "test" {
+  path = "root.tf-test-connector-annot"
+}
+
+resource "authproxy_connector" "test" {
+  namespace  = authproxy_namespace.test.path
+  definition = jsonencode({
+    display_name = "Annotated Connector"
+    description  = "Connector with annotations"
+    auth = {
+      type = "no-auth"
+    }
+  })
+  annotations = {
+    description = "Updated description"
+    region      = "us-east-1"
+  }
+}
+`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authproxy_connector.test", "annotations.description", "Updated description"),
+					resource.TestCheckResourceAttr("authproxy_connector.test", "annotations.region", "us-east-1"),
+					resource.TestCheckResourceAttr("authproxy_connector.test", "state", "primary"),
+				),
+			},
+			// Step 3: Use both labels and annotations together
+			{
+				Config: providerCfg + `
+resource "authproxy_namespace" "test" {
+  path = "root.tf-test-connector-annot"
+}
+
+resource "authproxy_connector" "test" {
+  namespace  = authproxy_namespace.test.path
+  definition = jsonencode({
+    display_name = "Annotated Connector"
+    description  = "Connector with annotations"
+    auth = {
+      type = "no-auth"
+    }
+  })
+  labels = {
+    env = "production"
+  }
+  annotations = {
+    description = "Connector with both labels and annotations"
+  }
+}
+`,
+				Check: resource.ComposeAggregateTestCheckFunc(
+					resource.TestCheckResourceAttr("authproxy_connector.test", "labels.env", "production"),
+					resource.TestCheckResourceAttr("authproxy_connector.test", "annotations.description", "Connector with both labels and annotations"),
+					resource.TestCheckResourceAttr("authproxy_connector.test", "state", "primary"),
+				),
+			},
+		},
+	})
+}
+
 // TestAccConnector_import tests importing an existing connector.
 func TestAccConnector_import(t *testing.T) {
 	env := testSetup(t)

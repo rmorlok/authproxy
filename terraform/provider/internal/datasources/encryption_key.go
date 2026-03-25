@@ -16,12 +16,13 @@ type EncryptionKeyDataSource struct {
 }
 
 type EncryptionKeyDataSourceModel struct {
-	Id        types.String `tfsdk:"id"`
-	Namespace types.String `tfsdk:"namespace"`
-	State     types.String `tfsdk:"state"`
-	Labels    types.Map    `tfsdk:"labels"`
-	CreatedAt types.String `tfsdk:"created_at"`
-	UpdatedAt types.String `tfsdk:"updated_at"`
+	Id          types.String `tfsdk:"id"`
+	Namespace   types.String `tfsdk:"namespace"`
+	State       types.String `tfsdk:"state"`
+	Labels      types.Map    `tfsdk:"labels"`
+	Annotations types.Map    `tfsdk:"annotations"`
+	CreatedAt   types.String `tfsdk:"created_at"`
+	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
 
 func NewEncryptionKeyDataSource() datasource.DataSource {
@@ -39,8 +40,9 @@ func (d *EncryptionKeyDataSource) Schema(_ context.Context, _ datasource.SchemaR
 			"id":         schema.StringAttribute{Required: true},
 			"namespace":  schema.StringAttribute{Computed: true},
 			"state":      schema.StringAttribute{Computed: true},
-			"labels":     schema.MapAttribute{Computed: true, ElementType: types.StringType},
-			"created_at": schema.StringAttribute{Computed: true},
+			"labels":      schema.MapAttribute{Computed: true, ElementType: types.StringType},
+			"annotations": schema.MapAttribute{Computed: true, ElementType: types.StringType},
+			"created_at":  schema.StringAttribute{Computed: true},
 			"updated_at": schema.StringAttribute{Computed: true},
 		},
 	}
@@ -69,6 +71,7 @@ func (d *EncryptionKeyDataSource) Read(ctx context.Context, req datasource.ReadR
 	config.Namespace = types.StringValue(ek.Namespace)
 	config.State = types.StringValue(ek.State)
 	config.Labels = labelsToMap(ek.Labels)
+	config.Annotations = annotationsToMap(ek.Annotations)
 	config.CreatedAt = types.StringValue(ek.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
 	config.UpdatedAt = types.StringValue(ek.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
 

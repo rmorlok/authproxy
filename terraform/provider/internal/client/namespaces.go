@@ -11,17 +11,20 @@ type Namespace struct {
 	State           string            `json:"state"`
 	EncryptionKeyId *string           `json:"encryption_key_id,omitempty"`
 	Labels          map[string]string `json:"labels,omitempty"`
+	Annotations     map[string]string `json:"annotations,omitempty"`
 	CreatedAt       time.Time         `json:"created_at"`
 	UpdatedAt       time.Time         `json:"updated_at"`
 }
 
 type CreateNamespaceRequest struct {
-	Path   string            `json:"path"`
-	Labels map[string]string `json:"labels,omitempty"`
+	Path        string            `json:"path"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 type UpdateNamespaceRequest struct {
-	Labels map[string]string `json:"labels,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 func (c *Client) CreateNamespace(ctx context.Context, req CreateNamespaceRequest) (*Namespace, error) {

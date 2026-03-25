@@ -16,12 +16,13 @@ type ActorDataSource struct {
 }
 
 type ActorDataSourceModel struct {
-	Id         types.String `tfsdk:"id"`
-	Namespace  types.String `tfsdk:"namespace"`
-	ExternalId types.String `tfsdk:"external_id"`
-	Labels     types.Map    `tfsdk:"labels"`
-	CreatedAt  types.String `tfsdk:"created_at"`
-	UpdatedAt  types.String `tfsdk:"updated_at"`
+	Id          types.String `tfsdk:"id"`
+	Namespace   types.String `tfsdk:"namespace"`
+	ExternalId  types.String `tfsdk:"external_id"`
+	Labels      types.Map    `tfsdk:"labels"`
+	Annotations types.Map    `tfsdk:"annotations"`
+	CreatedAt   types.String `tfsdk:"created_at"`
+	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
 
 func NewActorDataSource() datasource.DataSource {
@@ -39,8 +40,9 @@ func (d *ActorDataSource) Schema(_ context.Context, _ datasource.SchemaRequest, 
 			"id":          schema.StringAttribute{Required: true},
 			"namespace":   schema.StringAttribute{Computed: true},
 			"external_id": schema.StringAttribute{Computed: true},
-			"labels":      schema.MapAttribute{Computed: true, ElementType: types.StringType},
-			"created_at":  schema.StringAttribute{Computed: true},
+			"labels":       schema.MapAttribute{Computed: true, ElementType: types.StringType},
+			"annotations":  schema.MapAttribute{Computed: true, ElementType: types.StringType},
+			"created_at":   schema.StringAttribute{Computed: true},
 			"updated_at":  schema.StringAttribute{Computed: true},
 		},
 	}
@@ -69,6 +71,7 @@ func (d *ActorDataSource) Read(ctx context.Context, req datasource.ReadRequest, 
 	config.Namespace = types.StringValue(a.Namespace)
 	config.ExternalId = types.StringValue(a.ExternalId)
 	config.Labels = labelsToMap(a.Labels)
+	config.Annotations = annotationsToMap(a.Annotations)
 	config.CreatedAt = types.StringValue(a.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
 	config.UpdatedAt = types.StringValue(a.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
 

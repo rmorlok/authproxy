@@ -26,6 +26,7 @@ type ConnectorResourceModel struct {
 	Namespace   types.String         `tfsdk:"namespace"`
 	Definition  jsontypes.Normalized `tfsdk:"definition"`
 	Labels      types.Map            `tfsdk:"labels"`
+	Annotations types.Map            `tfsdk:"annotations"`
 	Publish     types.Bool           `tfsdk:"publish"`
 	Version     types.Int64          `tfsdk:"version"`
 	State       types.String         `tfsdk:"state"`
@@ -67,6 +68,12 @@ func (r *ConnectorResource) Schema(_ context.Context, _ resource.SchemaRequest, 
 			},
 			"labels": schema.MapAttribute{
 				Description: "Labels for the connector.",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+			},
+			"annotations": schema.MapAttribute{
+				Description: "Annotations for the connector.",
 				Optional:    true,
 				Computed:    true,
 				ElementType: types.StringType,
@@ -114,12 +121,18 @@ func (r *ConnectorResource) Create(ctx context.Context, req resource.CreateReque
 		return
 	}
 
+	annotations := extractAnnotations(ctx, plan.Annotations, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	defJSON := json.RawMessage(plan.Definition.ValueString())
 
 	cv, err := r.client.CreateConnector(ctx, client.CreateConnectorRequest{
-		Namespace:  plan.Namespace.ValueString(),
-		Definition: defJSON,
-		Labels:     labels,
+		Namespace:   plan.Namespace.ValueString(),
+		Definition:  defJSON,
+		Labels:      labels,
+		Annotations: annotations,
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create connector", err.Error())
@@ -190,6 +203,11 @@ func (r *ConnectorResource) Update(ctx context.Context, req resource.UpdateReque
 		return
 	}
 
+	annotations := extractAnnotations(ctx, plan.Annotations, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	definitionChanged := !plan.Definition.Equal(state.Definition)
 	publishChanged := !plan.Publish.Equal(state.Publish)
 
@@ -200,10 +218,12 @@ func (r *ConnectorResource) Update(ctx context.Context, req resource.UpdateReque
 		// Definition changed: create a new version
 		defJSON := json.RawMessage(plan.Definition.ValueString())
 		labelsPtr := &labels
+		annotationsPtr := &annotations
 
 		cv, err = r.client.CreateConnectorVersion(ctx, id, client.CreateConnectorVersionRequest{
-			Definition: &defJSON,
-			Labels:     labelsPtr,
+			Definition:  &defJSON,
+			Labels:      labelsPtr,
+			Annotations: annotationsPtr,
 		})
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to create new connector version", err.Error())
@@ -236,9 +256,9 @@ func (r *ConnectorResource) Update(ctx context.Context, req resource.UpdateReque
 			return
 		}
 	} else {
-		// Only labels changed: use connector-level PATCH which handles
+		// Only labels/annotations changed: use connector-level PATCH which handles
 		// draft creation internally (version-level PATCH requires draft state).
-		updateReq := client.UpdateConnectorRequest{Labels: &labels}
+		updateReq := client.UpdateConnectorRequest{Labels: &labels, Annotations: &annotations}
 		cv, err = r.client.UpdateConnector(ctx, id, updateReq)
 		if err != nil {
 			resp.Diagnostics.AddError("Failed to update connector labels", err.Error())
@@ -304,7 +324,7 @@ func (r *ConnectorResource) ImportState(ctx context.Context, req resource.Import
 // before storing the definition in state to avoid "inconsistent result" errors.
 var connectorMetadataFields = []string{
 	"id", "version", "namespace", "state", "logo",
-	"labels", "created_at", "updated_at",
+	"labels", "annotations", "created_at", "updated_at",
 }
 
 func setConnectorState(model *ConnectorResourceModel, cv *client.ConnectorVersion) {
@@ -313,6 +333,7 @@ func setConnectorState(model *ConnectorResourceModel, cv *client.ConnectorVersio
 	model.Version = types.Int64Value(int64(cv.Version))
 	model.State = types.StringValue(cv.State)
 	model.Labels = labelsToMap(cv.Labels)
+	model.Annotations = annotationsToMap(cv.Annotations)
 	model.CreatedAt = types.StringValue(cv.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
 	model.UpdatedAt = types.StringValue(cv.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
 
