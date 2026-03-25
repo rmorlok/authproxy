@@ -7,22 +7,25 @@ import (
 )
 
 type Actor struct {
-	Id         string            `json:"id"`
-	Namespace  string            `json:"namespace"`
-	ExternalId string            `json:"external_id"`
-	Labels     map[string]string `json:"labels,omitempty"`
-	CreatedAt  time.Time         `json:"created_at"`
-	UpdatedAt  time.Time         `json:"updated_at"`
+	Id          string            `json:"id"`
+	Namespace   string            `json:"namespace"`
+	ExternalId  string            `json:"external_id"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
 }
 
 type CreateActorRequest struct {
-	ExternalId string            `json:"external_id"`
-	Namespace  string            `json:"namespace"`
-	Labels     map[string]string `json:"labels,omitempty"`
+	ExternalId  string            `json:"external_id"`
+	Namespace   string            `json:"namespace"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 type UpdateActorRequest struct {
-	Labels map[string]string `json:"labels,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 func (c *Client) CreateActor(ctx context.Context, req CreateActorRequest) (*Actor, error) {

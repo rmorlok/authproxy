@@ -17,36 +17,41 @@ type Connector struct {
 	Description string            `json:"description"`
 	Logo        string            `json:"logo"`
 	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 	CreatedAt   time.Time         `json:"created_at"`
 	UpdatedAt   time.Time         `json:"updated_at"`
 	Versions    int64             `json:"versions,omitempty"`
 }
 
 type ConnectorVersion struct {
-	Id         string            `json:"id"`
-	Version    uint64            `json:"version"`
-	Namespace  string            `json:"namespace"`
-	State      string            `json:"state"`
-	Definition json.RawMessage   `json:"definition"`
-	Labels     map[string]string `json:"labels,omitempty"`
-	CreatedAt  time.Time         `json:"created_at"`
-	UpdatedAt  time.Time         `json:"updated_at"`
+	Id          string            `json:"id"`
+	Version     uint64            `json:"version"`
+	Namespace   string            `json:"namespace"`
+	State       string            `json:"state"`
+	Definition  json.RawMessage   `json:"definition"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
 }
 
 type CreateConnectorRequest struct {
-	Namespace  string            `json:"namespace"`
-	Definition json.RawMessage   `json:"definition"`
-	Labels     map[string]string `json:"labels,omitempty"`
+	Namespace   string            `json:"namespace"`
+	Definition  json.RawMessage   `json:"definition"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 type UpdateConnectorRequest struct {
-	Definition *json.RawMessage   `json:"definition,omitempty"`
-	Labels     *map[string]string `json:"labels,omitempty"`
+	Definition  *json.RawMessage   `json:"definition,omitempty"`
+	Labels      *map[string]string `json:"labels,omitempty"`
+	Annotations *map[string]string `json:"annotations,omitempty"`
 }
 
 type CreateConnectorVersionRequest struct {
-	Definition *json.RawMessage   `json:"definition,omitempty"`
-	Labels     *map[string]string `json:"labels,omitempty"`
+	Definition  *json.RawMessage   `json:"definition,omitempty"`
+	Labels      *map[string]string `json:"labels,omitempty"`
+	Annotations *map[string]string `json:"annotations,omitempty"`
 }
 
 type ForceStateRequest struct {

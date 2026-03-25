@@ -19,12 +19,13 @@ type EncryptionKeyResource struct {
 }
 
 type EncryptionKeyResourceModel struct {
-	Id        types.String `tfsdk:"id"`
-	Namespace types.String `tfsdk:"namespace"`
-	State     types.String `tfsdk:"state"`
-	Labels    types.Map    `tfsdk:"labels"`
-	CreatedAt types.String `tfsdk:"created_at"`
-	UpdatedAt types.String `tfsdk:"updated_at"`
+	Id          types.String `tfsdk:"id"`
+	Namespace   types.String `tfsdk:"namespace"`
+	State       types.String `tfsdk:"state"`
+	Labels      types.Map    `tfsdk:"labels"`
+	Annotations types.Map    `tfsdk:"annotations"`
+	CreatedAt   types.String `tfsdk:"created_at"`
+	UpdatedAt   types.String `tfsdk:"updated_at"`
 }
 
 func NewEncryptionKeyResource() resource.Resource {
@@ -64,6 +65,12 @@ func (r *EncryptionKeyResource) Schema(_ context.Context, _ resource.SchemaReque
 				Computed:    true,
 				ElementType: types.StringType,
 			},
+			"annotations": schema.MapAttribute{
+				Description: "Annotations for the encryption key.",
+				Optional:    true,
+				Computed:    true,
+				ElementType: types.StringType,
+			},
 			"created_at": schema.StringAttribute{Computed: true},
 			"updated_at": schema.StringAttribute{Computed: true},
 		},
@@ -89,10 +96,16 @@ func (r *EncryptionKeyResource) Create(ctx context.Context, req resource.CreateR
 		return
 	}
 
+	annotations := extractAnnotations(ctx, plan.Annotations, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	ek, err := r.client.CreateEncryptionKey(ctx, client.CreateEncryptionKeyRequest{
-		Namespace: plan.Namespace.ValueString(),
-		Labels:    labels,
-		KeyData:   map[string]interface{}{"random": true},
+		Namespace:   plan.Namespace.ValueString(),
+		Labels:      labels,
+		Annotations: annotations,
+		KeyData:     map[string]interface{}{"random": true},
 	})
 	if err != nil {
 		resp.Diagnostics.AddError("Failed to create encryption key", err.Error())
@@ -136,6 +149,11 @@ func (r *EncryptionKeyResource) Update(ctx context.Context, req resource.UpdateR
 		return
 	}
 
+	annotations := extractAnnotations(ctx, plan.Annotations, &resp.Diagnostics)
+	if resp.Diagnostics.HasError() {
+		return
+	}
+
 	updateReq := client.UpdateEncryptionKeyRequest{}
 	if !plan.State.IsNull() && !plan.State.IsUnknown() {
 		s := plan.State.ValueString()
@@ -143,6 +161,9 @@ func (r *EncryptionKeyResource) Update(ctx context.Context, req resource.UpdateR
 	}
 	if labels != nil {
 		updateReq.Labels = &labels
+	}
+	if annotations != nil {
+		updateReq.Annotations = &annotations
 	}
 
 	ek, err := r.client.UpdateEncryptionKey(ctx, plan.Id.ValueString(), updateReq)
@@ -177,6 +198,7 @@ func setEncryptionKeyState(model *EncryptionKeyResourceModel, ek *client.Encrypt
 	model.Namespace = types.StringValue(ek.Namespace)
 	model.State = types.StringValue(ek.State)
 	model.Labels = labelsToMap(ek.Labels)
+	model.Annotations = annotationsToMap(ek.Annotations)
 	model.CreatedAt = types.StringValue(ek.CreatedAt.Format("2006-01-02T15:04:05Z07:00"))
 	model.UpdatedAt = types.StringValue(ek.UpdatedAt.Format("2006-01-02T15:04:05Z07:00"))
 }

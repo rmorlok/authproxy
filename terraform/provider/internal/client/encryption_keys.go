@@ -7,23 +7,26 @@ import (
 )
 
 type EncryptionKey struct {
-	Id        string            `json:"id"`
-	Namespace string            `json:"namespace"`
-	State     string            `json:"state"`
-	Labels    map[string]string `json:"labels,omitempty"`
-	CreatedAt time.Time         `json:"created_at"`
-	UpdatedAt time.Time         `json:"updated_at"`
+	Id          string            `json:"id"`
+	Namespace   string            `json:"namespace"`
+	State       string            `json:"state"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
 }
 
 type CreateEncryptionKeyRequest struct {
-	Namespace string                 `json:"namespace"`
-	Labels    map[string]string      `json:"labels,omitempty"`
-	KeyData   map[string]interface{} `json:"key_data"`
+	Namespace   string                 `json:"namespace"`
+	Labels      map[string]string      `json:"labels,omitempty"`
+	Annotations map[string]string      `json:"annotations,omitempty"`
+	KeyData     map[string]interface{} `json:"key_data"`
 }
 
 type UpdateEncryptionKeyRequest struct {
-	State  *string            `json:"state,omitempty"`
-	Labels *map[string]string `json:"labels,omitempty"`
+	State       *string            `json:"state,omitempty"`
+	Labels      *map[string]string `json:"labels,omitempty"`
+	Annotations *map[string]string `json:"annotations,omitempty"`
 }
 
 func (c *Client) CreateEncryptionKey(ctx context.Context, req CreateEncryptionKeyRequest) (*EncryptionKey, error) {
