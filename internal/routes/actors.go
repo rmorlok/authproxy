@@ -820,11 +820,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 		existingActor.Labels = req.Labels
 	}
 
-	if req.Annotations != nil {
-		existingActor.Annotations = req.Annotations
-	}
-
-	// Use UpsertActor to update
+	// Use UpsertActor to update (handles labels, permissions, etc. but not annotations)
 	updatedActor, err := r.db.UpsertActor(ctx, existingActor)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
@@ -834,6 +830,20 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
+	}
+
+	// Update annotations separately since UpsertActor doesn't handle them
+	if req.Annotations != nil {
+		updatedActor, err = r.db.UpdateActorAnnotations(ctx, updatedActor.Id, req.Annotations)
+		if err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusInternalServerError().
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(r.logger, gctx)
+			val.MarkErrorReturn()
+			return
+		}
 	}
 
 	gctx.PureJSON(http.StatusOK, DatabaseActorToJson(updatedActor))
@@ -958,11 +968,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 		existingActor.Labels = req.Labels
 	}
 
-	if req.Annotations != nil {
-		existingActor.Annotations = req.Annotations
-	}
-
-	// Use UpsertActor to update
+	// Use UpsertActor to update (handles labels, permissions, etc. but not annotations)
 	updatedActor, err := r.db.UpsertActor(ctx, existingActor)
 	if err != nil {
 		api_common.NewHttpStatusErrorBuilder().
@@ -972,6 +978,20 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 			WriteGinResponse(r.logger, gctx)
 		val.MarkErrorReturn()
 		return
+	}
+
+	// Update annotations separately since UpsertActor doesn't handle them
+	if req.Annotations != nil {
+		updatedActor, err = r.db.UpdateActorAnnotations(ctx, updatedActor.Id, req.Annotations)
+		if err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusInternalServerError().
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(r.logger, gctx)
+			val.MarkErrorReturn()
+			return
+		}
 	}
 
 	gctx.PureJSON(http.StatusOK, DatabaseActorToJson(updatedActor))
