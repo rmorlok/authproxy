@@ -628,12 +628,27 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 		return
 	}
 
+	// Validate annotations if provided
+	if req.Annotations != nil {
+		if err := database.Annotations(req.Annotations).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid annotations: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(r.logger, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
 	// Create the actor
 	actor := &database.Actor{
-		Id:         apid.New(apid.PrefixActor),
-		Namespace:  req.Namespace,
-		ExternalId: req.ExternalId,
-		Labels:     req.Labels,
+		Id:          apid.New(apid.PrefixActor),
+		Namespace:   req.Namespace,
+		ExternalId:  req.ExternalId,
+		Labels:      req.Labels,
+		Annotations: req.Annotations,
 	}
 
 	if err := r.db.CreateActor(ctx, actor); err != nil {
@@ -749,6 +764,20 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 		}
 	}
 
+	// Validate annotations if provided
+	if req.Annotations != nil {
+		if err := database.Annotations(req.Annotations).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid annotations: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(r.logger, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
 	// Get the existing actor
 	existingActor, err := r.db.GetActor(ctx, id)
 	if err != nil {
@@ -789,6 +818,10 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 
 	if req.Labels != nil {
 		existingActor.Labels = req.Labels
+	}
+
+	if req.Annotations != nil {
+		existingActor.Annotations = req.Annotations
 	}
 
 	// Use UpsertActor to update
@@ -869,6 +902,20 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 		}
 	}
 
+	// Validate annotations if provided
+	if req.Annotations != nil {
+		if err := database.Annotations(req.Annotations).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid annotations: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(r.logger, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
 	// Get the existing actor
 	existingActor, err := r.db.GetActorByExternalId(ctx, namespace, externalId)
 	if err != nil {
@@ -909,6 +956,10 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 
 	if req.Labels != nil {
 		existingActor.Labels = req.Labels
+	}
+
+	if req.Annotations != nil {
+		existingActor.Annotations = req.Annotations
 	}
 
 	// Use UpsertActor to update

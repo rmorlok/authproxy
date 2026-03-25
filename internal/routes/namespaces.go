@@ -237,6 +237,31 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 		return
 	}
 
+	// Set annotations if provided
+	if req.Annotations != nil {
+		if err := database.Annotations(req.Annotations).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid annotations: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		ns, err = r.core.UpdateNamespaceAnnotations(ctx, req.Path, req.Annotations)
+		if err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				DefaultStatusInternalServerError().
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
 	gctx.PureJSON(http.StatusOK, NamespaceToJson(ns))
 }
 

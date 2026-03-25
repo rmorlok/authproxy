@@ -29,9 +29,10 @@ type EncryptionKeyJson struct {
 }
 
 type CreateEncryptionKeyRequestJson struct {
-	Namespace string             `json:"namespace"`
-	KeyData   *cfgschema.KeyData `json:"key_data,omitempty"`
-	Labels    map[string]string  `json:"labels,omitempty"`
+	Namespace   string            `json:"namespace"`
+	KeyData     *cfgschema.KeyData `json:"key_data,omitempty"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
 type UpdateEncryptionKeyRequestJson struct {
@@ -205,6 +206,31 @@ func (r *EncryptionKeysRoutes) create(gctx *gin.Context) {
 			WriteGinResponse(nil, gctx)
 		val.MarkErrorReturn()
 		return
+	}
+
+	// Set annotations if provided
+	if req.Annotations != nil {
+		if err := database.Annotations(req.Annotations).Validate(); err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusBadRequest().
+				WithInternalErr(err).
+				WithResponseMsgf("invalid annotations: %s", err.Error()).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
+
+		ek, err = r.core.UpdateEncryptionKeyAnnotations(ctx, ek.GetId(), req.Annotations)
+		if err != nil {
+			api_common.NewHttpStatusErrorBuilder().
+				DefaultStatusInternalServerError().
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+			val.MarkErrorReturn()
+			return
+		}
 	}
 
 	gctx.PureJSON(http.StatusOK, EncryptionKeyToJson(ek))
