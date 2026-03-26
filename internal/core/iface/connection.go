@@ -50,4 +50,5 @@ type Connection interface {
 		req *ProxyRequest,
 		w http.ResponseWriter,
 	) error
+	SubmitForm(ctx context.Context, req SubmitConnectionRequest) (InitiateConnectionResponse, error)
 }

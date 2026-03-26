@@ -97,8 +97,6 @@ type C interface {
 
 	InitiateConnection(ctx context.Context, req InitiateConnectionRequest) (InitiateConnectionResponse, error)
 
-	SubmitConnection(ctx context.Context, connectionId apid.ID, req SubmitConnectionRequest) (InitiateConnectionResponse, error)
-
 	/*
 	 *
 	 * Namespaces

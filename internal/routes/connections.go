@@ -114,6 +114,22 @@ func (r *ConnectionsRoutes) submit(gctx *gin.Context) {
 		return
 	}
 
+	c, err := r.core.GetConnection(ctx, id)
+	if err != nil {
+		api_common.HttpStatusErrorBuilderFromError(err).
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		httpErr.WriteGinResponse(nil, gctx)
+		return
+	}
+
 	var req coreIface.SubmitConnectionRequest
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
 		api_common.NewHttpStatusErrorBuilder().
@@ -125,7 +141,7 @@ func (r *ConnectionsRoutes) submit(gctx *gin.Context) {
 		return
 	}
 
-	resp, err := r.core.SubmitConnection(ctx, id, req)
+	resp, err := c.SubmitForm(ctx, req)
 	if err != nil {
 		api_common.HttpStatusErrorBuilderFromError(err).
 			WithStatusInternalServerError().
