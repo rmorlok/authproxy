@@ -61,6 +61,8 @@ export interface InitiateConnectionRequest {
 
 export enum InitiateConnectionResponseType {
     REDIRECT = 'redirect',
+    FORM = 'form',
+    COMPLETE = 'complete',
 }
 
 export interface InitiateConnectionResponse {
@@ -69,7 +71,34 @@ export interface InitiateConnectionResponse {
 }
 
 export interface InitiateConnectionRedirectResponse extends InitiateConnectionResponse {
+    type: InitiateConnectionResponseType.REDIRECT;
     redirect_url: string;
+}
+
+export interface InitiateConnectionFormResponse extends InitiateConnectionResponse {
+    type: InitiateConnectionResponseType.FORM;
+    json_schema: Record<string, unknown>;
+    ui_schema: Record<string, unknown>;
+}
+
+export interface InitiateConnectionCompleteResponse extends InitiateConnectionResponse {
+    type: InitiateConnectionResponseType.COMPLETE;
+}
+
+export function isRedirectResponse(response: InitiateConnectionResponse): response is InitiateConnectionRedirectResponse {
+    return response.type === InitiateConnectionResponseType.REDIRECT;
+}
+
+export function isFormResponse(response: InitiateConnectionResponse): response is InitiateConnectionFormResponse {
+    return response.type === InitiateConnectionResponseType.FORM;
+}
+
+export function isCompleteResponse(response: InitiateConnectionResponse): response is InitiateConnectionCompleteResponse {
+    return response.type === InitiateConnectionResponseType.COMPLETE;
+}
+
+export interface SubmitConnectionRequest {
+    data: unknown;
 }
 
 // Disconnect models
@@ -124,8 +153,20 @@ export const initiateConnection = (
         labels,
     };
 
-    return client.post<InitiateConnectionRedirectResponse>(
+    return client.post<InitiateConnectionResponse>(
         '/api/v1/connections/_initiate',
+        request
+    );
+};
+
+/**
+ * Submit form data for a connection setup step
+ */
+export const submitConnection = (connectionId: string, data: unknown) => {
+    const request: SubmitConnectionRequest = { data };
+
+    return client.post<InitiateConnectionResponse>(
+        `/api/v1/connections/${connectionId}/_submit`,
         request
     );
 };
@@ -217,6 +258,7 @@ export const connections = {
     list: listConnections,
     get: getConnection,
     initiate: initiateConnection,
+    submit: submitConnection,
     disconnect: disconnectConnection,
     force_state: forceConnectionState,
     update: updateConnection,

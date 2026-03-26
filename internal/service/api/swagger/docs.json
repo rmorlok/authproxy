@@ -1601,6 +1601,70 @@
                 }
             }
         },
+        "/connections/{id}/_submit": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Submit form data for a connection setup step",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "connections"
+                ],
+                "summary": "Submit connection form",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection ID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Form submission data",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/routes.SubmitConnectionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/routes.InitiateConnectionComplete"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "501": {
+                        "description": "Not Implemented",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/connections/{id}/annotations": {
             "get": {
                 "security": [
@@ -6225,6 +6289,22 @@
                 }
             }
         },
+        "routes.InitiateConnectionComplete": {
+            "description": "Completion response for connection initiation",
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "Connection UUID",
+                    "type": "string",
+                    "example": "req_test550e8400abcde"
+                },
+                "type": {
+                    "description": "Response type (always \"complete\")",
+                    "type": "string",
+                    "example": "complete"
+                }
+            }
+        },
         "routes.InitiateConnectionRedirect": {
             "description": "Redirect response for connection initiation",
             "type": "object",
@@ -6427,6 +6507,15 @@
             "properties": {
                 "value": {
                     "type": "string"
+                }
+            }
+        },
+        "routes.SubmitConnectionRequest": {
+            "description": "Form submission data",
+            "type": "object",
+            "properties": {
+                "data": {
+                    "description": "Form data matching the JSON Schema provided in the form response"
                 }
             }
         },

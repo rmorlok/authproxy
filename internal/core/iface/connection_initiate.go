@@ -1,6 +1,7 @@
 package iface
 
 import (
+	"encoding/json"
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
@@ -51,6 +52,8 @@ type InitiateConnectionResponseType string
 
 const (
 	PreconnectionResponseTypeRedirect InitiateConnectionResponseType = "redirect"
+	PreconnectionResponseTypeForm     InitiateConnectionResponseType = "form"
+	PreconnectionResponseTypeComplete InitiateConnectionResponseType = "complete"
 )
 
 type InitiateConnectionResponse interface {
@@ -70,4 +73,36 @@ func (icr *InitiateConnectionRedirect) GetId() apid.ID {
 
 func (icr *InitiateConnectionRedirect) GetType() InitiateConnectionResponseType {
 	return icr.Type
+}
+
+type InitiateConnectionForm struct {
+	Id         apid.ID                        `json:"id"`
+	Type       InitiateConnectionResponseType `json:"type"`
+	JsonSchema json.RawMessage                `json:"json_schema"`
+	UiSchema   json.RawMessage                `json:"ui_schema"`
+}
+
+func (icf *InitiateConnectionForm) GetId() apid.ID {
+	return icf.Id
+}
+
+func (icf *InitiateConnectionForm) GetType() InitiateConnectionResponseType {
+	return icf.Type
+}
+
+type InitiateConnectionComplete struct {
+	Id   apid.ID                        `json:"id"`
+	Type InitiateConnectionResponseType `json:"type"`
+}
+
+func (icc *InitiateConnectionComplete) GetId() apid.ID {
+	return icc.Id
+}
+
+func (icc *InitiateConnectionComplete) GetType() InitiateConnectionResponseType {
+	return icc.Type
+}
+
+type SubmitConnectionRequest struct {
+	Data json.RawMessage `json:"data"`
 }

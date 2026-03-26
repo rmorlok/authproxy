@@ -1,6 +1,19 @@
 import {createAsyncThunk, createSlice} from '@reduxjs/toolkit';
 import type {RootState} from './store';
-import {Connection, connections, ConnectionState, DisconnectResponseJson, ListConnectionsParams} from '@authproxy/api';
+import {
+    Connection,
+    connections,
+    ConnectionState,
+    DisconnectResponseJson,
+    isFormResponse,
+    ListConnectionsParams,
+} from '@authproxy/api';
+
+interface FormStep {
+    connectionId: string;
+    jsonSchema: Record<string, unknown>;
+    uiSchema: Record<string, unknown>;
+}
 
 interface ConnectionsState {
     items: Connection[];
@@ -11,6 +24,9 @@ interface ConnectionsState {
     disconnectingConnection: boolean;
     disconnectionError: string | null;
     currentTaskId: string | null;
+    currentFormStep: FormStep | null;
+    submittingForm: boolean;
+    formSubmitError: string | null;
 }
 
 const initialState: ConnectionsState = {
@@ -21,7 +37,10 @@ const initialState: ConnectionsState = {
     initiationError: null,
     disconnectingConnection: false,
     disconnectionError: null,
-    currentTaskId: null
+    currentTaskId: null,
+    currentFormStep: null,
+    submittingForm: false,
+    formSubmitError: null,
 };
 
 export const fetchConnectionsAsync = createAsyncThunk(
@@ -55,6 +74,14 @@ export const initiateConnectionAsync = createAsyncThunk(
     }
 );
 
+export const submitConnectionFormAsync = createAsyncThunk(
+    'connections/submitConnectionForm',
+    async ({connectionId, data}: { connectionId: string, data: unknown }) => {
+        const response = await connections.submit(connectionId, data);
+        return response.data;
+    }
+);
+
 export const disconnectConnectionAsync = createAsyncThunk(
     'connections/disconnectConnection',
     async (connectionId: string, _): Promise<DisconnectResponseJson> => {
@@ -73,7 +100,11 @@ export const connectionsSlice = createSlice({
         },
         clearDisconnectionError: (state) => {
             state.disconnectionError = null;
-        }
+        },
+        clearFormStep: (state) => {
+            state.currentFormStep = null;
+            state.formSubmitError = null;
+        },
     },
     extraReducers: (builder) => {
         builder
@@ -94,13 +125,45 @@ export const connectionsSlice = createSlice({
             .addCase(initiateConnectionAsync.pending, (state) => {
                 state.initiatingConnection = true;
                 state.initiationError = null;
+                state.currentFormStep = null;
             })
-            .addCase(initiateConnectionAsync.fulfilled, (state) => {
+            .addCase(initiateConnectionAsync.fulfilled, (state, action) => {
                 state.initiatingConnection = false;
+                const response = action.payload;
+                if (isFormResponse(response)) {
+                    state.currentFormStep = {
+                        connectionId: response.id,
+                        jsonSchema: response.json_schema,
+                        uiSchema: response.ui_schema,
+                    };
+                }
             })
             .addCase(initiateConnectionAsync.rejected, (state, action) => {
                 state.initiatingConnection = false;
                 state.initiationError = action.error.message || 'Failed to initiate connection';
+            })
+
+            // Submit connection form
+            .addCase(submitConnectionFormAsync.pending, (state) => {
+                state.submittingForm = true;
+                state.formSubmitError = null;
+            })
+            .addCase(submitConnectionFormAsync.fulfilled, (state, action) => {
+                state.submittingForm = false;
+                const response = action.payload;
+                if (isFormResponse(response)) {
+                    state.currentFormStep = {
+                        connectionId: response.id,
+                        jsonSchema: response.json_schema,
+                        uiSchema: response.ui_schema,
+                    };
+                } else {
+                    state.currentFormStep = null;
+                }
+            })
+            .addCase(submitConnectionFormAsync.rejected, (state, action) => {
+                state.submittingForm = false;
+                state.formSubmitError = action.error.message || 'Failed to submit form';
             })
 
             // Disconnect connection
@@ -125,7 +188,7 @@ export const connectionsSlice = createSlice({
     },
 });
 
-export const {clearInitiationError, clearDisconnectionError} = connectionsSlice.actions;
+export const {clearInitiationError, clearDisconnectionError, clearFormStep} = connectionsSlice.actions;
 
 // Selectors
 export const selectConnections = (state: RootState) => state.connections.items;
@@ -136,6 +199,10 @@ export const selectInitiationError = (state: RootState) => state.connections.ini
 export const selectDisconnectingConnection = (state: RootState) => state.connections.disconnectingConnection;
 export const selectDisconnectionError = (state: RootState) => state.connections.disconnectionError;
 export const selectCurrentTaskId = (state: RootState) => state.connections.currentTaskId;
+
+export const selectCurrentFormStep = (state: RootState) => state.connections.currentFormStep;
+export const selectSubmittingForm = (state: RootState) => state.connections.submittingForm;
+export const selectFormSubmitError = (state: RootState) => state.connections.formSubmitError;
 
 // Helper selectors
 export const selectActiveConnections = (state: RootState) =>

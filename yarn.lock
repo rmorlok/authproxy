@@ -111,6 +111,9 @@ __metadata:
     "@chromatic-com/storybook": "npm:^1.3.3"
     "@emotion/react": "npm:^11.11.4"
     "@emotion/styled": "npm:^11.11.0"
+    "@jsonforms/core": "npm:^3.7.0"
+    "@jsonforms/material-renderers": "npm:^3.7.0"
+    "@jsonforms/react": "npm:^3.7.0"
     "@mui/icons-material": "npm:^7.3.5"
     "@mui/material": "npm:^7.3.5"
     "@reduxjs/toolkit": "npm:^2.2.2"
@@ -559,6 +562,27 @@ __metadata:
   version: 3.0.4
   resolution: "@csstools/css-tokenizer@npm:3.0.4"
   checksum: 10c0/3b589f8e9942075a642213b389bab75a2d50d05d203727fcdac6827648a5572674caff07907eff3f9a2389d86a4ee47308fafe4f8588f4a77b7167c588d2559f
+  languageName: node
+  linkType: hard
+
+"@date-io/core@npm:^3.2.0":
+  version: 3.2.0
+  resolution: "@date-io/core@npm:3.2.0"
+  checksum: 10c0/e320e5eb1dc5cdafbebdb5b3a4c80fcf18cef1ccf39bd57e63de7826c966b89814c984b59f7fb1fc3f7650859fb0ba890e39b0e77bfb671f4b01991432ccc06e
+  languageName: node
+  linkType: hard
+
+"@date-io/dayjs@npm:^3.0.0":
+  version: 3.2.0
+  resolution: "@date-io/dayjs@npm:3.2.0"
+  dependencies:
+    "@date-io/core": "npm:^3.2.0"
+  peerDependencies:
+    dayjs: ^1.8.17
+  peerDependenciesMeta:
+    dayjs:
+      optional: true
+  checksum: 10c0/ba3d8d472b8aaa387c87310127a9692baf00d13fa6797dba2e740f3dba85890e87de47e171a17a547b1787fa20df26872c552637ccb2d5ce36319f7b7b90851e
   languageName: node
   linkType: hard
 
@@ -1363,6 +1387,50 @@ __metadata:
     "@jridgewell/resolve-uri": "npm:^3.1.0"
     "@jridgewell/sourcemap-codec": "npm:^1.4.14"
   checksum: 10c0/4b30ec8cd56c5fd9a661f088230af01e0c1a3888d11ffb6b47639700f71225be21d1f7e168048d6d4f9449207b978a235c07c8f15c07705685d16dc06280e9d9
+  languageName: node
+  linkType: hard
+
+"@jsonforms/core@npm:^3.7.0":
+  version: 3.7.0
+  resolution: "@jsonforms/core@npm:3.7.0"
+  dependencies:
+    "@types/json-schema": "npm:^7.0.3"
+    ajv: "npm:^8.6.1"
+    ajv-formats: "npm:^2.1.0"
+    lodash: "npm:^4.17.21"
+  checksum: 10c0/763ff255cfee731766331e616c47dc73eac6edfdca343ff5c0eb801079c3b2968bb67215ee91dc1fc1f4fb7e23ee92463e6481e58454504887272bbbb25af5c9
+  languageName: node
+  linkType: hard
+
+"@jsonforms/material-renderers@npm:^3.7.0":
+  version: 3.7.0
+  resolution: "@jsonforms/material-renderers@npm:3.7.0"
+  dependencies:
+    "@date-io/dayjs": "npm:^3.0.0"
+    dayjs: "npm:1.10.7"
+    lodash: "npm:^4.17.21"
+  peerDependencies:
+    "@emotion/react": ^11.5.0
+    "@emotion/styled": ^11.3.0
+    "@jsonforms/core": 3.7.0
+    "@jsonforms/react": 3.7.0
+    "@mui/icons-material": ^7.0.0
+    "@mui/material": ^7.0.0
+    "@mui/x-date-pickers": ^8.0.0
+    react: ^16.12.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+  checksum: 10c0/68ee9ecbfb3583ea04269b58d8679ac87b13260e560830572b3c774911f6972178d6d077d979d07c14dda08c64d02804281b424b90cebb5c231843c12fee4d67
+  languageName: node
+  linkType: hard
+
+"@jsonforms/react@npm:^3.7.0":
+  version: 3.7.0
+  resolution: "@jsonforms/react@npm:3.7.0"
+  dependencies:
+    lodash: "npm:^4.17.21"
+  peerDependencies:
+    "@jsonforms/core": 3.7.0
+    react: ^16.12.0 || ^17.0.0 || ^18.0.0 || ^19.0.0
+  checksum: 10c0/bafbafac7d62263d13d4e447c831a3a6336fcf4d050b69e7cd008e960e005fca74efa14cb19c1e3c01802d543c7fb2ecb35b0a7eb3d066ec72dc4ebbfed23ef7
   languageName: node
   linkType: hard
 
@@ -2914,7 +2982,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@types/json-schema@npm:*, @types/json-schema@npm:^7.0.15":
+"@types/json-schema@npm:*, @types/json-schema@npm:^7.0.15, @types/json-schema@npm:^7.0.3":
   version: 7.0.15
   resolution: "@types/json-schema@npm:7.0.15"
   checksum: 10c0/a996a745e6c5d60292f36731dd41341339d4eeed8180bb09226e5c8d23759067692b1d88e5d91d72ee83dfc00d3aca8e7bd43ea120516c17922cbcb7c3e252db
@@ -3505,7 +3573,7 @@ __metadata:
   languageName: node
   linkType: hard
 
-"ajv-formats@npm:^2.1.1":
+"ajv-formats@npm:^2.1.0, ajv-formats@npm:^2.1.1":
   version: 2.1.1
   resolution: "ajv-formats@npm:2.1.1"
   dependencies:
@@ -3540,6 +3608,18 @@ __metadata:
     json-schema-traverse: "npm:^1.0.0"
     require-from-string: "npm:^2.0.2"
   checksum: 10c0/ec3ba10a573c6b60f94639ffc53526275917a2df6810e4ab5a6b959d87459f9ef3f00d5e7865b82677cb7d21590355b34da14d1d0b9c32d75f95a187e76fff35
+  languageName: node
+  linkType: hard
+
+"ajv@npm:^8.6.1":
+  version: 8.18.0
+  resolution: "ajv@npm:8.18.0"
+  dependencies:
+    fast-deep-equal: "npm:^3.1.3"
+    fast-uri: "npm:^3.0.1"
+    json-schema-traverse: "npm:^1.0.0"
+    require-from-string: "npm:^2.0.2"
+  checksum: 10c0/e7517c426173513a07391be951879932bdf3348feaebd2199f5b901c20f99d60db8cd1591502d4d551dc82f594e82a05c4fe1c70139b15b8937f7afeaed9532f
   languageName: node
   linkType: hard
 
@@ -4400,6 +4480,13 @@ __metadata:
     es-errors: "npm:^1.3.0"
     is-data-view: "npm:^1.0.1"
   checksum: 10c0/fa7aa40078025b7810dcffc16df02c480573b7b53ef1205aa6a61533011005c1890e5ba17018c692ce7c900212b547262d33279fde801ad9843edc0863bf78c4
+  languageName: node
+  linkType: hard
+
+"dayjs@npm:1.10.7":
+  version: 1.10.7
+  resolution: "dayjs@npm:1.10.7"
+  checksum: 10c0/2ce908776ea5b383dba2c01c72290ff12ad97cafa81b9c72a9cc4f801d736d592f20bd992ea1dff083ab80e807080b5af21f634bb09e67f89f66582a9059053a
   languageName: node
   linkType: hard
 

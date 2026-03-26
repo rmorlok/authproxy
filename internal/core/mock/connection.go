@@ -99,6 +99,10 @@ func (m *Connection) ProxyRequestRaw(
 	return nil
 }
 
+func (m *Connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionRequest) (iface.InitiateConnectionResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 var _ iface.Connection = (*Connection)(nil)
 
 type ConnectionMatcher struct {

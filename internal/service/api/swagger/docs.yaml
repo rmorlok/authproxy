@@ -105,6 +105,18 @@ definitions:
         description: Stack trace (only in debug mode)
         type: string
     type: object
+  routes.InitiateConnectionComplete:
+    description: Completion response for connection initiation
+    properties:
+      id:
+        description: Connection UUID
+        example: req_test550e8400abcde
+        type: string
+      type:
+        description: Response type (always "complete")
+        example: complete
+        type: string
+    type: object
   routes.InitiateConnectionRedirect:
     description: Redirect response for connection initiation
     properties:
@@ -248,6 +260,12 @@ definitions:
     properties:
       value:
         type: string
+    type: object
+  routes.SubmitConnectionRequest:
+    description: Form submission data
+    properties:
+      data:
+        description: Form data matching the JSON Schema provided in the form response
     type: object
   routes.SwaggerConnectionAnnotationJson:
     description: Connection annotation key-value pair
@@ -1863,6 +1881,47 @@ paths:
       summary: Proxy request through connection
       tags:
       - proxy
+  /connections/{id}/_submit:
+    post:
+      consumes:
+      - application/json
+      description: Submit form data for a connection setup step
+      parameters:
+      - description: Connection ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Form submission data
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.SubmitConnectionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.InitiateConnectionComplete'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Submit connection form
+      tags:
+      - connections
   /connections/{id}/annotations:
     get:
       consumes:
