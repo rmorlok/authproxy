@@ -5,7 +5,6 @@ import {
     connections,
     ConnectionState,
     DisconnectResponseJson,
-    InitiateConnectionResponse,
     isFormResponse,
     ListConnectionsParams,
 } from '@authproxy/api';
