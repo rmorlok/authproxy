@@ -1,0 +1,83 @@
+# $schema: ./schema.json
+
+labels:
+  type: acme-crm
+display_name: Acme CRM
+logo:
+  public_url: https://example.com/acme-logo.png
+description: |
+  Connect to Acme CRM to manage your customer data
+auth:
+  type: OAuth2
+  client_id:
+    env_var: ACME_CLIENT_ID
+  client_secret:
+    env_var: ACME_CLIENT_SECRET
+  authorization:
+    endpoint: https://login.acme.com/oauth/authorize
+  token:
+    endpoint: https://login.acme.com/oauth/token
+  scopes:
+    - id: read
+      reason: Read access to your data
+setup_flow:
+  preconnect:
+    steps:
+      - id: tenant
+        title: "Enter your Acme tenant"
+        description: "Provide your Acme subdomain to connect to your account"
+        json_schema:
+          type: object
+          required:
+            - tenant
+          properties:
+            tenant:
+              type: string
+              title: Tenant subdomain
+              minLength: 1
+        ui_schema:
+          type: VerticalLayout
+          elements:
+            - type: Control
+              scope: "#/properties/tenant"
+  configure:
+    steps:
+      - id: select_workspace
+        title: "Select Workspace"
+        description: "Choose which workspace to sync data from"
+        json_schema:
+          type: object
+          required:
+            - workspace_id
+          properties:
+            workspace_id:
+              type: string
+              title: Workspace
+        ui_schema:
+          type: VerticalLayout
+          elements:
+            - type: Control
+              scope: "#/properties/workspace_id"
+        data_sources:
+          workspaces:
+            proxy_request:
+              method: GET
+              url: "https://api.acme.com/v1/workspaces"
+            transform: "data.map(w => ({ value: w.id, label: w.name }))"
+      - id: sync_options
+        title: "Sync Options"
+        json_schema:
+          type: object
+          properties:
+            sync_frequency:
+              type: string
+              title: Sync frequency
+              enum:
+                - hourly
+                - daily
+                - weekly
+        ui_schema:
+          type: VerticalLayout
+          elements:
+            - type: Control
+              scope: "#/properties/sync_frequency"
