@@ -41,6 +41,7 @@ type Connection interface {
 	SetSetupStep(ctx context.Context, setupStep *string) error
 	GetConfiguration(ctx context.Context) (map[string]any, error)
 	SetConfiguration(ctx context.Context, data map[string]any) error
+	GetMustacheContext(ctx context.Context) (map[string]any, error)
 	GetProbe(probeId string) (Probe, error)
 	GetProbes() []Probe
 	ProxyRequest(

@@ -260,3 +260,112 @@ func TestConnectionSetConfiguration(t *testing.T) {
 		assert.Equal(t, "field", result["extra"])
 	})
 }
+
+func TestConnectionGetMustacheContext(t *testing.T) {
+	t.Run("returns cfg from decrypted configuration", func(t *testing.T) {
+		e := encrypt.NewFakeEncryptService(false)
+		s := &service{encrypt: e, logger: aplog.NewNoopLogger()}
+		conn := newTestConnectionWithService(s)
+
+		ef, err := e.EncryptStringForNamespace(context.Background(), "root", `{"tenant":"acme"}`)
+		require.NoError(t, err)
+		conn.EncryptedConfiguration = &ef
+
+		data, err := conn.GetMustacheContext(context.Background())
+		require.NoError(t, err)
+
+		cfg, ok := data["cfg"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "acme", cfg["tenant"])
+	})
+
+	t.Run("returns labels in context", func(t *testing.T) {
+		conn := newTestConnection(cschema.Connector{})
+		conn.Labels = map[string]string{"env": "production", "team": "platform"}
+
+		data, err := conn.GetMustacheContext(context.Background())
+		require.NoError(t, err)
+
+		labels, ok := data["labels"].(map[string]string)
+		require.True(t, ok)
+		assert.Equal(t, "production", labels["env"])
+		assert.Equal(t, "platform", labels["team"])
+	})
+
+	t.Run("returns annotations in context", func(t *testing.T) {
+		conn := newTestConnection(cschema.Connector{})
+		conn.Annotations = map[string]string{"base_url": "custom.example.com"}
+
+		data, err := conn.GetMustacheContext(context.Background())
+		require.NoError(t, err)
+
+		annotations, ok := data["annotations"].(map[string]string)
+		require.True(t, ok)
+		assert.Equal(t, "custom.example.com", annotations["base_url"])
+	})
+
+	t.Run("returns all three when present", func(t *testing.T) {
+		e := encrypt.NewFakeEncryptService(false)
+		s := &service{encrypt: e, logger: aplog.NewNoopLogger()}
+		conn := newTestConnectionWithService(s)
+
+		ef, err := e.EncryptStringForNamespace(context.Background(), "root", `{"tenant":"acme"}`)
+		require.NoError(t, err)
+		conn.EncryptedConfiguration = &ef
+		conn.Labels = map[string]string{"env": "prod"}
+		conn.Annotations = map[string]string{"region": "us-east"}
+
+		data, err := conn.GetMustacheContext(context.Background())
+		require.NoError(t, err)
+
+		cfg, ok := data["cfg"].(map[string]any)
+		require.True(t, ok)
+		assert.Equal(t, "acme", cfg["tenant"])
+
+		labels, ok := data["labels"].(map[string]string)
+		require.True(t, ok)
+		assert.Equal(t, "prod", labels["env"])
+
+		annotations, ok := data["annotations"].(map[string]string)
+		require.True(t, ok)
+		assert.Equal(t, "us-east", annotations["region"])
+	})
+
+	t.Run("omits cfg when no configuration set", func(t *testing.T) {
+		conn := newTestConnection(cschema.Connector{})
+
+		data, err := conn.GetMustacheContext(context.Background())
+		require.NoError(t, err)
+		_, hasCfg := data["cfg"]
+		assert.False(t, hasCfg)
+	})
+
+	t.Run("omits labels when empty", func(t *testing.T) {
+		conn := newTestConnection(cschema.Connector{})
+
+		data, err := conn.GetMustacheContext(context.Background())
+		require.NoError(t, err)
+		_, hasLabels := data["labels"]
+		assert.False(t, hasLabels)
+	})
+
+	t.Run("omits annotations when empty", func(t *testing.T) {
+		conn := newTestConnection(cschema.Connector{})
+
+		data, err := conn.GetMustacheContext(context.Background())
+		require.NoError(t, err)
+		_, hasAnnotations := data["annotations"]
+		assert.False(t, hasAnnotations)
+	})
+
+	t.Run("returns error on decrypt failure", func(t *testing.T) {
+		e := encrypt.NewFakeEncryptService(false)
+		s := &service{encrypt: e, logger: aplog.NewNoopLogger()}
+		conn := newTestConnectionWithService(s)
+		conn.EncryptedConfiguration = &encfield.EncryptedField{ID: "ekv_wrong", Data: "some-data"}
+
+		_, err := conn.GetMustacheContext(context.Background())
+		assert.Error(t, err)
+		assert.Contains(t, err.Error(), "failed to get connection configuration")
+	})
+}

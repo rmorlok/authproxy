@@ -17,8 +17,8 @@ func TestRenderMustache(t *testing.T) {
 	})
 
 	t.Run("nested variable substitution", func(t *testing.T) {
-		result, err := RenderMustache("https://{{configuration.tenant}}.example.com/oauth/authorize", map[string]any{
-			"configuration": map[string]any{
+		result, err := RenderMustache("https://{{cfg.tenant}}.example.com/oauth/authorize", map[string]any{
+			"cfg": map[string]any{
 				"tenant": "acme-corp",
 			},
 		})
@@ -27,8 +27,8 @@ func TestRenderMustache(t *testing.T) {
 	})
 
 	t.Run("multiple variables", func(t *testing.T) {
-		result, err := RenderMustache("https://{{configuration.tenant}}.example.com/{{configuration.version}}/api", map[string]any{
-			"configuration": map[string]any{
+		result, err := RenderMustache("https://{{cfg.tenant}}.example.com/{{cfg.version}}/api", map[string]any{
+			"cfg": map[string]any{
 				"tenant":  "acme",
 				"version": "v2",
 			},

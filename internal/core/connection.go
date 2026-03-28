@@ -141,6 +141,28 @@ func (c *connection) SetConfiguration(ctx context.Context, data map[string]any) 
 	return nil
 }
 
+func (c *connection) GetMustacheContext(ctx context.Context) (map[string]any, error) {
+	data := map[string]any{}
+
+	cfg, err := c.GetConfiguration(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get connection configuration for mustache context: %w", err)
+	}
+	if cfg != nil {
+		data["cfg"] = cfg
+	}
+
+	if labels := c.GetLabels(); len(labels) > 0 {
+		data["labels"] = labels
+	}
+
+	if annotations := c.GetAnnotations(); len(annotations) > 0 {
+		data["annotations"] = annotations
+	}
+
+	return data, nil
+}
+
 func (c *connection) GetRateLimitConfig() *connectors.RateLimiting {
 	def := c.cv.GetDefinition()
 	if def == nil {

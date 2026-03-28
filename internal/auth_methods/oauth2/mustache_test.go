@@ -26,68 +26,6 @@ import (
 	genmock "gopkg.in/h2non/gentleman-mock.v2"
 )
 
-func TestGetMustacheContext(t *testing.T) {
-	ctx := context.Background()
-	connectionId := apid.New(apid.PrefixConnection)
-
-	t.Run("returns configuration in context", func(t *testing.T) {
-		o := &oAuth2Connection{
-			connection: &mockCore.Connection{
-				Id: connectionId,
-				Configuration: map[string]any{
-					"tenant": "acme-corp",
-					"region": "us-east-1",
-				},
-			},
-		}
-
-		data, err := o.getMustacheContext(ctx)
-		require.NoError(t, err)
-
-		config, ok := data["configuration"].(map[string]any)
-		require.True(t, ok)
-		assert.Equal(t, "acme-corp", config["tenant"])
-		assert.Equal(t, "us-east-1", config["region"])
-	})
-
-	t.Run("returns empty context when no configuration", func(t *testing.T) {
-		o := &oAuth2Connection{
-			connection: &mockCore.Connection{
-				Id:            connectionId,
-				Configuration: nil,
-			},
-		}
-
-		data, err := o.getMustacheContext(ctx)
-		require.NoError(t, err)
-		_, hasConfig := data["configuration"]
-		assert.False(t, hasConfig)
-	})
-
-	t.Run("returns empty context when connection is nil", func(t *testing.T) {
-		o := &oAuth2Connection{
-			connection: nil,
-		}
-
-		data, err := o.getMustacheContext(ctx)
-		require.NoError(t, err)
-		assert.Empty(t, data)
-	})
-
-	t.Run("propagates error from GetConfiguration", func(t *testing.T) {
-		o := &oAuth2Connection{
-			connection: &errorConnection{
-				Connection: &mockCore.Connection{Id: connectionId},
-				configErr:  fmt.Errorf("decryption failed"),
-			},
-		}
-
-		_, err := o.getMustacheContext(ctx)
-		require.Error(t, err)
-		assert.Contains(t, err.Error(), "decryption failed")
-	})
-}
-
 func TestRenderMustache(t *testing.T) {
 	ctx := context.Background()
 	connectionId := apid.New(apid.PrefixConnection)
@@ -101,24 +39,64 @@ func TestRenderMustache(t *testing.T) {
 		}
 	}
 
-	t.Run("renders tenant in endpoint URL", func(t *testing.T) {
+	t.Run("renders cfg values in endpoint URL", func(t *testing.T) {
 		o := newO2WithConfig(map[string]any{"tenant": "acme"})
 
-		result, err := o.renderMustache(ctx, "https://{{configuration.tenant}}.example.com/oauth/authorize")
+		result, err := o.renderMustache(ctx, "https://{{cfg.tenant}}.example.com/oauth/authorize")
 		require.NoError(t, err)
 		assert.Equal(t, "https://acme.example.com/oauth/authorize", result)
 	})
 
-	t.Run("renders multiple variables", func(t *testing.T) {
+	t.Run("renders multiple cfg variables", func(t *testing.T) {
 		o := newO2WithConfig(map[string]any{"tenant": "acme", "region": "eu"})
 
-		result, err := o.renderMustache(ctx, "https://{{configuration.tenant}}.{{configuration.region}}.example.com/api")
+		result, err := o.renderMustache(ctx, "https://{{cfg.tenant}}.{{cfg.region}}.example.com/api")
 		require.NoError(t, err)
 		assert.Equal(t, "https://acme.eu.example.com/api", result)
 	})
 
-	t.Run("returns plain string unchanged without fetching config", func(t *testing.T) {
-		// Use an error connection to prove GetConfiguration is never called
+	t.Run("renders labels in template", func(t *testing.T) {
+		o := &oAuth2Connection{
+			connection: &mockCore.Connection{
+				Id:     connectionId,
+				Labels: map[string]string{"env": "production"},
+			},
+		}
+
+		result, err := o.renderMustache(ctx, "https://{{labels.env}}.example.com/api")
+		require.NoError(t, err)
+		assert.Equal(t, "https://production.example.com/api", result)
+	})
+
+	t.Run("renders annotations in template", func(t *testing.T) {
+		o := &oAuth2Connection{
+			connection: &mockCore.Connection{
+				Id:          connectionId,
+				Annotations: map[string]string{"base_url": "custom.example.com"},
+			},
+		}
+
+		result, err := o.renderMustache(ctx, "https://{{annotations.base_url}}/api")
+		require.NoError(t, err)
+		assert.Equal(t, "https://custom.example.com/api", result)
+	})
+
+	t.Run("renders cfg, labels, and annotations together", func(t *testing.T) {
+		o := &oAuth2Connection{
+			connection: &mockCore.Connection{
+				Id:            connectionId,
+				Configuration: map[string]any{"tenant": "acme"},
+				Labels:        map[string]string{"env": "prod"},
+				Annotations:   map[string]string{"region": "us"},
+			},
+		}
+
+		result, err := o.renderMustache(ctx, "https://{{cfg.tenant}}.{{labels.env}}.{{annotations.region}}.example.com")
+		require.NoError(t, err)
+		assert.Equal(t, "https://acme.prod.us.example.com", result)
+	})
+
+	t.Run("returns plain string unchanged without fetching context", func(t *testing.T) {
 		o := &oAuth2Connection{
 			connection: &errorConnection{
 				Connection: &mockCore.Connection{Id: connectionId},
@@ -134,7 +112,7 @@ func TestRenderMustache(t *testing.T) {
 	t.Run("missing variable renders empty", func(t *testing.T) {
 		o := newO2WithConfig(map[string]any{})
 
-		result, err := o.renderMustache(ctx, "https://{{configuration.tenant}}.example.com")
+		result, err := o.renderMustache(ctx, "https://{{cfg.tenant}}.example.com")
 		require.NoError(t, err)
 		assert.Equal(t, "https://.example.com", result)
 	})
@@ -142,7 +120,7 @@ func TestRenderMustache(t *testing.T) {
 	t.Run("nil configuration renders variables empty", func(t *testing.T) {
 		o := newO2WithConfig(nil)
 
-		result, err := o.renderMustache(ctx, "https://{{configuration.tenant}}.example.com")
+		result, err := o.renderMustache(ctx, "https://{{cfg.tenant}}.example.com")
 		require.NoError(t, err)
 		assert.Equal(t, "https://.example.com", result)
 	})
@@ -155,19 +133,19 @@ func TestRenderMustache(t *testing.T) {
 			},
 		}
 
-		_, err := o.renderMustache(ctx, "https://{{configuration.tenant}}.example.com")
+		_, err := o.renderMustache(ctx, "https://{{cfg.tenant}}.example.com")
 		require.Error(t, err)
 		assert.Contains(t, err.Error(), "encryption key not found")
 	})
 }
 
-// errorConnection wraps a mock Connection but returns an error from GetConfiguration.
+// errorConnection wraps a mock Connection but returns an error from GetMustacheContext.
 type errorConnection struct {
 	*mockCore.Connection
 	configErr error
 }
 
-func (e *errorConnection) GetConfiguration(ctx context.Context) (map[string]any, error) {
+func (e *errorConnection) GetMustacheContext(ctx context.Context) (map[string]any, error) {
 	return nil, e.configErr
 }
 
@@ -213,7 +191,7 @@ func TestGenerateAuthUrl_TemplatedEndpoint(t *testing.T) {
 				Type:     cschema.AuthTypeOAuth2,
 				ClientId: common.NewStringValueDirect("my-client-id"),
 				Authorization: cschema.AuthOauth2Authorization{
-					Endpoint: "https://{{configuration.tenant}}.example.com/oauth/authorize",
+					Endpoint: "https://{{cfg.tenant}}.example.com/oauth/authorize",
 				},
 			},
 			state: &state{
@@ -251,7 +229,7 @@ func TestGenerateAuthUrl_TemplatedEndpoint(t *testing.T) {
 				Authorization: cschema.AuthOauth2Authorization{
 					Endpoint: "https://example.com/oauth/authorize",
 					QueryOverrides: map[string]string{
-						"resource": "https://{{configuration.tenant}}.example.com/api",
+						"resource": "https://{{cfg.tenant}}.example.com/api",
 					},
 				},
 			},
@@ -266,6 +244,38 @@ func TestGenerateAuthUrl_TemplatedEndpoint(t *testing.T) {
 		parsed, err := url.Parse(authUrl)
 		require.NoError(t, err)
 		assert.Equal(t, "https://acme-corp.example.com/api", parsed.Query().Get("resource"))
+	})
+
+	t.Run("renders labels in authorization endpoint", func(t *testing.T) {
+		o := &oAuth2Connection{
+			cfg: cfg,
+			connection: &configuredConnection{
+				Connection: &mockCore.Connection{
+					Id:     connectionId,
+					Labels: map[string]string{"tenant": "label-tenant"},
+				},
+				connectorVersion: &mockCore.ConnectorVersion{
+					Id: connectorVersionId,
+				},
+			},
+			auth: &cschema.AuthOAuth2{
+				Type:     cschema.AuthTypeOAuth2,
+				ClientId: common.NewStringValueDirect("my-client-id"),
+				Authorization: cschema.AuthOauth2Authorization{
+					Endpoint: "https://{{labels.tenant}}.example.com/oauth/authorize",
+				},
+			},
+			state: &state{
+				Id: stateId,
+			},
+		}
+
+		authUrl, err := o.GenerateAuthUrl(ctx, &mockActorData{id: apid.New(apid.PrefixActor)})
+		require.NoError(t, err)
+
+		parsed, err := url.Parse(authUrl)
+		require.NoError(t, err)
+		assert.Equal(t, "label-tenant.example.com", parsed.Host)
 	})
 
 	t.Run("static endpoint works without configuration", func(t *testing.T) {
@@ -322,10 +332,10 @@ func TestCallbackFrom3rdParty_TemplatedEndpoint(t *testing.T) {
 		logger, _ := mockLog.NewTestLogger(t)
 
 		return &oAuth2Connection{
-			cfg:   cfg,
-			db:    db,
-			httpf: h,
-			r:     nil,
+			cfg:     cfg,
+			db:      db,
+			httpf:   h,
+			r:       nil,
 			encrypt: encrypt,
 			logger:  logger,
 			connection: &mockCore.Connection{
@@ -351,12 +361,11 @@ func TestCallbackFrom3rdParty_TemplatedEndpoint(t *testing.T) {
 	t.Run("uses rendered mustache endpoint for token exchange", func(t *testing.T) {
 		o2, db, encrypt, ctrl := setupWithMocks(
 			t,
-			"https://{{configuration.tenant}}.example.com/oauth/token",
+			"https://{{cfg.tenant}}.example.com/oauth/token",
 			map[string]any{"tenant": "acme-corp"},
 		)
 		defer ctrl.Finish()
 
-		// The token exchange should hit the rendered endpoint
 		genmock.
 			New("https://acme-corp.example.com").
 			Post("/oauth/token").
@@ -435,7 +444,7 @@ func TestRevokeTokens_TemplatedEndpoint(t *testing.T) {
 	t.Run("uses rendered mustache endpoint for revocation", func(t *testing.T) {
 		o2, db, encrypt, ctrl := setupWithMocks(
 			t,
-			"https://{{configuration.tenant}}.example.com/oauth/revoke",
+			"https://{{cfg.tenant}}.example.com/oauth/revoke",
 			map[string]any{"tenant": "acme-corp"},
 		)
 		defer ctrl.Finish()
@@ -449,7 +458,6 @@ func TestRevokeTokens_TemplatedEndpoint(t *testing.T) {
 
 		db.EXPECT().DeleteOAuth2Token(gomock.Any(), tokenId).Return(nil)
 
-		// The revocation requests should hit the rendered endpoint with the tenant
 		genmock.
 			New("https://acme-corp.example.com").
 			Post("/oauth/revoke").
@@ -502,14 +510,14 @@ func TestRevokeTokens_TemplatedEndpoint(t *testing.T) {
 	t.Run("renders different tenants to different endpoints", func(t *testing.T) {
 		o2a, dbA, encryptA, ctrlA := setupWithMocks(
 			t,
-			"https://{{configuration.tenant}}.example.com/oauth/revoke",
+			"https://{{cfg.tenant}}.example.com/oauth/revoke",
 			map[string]any{"tenant": "alpha"},
 		)
 		defer ctrlA.Finish()
 
 		o2b, dbB, encryptB, ctrlB := setupWithMocks(
 			t,
-			"https://{{configuration.tenant}}.example.com/oauth/revoke",
+			"https://{{cfg.tenant}}.example.com/oauth/revoke",
 			map[string]any{"tenant": "beta"},
 		)
 		defer ctrlB.Finish()
@@ -533,7 +541,6 @@ func TestRevokeTokens_TemplatedEndpoint(t *testing.T) {
 		})
 		dbB.EXPECT().DeleteOAuth2Token(gomock.Any(), tokenIdB).Return(nil)
 
-		// Alpha tenant
 		genmock.
 			New("https://alpha.example.com").
 			Post("/oauth/revoke").
@@ -545,7 +552,6 @@ func TestRevokeTokens_TemplatedEndpoint(t *testing.T) {
 			MatchType("application/x-www-form-urlencoded").
 			Reply(200)
 
-		// Beta tenant
 		genmock.
 			New("https://beta.example.com").
 			Post("/oauth/revoke").
@@ -570,8 +576,8 @@ type mockActorData struct {
 	id apid.ID
 }
 
-func (m *mockActorData) GetId() apid.ID                            { return m.id }
-func (m *mockActorData) GetExternalId() string                     { return "ext-123" }
-func (m *mockActorData) GetLabels() map[string]string              { return nil }
-func (m *mockActorData) GetPermissions() []aschema.Permission { return nil }
-func (m *mockActorData) GetNamespace() string                      { return "/" }
+func (m *mockActorData) GetId() apid.ID                       { return m.id }
+func (m *mockActorData) GetExternalId() string                 { return "ext-123" }
+func (m *mockActorData) GetLabels() map[string]string          { return nil }
+func (m *mockActorData) GetPermissions() []aschema.Permission  { return nil }
+func (m *mockActorData) GetNamespace() string                  { return "/" }
