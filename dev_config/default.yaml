@@ -125,7 +125,7 @@ connectors:
       env: prod
     display_name: Google Drive
     logo:
-      public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/1024px-Google_Drive_icon_%282020%29.svg.png?20221103153031
+      public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/3840px-Google_Drive_icon_%282020%29.svg.png
     highlight: |
       Have the agent track your work in Google Drive.
     description: | 
@@ -217,7 +217,7 @@ connectors:
       env: prod
     display_name: GMail
     logo:
-      public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Gmail_icon_%282020%29.svg/2880px-Gmail_icon_%282020%29.svg.png
+      public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Gmail_icon_%282020%29.svg/3840px-Gmail_icon_%282020%29.svg.png
     description: |
       Have the agent respond to your emails without you needing to be involved. Like magic.
     auth:
@@ -243,7 +243,7 @@ connectors:
       env: prod
     display_name: pipedrive
     logo:
-      public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/4/4a/Pipedrive_logo.svg/2880px-Pipedrive_logo.svg.png
+      public_url: https://mms.businesswire.com/media/20251027073467/en/2621697/5/Pipedrive_Logo_Green.jpg
     description: |
       Allow our agent to handle your sales support.
     auth:
@@ -271,7 +271,7 @@ connectors:
       env: prod
     display_name: Asana
     logo:
-      public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Asana_logo.svg/2880px-Asana_logo.svg.png
+      public_url: https://assets.asana.biz/m/5f083bc48e06e1e2/original/asana-logo-1200x1200.png
     description: |
       Allow our agent organize your work
     auth:
