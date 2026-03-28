@@ -119,6 +119,24 @@ func (m *Connection) SetConfiguration(ctx context.Context, data map[string]any) 
 	return nil
 }
 
+func (m *Connection) GetMustacheContext(ctx context.Context) (map[string]any, error) {
+	data := map[string]any{}
+
+	if m.Configuration != nil {
+		data["cfg"] = m.Configuration
+	}
+
+	if len(m.Labels) > 0 {
+		data["labels"] = m.Labels
+	}
+
+	if len(m.Annotations) > 0 {
+		data["annotations"] = m.Annotations
+	}
+
+	return data, nil
+}
+
 func (m *Connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionRequest) (iface.InitiateConnectionResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }

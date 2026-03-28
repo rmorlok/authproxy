@@ -173,7 +173,7 @@ type DataSourceProxyRequest struct {
 	Method string `json:"method" yaml:"method"`
 
 	// Url is the URL to request. Supports mustache templating with connection configuration
-	// values, e.g. "https://{{configuration.tenant}}.example.com/api/v1/workspaces".
+	// values, e.g. "https://{{cfg.tenant}}.example.com/api/v1/workspaces".
 	Url string `json:"url" yaml:"url"`
 
 	// Headers are additional HTTP headers to include in the request.

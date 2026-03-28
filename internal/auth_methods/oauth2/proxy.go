@@ -63,11 +63,16 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 		ForRequestType(httpf.RequestTypeOAuth).
 		ForConnection(o.connection).
 		New()
+	tokenEndpoint, err := o.renderMustache(ctx, o.auth.Token.Endpoint)
+	if err != nil {
+		return nil, fmt.Errorf("failed to render token endpoint template: %w", err)
+	}
+
 	refreshReq := client.
 		UseContext(ctx).
 		Request().
 		Method("POST").
-		URL(o.auth.Token.Endpoint).
+		URL(tokenEndpoint).
 		SetHeader("Content-Type", "application/x-www-form-urlencoded").
 		AddHeader("accept", "application/json").
 		BodyString(
