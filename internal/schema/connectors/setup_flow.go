@@ -1,9 +1,15 @@
 package connectors
 
 import (
+	"bytes"
 	"encoding/json"
+	"fmt"
+	"strconv"
+	"strings"
 
 	"github.com/hashicorp/go-multierror"
+	jsonschemav5 "github.com/santhosh-tekuri/jsonschema/v5"
+
 	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
@@ -54,6 +60,124 @@ func (sf *SetupFlow) HasPreconnect() bool {
 // HasConfigure returns true if the setup flow has configure steps.
 func (sf *SetupFlow) HasConfigure() bool {
 	return sf != nil && sf.Configure != nil && len(sf.Configure.Steps) > 0
+}
+
+// TotalSteps returns the total number of form steps across both phases.
+func (sf *SetupFlow) TotalSteps() int {
+	if sf == nil {
+		return 0
+	}
+	total := 0
+	if sf.Preconnect != nil {
+		total += len(sf.Preconnect.Steps)
+	}
+	if sf.Configure != nil {
+		total += len(sf.Configure.Steps)
+	}
+	return total
+}
+
+// GetStepBySetupStep returns the step definition and its 0-based global index for the given
+// setup step string (e.g. "preconnect:0", "configure:1").
+func (sf *SetupFlow) GetStepBySetupStep(setupStep string) (*SetupFlowStep, int, error) {
+	phase, index, err := ParseSetupStep(setupStep)
+	if err != nil {
+		return nil, 0, err
+	}
+
+	switch phase {
+	case "preconnect":
+		if sf.Preconnect == nil || index >= len(sf.Preconnect.Steps) {
+			return nil, 0, fmt.Errorf("preconnect step index %d out of range", index)
+		}
+		return &sf.Preconnect.Steps[index], index, nil
+	case "configure":
+		if sf.Configure == nil || index >= len(sf.Configure.Steps) {
+			return nil, 0, fmt.Errorf("configure step index %d out of range", index)
+		}
+		globalIndex := index
+		if sf.Preconnect != nil {
+			globalIndex += len(sf.Preconnect.Steps)
+		}
+		return &sf.Configure.Steps[index], globalIndex, nil
+	default:
+		return nil, 0, fmt.Errorf("unknown phase %q", phase)
+	}
+}
+
+// FirstSetupStep returns the setup step string for the first step in the flow.
+// Returns "preconnect:0" if preconnect steps exist, otherwise "configure:0".
+// Returns empty string if no steps exist.
+func (sf *SetupFlow) FirstSetupStep() string {
+	if sf == nil {
+		return ""
+	}
+	if sf.HasPreconnect() {
+		return "preconnect:0"
+	}
+	if sf.HasConfigure() {
+		return "configure:0"
+	}
+	return ""
+}
+
+// NextSetupStep returns the next setup step after the given one, or empty string if done.
+// The auth phase is implicit between preconnect and configure phases.
+func (sf *SetupFlow) NextSetupStep(current string) (string, error) {
+	phase, index, err := ParseSetupStep(current)
+	if err != nil {
+		return "", err
+	}
+
+	switch phase {
+	case "preconnect":
+		if sf.Preconnect != nil && index+1 < len(sf.Preconnect.Steps) {
+			return fmt.Sprintf("preconnect:%d", index+1), nil
+		}
+		// Preconnect done — next is auth
+		return "auth", nil
+	case "auth":
+		if sf.HasConfigure() {
+			return "configure:0", nil
+		}
+		return "", nil // Complete
+	case "configure":
+		if sf.Configure != nil && index+1 < len(sf.Configure.Steps) {
+			return fmt.Sprintf("configure:%d", index+1), nil
+		}
+		return "", nil // Complete
+	default:
+		return "", fmt.Errorf("unknown phase %q", phase)
+	}
+}
+
+// ParseSetupStep parses a setup step string like "preconnect:0" into phase and index.
+// For "auth", returns ("auth", 0, nil).
+func ParseSetupStep(setupStep string) (phase string, index int, err error) {
+	if setupStep == "auth" {
+		return "auth", 0, nil
+	}
+
+	parts := strings.SplitN(setupStep, ":", 2)
+	if len(parts) != 2 {
+		return "", 0, fmt.Errorf("invalid setup step format %q", setupStep)
+	}
+
+	phase = parts[0]
+	if phase != "preconnect" && phase != "configure" {
+		return "", 0, fmt.Errorf("invalid setup step phase %q", phase)
+	}
+
+	index, err = strconv.Atoi(parts[1])
+	if err != nil {
+		return "", 0, fmt.Errorf("invalid setup step index %q: %w", parts[1], err)
+	}
+
+	if index < 0 {
+		return "", 0, fmt.Errorf("setup step index must be non-negative, got %d", index)
+	}
+
+	return phase, index, nil
 }
 
 // SetupFlowPhase is a sequential list of form steps within a phase (preconnect or configure).
@@ -137,6 +261,90 @@ func (s *SetupFlowStep) Validate(vc *common.ValidationContext, seenIds map[strin
 	}
 
 	return result.ErrorOrNil()
+}
+
+// ValidateAndMergeData validates submitted form data against this step and merges it into
+// the provided configuration map. It performs three checks:
+//  1. The stepId must match this step's Id.
+//  2. The data must be valid JSON that passes the step's JSON Schema validation.
+//  3. Only fields defined in the schema's top-level "properties" are merged into config,
+//     preventing arbitrary data injection.
+//
+// The config map is modified in place. If config is nil, a new map is created and returned.
+// Returns the (possibly new) config map and any validation error.
+func (s *SetupFlowStep) ValidateAndMergeData(stepId string, data json.RawMessage, config map[string]any) (map[string]any, error) {
+	if stepId == "" {
+		return config, fmt.Errorf("step_id is required")
+	}
+	if stepId != s.Id {
+		return config, fmt.Errorf("step_id %q does not match current step %q", stepId, s.Id)
+	}
+
+	// Parse the submitted data
+	var submittedData map[string]any
+	if err := json.Unmarshal(data, &submittedData); err != nil {
+		return config, fmt.Errorf("invalid form data JSON: %w", err)
+	}
+
+	// Validate against JSON schema
+	if err := validateDataAgainstSchema(data, json.RawMessage(s.JsonSchema)); err != nil {
+		return config, fmt.Errorf("form data validation failed: %w", err)
+	}
+
+	// Extract allowed field names from the schema
+	allowedFields, err := extractSchemaPropertyNames(json.RawMessage(s.JsonSchema))
+	if err != nil {
+		return config, fmt.Errorf("failed to parse schema properties: %w", err)
+	}
+
+	// Merge only allowed fields
+	if config == nil {
+		config = make(map[string]any)
+	}
+	for k, v := range submittedData {
+		if allowedFields[k] {
+			config[k] = v
+		}
+	}
+
+	return config, nil
+}
+
+// validateDataAgainstSchema validates JSON data against a JSON Schema.
+func validateDataAgainstSchema(data json.RawMessage, schema json.RawMessage) error {
+	compiler := jsonschemav5.NewCompiler()
+	if err := compiler.AddResource("schema.json", bytes.NewReader(schema)); err != nil {
+		return fmt.Errorf("invalid JSON schema: %w", err)
+	}
+
+	compiled, err := compiler.Compile("schema.json")
+	if err != nil {
+		return fmt.Errorf("failed to compile JSON schema: %w", err)
+	}
+
+	var v any
+	if err := json.Unmarshal(data, &v); err != nil {
+		return fmt.Errorf("invalid JSON data: %w", err)
+	}
+
+	return compiled.Validate(v)
+}
+
+// extractSchemaPropertyNames parses a JSON Schema and returns the set of top-level
+// property names defined in it.
+func extractSchemaPropertyNames(schema json.RawMessage) (map[string]bool, error) {
+	var parsed struct {
+		Properties map[string]any `json:"properties"`
+	}
+	if err := json.Unmarshal(schema, &parsed); err != nil {
+		return nil, err
+	}
+
+	result := make(map[string]bool, len(parsed.Properties))
+	for k := range parsed.Properties {
+		result[k] = true
+	}
+	return result, nil
 }
 
 // DataSourceDef defines how to fetch dynamic data for populating form fields.

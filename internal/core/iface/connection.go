@@ -56,4 +56,5 @@ type Connection interface {
 		w http.ResponseWriter,
 	) error
 	SubmitForm(ctx context.Context, req SubmitConnectionRequest) (InitiateConnectionResponse, error)
+	GetCurrentSetupStepResponse(ctx context.Context) (InitiateConnectionResponse, error)
 }

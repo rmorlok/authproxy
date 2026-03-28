@@ -76,10 +76,15 @@ func (icr *InitiateConnectionRedirect) GetType() InitiateConnectionResponseType 
 }
 
 type InitiateConnectionForm struct {
-	Id         apid.ID                        `json:"id"`
-	Type       InitiateConnectionResponseType `json:"type"`
-	JsonSchema json.RawMessage                `json:"json_schema"`
-	UiSchema   json.RawMessage                `json:"ui_schema"`
+	Id              apid.ID                        `json:"id"`
+	Type            InitiateConnectionResponseType `json:"type"`
+	StepId          string                         `json:"step_id"`
+	StepTitle       string                         `json:"step_title,omitempty"`
+	StepDescription string                         `json:"step_description,omitempty"`
+	CurrentStep     int                            `json:"current_step"`
+	TotalSteps      int                            `json:"total_steps"`
+	JsonSchema      json.RawMessage                `json:"json_schema"`
+	UiSchema        json.RawMessage                `json:"ui_schema"`
 }
 
 func (icf *InitiateConnectionForm) GetId() apid.ID {
@@ -104,5 +109,13 @@ func (icc *InitiateConnectionComplete) GetType() InitiateConnectionResponseType 
 }
 
 type SubmitConnectionRequest struct {
+	// StepId is the id of the step being submitted. Must match the current setup step's id.
+	StepId string `json:"step_id"`
+
+	// Data is the form data submitted by the user for the current step.
 	Data json.RawMessage `json:"data"`
+
+	// ReturnToUrl is required when the next step after form submission is an auth redirect.
+	// The client should provide this so the OAuth callback knows where to return.
+	ReturnToUrl string `json:"return_to_url,omitempty"`
 }

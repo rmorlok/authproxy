@@ -1698,7 +1698,7 @@ func TestConnections(t *testing.T) {
 			require.Equal(t, http.StatusBadRequest, w.Code)
 		})
 
-		t.Run("not implemented", func(t *testing.T) {
+		t.Run("no active setup step returns 400", func(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPost,
@@ -1713,7 +1713,7 @@ func TestConnections(t *testing.T) {
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusNotImplemented, w.Code)
+			require.Equal(t, http.StatusBadRequest, w.Code)
 		})
 	})
 }

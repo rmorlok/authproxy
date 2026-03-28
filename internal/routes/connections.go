@@ -155,6 +155,81 @@ func (r *ConnectionsRoutes) submit(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, resp)
 }
 
+// @Summary		Get setup step
+// @Description	Get the current setup step for a connection, used to resume an interrupted setup flow
+// @Tags			connections
+// @Produce		json
+// @Param			id	path		string	true	"Connection ID"
+// @Success		200	{object}	InitiateConnectionComplete
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		404	{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/_setup_step [get]
+func (r *ConnectionsRoutes) getSetupStep(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := apid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid id format").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == apid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	c, err := r.core.GetConnection(ctx, id)
+	if err != nil {
+		if errors.Is(err, coreIface.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("connection not found").
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+		} else {
+			api_common.HttpStatusErrorBuilderFromError(err).
+				WithStatusInternalServerError().
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+		}
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		httpErr.WriteGinResponse(nil, gctx)
+		return
+	}
+
+	resp, err := c.GetCurrentSetupStepResponse(ctx)
+	if err != nil {
+		api_common.HttpStatusErrorBuilderFromError(err).
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, resp)
+}
+
 type ConnectionJson struct {
 	Id          apid.ID                  `json:"id" swaggertype:"string"`
 	Namespace   string                   `json:"namespace"`
@@ -1640,6 +1715,15 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 			ForIdField("id").
 			Build(),
 		r.submit,
+	)
+	g.GET(
+		"/connections/:id/_setup_step",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("get").
+			ForIdField("id").
+			Build(),
+		r.getSetupStep,
 	)
 	g.POST(
 		"/connections/:id/_disconnect",

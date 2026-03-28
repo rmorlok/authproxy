@@ -347,6 +347,175 @@ func TestSetupFlowHelpers(t *testing.T) {
 	})
 }
 
+func TestParseSetupStep(t *testing.T) {
+	t.Run("valid preconnect", func(t *testing.T) {
+		phase, index, err := ParseSetupStep("preconnect:0")
+		require.NoError(t, err)
+		assert.Equal(t, "preconnect", phase)
+		assert.Equal(t, 0, index)
+	})
+
+	t.Run("valid configure with higher index", func(t *testing.T) {
+		phase, index, err := ParseSetupStep("configure:3")
+		require.NoError(t, err)
+		assert.Equal(t, "configure", phase)
+		assert.Equal(t, 3, index)
+	})
+
+	t.Run("auth phase", func(t *testing.T) {
+		phase, index, err := ParseSetupStep("auth")
+		require.NoError(t, err)
+		assert.Equal(t, "auth", phase)
+		assert.Equal(t, 0, index)
+	})
+
+	t.Run("invalid format", func(t *testing.T) {
+		_, _, err := ParseSetupStep("bad")
+		assert.Error(t, err)
+	})
+
+	t.Run("invalid phase", func(t *testing.T) {
+		_, _, err := ParseSetupStep("unknown:0")
+		assert.Error(t, err)
+	})
+
+	t.Run("invalid index", func(t *testing.T) {
+		_, _, err := ParseSetupStep("preconnect:abc")
+		assert.Error(t, err)
+	})
+
+	t.Run("negative index", func(t *testing.T) {
+		_, _, err := ParseSetupStep("preconnect:-1")
+		assert.Error(t, err)
+	})
+}
+
+func TestSetupFlowTotalSteps(t *testing.T) {
+	assert.Equal(t, 0, (*SetupFlow)(nil).TotalSteps())
+	assert.Equal(t, 0, (&SetupFlow{}).TotalSteps())
+
+	sf := &SetupFlow{
+		Preconnect: &SetupFlowPhase{
+			Steps: []SetupFlowStep{{Id: "a"}, {Id: "b"}},
+		},
+		Configure: &SetupFlowPhase{
+			Steps: []SetupFlowStep{{Id: "c"}},
+		},
+	}
+	assert.Equal(t, 3, sf.TotalSteps())
+}
+
+func TestSetupFlowFirstSetupStep(t *testing.T) {
+	assert.Equal(t, "", (*SetupFlow)(nil).FirstSetupStep())
+
+	t.Run("preconnect first", func(t *testing.T) {
+		sf := &SetupFlow{
+			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "a"}}},
+			Configure:  &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "b"}}},
+		}
+		assert.Equal(t, "preconnect:0", sf.FirstSetupStep())
+	})
+
+	t.Run("configure only", func(t *testing.T) {
+		sf := &SetupFlow{
+			Configure: &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "a"}}},
+		}
+		assert.Equal(t, "configure:0", sf.FirstSetupStep())
+	})
+}
+
+func TestSetupFlowNextSetupStep(t *testing.T) {
+	sf := &SetupFlow{
+		Preconnect: &SetupFlowPhase{
+			Steps: []SetupFlowStep{{Id: "a"}, {Id: "b"}},
+		},
+		Configure: &SetupFlowPhase{
+			Steps: []SetupFlowStep{{Id: "c"}, {Id: "d"}},
+		},
+	}
+
+	t.Run("preconnect:0 -> preconnect:1", func(t *testing.T) {
+		next, err := sf.NextSetupStep("preconnect:0")
+		require.NoError(t, err)
+		assert.Equal(t, "preconnect:1", next)
+	})
+
+	t.Run("preconnect:1 -> auth", func(t *testing.T) {
+		next, err := sf.NextSetupStep("preconnect:1")
+		require.NoError(t, err)
+		assert.Equal(t, "auth", next)
+	})
+
+	t.Run("auth -> configure:0", func(t *testing.T) {
+		next, err := sf.NextSetupStep("auth")
+		require.NoError(t, err)
+		assert.Equal(t, "configure:0", next)
+	})
+
+	t.Run("configure:0 -> configure:1", func(t *testing.T) {
+		next, err := sf.NextSetupStep("configure:0")
+		require.NoError(t, err)
+		assert.Equal(t, "configure:1", next)
+	})
+
+	t.Run("configure:1 -> empty (complete)", func(t *testing.T) {
+		next, err := sf.NextSetupStep("configure:1")
+		require.NoError(t, err)
+		assert.Equal(t, "", next)
+	})
+
+	t.Run("auth with no configure -> empty (complete)", func(t *testing.T) {
+		sfNoConfig := &SetupFlow{
+			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "a"}}},
+		}
+		next, err := sfNoConfig.NextSetupStep("auth")
+		require.NoError(t, err)
+		assert.Equal(t, "", next)
+	})
+}
+
+func TestSetupFlowGetStepBySetupStep(t *testing.T) {
+	sf := &SetupFlow{
+		Preconnect: &SetupFlowPhase{
+			Steps: []SetupFlowStep{{Id: "tenant"}, {Id: "region"}},
+		},
+		Configure: &SetupFlowPhase{
+			Steps: []SetupFlowStep{{Id: "workspace"}},
+		},
+	}
+
+	t.Run("preconnect:0", func(t *testing.T) {
+		step, idx, err := sf.GetStepBySetupStep("preconnect:0")
+		require.NoError(t, err)
+		assert.Equal(t, "tenant", step.Id)
+		assert.Equal(t, 0, idx)
+	})
+
+	t.Run("preconnect:1", func(t *testing.T) {
+		step, idx, err := sf.GetStepBySetupStep("preconnect:1")
+		require.NoError(t, err)
+		assert.Equal(t, "region", step.Id)
+		assert.Equal(t, 1, idx)
+	})
+
+	t.Run("configure:0 global index includes preconnect", func(t *testing.T) {
+		step, idx, err := sf.GetStepBySetupStep("configure:0")
+		require.NoError(t, err)
+		assert.Equal(t, "workspace", step.Id)
+		assert.Equal(t, 2, idx) // 2 preconnect steps before this
+	})
+
+	t.Run("out of range", func(t *testing.T) {
+		_, _, err := sf.GetStepBySetupStep("preconnect:5")
+		assert.Error(t, err)
+	})
+
+	t.Run("invalid step", func(t *testing.T) {
+		_, _, err := sf.GetStepBySetupStep("bad")
+		assert.Error(t, err)
+	})
+}
+
 func TestSetupFlowYAMLRoundtrip(t *testing.T) {
 	t.Run("parse connector with setup_flow from YAML", func(t *testing.T) {
 		data, err := os.ReadFile("test_data/valid-oauth-connector-with-setup-flow.yaml")
@@ -436,5 +605,121 @@ func TestSetupFlowYAMLRoundtrip(t *testing.T) {
 		require.NotNil(t, parsed.Configure.Steps[0].DataSources["items"].ProxyRequest)
 		assert.Equal(t, "GET", parsed.Configure.Steps[0].DataSources["items"].ProxyRequest.Method)
 		assert.Equal(t, "application/json", parsed.Configure.Steps[0].DataSources["items"].ProxyRequest.Headers["Accept"])
+	})
+}
+
+func TestSetupFlowStepValidateAndMergeData(t *testing.T) {
+	tenantSchema := common.RawJSON(`{
+		"type": "object",
+		"required": ["tenant"],
+		"properties": {
+			"tenant": {"type": "string"}
+		}
+	}`)
+
+	t.Run("rejects empty step_id", func(t *testing.T) {
+		step := &SetupFlowStep{Id: "tenant", JsonSchema: tenantSchema}
+
+		_, err := step.ValidateAndMergeData("", json.RawMessage(`{"tenant":"acme"}`), nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "step_id is required")
+	})
+
+	t.Run("rejects mismatched step_id", func(t *testing.T) {
+		step := &SetupFlowStep{Id: "tenant", JsonSchema: tenantSchema}
+
+		_, err := step.ValidateAndMergeData("wrong_id", json.RawMessage(`{"tenant":"acme"}`), nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "does not match current step")
+	})
+
+	t.Run("rejects missing required field", func(t *testing.T) {
+		step := &SetupFlowStep{Id: "tenant", JsonSchema: tenantSchema}
+
+		_, err := step.ValidateAndMergeData("tenant", json.RawMessage(`{}`), nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "validation failed")
+	})
+
+	t.Run("rejects wrong type for field", func(t *testing.T) {
+		schema := common.RawJSON(`{
+			"type": "object",
+			"properties": {
+				"count": {"type": "integer"}
+			}
+		}`)
+		step := &SetupFlowStep{Id: "step1", JsonSchema: schema}
+
+		_, err := step.ValidateAndMergeData("step1", json.RawMessage(`{"count": "not-a-number"}`), nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "validation failed")
+	})
+
+	t.Run("rejects invalid JSON data", func(t *testing.T) {
+		step := &SetupFlowStep{Id: "tenant", JsonSchema: tenantSchema}
+
+		_, err := step.ValidateAndMergeData("tenant", json.RawMessage(`{bad json`), nil)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "invalid form data JSON")
+	})
+
+	t.Run("merges valid data into nil config", func(t *testing.T) {
+		step := &SetupFlowStep{Id: "tenant", JsonSchema: tenantSchema}
+
+		cfg, err := step.ValidateAndMergeData("tenant", json.RawMessage(`{"tenant":"acme"}`), nil)
+		require.NoError(t, err)
+		assert.Equal(t, "acme", cfg["tenant"])
+	})
+
+	t.Run("merges valid data into existing config", func(t *testing.T) {
+		step := &SetupFlowStep{Id: "tenant", JsonSchema: tenantSchema}
+		existing := map[string]any{"region": "us-east"}
+
+		cfg, err := step.ValidateAndMergeData("tenant", json.RawMessage(`{"tenant":"acme"}`), existing)
+		require.NoError(t, err)
+		assert.Equal(t, "acme", cfg["tenant"])
+		assert.Equal(t, "us-east", cfg["region"])
+	})
+
+	t.Run("strips fields not in schema properties", func(t *testing.T) {
+		step := &SetupFlowStep{Id: "tenant", JsonSchema: tenantSchema}
+
+		cfg, err := step.ValidateAndMergeData("tenant", json.RawMessage(`{"tenant":"acme","injected_secret":"evil","admin":true}`), nil)
+		require.NoError(t, err)
+		assert.Equal(t, "acme", cfg["tenant"])
+		assert.NotContains(t, cfg, "injected_secret")
+		assert.NotContains(t, cfg, "admin")
+	})
+
+	t.Run("extra fields cannot overwrite prior config values", func(t *testing.T) {
+		schema := common.RawJSON(`{
+			"type": "object",
+			"properties": {
+				"workspace": {"type": "string"}
+			}
+		}`)
+		step := &SetupFlowStep{Id: "step2", JsonSchema: schema}
+
+		existing := map[string]any{"tenant": "acme"}
+		cfg, err := step.ValidateAndMergeData("step2", json.RawMessage(`{"workspace":"main","tenant":"evil-override"}`), existing)
+		require.NoError(t, err)
+		assert.Equal(t, "acme", cfg["tenant"], "tenant should not be overwritten")
+		assert.Equal(t, "main", cfg["workspace"])
+	})
+
+	t.Run("strips prototype pollution fields", func(t *testing.T) {
+		schema := common.RawJSON(`{
+			"type": "object",
+			"properties": {
+				"name": {"type": "string"}
+			}
+		}`)
+		step := &SetupFlowStep{Id: "step1", JsonSchema: schema}
+
+		cfg, err := step.ValidateAndMergeData("step1", json.RawMessage(`{"name":"legit","__proto__":"attack","constructor":"evil"}`), nil)
+		require.NoError(t, err)
+		assert.Equal(t, "legit", cfg["name"])
+		assert.NotContains(t, cfg, "__proto__")
+		assert.NotContains(t, cfg, "constructor")
 	})
 }

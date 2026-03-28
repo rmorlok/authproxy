@@ -141,6 +141,10 @@ func (m *Connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 	return nil, fmt.Errorf("not implemented")
 }
 
+func (m *Connection) GetCurrentSetupStepResponse(ctx context.Context) (iface.InitiateConnectionResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 var _ iface.Connection = (*Connection)(nil)
 
 type ConnectionMatcher struct {
