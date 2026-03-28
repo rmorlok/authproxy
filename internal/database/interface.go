@@ -108,6 +108,8 @@ type DB interface {
 	CreateConnection(ctx context.Context, c *Connection) error
 	DeleteConnection(ctx context.Context, id apid.ID) error
 	SetConnectionState(ctx context.Context, id apid.ID, state ConnectionState) error
+	SetConnectionSetupStep(ctx context.Context, id apid.ID, setupStep *string) error
+	SetConnectionEncryptedConfiguration(ctx context.Context, id apid.ID, encryptedConfig *encfield.EncryptedField) error
 	UpdateConnectionLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Connection, error)
 	PutConnectionLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Connection, error)
 	DeleteConnectionLabels(ctx context.Context, id apid.ID, keys []string) (*Connection, error)

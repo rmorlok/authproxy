@@ -21,16 +21,19 @@ create unique index idx_actors_namespace
 
 create table connections
 (
-    id                text primary key,
-    namespace         text,
-    labels            jsonb,
-    annotations       jsonb,
-    state             text,
-    connector_id      text,
-    connector_version integer,
-    created_at        timestamptz,
-    updated_at        timestamptz,
-    deleted_at        timestamptz
+    id                      text primary key,
+    namespace               text,
+    labels                  jsonb,
+    annotations             jsonb,
+    state                   text,
+    connector_id            text,
+    connector_version       integer,
+    encrypted_configuration jsonb,
+    setup_step              text,
+    created_at              timestamptz,
+    updated_at              timestamptz,
+    encrypted_at            timestamptz,
+    deleted_at              timestamptz
 );
 
 create index idx_connections_deleted_at

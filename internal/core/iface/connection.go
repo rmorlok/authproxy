@@ -25,6 +25,7 @@ type Connection interface {
 	GetDeletedAt() *time.Time
 	GetLabels() map[string]string
 	GetAnnotations() map[string]string
+	GetSetupStep() *string
 
 	/*
 	 * Nested entities
@@ -37,6 +38,9 @@ type Connection interface {
 	 */
 
 	SetState(ctx context.Context, state database.ConnectionState) error
+	SetSetupStep(ctx context.Context, setupStep *string) error
+	GetConfiguration(ctx context.Context) (map[string]any, error)
+	SetConfiguration(ctx context.Context, data map[string]any) error
 	GetProbe(probeId string) (Probe, error)
 	GetProbes() []Probe
 	ProxyRequest(

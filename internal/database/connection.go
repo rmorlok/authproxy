@@ -11,9 +11,19 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
+
+func init() {
+	RegisterEncryptedField(EncryptedFieldRegistration{
+		Table:          ConnectionsTable,
+		PrimaryKeyCols: []string{"id"},
+		EncryptedCols:  []string{"encrypted_configuration"},
+		NamespaceCol:   "namespace",
+	})
+}
 
 type ConnectionState string
 
@@ -41,16 +51,19 @@ func IsValidConnectionState[T string | ConnectionState](state T) bool {
 const ConnectionsTable = "connections"
 
 type Connection struct {
-	Id               apid.ID
-	Namespace        string
-	State            ConnectionState
-	ConnectorId      apid.ID
-	ConnectorVersion uint64
-	Labels           Labels
-	Annotations      Annotations
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	DeletedAt        *time.Time
+	Id                      apid.ID
+	Namespace               string
+	State                   ConnectionState
+	ConnectorId             apid.ID
+	ConnectorVersion        uint64
+	Labels                  Labels
+	Annotations             Annotations
+	EncryptedConfiguration  *encfield.EncryptedField
+	EncryptedAt             *time.Time
+	SetupStep               *string
+	CreatedAt               time.Time
+	UpdatedAt               time.Time
+	DeletedAt               *time.Time
 }
 
 func (c *Connection) cols() []string {
@@ -62,6 +75,9 @@ func (c *Connection) cols() []string {
 		"connector_version",
 		"labels",
 		"annotations",
+		"encrypted_configuration",
+		"encrypted_at",
+		"setup_step",
 		"created_at",
 		"updated_at",
 		"deleted_at",
@@ -77,6 +93,9 @@ func (c *Connection) fields() []any {
 		&c.ConnectorVersion,
 		&c.Labels,
 		&c.Annotations,
+		&c.EncryptedConfiguration,
+		&c.EncryptedAt,
+		&c.SetupStep,
 		&c.CreatedAt,
 		&c.UpdatedAt,
 		&c.DeletedAt,
@@ -92,6 +111,9 @@ func (c *Connection) values() []any {
 		c.ConnectorVersion,
 		c.Labels,
 		c.Annotations,
+		c.EncryptedConfiguration,
+		c.EncryptedAt,
+		c.SetupStep,
 		c.CreatedAt,
 		c.UpdatedAt,
 		c.DeletedAt,
@@ -273,6 +295,73 @@ func (s *service) SetConnectionState(ctx context.Context, id apid.ID, state Conn
 
 	if affected > 1 {
 		return fmt.Errorf("multiple connections had state updated: %w", ErrViolation)
+	}
+
+	return nil
+}
+
+func (s *service) SetConnectionSetupStep(ctx context.Context, id apid.ID, setupStep *string) error {
+	if id == apid.Nil {
+		return errors.New("connection id is required")
+	}
+
+	now := apctx.GetClock(ctx).Now()
+	dbResult, err := s.sq.
+		Update(ConnectionsTable).
+		Set("updated_at", now).
+		Set("setup_step", setupStep).
+		Where(sq.Eq{"id": id, "deleted_at": nil}).
+		RunWith(s.db).
+		Exec()
+	if err != nil {
+		return fmt.Errorf("failed to update connection setup step: %w", err)
+	}
+
+	affected, err := dbResult.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to update connection setup step: %w", err)
+	}
+
+	if affected == 0 {
+		return ErrNotFound
+	}
+
+	if affected > 1 {
+		return fmt.Errorf("multiple connections had setup step updated: %w", ErrViolation)
+	}
+
+	return nil
+}
+
+func (s *service) SetConnectionEncryptedConfiguration(ctx context.Context, id apid.ID, encryptedConfig *encfield.EncryptedField) error {
+	if id == apid.Nil {
+		return errors.New("connection id is required")
+	}
+
+	now := apctx.GetClock(ctx).Now()
+	dbResult, err := s.sq.
+		Update(ConnectionsTable).
+		Set("updated_at", now).
+		Set("encrypted_configuration", encryptedConfig).
+		Set("encrypted_at", &now).
+		Where(sq.Eq{"id": id, "deleted_at": nil}).
+		RunWith(s.db).
+		Exec()
+	if err != nil {
+		return fmt.Errorf("failed to update connection configuration: %w", err)
+	}
+
+	affected, err := dbResult.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to update connection configuration: %w", err)
+	}
+
+	if affected == 0 {
+		return ErrNotFound
+	}
+
+	if affected > 1 {
+		return fmt.Errorf("multiple connections had configuration updated: %w", ErrViolation)
 	}
 
 	return nil

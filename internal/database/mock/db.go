@@ -1246,20 +1246,6 @@ func (mr *MockDBMockRecorder) PurgeSoftDeletedRecords(ctx, olderThan interface{}
 }
 
 // PutActorAnnotations mocks base method.
-func (m *MockDB) UpdateActorAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*database.Actor, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "UpdateActorAnnotations", ctx, id, annotations)
-	ret0, _ := ret[0].(*database.Actor)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// UpdateActorAnnotations indicates an expected call of UpdateActorAnnotations.
-func (mr *MockDBMockRecorder) UpdateActorAnnotations(ctx, id, annotations interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateActorAnnotations", reflect.TypeOf((*MockDB)(nil).UpdateActorAnnotations), ctx, id, annotations)
-}
-
 func (m *MockDB) PutActorAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*database.Actor, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "PutActorAnnotations", ctx, id, annotations)
@@ -1379,6 +1365,34 @@ func (mr *MockDBMockRecorder) PutNamespaceLabels(ctx, path, labels interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutNamespaceLabels", reflect.TypeOf((*MockDB)(nil).PutNamespaceLabels), ctx, path, labels)
 }
 
+// SetConnectionEncryptedConfiguration mocks base method.
+func (m *MockDB) SetConnectionEncryptedConfiguration(ctx context.Context, id apid.ID, encryptedConfig *encfield.EncryptedField) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetConnectionEncryptedConfiguration", ctx, id, encryptedConfig)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetConnectionEncryptedConfiguration indicates an expected call of SetConnectionEncryptedConfiguration.
+func (mr *MockDBMockRecorder) SetConnectionEncryptedConfiguration(ctx, id, encryptedConfig interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectionEncryptedConfiguration", reflect.TypeOf((*MockDB)(nil).SetConnectionEncryptedConfiguration), ctx, id, encryptedConfig)
+}
+
+// SetConnectionSetupStep mocks base method.
+func (m *MockDB) SetConnectionSetupStep(ctx context.Context, id apid.ID, setupStep *string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetConnectionSetupStep", ctx, id, setupStep)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetConnectionSetupStep indicates an expected call of SetConnectionSetupStep.
+func (mr *MockDBMockRecorder) SetConnectionSetupStep(ctx, id, setupStep interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectionSetupStep", reflect.TypeOf((*MockDB)(nil).SetConnectionSetupStep), ctx, id, setupStep)
+}
+
 // SetConnectionState mocks base method.
 func (m *MockDB) SetConnectionState(ctx context.Context, id apid.ID, state database.ConnectionState) error {
 	m.ctrl.T.Helper()
@@ -1474,6 +1488,21 @@ func (m *MockDB) SetNamespaceState(ctx context.Context, path string, state datab
 func (mr *MockDBMockRecorder) SetNamespaceState(ctx, path, state interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetNamespaceState", reflect.TypeOf((*MockDB)(nil).SetNamespaceState), ctx, path, state)
+}
+
+// UpdateActorAnnotations mocks base method.
+func (m *MockDB) UpdateActorAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*database.Actor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateActorAnnotations", ctx, id, annotations)
+	ret0, _ := ret[0].(*database.Actor)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateActorAnnotations indicates an expected call of UpdateActorAnnotations.
+func (mr *MockDBMockRecorder) UpdateActorAnnotations(ctx, id, annotations interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateActorAnnotations", reflect.TypeOf((*MockDB)(nil).UpdateActorAnnotations), ctx, id, annotations)
 }
 
 // UpdateConnectionAnnotations mocks base method.

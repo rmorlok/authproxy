@@ -307,6 +307,10 @@ definitions:
         description: Namespace path
         example: acme
         type: string
+      setup_step:
+        description: Current setup step if connection setup is in progress
+        example: preconnect:0
+        type: string
       state:
         description: Connection state (pending, connected, disconnecting, disconnected,
           error)
