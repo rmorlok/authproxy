@@ -71,9 +71,14 @@ func (o *oAuth2Connection) revokeRefreshToken(ctx context.Context, token *databa
 		New().
 		UseContext(ctx)
 
+	revocationEndpoint, err := o.renderMustache(ctx, o.auth.Revocation.Endpoint)
+	if err != nil {
+		return fmt.Errorf("failed to render revocation endpoint template: %w", err)
+	}
+
 	req := c.Request().
 		Method("POST").
-		URL(o.auth.Revocation.Endpoint).
+		URL(revocationEndpoint).
 		Type("application/x-www-form-urlencoded").
 		AddHeader("accept", "application/json").
 		SetHeader("Authorization", "Bearer "+accessToken)
@@ -133,9 +138,14 @@ func (o *oAuth2Connection) revokeAccessToken(ctx context.Context, token *databas
 		New().
 		UseContext(ctx)
 
+	revocationEndpoint, err := o.renderMustache(ctx, o.auth.Revocation.Endpoint)
+	if err != nil {
+		return fmt.Errorf("failed to render revocation endpoint template: %w", err)
+	}
+
 	req := c.Request().
 		Method("POST").
-		URL(o.auth.Revocation.Endpoint).
+		URL(revocationEndpoint).
 		Type("application/x-www-form-urlencoded").
 		AddHeader("accept", "application/json").
 		SetHeader("Authorization", "Bearer "+accessToken)

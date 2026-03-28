@@ -61,9 +61,14 @@ func (o *oAuth2Connection) CallbackFrom3rdParty(ctx context.Context, query url.V
 		return errorRedirectPage, fmt.Errorf("failed to get client id for connector: %w", err)
 	}
 
+	tokenEndpoint, err := o.renderMustache(ctx, o.auth.Token.Endpoint)
+	if err != nil {
+		return errorRedirectPage, fmt.Errorf("failed to render token endpoint template: %w", err)
+	}
+
 	req := c.Request().
 		Method("POST").
-		URL(o.auth.Token.Endpoint).
+		URL(tokenEndpoint).
 		Type("application/x-www-form-urlencoded").
 		AddHeader("accept", "application/json")
 

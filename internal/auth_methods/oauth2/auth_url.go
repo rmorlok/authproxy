@@ -83,7 +83,12 @@ func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor IActorData
 		return s.Id
 	})
 
-	authUrl3p, err := url.Parse(o.auth.Authorization.Endpoint)
+	authEndpoint, err := o.renderMustache(ctx, o.auth.Authorization.Endpoint)
+	if err != nil {
+		return "", fmt.Errorf("failed to render authorization endpoint template for connector %s: %w", cv.GetId(), err)
+	}
+
+	authUrl3p, err := url.Parse(authEndpoint)
 	if err != nil {
 		return "", fmt.Errorf("failed to parse authorization endpoint for connector %s: %w", cv.GetId(), err)
 	}
@@ -98,7 +103,11 @@ func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor IActorData
 	query.Set("state", o.state.Id.String())
 
 	for k, v := range o.auth.Authorization.QueryOverrides {
-		query.Set(k, v)
+		rendered, err := o.renderMustache(ctx, v)
+		if err != nil {
+			return "", fmt.Errorf("failed to render query override %q template for connector %s: %w", k, cv.GetId(), err)
+		}
+		query.Set(k, rendered)
 	}
 
 	authUrl3p.RawQuery = query.Encode()
