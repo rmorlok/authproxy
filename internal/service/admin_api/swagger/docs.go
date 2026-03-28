@@ -6581,6 +6581,11 @@ const docTemplateadmin_api = `{
                     "type": "string",
                     "example": "acme"
                 },
+                "setup_step": {
+                    "description": "Current setup step if connection setup is in progress",
+                    "type": "string",
+                    "example": "preconnect:0"
+                },
                 "state": {
                     "description": "Connection state (pending, connected, disconnecting, disconnected, error)",
                     "type": "string",

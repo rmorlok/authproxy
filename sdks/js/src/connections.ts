@@ -39,6 +39,7 @@ export interface Connection {
     namespace: string;
     connector: Connector;
     state: ConnectionState;
+    setup_step?: string;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
     created_at: string;

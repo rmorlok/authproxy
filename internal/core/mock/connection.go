@@ -23,6 +23,8 @@ type Connection struct {
 	DeletedAt        *time.Time
 	Labels           map[string]string
 	Annotations      map[string]string
+	SetupStep        *string
+	Configuration    map[string]any
 }
 
 func (m *Connection) GetId() apid.ID {
@@ -96,6 +98,24 @@ func (m *Connection) ProxyRequestRaw(
 	req *iface.ProxyRequest,
 	w http.ResponseWriter,
 ) error {
+	return nil
+}
+
+func (m *Connection) GetSetupStep() *string {
+	return m.SetupStep
+}
+
+func (m *Connection) SetSetupStep(ctx context.Context, setupStep *string) error {
+	m.SetupStep = setupStep
+	return nil
+}
+
+func (m *Connection) GetConfiguration(ctx context.Context) (map[string]any, error) {
+	return m.Configuration, nil
+}
+
+func (m *Connection) SetConfiguration(ctx context.Context, data map[string]any) error {
+	m.Configuration = data
 	return nil
 }
 

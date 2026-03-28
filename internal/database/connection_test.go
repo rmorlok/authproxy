@@ -7,9 +7,11 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
 )
 
@@ -904,5 +906,201 @@ func TestConnections(t *testing.T) {
 			assert.NoError(t, err)
 			assert.Equal(t, 100, total)
 		})
+	})
+
+	t.Run("set connection setup step", func(t *testing.T) {
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
+		defer rawDb.Close()
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		type connectionResult struct {
+			Id        string
+			SetupStep *string
+			UpdatedAt time.Time
+		}
+
+		u := apid.New(apid.PrefixConnection)
+		err := db.CreateConnection(ctx, &Connection{
+			Id:               u,
+			Namespace:        "root.some-namespace",
+			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+		})
+		require.NoError(t, err)
+
+		// Initially setup_step should be nil
+		c, err := db.GetConnection(ctx, u)
+		require.NoError(t, err)
+		assert.Nil(t, c.SetupStep)
+
+		// Set setup step
+		newNow := time.Date(1955, time.November, 6, 6, 29, 0, 0, time.UTC)
+		ctx = apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(newNow)).Build()
+
+		step := "preconnect:0"
+		err = db.SetConnectionSetupStep(ctx, u, &step)
+		require.NoError(t, err)
+
+		test_utils.AssertSql(t, rawDb, `
+			SELECT id, setup_step, updated_at FROM connections;
+		`, []connectionResult{
+			{
+				Id:        u.String(),
+				SetupStep: &step,
+				UpdatedAt: newNow,
+			},
+		})
+
+		// Verify round trip via GetConnection
+		c, err = db.GetConnection(ctx, u)
+		require.NoError(t, err)
+		require.NotNil(t, c.SetupStep)
+		assert.Equal(t, "preconnect:0", *c.SetupStep)
+
+		// Update to a different step
+		step2 := "configure:0"
+		err = db.SetConnectionSetupStep(ctx, u, &step2)
+		require.NoError(t, err)
+
+		c, err = db.GetConnection(ctx, u)
+		require.NoError(t, err)
+		require.NotNil(t, c.SetupStep)
+		assert.Equal(t, "configure:0", *c.SetupStep)
+
+		// Clear setup step (set to nil)
+		err = db.SetConnectionSetupStep(ctx, u, nil)
+		require.NoError(t, err)
+
+		c, err = db.GetConnection(ctx, u)
+		require.NoError(t, err)
+		assert.Nil(t, c.SetupStep)
+	})
+
+	t.Run("set connection setup step returns not found for missing connection", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig(t, nil)
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		step := "preconnect:0"
+		err := db.SetConnectionSetupStep(ctx, apid.New(apid.PrefixConnection), &step)
+		assert.ErrorIs(t, err, ErrNotFound)
+	})
+
+	t.Run("set connection setup step returns not found for soft-deleted connection", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig(t, nil)
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		u := apid.New(apid.PrefixConnection)
+		err := db.CreateConnection(ctx, &Connection{
+			Id:               u,
+			Namespace:        "root",
+			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+		})
+		require.NoError(t, err)
+
+		err = db.DeleteConnection(ctx, u)
+		require.NoError(t, err)
+
+		step := "preconnect:0"
+		err = db.SetConnectionSetupStep(ctx, u, &step)
+		assert.ErrorIs(t, err, ErrNotFound)
+	})
+
+	t.Run("set connection encrypted configuration", func(t *testing.T) {
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
+		defer rawDb.Close()
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		u := apid.New(apid.PrefixConnection)
+		err := db.CreateConnection(ctx, &Connection{
+			Id:               u,
+			Namespace:        "root.some-namespace",
+			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+		})
+		require.NoError(t, err)
+
+		// Initially encrypted_configuration should be nil
+		c, err := db.GetConnection(ctx, u)
+		require.NoError(t, err)
+		assert.Nil(t, c.EncryptedConfiguration)
+		assert.Nil(t, c.EncryptedAt)
+
+		// Set encrypted configuration
+		newNow := time.Date(1955, time.November, 6, 6, 29, 0, 0, time.UTC)
+		ctx = apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(newNow)).Build()
+
+		ef := &encfield.EncryptedField{ID: "ekv_test1234", Data: "encrypted-config-data"}
+		err = db.SetConnectionEncryptedConfiguration(ctx, u, ef)
+		require.NoError(t, err)
+
+		// Verify round trip
+		c, err = db.GetConnection(ctx, u)
+		require.NoError(t, err)
+		require.NotNil(t, c.EncryptedConfiguration)
+		assert.Equal(t, apid.ID("ekv_test1234"), c.EncryptedConfiguration.ID)
+		assert.Equal(t, "encrypted-config-data", c.EncryptedConfiguration.Data)
+		require.NotNil(t, c.EncryptedAt)
+		assert.True(t, c.EncryptedAt.Equal(newNow))
+		assert.True(t, c.UpdatedAt.Equal(newNow))
+
+		// Update encrypted configuration
+		ef2 := &encfield.EncryptedField{ID: "ekv_test5678", Data: "updated-config-data"}
+		err = db.SetConnectionEncryptedConfiguration(ctx, u, ef2)
+		require.NoError(t, err)
+
+		c, err = db.GetConnection(ctx, u)
+		require.NoError(t, err)
+		require.NotNil(t, c.EncryptedConfiguration)
+		assert.Equal(t, apid.ID("ekv_test5678"), c.EncryptedConfiguration.ID)
+		assert.Equal(t, "updated-config-data", c.EncryptedConfiguration.Data)
+	})
+
+	t.Run("set connection encrypted configuration returns not found for missing connection", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig(t, nil)
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		ef := &encfield.EncryptedField{ID: "ekv_test1234", Data: "encrypted-config-data"}
+		err := db.SetConnectionEncryptedConfiguration(ctx, apid.New(apid.PrefixConnection), ef)
+		assert.ErrorIs(t, err, ErrNotFound)
+	})
+
+	t.Run("round trip with encrypted configuration and setup step", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig(t, nil)
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		step := "preconnect:0"
+		ef := encfield.EncryptedField{ID: "ekv_test1234", Data: "encrypted-config-data"}
+		u := apid.New(apid.PrefixConnection)
+		err := db.CreateConnection(ctx, &Connection{
+			Id:                     u,
+			Namespace:              "root.some-namespace",
+			ConnectorId:            apid.New(apid.PrefixConnectorVersion),
+			ConnectorVersion:       1,
+			State:                  ConnectionStateCreated,
+			SetupStep:              &step,
+			EncryptedConfiguration: &ef,
+			EncryptedAt:            &now,
+		})
+		require.NoError(t, err)
+
+		c, err := db.GetConnection(ctx, u)
+		require.NoError(t, err)
+		require.NotNil(t, c.SetupStep)
+		assert.Equal(t, "preconnect:0", *c.SetupStep)
+		require.NotNil(t, c.EncryptedConfiguration)
+		assert.Equal(t, apid.ID("ekv_test1234"), c.EncryptedConfiguration.ID)
+		assert.Equal(t, "encrypted-config-data", c.EncryptedConfiguration.Data)
+		require.NotNil(t, c.EncryptedAt)
+		assert.True(t, c.EncryptedAt.Equal(now))
 	})
 }

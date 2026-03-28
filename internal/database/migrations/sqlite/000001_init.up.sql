@@ -21,16 +21,19 @@ create unique index idx_actors_namespace
 
 create table connections
 (
-    id                text primary key,
-    namespace         text,
-    labels            text,
-    annotations       text,
-    state             text,
-    connector_id      text,
-    connector_version integer,
-    created_at        datetime,
-    updated_at        datetime,
-    deleted_at        datetime
+    id                      text primary key,
+    namespace               text,
+    labels                  text,
+    annotations             text,
+    state                   text,
+    connector_id            text,
+    connector_version       integer,
+    encrypted_configuration text,
+    setup_step              text,
+    created_at              datetime,
+    updated_at              datetime,
+    encrypted_at            datetime,
+    deleted_at              datetime
 );
 
 create index idx_connections_deleted_at

@@ -161,6 +161,7 @@ type ConnectionJson struct {
 	Labels      map[string]string        `json:"labels,omitempty"`
 	Annotations map[string]string        `json:"annotations,omitempty"`
 	State       database.ConnectionState `json:"state"`
+	SetupStep   *string                  `json:"setup_step,omitempty"`
 	Connector   ConnectorJson            `json:"connector"`
 	CreatedAt   time.Time                `json:"created_at"`
 	UpdatedAt   time.Time                `json:"updated_at"`
@@ -175,6 +176,7 @@ func ConnectionToJson(conn coreIface.Connection) ConnectionJson {
 		Labels:      conn.GetLabels(),
 		Annotations: conn.GetAnnotations(),
 		State:       conn.GetState(),
+		SetupStep:   conn.GetSetupStep(),
 		Connector:   connector,
 		CreatedAt:   conn.GetCreatedAt(),
 		UpdatedAt:   conn.GetUpdatedAt(),

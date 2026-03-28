@@ -120,6 +120,8 @@ type SwaggerConnectionJson struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 	// Connection state (pending, connected, disconnecting, disconnected, error)
 	State string `json:"state" example:"connected"`
+	// Current setup step if connection setup is in progress
+	SetupStep *string `json:"setup_step,omitempty" example:"preconnect:0"`
 	// Connector information
 	Connector SwaggerConnectorJson `json:"connector"`
 	// Creation timestamp
