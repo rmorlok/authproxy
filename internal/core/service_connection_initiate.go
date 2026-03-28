@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 
 	"github.com/rmorlok/authproxy/internal/apauth/core"
@@ -105,6 +106,32 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 	}
 
 	connector := cv.GetDefinition()
+
+	// If the connector has preconnect steps, return the first form instead of proceeding to auth
+	if connector.SetupFlow.HasPreconnect() {
+		firstStep := connector.SetupFlow.Preconnect.Steps[0]
+		setupStep := "preconnect:0"
+		if err := connection.SetSetupStep(ctx, &setupStep); err != nil {
+			val.MarkErrorReturn()
+			return nil, api_common.NewHttpStatusErrorBuilder().
+				WithStatusInternalServerError().
+				WithInternalErr(err).
+				BuildStatusError()
+		}
+
+		return &iface.InitiateConnectionForm{
+			Id:              connection.GetId(),
+			Type:            iface.PreconnectionResponseTypeForm,
+			StepId:          firstStep.Id,
+			StepTitle:       firstStep.Title,
+			StepDescription: firstStep.Description,
+			CurrentStep:     0,
+			TotalSteps:      connector.SetupFlow.TotalSteps(),
+			JsonSchema:      json.RawMessage(firstStep.JsonSchema),
+			UiSchema:        json.RawMessage(firstStep.UiSchema),
+		}, nil
+	}
+
 	if _, ok := connector.Auth.Inner().(*config.AuthOAuth2); ok {
 		if req.ReturnToUrl == "" {
 			val.MarkErrorReturn()

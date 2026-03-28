@@ -105,5 +105,33 @@ func (o *oAuth2Connection) CallbackFrom3rdParty(ctx context.Context, query url.V
 		return errorRedirectPage, fmt.Errorf("failed to create db token from response: %w", err)
 	}
 
+	// Check if the connector has configure steps to complete after auth
+	cv := o.connection.GetConnectorVersionEntity()
+	hasConfigure := cv != nil && cv.GetDefinition().SetupFlow.HasConfigure()
+	if hasConfigure {
+		configureStep := "configure:0"
+		if err := o.connection.SetSetupStep(ctx, &configureStep); err != nil {
+			return errorRedirectPage, fmt.Errorf("failed to set setup step to configure:0: %w", err)
+		}
+
+		// Append setup=pending to return URL so the UI knows to show configure forms
+		returnUrl, err := url.Parse(o.state.ReturnToUrl)
+		if err != nil {
+			return o.state.ReturnToUrl, nil // Fall back to the raw URL if parsing fails
+		}
+		q := returnUrl.Query()
+		q.Set("setup", "pending")
+		q.Set("connection_id", string(o.connection.GetId()))
+		returnUrl.RawQuery = q.Encode()
+		return returnUrl.String(), nil
+	}
+
+	// No configure steps — clear setup step if it was set
+	if o.connection.GetSetupStep() != nil {
+		if err := o.connection.SetSetupStep(ctx, nil); err != nil {
+			return errorRedirectPage, fmt.Errorf("failed to clear setup step: %w", err)
+		}
+	}
+
 	return o.state.ReturnToUrl, nil
 }
