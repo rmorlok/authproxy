@@ -91,6 +91,92 @@
           "$ref": "../common/schema.json#/$defs/HumanDuration"
         }
       }
+    },
+    "SetupFlow": {
+      "type": "object",
+      "properties": {
+        "preconnect": {
+          "$ref": "#/$defs/SetupFlowPhase"
+        },
+        "configure": {
+          "$ref": "#/$defs/SetupFlowPhase"
+        }
+      },
+      "additionalProperties": false
+    },
+    "SetupFlowPhase": {
+      "type": "object",
+      "required": ["steps"],
+      "properties": {
+        "steps": {
+          "type": "array",
+          "minItems": 1,
+          "items": {
+            "$ref": "#/$defs/SetupFlowStep"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "SetupFlowStep": {
+      "type": "object",
+      "required": ["id", "json_schema"],
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "title": {
+          "type": "string"
+        },
+        "description": {
+          "type": "string"
+        },
+        "json_schema": {
+          "type": "object"
+        },
+        "ui_schema": {
+          "type": "object"
+        },
+        "data_sources": {
+          "type": "object",
+          "additionalProperties": {
+            "$ref": "#/$defs/DataSourceDef"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "DataSourceDef": {
+      "type": "object",
+      "required": ["proxy_request", "transform"],
+      "properties": {
+        "proxy_request": {
+          "$ref": "#/$defs/DataSourceProxyRequest"
+        },
+        "transform": {
+          "type": "string"
+        }
+      },
+      "additionalProperties": false
+    },
+    "DataSourceProxyRequest": {
+      "type": "object",
+      "required": ["method", "url"],
+      "properties": {
+        "method": {
+          "type": "string"
+        },
+        "url": {
+          "type": "string"
+        },
+        "headers": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "additionalProperties": false
     }
   },
   "properties": {
@@ -136,6 +222,9 @@
       "items": {
         "$ref": "#/$defs/Probe"
       }
+    },
+    "setup_flow": {
+      "$ref": "#/$defs/SetupFlow"
     }
   },
   "required": ["labels", "display_name", "logo", "auth"],

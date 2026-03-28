@@ -74,6 +74,10 @@ type Connector struct {
 	// Probes are a list of probes to run against connections of this connector type to validation the connection.
 	Probes []Probe `json:"probes,omitempty" yaml:"probes,omitempty"`
 
+	// SetupFlow defines the multi-step setup flow for configuring connections.
+	// Includes optional preconnect forms (before auth) and configure forms (after auth).
+	SetupFlow *SetupFlow `json:"setup_flow,omitempty" yaml:"setup_flow,omitempty"`
+
 	// Labels are the labels for the connector.
 	Labels map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 }
@@ -130,6 +134,12 @@ func (c *Connector) Validate(vc *common.ValidationContext) error {
 
 	for i, probe := range c.Probes {
 		if err := probe.Validate(vc.PushField("probes").PushIndex(i)); err != nil {
+			result = multierror.Append(result, err)
+		}
+	}
+
+	if c.SetupFlow != nil {
+		if err := c.SetupFlow.Validate(vc.PushField("setup_flow")); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
