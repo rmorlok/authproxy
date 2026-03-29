@@ -87,6 +87,18 @@ definitions:
       path:
         type: string
     type: object
+  routes.DataSourceOptionJson:
+    description: Data source option for form select fields
+    properties:
+      label:
+        description: Human-readable label
+        example: My Workspace
+        type: string
+      value:
+        description: Option value
+        example: ws-123
+        type: string
+    type: object
   routes.EncryptionKeyLabelJson:
     properties:
       key:
@@ -1747,6 +1759,47 @@ paths:
       summary: Update connection
       tags:
       - connections
+  /connections/{id}/_data_source/{source_id}:
+    get:
+      description: Fetch dynamic options for a data source defined in the current
+        setup step
+      parameters:
+      - description: Connection ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Data Source ID
+        in: path
+        name: source_id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            items:
+              $ref: '#/definitions/routes.DataSourceOptionJson'
+            type: array
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get data source options
+      tags:
+      - connections
   /connections/{id}/_disconnect:
     post:
       consumes:
@@ -1885,6 +1938,40 @@ paths:
       summary: Proxy request through connection
       tags:
       - proxy
+  /connections/{id}/_setup_step:
+    get:
+      description: Get the current setup step for a connection, used to resume an
+        interrupted setup flow
+      parameters:
+      - description: Connection ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.InitiateConnectionComplete'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get setup step
+      tags:
+      - connections
   /connections/{id}/_submit:
     post:
       consumes:

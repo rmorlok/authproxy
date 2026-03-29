@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
@@ -142,6 +143,10 @@ func (m *Connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 }
 
 func (m *Connection) GetCurrentSetupStepResponse(ctx context.Context) (iface.InitiateConnectionResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
+func (m *Connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs.DataSourceOption, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 

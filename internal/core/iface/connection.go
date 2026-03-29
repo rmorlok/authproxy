@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 )
@@ -57,4 +58,5 @@ type Connection interface {
 	) error
 	SubmitForm(ctx context.Context, req SubmitConnectionRequest) (InitiateConnectionResponse, error)
 	GetCurrentSetupStepResponse(ctx context.Context) (InitiateConnectionResponse, error)
+	GetDataSource(ctx context.Context, sourceId string) ([]apjs.DataSourceOption, error)
 }
