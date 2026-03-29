@@ -74,6 +74,16 @@ type SubmitConnectionRequest struct {
 	Data interface{} `json:"data"`
 }
 
+// DataSourceOptionJson represents a single option from a data source for populating form dropdowns.
+//
+//	@Description	Data source option for form select fields
+type DataSourceOptionJson struct {
+	// Option value
+	Value string `json:"value" example:"ws-123"`
+	// Human-readable label
+	Label string `json:"label" example:"My Workspace"`
+}
+
 // ProxyRequest represents a request to proxy through a connection.
 //
 //	@Description	Request to proxy an HTTP request through a connection
