@@ -8,6 +8,16 @@ AuthProxy is an open-source, embeddable integration platform-as-a-service (iPaaS
 
 ## Development Commands
 
+### Preflight (Required Before Commit)
+
+Always run the preflight checks before committing:
+
+```bash
+./scripts/preflight.sh
+```
+
+If it fails, fix the issues (e.g., regenerate Swagger docs, update integration test module deps) before committing.
+
 ### Backend (Go)
 
 **Start Dependencies (Docker Compose — recommended):**

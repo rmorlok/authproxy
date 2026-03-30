@@ -447,6 +447,25 @@ POSTGRES_TEST_OPTIONS=sslmode=disable \
 go test -v ./...
 ```
 
+### Pre-push Preflight
+
+To avoid CI failures from stale Swagger docs or missing integration test module updates, install the pre-push hook:
+
+```bash
+./scripts/install-hooks.sh
+```
+
+This runs `./scripts/preflight.sh` on every `git push`, which:
+
+- Regenerates Swagger docs and fails if they changed (you need to commit them).
+- Runs `go list -mod=readonly ./...` in `integration_tests` to ensure module deps are updated.
+
+You can also run it manually:
+
+```bash
+./scripts/preflight.sh
+```
+
 ## UI
 
 ### Marketplace UI
