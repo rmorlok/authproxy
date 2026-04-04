@@ -36,6 +36,27 @@ go test -tags integration -v -run TestRateLimiting429 ./proxy/...
 
 Integration tests use the `integration` build tag so they are excluded from `go test ./...`.
 
+## AWS Secrets Manager Integration Test
+
+This test hits real AWS Secrets Manager and is gated behind the `aws` build tag and an env flag.
+
+Requirements:
+- AWS credentials available via the standard AWS SDK chain.
+- `AWS_REGION` set.
+- `AUTH_PROXY_AWS_SECRETS_TEST=1` set to opt in.
+- IAM permissions: `secretsmanager:CreateSecret`, `secretsmanager:PutSecretValue`, `secretsmanager:ListSecretVersionIds`, `secretsmanager:GetSecretValue`, `secretsmanager:DeleteSecret`.
+
+Run:
+```bash
+cd integration_tests
+AUTH_PROXY_AWS_SECRETS_TEST=1 AWS_REGION=us-east-1 \\
+  go test -tags "integration,aws" -v ./encrypt/...
+```
+
+Notes:
+- The test creates a short-lived secret and deletes it at the end.
+- For CI, provide `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_SESSION_TOKEN` via secrets.
+
 ## Teardown
 
 ```bash
