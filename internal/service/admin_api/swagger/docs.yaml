@@ -129,6 +129,22 @@ definitions:
         example: complete
         type: string
     type: object
+  routes.InitiateConnectionForm:
+    description: Form response for connection initiation
+    properties:
+      id:
+        description: Connection UUID
+        example: req_test550e8400abcde
+        type: string
+      json_schema:
+        description: JSON Schema defining the form fields
+      type:
+        description: Response type (always "form")
+        example: form
+        type: string
+      ui_schema:
+        description: UI Schema for JSON Forms rendering
+    type: object
   routes.InitiateConnectionRedirect:
     description: Redirect response for connection initiation
     properties:
@@ -1970,6 +1986,40 @@ paths:
       summary: Proxy request through connection
       tags:
       - proxy
+  /connections/{id}/_reconfigure:
+    post:
+      description: Restart the configure phase for a completed connection, allowing
+        re-entry of post-auth settings
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.InitiateConnectionForm'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Reconfigure connection
+      tags:
+      - connections
   /connections/{id}/_setup_step:
     get:
       description: Get the current setup step for a connection, used to resume an

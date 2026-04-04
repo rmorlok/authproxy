@@ -150,6 +150,10 @@ func (m *Connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 	return nil, fmt.Errorf("not implemented")
 }
 
+func (m *Connection) Reconfigure(ctx context.Context) (iface.InitiateConnectionResponse, error) {
+	return nil, fmt.Errorf("not implemented")
+}
+
 var _ iface.Connection = (*Connection)(nil)
 
 type ConnectionMatcher struct {
