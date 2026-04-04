@@ -59,4 +59,5 @@ type Connection interface {
 	SubmitForm(ctx context.Context, req SubmitConnectionRequest) (InitiateConnectionResponse, error)
 	GetCurrentSetupStepResponse(ctx context.Context) (InitiateConnectionResponse, error)
 	GetDataSource(ctx context.Context, sourceId string) ([]apjs.DataSourceOption, error)
+	Reconfigure(ctx context.Context) (InitiateConnectionResponse, error)
 }

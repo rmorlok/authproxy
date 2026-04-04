@@ -1718,6 +1718,58 @@ const docTemplateApi = `{
                 }
             }
         },
+        "/connections/{id}/_reconfigure": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Restart the configure phase for a completed connection, allowing re-entry of post-auth settings",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "connections"
+                ],
+                "summary": "Reconfigure connection",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/routes.InitiateConnectionForm"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/connections/{id}/_setup_step": {
             "get": {
                 "security": [
@@ -6487,6 +6539,28 @@ const docTemplateApi = `{
                     "description": "Response type (always \"complete\")",
                     "type": "string",
                     "example": "complete"
+                }
+            }
+        },
+        "routes.InitiateConnectionForm": {
+            "description": "Form response for connection initiation",
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "Connection UUID",
+                    "type": "string",
+                    "example": "req_test550e8400abcde"
+                },
+                "json_schema": {
+                    "description": "JSON Schema defining the form fields"
+                },
+                "type": {
+                    "description": "Response type (always \"form\")",
+                    "type": "string",
+                    "example": "form"
+                },
+                "ui_schema": {
+                    "description": "UI Schema for JSON Forms rendering"
                 }
             }
         },
