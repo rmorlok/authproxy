@@ -5,14 +5,33 @@ import {
     connections,
     ConnectionState,
     DisconnectResponseJson,
+    InitiateConnectionFormResponse,
     isFormResponse,
     ListConnectionsParams,
 } from '@authproxy/api';
 
 interface FormStep {
     connectionId: string;
+    stepId: string;
+    stepTitle?: string;
+    stepDescription?: string;
+    currentStep: number;
+    totalSteps: number;
     jsonSchema: Record<string, unknown>;
     uiSchema: Record<string, unknown>;
+}
+
+function formStepFromResponse(response: InitiateConnectionFormResponse): FormStep {
+    return {
+        connectionId: response.id,
+        stepId: response.step_id,
+        stepTitle: response.step_title,
+        stepDescription: response.step_description,
+        currentStep: response.current_step,
+        totalSteps: response.total_steps,
+        jsonSchema: response.json_schema,
+        uiSchema: response.ui_schema,
+    };
 }
 
 interface ConnectionsState {
@@ -82,6 +101,30 @@ export const submitConnectionFormAsync = createAsyncThunk(
     }
 );
 
+export const abortConnectionAsync = createAsyncThunk(
+    'connections/abortConnection',
+    async (connectionId: string) => {
+        await connections.abort(connectionId);
+        return connectionId;
+    }
+);
+
+export const getSetupStepAsync = createAsyncThunk(
+    'connections/getSetupStep',
+    async (connectionId: string) => {
+        const response = await connections.getSetupStep(connectionId);
+        return response.data;
+    }
+);
+
+export const reconfigureConnectionAsync = createAsyncThunk(
+    'connections/reconfigureConnection',
+    async (connectionId: string) => {
+        const response = await connections.reconfigure(connectionId);
+        return response.data;
+    }
+);
+
 export const disconnectConnectionAsync = createAsyncThunk(
     'connections/disconnectConnection',
     async (connectionId: string, _): Promise<DisconnectResponseJson> => {
@@ -131,11 +174,7 @@ export const connectionsSlice = createSlice({
                 state.initiatingConnection = false;
                 const response = action.payload;
                 if (isFormResponse(response)) {
-                    state.currentFormStep = {
-                        connectionId: response.id,
-                        jsonSchema: response.json_schema,
-                        uiSchema: response.ui_schema,
-                    };
+                    state.currentFormStep = formStepFromResponse(response);
                 }
             })
             .addCase(initiateConnectionAsync.rejected, (state, action) => {
@@ -152,11 +191,7 @@ export const connectionsSlice = createSlice({
                 state.submittingForm = false;
                 const response = action.payload;
                 if (isFormResponse(response)) {
-                    state.currentFormStep = {
-                        connectionId: response.id,
-                        jsonSchema: response.json_schema,
-                        uiSchema: response.ui_schema,
-                    };
+                    state.currentFormStep = formStepFromResponse(response);
                 } else {
                     state.currentFormStep = null;
                 }
@@ -164,6 +199,37 @@ export const connectionsSlice = createSlice({
             .addCase(submitConnectionFormAsync.rejected, (state, action) => {
                 state.submittingForm = false;
                 state.formSubmitError = action.error.message || 'Failed to submit form';
+            })
+
+            // Abort connection
+            .addCase(abortConnectionAsync.fulfilled, (state, action) => {
+                state.currentFormStep = null;
+                state.items = state.items.filter(conn => conn.id !== action.payload);
+            })
+
+            // Get setup step (resume)
+            .addCase(getSetupStepAsync.fulfilled, (state, action) => {
+                const response = action.payload;
+                if (isFormResponse(response)) {
+                    state.currentFormStep = formStepFromResponse(response);
+                }
+            })
+
+            // Reconfigure connection
+            .addCase(reconfigureConnectionAsync.pending, (state) => {
+                state.initiatingConnection = true;
+                state.initiationError = null;
+            })
+            .addCase(reconfigureConnectionAsync.fulfilled, (state, action) => {
+                state.initiatingConnection = false;
+                const response = action.payload;
+                if (isFormResponse(response)) {
+                    state.currentFormStep = formStepFromResponse(response);
+                }
+            })
+            .addCase(reconfigureConnectionAsync.rejected, (state, action) => {
+                state.initiatingConnection = false;
+                state.initiationError = action.error.message || 'Failed to reconfigure connection';
             })
 
             // Disconnect connection
@@ -206,6 +272,6 @@ export const selectFormSubmitError = (state: RootState) => state.connections.for
 
 // Helper selectors
 export const selectActiveConnections = (state: RootState) =>
-    state.connections.items.filter(conn => conn.state === ConnectionState.CONNECTED);
+    state.connections.items.filter(conn => conn.state === ConnectionState.READY);
 
 export default connectionsSlice.reducer;

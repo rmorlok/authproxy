@@ -43,7 +43,7 @@ const makeConnection = (overrides: Partial<Connection> = {}): Connection => ({
     id: 'c-1',
     namespace: 'root',
     connector: connector,
-    state: ConnectionState.CONNECTED,
+    state: ConnectionState.READY,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
     ...overrides,
@@ -62,6 +62,9 @@ describe('ConnectionList', () => {
                 disconnectingConnection: false,
                 disconnectionError: null,
                 currentTaskId: null,
+                currentFormStep: null,
+                submittingForm: false,
+                formSubmitError: null,
             },
             toasts: {items: []},
         });
@@ -89,6 +92,9 @@ describe('ConnectionList', () => {
                 disconnectingConnection: false,
                 disconnectionError: null,
                 currentTaskId: null,
+                currentFormStep: null,
+                submittingForm: false,
+                formSubmitError: null,
             },
             toasts: {items: []},
         });
@@ -116,6 +122,9 @@ describe('ConnectionList', () => {
                 disconnectingConnection: false,
                 disconnectionError: null,
                 currentTaskId: null,
+                currentFormStep: null,
+                submittingForm: false,
+                formSubmitError: null,
             },
             toasts: {items: []},
         });
@@ -145,6 +154,9 @@ describe('ConnectionList', () => {
                 disconnectingConnection: false,
                 disconnectionError: null,
                 currentTaskId: null,
+                currentFormStep: null,
+                submittingForm: false,
+                formSubmitError: null,
             },
             toasts: {items: []},
         });

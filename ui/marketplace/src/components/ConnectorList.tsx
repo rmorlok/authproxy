@@ -23,6 +23,7 @@ import {
   selectFormSubmitError,
   clearFormStep,
   submitConnectionFormAsync,
+  abortConnectionAsync,
 } from '../store';
 import ConnectorCard, { ConnectorCardSkeleton } from './ConnectorCard';
 import ConnectionFormStep from './ConnectionFormStep';
@@ -80,8 +81,12 @@ const ConnectorList: React.FC = () => {
   }, [dispatch]);
 
   const handleFormCancel = useCallback(() => {
-    dispatch(clearFormStep());
-  }, [dispatch]);
+    if (currentFormStep) {
+      dispatch(abortConnectionAsync(currentFormStep.connectionId));
+    } else {
+      dispatch(clearFormStep());
+    }
+  }, [dispatch, currentFormStep]);
 
   let content;
 
@@ -152,6 +157,10 @@ const ConnectorList: React.FC = () => {
           {currentFormStep && (
             <ConnectionFormStep
               connectionId={currentFormStep.connectionId}
+              stepTitle={currentFormStep.stepTitle}
+              stepDescription={currentFormStep.stepDescription}
+              currentStep={currentFormStep.currentStep}
+              totalSteps={currentFormStep.totalSteps}
               jsonSchema={currentFormStep.jsonSchema}
               uiSchema={currentFormStep.uiSchema}
               onSubmit={handleFormSubmit}

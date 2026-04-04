@@ -1,22 +1,32 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { 
-  Grid, 
-  Typography, 
-  Container, 
-  Alert, 
+import {
+  Grid,
+  Typography,
+  Container,
+  Alert,
   Box,
-  Button
+  Button,
+  Dialog,
+  DialogTitle,
+  DialogContent,
 } from '@mui/material';
-import { 
-  selectConnections, 
-  selectConnectionsStatus, 
+import { isRedirectResponse } from '@authproxy/api';
+import {
+  selectConnections,
+  selectConnectionsStatus,
   selectConnectionsError,
   fetchConnectionsAsync,
   fetchConnectorsAsync,
-  selectConnectorsStatus
+  selectConnectorsStatus,
+  selectCurrentFormStep,
+  selectSubmittingForm,
+  selectFormSubmitError,
+  submitConnectionFormAsync,
+  clearFormStep,
 } from '../store';
 import ConnectionCard, { ConnectionCardSkeleton } from './ConnectionCard';
+import ConnectionFormStep from './ConnectionFormStep';
 import { AppDispatch } from '../store';
 import { Link } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
@@ -30,16 +40,35 @@ const ConnectionList: React.FC = () => {
   const status = useSelector(selectConnectionsStatus);
   const error = useSelector(selectConnectionsError);
   const connectorsStatus = useSelector(selectConnectorsStatus);
+  const currentFormStep = useSelector(selectCurrentFormStep);
+  const isSubmittingForm = useSelector(selectSubmittingForm);
+  const formSubmitError = useSelector(selectFormSubmitError);
 
   useEffect(() => {
     if (status === 'idle') {
       dispatch(fetchConnectionsAsync());
     }
-    
+
     if (connectorsStatus === 'idle') {
       dispatch(fetchConnectorsAsync());
     }
   }, [status, connectorsStatus, dispatch]);
+
+  const handleFormSubmit = useCallback((connectionId: string, data: unknown) => {
+    dispatch(submitConnectionFormAsync({ connectionId, data })).then((action) => {
+      if (action.meta.requestStatus === 'fulfilled') {
+        const response = action.payload as any;
+        if (isRedirectResponse(response)) {
+          window.location.href = response.redirect_url;
+        }
+        // If type === 'complete', Redux state clears the form and we should refresh
+      }
+    });
+  }, [dispatch]);
+
+  const handleFormCancel = useCallback(() => {
+    dispatch(clearFormStep());
+  }, [dispatch]);
 
   let content;
 
@@ -61,9 +90,9 @@ const ConnectionList: React.FC = () => {
         <Typography variant="h6" color="text.secondary" gutterBottom>
           No connections yet
         </Typography>
-        <Button 
-          variant="contained" 
-          color="primary" 
+        <Button
+          variant="contained"
+          color="primary"
           startIcon={<AddIcon />}
           component={Link}
           to="/connectors"
@@ -92,9 +121,9 @@ const ConnectionList: React.FC = () => {
           Your Connections
         </Typography>
         {connections.length > 0 && (
-          <Button 
-            variant="contained" 
-            color="primary" 
+          <Button
+            variant="contained"
+            color="primary"
             startIcon={<AddIcon />}
             component={Link}
             to="/connectors"
@@ -104,6 +133,34 @@ const ConnectionList: React.FC = () => {
         )}
       </Box>
       {content}
+
+      <Dialog
+        open={currentFormStep !== null}
+        onClose={handleFormCancel}
+        maxWidth="sm"
+        fullWidth
+      >
+        <DialogTitle>Connection Setup</DialogTitle>
+        <DialogContent>
+          {formSubmitError && (
+            <Alert severity="error" sx={{ mb: 2 }}>{formSubmitError}</Alert>
+          )}
+          {currentFormStep && (
+            <ConnectionFormStep
+              connectionId={currentFormStep.connectionId}
+              stepTitle={currentFormStep.stepTitle}
+              stepDescription={currentFormStep.stepDescription}
+              currentStep={currentFormStep.currentStep}
+              totalSteps={currentFormStep.totalSteps}
+              jsonSchema={currentFormStep.jsonSchema}
+              uiSchema={currentFormStep.uiSchema}
+              onSubmit={handleFormSubmit}
+              onCancel={handleFormCancel}
+              isSubmitting={isSubmittingForm}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </Container>
   );
 };
