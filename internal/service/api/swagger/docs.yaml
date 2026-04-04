@@ -1759,6 +1759,38 @@ paths:
       summary: Update connection
       tags:
       - connections
+  /connections/{id}/_abort:
+    post:
+      description: Abort an in-progress connection setup, cleaning up credentials
+        and deleting the connection
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Abort connection setup
+      tags:
+      - connections
   /connections/{id}/_data_source/{source_id}:
     get:
       description: Fetch dynamic options for a data source defined in the current

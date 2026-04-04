@@ -9,6 +9,9 @@ import (
 // connection and how that auth type is configured.
 func (c *connection) getRevokeCredentialsOperations() []operation {
 	def := c.cv.GetDefinition()
+	if def == nil || def.Auth == nil {
+		return nil
+	}
 	auth := def.Auth
 
 	if _, ok := auth.Inner().(*config.AuthOAuth2); ok {

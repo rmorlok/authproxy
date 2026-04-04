@@ -406,19 +406,23 @@ type ListConnectionsBuilder interface {
 	IncludeDeleted() ListConnectionsBuilder
 	WithDeletedHandling(DeletedHandling) ListConnectionsBuilder
 	ForLabelSelector(selector string) ListConnectionsBuilder
+	WithSetupStepNotNull() ListConnectionsBuilder
+	UpdatedBefore(t time.Time) ListConnectionsBuilder
 }
 
 type listConnectionsFilters struct {
-	s                 *service                `json:"-"`
-	LimitVal          uint64                  `json:"limit"`
-	Offset            uint64                  `json:"offset"`
-	StatesVal         []ConnectionState       `json:"states,omitempty"`
-	NamespaceMatchers []string                `json:"namespace_matchers,omitempty"`
-	OrderByFieldVal   *ConnectionOrderByField `json:"order_by_field"`
-	OrderByVal        *pagination.OrderBy     `json:"order_by"`
-	IncludeDeletedVal bool                    `json:"include_deleted,omitempty"`
-	LabelSelectorVal  *string                 `json:"label_selector,omitempty"`
-	Errors            *multierror.Error       `json:"-"`
+	s                    *service                `json:"-"`
+	LimitVal             uint64                  `json:"limit"`
+	Offset               uint64                  `json:"offset"`
+	StatesVal            []ConnectionState       `json:"states,omitempty"`
+	NamespaceMatchers    []string                `json:"namespace_matchers,omitempty"`
+	OrderByFieldVal      *ConnectionOrderByField `json:"order_by_field"`
+	OrderByVal           *pagination.OrderBy     `json:"order_by"`
+	IncludeDeletedVal    bool                    `json:"include_deleted,omitempty"`
+	LabelSelectorVal     *string                 `json:"label_selector,omitempty"`
+	SetupStepNotNullVal  bool                    `json:"setup_step_not_null,omitempty"`
+	UpdatedBeforeVal     *time.Time              `json:"updated_before,omitempty"`
+	Errors               *multierror.Error       `json:"-"`
 }
 
 func (l *listConnectionsFilters) addError(e error) ListConnectionsBuilder {
@@ -489,6 +493,16 @@ func (l *listConnectionsFilters) ForLabelSelector(selector string) ListConnectio
 	return l
 }
 
+func (l *listConnectionsFilters) WithSetupStepNotNull() ListConnectionsBuilder {
+	l.SetupStepNotNullVal = true
+	return l
+}
+
+func (l *listConnectionsFilters) UpdatedBefore(t time.Time) ListConnectionsBuilder {
+	l.UpdatedBeforeVal = &t
+	return l
+}
+
 func (l *listConnectionsFilters) FromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error) {
 	s := l.s
 	parsed, err := pagination.ParseCursor[listConnectionsFilters](ctx, s.cursorEncryptor, cursor)
@@ -534,6 +548,14 @@ func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) sq.Selec
 
 	if len(l.NamespaceMatchers) > 0 {
 		q = restrictToNamespaceMatchers(q, "namespace", l.NamespaceMatchers)
+	}
+
+	if l.SetupStepNotNullVal {
+		q = q.Where(sq.NotEq{"setup_step": nil})
+	}
+
+	if l.UpdatedBeforeVal != nil {
+		q = q.Where(sq.Lt{"updated_at": *l.UpdatedBeforeVal})
 	}
 
 	if l.OrderByFieldVal != nil {

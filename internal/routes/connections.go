@@ -651,6 +651,81 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, response)
 }
 
+// @Summary		Abort connection setup
+// @Description	Abort an in-progress connection setup, cleaning up credentials and deleting the connection
+// @Tags			connections
+// @Produce		json
+// @Param			id	path		string	true	"Connection UUID"
+// @Success		204
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		404	{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/_abort [post]
+func (r *ConnectionsRoutes) abort(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := apid.Parse(gctx.Param("id"))
+	if err != nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithInternalErr(err).
+			WithResponseMsg("invalid id format").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == apid.Nil {
+		api_common.NewHttpStatusErrorBuilder().
+			WithStatusBadRequest().
+			WithResponseMsg("id is required").
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	c, err := r.core.GetConnection(ctx, id)
+	if err != nil {
+		if errors.Is(err, coreIface.ErrNotFound) {
+			api_common.NewHttpStatusErrorBuilder().
+				WithStatusNotFound().
+				WithResponseMsg("connection not found").
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+		} else {
+			api_common.HttpStatusErrorBuilderFromError(err).
+				WithStatusInternalServerError().
+				WithInternalErr(err).
+				BuildStatusError().
+				WriteGinResponse(nil, gctx)
+		}
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		httpErr.WriteGinResponse(nil, gctx)
+		return
+	}
+
+	err = r.core.AbortConnection(ctx, id)
+	if err != nil {
+		api_common.HttpStatusErrorBuilderFromError(err).
+			WithStatusInternalServerError().
+			WithInternalErr(err).
+			BuildStatusError().
+			WriteGinResponse(nil, gctx)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.Status(http.StatusNoContent)
+}
+
 type ForceStateRequestJson struct {
 	State database.ConnectionState `json:"state"`
 }
@@ -1829,6 +1904,15 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 			ForIdField("id").
 			Build(),
 		r.disconnect,
+	)
+	g.POST(
+		"/connections/:id/_abort",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("create").
+			ForIdField("id").
+			Build(),
+		r.abort,
 	)
 	g.PUT(
 		"/connections/:id/_force_state",
