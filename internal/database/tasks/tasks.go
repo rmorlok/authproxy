@@ -37,6 +37,7 @@ func NewTaskHandler(
 // RegisterTasks registers the database task handlers with the asynq mux.
 func (th *taskHandler) RegisterTasks(mux *asynq.ServeMux) {
 	mux.HandleFunc(taskTypePurgeSoftDeleted, th.purgeSoftDeletedRecords)
+	mux.HandleFunc(taskTypeCleanupStaleConnections, th.cleanupStaleConnections)
 }
 
 // GetCronTasks returns the cron task configurations for database maintenance.
@@ -48,10 +49,20 @@ func (th *taskHandler) GetCronTasks() []*asynq.PeriodicTaskConfig {
 		cronspec = "@hourly"
 	}
 
+	setupTtl := th.cfg.GetRoot().Connections.GetSetupTtlOrDefault()
+	cleanupCronspec := "@hourly"
+	if setupTtl > 24*time.Hour {
+		cleanupCronspec = "@daily"
+	}
+
 	return []*asynq.PeriodicTaskConfig{
 		{
 			Cronspec: cronspec,
 			Task:     newPurgeSoftDeletedTask(),
+		},
+		{
+			Cronspec: cleanupCronspec,
+			Task:     newCleanupStaleConnectionsTask(),
 		},
 	}
 }

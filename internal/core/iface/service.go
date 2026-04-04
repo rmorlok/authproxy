@@ -83,6 +83,10 @@ type C interface {
 	// with the 3rd party.
 	DisconnectConnection(ctx context.Context, id apid.ID) (taskInfo *tasks.TaskInfo, err error)
 
+	// AbortConnection aborts an in-progress connection setup, revoking any credentials and deleting the connection.
+	// Only valid for connections with a non-null setup_step.
+	AbortConnection(ctx context.Context, id apid.ID) error
+
 	// GetConnection returns a connection by ID. This connection has the full connection version details in it.
 	GetConnection(ctx context.Context, id apid.ID) (Connection, error)
 
