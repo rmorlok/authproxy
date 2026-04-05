@@ -27,8 +27,8 @@ import {selectCurrentNamespacePath} from "../store/namespacesSlice";
 function renderState(state: ConnectionState) {
     const colors: Record<ConnectionState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
         [ConnectionState.CREATED]: 'primary',
-        [ConnectionState.CONNECTED]: 'success',
-        [ConnectionState.FAILED]: 'error',
+        [ConnectionState.READY]: 'success',
+        [ConnectionState.DISABLED]: 'error',
         [ConnectionState.DISCONNECTING]: 'warning',
         [ConnectionState.DISCONNECTED]: 'default'
     };
@@ -124,8 +124,8 @@ export default function Connections() {
     const stateOptions = useMemo(() => [
         { label: 'All', value: '' },
         { label: 'Created', value: ConnectionState.CREATED },
-        { label: 'Connected', value: ConnectionState.CONNECTED },
-        { label: 'Failed', value: ConnectionState.FAILED },
+        { label: 'Ready', value: ConnectionState.READY },
+        { label: 'Disabled', value: ConnectionState.DISABLED },
         { label: 'Disconnecting', value: ConnectionState.DISCONNECTING },
         { label: 'Disconnected', value: ConnectionState.DISCONNECTED },
     ], []);

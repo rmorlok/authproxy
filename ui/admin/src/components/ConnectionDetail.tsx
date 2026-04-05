@@ -29,8 +29,8 @@ import AnnotationsEditor from "./AnnotationsEditor";
 function StateChip({state}: { state: ConnectionState }) {
   const colors: Record<ConnectionState, "default" | "success" | "error" | "info" | "warning" | "primary" | "secondary"> = {
     [ConnectionState.CREATED]: 'primary',
-    [ConnectionState.CONNECTED]: 'success',
-    [ConnectionState.FAILED]: 'error',
+    [ConnectionState.READY]: 'success',
+    [ConnectionState.DISABLED]: 'error',
     [ConnectionState.DISCONNECTING]: 'warning',
     [ConnectionState.DISCONNECTED]: 'default',
   };

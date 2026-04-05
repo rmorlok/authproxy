@@ -20,8 +20,10 @@ import {tasks, Connection, ConnectionState, canBeDisconnected, PollForTaskResult
 import { useDispatch } from 'react-redux';
 import {
   disconnectConnectionAsync,
+  reconfigureConnectionAsync,
   AppDispatch, addToast, fetchConnectionsAsync,
 } from '../store';
+import SettingsIcon from '@mui/icons-material/Settings';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 interface ConnectionCardProps {
@@ -55,10 +57,10 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
   // Determine the status color
   let statusColor: 'success' | 'error' | 'warning' | 'default' = 'default';
   switch (connection.state) {
-    case ConnectionState.CONNECTED:
+    case ConnectionState.READY:
       statusColor = 'success';
       break;
-    case ConnectionState.FAILED:
+    case ConnectionState.DISABLED:
       statusColor = 'error';
       break;
     case ConnectionState.CREATED:
@@ -70,6 +72,11 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
     default:
       statusColor = 'default';
   }
+
+  // Handle reconfigure button click
+  const handleReconfigureClick = () => {
+    dispatch(reconfigureConnectionAsync(connection.id));
+  };
 
   // Handle disconnect button click
   const handleDisconnectClick = () => {
@@ -183,9 +190,18 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
 
       {canBeDisconnected(connection) && (
         <CardActions>
-          <Button 
-            size="small" 
-            color="error" 
+          {connection.state === ConnectionState.READY && (
+            <Button
+              size="small"
+              startIcon={<SettingsIcon />}
+              onClick={handleReconfigureClick}
+            >
+              Reconfigure
+            </Button>
+          )}
+          <Button
+            size="small"
+            color="error"
             onClick={handleDisconnectClick}
             disabled={connection.state === ConnectionState.DISCONNECTING}
           >

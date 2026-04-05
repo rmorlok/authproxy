@@ -5,8 +5,8 @@ import {ListResponse} from './common';
 // Connection models
 export enum ConnectionState {
     CREATED = 'created',
-    CONNECTED = 'connected',
-    FAILED = 'failed',
+    READY = 'ready',
+    DISABLED = 'disabled',
     DISCONNECTING = 'disconnecting',
     DISCONNECTED = 'disconnected',
 }
@@ -78,6 +78,11 @@ export interface InitiateConnectionRedirectResponse extends InitiateConnectionRe
 
 export interface InitiateConnectionFormResponse extends InitiateConnectionResponse {
     type: InitiateConnectionResponseType.FORM;
+    step_id: string;
+    step_title?: string;
+    step_description?: string;
+    current_step: number;
+    total_steps: number;
     json_schema: Record<string, unknown>;
     ui_schema: Record<string, unknown>;
 }
@@ -100,6 +105,11 @@ export function isCompleteResponse(response: InitiateConnectionResponse): respon
 
 export interface SubmitConnectionRequest {
     data: unknown;
+}
+
+export interface DataSourceOption {
+    value: string;
+    label: string;
 }
 
 // Disconnect models
@@ -255,14 +265,46 @@ export const deleteConnectionAnnotation = (id: string, annotationKey: string) =>
     return client.delete(`/api/v1/connections/${id}/annotations/${annotationKey}`);
 };
 
+/**
+ * Abort a connection that is still in setup
+ */
+export const abortConnection = (id: string) => {
+    return client.post<void>(`/api/v1/connections/${id}/_abort`);
+};
+
+/**
+ * Get the current setup step for a connection
+ */
+export const getSetupStep = (connectionId: string) => {
+    return client.get<InitiateConnectionResponse>(`/api/v1/connections/${connectionId}/_setup_step`);
+};
+
+/**
+ * Get data source options for a connection setup step
+ */
+export const getDataSource = (connectionId: string, sourceId: string) => {
+    return client.get<DataSourceOption[]>(`/api/v1/connections/${connectionId}/_data_source/${sourceId}`);
+};
+
+/**
+ * Reconfigure a completed connection by restarting its configure phase
+ */
+export const reconfigureConnection = (id: string) => {
+    return client.post<InitiateConnectionResponse>(`/api/v1/connections/${id}/_reconfigure`);
+};
+
 export const connections = {
     list: listConnections,
     get: getConnection,
     initiate: initiateConnection,
     submit: submitConnection,
     disconnect: disconnectConnection,
+    abort: abortConnection,
     force_state: forceConnectionState,
     update: updateConnection,
+    getSetupStep: getSetupStep,
+    getDataSource: getDataSource,
+    reconfigure: reconfigureConnection,
     getLabels: getConnectionLabels,
     getLabel: getConnectionLabel,
     putLabel: putConnectionLabel,
