@@ -196,6 +196,32 @@ connectors:
         - id: https://www.googleapis.com/auth/calendar.readonly
           reason: |
             We need to be able to read the calendar
+    setup_flow:
+      configure:
+        steps:
+          - id: select-calendar
+            title: Select a Calendar
+            description: Choose which Google Calendar the agent should manage.
+            json_schema:
+              type: object
+              required:
+                - calendar_id
+              properties:
+                calendar_id:
+                  type: string
+                  title: Calendar
+                  x-data-source: calendars
+            ui_schema:
+              type: VerticalLayout
+              elements:
+                - type: Control
+                  scope: "#/properties/calendar_id"
+            data_sources:
+              calendars:
+                proxy_request:
+                  method: GET
+                  url: https://www.googleapis.com/calendar/v3/users/me/calendarList
+                transform: "data.items.map(function(c) { return { value: c.id, label: c.summary || c.id }; })"
     probes:
       - id: example
         period: 1m
