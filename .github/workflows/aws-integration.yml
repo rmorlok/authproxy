@@ -8,6 +8,7 @@ on:
 
 jobs:
   aws-secrets-integration:
+    environment: AWS Integration Tests
     runs-on: ubuntu-latest
     services:
       postgres:
