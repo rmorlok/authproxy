@@ -40,8 +40,8 @@ docker compose --profile server up -d
 # Create network
 docker network create authproxy
 
-# Start Redis (required - includes search module)
-docker run --name redis-server -p 6379:6379 --network authproxy -d redis/redis-stack-server:latest
+# Start Redis
+docker run --name redis-server -p 6379:6379 --network authproxy -d redis:latest
 
 # Start MinIO (required for request log storage)
 # Note: port 9002 is used for the S3 API to avoid conflicts with other services (e.g. ClickHouse uses 9000)

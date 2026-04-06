@@ -315,10 +315,10 @@ Create a network for the asynq system to interact with redis:
 docker network create authproxy
 ```
 
-Start redis (requires search module):
+Start redis:
 
 ```bash
-docker run --name redis-server -p 6379:6379 --network authproxy -d redis/redis-stack-server:latest
+docker run --name redis-server -p 6379:6379 --network authproxy -d redis:latest
 ```
 
 Start Postgres (for local development and tests):

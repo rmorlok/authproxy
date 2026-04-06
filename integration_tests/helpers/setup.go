@@ -18,6 +18,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/encrypt"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/schema/connectors"
@@ -143,14 +144,23 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 	serviceId := string(opts.Service)
 	dm := service.NewDependencyManager(serviceId, cfg)
 
-	// Clear the Redis sentinel that gates encrypt key sync. Each test gets an
-	// isolated database via pgtestdb, but they share the same Redis. Without
-	// this, only the first test syncs keys; subsequent tests skip the sync
-	// (sentinel says "recently done") and the encrypt service panics waiting
-	// for a global AES key that was never written to the new database.
-	dm.GetRedisClient().Del(context.Background(), "encrypt:last_key_sync_time")
+	dm.AutoMigrateDatabase()
 
-	dm.AutoMigrateAll()
+	// Each test gets an isolated database via pgtestdb but shares the same Redis.
+	// The Redis sentinel in SyncKeysToDatabase ("recently synced") can cause a
+	// concurrent test's sync to be skipped, leaving the new database without a
+	// global AES key. Passing nil for Redis bypasses the sentinel so this test's
+	// database is always seeded with the key, regardless of what other packages
+	// are doing concurrently.
+	//
+	// This must happen before AutoMigrateLogStorageService because that call
+	// can trigger GetEncryptService(), which starts the syncLoop goroutine that
+	// immediately tries to read the global key from the database.
+	require.NoError(t, encrypt.SyncKeysToDatabase(context.Background(), cfg, dm.GetDatabase(), dm.GetLogger(), nil))
+
+	dm.AutoMigrateLogStorageService()
+	dm.AutoMigrateCore()
+	dm.AutoMigratePredefinedActors()
 
 	// Get the appropriate server
 	var httpServer *http.Server
@@ -214,11 +224,15 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 
 		env.Cleanup = func() {
 			httpServer.Close()
+			dm.GetEncryptService().Shutdown()
 		}
 	} else {
 		// Extract the gin engine from the http.Server handler for in-process testing
 		if handler, ok := httpServer.Handler.(*gin.Engine); ok {
 			env.Gin = handler
+		}
+		env.Cleanup = func() {
+			dm.GetEncryptService().Shutdown()
 		}
 	}
 
