@@ -109,7 +109,7 @@ jobs:
           --health-timeout 5s
           --health-retries 10
       redis:
-        image: redis/redis-stack-server:latest
+        image: redis:latest
         ports:
           - 6380:6379
         options: >-
