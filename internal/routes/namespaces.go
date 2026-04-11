@@ -4,10 +4,13 @@ import (
 	"errors"
 	"time"
 
+	"fmt"
+
 	"github.com/gin-gonic/gin"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
-	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
@@ -116,11 +119,7 @@ func (r *NamespacesRoutes) get(gctx *gin.Context) {
 	path := gctx.Param("path")
 
 	if path == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("path is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("path is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -128,27 +127,18 @@ func (r *NamespacesRoutes) get(gctx *gin.Context) {
 	ns, err := r.core.GetNamespace(ctx, path)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("namespace '%s' not found", path).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("namespace '%s' not found", path), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -174,22 +164,13 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 
 	var req CreateNamespaceRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := database.ValidateNamespacePath(req.Path); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid namespace path '%s': %s", req.Path, err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid namespace path '%s': %s", req.Path, err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
@@ -197,42 +178,26 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 	ns, err := r.core.GetNamespace(ctx, req.Path)
 	if err == nil {
 		// This means the namespace already exists
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatus(http.StatusConflict).
-			WithResponseMsgf("namespace '%s' already exists", req.Path).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.Conflictf("namespace '%s' already exists", req.Path))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if !errors.Is(err, core.ErrNotFound) {
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := val.ValidateNamespace(req.Path); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithPublicErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	ns, err = r.core.CreateNamespace(ctx, req.Path, req.Labels)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -240,23 +205,14 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 	// Set annotations if provided
 	if req.Annotations != nil {
 		if err := database.Annotations(req.Annotations).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid annotations: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotations: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
 		}
 
 		ns, err = r.core.UpdateNamespaceAnnotations(ctx, req.Path, req.Annotations)
 		if err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				DefaultStatusInternalServerError().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteErr(gctx, nil, err)
 			val.MarkErrorReturn()
 			return
 		}
@@ -289,12 +245,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 
 	var req ListNamespacesRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg(err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -305,12 +256,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 	if req.Cursor != nil {
 		ex, err = r.core.ListNamespacesFromCursor(ctx, *req.Cursor)
 		if err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				WithResponseMsg("failed to list namespaces from cursor").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to list namespaces from cursor", httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -338,22 +284,13 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 		if req.OrderByVal != nil {
 			field, order, err := pagination.SplitOrderByParam[database.NamespaceOrderByField](*req.OrderByVal)
 			if err != nil {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusBadRequest().
-					WithInternalErr(err).
-					WithResponseMsg(err.Error()).
-					BuildStatusError().
-					WriteGinResponse(nil, gctx)
+				apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
 
 			if !database.IsValidNamespaceOrderByField(field) {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusBadRequest().
-					WithResponseMsgf("invalid sort field '%s'", field).
-					BuildStatusError().
-					WriteGinResponse(nil, gctx)
+				apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid sort field '%s'", field))
 				val.MarkErrorReturn()
 				return
 			}
@@ -367,11 +304,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 	result := ex.FetchPage(ctx)
 
 	if result.Error != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(result.Error).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, result.Error)
 		val.MarkErrorReturn()
 		return
 	}
@@ -403,23 +336,14 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 	path := gctx.Param("path")
 
 	if path == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("path is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("path is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req UpdateNamespaceRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -427,12 +351,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 	// Validate labels if provided
 	if req.Labels != nil {
 		if err := database.Labels(req.Labels).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid labels: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
 		}
@@ -441,12 +360,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 	// Validate annotations if provided
 	if req.Annotations != nil {
 		if err := database.Annotations(req.Annotations).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid annotations: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotations: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
 		}
@@ -456,27 +370,18 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 	ns, err := r.core.GetNamespace(ctx, path)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("namespace '%s' not found", path).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("namespace '%s' not found", path), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -485,21 +390,12 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 		ns, err = r.core.UpdateNamespaceLabels(ctx, path, req.Labels)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusNotFound().
-					WithResponseMsgf("namespace '%s' not found", path).
-					WithInternalErr(err).
-					BuildStatusError().
-					WriteGinResponse(nil, gctx)
+				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("namespace '%s' not found", path), httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
 
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -510,21 +406,12 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 		ns, err = r.core.UpdateNamespaceAnnotations(ctx, path, req.Annotations)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusNotFound().
-					WithResponseMsgf("namespace '%s' not found", path).
-					WithInternalErr(err).
-					BuildStatusError().
-					WriteGinResponse(nil, gctx)
+				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("namespace '%s' not found", path), httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
 
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -553,11 +440,7 @@ func (r *NamespacesRoutes) getLabels(gctx *gin.Context) {
 	path := gctx.Param("path")
 
 	if path == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("path is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("path is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -565,27 +448,18 @@ func (r *NamespacesRoutes) getLabels(gctx *gin.Context) {
 	ns, err := r.core.GetNamespace(ctx, path)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("namespace '%s' not found", path).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("namespace '%s' not found", path), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -618,22 +492,14 @@ func (r *NamespacesRoutes) getLabel(gctx *gin.Context) {
 	path := gctx.Param("path")
 
 	if path == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("path is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("path is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	labelKey := gctx.Param("label")
 	if labelKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("label key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -641,38 +507,25 @@ func (r *NamespacesRoutes) getLabel(gctx *gin.Context) {
 	ns, err := r.core.GetNamespace(ctx, path)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("namespace '%s' not found", path).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("namespace '%s' not found", path), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	labels := ns.GetLabels()
 	value, exists := labels[labelKey]
 	if !exists {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("label '%s' not found", labelKey).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("label '%s' not found", labelKey))
 		val.MarkErrorReturn()
 		return
 	}
@@ -706,58 +559,35 @@ func (r *NamespacesRoutes) putLabel(gctx *gin.Context) {
 	path := gctx.Param("path")
 
 	if path == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("path is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("path is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	labelKey := gctx.Param("label")
 	if labelKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("label key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	// Validate label key
 	if err := database.ValidateLabelKey(labelKey); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid label key: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid label key: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req PutNamespaceLabelRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	// Validate label value
 	if err := database.ValidateLabelValue(req.Value); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid label value: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid label value: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
@@ -766,27 +596,18 @@ func (r *NamespacesRoutes) putLabel(gctx *gin.Context) {
 	ns, err := r.core.GetNamespace(ctx, path)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("namespace '%s' not found", path).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("namespace '%s' not found", path), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -794,21 +615,12 @@ func (r *NamespacesRoutes) putLabel(gctx *gin.Context) {
 	updatedNs, err := r.core.PutNamespaceLabels(ctx, path, map[string]string{labelKey: req.Value})
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("namespace '%s' not found", path).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("namespace '%s' not found", path), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -840,22 +652,14 @@ func (r *NamespacesRoutes) deleteLabel(gctx *gin.Context) {
 	path := gctx.Param("path")
 
 	if path == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("path is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("path is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	labelKey := gctx.Param("label")
 	if labelKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("label key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -870,17 +674,13 @@ func (r *NamespacesRoutes) deleteLabel(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -893,11 +693,7 @@ func (r *NamespacesRoutes) deleteLabel(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -925,11 +721,7 @@ func (r *NamespacesRoutes) getAnnotations(gctx *gin.Context) {
 	path := gctx.Param("path")
 
 	if path == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("path is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("path is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -937,27 +729,18 @@ func (r *NamespacesRoutes) getAnnotations(gctx *gin.Context) {
 	ns, err := r.core.GetNamespace(ctx, path)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("namespace '%s' not found", path).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("namespace '%s' not found", path), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -990,22 +773,14 @@ func (r *NamespacesRoutes) getAnnotation(gctx *gin.Context) {
 	path := gctx.Param("path")
 
 	if path == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("path is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("path is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	annotationKey := gctx.Param("annotation")
 	if annotationKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("annotation key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1013,38 +788,25 @@ func (r *NamespacesRoutes) getAnnotation(gctx *gin.Context) {
 	ns, err := r.core.GetNamespace(ctx, path)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("namespace '%s' not found", path).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("namespace '%s' not found", path), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	annotations := ns.GetAnnotations()
 	value, exists := annotations[annotationKey]
 	if !exists {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("annotation '%s' not found", annotationKey).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("annotation '%s' not found", annotationKey))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1078,46 +840,28 @@ func (r *NamespacesRoutes) putAnnotation(gctx *gin.Context) {
 	path := gctx.Param("path")
 
 	if path == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("path is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("path is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	annotationKey := gctx.Param("annotation")
 	if annotationKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("annotation key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	// Validate annotation key
 	if err := database.ValidateAnnotationKey(annotationKey); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid annotation key: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotation key: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req PutNamespaceAnnotationRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1126,27 +870,18 @@ func (r *NamespacesRoutes) putAnnotation(gctx *gin.Context) {
 	ns, err := r.core.GetNamespace(ctx, path)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("namespace '%s' not found", path).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("namespace '%s' not found", path), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -1154,21 +889,12 @@ func (r *NamespacesRoutes) putAnnotation(gctx *gin.Context) {
 	updatedNs, err := r.core.PutNamespaceAnnotations(ctx, path, map[string]string{annotationKey: req.Value})
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("namespace '%s' not found", path).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("namespace '%s' not found", path), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1200,22 +926,14 @@ func (r *NamespacesRoutes) deleteAnnotation(gctx *gin.Context) {
 	path := gctx.Param("path")
 
 	if path == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("path is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("path is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	annotationKey := gctx.Param("annotation")
 	if annotationKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("annotation key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1230,17 +948,13 @@ func (r *NamespacesRoutes) deleteAnnotation(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -1253,11 +967,7 @@ func (r *NamespacesRoutes) deleteAnnotation(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1280,11 +990,7 @@ func (r *NamespacesRoutes) getEncryptionKey(gctx *gin.Context) {
 	path := gctx.Param("path")
 
 	if path == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("path is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("path is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1292,37 +998,24 @@ func (r *NamespacesRoutes) getEncryptionKey(gctx *gin.Context) {
 	ns, err := r.core.GetNamespace(ctx, path)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("namespace '%s' not found", path).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("namespace '%s' not found", path), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	ekId := ns.GetEncryptionKeyId()
 	if ekId == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("namespace '%s' has no encryption key set", path).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("namespace '%s' has no encryption key set", path))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1339,33 +1032,20 @@ func (r *NamespacesRoutes) setEncryptionKey(gctx *gin.Context) {
 	path := gctx.Param("path")
 
 	if path == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("path is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("path is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req SetNamespaceEncryptionKeyRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if req.EncryptionKeyId == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("encryption_key_id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("encryption_key_id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1374,55 +1054,37 @@ func (r *NamespacesRoutes) setEncryptionKey(gctx *gin.Context) {
 	ns, err := r.core.GetNamespace(ctx, path)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("namespace '%s' not found", path).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("namespace '%s' not found", path), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	ns, err = r.core.SetNamespaceEncryptionKey(ctx, path, apid.ID(req.EncryptionKeyId))
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("encryption key '%s' not found", req.EncryptionKeyId).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", req.EncryptionKeyId), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		var httpErr *api_common.HttpStatusError
+		var httpErr *httperr.Error
 		if errors.As(err, &httpErr) {
-			httpErr.WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httpErr)
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1437,11 +1099,7 @@ func (r *NamespacesRoutes) clearEncryptionKey(gctx *gin.Context) {
 	path := gctx.Param("path")
 
 	if path == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("path is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("path is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1455,17 +1113,13 @@ func (r *NamespacesRoutes) clearEncryptionKey(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ns); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -1476,11 +1130,7 @@ func (r *NamespacesRoutes) clearEncryptionKey(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}

@@ -6,7 +6,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
@@ -123,17 +123,13 @@ func (rpv *ResourcePermissionValidator) Validate(obj interface{}) error {
 }
 
 // ValidateHttpStatusError does the same validation as Validate, but returns a HttpStatusError instead of an error.
-func (rpv *ResourcePermissionValidator) ValidateHttpStatusError(obj interface{}) *api_common.HttpStatusError {
+func (rpv *ResourcePermissionValidator) ValidateHttpStatusError(obj interface{}) *httperr.Error {
 	err := rpv.Validate(obj)
 	if err == nil {
 		return nil
 	}
 
-	return api_common.
-		NewHttpStatusErrorBuilder().
-		WithStatusForbidden().
-		WithPublicErr(err).
-		BuildStatusError()
+	return httperr.Forbidden(err.Error(), httperr.WithPublicErr(err))
 }
 
 // GetEffectiveNamespaceMatchers computes the namespace matchers that should be applied to a database query.

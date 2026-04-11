@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/hashicorp/go-multierror"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
@@ -111,11 +111,7 @@ func (l *ListFilters) Validate() error {
 	if l.OrderByFieldVal != nil {
 		if !IsValidOrderByField(*l.OrderByFieldVal) {
 			msg := fmt.Sprintf("invalid order by field '%s'", *l.OrderByFieldVal)
-			return api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithResponseMsg(msg).
-				WithInternalErr(errors.New("invalid order by field")).
-				BuildStatusError()
+			return httperr.BadRequest(msg, httperr.WithInternalErr(errors.New("invalid order by field")))
 		}
 	}
 
@@ -196,12 +192,7 @@ func (l *ListFilters) SetPath(path string) {
 func (l *ListFilters) SetPathRegex(r string) error {
 	_, err := regexp.Compile(r)
 	if err != nil {
-		return api_common.
-			NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsgf("invalid path regex format: '%s'; cannot compile regex", r).
-			WithInternalErr(err).
-			Build()
+		return httperr.BadRequest(fmt.Sprintf("invalid path regex format: '%s'; cannot compile regex", r), httperr.WithInternalErr(err))
 	}
 
 	l.PathRegex = util.ToPtr(r)

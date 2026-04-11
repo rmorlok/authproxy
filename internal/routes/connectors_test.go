@@ -13,7 +13,7 @@ import (
 	"github.com/golang/mock/gomock"
 	asynqmock "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis/mock"
@@ -80,7 +80,7 @@ func TestConnectors(t *testing.T) {
 
 		cr := NewConnectorsRoutes(cfg, auth, c)
 
-		r := api_common.GinForTest(nil)
+		r := apgin.ForTest(nil)
 		cr.Register(r)
 
 		return &TestSetup{

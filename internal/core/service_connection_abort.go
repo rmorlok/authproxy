@@ -4,7 +4,7 @@ import (
 	"context"
 	"fmt"
 
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 )
@@ -21,10 +21,7 @@ func (s *service) AbortConnection(ctx context.Context, id apid.ID) error {
 
 	setupStep := conn.GetSetupStep()
 	if setupStep == nil {
-		return api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("connection setup is already complete; use disconnect instead").
-			BuildStatusError()
+		return httperr.BadRequest("connection setup is already complete; use disconnect instead")
 	}
 
 	// Revoke any credentials that may have been obtained during auth phase

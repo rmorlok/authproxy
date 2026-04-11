@@ -11,7 +11,7 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apctx"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -246,10 +246,7 @@ func (s *service) createNamespace(ctx context.Context, tx *sql.Tx, ns *Namespace
 		parent, err := s.getNamespaceByPath(ctx, tx, prefixes[i])
 		if err != nil {
 			if errors.Is(err, ErrNotFound) {
-				return api_common.NewHttpStatusErrorBuilder().
-					WithStatusBadRequest().
-					WithPublicErrf("cannot create namespace '%s' because parent namespace '%s' does not exist or is deleted", ns.Path, prefixes[i]).
-					Build()
+				return httperr.BadRequest("", httperr.WithPublicErr(fmt.Errorf("cannot create namespace '%s' because parent namespace '%s' does not exist or is deleted", ns.Path, prefixes[i])))
 			}
 			return err
 		}
@@ -335,10 +332,7 @@ func (s *service) EnsureNamespaceByPath(ctx context.Context, path string) error 
 			}
 
 			if ns.State != NamespaceStateActive {
-				return api_common.NewHttpStatusErrorBuilder().
-					WithStatusBadRequest().
-					WithPublicErrf("namespace '%s' is not active", prefixes[i]).
-					Build()
+				return httperr.BadRequest("", httperr.WithPublicErr(fmt.Errorf("namespace '%s' is not active", prefixes[i])))
 			}
 		}
 
@@ -405,15 +399,9 @@ func (s *service) SetNamespaceEncryptionKeyId(ctx context.Context, path string, 
 
 		if !found {
 			if len(strictAncestors) == 0 {
-				return nil, api_common.NewHttpStatusErrorBuilder().
-					WithStatusBadRequest().
-					WithResponseMsgf("cannot assign encryption key to root namespace; encryption keys must belong to a strict ancestor namespace").
-					BuildStatusError()
+				return nil, httperr.BadRequestf("cannot assign encryption key to root namespace; encryption keys must belong to a strict ancestor namespace")
 			}
-			return nil, api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithResponseMsgf("encryption key belongs to namespace '%s' which is not a strict ancestor of '%s'", ek.Namespace, path).
-				BuildStatusError()
+			return nil, httperr.BadRequestf("encryption key belongs to namespace '%s' which is not a strict ancestor of '%s'", ek.Namespace, path)
 		}
 	}
 

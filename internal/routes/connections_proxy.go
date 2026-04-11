@@ -6,9 +6,10 @@ import (
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
-	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core/iface"
@@ -50,23 +51,13 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 	id := gctx.Param("id")
 	connectionUuid, err := apid.Parse(id)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid connection id").
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid connection id", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectionUuid == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("connection id is required").
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("connection id is required", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -74,55 +65,36 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 	conn, err := r.core.GetConnection(ctx, connectionUuid)
 	if err != nil {
 		if errors.Is(err, iface.ErrConnectionNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("connection not found").
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.NotFound("connection not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(conn); httpErr != nil {
-		httpErr.WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httpErr)
 		return
 	}
 
 	var proxyRequest iface.ProxyRequest
 	if err := gctx.ShouldBindJSON(&proxyRequest); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid proxy request payload").
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid proxy request payload", httperr.WithInternalErr(err)))
 		return
 	}
 
 	validateErr := proxyRequest.Validate()
 	if validateErr != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithInternalErr(validateErr).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteErr(gctx, r.logger, validateErr)
 		return
 	}
 
 	resp, err := conn.ProxyRequest(ctx, httpf.RequestTypeProxy, &proxyRequest)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteErr(gctx, r.logger, err)
 		return
 	}
 

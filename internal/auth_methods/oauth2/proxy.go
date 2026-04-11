@@ -7,7 +7,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
@@ -102,24 +102,14 @@ func (o *oAuth2Connection) getValidToken(ctx context.Context) (*database.OAuth2T
 	token, err := o.db.GetOAuth2Token(ctx, o.connection.GetId())
 	if err != nil {
 		if errors.Is(database.ErrNotFound, err) {
-			return nil, api_common.
-				NewHttpStatusErrorBuilder().
-				WithStatus(422).
-				WithResponseMsg("no valid oauth token found").
-				WithInternalErr(err).
-				Build()
+			return nil, httperr.New(422, "no valid oauth token found", httperr.WithInternalErr(err))
 		}
 
 		return nil, err
 	}
 
 	if token == nil {
-		return nil, api_common.
-			NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithResponseMsg("token unexpectedly nil").
-			WithInternalErr(err).
-			Build()
+		return nil, httperr.InternalServerErrorMsg("token unexpectedly nil", httperr.WithInternalErr(err))
 	}
 
 	// Check if the token has expired

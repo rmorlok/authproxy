@@ -5,7 +5,7 @@ import (
 	"errors"
 
 	"github.com/rmorlok/authproxy/internal/apctx"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
@@ -26,11 +26,7 @@ func (s *service) CreateConnection(
 	)
 
 	if !aschema.NamespaceIsSameOrChild(cv.GetNamespace(), namespace) {
-		return nil, api_common.
-			NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(errors.New("connections must be created in the same or child namespace of the connector")).
-			Build()
+		return nil, httperr.BadRequestErr(errors.New("connections must be created in the same or child namespace of the connector"))
 	}
 
 	id := apctx.GetIdGenerator(ctx).New(apid.PrefixConnection)

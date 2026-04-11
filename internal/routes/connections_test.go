@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apgin"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
@@ -68,7 +68,7 @@ func TestConnections(t *testing.T) {
 		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		assert.NoError(t, c.Migrate(context.Background()))
 		cr := NewConnectionsRoutes(cfg, auth, db, rds, c, h, e, test_utils.NewTestLogger())
-		r := api_common.GinForTest(nil)
+		r := apgin.ForTest(nil)
 		cr.Register(r)
 
 		return &TestSetup{

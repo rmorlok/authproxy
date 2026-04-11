@@ -13,7 +13,7 @@ import (
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/apasynq/mock"
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
@@ -37,7 +37,7 @@ func TestTaskMonitoringRoutes(t *testing.T) {
 		inspector := mock.NewMockInspector(ctrl)
 		routes := NewTaskMonitoringRoutes(cfg, auth, inspector, pagination.NewRandomCursorEncryptor())
 
-		r := api_common.GinForTest(nil)
+		r := apgin.ForTest(nil)
 		routes.Register(r)
 
 		return &TestSetup{

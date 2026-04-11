@@ -10,7 +10,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apgin"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
@@ -55,7 +55,7 @@ func TestActorsRoutes(t *testing.T) {
 
 		// Build routes
 		ar := NewActorsRoutes(cfg, auth, db, rds, h, e, test_utils.NewTestLogger())
-		r := api_common.GinForTest(nil)
+		r := apgin.ForTest(nil)
 		ar.Register(r)
 
 		// gomock controller (only for redis mock if we needed, but kept for parity)

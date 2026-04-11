@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/rmorlok/authproxy/internal/apauth/core"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/httperr"
 )
 
 /*
@@ -67,16 +67,14 @@ func (j *service) auth(requireAuth bool, requireSessionXsrf bool, abort func()) 
 				// We treat any errors as a failure, even if the resulting status is unauthorized. Not passing
 				// a JWT will just result in you requesting this endpoint without authentication, but passing a bad
 				// JWT will result in some sort of error -- unauthorized or otherwise.
-				httpStatusErr := api_common.AsHttpStatusError(err)
+				httpStatusErr := httperr.FromError(err)
 				httpStatusErr.WriteResponse(r.Context(), nil, w)
 				abort()
 				return
 			}
 
 			if requireAuth && !requestAuth.IsAuthenticated() {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusUnauthorized().
-					BuildStatusError().
+				httperr.Unauthorized().
 					WriteResponse(r.Context(), nil, w)
 				abort()
 				return

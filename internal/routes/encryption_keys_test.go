@@ -17,7 +17,8 @@ import (
 	asynqmock "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apctx"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apgin"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"
@@ -64,7 +65,7 @@ func TestEncryptionKeys(t *testing.T) {
 		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		require.NoError(t, c.Migrate(ctx))
 		ekr := NewEncryptionKeysRoutes(cfg, auth, c)
-		r := api_common.GinForTest(nil)
+		r := apgin.ForTest(nil)
 		ekr.Register(r)
 
 		return &TestSetup{
@@ -777,7 +778,7 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusBadRequest, w.Code)
 
-			var errResp api_common.ErrorResponse
+			var errResp httperr.ErrorResponse
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &errResp))
 			require.Contains(t, errResp.Error, "global encryption key cannot be deleted")
 		})

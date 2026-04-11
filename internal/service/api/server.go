@@ -10,7 +10,7 @@ import (
 	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/config"
 	common_routes "github.com/rmorlok/authproxy/internal/routes"
@@ -34,7 +34,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		dm.GetLogger(),
 	)
 
-	server := api_common.GinForService(service, logger, dm.GetConfig().IsDebugMode())
+	server := apgin.ForService(service, logger, dm.GetConfig().IsDebugMode())
 
 	corsConfig := root.Api.CorsVal.ToGinCorsConfig(nil)
 	if corsConfig != nil {
@@ -58,7 +58,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 
 	var healthChecker *gin.Engine
 	if service.Port() != service.HealthCheckPort() {
-		healthChecker = api_common.GinForService(service, logger, dm.GetConfig().IsDebugMode())
+		healthChecker = apgin.ForService(service, logger, dm.GetConfig().IsDebugMode())
 	} else {
 		healthChecker = server
 	}
@@ -181,7 +181,7 @@ func Serve(cfg config.C) {
 	go func() {
 		defer wg.Done()
 		logger.Info("running service", "addr", server.Addr)
-		err := api_common.RunServer(server, logger)
+		err := apgin.RunServer(server, logger)
 		if err != nil {
 			logger.Error(err.Error(), "error", err)
 		}
@@ -192,7 +192,7 @@ func Serve(cfg config.C) {
 		go func() {
 			defer wg.Done()
 			logger.Info("running health checker", "addr", healthChecker.Addr)
-			err := api_common.RunServer(healthChecker, logger)
+			err := apgin.RunServer(healthChecker, logger)
 			if err != nil {
 				logger.Error(err.Error(), "error", err)
 			}
