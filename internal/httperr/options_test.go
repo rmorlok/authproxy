@@ -82,7 +82,7 @@ func TestWithWrap_HttpError(t *testing.T) {
 
 func TestWithInternalErrf(t *testing.T) {
 	inner := errors.New("db fail")
-	e := InternalServerError(WithInternalErrf("query failed: %w", inner))
+	e := InternalServerError(WithInternalErrorf("query failed: %w", inner))
 	require.Equal(t, "query failed: db fail", e.InternalErr.Error())
 	require.True(t, errors.Is(e.InternalErr, inner))
 }

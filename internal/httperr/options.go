@@ -58,7 +58,7 @@ func WithPublicErr(err error) Option {
 
 // WithInternalErrf sets the internal error using a format string, equivalent to
 // WithInternalErr(fmt.Errorf(format, args...)).
-func WithInternalErrf(format string, args ...any) Option {
+func WithInternalErrorf(format string, args ...any) Option {
 	return WithInternalErr(fmt.Errorf(format, args...))
 }
 

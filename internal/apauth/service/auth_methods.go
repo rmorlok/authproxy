@@ -13,8 +13,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	jwt2 "github.com/rmorlok/authproxy/internal/apauth/jwt"
 	"github.com/rmorlok/authproxy/internal/apctx"
-	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -322,7 +322,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 				return core.NewUnauthenticatedRequestAuth(), httperr.Unauthorized(httperr.WithPublicErr(err))
 			}
 
-			return core.NewUnauthenticatedRequestAuth(), httperr.UnauthorizedMsg("invalid token", httperr.WithInternalErrf("failed to get token: %w", err))
+			return core.NewUnauthenticatedRequestAuth(), httperr.UnauthorizedMsg("invalid token", httperr.WithInternalErrorf("failed to get token: %w", err))
 		}
 
 		if claims.IsExpired(ctx) {
@@ -338,7 +338,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 
 			wasValid, err := s.db.CheckNonceValidAndMarkUsed(ctx, *claims.Nonce, claims.ExpiresAt.Time)
 			if err != nil {
-				return core.NewUnauthenticatedRequestAuth(), httperr.UnauthorizedMsg("failed to verify jwt details", httperr.WithInternalErrf("can't check nonce: %w", err))
+				return core.NewUnauthenticatedRequestAuth(), httperr.UnauthorizedMsg("failed to verify jwt details", httperr.WithInternalErrorf("can't check nonce: %w", err))
 			}
 
 			if !wasValid {
@@ -357,9 +357,9 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 				actor, err = s.db.GetActorByExternalId(ctx, claims.GetNamespace(), claims.Subject)
 				if err != nil {
 					if errors.Is(err, database.ErrNotFound) {
-						return core.NewUnauthenticatedRequestAuth(), httperr.UnauthorizedMsg("actor does not exist", httperr.WithInternalErrf("actor '%s' not found", claims.Subject))
+						return core.NewUnauthenticatedRequestAuth(), httperr.UnauthorizedMsg("actor does not exist", httperr.WithInternalErrorf("actor '%s' not found", claims.Subject))
 					}
-					return core.NewUnauthenticatedRequestAuth(), httperr.InternalServerErrorMsg("database error", httperr.WithInternalErrf("failed to get actor: %w", err))
+					return core.NewUnauthenticatedRequestAuth(), httperr.InternalServerErrorMsg("database error", httperr.WithInternalErrorf("failed to get actor: %w", err))
 				}
 				cache.Put(actor)
 			}
@@ -368,7 +368,7 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 			// it consistent with the request's definition.
 			actor, err = s.db.UpsertActor(ctx, claims.Actor)
 			if err != nil {
-				return core.NewUnauthenticatedRequestAuth(), httperr.InternalServerErrorMsg("database error", httperr.WithInternalErrf("failed to upsert actor: %w", err))
+				return core.NewUnauthenticatedRequestAuth(), httperr.InternalServerErrorMsg("database error", httperr.WithInternalErrorf("failed to upsert actor: %w", err))
 			}
 			cache.Put(actor)
 		}

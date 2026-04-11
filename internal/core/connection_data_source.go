@@ -4,10 +4,10 @@ import (
 	"context"
 	"net/http"
 
-	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/aptmpl"
 	"github.com/rmorlok/authproxy/internal/core/iface"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
@@ -36,7 +36,7 @@ func (c *connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 
 	step, _, err := connector.SetupFlow.GetStepBySetupStep(*setupStep)
 	if err != nil {
-		return nil, httperr.InternalServerError(httperr.WithInternalErrf("failed to get current step: %w", err))
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to get current step: %w", err))
 	}
 
 	ds, ok := step.DataSources[sourceId]
@@ -51,13 +51,13 @@ func (c *connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 	// Get mustache context for template rendering
 	mustacheCtx, err := c.GetMustacheContext(ctx)
 	if err != nil {
-		return nil, httperr.InternalServerError(httperr.WithInternalErrf("failed to get mustache context: %w", err))
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to get mustache context: %w", err))
 	}
 
 	// Render URL template
 	renderedUrl, err := aptmpl.RenderMustache(ds.ProxyRequest.Url, mustacheCtx)
 	if err != nil {
-		return nil, httperr.InternalServerError(httperr.WithInternalErrf("failed to render data source URL template: %w", err))
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to render data source URL template: %w", err))
 	}
 
 	// Render header templates
@@ -65,7 +65,7 @@ func (c *connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 	for k, v := range ds.ProxyRequest.Headers {
 		rendered, err := aptmpl.RenderMustache(v, mustacheCtx)
 		if err != nil {
-			return nil, httperr.InternalServerError(httperr.WithInternalErrf("failed to render header %q template: %w", k, err))
+			return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to render header %q template: %w", k, err))
 		}
 		renderedHeaders[k] = rendered
 	}
@@ -79,7 +79,7 @@ func (c *connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 
 	proxyResp, err := c.ProxyRequest(ctx, httpf.RequestTypeProxy, proxyReq)
 	if err != nil {
-		return nil, httperr.New(http.StatusBadGateway, "failed to fetch data source", httperr.WithInternalErrf("data source proxy request failed: %w", err))
+		return nil, httperr.New(http.StatusBadGateway, "failed to fetch data source", httperr.WithInternalErrorf("data source proxy request failed: %w", err))
 	}
 
 	if proxyResp.StatusCode < 200 || proxyResp.StatusCode >= 300 {
@@ -97,7 +97,7 @@ func (c *connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 	// Run JavaScript transform
 	options, err := apjs.TransformJSON(ds.Transform, responseData)
 	if err != nil {
-		return nil, httperr.InternalServerErrorMsg("failed to transform data source response", httperr.WithInternalErrf("data source transform failed: %w", err))
+		return nil, httperr.InternalServerErrorMsg("failed to transform data source response", httperr.WithInternalErrorf("data source transform failed: %w", err))
 	}
 
 	return options, nil

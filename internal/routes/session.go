@@ -5,16 +5,16 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
-	"github.com/rmorlok/authproxy/internal/apgin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
 )
 
@@ -102,7 +102,7 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 		logger.Debug("existing request was not in a session, creating one")
 		err := r.authService.EstablishGinSession(gctx, ra)
 		if err != nil {
-			apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErrf("failed to establish gin session: %w", err)))
+			apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErrorf("failed to establish gin session: %w", err)))
 			return
 		}
 	}
@@ -144,7 +144,7 @@ func (r *SessionRoutes) terminate(gctx *gin.Context) {
 	err := r.authService.EndGinSession(gctx, ra)
 	if err != nil {
 		logger.Error("failed to end gin session", "error", err)
-		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErrf("failed to end gin session: %w", err)))
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErrorf("failed to end gin session: %w", err)))
 		return
 	}
 
