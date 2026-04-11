@@ -99,6 +99,12 @@ func NewWithErr(status int, err error, opts ...Option) *Error {
 	return apply(&Error{Status: status, InternalErr: err}, opts)
 }
 
+// FromErrorf wraps err with a formatted message and extracts an *Error if one
+// is wrapped inside it, equivalent to FromError(fmt.Errorf(format, args...)).
+func FromErrorf(format string, args ...any) *Error {
+	return FromError(fmt.Errorf(format, args...))
+}
+
 // FromError extracts an *Error from err if one is wrapped inside it.
 // If err is not an *Error, wraps it as a 500. Options can override fields.
 func FromError(err error, opts ...Option) *Error {

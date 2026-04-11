@@ -80,6 +80,13 @@ func TestWithWrap_HttpError(t *testing.T) {
 	require.Contains(t, e.InternalErr.Error(), "fetching")
 }
 
+func TestWithInternalErrf(t *testing.T) {
+	inner := errors.New("db fail")
+	e := InternalServerError(WithInternalErrf("query failed: %w", inner))
+	require.Equal(t, "query failed: db fail", e.InternalErr.Error())
+	require.True(t, errors.Is(e.InternalErr, inner))
+}
+
 func TestOptions_DoNotOverrideConstructorMsg(t *testing.T) {
 	// WithInternalErr from a direct *Error should NOT override the constructor's message
 	inner := &Error{ResponseMsg: "inner msg"}

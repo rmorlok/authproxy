@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"encoding/json"
-	"fmt"
 
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/httperr"
@@ -40,13 +39,13 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 	// Look up the current step definition
 	currentStep, _, err := connector.SetupFlow.GetStepBySetupStep(*setupStep)
 	if err != nil {
-		return nil, httperr.InternalServerError(httperr.WithInternalErr(fmt.Errorf("failed to get current step: %w", err)))
+		return nil, httperr.InternalServerError(httperr.WithInternalErrf("failed to get current step: %w", err))
 	}
 
 	// Get existing configuration to merge into
 	existingConfig, err := c.GetConfiguration(ctx)
 	if err != nil {
-		return nil, httperr.InternalServerError(httperr.WithInternalErr(fmt.Errorf("failed to get existing configuration: %w", err)))
+		return nil, httperr.InternalServerError(httperr.WithInternalErrf("failed to get existing configuration: %w", err))
 	}
 
 	// Validate step id, validate data against schema, and merge only allowed fields
@@ -56,24 +55,24 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 	}
 
 	if err := c.SetConfiguration(ctx, mergedConfig); err != nil {
-		return nil, httperr.InternalServerError(httperr.WithInternalErr(fmt.Errorf("failed to save configuration: %w", err)))
+		return nil, httperr.InternalServerError(httperr.WithInternalErrf("failed to save configuration: %w", err))
 	}
 
 	// Determine the next step
 	nextStep, err := connector.SetupFlow.NextSetupStep(*setupStep)
 	if err != nil {
-		return nil, httperr.InternalServerError(httperr.WithInternalErr(fmt.Errorf("failed to determine next step: %w", err)))
+		return nil, httperr.InternalServerError(httperr.WithInternalErrf("failed to determine next step: %w", err))
 	}
 
 	// Handle each possible next step
 	if nextStep == "" {
 		// Flow complete
 		if err := c.SetSetupStep(ctx, nil); err != nil {
-			return nil, httperr.InternalServerError(httperr.WithInternalErr(fmt.Errorf("failed to clear setup step: %w", err)))
+			return nil, httperr.InternalServerError(httperr.WithInternalErrf("failed to clear setup step: %w", err))
 		}
 
 		if err := c.SetState(ctx, database.ConnectionStateReady); err != nil {
-			return nil, httperr.InternalServerError(httperr.WithInternalErr(fmt.Errorf("failed to set connection state to ready: %w", err)))
+			return nil, httperr.InternalServerError(httperr.WithInternalErrf("failed to set connection state to ready: %w", err))
 		}
 
 		return &iface.InitiateConnectionComplete{
@@ -107,14 +106,14 @@ func (c *connection) initiateAuthStep(ctx context.Context, returnToUrl string, c
 
 	authStep := "auth"
 	if err := c.SetSetupStep(ctx, &authStep); err != nil {
-		return nil, httperr.InternalServerError(httperr.WithInternalErr(fmt.Errorf("failed to set setup step to auth: %w", err)))
+		return nil, httperr.InternalServerError(httperr.WithInternalErrf("failed to set setup step to auth: %w", err))
 	}
 
 	ra := core.GetAuthFromContext(ctx)
 	o2 := c.s.getOAuth2Factory().NewOAuth2(c)
 	url, err := o2.SetStateAndGeneratePublicUrl(ctx, ra.MustGetActor(), returnToUrl)
 	if err != nil {
-		return nil, httperr.InternalServerError(httperr.WithInternalErr(fmt.Errorf("failed to generate OAuth redirect URL: %w", err)))
+		return nil, httperr.InternalServerError(httperr.WithInternalErrf("failed to generate OAuth redirect URL: %w", err))
 	}
 
 	return &iface.InitiateConnectionRedirect{
@@ -128,11 +127,11 @@ func (c *connection) initiateAuthStep(ctx context.Context, returnToUrl string, c
 func (c *connection) buildFormResponse(ctx context.Context, setupStep string, sf *cschema.SetupFlow) (iface.InitiateConnectionResponse, error) {
 	step, globalIndex, err := sf.GetStepBySetupStep(setupStep)
 	if err != nil {
-		return nil, httperr.InternalServerError(httperr.WithInternalErr(fmt.Errorf("failed to get step definition: %w", err)))
+		return nil, httperr.InternalServerError(httperr.WithInternalErrf("failed to get step definition: %w", err))
 	}
 
 	if err := c.SetSetupStep(ctx, &setupStep); err != nil {
-		return nil, httperr.InternalServerError(httperr.WithInternalErr(fmt.Errorf("failed to update setup step: %w", err)))
+		return nil, httperr.InternalServerError(httperr.WithInternalErrf("failed to update setup step: %w", err))
 	}
 
 	return &iface.InitiateConnectionForm{

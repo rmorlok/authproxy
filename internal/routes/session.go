@@ -1,7 +1,6 @@
 package routes
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -103,7 +102,7 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 		logger.Debug("existing request was not in a session, creating one")
 		err := r.authService.EstablishGinSession(gctx, ra)
 		if err != nil {
-			apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(fmt.Errorf("failed to establish gin session: %w", err))))
+			apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErrf("failed to establish gin session: %w", err)))
 			return
 		}
 	}
@@ -145,7 +144,7 @@ func (r *SessionRoutes) terminate(gctx *gin.Context) {
 	err := r.authService.EndGinSession(gctx, ra)
 	if err != nil {
 		logger.Error("failed to end gin session", "error", err)
-		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(fmt.Errorf("failed to end gin session: %w", err))))
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErrf("failed to end gin session: %w", err)))
 		return
 	}
 

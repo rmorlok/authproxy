@@ -120,6 +120,21 @@ func TestNewWithErr(t *testing.T) {
 	require.Equal(t, inner, e.InternalErr)
 }
 
+func TestFromErrorf(t *testing.T) {
+	inner := &Error{Status: http.StatusForbidden, ResponseMsg: "forbidden"}
+	e := FromErrorf("wrapped: %w", inner)
+	require.Equal(t, http.StatusForbidden, e.Status)
+	require.Equal(t, "forbidden", e.ResponseMsg)
+	require.Equal(t, "wrapped: forbidden", e.InternalErr.Error())
+}
+
+func TestFromErrorf_PlainError(t *testing.T) {
+	inner := errors.New("db error")
+	e := FromErrorf("query failed: %w", inner)
+	require.Equal(t, http.StatusInternalServerError, e.Status)
+	require.Equal(t, "query failed: db error", e.InternalErr.Error())
+}
+
 func TestFromError_PlainError(t *testing.T) {
 	inner := errors.New("something broke")
 	e := FromError(inner)
