@@ -8,9 +8,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/apasynq"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
-	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/tasks"
@@ -117,88 +118,50 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 
 	ra := auth.GetAuthFromGinContext(gctx)
 	if !ra.IsAuthenticated() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusUnauthorized().
-			WithResponseMsg("unauthorized").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.UnauthorizedMsg("unauthorized"))
 		return
 	}
 
 	encryptedTaskInfo := gctx.Param("encryptedTaskInfo")
 	if encryptedTaskInfo == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 	}
 
 	ti, err := tasks.FromSecureEncryptedString(ctx, r.encrypt, encryptedTaskInfo)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid task info").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid task info", httperr.WithInternalErr(err)))
 		return
 	}
 
 	// This really shouldn't happen
 	if ti == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("connection not found").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 		return
 	}
 
 	if ti.TrackedVia != tasks.TrackedViaAsynq {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithResponseMsg("invalid task info: bad type").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("invalid task info: bad type"))
 		return
 	}
 
 	if ti.AsynqQueue == "" || ti.AsynqId == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithResponseMsg("invalid task info: data missing").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("invalid task info: data missing"))
 		return
 	}
 
 	if ti.ActorId != apid.Nil && ti.ActorId != ra.MustGetActor().Id {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusForbidden().
-			WithResponseMsg("not authorized to view task").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.Forbidden("not authorized to view task"))
 		return
 	}
 
 	ati, err := r.asynqInspector.GetTaskInfo(ti.AsynqQueue, ti.AsynqId)
 	if err != nil {
 		if errors.Is(err, asynq.ErrTaskNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("task not found").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound("task not found"))
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			WithResponseMsg("failed to load task").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to load task", httperr.WithInternalErr(err)))
 		return
 	}
 

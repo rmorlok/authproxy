@@ -10,9 +10,10 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/apasynq"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
-	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -278,12 +279,7 @@ func (r *TaskMonitoringRoutes) listQueues(gctx *gin.Context) {
 
 	queues, err := r.inspector.Queues()
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			WithResponseMsg("failed to list queues").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to list queues", httperr.WithInternalErr(err)))
 		return
 	}
 
@@ -291,12 +287,7 @@ func (r *TaskMonitoringRoutes) listQueues(gctx *gin.Context) {
 	for _, q := range queues {
 		qi, err := r.inspector.GetQueueInfo(q)
 		if err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				WithResponseMsgf("failed to get queue info for %s", q).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.InternalServerErrorf("failed to get queue info for %s", q))
 			return
 		}
 		items = append(items, queueInfoToJson(qi))
@@ -311,22 +302,13 @@ func (r *TaskMonitoringRoutes) getQueueInfo(gctx *gin.Context) {
 
 	queue := gctx.Param("queue")
 	if queue == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("queue is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("queue is required"))
 		return
 	}
 
 	qi, err := r.inspector.GetQueueInfo(queue)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			WithResponseMsg("failed to get queue info").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to get queue info", httperr.WithInternalErr(err)))
 		return
 	}
 
@@ -339,11 +321,7 @@ func (r *TaskMonitoringRoutes) getQueueHistory(gctx *gin.Context) {
 
 	queue := gctx.Param("queue")
 	if queue == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("queue is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("queue is required"))
 		return
 	}
 
@@ -351,11 +329,7 @@ func (r *TaskMonitoringRoutes) getQueueHistory(gctx *gin.Context) {
 	if daysStr := gctx.Query("days"); daysStr != "" {
 		d, err := strconv.Atoi(daysStr)
 		if err != nil || d < 1 {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithResponseMsg("invalid days parameter").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequest("invalid days parameter"))
 			return
 		}
 		days = d
@@ -363,12 +337,7 @@ func (r *TaskMonitoringRoutes) getQueueHistory(gctx *gin.Context) {
 
 	stats, err := r.inspector.History(queue, days)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			WithResponseMsg("failed to get queue history").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to get queue history", httperr.WithInternalErr(err)))
 		return
 	}
 
@@ -389,11 +358,7 @@ func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
 	state := gctx.Param("state")
 
 	if queue == "" || state == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("queue and state are required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("queue and state are required"))
 		return
 	}
 
@@ -401,11 +366,7 @@ func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
 	case "pending", "active", "scheduled", "retry", "archived", "completed":
 		// valid
 	default:
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsgf("invalid state: %s", state).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid state: %s", state))
 		return
 	}
 
@@ -416,11 +377,7 @@ func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
 	if cursorStr != "" {
 		parsed, err := pagination.ParseCursor[taskListCursor](ctx, r.cursorEncryptor, cursorStr)
 		if err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithResponseMsg("invalid cursor").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequest("invalid cursor"))
 			return
 		}
 		page = parsed.Page
@@ -456,12 +413,7 @@ func (r *TaskMonitoringRoutes) listTasksByState(gctx *gin.Context) {
 	}
 
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			WithResponseMsg("failed to list tasks").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to list tasks", httperr.WithInternalErr(err)))
 		return
 	}
 
@@ -500,22 +452,13 @@ func (r *TaskMonitoringRoutes) getTask(gctx *gin.Context) {
 	taskId := gctx.Param("task_id")
 
 	if queue == "" || taskId == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("queue and task_id are required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("queue and task_id are required"))
 		return
 	}
 
 	ti, err := r.inspector.GetTaskInfo(queue, taskId)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			WithResponseMsg("failed to get task info").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to get task info", httperr.WithInternalErr(err)))
 		return
 	}
 
@@ -528,12 +471,7 @@ func (r *TaskMonitoringRoutes) listServers(gctx *gin.Context) {
 
 	servers, err := r.inspector.Servers()
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			WithResponseMsg("failed to list servers").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to list servers", httperr.WithInternalErr(err)))
 		return
 	}
 
@@ -551,12 +489,7 @@ func (r *TaskMonitoringRoutes) listSchedulerEntries(gctx *gin.Context) {
 
 	entries, err := r.inspector.SchedulerEntries()
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			WithResponseMsg("failed to list scheduler entries").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to list scheduler entries", httperr.WithInternalErr(err)))
 		return
 	}
 
@@ -576,12 +509,7 @@ func (r *TaskMonitoringRoutes) runTask(gctx *gin.Context) {
 	taskId := gctx.Param("task_id")
 
 	if err := r.inspector.RunTask(queue, taskId); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			WithResponseMsg("failed to run task").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to run task", httperr.WithInternalErr(err)))
 		return
 	}
 
@@ -596,12 +524,7 @@ func (r *TaskMonitoringRoutes) archiveTask(gctx *gin.Context) {
 	taskId := gctx.Param("task_id")
 
 	if err := r.inspector.ArchiveTask(queue, taskId); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			WithResponseMsg("failed to archive task").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to archive task", httperr.WithInternalErr(err)))
 		return
 	}
 
@@ -615,12 +538,7 @@ func (r *TaskMonitoringRoutes) cancelTask(gctx *gin.Context) {
 	taskId := gctx.Param("task_id")
 
 	if err := r.inspector.CancelProcessing(taskId); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			WithResponseMsg("failed to cancel task").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to cancel task", httperr.WithInternalErr(err)))
 		return
 	}
 
@@ -635,12 +553,7 @@ func (r *TaskMonitoringRoutes) deleteTask(gctx *gin.Context) {
 	taskId := gctx.Param("task_id")
 
 	if err := r.inspector.DeleteTask(queue, taskId); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			WithResponseMsg("failed to delete task").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to delete task", httperr.WithInternalErr(err)))
 		return
 	}
 
@@ -654,12 +567,7 @@ func (r *TaskMonitoringRoutes) pauseQueue(gctx *gin.Context) {
 	queue := gctx.Param("queue")
 
 	if err := r.inspector.PauseQueue(queue); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			WithResponseMsg("failed to pause queue").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to pause queue", httperr.WithInternalErr(err)))
 		return
 	}
 
@@ -673,12 +581,7 @@ func (r *TaskMonitoringRoutes) unpauseQueue(gctx *gin.Context) {
 	queue := gctx.Param("queue")
 
 	if err := r.inspector.UnpauseQueue(queue); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			WithResponseMsg("failed to unpause queue").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to unpause queue", httperr.WithInternalErr(err)))
 		return
 	}
 
@@ -693,12 +596,7 @@ func (r *TaskMonitoringRoutes) runAllArchivedTasks(gctx *gin.Context) {
 
 	count, err := r.inspector.RunAllArchivedTasks(queue)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			WithResponseMsg("failed to run all archived tasks").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to run all archived tasks", httperr.WithInternalErr(err)))
 		return
 	}
 
@@ -713,12 +611,7 @@ func (r *TaskMonitoringRoutes) runAllRetryTasks(gctx *gin.Context) {
 
 	count, err := r.inspector.RunAllRetryTasks(queue)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			WithResponseMsg("failed to run all retry tasks").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to run all retry tasks", httperr.WithInternalErr(err)))
 		return
 	}
 
@@ -733,12 +626,7 @@ func (r *TaskMonitoringRoutes) deleteAllArchivedTasks(gctx *gin.Context) {
 
 	count, err := r.inspector.DeleteAllArchivedTasks(queue)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			WithResponseMsg("failed to delete all archived tasks").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to delete all archived tasks", httperr.WithInternalErr(err)))
 		return
 	}
 
@@ -753,12 +641,7 @@ func (r *TaskMonitoringRoutes) deleteAllCompletedTasks(gctx *gin.Context) {
 
 	count, err := r.inspector.DeleteAllCompletedTasks(queue)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			WithResponseMsg("failed to delete all completed tasks").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to delete all completed tasks", httperr.WithInternalErr(err)))
 		return
 	}
 

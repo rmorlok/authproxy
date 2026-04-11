@@ -8,7 +8,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apctx"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/sqlh"
@@ -1914,7 +1914,7 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 	t.Run("rejected: key in same namespace", func(t *testing.T) {
 		_, err := db.SetNamespaceEncryptionKeyId(ctx, "root.parent.child", &ekChild.Id)
 		require.Error(t, err)
-		var httpErr *api_common.HttpStatusError
+		var httpErr *httperr.Error
 		require.True(t, errors.As(err, &httpErr))
 		require.Equal(t, http.StatusBadRequest, httpErr.Status)
 	})
@@ -1922,7 +1922,7 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 	t.Run("rejected: key in descendant namespace", func(t *testing.T) {
 		_, err := db.SetNamespaceEncryptionKeyId(ctx, "root.parent.child", &ekGrandchild.Id)
 		require.Error(t, err)
-		var httpErr *api_common.HttpStatusError
+		var httpErr *httperr.Error
 		require.True(t, errors.As(err, &httpErr))
 		require.Equal(t, http.StatusBadRequest, httpErr.Status)
 	})
@@ -1930,7 +1930,7 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 	t.Run("rejected: key in sibling namespace", func(t *testing.T) {
 		_, err := db.SetNamespaceEncryptionKeyId(ctx, "root.parent.child", &ekSibling.Id)
 		require.Error(t, err)
-		var httpErr *api_common.HttpStatusError
+		var httpErr *httperr.Error
 		require.True(t, errors.As(err, &httpErr))
 		require.Equal(t, http.StatusBadRequest, httpErr.Status)
 	})
@@ -1938,7 +1938,7 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 	t.Run("rejected: key on root namespace", func(t *testing.T) {
 		_, err := db.SetNamespaceEncryptionKeyId(ctx, "root", &ekRoot.Id)
 		require.Error(t, err)
-		var httpErr *api_common.HttpStatusError
+		var httpErr *httperr.Error
 		require.True(t, errors.As(err, &httpErr))
 		require.Equal(t, http.StatusBadRequest, httpErr.Status)
 		require.Contains(t, httpErr.ResponseMsg, "root namespace")

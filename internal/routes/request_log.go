@@ -5,9 +5,10 @@ import (
 	"net/http"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
-	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/request_log"
@@ -80,11 +81,7 @@ func (q *ListRequestsQuery) ApplyToBuilder(
 	}
 
 	if q.StatusCode != nil && q.StatusCodeRangeInclusive != nil {
-		return nil, api_common.
-			NewHttpStatusErrorBuilder().
-			DefaultStatusBadRequest().
-			WithResponseMsg("cannot specify both status_code and status_code_range").
-			Build()
+		return nil, httperr.BadRequest("cannot specify both status_code and status_code_range")
 	}
 
 	if q.StatusCode != nil {
@@ -106,11 +103,7 @@ func (q *ListRequestsQuery) ApplyToBuilder(
 	}
 
 	if q.Path != nil && q.PathRegex != nil {
-		return nil, api_common.
-			NewHttpStatusErrorBuilder().
-			DefaultStatusBadRequest().
-			WithResponseMsg("cannot specify both path and path_regex").
-			Build()
+		return nil, httperr.BadRequest("cannot specify both path and path_regex")
 	}
 
 	if q.Path != nil {
@@ -160,32 +153,20 @@ func (r *RequestLogRoutes) get(gctx *gin.Context) {
 	logIdStr := gctx.Param("id")
 
 	if logIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	logId, err := apid.Parse(logIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if logId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -194,26 +175,18 @@ func (r *RequestLogRoutes) get(gctx *gin.Context) {
 
 	if err != nil {
 		if errors.Is(err, request_log.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("request log not found").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound("request log not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(entry); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -256,12 +229,7 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 	var err error
 
 	if err = gctx.ShouldBindQuery(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg(err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -271,12 +239,7 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 	if req.Cursor != nil {
 		ex, err = r.rl.ListRequestsFromCursor(gctx, *req.Cursor)
 		if err != nil {
-			api_common.HttpStatusErrorBuilderFromError(err).
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsg("failed to list requests from cursor").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequest("failed to list requests from cursor", httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -287,9 +250,7 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 
 		b, err = req.ApplyToBuilder(b)
 		if err != nil {
-			api_common.HttpStatusErrorBuilderFromError(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteErr(gctx, nil, err)
 			val.MarkErrorReturn()
 			return
 		}
@@ -301,22 +262,13 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 		if req.OrderByVal != nil {
 			field, ob, err := pagination.SplitOrderByParam[request_log.RequestOrderByField](*req.OrderByVal)
 			if err != nil {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusBadRequest().
-					WithInternalErr(err).
-					WithResponseMsg("invalid order by").
-					BuildStatusError().
-					WriteGinResponse(nil, gctx)
+				apgin.WriteError(gctx, nil, httperr.BadRequest("invalid order by", httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
 
 			if !request_log.IsValidOrderByField(field) {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusBadRequest().
-					WithResponseMsg("invalid order by field").
-					BuildStatusError().
-					WriteGinResponse(nil, gctx)
+				apgin.WriteError(gctx, nil, httperr.BadRequest("invalid order by field"))
 				val.MarkErrorReturn()
 				return
 			}
@@ -329,11 +281,7 @@ func (r *RequestLogRoutes) list(gctx *gin.Context) {
 
 	result := ex.FetchPage(ctx)
 	if result.Error != nil {
-		api_common.HttpStatusErrorBuilderFromError(result.Error).
-			DefaultStatusBadRequest().
-			DefaultResponseMsg("failed to list requests").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, result.Error)
 		val.MarkErrorReturn()
 		return
 	}

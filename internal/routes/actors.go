@@ -2,10 +2,12 @@ package routes
 
 import (
 	"errors"
+	"fmt"
 
 	"github.com/gin-gonic/gin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apgin"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
@@ -121,12 +123,7 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 	var err error
 
 	if err = gctx.ShouldBindQuery(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg(err.Error()).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -136,11 +133,7 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 	if req.Cursor != nil {
 		ex, err = r.db.ListActorsFromCursor(ctx, *req.Cursor)
 		if err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.BadRequestErr(err))
 			val.MarkErrorReturn()
 			return
 		}
@@ -164,22 +157,13 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 		if req.OrderByVal != nil {
 			field, order, err := pagination.SplitOrderByParam[database.ActorOrderByField](*req.OrderByVal)
 			if err != nil {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusBadRequest().
-					WithInternalErr(err).
-					WithResponseMsg(err.Error()).
-					BuildStatusError().
-					WriteGinResponse(r.logger, gctx)
+				apgin.WriteError(gctx, r.logger, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
 
 			if !database.IsValidActorOrderByField(field) {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusBadRequest().
-					WithResponseMsgf("invalid sort field '%s'", field).
-					BuildStatusError().
-					WriteGinResponse(r.logger, gctx)
+				apgin.WriteError(gctx, r.logger, httperr.BadRequestf("invalid sort field '%s'", field))
 				val.MarkErrorReturn()
 				return
 			}
@@ -193,11 +177,7 @@ func (r *ActorsRoutes) list(gctx *gin.Context) {
 	result := ex.FetchPage(ctx)
 
 	if result.Error != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(result.Error).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(result.Error)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -227,23 +207,13 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("id is required", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -251,36 +221,24 @@ func (r *ActorsRoutes) get(gctx *gin.Context) {
 	a, err := r.db.GetActor(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("actor not found").
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if a == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("actor not found").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(a); httpErr != nil {
-		httpErr.WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httpErr)
 		return
 	}
 
@@ -307,11 +265,7 @@ func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 
 	externalId := gctx.Param("external_id")
 	if externalId == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("external_id is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("external_id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -325,36 +279,24 @@ func (r *ActorsRoutes) getByExternalId(gctx *gin.Context) {
 	a, err := r.db.GetActorByExternalId(ctx, namespace, externalId)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("actor not found").
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if a == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("actor not found").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(a); httpErr != nil {
-		httpErr.WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httpErr)
 		return
 	}
 
@@ -380,23 +322,13 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("id is required", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -410,11 +342,7 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -427,7 +355,7 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 	}
 
 	if httpErr := val.ValidateHttpStatusError(a); httpErr != nil {
-		httpErr.WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httpErr)
 		return
 	}
 
@@ -435,11 +363,7 @@ func (r *ActorsRoutes) delete(gctx *gin.Context) {
 
 	err = r.db.DeleteActor(ctx, id)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -467,11 +391,7 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 	externalId := gctx.Param("external_id")
 
 	if externalId == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("external_id is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("external_id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -491,11 +411,7 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -508,7 +424,7 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 	}
 
 	if httpErr := val.ValidateHttpStatusError(a); httpErr != nil {
-		httpErr.WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httpErr)
 		return
 	}
 
@@ -516,11 +432,7 @@ func (r *ActorsRoutes) deleteByExternalId(gctx *gin.Context) {
 
 	err = r.db.DeleteActor(ctx, a.Id)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -548,35 +460,21 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 
 	var req CreateActorRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	// Validate external_id is not empty
 	if req.ExternalId == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("external_id is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("external_id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	// Validate namespace path
 	if err := database.ValidateNamespacePath(req.Namespace); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid namespace '%s': %s", req.Namespace, err.Error()).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest(fmt.Sprintf("invalid namespace '%s': %s", req.Namespace, err.Error()), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -584,12 +482,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 	// Validate labels if provided
 	if req.Labels != nil {
 		if err := database.Labels(req.Labels).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid labels: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.BadRequest(fmt.Sprintf("invalid labels: %s", err.Error()), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -597,11 +490,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 
 	// Validate authorization for the namespace
 	if err := val.ValidateNamespace(req.Namespace); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusForbidden().
-			WithPublicErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.Forbidden(err.Error(), httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -609,21 +498,13 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 	// Check if actor already exists with the same external_id in the namespace
 	existingActor, err := r.db.GetActorByExternalId(ctx, req.Namespace, req.ExternalId)
 	if err == nil && existingActor != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatus(http.StatusConflict).
-			WithResponseMsgf("actor with external_id '%s' already exists in namespace '%s'", req.ExternalId, req.Namespace).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.Conflictf("actor with external_id '%s' already exists in namespace '%s'", req.ExternalId, req.Namespace))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err != nil && !errors.Is(err, database.ErrNotFound) {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -631,12 +512,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 	// Validate annotations if provided
 	if req.Annotations != nil {
 		if err := database.Annotations(req.Annotations).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid annotations: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.BadRequest(fmt.Sprintf("invalid annotations: %s", err.Error()), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -654,30 +530,18 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 	if err := r.db.CreateActor(ctx, actor); err != nil {
 		// Handle specific error cases
 		if errors.Is(err, database.ErrNamespaceDoesNotExist) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithResponseMsgf("namespace '%s' does not exist", req.Namespace).
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.BadRequestf("namespace '%s' does not exist", req.Namespace))
 			val.MarkErrorReturn()
 			return
 		}
 
 		if errors.Is(err, database.ErrDuplicate) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatus(http.StatusConflict).
-				WithResponseMsgf("actor with external_id '%s' already exists in namespace '%s'", req.ExternalId, req.Namespace).
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.Conflictf("actor with external_id '%s' already exists in namespace '%s'", req.ExternalId, req.Namespace))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -685,11 +549,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 	// Fetch the created actor to get the timestamps
 	createdActor, err := r.db.GetActor(ctx, actor.Id)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -718,34 +578,20 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req UpdateActorRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -753,12 +599,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 	// Validate labels if provided
 	if req.Labels != nil {
 		if err := database.Labels(req.Labels).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid labels: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.BadRequest(fmt.Sprintf("invalid labels: %s", err.Error()), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -767,12 +608,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 	// Validate annotations if provided
 	if req.Annotations != nil {
 		if err := database.Annotations(req.Annotations).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid annotations: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.BadRequest(fmt.Sprintf("invalid annotations: %s", err.Error()), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -782,37 +618,25 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 	existingActor, err := r.db.GetActor(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("actor not found").
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if existingActor == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("actor not found").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	// Validate authorization for the actor's namespace
 	if httpErr := val.ValidateHttpStatusError(existingActor); httpErr != nil {
-		httpErr.WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httpErr)
 		return
 	}
 
@@ -823,11 +647,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 	// Use UpsertActor to update (handles labels, permissions, etc. but not annotations)
 	updatedActor, err := r.db.UpsertActor(ctx, existingActor)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -836,11 +656,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 	if req.Annotations != nil {
 		updatedActor, err = r.db.UpdateActorAnnotations(ctx, updatedActor.Id, req.Annotations)
 		if err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -871,11 +687,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 
 	externalId := gctx.Param("external_id")
 	if externalId == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("external_id is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("external_id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -888,12 +700,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 
 	var req UpdateActorRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -901,12 +708,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 	// Validate labels if provided
 	if req.Labels != nil {
 		if err := database.Labels(req.Labels).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid labels: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.BadRequest(fmt.Sprintf("invalid labels: %s", err.Error()), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -915,12 +717,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 	// Validate annotations if provided
 	if req.Annotations != nil {
 		if err := database.Annotations(req.Annotations).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid annotations: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.BadRequest(fmt.Sprintf("invalid annotations: %s", err.Error()), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -930,37 +727,25 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 	existingActor, err := r.db.GetActorByExternalId(ctx, namespace, externalId)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("actor not found").
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if existingActor == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("actor not found").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	// Validate authorization for the actor's namespace
 	if httpErr := val.ValidateHttpStatusError(existingActor); httpErr != nil {
-		httpErr.WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httpErr)
 		return
 	}
 
@@ -971,11 +756,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 	// Use UpsertActor to update (handles labels, permissions, etc. but not annotations)
 	updatedActor, err := r.db.UpsertActor(ctx, existingActor)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -984,11 +765,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 	if req.Annotations != nil {
 		updatedActor, err = r.db.UpdateActorAnnotations(ctx, updatedActor.Id, req.Annotations)
 		if err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -1016,22 +793,13 @@ func (r *ActorsRoutes) getLabels(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1039,36 +807,24 @@ func (r *ActorsRoutes) getLabels(gctx *gin.Context) {
 	actor, err := r.db.GetActor(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("actor not found").
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if actor == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("actor not found").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
-		httpErr.WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httpErr)
 		return
 	}
 
@@ -1100,33 +856,20 @@ func (r *ActorsRoutes) getLabel(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	labelKey := gctx.Param("label")
 	if labelKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("label key is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("label key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1134,47 +877,31 @@ func (r *ActorsRoutes) getLabel(gctx *gin.Context) {
 	actor, err := r.db.GetActor(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("actor not found").
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if actor == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("actor not found").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
-		httpErr.WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httpErr)
 		return
 	}
 
 	labels := actor.GetLabels()
 	value, exists := labels[labelKey]
 	if !exists {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("label '%s' not found", labelKey).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.NotFoundf("label '%s' not found", labelKey))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1207,69 +934,41 @@ func (r *ActorsRoutes) putLabel(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	labelKey := gctx.Param("label")
 	if labelKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("label key is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("label key is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	// Validate label key
 	if err := database.ValidateLabelKey(labelKey); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid label key: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest(fmt.Sprintf("invalid label key: %s", err.Error()), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req PutActorLabelRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	// Validate label value
 	if err := database.ValidateLabelValue(req.Value); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid label value: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest(fmt.Sprintf("invalid label value: %s", err.Error()), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1278,36 +977,24 @@ func (r *ActorsRoutes) putLabel(gctx *gin.Context) {
 	actor, err := r.db.GetActor(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("actor not found").
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if actor == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("actor not found").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
-		httpErr.WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httpErr)
 		return
 	}
 
@@ -1315,20 +1002,12 @@ func (r *ActorsRoutes) putLabel(gctx *gin.Context) {
 	updatedActor, err := r.db.PutActorLabels(ctx, id, map[string]string{labelKey: req.Value})
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("actor not found").
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1359,33 +1038,20 @@ func (r *ActorsRoutes) deleteLabel(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	labelKey := gctx.Param("label")
 	if labelKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("label key is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("label key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1400,11 +1066,7 @@ func (r *ActorsRoutes) deleteLabel(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1417,7 +1079,7 @@ func (r *ActorsRoutes) deleteLabel(gctx *gin.Context) {
 	}
 
 	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
-		httpErr.WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httpErr)
 		return
 	}
 
@@ -1430,11 +1092,7 @@ func (r *ActorsRoutes) deleteLabel(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1461,22 +1119,13 @@ func (r *ActorsRoutes) getAnnotations(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1484,36 +1133,24 @@ func (r *ActorsRoutes) getAnnotations(gctx *gin.Context) {
 	actor, err := r.db.GetActor(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("actor not found").
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if actor == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("actor not found").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
-		httpErr.WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httpErr)
 		return
 	}
 
@@ -1545,33 +1182,20 @@ func (r *ActorsRoutes) getAnnotation(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	annotationKey := gctx.Param("annotation")
 	if annotationKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("annotation key is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("annotation key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1579,47 +1203,31 @@ func (r *ActorsRoutes) getAnnotation(gctx *gin.Context) {
 	actor, err := r.db.GetActor(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("actor not found").
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if actor == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("actor not found").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
-		httpErr.WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httpErr)
 		return
 	}
 
 	annotations := actor.GetAnnotations()
 	value, exists := annotations[annotationKey]
 	if !exists {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("annotation '%s' not found", annotationKey).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.NotFoundf("annotation '%s' not found", annotationKey))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1652,57 +1260,34 @@ func (r *ActorsRoutes) putAnnotation(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	annotationKey := gctx.Param("annotation")
 	if annotationKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("annotation key is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("annotation key is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	// Validate annotation key
 	if err := database.ValidateAnnotationKey(annotationKey); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid annotation key: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest(fmt.Sprintf("invalid annotation key: %s", err.Error()), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req PutActorAnnotationRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1711,36 +1296,24 @@ func (r *ActorsRoutes) putAnnotation(gctx *gin.Context) {
 	actor, err := r.db.GetActor(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("actor not found").
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if actor == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("actor not found").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
-		httpErr.WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httpErr)
 		return
 	}
 
@@ -1748,20 +1321,12 @@ func (r *ActorsRoutes) putAnnotation(gctx *gin.Context) {
 	updatedActor, err := r.db.PutActorAnnotations(ctx, id, map[string]string{annotationKey: req.Value})
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("actor not found").
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.NotFound("actor not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1792,33 +1357,20 @@ func (r *ActorsRoutes) deleteAnnotation(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	annotationKey := gctx.Param("annotation")
 	if annotationKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("annotation key is required").
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequest("annotation key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1833,11 +1385,7 @@ func (r *ActorsRoutes) deleteAnnotation(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1850,7 +1398,7 @@ func (r *ActorsRoutes) deleteAnnotation(gctx *gin.Context) {
 	}
 
 	if httpErr := val.ValidateHttpStatusError(actor); httpErr != nil {
-		httpErr.WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httpErr)
 		return
 	}
 
@@ -1863,11 +1411,7 @@ func (r *ActorsRoutes) deleteAnnotation(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}

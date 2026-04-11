@@ -9,7 +9,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/httperr"
 )
 
 // GetAuthFromGinContext returns auth info from a request. This auth info can be authenticated or unauthenticated.
@@ -77,9 +77,7 @@ func (j *service) requiredWithPostValidation(validators []AuthValidator, postVal
 
 			// This check is duplicative of the one in Auth, but it's here for clarity.
 			if !a.IsAuthenticated() {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusUnauthorized().
-					BuildStatusError().
+				httperr.Unauthorized().
 					WriteResponse(r.Context(), nil, w)
 				c.Abort()
 				return
@@ -88,10 +86,7 @@ func (j *service) requiredWithPostValidation(validators []AuthValidator, postVal
 			combinedValidators := combineAuthValidators(j.defaultAuthValidators, validators)
 			valid, reason := validateAllAuthValidators(combinedValidators, c, a)
 			if !valid {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusForbidden().
-					WithResponseMsg(reason).
-					BuildStatusError().
+				httperr.Forbidden(reason).
 					WriteResponse(r.Context(), nil, w)
 				c.Abort()
 				return
@@ -119,10 +114,7 @@ func (j *service) Optional(validators ...AuthValidator) gin.HandlerFunc {
 				combinedValidators := combineAuthValidators(j.defaultAuthValidators, validators)
 				valid, reason := validateAllAuthValidators(combinedValidators, c, a)
 				if !valid {
-					api_common.NewHttpStatusErrorBuilder().
-						WithStatusForbidden().
-						WithResponseMsg(reason).
-						BuildStatusError().
+					httperr.Forbidden(reason).
 						WriteResponse(r.Context(), nil, w)
 					c.Abort()
 					return
@@ -147,10 +139,7 @@ func (j *service) OptionalXsrfNotRequired(validators ...AuthValidator) gin.Handl
 				combinedValidators := combineAuthValidators(j.defaultAuthValidators, validators)
 				valid, reason := validateAllAuthValidators(combinedValidators, c, a)
 				if !valid {
-					api_common.NewHttpStatusErrorBuilder().
-						WithStatusForbidden().
-						WithResponseMsg(reason).
-						BuildStatusError().
+					httperr.Forbidden(reason).
 						WriteResponse(r.Context(), nil, w)
 					c.Abort()
 					return

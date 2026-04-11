@@ -3,13 +3,11 @@ package core
 import (
 	"context"
 	"encoding/json"
-	"fmt"
-	"net/http"
 
 	"github.com/rmorlok/authproxy/internal/apauth/core"
-	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
@@ -20,94 +18,61 @@ import (
 func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionRequest) (iface.InitiateConnectionResponse, error) {
 	setupStep := c.GetSetupStep()
 	if setupStep == nil {
-		return nil, api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("connection has no active setup step").
-			BuildStatusError()
+		return nil, httperr.BadRequest("connection has no active setup step")
 	}
 
 	connector := c.cv.GetDefinition()
 	if connector.SetupFlow == nil {
-		return nil, api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("connector has no setup flow").
-			BuildStatusError()
+		return nil, httperr.BadRequest("connector has no setup flow")
 	}
 
 	phase, _, err := cschema.ParseSetupStep(*setupStep)
 	if err != nil {
-		return nil, api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg(fmt.Sprintf("invalid setup step: %s", err)).
-			BuildStatusError()
+		return nil, httperr.BadRequestf("invalid setup step: %s", err)
 	}
 
 	// Only preconnect and configure phases accept form submissions
 	if phase != "preconnect" && phase != "configure" {
-		return nil, api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg(fmt.Sprintf("cannot submit form for phase %q", phase)).
-			BuildStatusError()
+		return nil, httperr.BadRequestf("cannot submit form for phase %q", phase)
 	}
 
 	// Look up the current step definition
 	currentStep, _, err := connector.SetupFlow.GetStepBySetupStep(*setupStep)
 	if err != nil {
-		return nil, api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(fmt.Errorf("failed to get current step: %w", err)).
-			BuildStatusError()
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to get current step: %w", err))
 	}
 
 	// Get existing configuration to merge into
 	existingConfig, err := c.GetConfiguration(ctx)
 	if err != nil {
-		return nil, api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(fmt.Errorf("failed to get existing configuration: %w", err)).
-			BuildStatusError()
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to get existing configuration: %w", err))
 	}
 
 	// Validate step id, validate data against schema, and merge only allowed fields
 	mergedConfig, err := currentStep.ValidateAndMergeData(req.StepId, req.Data, existingConfig)
 	if err != nil {
-		return nil, api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg(err.Error()).
-			BuildStatusError()
+		return nil, httperr.BadRequest(err.Error())
 	}
 
 	if err := c.SetConfiguration(ctx, mergedConfig); err != nil {
-		return nil, api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(fmt.Errorf("failed to save configuration: %w", err)).
-			BuildStatusError()
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to save configuration: %w", err))
 	}
 
 	// Determine the next step
 	nextStep, err := connector.SetupFlow.NextSetupStep(*setupStep)
 	if err != nil {
-		return nil, api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(fmt.Errorf("failed to determine next step: %w", err)).
-			BuildStatusError()
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to determine next step: %w", err))
 	}
 
 	// Handle each possible next step
 	if nextStep == "" {
 		// Flow complete
 		if err := c.SetSetupStep(ctx, nil); err != nil {
-			return nil, api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
-				WithInternalErr(fmt.Errorf("failed to clear setup step: %w", err)).
-				BuildStatusError()
+			return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to clear setup step: %w", err))
 		}
 
 		if err := c.SetState(ctx, database.ConnectionStateReady); err != nil {
-			return nil, api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
-				WithInternalErr(fmt.Errorf("failed to set connection state to ready: %w", err)).
-				BuildStatusError()
+			return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to set connection state to ready: %w", err))
 		}
 
 		return &iface.InitiateConnectionComplete{
@@ -128,42 +93,27 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 // initiateAuthStep starts the OAuth flow after preconnect steps are complete.
 func (c *connection) initiateAuthStep(ctx context.Context, returnToUrl string, connector *cschema.Connector) (iface.InitiateConnectionResponse, error) {
 	if returnToUrl == "" {
-		return nil, api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("return_to_url is required for auth step").
-			BuildStatusError()
+		return nil, httperr.BadRequest("return_to_url is required for auth step")
 	}
 
 	if connector.Auth == nil {
-		return nil, api_common.NewHttpStatusErrorBuilder().
-			WithStatus(http.StatusInternalServerError).
-			WithResponseMsg("connector has no auth configuration").
-			BuildStatusError()
+		return nil, httperr.InternalServerErrorMsg("connector has no auth configuration")
 	}
 
 	if _, ok := connector.Auth.Inner().(*config.AuthOAuth2); !ok {
-		return nil, api_common.NewHttpStatusErrorBuilder().
-			WithStatus(http.StatusInternalServerError).
-			WithResponseMsg("unsupported connector auth type for setup flow").
-			BuildStatusError()
+		return nil, httperr.InternalServerErrorMsg("unsupported connector auth type for setup flow")
 	}
 
 	authStep := "auth"
 	if err := c.SetSetupStep(ctx, &authStep); err != nil {
-		return nil, api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(fmt.Errorf("failed to set setup step to auth: %w", err)).
-			BuildStatusError()
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to set setup step to auth: %w", err))
 	}
 
 	ra := core.GetAuthFromContext(ctx)
 	o2 := c.s.getOAuth2Factory().NewOAuth2(c)
 	url, err := o2.SetStateAndGeneratePublicUrl(ctx, ra.MustGetActor(), returnToUrl)
 	if err != nil {
-		return nil, api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(fmt.Errorf("failed to generate OAuth redirect URL: %w", err)).
-			BuildStatusError()
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to generate OAuth redirect URL: %w", err))
 	}
 
 	return &iface.InitiateConnectionRedirect{
@@ -177,17 +127,11 @@ func (c *connection) initiateAuthStep(ctx context.Context, returnToUrl string, c
 func (c *connection) buildFormResponse(ctx context.Context, setupStep string, sf *cschema.SetupFlow) (iface.InitiateConnectionResponse, error) {
 	step, globalIndex, err := sf.GetStepBySetupStep(setupStep)
 	if err != nil {
-		return nil, api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(fmt.Errorf("failed to get step definition: %w", err)).
-			BuildStatusError()
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to get step definition: %w", err))
 	}
 
 	if err := c.SetSetupStep(ctx, &setupStep); err != nil {
-		return nil, api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(fmt.Errorf("failed to update setup step: %w", err)).
-			BuildStatusError()
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to update setup step: %w", err))
 	}
 
 	return &iface.InitiateConnectionForm{
@@ -224,10 +168,7 @@ func (c *connection) GetCurrentSetupStepResponse(ctx context.Context) (iface.Ini
 
 	phase, _, err := cschema.ParseSetupStep(*setupStep)
 	if err != nil {
-		return nil, api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg(fmt.Sprintf("invalid setup step: %s", err)).
-			BuildStatusError()
+		return nil, httperr.BadRequestf("invalid setup step: %s", err)
 	}
 
 	if phase == "auth" {

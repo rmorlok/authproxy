@@ -12,7 +12,7 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	authSync "github.com/rmorlok/authproxy/internal/apauth/tasks"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/config"
@@ -31,7 +31,7 @@ func Serve(cfg config.C) {
 	}
 
 	workerConfig := cfg.GetRoot().Worker
-	router := api_common.GinForService(&workerConfig, logger, cfg.IsDebugMode())
+	router := apgin.ForService(&workerConfig, logger, cfg.IsDebugMode())
 
 	router.GET("/ping", func(c *gin.Context) {
 		c.PureJSON(http.StatusOK, gin.H{
@@ -183,7 +183,7 @@ func Serve(cfg config.C) {
 			Addr:    fmt.Sprintf(":%d", workerConfig.HealthCheckPort()),
 			Handler: router,
 		}
-		if err := api_common.RunServer(httpServer, logger); err != nil {
+		if err := apgin.RunServer(httpServer, logger); err != nil {
 			log.Fatalf("could not run gin server: %v", err)
 		}
 		logger.Info("Gin shutdown complete")

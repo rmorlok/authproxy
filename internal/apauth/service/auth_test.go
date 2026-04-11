@@ -17,7 +17,8 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apauth/jwt"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apgin"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	apredis2 "github.com/rmorlok/authproxy/internal/apredis"
@@ -406,7 +407,7 @@ func (ts *TestSetup) Request(ctx context.Context, method string, path string, bo
 	}
 
 	// Return the response actor and HTTP status code
-	return responseJson, w.Code, w.Header().Get(api_common.DebugHeader)
+	return responseJson, w.Code, w.Header().Get(httperr.DebugHeader)
 }
 func (ts *TestSetup) PostWithSigner(ctx context.Context, path string, body gin.H, sign func(req *http.Request)) (responseJson gin.H, statusCode int, debugHeader string) {
 	// Convert the body into a JSON reader
@@ -431,7 +432,7 @@ func (ts *TestSetup) PostWithSigner(ctx context.Context, path string, body gin.H
 	}
 
 	// Return the response actor and HTTP status code
-	return responseJson, w.Code, w.Header().Get(api_common.DebugHeader)
+	return responseJson, w.Code, w.Header().Get(httperr.DebugHeader)
 }
 
 // MustGetInvalidActorWithKey gives an actor that cannot be used to sign JWTs as it is not listed in the config
@@ -893,10 +894,7 @@ func TestAuth(t *testing.T) {
 					ra := GetAuthFromGinContext(gctx)
 					err := auth.EstablishGinSession(gctx, ra)
 					if err != nil {
-						api_common.NewHttpStatusErrorBuilder().
-							WithInternalErr(err).
-							BuildStatusError().
-							WriteGinResponse(nil, gctx)
+						apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 						return
 					}
 
@@ -906,10 +904,7 @@ func TestAuth(t *testing.T) {
 					ra := GetAuthFromGinContext(gctx)
 					err := auth.EndGinSession(gctx, ra)
 					if err != nil {
-						api_common.NewHttpStatusErrorBuilder().
-							WithInternalErr(err).
-							BuildStatusError().
-							WriteGinResponse(nil, gctx)
+						apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 						return
 					}
 
@@ -1010,10 +1005,7 @@ func TestAuth(t *testing.T) {
 					if ra.IsAuthenticated() {
 						err := auth.EstablishGinSession(gctx, ra)
 						if err != nil {
-							api_common.NewHttpStatusErrorBuilder().
-								WithInternalErr(err).
-								BuildStatusError().
-								WriteGinResponse(nil, gctx)
+							apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 							return
 						}
 
@@ -1027,10 +1019,7 @@ func TestAuth(t *testing.T) {
 					if ra.IsAuthenticated() {
 						err := auth.EndGinSession(gctx, ra)
 						if err != nil {
-							api_common.NewHttpStatusErrorBuilder().
-								WithInternalErr(err).
-								BuildStatusError().
-								WriteGinResponse(nil, gctx)
+							apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 							return
 						}
 
@@ -1195,10 +1184,7 @@ func TestAuth(t *testing.T) {
 					ra := GetAuthFromGinContext(gctx)
 					err := auth.EstablishGinSession(gctx, ra)
 					if err != nil {
-						api_common.NewHttpStatusErrorBuilder().
-							WithInternalErr(err).
-							BuildStatusError().
-							WriteGinResponse(nil, gctx)
+						apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 						return
 					}
 					gctx.PureJSON(http.StatusOK, gin.H{"ok": true})

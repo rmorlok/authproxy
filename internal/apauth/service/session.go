@@ -13,7 +13,7 @@ import (
 	"github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/schema/config"
@@ -192,11 +192,7 @@ func (s *service) establishAuthFromSession(
 		if requireSessionXsrf && r.Method != http.MethodGet {
 			xsrfTokenHeader := r.Header.Get(xsrfHeaderKey)
 			if xsrfTokenHeader == "" {
-				return core.NewUnauthenticatedRequestAuth(), api_common.
-					NewHttpStatusErrorBuilder().
-					WithStatusForbidden().
-					WithResponseMsg("missing XSRF token").
-					Build()
+				return core.NewUnauthenticatedRequestAuth(), httperr.Forbidden("missing XSRF token")
 			}
 
 			isValidXsrf := false
@@ -210,10 +206,7 @@ func (s *service) establishAuthFromSession(
 			}
 
 			if !isValidXsrf {
-				return core.NewUnauthenticatedRequestAuth(), api_common.NewHttpStatusErrorBuilder().
-					WithStatusForbidden().
-					WithResponseMsg("invalid XSRF token").
-					Build()
+				return core.NewUnauthenticatedRequestAuth(), httperr.Forbidden("invalid XSRF token")
 			}
 		}
 	}

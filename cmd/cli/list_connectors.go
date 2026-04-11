@@ -6,7 +6,7 @@ import (
 
 	"github.com/go-resty/resty/v2"
 	"github.com/rmorlok/authproxy/cmd/cli/config"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	routes2 "github.com/rmorlok/authproxy/internal/routes"
 	"github.com/spf13/cobra"
 )
@@ -44,7 +44,7 @@ func cmdListConnectors() *cobra.Command {
 			client := resty.New()
 
 			var response routes2.ListConnectorsResponseJson
-			var apiErr api_common.ErrorResponse
+			var apiErr httperr.ErrorResponse
 			var resp *resty.Response
 
 			req := signer.SignRestyRequest(client.R()).

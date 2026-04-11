@@ -8,8 +8,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	connIface "github.com/rmorlok/authproxy/internal/core/iface"
@@ -195,32 +196,20 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -232,21 +221,13 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 		FetchPage(ctx)
 
 	if result.Error != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(result.Error).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(result.Error)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if len(result.Results) == 0 {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("connector '%s' not found", connectorId).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
 		val.MarkErrorReturn()
 		return
 	}
@@ -254,7 +235,7 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 	c := result.Results[0]
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -284,12 +265,7 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 
 	var req ListConnectorsRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg(err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -300,12 +276,7 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 	if req.Cursor != nil {
 		ex, err = r.connectors.ListConnectorsFromCursor(ctx, *req.Cursor)
 		if err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				WithResponseMsg("failed to list core from cursor").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err), httperr.WithResponseMsg("failed to list core from cursor")))
 			val.MarkErrorReturn()
 			return
 		}
@@ -329,22 +300,13 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 		if req.OrderByVal != nil {
 			field, order, err := pagination.SplitOrderByParam[database.ConnectorOrderByField](*req.OrderByVal)
 			if err != nil {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusBadRequest().
-					WithInternalErr(err).
-					WithResponseMsg(err.Error()).
-					BuildStatusError().
-					WriteGinResponse(nil, gctx)
+				apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
 
 			if !database.IsValidConnectorOrderByField(field) {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusBadRequest().
-					WithResponseMsgf("invalid sort field '%s'", field).
-					BuildStatusError().
-					WriteGinResponse(nil, gctx)
+				apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid sort field '%s'", field))
 				val.MarkErrorReturn()
 				return
 			}
@@ -358,11 +320,7 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 	result := ex.FetchPage(ctx)
 
 	if result.Error != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(result.Error).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, result.Error)
 		val.MarkErrorReturn()
 		return
 	}
@@ -394,32 +352,20 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 	connectorIdStr := gctx.Param("id")
 
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -432,22 +378,14 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 	versionStr := gctx.Param("version")
 
 	if versionStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("version is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	version, err := strconv.ParseUint(versionStr, 10, 64)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("failed to parse version as an integer").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -458,21 +396,13 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 
 	result := b.FetchPage(ctx)
 	if result.Error != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(result.Error).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(result.Error)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if len(result.Results) == 0 {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("connector version '%s:%d' not found", connectorId, version).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
 		val.MarkErrorReturn()
 		return
 	}
@@ -480,7 +410,7 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 	cv := result.Results[0]
 
 	if httpErr := val.ValidateHttpStatusError(cv); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -515,44 +445,27 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 	connectorIdStr := gctx.Param("id")
 
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req ListConnectorVersionsRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg(err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -569,12 +482,7 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 	if req.Cursor != nil {
 		ex, err = r.connectors.ListConnectorVersionsFromCursor(ctx, *req.Cursor)
 		if err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				WithResponseMsg("failed to list connector versions from cursor").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err), httperr.WithResponseMsg("failed to list connector versions from cursor")))
 			val.MarkErrorReturn()
 			return
 		}
@@ -605,22 +513,13 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 		if req.OrderByVal != nil {
 			field, order, err := pagination.SplitOrderByParam[database.ConnectorVersionOrderByField](*req.OrderByVal)
 			if err != nil {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusBadRequest().
-					WithInternalErr(err).
-					WithResponseMsg(err.Error()).
-					BuildStatusError().
-					WriteGinResponse(nil, gctx)
+				apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
 
 			if !database.IsValidConnectorVersionOrderByField(field) {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusBadRequest().
-					WithResponseMsgf("invalid sort field '%s'", field).
-					BuildStatusError().
-					WriteGinResponse(nil, gctx)
+				apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid sort field '%s'", field))
 				val.MarkErrorReturn()
 				return
 			}
@@ -634,11 +533,7 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 	result := ex.FetchPage(ctx)
 
 	if result.Error != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(result.Error).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, result.Error)
 		val.MarkErrorReturn()
 		return
 	}
@@ -668,76 +563,43 @@ func (r *ConnectorsRoutes) createConnector(gctx *gin.Context) {
 
 	var req CreateConnectorRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg(err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := database.ValidateNamespacePath(req.Namespace); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid namespace '%s': %s", req.Namespace, err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid namespace '%s': %s", req.Namespace, err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := database.Labels(req.Labels).Validate(); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid labels: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := database.Annotations(req.Annotations).Validate(); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid annotations: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotations: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := req.Definition.Validate(&common.ValidationContext{}); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid connector definition: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid connector definition: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := val.ValidateNamespace(req.Namespace); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusForbidden().
-			WithPublicErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.Forbidden("", httperr.WithPublicErr(err)))
 		return
 	}
 
 	result, err := r.connectors.CreateConnectorVersion(ctx, req.Namespace, &req.Definition, req.Labels, req.Annotations)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -766,56 +628,34 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req UpdateConnectorRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg(err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if req.Labels != nil {
 		if err := database.Labels(*req.Labels).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid labels: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
 		}
@@ -823,12 +663,7 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 
 	if req.Annotations != nil {
 		if err := database.Annotations(*req.Annotations).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid annotations: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotations: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
 		}
@@ -837,25 +672,17 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 	draft, err := r.connectors.GetOrCreateDraftConnectorVersion(ctx, connectorId)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("connector '%s' not found", connectorId).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
 			val.MarkErrorReturn()
 			return
 		}
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(draft); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -867,12 +694,7 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 	}
 
 	if err := def.Validate(&common.ValidationContext{}); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid connector definition: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid connector definition: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
@@ -893,11 +715,7 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 
 	result, err := r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, draft.GetVersion(), def, labels, annotations)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -927,32 +745,20 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -965,28 +771,20 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 		FetchPage(ctx)
 
 	if connectorResult.Error != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(connectorResult.Error).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(connectorResult.Error)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if len(connectorResult.Results) == 0 {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("connector '%s' not found", connectorId).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connector := connectorResult.Results[0]
 	if httpErr := val.ValidateHttpStatusError(connector); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -994,12 +792,7 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 	// Support a blank post to create a new draft version of the connector
 	if gctx.Request.ContentLength > 0 {
 		if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsg(err.Error()).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -1007,12 +800,7 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 
 	if req.Definition != nil {
 		if err := req.Definition.Validate(&common.ValidationContext{}); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid connector definition: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid connector definition: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
 		}
@@ -1022,12 +810,7 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 	if req.Labels != nil {
 		labels = *req.Labels
 		if err := database.Labels(labels).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid labels: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
 		}
@@ -1037,12 +820,7 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 	if req.Annotations != nil {
 		annotations = *req.Annotations
 		if err := database.Annotations(annotations).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid annotations: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotations: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
 		}
@@ -1051,28 +829,16 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 	result, err := r.connectors.CreateDraftConnectorVersion(ctx, connectorId, req.Definition, labels, annotations)
 	if err != nil {
 		if errors.Is(err, core.ErrDraftAlreadyExists) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatus(http.StatusConflict).
-				WithResponseMsg("a draft version already exists for this connector").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.Conflict("a draft version already exists for this connector"))
 			val.MarkErrorReturn()
 			return
 		}
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("connector '%s' not found", connectorId).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
 			val.MarkErrorReturn()
 			return
 		}
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1103,78 +869,48 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	versionStr := gctx.Param("version")
 	if versionStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("version is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	version, err := strconv.ParseUint(versionStr, 10, 64)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("failed to parse version as an integer").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req UpdateConnectorRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg(err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if req.Labels != nil {
 		if err := database.Labels(*req.Labels).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid labels: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
 		}
@@ -1182,12 +918,7 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 
 	if req.Annotations != nil {
 		if err := database.Annotations(*req.Annotations).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid annotations: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotations: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
 		}
@@ -1196,34 +927,22 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 	existing, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("connector version '%s:%d' not found", connectorId, version).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
 			val.MarkErrorReturn()
 			return
 		}
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(existing); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	if existing.GetState() != database.ConnectorVersionStateDraft {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatus(http.StatusConflict).
-			WithResponseMsgf("connector version '%s:%d' is not a draft", connectorId, version).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.Conflictf("connector version '%s:%d' is not a draft", connectorId, version))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1236,12 +955,7 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 	}
 
 	if err := def.Validate(&common.ValidationContext{}); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid connector definition: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid connector definition: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1263,19 +977,11 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 	result, err := r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, version, def, labels, annotations)
 	if err != nil {
 		if errors.Is(err, core.ErrNotDraft) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatus(http.StatusConflict).
-				WithResponseMsgf("connector version '%s:%d' is not a draft", connectorId, version).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.Conflictf("connector version '%s:%d' is not a draft", connectorId, version))
 			val.MarkErrorReturn()
 			return
 		}
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1302,32 +1008,20 @@ func (r *ConnectorsRoutes) getLabels(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1339,21 +1033,13 @@ func (r *ConnectorsRoutes) getLabels(gctx *gin.Context) {
 		FetchPage(ctx)
 
 	if result.Error != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(result.Error).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(result.Error)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if len(result.Results) == 0 {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("connector '%s' not found", connectorId).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1361,7 +1047,7 @@ func (r *ConnectorsRoutes) getLabels(gctx *gin.Context) {
 	c := result.Results[0]
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -1393,43 +1079,27 @@ func (r *ConnectorsRoutes) getLabel(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	labelKey := gctx.Param("label")
 	if labelKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("label key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1441,21 +1111,13 @@ func (r *ConnectorsRoutes) getLabel(gctx *gin.Context) {
 		FetchPage(ctx)
 
 	if result.Error != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(result.Error).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(result.Error)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if len(result.Results) == 0 {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("connector '%s' not found", connectorId).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1463,18 +1125,14 @@ func (r *ConnectorsRoutes) getLabel(gctx *gin.Context) {
 	c := result.Results[0]
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	labels := c.GetLabels()
 	value, exists := labels[labelKey]
 	if !exists {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("label '%s' not found", labelKey).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("label '%s' not found", labelKey))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1507,77 +1165,46 @@ func (r *ConnectorsRoutes) putLabel(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	labelKey := gctx.Param("label")
 	if labelKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("label key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := database.ValidateLabelKey(labelKey); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid label key: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid label key: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req PutConnectorLabelRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := database.ValidateLabelValue(req.Value); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid label value: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid label value: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1585,25 +1212,17 @@ func (r *ConnectorsRoutes) putLabel(gctx *gin.Context) {
 	draft, err := r.connectors.GetOrCreateDraftConnectorVersion(ctx, connectorId)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("connector '%s' not found", connectorId).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
 			val.MarkErrorReturn()
 			return
 		}
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(draft); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -1615,11 +1234,7 @@ func (r *ConnectorsRoutes) putLabel(gctx *gin.Context) {
 
 	_, err = r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, draft.GetVersion(), draft.GetDefinition(), labels, draft.GetAnnotations())
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1650,43 +1265,27 @@ func (r *ConnectorsRoutes) deleteLabel(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	labelKey := gctx.Param("label")
 	if labelKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("label key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1698,17 +1297,13 @@ func (r *ConnectorsRoutes) deleteLabel(gctx *gin.Context) {
 			val.MarkValidated()
 			return
 		}
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(draft); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -1720,11 +1315,7 @@ func (r *ConnectorsRoutes) deleteLabel(gctx *gin.Context) {
 
 	_, err = r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, draft.GetVersion(), draft.GetDefinition(), labels, draft.GetAnnotations())
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -1752,54 +1343,34 @@ func (r *ConnectorsRoutes) getVersionLabels(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	versionStr := gctx.Param("version")
 	if versionStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("version is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	version, err := strconv.ParseUint(versionStr, 10, 64)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("failed to parse version as an integer").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1807,25 +1378,17 @@ func (r *ConnectorsRoutes) getVersionLabels(gctx *gin.Context) {
 	cv, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("connector version '%s:%d' not found", connectorId, version).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
 			val.MarkErrorReturn()
 			return
 		}
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(cv); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -1858,65 +1421,41 @@ func (r *ConnectorsRoutes) getVersionLabel(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	versionStr := gctx.Param("version")
 	if versionStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("version is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	version, err := strconv.ParseUint(versionStr, 10, 64)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("failed to parse version as an integer").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	labelKey := gctx.Param("label")
 	if labelKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("label key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1924,36 +1463,24 @@ func (r *ConnectorsRoutes) getVersionLabel(gctx *gin.Context) {
 	cv, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("connector version '%s:%d' not found", connectorId, version).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
 			val.MarkErrorReturn()
 			return
 		}
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(cv); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	labels := cv.GetLabels()
 	value, exists := labels[labelKey]
 	if !exists {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("label '%s' not found", labelKey).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("label '%s' not found", labelKey))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1988,99 +1515,60 @@ func (r *ConnectorsRoutes) putVersionLabel(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	versionStr := gctx.Param("version")
 	if versionStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("version is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	version, err := strconv.ParseUint(versionStr, 10, 64)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("failed to parse version as an integer").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	labelKey := gctx.Param("label")
 	if labelKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("label key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := database.ValidateLabelKey(labelKey); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid label key: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid label key: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req PutConnectorLabelRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := database.ValidateLabelValue(req.Value); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid label value: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid label value: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
@@ -2088,34 +1576,22 @@ func (r *ConnectorsRoutes) putVersionLabel(gctx *gin.Context) {
 	existing, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("connector version '%s:%d' not found", connectorId, version).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
 			val.MarkErrorReturn()
 			return
 		}
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(existing); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	if existing.GetState() != database.ConnectorVersionStateDraft {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatus(http.StatusConflict).
-			WithResponseMsgf("connector version '%s:%d' is not a draft", connectorId, version).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.Conflictf("connector version '%s:%d' is not a draft", connectorId, version))
 		val.MarkErrorReturn()
 		return
 	}
@@ -2128,11 +1604,7 @@ func (r *ConnectorsRoutes) putVersionLabel(gctx *gin.Context) {
 
 	_, err = r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, version, existing.GetDefinition(), labels, existing.GetAnnotations())
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -2165,65 +1637,41 @@ func (r *ConnectorsRoutes) deleteVersionLabel(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	versionStr := gctx.Param("version")
 	if versionStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("version is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	version, err := strconv.ParseUint(versionStr, 10, 64)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("failed to parse version as an integer").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	labelKey := gctx.Param("label")
 	if labelKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("label key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -2235,26 +1683,18 @@ func (r *ConnectorsRoutes) deleteVersionLabel(gctx *gin.Context) {
 			val.MarkValidated()
 			return
 		}
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(existing); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	if existing.GetState() != database.ConnectorVersionStateDraft {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatus(http.StatusConflict).
-			WithResponseMsgf("connector version '%s:%d' is not a draft", connectorId, version).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.Conflictf("connector version '%s:%d' is not a draft", connectorId, version))
 		val.MarkErrorReturn()
 		return
 	}
@@ -2267,11 +1707,7 @@ func (r *ConnectorsRoutes) deleteVersionLabel(gctx *gin.Context) {
 
 	_, err = r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, version, existing.GetDefinition(), labels, existing.GetAnnotations())
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -2305,54 +1741,34 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	versionStr := gctx.Param("version")
 	if versionStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("version is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	version, err := strconv.ParseUint(versionStr, 10, 64)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("failed to parse version as an integer").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -2360,31 +1776,19 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 	req := ForceConnectorVersionStateRequestJson{}
 	err = gctx.BindJSON(&req)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if req.State == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("state is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("state is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if !database.IsValidConnectorVersionState(req.State) {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsgf("invalid connector version state '%s'", req.State).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid connector version state '%s'", req.State))
 		val.MarkErrorReturn()
 		return
 	}
@@ -2392,26 +1796,18 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 	cv, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("connector version '%s:%d' not found", connectorId, version).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(cv); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -2422,11 +1818,7 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 
 	err = cv.SetState(ctx, req.State)
 	if err != nil {
-		api_common.HttpStatusErrorBuilderFromError(err).
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.FromError(err))
 		val.MarkErrorReturn()
 		return
 	}
@@ -2453,32 +1845,20 @@ func (r *ConnectorsRoutes) getAnnotations(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -2490,21 +1870,13 @@ func (r *ConnectorsRoutes) getAnnotations(gctx *gin.Context) {
 		FetchPage(ctx)
 
 	if result.Error != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(result.Error).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(result.Error)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if len(result.Results) == 0 {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("connector '%s' not found", connectorId).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
 		val.MarkErrorReturn()
 		return
 	}
@@ -2512,7 +1884,7 @@ func (r *ConnectorsRoutes) getAnnotations(gctx *gin.Context) {
 	c := result.Results[0]
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -2544,43 +1916,27 @@ func (r *ConnectorsRoutes) getAnnotation(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	annotationKey := gctx.Param("annotation")
 	if annotationKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("annotation key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -2592,21 +1948,13 @@ func (r *ConnectorsRoutes) getAnnotation(gctx *gin.Context) {
 		FetchPage(ctx)
 
 	if result.Error != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(result.Error).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(result.Error)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if len(result.Results) == 0 {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("connector '%s' not found", connectorId).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
 		val.MarkErrorReturn()
 		return
 	}
@@ -2614,18 +1962,14 @@ func (r *ConnectorsRoutes) getAnnotation(gctx *gin.Context) {
 	c := result.Results[0]
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	annotations := c.GetAnnotations()
 	value, exists := annotations[annotationKey]
 	if !exists {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("annotation '%s' not found", annotationKey).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("annotation '%s' not found", annotationKey))
 		val.MarkErrorReturn()
 		return
 	}
@@ -2658,67 +2002,41 @@ func (r *ConnectorsRoutes) putAnnotation(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	annotationKey := gctx.Param("annotation")
 	if annotationKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("annotation key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	// Validate annotation key (same rules as label keys)
 	if err := database.ValidateAnnotationKey(annotationKey); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid annotation key: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotation key: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req PutConnectorAnnotationRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -2726,25 +2044,17 @@ func (r *ConnectorsRoutes) putAnnotation(gctx *gin.Context) {
 	draft, err := r.connectors.GetOrCreateDraftConnectorVersion(ctx, connectorId)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("connector '%s' not found", connectorId).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
 			val.MarkErrorReturn()
 			return
 		}
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(draft); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -2756,11 +2066,7 @@ func (r *ConnectorsRoutes) putAnnotation(gctx *gin.Context) {
 
 	_, err = r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, draft.GetVersion(), draft.GetDefinition(), draft.GetLabels(), annotations)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -2791,43 +2097,27 @@ func (r *ConnectorsRoutes) deleteAnnotation(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	annotationKey := gctx.Param("annotation")
 	if annotationKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("annotation key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -2839,17 +2129,13 @@ func (r *ConnectorsRoutes) deleteAnnotation(gctx *gin.Context) {
 			val.MarkValidated()
 			return
 		}
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(draft); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -2861,11 +2147,7 @@ func (r *ConnectorsRoutes) deleteAnnotation(gctx *gin.Context) {
 
 	_, err = r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, draft.GetVersion(), draft.GetDefinition(), draft.GetLabels(), annotations)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -2893,54 +2175,34 @@ func (r *ConnectorsRoutes) getVersionAnnotations(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	versionStr := gctx.Param("version")
 	if versionStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("version is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	version, err := strconv.ParseUint(versionStr, 10, 64)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("failed to parse version as an integer").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -2948,25 +2210,17 @@ func (r *ConnectorsRoutes) getVersionAnnotations(gctx *gin.Context) {
 	existing, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("connector version '%s:%d' not found", connectorId, version).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
 			val.MarkErrorReturn()
 			return
 		}
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(existing); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -2999,65 +2253,41 @@ func (r *ConnectorsRoutes) getVersionAnnotation(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	versionStr := gctx.Param("version")
 	if versionStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("version is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	version, err := strconv.ParseUint(versionStr, 10, 64)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("failed to parse version as an integer").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	annotationKey := gctx.Param("annotation")
 	if annotationKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("annotation key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -3065,36 +2295,24 @@ func (r *ConnectorsRoutes) getVersionAnnotation(gctx *gin.Context) {
 	existing, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("connector version '%s:%d' not found", connectorId, version).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
 			val.MarkErrorReturn()
 			return
 		}
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(existing); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	annotations := existing.GetAnnotations()
 	value, exists := annotations[annotationKey]
 	if !exists {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("annotation '%s' not found", annotationKey).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("annotation '%s' not found", annotationKey))
 		val.MarkErrorReturn()
 		return
 	}
@@ -3129,88 +2347,54 @@ func (r *ConnectorsRoutes) putVersionAnnotation(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	versionStr := gctx.Param("version")
 	if versionStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("version is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	version, err := strconv.ParseUint(versionStr, 10, 64)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("failed to parse version as an integer").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	annotationKey := gctx.Param("annotation")
 	if annotationKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("annotation key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := database.ValidateAnnotationKey(annotationKey); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid annotation key: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotation key: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req PutConnectorAnnotationRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -3218,34 +2402,22 @@ func (r *ConnectorsRoutes) putVersionAnnotation(gctx *gin.Context) {
 	existing, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("connector version '%s:%d' not found", connectorId, version).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
 			val.MarkErrorReturn()
 			return
 		}
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(existing); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	if existing.GetState() != database.ConnectorVersionStateDraft {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatus(http.StatusConflict).
-			WithResponseMsgf("connector version '%s:%d' is not a draft", connectorId, version).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.Conflictf("connector version '%s:%d' is not a draft", connectorId, version))
 		val.MarkErrorReturn()
 		return
 	}
@@ -3258,11 +2430,7 @@ func (r *ConnectorsRoutes) putVersionAnnotation(gctx *gin.Context) {
 
 	_, err = r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, version, existing.GetDefinition(), existing.GetLabels(), annotations)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -3295,65 +2463,41 @@ func (r *ConnectorsRoutes) deleteVersionAnnotation(gctx *gin.Context) {
 
 	connectorIdStr := gctx.Param("id")
 	if connectorIdStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	connectorId, err := apid.Parse(connectorIdStr)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if connectorId == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	versionStr := gctx.Param("version")
 	if versionStr == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("version is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	version, err := strconv.ParseUint(versionStr, 10, 64)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("failed to parse version as an integer").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	annotationKey := gctx.Param("annotation")
 	if annotationKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("annotation key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -3365,26 +2509,18 @@ func (r *ConnectorsRoutes) deleteVersionAnnotation(gctx *gin.Context) {
 			val.MarkValidated()
 			return
 		}
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(existing); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	if existing.GetState() != database.ConnectorVersionStateDraft {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatus(http.StatusConflict).
-			WithResponseMsgf("connector version '%s:%d' is not a draft", connectorId, version).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.Conflictf("connector version '%s:%d' is not a draft", connectorId, version))
 		val.MarkErrorReturn()
 		return
 	}
@@ -3397,11 +2533,7 @@ func (r *ConnectorsRoutes) deleteVersionAnnotation(gctx *gin.Context) {
 
 	_, err = r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, version, existing.GetDefinition(), existing.GetLabels(), annotations)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}

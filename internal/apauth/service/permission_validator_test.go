@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -565,7 +566,7 @@ func TestValidatorOnRoutes(t *testing.T) {
 			val := MustGetValidatorFromGinContext(gctx)
 			httpErr := val.ValidateHttpStatusError(fm)
 			if httpErr != nil {
-				httpErr.WriteGinResponse(nil, gctx)
+				apgin.WriteError(gctx, nil, httpErr)
 				return
 			}
 

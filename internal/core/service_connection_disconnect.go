@@ -6,7 +6,7 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/tasks"
@@ -21,10 +21,7 @@ func (s *service) DisconnectConnection(
 	if err != nil {
 		if errors.Is(database.ErrNotFound, err) {
 			// Default the error type to a 404 error
-			return nil, api_common.
-				HttpStatusErrorBuilderFromError(err).
-				WithStatusNotFound().
-				Build()
+			return nil, httperr.NotFound("", httperr.WithInternalErr(err))
 		}
 
 		return nil, err

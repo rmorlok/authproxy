@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apgin"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
@@ -49,7 +49,7 @@ func TestTasks(t *testing.T) {
 
 		tr := NewTaskRoutes(cfg, auth, e, mockInspector)
 
-		r := api_common.GinForTest(nil)
+		r := apgin.ForTest(nil)
 		tr.Register(r)
 
 		return &TestSetup{

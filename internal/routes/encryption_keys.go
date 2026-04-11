@@ -2,13 +2,15 @@ package routes
 
 import (
 	"errors"
+	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
-	"github.com/rmorlok/authproxy/internal/api_common"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
@@ -111,11 +113,7 @@ func (r *EncryptionKeysRoutes) get(gctx *gin.Context) {
 	id := apid.ID(gctx.Param("id"))
 
 	if id.IsNil() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -123,27 +121,18 @@ func (r *EncryptionKeysRoutes) get(gctx *gin.Context) {
 	ek, err := r.core.GetEncryptionKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("encryption key '%s' not found", id).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -168,42 +157,26 @@ func (r *EncryptionKeysRoutes) create(gctx *gin.Context) {
 
 	var req CreateEncryptionKeyRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if req.Namespace == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("namespace is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("namespace is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := val.ValidateNamespace(req.Namespace); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithPublicErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	ek, err := r.core.CreateEncryptionKey(ctx, req.Namespace, req.KeyData, req.Labels)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -211,23 +184,14 @@ func (r *EncryptionKeysRoutes) create(gctx *gin.Context) {
 	// Set annotations if provided
 	if req.Annotations != nil {
 		if err := database.Annotations(req.Annotations).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid annotations: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotations: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
 		}
 
 		ek, err = r.core.UpdateEncryptionKeyAnnotations(ctx, ek.GetId(), req.Annotations)
 		if err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				DefaultStatusInternalServerError().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteErr(gctx, nil, err)
 			val.MarkErrorReturn()
 			return
 		}
@@ -259,12 +223,7 @@ func (r *EncryptionKeysRoutes) list(gctx *gin.Context) {
 
 	var req ListEncryptionKeysRequestQueryParams
 	if err := gctx.ShouldBindQuery(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg(err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -275,12 +234,7 @@ func (r *EncryptionKeysRoutes) list(gctx *gin.Context) {
 	if req.Cursor != nil {
 		ex, err = r.core.ListEncryptionKeysFromCursor(ctx, *req.Cursor)
 		if err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				WithResponseMsg("failed to list encryption keys from cursor").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to list encryption keys from cursor", httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -304,22 +258,13 @@ func (r *EncryptionKeysRoutes) list(gctx *gin.Context) {
 		if req.OrderByVal != nil {
 			field, order, err := pagination.SplitOrderByParam[database.EncryptionKeyOrderByField](*req.OrderByVal)
 			if err != nil {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusBadRequest().
-					WithInternalErr(err).
-					WithResponseMsg(err.Error()).
-					BuildStatusError().
-					WriteGinResponse(nil, gctx)
+				apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
 
 			if !database.IsValidEncryptionKeyOrderByField(field) {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusBadRequest().
-					WithResponseMsgf("invalid sort field '%s'", field).
-					BuildStatusError().
-					WriteGinResponse(nil, gctx)
+				apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid sort field '%s'", field))
 				val.MarkErrorReturn()
 				return
 			}
@@ -333,11 +278,7 @@ func (r *EncryptionKeysRoutes) list(gctx *gin.Context) {
 	result := ex.FetchPage(ctx)
 
 	if result.Error != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			DefaultStatusInternalServerError().
-			WithInternalErr(result.Error).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, result.Error)
 		val.MarkErrorReturn()
 		return
 	}
@@ -369,34 +310,21 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 	id := apid.ID(gctx.Param("id"))
 
 	if id.IsNil() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req UpdateEncryptionKeyRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	// Validate state if provided
 	if req.State != nil && !database.IsValidEncryptionKeyState(*req.State) {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsgf("invalid state '%s'", *req.State).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid state '%s'", *req.State))
 		val.MarkErrorReturn()
 		return
 	}
@@ -404,12 +332,7 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 	// Validate labels if provided
 	if req.Labels != nil {
 		if err := database.Labels(*req.Labels).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid labels: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
 		}
@@ -418,12 +341,7 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 	// Validate annotations if provided
 	if req.Annotations != nil {
 		if err := database.Annotations(*req.Annotations).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid annotations: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotations: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
 		}
@@ -433,27 +351,18 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 	ek, err := r.core.GetEncryptionKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("encryption key '%s' not found", id).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -461,21 +370,12 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 		err = r.core.SetEncryptionKeyState(ctx, id, *req.State)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusNotFound().
-					WithResponseMsgf("encryption key '%s' not found", id).
-					WithInternalErr(err).
-					BuildStatusError().
-					WriteGinResponse(nil, gctx)
+				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
 
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 		}
 	}
@@ -484,21 +384,12 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 		_, err = r.core.UpdateEncryptionKeyLabels(ctx, id, *req.Labels)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusNotFound().
-					WithResponseMsgf("encryption key '%s' not found", id).
-					WithInternalErr(err).
-					BuildStatusError().
-					WriteGinResponse(nil, gctx)
+				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
 
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 		}
 	}
@@ -507,21 +398,12 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 		_, err = r.core.UpdateEncryptionKeyAnnotations(ctx, id, *req.Annotations)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusNotFound().
-					WithResponseMsgf("encryption key '%s' not found", id).
-					WithInternalErr(err).
-					BuildStatusError().
-					WriteGinResponse(nil, gctx)
+				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
 
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 		}
 	}
@@ -529,21 +411,12 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 	ek, err = r.core.GetEncryptionKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("encryption key '%s' not found", id).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -570,21 +443,13 @@ func (r *EncryptionKeysRoutes) delete(gctx *gin.Context) {
 	id := apid.ID(gctx.Param("id"))
 
 	if id.IsNil() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == database.GlobalEncryptionKeyID {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("the global encryption key cannot be deleted").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("the global encryption key cannot be deleted"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -598,17 +463,13 @@ func (r *EncryptionKeysRoutes) delete(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -619,11 +480,7 @@ func (r *EncryptionKeysRoutes) delete(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -651,11 +508,7 @@ func (r *EncryptionKeysRoutes) getLabels(gctx *gin.Context) {
 	id := apid.ID(gctx.Param("id"))
 
 	if id.IsNil() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -663,27 +516,18 @@ func (r *EncryptionKeysRoutes) getLabels(gctx *gin.Context) {
 	ek, err := r.core.GetEncryptionKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("encryption key '%s' not found", id).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -716,22 +560,14 @@ func (r *EncryptionKeysRoutes) getLabel(gctx *gin.Context) {
 	id := apid.ID(gctx.Param("id"))
 
 	if id.IsNil() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	labelKey := gctx.Param("label")
 	if labelKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("label key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -739,38 +575,25 @@ func (r *EncryptionKeysRoutes) getLabel(gctx *gin.Context) {
 	ek, err := r.core.GetEncryptionKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("encryption key '%s' not found", id).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	labels := ek.GetLabels()
 	value, exists := labels[labelKey]
 	if !exists {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("label '%s' not found", labelKey).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("label '%s' not found", labelKey))
 		val.MarkErrorReturn()
 		return
 	}
@@ -803,56 +626,33 @@ func (r *EncryptionKeysRoutes) putLabel(gctx *gin.Context) {
 	id := apid.ID(gctx.Param("id"))
 
 	if id.IsNil() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	labelKey := gctx.Param("label")
 	if labelKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("label key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := database.ValidateLabelKey(labelKey); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid label key: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid label key: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req PutEncryptionKeyLabelRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := database.ValidateLabelValue(req.Value); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid label value: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid label value: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
@@ -861,48 +661,30 @@ func (r *EncryptionKeysRoutes) putLabel(gctx *gin.Context) {
 	ek, err := r.core.GetEncryptionKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("encryption key '%s' not found", id).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	updatedEk, err := r.core.PutEncryptionKeyLabels(ctx, id, map[string]string{labelKey: req.Value})
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("encryption key '%s' not found", id).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -933,22 +715,14 @@ func (r *EncryptionKeysRoutes) deleteLabel(gctx *gin.Context) {
 	id := apid.ID(gctx.Param("id"))
 
 	if id.IsNil() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	labelKey := gctx.Param("label")
 	if labelKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("label key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -962,17 +736,13 @@ func (r *EncryptionKeysRoutes) deleteLabel(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -983,11 +753,7 @@ func (r *EncryptionKeysRoutes) deleteLabel(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1015,11 +781,7 @@ func (r *EncryptionKeysRoutes) getAnnotations(gctx *gin.Context) {
 	id := apid.ID(gctx.Param("id"))
 
 	if id.IsNil() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1027,27 +789,18 @@ func (r *EncryptionKeysRoutes) getAnnotations(gctx *gin.Context) {
 	ek, err := r.core.GetEncryptionKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("encryption key '%s' not found", id).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -1080,22 +833,14 @@ func (r *EncryptionKeysRoutes) getAnnotation(gctx *gin.Context) {
 	id := apid.ID(gctx.Param("id"))
 
 	if id.IsNil() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	annotationKey := gctx.Param("annotation")
 	if annotationKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("annotation key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1103,38 +848,25 @@ func (r *EncryptionKeysRoutes) getAnnotation(gctx *gin.Context) {
 	ek, err := r.core.GetEncryptionKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("encryption key '%s' not found", id).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	annotations := ek.GetAnnotations()
 	value, exists := annotations[annotationKey]
 	if !exists {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("annotation '%s' not found", annotationKey).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("annotation '%s' not found", annotationKey))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1167,56 +899,33 @@ func (r *EncryptionKeysRoutes) putAnnotation(gctx *gin.Context) {
 	id := apid.ID(gctx.Param("id"))
 
 	if id.IsNil() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	annotationKey := gctx.Param("annotation")
 	if annotationKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("annotation key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := database.ValidateAnnotationKey(annotationKey); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid annotation key: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotation key: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req PutEncryptionKeyAnnotationRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := database.ValidateAnnotationValue(req.Value); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid annotation value: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotation value: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1225,48 +934,30 @@ func (r *EncryptionKeysRoutes) putAnnotation(gctx *gin.Context) {
 	ek, err := r.core.GetEncryptionKey(ctx, id)
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("encryption key '%s' not found", id).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	updatedEk, err := r.core.PutEncryptionKeyAnnotations(ctx, id, map[string]string{annotationKey: req.Value})
 	if err != nil {
 		if errors.Is(err, core.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsgf("encryption key '%s' not found", id).
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1297,22 +988,14 @@ func (r *EncryptionKeysRoutes) deleteAnnotation(gctx *gin.Context) {
 	id := apid.ID(gctx.Param("id"))
 
 	if id.IsNil() {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	annotationKey := gctx.Param("annotation")
 	if annotationKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("annotation key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1326,17 +1009,13 @@ func (r *EncryptionKeysRoutes) deleteAnnotation(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -1347,11 +1026,7 @@ func (r *EncryptionKeysRoutes) deleteAnnotation(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}

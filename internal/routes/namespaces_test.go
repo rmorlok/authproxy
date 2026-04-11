@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apgin"
 
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
@@ -57,7 +57,7 @@ func TestNamespaces(t *testing.T) {
 		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		assert.NoError(t, c.Migrate(ctx))
 		nr := NewNamespacesRoutes(cfg, auth, c)
-		r := api_common.GinForTest(nil)
+		r := apgin.ForTest(nil)
 		nr.Register(r)
 
 		return &TestSetup{

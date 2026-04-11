@@ -1,13 +1,12 @@
 package routes
 
 import (
-	"fmt"
 	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"
@@ -15,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
 )
 
@@ -82,18 +82,14 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 
 	var req InitiateParams
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.BadRequestErr(err))
 		return
 	}
 
 	ra := auth.GetAuthFromGinContext(gctx)
 	if !ra.IsAuthenticated() {
 		logger.Debug("request was not authenticated, returning redirect url")
-		api_common.AddGinDebugHeader(gctx, "auth not present on context")
+		apgin.AddDebugHeader(gctx, "auth not present on context")
 		gctx.PureJSON(http.StatusUnauthorized, InitiateFailureResponse{
 			RedirectUrl: r.sessionInitiateUrlGenerator.GetInitiateSessionUrl(req.ReturnToUrl),
 		})
@@ -106,11 +102,7 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 		logger.Debug("existing request was not in a session, creating one")
 		err := r.authService.EstablishGinSession(gctx, ra)
 		if err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
-				WithInternalErr(fmt.Errorf("failed to establish gin session: %w", err)).
-				BuildStatusError().
-				WriteGinResponse(r.logger, gctx)
+			apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErrorf("failed to establish gin session: %w", err)))
 			return
 		}
 	}
@@ -144,7 +136,7 @@ func (r *SessionRoutes) terminate(gctx *gin.Context) {
 	ra := auth.GetAuthFromGinContext(gctx)
 	if !ra.IsAuthenticated() {
 		logger.Debug("request was already unauthenticated; ignoring")
-		api_common.AddGinDebugHeader(gctx, "auth not present on context")
+		apgin.AddDebugHeader(gctx, "auth not present on context")
 		gctx.PureJSON(http.StatusOK, gin.H{})
 		return
 	}
@@ -152,11 +144,7 @@ func (r *SessionRoutes) terminate(gctx *gin.Context) {
 	err := r.authService.EndGinSession(gctx, ra)
 	if err != nil {
 		logger.Error("failed to end gin session", "error", err)
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(fmt.Errorf("failed to end gin session: %w", err)).
-			BuildStatusError().
-			WriteGinResponse(r.logger, gctx)
+		apgin.WriteError(gctx, r.logger, httperr.InternalServerError(httperr.WithInternalErrorf("failed to end gin session: %w", err)))
 		return
 	}
 

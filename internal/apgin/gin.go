@@ -1,4 +1,4 @@
-package api_common
+package apgin
 
 import (
 	"context"
@@ -17,7 +17,9 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
-func GinForService(service config.Service, logger *slog.Logger, debugMode bool) *gin.Engine {
+// ForService creates a Gin engine configured for a production service with
+// debug mode, logging, recovery, and error logging middleware.
+func ForService(service config.Service, logger *slog.Logger, debugMode bool) *gin.Engine {
 	logFormatter := func(param gin.LogFormatterParams) string {
 		var statusColor, methodColor, resetColor string
 		if param.IsOutputColor() {
@@ -46,8 +48,8 @@ func GinForService(service config.Service, logger *slog.Logger, debugMode bool) 
 	return engine
 }
 
-// GinForTest returns a gin engine configured for tests with error logging enabled.
-func GinForTest(logger *slog.Logger) *gin.Engine {
+// ForTest returns a Gin engine configured for tests with recovery and error logging.
+func ForTest(logger *slog.Logger) *gin.Engine {
 	engine := gin.New()
 	engine.Use(gin.Recovery(), ErrorLoggingMiddleware(logger))
 	return engine
@@ -63,7 +65,6 @@ func DebugModeMiddleware(debugMode bool) gin.HandlerFunc {
 }
 
 // ErrorLoggingMiddleware logs any request that results in a 500+ response.
-// It attempts to include any internal errors attached to the gin context.
 func ErrorLoggingMiddleware(logger *slog.Logger) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		c.Next()
@@ -104,9 +105,8 @@ func ErrorLoggingMiddleware(logger *slog.Logger) gin.HandlerFunc {
 	}
 }
 
-// RunServer Runs a HTTP server and handles termination signals automatically.
+// RunServer runs an HTTP server and handles termination signals automatically.
 func RunServer(srv *http.Server, logger *slog.Logger) (err error) {
-	// Create channel to listen for signals
 	quit := make(chan os.Signal, 1)
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 
@@ -129,15 +129,12 @@ func RunServer(srv *http.Server, logger *slog.Logger) (err error) {
 		}
 	}()
 
-	// Wait for interrupt signal
 	<-quit
 	logger.Info("Shutting down Gin server...")
 
-	// Create context with timeout for shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 
-	// Attempt graceful shutdown
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Fatal("Server forced to shutdown:", err)
 	}

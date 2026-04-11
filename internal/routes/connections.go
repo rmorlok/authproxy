@@ -5,7 +5,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
@@ -13,6 +13,7 @@ import (
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -51,11 +52,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 
 	var req coreIface.InitiateConnectionRequest
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
@@ -63,11 +60,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 	// InitiateConnection also performs request validation for security
 	resp, err := r.core.InitiateConnection(ctx, req)
 	if err != nil {
-		api_common.HttpStatusErrorBuilderFromError(err).
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -94,60 +87,39 @@ func (r *ConnectionsRoutes) submit(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	c, err := r.core.GetConnection(ctx, id)
 	if err != nil {
-		api_common.HttpStatusErrorBuilderFromError(err).
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	var req coreIface.SubmitConnectionRequest
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
 
 	resp, err := c.SubmitForm(ctx, req)
 	if err != nil {
-		api_common.HttpStatusErrorBuilderFromError(err).
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -172,22 +144,13 @@ func (r *ConnectionsRoutes) getSetupStep(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -195,34 +158,22 @@ func (r *ConnectionsRoutes) getSetupStep(gctx *gin.Context) {
 	c, err := r.core.GetConnection(ctx, id)
 	if err != nil {
 		if errors.Is(err, coreIface.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("connection not found").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 		} else {
-			api_common.HttpStatusErrorBuilderFromError(err).
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteErr(gctx, nil, err)
 		}
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	resp, err := c.GetCurrentSetupStepResponse(ctx)
 	if err != nil {
-		api_common.HttpStatusErrorBuilderFromError(err).
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -248,33 +199,20 @@ func (r *ConnectionsRoutes) getDataSource(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	sourceId := gctx.Param("source_id")
 	if sourceId == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("source_id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("source_id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -282,34 +220,22 @@ func (r *ConnectionsRoutes) getDataSource(gctx *gin.Context) {
 	c, err := r.core.GetConnection(ctx, id)
 	if err != nil {
 		if errors.Is(err, coreIface.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("connection not found").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 		} else {
-			api_common.HttpStatusErrorBuilderFromError(err).
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteErr(gctx, nil, err)
 		}
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	options, err := c.GetDataSource(ctx, sourceId)
 	if err != nil {
-		api_common.HttpStatusErrorBuilderFromError(err).
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -384,12 +310,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 	var err error
 
 	if err = gctx.ShouldBindQuery(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg(err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -399,11 +320,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 	if req.Cursor != nil {
 		ex, err = r.core.ListConnectionsFromCursor(ctx, *req.Cursor)
 		if err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 			val.MarkErrorReturn()
 			return
 		}
@@ -427,22 +344,13 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 		if req.OrderByVal != nil {
 			field, order, err := pagination.SplitOrderByParam[database.ConnectionOrderByField](*req.OrderByVal)
 			if err != nil {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusBadRequest().
-					WithInternalErr(err).
-					WithResponseMsg(err.Error()).
-					BuildStatusError().
-					WriteGinResponse(nil, gctx)
+				apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
 				val.MarkErrorReturn()
 				return
 			}
 
 			if !database.IsValidConnectionOrderByField(field) {
-				api_common.NewHttpStatusErrorBuilder().
-					WithStatusBadRequest().
-					WithResponseMsgf("invalid sort field '%s'", field).
-					BuildStatusError().
-					WriteGinResponse(nil, gctx)
+				apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid sort field '%s'", field))
 				val.MarkErrorReturn()
 				return
 			}
@@ -456,11 +364,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 	result := ex.FetchPage(ctx)
 
 	if result.Error != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(result.Error).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(result.Error)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -492,23 +396,13 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -516,36 +410,24 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 	c, err := r.core.GetConnection(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("connection not found").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if c == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("connection not found").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -576,50 +458,32 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	c, err := r.core.GetConnection(ctx, id)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	ti, err := r.core.DisconnectConnection(ctx, id)
 	if err != nil {
-		api_common.HttpStatusErrorBuilderFromError(err).
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -630,11 +494,7 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 		ToSecureEncryptedString(ctx, r.encrypt)
 
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -668,22 +528,13 @@ func (r *ConnectionsRoutes) abort(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -691,34 +542,22 @@ func (r *ConnectionsRoutes) abort(gctx *gin.Context) {
 	c, err := r.core.GetConnection(ctx, id)
 	if err != nil {
 		if errors.Is(err, coreIface.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("connection not found").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 		} else {
-			api_common.HttpStatusErrorBuilderFromError(err).
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteErr(gctx, nil, err)
 		}
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	err = r.core.AbortConnection(ctx, id)
 	if err != nil {
-		api_common.HttpStatusErrorBuilderFromError(err).
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -743,22 +582,13 @@ func (r *ConnectionsRoutes) reconfigure(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -766,34 +596,22 @@ func (r *ConnectionsRoutes) reconfigure(gctx *gin.Context) {
 	c, err := r.core.GetConnection(ctx, id)
 	if err != nil {
 		if errors.Is(err, coreIface.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("connection not found").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 		} else {
-			api_common.HttpStatusErrorBuilderFromError(err).
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteErr(gctx, nil, err)
 		}
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	resp, err := c.Reconfigure(ctx)
 	if err != nil {
-		api_common.HttpStatusErrorBuilderFromError(err).
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -826,23 +644,13 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -850,21 +658,13 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 	req := ForceStateRequestJson{}
 	err = gctx.BindJSON(&req)
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if req.State == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("state is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("state is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -872,26 +672,18 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 	c, err := r.core.GetConnection(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("connection not found").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -902,11 +694,7 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 
 	err = c.SetState(ctx, req.State)
 	if err != nil {
-		api_common.HttpStatusErrorBuilderFromError(err).
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -958,46 +746,27 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req UpdateConnectionRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if req.Labels != nil {
 		if err := database.Labels(req.Labels).Validate(); err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusBadRequest().
-				WithInternalErr(err).
-				WithResponseMsgf("invalid labels: %s", err.Error()).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
 		}
@@ -1006,37 +775,25 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 	c, err := r.core.GetConnection(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("connection not found").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	if req.Labels != nil {
 		_, err = r.db.UpdateConnectionLabels(ctx, id, req.Labels)
 		if err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -1044,11 +801,7 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 		// Re-fetch connection to get updated state with connector info
 		c, err = r.core.GetConnection(ctx, id)
 		if err != nil {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusInternalServerError().
-				WithInternalErr(err).
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
 		}
@@ -1076,22 +829,13 @@ func (r *ConnectionsRoutes) getLabels(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1099,36 +843,24 @@ func (r *ConnectionsRoutes) getLabels(gctx *gin.Context) {
 	c, err := r.core.GetConnection(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("connection not found").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if c == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("connection not found").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -1160,33 +892,20 @@ func (r *ConnectionsRoutes) getLabel(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	labelKey := gctx.Param("label")
 	if labelKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("label key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1194,47 +913,31 @@ func (r *ConnectionsRoutes) getLabel(gctx *gin.Context) {
 	c, err := r.core.GetConnection(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("connection not found").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if c == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("connection not found").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	labels := c.GetLabels()
 	value, exists := labels[labelKey]
 	if !exists {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("label '%s' not found", labelKey).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("label '%s' not found", labelKey))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1267,67 +970,39 @@ func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	labelKey := gctx.Param("label")
 	if labelKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("label key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := database.ValidateLabelKey(labelKey); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid label key: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid label key: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req PutConnectionLabelRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := database.ValidateLabelValue(req.Value); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid label value: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid label value: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1335,56 +1010,36 @@ func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) {
 	c, err := r.core.GetConnection(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("connection not found").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if c == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("connection not found").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	updatedConn, err := r.db.PutConnectionLabels(ctx, id, map[string]string{labelKey: req.Value})
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("connection not found").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1415,33 +1070,20 @@ func (r *ConnectionsRoutes) deleteLabel(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	labelKey := gctx.Param("label")
 	if labelKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("label key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1454,11 +1096,7 @@ func (r *ConnectionsRoutes) deleteLabel(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1470,7 +1108,7 @@ func (r *ConnectionsRoutes) deleteLabel(gctx *gin.Context) {
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -1481,11 +1119,7 @@ func (r *ConnectionsRoutes) deleteLabel(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1512,22 +1146,13 @@ func (r *ConnectionsRoutes) getAnnotations(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1535,36 +1160,24 @@ func (r *ConnectionsRoutes) getAnnotations(gctx *gin.Context) {
 	c, err := r.core.GetConnection(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("connection not found").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if c == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("connection not found").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -1596,33 +1209,20 @@ func (r *ConnectionsRoutes) getAnnotation(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	annotationKey := gctx.Param("annotation")
 	if annotationKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("annotation key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1630,47 +1230,31 @@ func (r *ConnectionsRoutes) getAnnotation(gctx *gin.Context) {
 	c, err := r.core.GetConnection(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("connection not found").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if c == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("connection not found").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	annotations := c.GetAnnotations()
 	value, exists := annotations[annotationKey]
 	if !exists {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsgf("annotation '%s' not found", annotationKey).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFoundf("annotation '%s' not found", annotationKey))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1703,56 +1287,33 @@ func (r *ConnectionsRoutes) putAnnotation(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	annotationKey := gctx.Param("annotation")
 	if annotationKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("annotation key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := database.ValidateAnnotationKey(annotationKey); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsgf("invalid annotation key: %s", err.Error()).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotation key: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req PutConnectionAnnotationRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid request body").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1760,56 +1321,36 @@ func (r *ConnectionsRoutes) putAnnotation(gctx *gin.Context) {
 	c, err := r.core.GetConnection(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("connection not found").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if c == nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusNotFound().
-			WithResponseMsg("connection not found").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
 	updatedConn, err := r.db.PutConnectionAnnotations(ctx, id, map[string]string{annotationKey: req.Value})
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			api_common.NewHttpStatusErrorBuilder().
-				WithStatusNotFound().
-				WithResponseMsg("connection not found").
-				BuildStatusError().
-				WriteGinResponse(nil, gctx)
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
 			val.MarkErrorReturn()
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1840,33 +1381,20 @@ func (r *ConnectionsRoutes) deleteAnnotation(gctx *gin.Context) {
 
 	id, err := apid.Parse(gctx.Param("id"))
 	if err != nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithInternalErr(err).
-			WithResponseMsg("invalid id format").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if id == apid.Nil {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("id is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
 		val.MarkErrorReturn()
 		return
 	}
 
 	annotationKey := gctx.Param("annotation")
 	if annotationKey == "" {
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg("annotation key is required").
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1879,11 +1407,7 @@ func (r *ConnectionsRoutes) deleteAnnotation(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
@@ -1895,7 +1419,7 @@ func (r *ConnectionsRoutes) deleteAnnotation(gctx *gin.Context) {
 	}
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		httpErr.WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httpErr)
 		return
 	}
 
@@ -1906,11 +1430,7 @@ func (r *ConnectionsRoutes) deleteAnnotation(gctx *gin.Context) {
 			return
 		}
 
-		api_common.NewHttpStatusErrorBuilder().
-			WithStatusInternalServerError().
-			WithInternalErr(err).
-			BuildStatusError().
-			WriteGinResponse(nil, gctx)
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}

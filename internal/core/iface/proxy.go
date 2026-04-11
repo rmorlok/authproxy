@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/rmorlok/authproxy/internal/api_common"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"gopkg.in/h2non/gentleman.v2"
@@ -75,10 +75,7 @@ func (r *ProxyRequest) Validate() error {
 	}
 
 	if len(errors) > 0 {
-		return api_common.NewHttpStatusErrorBuilder().
-			WithStatusBadRequest().
-			WithResponseMsg(strings.Join(errors, ", ")).
-			Build()
+		return httperr.BadRequest(strings.Join(errors, ", "))
 	}
 
 	return nil
