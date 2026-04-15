@@ -68,7 +68,8 @@ const ConnectorList: React.FC = () => {
   };
 
   const handleFormSubmit = useCallback((connectionId: string, data: unknown) => {
-    dispatch(submitConnectionFormAsync({ connectionId, data })).then((action) => {
+    const stepId = currentFormStep?.stepId ?? '';
+    dispatch(submitConnectionFormAsync({ connectionId, stepId, data })).then((action) => {
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
@@ -78,7 +79,7 @@ const ConnectorList: React.FC = () => {
         // If type === 'complete', Redux state clears the form
       }
     });
-  }, [dispatch]);
+  }, [dispatch, currentFormStep]);
 
   const handleFormCancel = useCallback(() => {
     if (currentFormStep) {
