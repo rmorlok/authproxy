@@ -14,6 +14,14 @@ const (
 	JwtQueryParam = "auth_token"
 )
 
+// AuthRedirectUrlGenerator produces the URL a browser should be redirected to when a request
+// reaches an auth-required endpoint that is configured to redirect unauthenticated users
+// through the standard login flow. returnToUrl is the fully-qualified URL the user should
+// land back on after successful authentication, as a query parameter on the generated URL.
+type AuthRedirectUrlGenerator interface {
+	GetInitiateSessionUrl(returnToUrl string) string
+}
+
 type A interface {
 	/*
 	 * Gin middlewares for establishing auth
@@ -21,6 +29,12 @@ type A interface {
 
 	NewRequiredBuilder() *PermissionValidatorBuilder
 	Required(validators ...AuthValidator) gin.HandlerFunc
+	// RequiredWithAuthRedirect is like Required but, when the request is not authenticated,
+	// redirects the browser to the URL produced by gen rather than returning 401. The current
+	// request URL is passed through as the return_to target so the browser lands back on the
+	// same endpoint after re-authenticating (typically with an auth_token query param).
+	// Authenticated-but-invalid actors still receive 403 as usual.
+	RequiredWithAuthRedirect(gen AuthRedirectUrlGenerator, validators ...AuthValidator) gin.HandlerFunc
 	Optional(validators ...AuthValidator) gin.HandlerFunc
 	OptionalXsrfNotRequired(validators ...AuthValidator) gin.HandlerFunc
 

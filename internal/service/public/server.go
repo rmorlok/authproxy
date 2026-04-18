@@ -15,7 +15,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	common_routes "github.com/rmorlok/authproxy/internal/routes"
 	"github.com/rmorlok/authproxy/internal/service"
-	"github.com/rmorlok/authproxy/internal/service/public/routes"
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
@@ -107,9 +106,10 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 	routesError := common_routes.NewErrorRoutes(dm.GetConfig())
 	routesError.Register(server)
 
-	routesOauth2 := routes.NewOauth2Routes(
+	routesOauth2 := common_routes.NewPublicOauth2Routes(
 		dm.GetConfig(),
 		authService,
+		&root.HostApplication,
 		dm.GetDatabase(),
 		dm.GetRedisClient(),
 		dm.GetCoreService(),
