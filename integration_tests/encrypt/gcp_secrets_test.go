@@ -1,4 +1,4 @@
-//go:build integration && aws
+//go:build integration && gcp
 
 package encrypt_test
 
@@ -10,9 +10,9 @@ import (
 	"testing"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
-	awsconfig "github.com/aws/aws-sdk-go-v2/config"
-	"github.com/aws/aws-sdk-go-v2/service/secretsmanager"
+	secretmanager "cloud.google.com/go/secretmanager/apiv1"
+	secretmanagerpb "cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
+	"github.com/joho/godotenv"
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -21,48 +21,65 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const awsSecretsTestEnv = "AUTH_PROXY_AWS_SECRETS_TEST"
+const (
+	gcpSecretsTestEnv = "AUTH_PROXY_GCP_SECRETS_TEST"
+	gcpProjectIDEnv   = "GCP_PROJECT_ID"
+)
 
-func TestAwsSecretsManagerKeySyncAndReencrypt(t *testing.T) {
-	if os.Getenv(awsSecretsTestEnv) != "1" {
-		t.Skipf("%s is not set to 1", awsSecretsTestEnv)
+func init() {
+	// Best-effort load of a .env file so the test is runnable locally when
+	// secrets are provided in a .env file at the repo root or in integration_tests.
+	_ = godotenv.Load(".env", "../.env")
+}
+
+func TestGcpSecretManagerKeySyncAndReencrypt(t *testing.T) {
+	if os.Getenv(gcpSecretsTestEnv) != "1" {
+		t.Skipf("%s is not set to 1", gcpSecretsTestEnv)
 	}
 
-	region := os.Getenv("AWS_REGION")
-	if region == "" {
-		t.Skip("AWS_REGION is not set")
+	projectID := os.Getenv(gcpProjectIDEnv)
+	if projectID == "" {
+		t.Skipf("%s is not set", gcpProjectIDEnv)
 	}
 
 	ctx := context.Background()
-	sm := newSecretsManagerClient(t, ctx, region)
+	sm := newGcpSecretManagerClient(t, ctx)
+	defer sm.Close()
 
 	env := helpers.Setup(t, helpers.SetupOptions{Service: helpers.ServiceTypeAPI})
 	defer env.Cleanup()
 
-	secretName := fmt.Sprintf("authproxy-aws-sm-%d", time.Now().UnixNano())
+	secretName := fmt.Sprintf("authproxy-gcp-sm-%d", time.Now().UnixNano())
 	keyV1 := randomBytes(t, 32)
 
-	createOut, err := sm.CreateSecret(ctx, &secretsmanager.CreateSecretInput{
-		Name:         aws.String(secretName),
-		SecretBinary: keyV1,
+	createdSecret, err := sm.CreateSecret(ctx, &secretmanagerpb.CreateSecretRequest{
+		Parent:   fmt.Sprintf("projects/%s", projectID),
+		SecretId: secretName,
+		Secret: &secretmanagerpb.Secret{
+			Replication: &secretmanagerpb.Replication{
+				Replication: &secretmanagerpb.Replication_Automatic_{
+					Automatic: &secretmanagerpb.Replication_Automatic{},
+				},
+			},
+		},
 	})
 	require.NoError(t, err)
-
-	secretID := secretName
-	if createOut.ARN != nil {
-		secretID = *createOut.ARN
-	}
 
 	t.Cleanup(func() {
 		cleanupCtx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 		defer cancel()
-		_, _ = sm.DeleteSecret(cleanupCtx, &secretsmanager.DeleteSecretInput{
-			SecretId:                   aws.String(secretID),
-			ForceDeleteWithoutRecovery: aws.Bool(true),
+		_ = sm.DeleteSecret(cleanupCtx, &secretmanagerpb.DeleteSecretRequest{
+			Name: createdSecret.Name,
 		})
 	})
 
-	namespace := fmt.Sprintf("root.aws-sm-test-%d", time.Now().UnixNano())
+	_, err = sm.AddSecretVersion(ctx, &secretmanagerpb.AddSecretVersionRequest{
+		Parent:  createdSecret.Name,
+		Payload: &secretmanagerpb.SecretPayload{Data: keyV1},
+	})
+	require.NoError(t, err)
+
+	namespace := fmt.Sprintf("root.gcp-sm-test-%d", time.Now().UnixNano())
 	ekID := apid.New(apid.PrefixEncryptionKey)
 
 	require.NoError(t, env.Db.CreateNamespace(ctx, &database.Namespace{
@@ -71,9 +88,9 @@ func TestAwsSecretsManagerKeySyncAndReencrypt(t *testing.T) {
 	}))
 
 	keyData := sconfig.KeyData{
-		InnerVal: &sconfig.KeyDataAwsSecret{
-			AwsSecretID: secretID,
-			AwsRegion:   region,
+		InnerVal: &sconfig.KeyDataGcpSecret{
+			GcpSecretName: secretName,
+			GcpProject:    projectID,
 		},
 	}
 	keyDataJSON, err := json.Marshal(&keyData)
@@ -95,7 +112,7 @@ func TestAwsSecretsManagerKeySyncAndReencrypt(t *testing.T) {
 	currentV1, err := env.Db.GetCurrentEncryptionKeyVersionForNamespace(ctx, namespace)
 	require.NoError(t, err)
 
-	plaintext := "aws-secrets-manager-test"
+	plaintext := "gcp-secret-manager-test"
 	encrypted, err := env.DM.GetEncryptService().EncryptStringForNamespace(ctx, namespace, plaintext)
 	require.NoError(t, err)
 	require.Equal(t, currentV1.Id, encrypted.ID)
@@ -104,14 +121,14 @@ func TestAwsSecretsManagerKeySyncAndReencrypt(t *testing.T) {
 	require.NoError(t, env.Db.CreateActor(ctx, &database.Actor{
 		Id:           actorID,
 		Namespace:    namespace,
-		ExternalId:   "aws-sm-test-actor",
+		ExternalId:   "gcp-sm-test-actor",
 		EncryptedKey: &encrypted,
 	}))
 
 	keyV2 := randomBytes(t, 32)
-	_, err = sm.PutSecretValue(ctx, &secretsmanager.PutSecretValueInput{
-		SecretId:     aws.String(secretID),
-		SecretBinary: keyV2,
+	_, err = sm.AddSecretVersion(ctx, &secretmanagerpb.AddSecretVersionRequest{
+		Parent:  createdSecret.Name,
+		Payload: &secretmanagerpb.SecretPayload{Data: keyV2},
 	})
 	require.NoError(t, err)
 
@@ -134,11 +151,10 @@ func TestAwsSecretsManagerKeySyncAndReencrypt(t *testing.T) {
 	require.Equal(t, plaintext, decrypted)
 }
 
-func newSecretsManagerClient(t *testing.T, ctx context.Context, region string) *secretsmanager.Client {
+func newGcpSecretManagerClient(t *testing.T, ctx context.Context) *secretmanager.Client {
 	t.Helper()
 
-	cfg, err := awsconfig.LoadDefaultConfig(ctx, awsconfig.WithRegion(region))
+	client, err := secretmanager.NewClient(ctx)
 	require.NoError(t, err)
-
-	return secretsmanager.NewFromConfig(cfg)
+	return client
 }
