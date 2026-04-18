@@ -28,8 +28,10 @@ const (
 
 func init() {
 	// Best-effort load of a .env file so the test is runnable locally when
-	// secrets are provided in a .env file at the repo root or in integration_tests.
-	_ = godotenv.Load(".env", "../.env")
+	// secrets are provided in a .env file. go test runs with CWD set to the
+	// package directory (integration_tests/encrypt), so look in this dir, the
+	// integration_tests dir, and the repo root.
+	_ = godotenv.Load(".env", "../.env", "../../.env")
 }
 
 func TestGcpSecretManagerKeySyncAndReencrypt(t *testing.T) {
