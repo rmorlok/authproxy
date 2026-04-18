@@ -71,7 +71,7 @@ func (ep *ErrorPages) UrlForError(error ErrorPage, publicBaseUrl string) string 
 	return parsedUrl.String()
 }
 
-func (ep *ErrorPages) RenderRenderOrRedirect(gctx *gin.Context, vals ErrorTemplateValues) {
+func (ep *ErrorPages) RenderErrorOrRedirect(gctx *gin.Context, vals ErrorTemplateValues) {
 	switch vals.Error {
 	case ErrorPageNotFound:
 		if ep.NotFound != "" {

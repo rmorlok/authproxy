@@ -39,7 +39,7 @@ func (r *Oauth2Routes) callback(gctx *gin.Context) {
 	if !ra.IsAuthenticated() {
 		logger.Warn("callback called without auth")
 		apgin.AddDebugHeader(gctx, "auth not present on context")
-		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
+		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
 			Error:       sconfig.ErrorPageUnauthorized,
 			Description: "Request is not part of an authenticated session.",
 		})
@@ -51,7 +51,7 @@ func (r *Oauth2Routes) callback(gctx *gin.Context) {
 		logger.Error(err.Error(), "error", err)
 		apgin.AddDebugHeaderError(gctx, err)
 		gctx.Redirect(http.StatusFound, r.cfg.GetErrorPageUrl(sconfig.ErrorPageInternalError))
-		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
+		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
 			Error: sconfig.ErrorPageInternalError,
 		})
 		return
@@ -62,7 +62,7 @@ func (r *Oauth2Routes) callback(gctx *gin.Context) {
 		err = fmt.Errorf("failed to parse state param to UUID: %w", err)
 		logger.Error(err.Error(), "error", err)
 		apgin.AddDebugHeaderError(gctx, err)
-		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
+		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
 			Error: sconfig.ErrorPageInternalError,
 		})
 		return
@@ -73,7 +73,7 @@ func (r *Oauth2Routes) callback(gctx *gin.Context) {
 		err = fmt.Errorf("failed to get oauth2 state: %w", err)
 		logger.Error(err.Error(), "error", err)
 		apgin.AddDebugHeaderError(gctx, err)
-		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
+		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
 			Error: sconfig.ErrorPageInternalError,
 		})
 		return
@@ -85,7 +85,7 @@ func (r *Oauth2Routes) callback(gctx *gin.Context) {
 			err = fmt.Errorf("failed to end gin session: %w", err)
 			logger.Error(err.Error(), "error", err)
 			apgin.AddDebugHeaderError(gctx, err)
-			r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
+			r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
 				Error: sconfig.ErrorPageInternalError,
 			})
 			return
@@ -97,7 +97,7 @@ func (r *Oauth2Routes) callback(gctx *gin.Context) {
 		err = fmt.Errorf("failed to handle oauth2 callback: %w", err)
 		logger.Error(err.Error(), "error", err)
 		apgin.AddDebugHeaderError(gctx, err)
-		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
+		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
 			Error: sconfig.ErrorPageInternalError,
 		})
 		return
@@ -118,7 +118,7 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 	if !ra.IsAuthenticated() {
 		logger.Warn("redirect called without auth")
 		apgin.AddDebugHeader(gctx, "auth not present on context")
-		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
+		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
 			Error: sconfig.ErrorPageInternalError,
 		})
 		return
@@ -133,7 +133,7 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 			err = fmt.Errorf("failed to establish gin session: %w", err)
 			logger.Error(err.Error(), "error", err)
 			apgin.AddDebugHeaderError(gctx, err)
-			r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
+			r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
 				Error: sconfig.ErrorPageInternalError,
 			})
 			return
@@ -145,7 +145,7 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 		err = fmt.Errorf("failed to bind redirect params: %w", err)
 		logger.Error(err.Error(), "error", err)
 		apgin.AddDebugHeaderError(gctx, err)
-		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
+		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
 			Error: sconfig.ErrorPageInternalError,
 		})
 		return
@@ -154,7 +154,7 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 	if req.StateId == "" {
 		logger.Error("state_id is required")
 		apgin.AddDebugHeader(gctx, "state_id is required")
-		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
+		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
 			Error: sconfig.ErrorPageInternalError,
 		})
 		return
@@ -165,7 +165,7 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 		err = fmt.Errorf("failed to parse state_id: %w", err)
 		logger.Error(err.Error(), "error", err)
 		apgin.AddDebugHeaderError(gctx, err)
-		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
+		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
 			Error: sconfig.ErrorPageInternalError,
 		})
 		return
@@ -176,7 +176,7 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 		err = fmt.Errorf("failed to get oauth2 state: %w", err)
 		logger.Error(err.Error(), "error", err)
 		apgin.AddDebugHeaderError(gctx, err)
-		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
+		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
 			Error: sconfig.ErrorPageInternalError,
 		})
 		return
@@ -187,7 +187,7 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 		err = fmt.Errorf("failed to record cancel session after auth: %w", err)
 		logger.Error(err.Error(), "error", err)
 		apgin.AddDebugHeaderError(gctx, err)
-		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
+		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
 			Error: sconfig.ErrorPageInternalError,
 		})
 		return
@@ -198,7 +198,7 @@ func (r *Oauth2Routes) redirect(gctx *gin.Context) {
 		err = fmt.Errorf("failed to generate oauth2 redirect url: %w", err)
 		logger.Error(err.Error(), "error", err)
 		apgin.AddDebugHeaderError(gctx, err)
-		r.cfg.GetRoot().ErrorPages.RenderRenderOrRedirect(gctx, sconfig.ErrorTemplateValues{
+		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
 			Error: sconfig.ErrorPageInternalError,
 		})
 		return
