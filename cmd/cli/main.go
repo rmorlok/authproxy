@@ -1,13 +1,14 @@
 package main
 
 import (
-	"github.com/joho/godotenv"
+	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/spf13/cobra"
 )
 
 func main() {
-	// Optionally load environment variables from a .env file.
-	_ = godotenv.Load()
+	// Optionally load environment variables from .env files walking up
+	// from the current working directory.
+	util.LoadDotEnv()
 
 	var rootCmd = &cobra.Command{
 		Use: "ap",

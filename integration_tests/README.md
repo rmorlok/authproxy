@@ -57,6 +57,41 @@ Notes:
 - The test creates a short-lived secret and deletes it at the end.
 - For CI, provide `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`, and optional `AWS_SESSION_TOKEN` via secrets.
 
+## GCP Secret Manager Integration Test
+
+This test hits real GCP Secret Manager and is gated behind the `gcp` build tag and an env flag.
+
+Requirements:
+- GCP credentials available via Application Default Credentials — typically a service account key file path in `GOOGLE_APPLICATION_CREDENTIALS`, or `gcloud auth application-default login` for local development.
+- `GCP_PROJECT_ID` set to the project that owns the secrets.
+- `AUTH_PROXY_GCP_SECRETS_TEST=1` set to opt in.
+- IAM permissions on the project (role `roles/secretmanager.admin` covers all of these):
+  - `secretmanager.secrets.create`
+  - `secretmanager.secrets.delete`
+  - `secretmanager.versions.add`
+  - `secretmanager.versions.access`
+
+Run:
+```bash
+cd integration_tests
+AUTH_PROXY_GCP_SECRETS_TEST=1 GCP_PROJECT_ID=my-project \
+  GOOGLE_APPLICATION_CREDENTIALS=/path/to/sa.json \
+  go test -tags "integration,gcp" -v ./encrypt/...
+```
+
+The test walks up from the current working directory and loads any `.env` files it finds (nearest wins), so you can drop your credentials wherever is convenient — the package directory, `integration_tests/`, the repo root, etc. Example `.env`:
+
+```
+AUTH_PROXY_GCP_SECRETS_TEST=1
+GCP_PROJECT_ID=my-project
+GOOGLE_APPLICATION_CREDENTIALS=/absolute/path/to/sa.json
+```
+
+Notes:
+- The test creates a short-lived secret and deletes it at the end.
+- For CI, provide `GCP_PROJECT_ID` and `GOOGLE_APPLICATION_CREDENTIALS_JSON` (the full service account key JSON) as repository secrets. The GitHub Actions workflow writes the JSON to a temp file and points `GOOGLE_APPLICATION_CREDENTIALS` at it.
+- The workflow runs only on pushes to `main` (and manual `workflow_dispatch`) to avoid exposing the GCP secrets to PRs from forks.
+
 ## Teardown
 
 ```bash

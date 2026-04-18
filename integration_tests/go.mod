@@ -9,6 +9,7 @@ replace github.com/rmorlok/authproxy/terraform/provider => ../terraform/provider
 replace github.com/Masterminds/squirrel v1.5.4 => github.com/jack-t/squirrel v1.6.0
 
 require (
+	cloud.google.com/go/secretmanager v1.16.0
 	github.com/aws/aws-sdk-go-v2 v1.41.2
 	github.com/aws/aws-sdk-go-v2/config v1.32.9
 	github.com/aws/aws-sdk-go-v2/service/secretsmanager v1.41.2
@@ -26,7 +27,6 @@ require (
 	cloud.google.com/go/auth/oauth2adapt v0.2.8 // indirect
 	cloud.google.com/go/compute/metadata v0.9.0 // indirect
 	cloud.google.com/go/iam v1.5.2 // indirect
-	cloud.google.com/go/secretmanager v1.16.0 // indirect
 	github.com/ClickHouse/ch-go v0.71.0 // indirect
 	github.com/ClickHouse/clickhouse-go/v2 v2.43.0 // indirect
 	github.com/KyleBanks/depth v1.2.1 // indirect

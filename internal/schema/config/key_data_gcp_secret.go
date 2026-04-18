@@ -3,10 +3,12 @@ package config
 import (
 	"context"
 	"fmt"
+	"strings"
 	"time"
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	secretmanagerpb "cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
+	"google.golang.org/api/iterator"
 )
 
 // KeyDataGcpSecret retrieves an AES key from GCP Secret Manager.
@@ -47,7 +49,7 @@ func (kg *KeyDataGcpSecret) currentVersionString() string {
 }
 
 func (kg *KeyDataGcpSecret) fetchCurrentVersion(ctx context.Context) (KeyVersionInfo, error) {
-	data, err := kg.fetchFromGCP(ctx)
+	data, resolvedVersion, err := kg.fetchFromGCP(ctx)
 	if err != nil {
 		return KeyVersionInfo{}, err
 	}
@@ -55,14 +57,14 @@ func (kg *KeyDataGcpSecret) fetchCurrentVersion(ctx context.Context) (KeyVersion
 	return KeyVersionInfo{
 		Provider:        ProviderTypeGcp,
 		ProviderID:      kg.secretResourceName(),
-		ProviderVersion: kg.currentVersionString(),
+		ProviderVersion: resolvedVersion,
 		Data:            data,
 		IsCurrent:       true,
 	}, nil
 }
 
 func (kg *KeyDataGcpSecret) fetchVersionInfo(ctx context.Context, version string) (KeyVersionInfo, error) {
-	data, err := kg.fetchVersionFromGCP(ctx, version)
+	data, resolvedVersion, err := kg.fetchVersionFromGCP(ctx, version)
 	if err != nil {
 		return KeyVersionInfo{}, err
 	}
@@ -70,18 +72,68 @@ func (kg *KeyDataGcpSecret) fetchVersionInfo(ctx context.Context, version string
 	return KeyVersionInfo{
 		Provider:        ProviderTypeGcp,
 		ProviderID:      kg.secretResourceName(),
-		ProviderVersion: version,
+		ProviderVersion: resolvedVersion,
 		Data:            data,
-		IsCurrent:       version == kg.currentVersionString(),
 	}, nil
 }
 
 func (kg *KeyDataGcpSecret) fetchListVersions(ctx context.Context) ([]KeyVersionInfo, error) {
-	v, err := kg.fetchCurrentVersion(ctx)
-	if err != nil {
-		return nil, err
+	// Determine the current version so we can tag it correctly. If this fails
+	// it's not fatal — some listed versions still count as valid, they just
+	// won't be flagged as current.
+	currentInfo, currentErr := kg.fetchCurrentVersion(ctx)
+	currentVersion := ""
+	if currentErr == nil {
+		currentVersion = currentInfo.ProviderVersion
 	}
-	return []KeyVersionInfo{v}, nil
+
+	client, err := secretmanager.NewClient(ctx)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create gcp secret manager client: %w", err)
+	}
+	defer client.Close()
+
+	it := client.ListSecretVersions(ctx, &secretmanagerpb.ListSecretVersionsRequest{
+		Parent: kg.secretResourceName(),
+	})
+
+	var infos []KeyVersionInfo
+	for {
+		v, err := it.Next()
+		if err == iterator.Done {
+			break
+		}
+		if err != nil {
+			return nil, fmt.Errorf("failed to list gcp secret versions for %s: %w", kg.GcpSecretName, err)
+		}
+
+		// Skip versions that can't be accessed (disabled/destroyed).
+		if v.State != secretmanagerpb.SecretVersion_ENABLED {
+			continue
+		}
+
+		version := parseGcpSecretVersionFromName(v.Name)
+		data, resolvedVersion, err := kg.fetchVersionFromGCP(ctx, version)
+		if err != nil {
+			return nil, fmt.Errorf("failed to fetch version %s for secret %s: %w", version, kg.GcpSecretName, err)
+		}
+
+		infos = append(infos, KeyVersionInfo{
+			Provider:        ProviderTypeGcp,
+			ProviderID:      kg.secretResourceName(),
+			ProviderVersion: resolvedVersion,
+			Data:            data,
+			IsCurrent:       currentVersion != "" && resolvedVersion == currentVersion,
+		})
+	}
+
+	// If the iterator returned nothing (should be rare), fall back to the
+	// current version so we don't wipe out the only known version.
+	if len(infos) == 0 && currentErr == nil {
+		return []KeyVersionInfo{currentInfo}, nil
+	}
+
+	return infos, nil
 }
 
 func (kg *KeyDataGcpSecret) GetCurrentVersion(ctx context.Context) (KeyVersionInfo, error) {
@@ -138,14 +190,17 @@ func (kg *KeyDataGcpSecret) secretVersionName() string {
 	return fmt.Sprintf("projects/%s/secrets/%s/versions/%s", kg.GcpProject, kg.GcpSecretName, version)
 }
 
-func (kg *KeyDataGcpSecret) fetchFromGCP(ctx context.Context) ([]byte, error) {
+func (kg *KeyDataGcpSecret) fetchFromGCP(ctx context.Context) ([]byte, string, error) {
 	return kg.fetchVersionFromGCP(ctx, "")
 }
 
-func (kg *KeyDataGcpSecret) fetchVersionFromGCP(ctx context.Context, version string) ([]byte, error) {
+// fetchVersionFromGCP accesses the requested version of the secret and returns
+// the payload along with the concrete version resolved by GCP (e.g., "5"
+// rather than "latest") as reported by AccessSecretVersionResponse.Name.
+func (kg *KeyDataGcpSecret) fetchVersionFromGCP(ctx context.Context, version string) ([]byte, string, error) {
 	client, err := secretmanager.NewClient(ctx)
 	if err != nil {
-		return nil, fmt.Errorf("failed to create gcp secret manager client: %w", err)
+		return nil, "", fmt.Errorf("failed to create gcp secret manager client: %w", err)
 	}
 	defer client.Close()
 
@@ -158,10 +213,30 @@ func (kg *KeyDataGcpSecret) fetchVersionFromGCP(ctx context.Context, version str
 		Name: versionName,
 	})
 	if err != nil {
-		return nil, fmt.Errorf("failed to access gcp secret %s version %s: %w", kg.GcpSecretName, version, err)
+		return nil, "", fmt.Errorf("failed to access gcp secret %s version %s: %w", kg.GcpSecretName, version, err)
 	}
 
-	return result.Payload.Data, nil
+	resolvedVersion := parseGcpSecretVersionFromName(result.Name)
+	if resolvedVersion == "" {
+		resolvedVersion = version
+	}
+	if resolvedVersion == "" {
+		resolvedVersion = kg.currentVersionString()
+	}
+
+	return result.Payload.Data, resolvedVersion, nil
+}
+
+// parseGcpSecretVersionFromName extracts the version segment from a full
+// Secret Manager version resource name like
+// `projects/*/secrets/*/versions/5`.
+func parseGcpSecretVersionFromName(name string) string {
+	const marker = "/versions/"
+	idx := strings.LastIndex(name, marker)
+	if idx < 0 {
+		return ""
+	}
+	return name[idx+len(marker):]
 }
 
 func (kg *KeyDataGcpSecret) secretVersionNameFor(version string) string {
