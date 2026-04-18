@@ -74,7 +74,7 @@ func TestErrorPages_RenderRenderOrRedirect(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/", nil)
-		ep.RenderErrorOrRedirect(c, ErrorTemplateValues{Error: ErrorPageNotFound})
+		ep.RenderErrorOrRedirect(c, ErrorTemplateValues{Error: ErrorPageNotFound}, nil)
 		assert.Equal(t, http.StatusFound, w.Code)
 		assert.Equal(t, "https://example.com/404", w.Header().Get("Location"))
 
@@ -82,7 +82,7 @@ func TestErrorPages_RenderRenderOrRedirect(t *testing.T) {
 		w = httptest.NewRecorder()
 		c, _ = gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/", nil)
-		ep.RenderErrorOrRedirect(c, ErrorTemplateValues{Error: ErrorPageUnauthorized})
+		ep.RenderErrorOrRedirect(c, ErrorTemplateValues{Error: ErrorPageUnauthorized}, nil)
 		assert.Equal(t, http.StatusFound, w.Code)
 		assert.Equal(t, "https://example.com/401", w.Header().Get("Location"))
 
@@ -90,7 +90,7 @@ func TestErrorPages_RenderRenderOrRedirect(t *testing.T) {
 		w = httptest.NewRecorder()
 		c, _ = gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/", nil)
-		ep.RenderErrorOrRedirect(c, ErrorTemplateValues{Error: ErrorPageInternalError})
+		ep.RenderErrorOrRedirect(c, ErrorTemplateValues{Error: ErrorPageInternalError}, nil)
 		assert.Equal(t, http.StatusFound, w.Code)
 		assert.Equal(t, "https://example.com/500", w.Header().Get("Location"))
 
@@ -98,7 +98,7 @@ func TestErrorPages_RenderRenderOrRedirect(t *testing.T) {
 		w = httptest.NewRecorder()
 		c, _ = gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/", nil)
-		ep.RenderErrorOrRedirect(c, ErrorTemplateValues{Error: "unknown"})
+		ep.RenderErrorOrRedirect(c, ErrorTemplateValues{Error: "unknown"}, nil)
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		assert.Contains(t, w.Body.String(), "Error Occurred")
 	})
@@ -114,7 +114,7 @@ func TestErrorPages_RenderRenderOrRedirect(t *testing.T) {
 		w := httptest.NewRecorder()
 		c, _ := gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/", nil)
-		ep.RenderErrorOrRedirect(c, ErrorTemplateValues{Error: ErrorPageNotFound})
+		ep.RenderErrorOrRedirect(c, ErrorTemplateValues{Error: ErrorPageNotFound}, nil)
 		assert.Equal(t, http.StatusOK, w.Code) // No status set because it returns early
 		assert.Empty(t, w.Body.String())       // No body because it returns early
 
@@ -122,7 +122,7 @@ func TestErrorPages_RenderRenderOrRedirect(t *testing.T) {
 		w = httptest.NewRecorder()
 		c, _ = gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/", nil)
-		ep.RenderErrorOrRedirect(c, ErrorTemplateValues{Error: ErrorPageUnauthorized})
+		ep.RenderErrorOrRedirect(c, ErrorTemplateValues{Error: ErrorPageUnauthorized}, nil)
 		assert.Equal(t, http.StatusOK, w.Code) // No status set because it returns early
 		assert.Empty(t, w.Body.String())       // No body because it returns early
 
@@ -130,7 +130,7 @@ func TestErrorPages_RenderRenderOrRedirect(t *testing.T) {
 		w = httptest.NewRecorder()
 		c, _ = gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/", nil)
-		ep.RenderErrorOrRedirect(c, ErrorTemplateValues{Error: ErrorPageInternalError})
+		ep.RenderErrorOrRedirect(c, ErrorTemplateValues{Error: ErrorPageInternalError}, nil)
 		assert.Equal(t, http.StatusOK, w.Code) // No status set because it returns early
 		assert.Empty(t, w.Body.String())       // No body because it returns early
 
@@ -138,7 +138,7 @@ func TestErrorPages_RenderRenderOrRedirect(t *testing.T) {
 		w = httptest.NewRecorder()
 		c, _ = gin.CreateTestContext(w)
 		c.Request, _ = http.NewRequest("GET", "/", nil)
-		ep.RenderErrorOrRedirect(c, ErrorTemplateValues{Error: "unknown"})
+		ep.RenderErrorOrRedirect(c, ErrorTemplateValues{Error: "unknown"}, nil)
 		assert.Equal(t, http.StatusInternalServerError, w.Code)
 		assert.Contains(t, w.Body.String(), "Error Occurred")
 	})

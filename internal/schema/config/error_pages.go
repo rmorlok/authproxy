@@ -2,9 +2,11 @@ package config
 
 import (
 	"html/template"
+	"log/slog"
 	"net/url"
 
 	"github.com/gin-gonic/gin"
+	"github.com/rmorlok/authproxy/internal/apctx"
 )
 
 type ErrorPage string
@@ -71,7 +73,14 @@ func (ep *ErrorPages) UrlForError(error ErrorPage, publicBaseUrl string) string 
 	return parsedUrl.String()
 }
 
-func (ep *ErrorPages) RenderErrorOrRedirect(gctx *gin.Context, vals ErrorTemplateValues) {
+func (ep *ErrorPages) RenderErrorOrRedirect(gctx *gin.Context, vals ErrorTemplateValues, err error) {
+	if err != nil {
+		slog.Default().Error(err.Error(), "error", err)
+		if apctx.IsDebugMode(gctx.Request.Context()) {
+			gctx.Header("x-authproxy-debug", err.Error())
+		}
+	}
+
 	switch vals.Error {
 	case ErrorPageNotFound:
 		if ep.NotFound != "" {
