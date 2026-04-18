@@ -201,6 +201,7 @@ type PermissionValidatorBuilder struct {
 	namespaceQueryParam string
 	namespacePathParam  string
 	idExtractor         IdExtractor
+	unauthRedirectGen   AuthRedirectUrlGenerator
 }
 
 // ForResource sets the resource type being accessed (e.g., "connections", "connectors").
@@ -250,6 +251,18 @@ func (pb *PermissionValidatorBuilder) ForNamespaceQueryParam(param string) *Perm
 // Example: ForNamespacePathParam("ns") extracts from "/namespaces/:ns/..."
 func (pb *PermissionValidatorBuilder) ForNamespacePathParam(param string) *PermissionValidatorBuilder {
 	pb.namespacePathParam = param
+	return pb
+}
+
+// WithRedirectOnUnauthenticated causes the generated middleware to issue a 302 redirect to the
+// URL produced by gen.GetInitiateSessionUrl(currentUrl) when the request arrives unauthenticated,
+// rather than returning 401. Authenticated-but-unauthorized requests still receive 403.
+//
+// This is intended for browser-initiated endpoints (e.g. OAuth2 redirects) where a bare 401 is
+// a dead end for the user. The generated login URL is expected to round-trip the user back to
+// the original endpoint with an auth_token query parameter after successful authentication.
+func (pb *PermissionValidatorBuilder) WithRedirectOnUnauthenticated(gen AuthRedirectUrlGenerator) *PermissionValidatorBuilder {
+	pb.unauthRedirectGen = gen
 	return pb
 }
 
@@ -330,5 +343,5 @@ func (pb *PermissionValidatorBuilder) Build() gin.HandlerFunc {
 		}
 	}
 
-	return pb.s.requiredWithPostValidation([]AuthValidator{permissionValidator}, postValidator)
+	return pb.s.requiredWithRedirectAndPostValidation(pb.unauthRedirectGen, []AuthValidator{permissionValidator}, postValidator)
 }

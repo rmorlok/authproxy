@@ -20,27 +20,23 @@ import (
 )
 
 type PublicOauth2Routes struct {
-	cfg         config.C
-	authService auth.A
-	db          database.DB
-	r           apredis.Client
-	httpf       httpf.F
-	encrypt     encrypt.E
-	oauthf      oauth2.Factory
-	logger      *slog.Logger
+	cfg                         config.C
+	authService                 auth.A
+	sessionInitiateUrlGenerator SessionInitiateUrlGenerator
+	db                          database.DB
+	r                           apredis.Client
+	httpf                       httpf.F
+	encrypt                     encrypt.E
+	oauthf                      oauth2.Factory
+	logger                      *slog.Logger
 }
 
 func (r *PublicOauth2Routes) callback(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 
-	ra := auth.GetAuthFromGinContext(gctx)
-	if !ra.IsAuthenticated() {
-		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
-			Error:       sconfig.ErrorPageUnauthorized,
-			Description: "Request is not part of an authenticated session.",
-		}, errors.New("auth not present on context"))
-		return
-	}
+	ra := auth.MustGetAuthFromGinContext(gctx)
+	// Permission was checked at the middleware level; there's no per-resource namespace to validate here.
+	auth.MustGetValidatorFromGinContext(gctx).MarkValidated()
 
 	if gctx.Query("state") == "" {
 		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
@@ -93,13 +89,9 @@ type RedirectParams struct {
 func (r *PublicOauth2Routes) redirect(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 
-	ra := auth.GetAuthFromGinContext(gctx)
-	if !ra.IsAuthenticated() {
-		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
-			Error: sconfig.ErrorPageInternalError,
-		}, errors.New("auth not present on context"))
-		return
-	}
+	ra := auth.MustGetAuthFromGinContext(gctx)
+	// Permission was checked at the middleware level; there's no per-resource namespace to validate here.
+	auth.MustGetValidatorFromGinContext(gctx).MarkValidated()
 
 	// If we are not in a session, we create one, but cancel it after the oauth flow completes
 	shouldCancelSession := false
@@ -166,13 +158,23 @@ func (r *PublicOauth2Routes) redirect(gctx *gin.Context) {
 }
 
 func (r *PublicOauth2Routes) Register(g *gin.Engine) {
-	g.GET("/oauth2/callback", r.authService.Required(), r.callback)
-	g.GET("/oauth2/redirect", r.authService.Optional(), r.redirect) // Auth here is optional so we can handle nice redirects for unauthed requests
+	// Both endpoints are browser-initiated via 3rd-party OAuth providers. Require auth + permission to create
+	// connections, but redirect through the standard login flow on unauthenticated requests so an idled-out
+	// session doesn't dead-end the user mid-flow.
+	mw := r.authService.NewRequiredBuilder().
+		ForResource("connections").
+		ForVerb("create").
+		WithRedirectOnUnauthenticated(r.sessionInitiateUrlGenerator).
+		Build()
+
+	g.GET("/oauth2/callback", mw, r.callback)
+	g.GET("/oauth2/redirect", mw, r.redirect)
 }
 
 func NewPublicOauth2Routes(
 	cfg config.C,
 	authService auth.A,
+	sessionInitiateUrlGenerator SessionInitiateUrlGenerator,
 	db database.DB,
 	r apredis.Client,
 	c iface.C,
@@ -181,13 +183,14 @@ func NewPublicOauth2Routes(
 	logger *slog.Logger,
 ) *PublicOauth2Routes {
 	return &PublicOauth2Routes{
-		cfg:         cfg,
-		authService: authService,
-		db:          db,
-		r:           r,
-		httpf:       httpf,
-		encrypt:     encrypt,
-		oauthf:      oauth2.NewFactory(cfg, db, r, c, httpf, encrypt, logger),
-		logger:      logger,
+		cfg:                         cfg,
+		authService:                 authService,
+		sessionInitiateUrlGenerator: sessionInitiateUrlGenerator,
+		db:                          db,
+		r:                           r,
+		httpf:                       httpf,
+		encrypt:                     encrypt,
+		oauthf:                      oauth2.NewFactory(cfg, db, r, c, httpf, encrypt, logger),
+		logger:                      logger,
 	}
 }

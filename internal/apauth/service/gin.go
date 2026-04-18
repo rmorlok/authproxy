@@ -68,15 +68,37 @@ func (j *service) Required(validators ...AuthValidator) gin.HandlerFunc {
 	return j.requiredWithPostValidation(validators, nil)
 }
 
+// RequiredWithAuthRedirect is like Required but, when the request is unauthenticated, issues a 302 redirect to
+// the login URL produced by gen rather than returning 401. The original request URL is passed through to gen so
+// the browser lands back on this endpoint after authenticating (typically with an auth_token query param).
+func (j *service) RequiredWithAuthRedirect(gen AuthRedirectUrlGenerator, validators ...AuthValidator) gin.HandlerFunc {
+	return j.requiredWithRedirectAndPostValidation(gen, validators, nil)
+}
+
 // Required middleware requires authentication and validates the actor. There must be an authenticated actor, and
 // the actor must pass the validators passed here and defaulted in the service.
 func (j *service) requiredWithPostValidation(validators []AuthValidator, postValidation func(gctx *gin.Context, ra *core.RequestAuth)) gin.HandlerFunc {
+	return j.requiredWithRedirectAndPostValidation(nil, validators, postValidation)
+}
+
+// requiredWithRedirectAndPostValidation is the shared implementation for Required/RequiredWithAuthRedirect and
+// the permission builder. If unauthRedirect is nil the behavior matches Required (401 on unauthenticated). If
+// set, unauthenticated requests are redirected to the URL produced by unauthRedirect.GetInitiateSessionUrl with
+// the current request URL as the return_to target.
+func (j *service) requiredWithRedirectAndPostValidation(unauthRedirect AuthRedirectUrlGenerator, validators []AuthValidator, postValidation func(gctx *gin.Context, ra *core.RequestAuth)) gin.HandlerFunc {
 	return func(c *gin.Context) {
 		_next := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			a := GetAuthFromRequest(r)
 
-			// This check is duplicative of the one in Auth, but it's here for clarity.
 			if !a.IsAuthenticated() {
+				if unauthRedirect != nil {
+					returnToUrl := j.service.GetBaseUrl() + r.URL.RequestURI()
+					http.Redirect(w, r, unauthRedirect.GetInitiateSessionUrl(returnToUrl), http.StatusFound)
+					c.Abort()
+					return
+				}
+
+				// This check is duplicative of the one in Auth, but it's here for clarity.
 				httperr.Unauthorized().
 					WriteResponse(r.Context(), nil, w)
 				c.Abort()
@@ -99,7 +121,14 @@ func (j *service) requiredWithPostValidation(validators []AuthValidator, postVal
 				postValidation(c, a)
 			}
 		})
-		j.Auth(_next, c.Abort).ServeHTTP(c.Writer, c.Request)
+
+		if unauthRedirect != nil {
+			// Use Trace so unauthenticated requests reach _next where we can redirect. Invalid/expired JWTs
+			// still short-circuit with an error from establishAuthFromRequest.
+			j.Trace(_next, c.Abort).ServeHTTP(c.Writer, c.Request)
+		} else {
+			j.Auth(_next, c.Abort).ServeHTTP(c.Writer, c.Request)
+		}
 	}
 }
 

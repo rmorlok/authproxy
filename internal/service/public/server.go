@@ -109,6 +109,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 	routesOauth2 := common_routes.NewPublicOauth2Routes(
 		dm.GetConfig(),
 		authService,
+		&root.HostApplication,
 		dm.GetDatabase(),
 		dm.GetRedisClient(),
 		dm.GetCoreService(),
