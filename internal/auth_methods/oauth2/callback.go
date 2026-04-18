@@ -35,6 +35,12 @@ func (o *oAuth2Connection) CallbackFrom3rdParty(ctx context.Context, query url.V
 		return errorRedirectPage, errors.New("state is nil")
 	}
 
+	// Delete the state from Redis now that the callback is consuming it.
+	// This is the terminal step of the OAuth flow, so the state is no longer needed.
+	if err := deleteStateFromRedis(ctx, o.r, o.state.Id); err != nil {
+		return errorRedirectPage, fmt.Errorf("failed to clean up oauth state: %w", err)
+	}
+
 	code := query.Get("code")
 	if code == "" {
 		return errorRedirectPage, errors.New("no code in query")

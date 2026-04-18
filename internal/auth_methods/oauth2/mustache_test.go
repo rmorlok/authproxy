@@ -7,8 +7,10 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/internal/apid"
 	mockLog "github.com/rmorlok/authproxy/internal/aplog/mock"
+	mockRedis "github.com/rmorlok/authproxy/internal/apredis/mock"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	mockCore "github.com/rmorlok/authproxy/internal/core/mock"
@@ -329,13 +331,17 @@ func TestCallbackFrom3rdParty_TemplatedEndpoint(t *testing.T) {
 		h := mockH.NewFactoryWithMockingClient(ctrl)
 		db := mockDb.NewMockDB(ctrl)
 		encrypt := mockEncrypt.NewMockE(ctrl)
+		r := mockRedis.NewMockClient(ctrl)
 		logger, _ := mockLog.NewTestLogger(t)
+
+		// CallbackFrom3rdParty deletes the OAuth state from Redis after consuming it
+		r.EXPECT().Del(gomock.Any(), gomock.Any()).Return(redis.NewIntCmd(context.Background())).AnyTimes()
 
 		return &oAuth2Connection{
 			cfg:     cfg,
 			db:      db,
 			httpf:   h,
-			r:       nil,
+			r:       r,
 			encrypt: encrypt,
 			logger:  logger,
 			connection: &mockCore.Connection{

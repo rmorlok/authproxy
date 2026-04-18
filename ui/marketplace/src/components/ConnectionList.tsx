@@ -23,12 +23,13 @@ import {
   selectSubmittingForm,
   selectFormSubmitError,
   submitConnectionFormAsync,
+  getSetupStepAsync,
   clearFormStep,
 } from '../store';
 import ConnectionCard, { ConnectionCardSkeleton } from './ConnectionCard';
 import ConnectionFormStep from './ConnectionFormStep';
 import { AppDispatch } from '../store';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 
 /**
@@ -36,6 +37,7 @@ import AddIcon from '@mui/icons-material/Add';
  */
 const ConnectionList: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
+  const [searchParams, setSearchParams] = useSearchParams();
   const connections = useSelector(selectConnections);
   const status = useSelector(selectConnectionsStatus);
   const error = useSelector(selectConnectionsError);
@@ -54,17 +56,35 @@ const ConnectionList: React.FC = () => {
     }
   }, [status, connectorsStatus, dispatch]);
 
+  // After OAuth completes, the callback redirects here with setup=pending&connection_id=...
+  // Detect these params and fetch the configure step to show the setup form.
+  useEffect(() => {
+    const setup = searchParams.get('setup');
+    const connectionId = searchParams.get('connection_id');
+
+    if (setup === 'pending' && connectionId) {
+      dispatch(getSetupStepAsync(connectionId));
+      // Clean up the URL params so a page refresh doesn't re-trigger
+      searchParams.delete('setup');
+      searchParams.delete('connection_id');
+      setSearchParams(searchParams, { replace: true });
+    }
+  }, [searchParams, setSearchParams, dispatch]);
+
   const handleFormSubmit = useCallback((connectionId: string, data: unknown) => {
-    dispatch(submitConnectionFormAsync({ connectionId, data })).then((action) => {
+    const stepId = currentFormStep?.stepId ?? '';
+    dispatch(submitConnectionFormAsync({ connectionId, stepId, data })).then((action) => {
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
           window.location.href = response.redirect_url;
+        } else {
+          // Refresh connections list to reflect updated state
+          dispatch(fetchConnectionsAsync());
         }
-        // If type === 'complete', Redux state clears the form and we should refresh
       }
     });
-  }, [dispatch]);
+  }, [dispatch, currentFormStep]);
 
   const handleFormCancel = useCallback(() => {
     dispatch(clearFormStep());

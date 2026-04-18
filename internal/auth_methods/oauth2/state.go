@@ -135,10 +135,15 @@ func getOAuth2State(
 	o := newOAuth2(cfg, db, r, core, encrypt, logger, httpf, connection)
 	o.state = &s
 
-	deleteResult := r.Del(ctx, getStateRedisKey(stateId))
-	if deleteResult.Err() != nil {
-		return nil, fmt.Errorf("failed to delete oauth state from redis for id %s: %w", stateId.String(), result.Err())
-	}
-
 	return o, nil
+}
+
+// deleteStateFromRedis removes the OAuth state from Redis. This should be called
+// after the state has been fully consumed (i.e., after the callback processes it).
+func deleteStateFromRedis(ctx context.Context, r apredis.Client, stateId apid.ID) error {
+	result := r.Del(ctx, getStateRedisKey(stateId))
+	if result.Err() != nil {
+		return fmt.Errorf("failed to delete oauth state from redis for id %s: %w", stateId.String(), result.Err())
+	}
+	return nil
 }

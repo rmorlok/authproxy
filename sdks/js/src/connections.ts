@@ -104,6 +104,7 @@ export function isCompleteResponse(response: InitiateConnectionResponse): respon
 }
 
 export interface SubmitConnectionRequest {
+    step_id: string;
     data: unknown;
 }
 
@@ -173,8 +174,8 @@ export const initiateConnection = (
 /**
  * Submit form data for a connection setup step
  */
-export const submitConnection = (connectionId: string, data: unknown) => {
-    const request: SubmitConnectionRequest = { data };
+export const submitConnection = (connectionId: string, stepId: string, data: unknown) => {
+    const request: SubmitConnectionRequest = { step_id: stepId, data };
 
     return client.post<InitiateConnectionResponse>(
         `/api/v1/connections/${connectionId}/_submit`,
