@@ -79,7 +79,7 @@ AUTH_PROXY_GCP_SECRETS_TEST=1 GCP_PROJECT_ID=my-project \
   go test -tags "integration,gcp" -v ./encrypt/...
 ```
 
-The test also loads a `.env` file from `integration_tests/encrypt/`, `integration_tests/`, or the repo root (in that order), so you can drop your credentials in whichever location is convenient. Example `.env`:
+The test walks up from the current working directory and loads any `.env` files it finds (nearest wins), so you can drop your credentials wherever is convenient — the package directory, `integration_tests/`, the repo root, etc. Example `.env`:
 
 ```
 AUTH_PROXY_GCP_SECRETS_TEST=1

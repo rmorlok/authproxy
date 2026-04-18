@@ -91,7 +91,7 @@ go test ./internal/database/...
 set -a && source .env && set +a && go test ./internal/database/...
 ```
 
-The `.env` file at the project root contains the PostgreSQL connection credentials. The test helper (`test_db.go`) also calls `godotenv.Load()` automatically, so tests pick up the `.env` file when it exists. The key variables to look for in `.env` are:
+The `.env` file at the project root contains the PostgreSQL connection credentials. The test helper (`test_db.go`) calls `util.LoadDotEnv()`, which walks up from the current working directory loading every `.env` file it finds (nearest wins), so tests pick up the `.env` file when it exists. The key variables to look for in `.env` are:
 
 - `AUTH_PROXY_TEST_DATABASE_PROVIDER` — must be set to `postgres` to enable PostgreSQL tests
 - `POSTGRES_TEST_HOST` — database host (typically `localhost`)

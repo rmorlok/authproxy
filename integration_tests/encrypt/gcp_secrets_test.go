@@ -12,12 +12,12 @@ import (
 
 	secretmanager "cloud.google.com/go/secretmanager/apiv1"
 	secretmanagerpb "cloud.google.com/go/secretmanager/apiv1/secretmanagerpb"
-	"github.com/joho/godotenv"
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
 )
 
@@ -27,11 +27,10 @@ const (
 )
 
 func init() {
-	// Best-effort load of a .env file so the test is runnable locally when
-	// secrets are provided in a .env file. go test runs with CWD set to the
-	// package directory (integration_tests/encrypt), so look in this dir, the
-	// integration_tests dir, and the repo root.
-	_ = godotenv.Load(".env", "../.env", "../../.env")
+	// Best-effort load of .env files walking up from the current working
+	// directory so the test is runnable locally regardless of where the
+	// user keeps their .env (repo root, integration_tests/, etc).
+	util.LoadDotEnv()
 }
 
 func TestGcpSecretManagerKeySyncAndReencrypt(t *testing.T) {

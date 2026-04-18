@@ -9,7 +9,6 @@ import (
 
 	"github.com/fatih/color"
 	"github.com/gin-gonic/gin"
-	"github.com/joho/godotenv"
 	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/encrypt"
@@ -18,6 +17,7 @@ import (
 	api "github.com/rmorlok/authproxy/internal/service/api"
 	public "github.com/rmorlok/authproxy/internal/service/public"
 	"github.com/rmorlok/authproxy/internal/service/worker"
+	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/spf13/cobra"
 )
 
@@ -156,8 +156,9 @@ func cmdReencrypt() *cobra.Command {
 }
 
 func main() {
-	// Optionally load environment variables from a .env file.
-	_ = godotenv.Load()
+	// Optionally load environment variables from .env files walking up
+	// from the current working directory.
+	util.LoadDotEnv()
 
 	var rootCmd = &cobra.Command{
 		Use: "authproxy",
