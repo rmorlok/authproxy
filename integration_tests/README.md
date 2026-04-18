@@ -92,6 +92,36 @@ Notes:
 - For CI, provide `GCP_PROJECT_ID` and `GOOGLE_APPLICATION_CREDENTIALS_JSON` (the full service account key JSON) as repository secrets. The GitHub Actions workflow writes the JSON to a temp file and points `GOOGLE_APPLICATION_CREDENTIALS` at it.
 - The workflow runs only on pushes to `main` (and manual `workflow_dispatch`) to avoid exposing the GCP secrets to PRs from forks.
 
+## HashiCorp Vault Integration Test
+
+This test hits a running HashiCorp Vault server and is gated behind the `vault` build tag and an env flag. Unlike the AWS and GCP tests, Vault runs locally (in dev mode) both on developer machines and in CI — no external credentials required.
+
+Requirements:
+- A Vault server reachable at `VAULT_ADDR` with a token in `VAULT_TOKEN` that can read and write the `secret/` KV v2 mount.
+- `AUTH_PROXY_VAULT_TEST=1` set to opt in.
+
+The `docker-compose.yml` in this directory already includes a Vault dev-mode service with the root token `dev-only-token`. Bring it up with `docker compose up -d` and point the test at it:
+
+```bash
+cd integration_tests
+AUTH_PROXY_VAULT_TEST=1 \
+  VAULT_ADDR=http://127.0.0.1:8200 \
+  VAULT_TOKEN=dev-only-token \
+  go test -tags "integration,vault" -v ./encrypt/...
+```
+
+Or start Vault ad hoc:
+
+```bash
+docker run -d --name vault -p 8200:8200 --cap-add=IPC_LOCK \
+  -e VAULT_DEV_ROOT_TOKEN_ID=dev-only-token \
+  hashicorp/vault:latest server -dev
+```
+
+Notes:
+- The test writes a short-lived KV v2 secret at a unique path and deletes its metadata on cleanup.
+- CI uses `.github/workflows/vault-integration.yml`, which runs Vault as a dev-mode container inside the workflow. The workflow runs on pushes to `main` and on `workflow_dispatch`.
+
 ## Teardown
 
 ```bash

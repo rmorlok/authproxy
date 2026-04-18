@@ -76,3 +76,21 @@ services:
       mc alias set minio http://minio:9000 minioadmin minioadmin &&
       mc mb --ignore-existing minio/authproxy-request-logs
       "
+
+  vault:
+    image: hashicorp/vault:latest
+    ports:
+      - "8200:8200"
+    environment:
+      VAULT_DEV_ROOT_TOKEN_ID: dev-only-token
+      VAULT_DEV_LISTEN_ADDRESS: 0.0.0.0:8200
+      # Dev mode does not need mlock (and mlock via CAP_IPC_LOCK requires
+      # CAP_SETFCAP to install at runtime). Skip setcap so the entrypoint
+      # runs cleanly without extra privileges.
+      SKIP_SETCAP: "true"
+    command: server -dev
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:8200/v1/sys/health"]
+      interval: 3s
+      timeout: 3s
+      retries: 10
