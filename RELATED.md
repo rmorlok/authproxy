@@ -83,6 +83,7 @@ Below are summaries and comparison tables for the projects in this repo's list. 
 | [Airweave](https://airweave.ai/) | Open source + hosted | Embedded for AI (data ingestion) | 50+ data sources | Yes (open source; self-host or hosted) | Unified retrieval layer for agents. |
 | [LiteLLM](https://www.litellm.ai/) | Open source + commercial | AI gateway | 100+ providers | Yes (OSS self-host; cloud option) | LLM gateway with auth, quotas, and routing. |
 | [Bifrost](https://docs.getbifrost.ai/) | Open source + commercial | AI gateway | 20+ providers | Yes (self-hostable gateway) | OpenAI-compatible gateway with governance and routing. |
+| [Agent Vault](https://github.com/Infisical/agent-vault) | Open source (MIT) + commercial | Credential proxy for AI agents | Any HTTPS service (no connector catalog) | Yes (binary, Docker, from source) | Infisical's HTTP credential broker; injects credentials at the network layer so agents never see secrets. |
 
 **AI / Agent Product Notes**
 
@@ -92,6 +93,7 @@ Below are summaries and comparison tables for the projects in this repo's list. 
 - **Airweave**: Open-source context retrieval layer with 50+ prebuilt connectors; focuses on ingestion and unified search for agents. Site FAQ says it is open source and can be self-hosted or used via hosted platform. See: https://airweave.ai/ and https://docs.airweave.ai/.
 - **LiteLLM**: Open-source LLM gateway supporting 100+ provider integrations, with spend tracking and routing. OSS page highlights self-hosting with no data sent to LiteLLM servers; docs show running the proxy via Docker or CLI. See: https://www.litellm.ai/oss and https://docs.litellm.ai/.
 - **Bifrost**: Open-source AI gateway with 20+ providers and OpenAI-compatible APIs; supports routing, failover, and governance. GitHub repo is Apache-2.0 and docs show local deployment via Docker or NPX. See: https://github.com/maximhq/bifrost and https://docs.getbifrost.ai/.
+- **Agent Vault**: Open-source HTTP credential proxy by Infisical, purpose-built for AI agents. Agents get a scoped session and a local `HTTPS_PROXY`; Agent Vault injects the credential at the network layer so credentials are never returned to the agent. Works with any HTTP-speaking agent (Claude Code, Cursor, Codex, custom Python/TypeScript, sandboxed processes) and any HTTPS API — there is no prebuilt connector catalog; you register your own services and credentials. Ships as a binary, Docker image, or from source; MIT-licensed with a separate `ee/` directory for enterprise features. Offers a container-sandbox mode (iptables-locked egress through the proxy) and an SDK for orchestrating sandboxed agents (Docker/Daytona/E2B). See: https://github.com/Infisical/agent-vault, https://docs.agent-vault.dev, and https://infisical.com/blog/agent-vault-the-open-source-credential-proxy-and-vault-for-agents.
 
 ---
 
@@ -131,3 +133,4 @@ Below are summaries and comparison tables for the projects in this repo's list. 
 | Airweave | Agent data ingestion | Code-first | Sync + retrieval | Connectors for data sources | Yes (open source; self-host or hosted) |
 | LiteLLM | LLM gateway | Code-first | N/A | Provider integrations | Yes (OSS self-host; cloud option) |
 | Bifrost | LLM gateway | Code-first | N/A | Provider integrations | Yes (self-hostable gateway) |
+| Agent Vault | Credential brokerage for AI agents | Code-first (CLI + SDK) | N/A (network-layer proxy) | User-registered services + credentials; no prebuilt connectors | Yes (OSS MIT; binary or Docker) |
