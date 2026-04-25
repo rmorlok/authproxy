@@ -173,6 +173,13 @@ func (a *Actor) setFromData(d IActorData) {
 	a.Permissions = d.GetPermissions()
 	a.Labels = d.GetLabels()
 
+	// Annotations follow PATCH semantics: a nil map leaves existing annotations
+	// unchanged so server-side metadata is not wiped by callers (e.g. JWT auth)
+	// that don't carry annotations.
+	if annotations := d.GetAnnotations(); annotations != nil {
+		a.Annotations = annotations
+	}
+
 	// Handle extended fields via type assertion
 	if extended, ok := d.(IActorDataExtended); ok {
 		a.EncryptedKey = extended.GetEncryptedKey()
@@ -189,6 +196,19 @@ func (a *Actor) sameAsData(d IActorData) bool {
 	for k, v := range a.Labels {
 		if dv, ok := dLabels[k]; !ok || dv != v {
 			return false
+		}
+	}
+
+	// Compare annotations only when the caller provided them (matches the
+	// PATCH semantics in setFromData).
+	if dAnnotations := d.GetAnnotations(); dAnnotations != nil {
+		if len(a.Annotations) != len(dAnnotations) {
+			return false
+		}
+		for k, v := range a.Annotations {
+			if dv, ok := dAnnotations[k]; !ok || dv != v {
+				return false
+			}
 		}
 	}
 

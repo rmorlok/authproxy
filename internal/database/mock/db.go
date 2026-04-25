@@ -40,6 +40,20 @@ func (m *MockIActorData) EXPECT() *MockIActorDataMockRecorder {
 	return m.recorder
 }
 
+// GetAnnotations mocks base method.
+func (m *MockIActorData) GetAnnotations() map[string]string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAnnotations")
+	ret0, _ := ret[0].(map[string]string)
+	return ret0
+}
+
+// GetAnnotations indicates an expected call of GetAnnotations.
+func (mr *MockIActorDataMockRecorder) GetAnnotations() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAnnotations", reflect.TypeOf((*MockIActorData)(nil).GetAnnotations))
+}
+
 // GetExternalId mocks base method.
 func (m *MockIActorData) GetExternalId() string {
 	m.ctrl.T.Helper()
@@ -131,6 +145,20 @@ func NewMockIActorDataExtended(ctrl *gomock.Controller) *MockIActorDataExtended 
 // EXPECT returns an object that allows the caller to indicate expected use.
 func (m *MockIActorDataExtended) EXPECT() *MockIActorDataExtendedMockRecorder {
 	return m.recorder
+}
+
+// GetAnnotations mocks base method.
+func (m *MockIActorDataExtended) GetAnnotations() map[string]string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAnnotations")
+	ret0, _ := ret[0].(map[string]string)
+	return ret0
+}
+
+// GetAnnotations indicates an expected call of GetAnnotations.
+func (mr *MockIActorDataExtendedMockRecorder) GetAnnotations() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAnnotations", reflect.TypeOf((*MockIActorDataExtended)(nil).GetAnnotations))
 }
 
 // GetEncryptedKey mocks base method.
