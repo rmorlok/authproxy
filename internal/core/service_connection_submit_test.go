@@ -350,7 +350,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 		defer ctrl.Finish()
 
 		conn, _ := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
-		step := cschema.SetupStepVerify
+		step := cschema.SetupStepVerify.String()
 		conn.SetupStep = &step
 
 		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
@@ -364,7 +364,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 		defer ctrl.Finish()
 
 		conn, _ := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
-		step := cschema.SetupStepVerifyFailed
+		step := cschema.SetupStepVerifyFailed.String()
 		conn.SetupStep = &step
 		errMsg := `probe "ping" failed: 401 unauthorized`
 		conn.SetupError = &errMsg

@@ -21,7 +21,7 @@ func (c *connection) HandleCredentialsEstablished(ctx context.Context) (iface.Po
 	}
 
 	if len(connectorDef.Probes) > 0 {
-		verifyStep := cschema.SetupStepVerify
+		verifyStep := cschema.SetupStepVerify.String()
 		if err := c.SetSetupStep(ctx, &verifyStep); err != nil {
 			return iface.PostAuthOutcome{}, fmt.Errorf("failed to set setup step to verify: %w", err)
 		}
@@ -32,7 +32,11 @@ func (c *connection) HandleCredentialsEstablished(ctx context.Context) (iface.Po
 	}
 
 	if connectorDef.SetupFlow.HasConfigure() {
-		configureStep := "configure:0"
+		first, err := cschema.NewIndexedSetupStep(cschema.SetupPhaseConfigure, 0)
+		if err != nil {
+			return iface.PostAuthOutcome{}, fmt.Errorf("failed to construct configure:0 setup step: %w", err)
+		}
+		configureStep := first.String()
 		if err := c.SetSetupStep(ctx, &configureStep); err != nil {
 			return iface.PostAuthOutcome{}, fmt.Errorf("failed to set setup step to configure:0: %w", err)
 		}
@@ -57,7 +61,7 @@ func (c *connection) HandleAuthFailed(ctx context.Context, authErr error) error 
 		return fmt.Errorf("failed to record setup error after auth failure: %w", err)
 	}
 
-	failedStep := cschema.SetupStepAuthFailed
+	failedStep := cschema.SetupStepAuthFailed.String()
 	if err := c.SetSetupStep(ctx, &failedStep); err != nil {
 		return fmt.Errorf("failed to set setup step to auth_failed: %w", err)
 	}

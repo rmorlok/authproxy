@@ -63,8 +63,13 @@ func (s *service) verifyConnection(ctx context.Context, t *asynq.Task) error {
 
 	// Guard against stale tasks: only run if the connection is still in verify phase.
 	setupStep := conn.GetSetupStep()
-	if setupStep == nil || *setupStep != cschema.SetupStepVerify {
+	if setupStep == nil {
 		logger.Info("connection is no longer in verify phase; skipping", "setup_step", setupStep)
+		return nil
+	}
+	parsed, err := cschema.ParseSetupStep(*setupStep)
+	if err != nil || !parsed.Equals(cschema.SetupStepVerify) {
+		logger.Info("connection is no longer in verify phase; skipping", "setup_step", *setupStep)
 		return nil
 	}
 

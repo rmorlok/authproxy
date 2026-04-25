@@ -77,132 +77,213 @@ func (sf *SetupFlow) TotalSteps() int {
 	return total
 }
 
-// GetStepBySetupStep returns the step definition and its 0-based global index for the given
-// setup step string (e.g. "preconnect:0", "configure:1").
-func (sf *SetupFlow) GetStepBySetupStep(setupStep string) (*SetupFlowStep, int, error) {
-	phase, index, err := ParseSetupStep(setupStep)
-	if err != nil {
-		return nil, 0, err
-	}
+// SetupStepPhase identifies which phase of the setup flow a step belongs to. The indexed
+// phases (preconnect, configure) carry an integer index in their canonical setup-step form;
+// the others are singleton pseudo-steps with no index.
+type SetupStepPhase string
 
-	switch phase {
-	case "preconnect":
-		if sf.Preconnect == nil || index >= len(sf.Preconnect.Steps) {
-			return nil, 0, fmt.Errorf("preconnect step index %d out of range", index)
-		}
-		return &sf.Preconnect.Steps[index], index, nil
-	case "configure":
-		if sf.Configure == nil || index >= len(sf.Configure.Steps) {
-			return nil, 0, fmt.Errorf("configure step index %d out of range", index)
-		}
-		globalIndex := index
-		if sf.Preconnect != nil {
-			globalIndex += len(sf.Preconnect.Steps)
-		}
-		return &sf.Configure.Steps[index], globalIndex, nil
-	default:
-		return nil, 0, fmt.Errorf("unknown phase %q", phase)
-	}
+const (
+	SetupPhasePreconnect   SetupStepPhase = "preconnect"
+	SetupPhaseAuth         SetupStepPhase = "auth"
+	SetupPhaseVerify       SetupStepPhase = "verify"
+	SetupPhaseConfigure    SetupStepPhase = "configure"
+	SetupPhaseVerifyFailed SetupStepPhase = "verify_failed"
+	SetupPhaseAuthFailed   SetupStepPhase = "auth_failed"
+)
+
+// String returns the underlying phase identifier.
+func (p SetupStepPhase) String() string { return string(p) }
+
+// IsIndexed reports whether the phase carries a 0-based step index in its canonical form
+// (preconnect, configure). Singleton pseudo-steps return false.
+func (p SetupStepPhase) IsIndexed() bool {
+	return p == SetupPhasePreconnect || p == SetupPhaseConfigure
 }
 
-// FirstSetupStep returns the setup step string for the first step in the flow.
-// Returns "preconnect:0" if preconnect steps exist, otherwise "configure:0".
-// Returns empty string if no steps exist.
-func (sf *SetupFlow) FirstSetupStep() string {
-	if sf == nil {
+// IsTerminalFailure reports whether the phase represents a terminal failure pseudo-step
+// (verify_failed, auth_failed). Connections in this phase are retryable via the retry endpoint.
+func (p SetupStepPhase) IsTerminalFailure() bool {
+	return p == SetupPhaseVerifyFailed || p == SetupPhaseAuthFailed
+}
+
+// IsValid reports whether p is one of the recognized phases.
+func (p SetupStepPhase) IsValid() bool {
+	switch p {
+	case SetupPhasePreconnect, SetupPhaseAuth, SetupPhaseVerify, SetupPhaseConfigure,
+		SetupPhaseVerifyFailed, SetupPhaseAuthFailed:
+		return true
+	}
+	return false
+}
+
+// SetupStep is a typed representation of a setup-flow step. It captures the phase and, for
+// indexed phases, the 0-based step index. The zero SetupStep is invalid; use ParseSetupStep,
+// NewSetupStep, or NewIndexedSetupStep to construct one.
+type SetupStep struct {
+	phase SetupStepPhase
+	index int
+}
+
+// NewSetupStep returns a SetupStep for a singleton (non-indexed) phase.
+// Returns an error if phase is indexed or unknown.
+func NewSetupStep(phase SetupStepPhase) (SetupStep, error) {
+	if !phase.IsValid() {
+		return SetupStep{}, fmt.Errorf("unknown setup phase %q", phase)
+	}
+	if phase.IsIndexed() {
+		return SetupStep{}, fmt.Errorf("phase %q is indexed; use NewIndexedSetupStep", phase)
+	}
+	return SetupStep{phase: phase}, nil
+}
+
+// NewIndexedSetupStep returns a SetupStep for an indexed phase (preconnect, configure).
+// Returns an error if phase is not indexed or index is negative.
+func NewIndexedSetupStep(phase SetupStepPhase, index int) (SetupStep, error) {
+	if !phase.IsIndexed() {
+		return SetupStep{}, fmt.Errorf("phase %q is not indexed", phase)
+	}
+	if index < 0 {
+		return SetupStep{}, fmt.Errorf("setup step index must be non-negative, got %d", index)
+	}
+	return SetupStep{phase: phase, index: index}, nil
+}
+
+// Predefined SetupSteps for the singleton phases.
+var (
+	SetupStepAuth         = SetupStep{phase: SetupPhaseAuth}
+	SetupStepVerify       = SetupStep{phase: SetupPhaseVerify}
+	SetupStepVerifyFailed = SetupStep{phase: SetupPhaseVerifyFailed}
+	SetupStepAuthFailed   = SetupStep{phase: SetupPhaseAuthFailed}
+)
+
+// Phase returns the step's phase.
+func (s SetupStep) Phase() SetupStepPhase { return s.phase }
+
+// Index returns the 0-based index for indexed phases. Returns 0 for singleton phases.
+func (s SetupStep) Index() int { return s.index }
+
+// String renders the canonical setup-step form: "phase:index" for indexed phases, "phase"
+// for singletons. The zero SetupStep returns "".
+func (s SetupStep) String() string {
+	if s.phase == "" {
 		return ""
 	}
-	if sf.HasPreconnect() {
-		return "preconnect:0"
+	if s.phase.IsIndexed() {
+		return fmt.Sprintf("%s:%d", s.phase, s.index)
 	}
-	if sf.HasConfigure() {
-		return "configure:0"
-	}
-	return ""
+	return string(s.phase)
 }
 
-// SetupStepVerify is the pseudo-step that indicates connection probes are running in the background
-// to verify credentials obtained during auth.
-const SetupStepVerify = "verify"
+// IsZero reports whether s is the zero SetupStep (no phase set).
+func (s SetupStep) IsZero() bool { return s.phase == "" }
 
-// SetupStepVerifyFailed is a terminal pseudo-step that indicates probe verification failed.
-// The connection's setup_error column holds the failure message. It is not part of the normal
-// linear flow; the UI surfaces an error screen with retry/cancel options.
-const SetupStepVerifyFailed = "verify_failed"
+// Equals reports whether s and other are identical.
+func (s SetupStep) Equals(other SetupStep) bool { return s == other }
 
-// SetupStepAuthFailed is a terminal pseudo-step that indicates the auth phase failed (e.g. an
-// OAuth token exchange returned an error). The connection's setup_error column holds the
-// failure message. Like verify_failed, it is outside the normal linear flow; the UI surfaces
-// an error screen with retry/cancel options.
-const SetupStepAuthFailed = "auth_failed"
+// IsTerminalFailure reports whether the step is in a terminal failure phase.
+func (s SetupStep) IsTerminalFailure() bool { return s.phase.IsTerminalFailure() }
 
-// NextSetupStep returns the next setup step after the given one, or empty string if done.
-// The auth phase is implicit between preconnect and configure phases. When the connector has
-// probes, a verify phase runs between auth and configure.
-func (sf *SetupFlow) NextSetupStep(current string, hasProbes bool) (string, error) {
-	phase, index, err := ParseSetupStep(current)
-	if err != nil {
-		return "", err
-	}
-
-	switch phase {
-	case "preconnect":
-		if sf.Preconnect != nil && index+1 < len(sf.Preconnect.Steps) {
-			return fmt.Sprintf("preconnect:%d", index+1), nil
-		}
-		// Preconnect done — next is auth
-		return "auth", nil
-	case "auth":
-		if hasProbes {
-			return SetupStepVerify, nil
-		}
-		if sf.HasConfigure() {
-			return "configure:0", nil
-		}
-		return "", nil // Complete
-	case SetupStepVerify:
-		if sf.HasConfigure() {
-			return "configure:0", nil
-		}
-		return "", nil // Complete
-	case "configure":
-		if sf.Configure != nil && index+1 < len(sf.Configure.Steps) {
-			return fmt.Sprintf("configure:%d", index+1), nil
-		}
-		return "", nil // Complete
-	default:
-		return "", fmt.Errorf("unknown phase %q", phase)
-	}
-}
-
-// ParseSetupStep parses a setup step string like "preconnect:0" into phase and index.
-// Singleton pseudo-steps "auth", "verify", "verify_failed", and "auth_failed" return (phase, 0, nil).
-func ParseSetupStep(setupStep string) (phase string, index int, err error) {
-	switch setupStep {
-	case "auth", SetupStepVerify, SetupStepVerifyFailed, SetupStepAuthFailed:
-		return setupStep, 0, nil
+// ParseSetupStep parses a setup-step string into a SetupStep. Indexed forms must be
+// "phase:index" (e.g. "preconnect:0", "configure:3"); singleton phases ("auth", "verify",
+// "verify_failed", "auth_failed") parse as a SetupStep with index 0.
+func ParseSetupStep(setupStep string) (SetupStep, error) {
+	phase := SetupStepPhase(setupStep)
+	if phase.IsValid() && !phase.IsIndexed() {
+		return SetupStep{phase: phase}, nil
 	}
 
 	parts := strings.SplitN(setupStep, ":", 2)
 	if len(parts) != 2 {
-		return "", 0, fmt.Errorf("invalid setup step format %q", setupStep)
+		return SetupStep{}, fmt.Errorf("invalid setup step format %q", setupStep)
 	}
 
-	phase = parts[0]
-	if phase != "preconnect" && phase != "configure" {
-		return "", 0, fmt.Errorf("invalid setup step phase %q", phase)
+	phase = SetupStepPhase(parts[0])
+	if !phase.IsIndexed() {
+		return SetupStep{}, fmt.Errorf("invalid setup step phase %q", phase)
 	}
 
-	index, err = strconv.Atoi(parts[1])
+	index, err := strconv.Atoi(parts[1])
 	if err != nil {
-		return "", 0, fmt.Errorf("invalid setup step index %q: %w", parts[1], err)
+		return SetupStep{}, fmt.Errorf("invalid setup step index %q: %w", parts[1], err)
 	}
 
 	if index < 0 {
-		return "", 0, fmt.Errorf("setup step index must be non-negative, got %d", index)
+		return SetupStep{}, fmt.Errorf("setup step index must be non-negative, got %d", index)
 	}
 
-	return phase, index, nil
+	return SetupStep{phase: phase, index: index}, nil
+}
+
+// GetStepBySetupStep returns the step definition and its 0-based global index for the given
+// setup step. Returns an error if step is not an indexed phase or its index is out of range.
+func (sf *SetupFlow) GetStepBySetupStep(step SetupStep) (*SetupFlowStep, int, error) {
+	switch step.phase {
+	case SetupPhasePreconnect:
+		if sf.Preconnect == nil || step.index >= len(sf.Preconnect.Steps) {
+			return nil, 0, fmt.Errorf("preconnect step index %d out of range", step.index)
+		}
+		return &sf.Preconnect.Steps[step.index], step.index, nil
+	case SetupPhaseConfigure:
+		if sf.Configure == nil || step.index >= len(sf.Configure.Steps) {
+			return nil, 0, fmt.Errorf("configure step index %d out of range", step.index)
+		}
+		globalIndex := step.index
+		if sf.Preconnect != nil {
+			globalIndex += len(sf.Preconnect.Steps)
+		}
+		return &sf.Configure.Steps[step.index], globalIndex, nil
+	default:
+		return nil, 0, fmt.Errorf("phase %q does not have indexed steps", step.phase)
+	}
+}
+
+// FirstSetupStep returns the first step in the flow. Returns the zero SetupStep when the
+// flow has no steps (caller should check IsZero).
+func (sf *SetupFlow) FirstSetupStep() SetupStep {
+	if sf == nil {
+		return SetupStep{}
+	}
+	if sf.HasPreconnect() {
+		return SetupStep{phase: SetupPhasePreconnect}
+	}
+	if sf.HasConfigure() {
+		return SetupStep{phase: SetupPhaseConfigure}
+	}
+	return SetupStep{}
+}
+
+// NextSetupStep returns the step that follows current. The auth phase is implicit between
+// preconnect and configure phases; when the connector has probes, a verify phase runs between
+// auth and configure. Returns the zero SetupStep (IsZero) when current is the final step.
+func (sf *SetupFlow) NextSetupStep(current SetupStep, hasProbes bool) (SetupStep, error) {
+	switch current.phase {
+	case SetupPhasePreconnect:
+		if sf.Preconnect != nil && current.index+1 < len(sf.Preconnect.Steps) {
+			return SetupStep{phase: SetupPhasePreconnect, index: current.index + 1}, nil
+		}
+		// Preconnect done — next is auth
+		return SetupStepAuth, nil
+	case SetupPhaseAuth:
+		if hasProbes {
+			return SetupStepVerify, nil
+		}
+		if sf.HasConfigure() {
+			return SetupStep{phase: SetupPhaseConfigure}, nil
+		}
+		return SetupStep{}, nil // Complete
+	case SetupPhaseVerify:
+		if sf.HasConfigure() {
+			return SetupStep{phase: SetupPhaseConfigure}, nil
+		}
+		return SetupStep{}, nil // Complete
+	case SetupPhaseConfigure:
+		if sf.Configure != nil && current.index+1 < len(sf.Configure.Steps) {
+			return SetupStep{phase: SetupPhaseConfigure, index: current.index + 1}, nil
+		}
+		return SetupStep{}, nil // Complete
+	default:
+		return SetupStep{}, fmt.Errorf("no successor defined for phase %q", current.phase)
+	}
 }
 
 // SetupFlowPhase is a sequential list of form steps within a phase (preconnect or configure).

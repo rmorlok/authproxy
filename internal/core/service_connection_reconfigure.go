@@ -3,9 +3,10 @@ package core
 import (
 	"context"
 
-	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/httperr"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
 // Reconfigure initiates a reconfiguration of a completed connection by resetting
@@ -21,5 +22,9 @@ func (c *connection) Reconfigure(ctx context.Context) (iface.InitiateConnectionR
 		return nil, httperr.BadRequest("connector has no configure steps to reconfigure")
 	}
 
-	return c.buildFormResponse(ctx, "configure:0", connector.SetupFlow)
+	first, err := cschema.NewIndexedSetupStep(cschema.SetupPhaseConfigure, 0)
+	if err != nil {
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to construct configure:0 setup step: %w", err))
+	}
+	return c.buildFormResponse(ctx, first, connector.SetupFlow)
 }

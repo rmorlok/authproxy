@@ -55,7 +55,7 @@ func TestRetryConnectionSetup(t *testing.T) {
 				},
 			},
 		})
-		step := cschema.SetupStepVerifyFailed
+		step := cschema.SetupStepVerifyFailed.String()
 		conn.SetupStep = &step
 		errMsg := "probe failed"
 		conn.SetupError = &errMsg
@@ -93,7 +93,7 @@ func TestRetryConnectionSetup(t *testing.T) {
 				},
 			},
 		})
-		step := cschema.SetupStepAuthFailed
+		step := cschema.SetupStepAuthFailed.String()
 		conn.SetupStep = &step
 		errMsg := "token exchange failed"
 		conn.SetupError = &errMsg

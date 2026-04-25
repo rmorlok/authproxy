@@ -14,7 +14,7 @@ import (
 func (c *connection) onVerifyPassed(ctx context.Context) error {
 	connector := c.cv.GetDefinition()
 
-	var nextStep string
+	var nextStep cschema.SetupStep
 	if connector != nil && connector.SetupFlow != nil {
 		var err error
 		nextStep, err = connector.SetupFlow.NextSetupStep(cschema.SetupStepVerify, connector.HasProbes())
@@ -23,7 +23,7 @@ func (c *connection) onVerifyPassed(ctx context.Context) error {
 		}
 	}
 
-	if nextStep == "" {
+	if nextStep.IsZero() {
 		if err := c.SetSetupStep(ctx, nil); err != nil {
 			return fmt.Errorf("failed to clear setup step after verify: %w", err)
 		}
@@ -33,7 +33,8 @@ func (c *connection) onVerifyPassed(ctx context.Context) error {
 		return nil
 	}
 
-	if err := c.SetSetupStep(ctx, &nextStep); err != nil {
+	nextStr := nextStep.String()
+	if err := c.SetSetupStep(ctx, &nextStr); err != nil {
 		return fmt.Errorf("failed to advance setup step after verify: %w", err)
 	}
 	return nil
@@ -55,7 +56,7 @@ func (c *connection) onVerifyFailed(ctx context.Context, probeId string, invokeE
 		return err
 	}
 
-	failedStep := cschema.SetupStepVerifyFailed
+	failedStep := cschema.SetupStepVerifyFailed.String()
 	if err := c.SetSetupStep(ctx, &failedStep); err != nil {
 		return err
 	}

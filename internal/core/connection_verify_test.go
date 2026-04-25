@@ -63,12 +63,12 @@ func TestOnVerifyFailed(t *testing.T) {
 				assert.Contains(t, *msg, "boom")
 				return nil
 			})
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStr(cschema.SetupStepVerifyFailed)).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStr(cschema.SetupStepVerifyFailed.String())).Return(nil)
 
 		err := conn.onVerifyFailed(context.Background(), "ping", errors.New("boom"))
 		require.NoError(t, err)
 		require.NotNil(t, conn.GetSetupStep())
-		assert.Equal(t, cschema.SetupStepVerifyFailed, *conn.GetSetupStep())
+		assert.Equal(t, cschema.SetupStepVerifyFailed.String(), *conn.GetSetupStep())
 		require.NotNil(t, conn.GetSetupError())
 		assert.Contains(t, *conn.GetSetupError(), "boom")
 	})

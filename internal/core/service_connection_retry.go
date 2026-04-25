@@ -21,7 +21,11 @@ func (s *service) RetryConnectionSetup(ctx context.Context, id apid.ID, returnTo
 	}
 
 	setupStep := conn.GetSetupStep()
-	if setupStep == nil || (*setupStep != cschema.SetupStepVerifyFailed && *setupStep != cschema.SetupStepAuthFailed) {
+	if setupStep == nil {
+		return nil, httperr.BadRequest("connection is not in a retryable state")
+	}
+	parsed, err := cschema.ParseSetupStep(*setupStep)
+	if err != nil || !parsed.IsTerminalFailure() {
 		return nil, httperr.BadRequest("connection is not in a retryable state")
 	}
 
@@ -36,7 +40,11 @@ func (s *service) RetryConnectionSetup(ctx context.Context, id apid.ID, returnTo
 	}
 
 	if connector.SetupFlow.HasPreconnect() {
-		return conn.buildFormResponse(ctx, "preconnect:0", connector.SetupFlow)
+		first, err := cschema.NewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		if err != nil {
+			return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to construct preconnect:0 setup step: %w", err))
+		}
+		return conn.buildFormResponse(ctx, first, connector.SetupFlow)
 	}
 
 	// No preconnect to return to — re-initiate OAuth from scratch.
