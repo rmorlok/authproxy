@@ -13,7 +13,7 @@ import (
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
-const taskTypeVerifyConnection = "connectors:verify_connection"
+const taskTypeVerifyConnection = "core:verify_connection"
 
 func newVerifyConnectionTask(connectionId apid.ID) (*asynq.Task, error) {
 	payload, err := json.Marshal(verifyConnectionTaskPayload{ConnectionId: connectionId})

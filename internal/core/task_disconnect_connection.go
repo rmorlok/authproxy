@@ -11,7 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 )
 
-const taskTypeDisconnectConnection = "connectors:disconnect_connection"
+const taskTypeDisconnectConnection = "core:disconnect_connection"
 
 func newDisconnectConnectionTask(connectionId apid.ID) (*asynq.Task, error) {
 	payload, err := json.Marshal(disconnectConnectionTaskPayload{connectionId})
