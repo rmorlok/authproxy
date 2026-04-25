@@ -17,6 +17,7 @@ require (
 	github.com/hashicorp/terraform-plugin-framework v1.19.0
 	github.com/hashicorp/terraform-plugin-go v0.31.0
 	github.com/hashicorp/terraform-plugin-testing v1.15.0
+	github.com/hashicorp/vault/api v1.22.0
 	github.com/rmorlok/authproxy v0.0.0-00010101000000-000000000000
 	github.com/rmorlok/authproxy/terraform/provider v0.0.0-00010101000000-000000000000
 	github.com/stretchr/testify v1.11.1
@@ -127,7 +128,6 @@ require (
 	github.com/hashicorp/terraform-plugin-sdk/v2 v2.40.0 // indirect
 	github.com/hashicorp/terraform-registry-address v0.4.0 // indirect
 	github.com/hashicorp/terraform-svchost v0.1.1 // indirect
-	github.com/hashicorp/vault/api v1.22.0 // indirect
 	github.com/hashicorp/yamux v0.1.2 // indirect
 	github.com/hibiken/asynq v0.25.1 // indirect
 	github.com/invopop/jsonschema v0.12.0 // indirect

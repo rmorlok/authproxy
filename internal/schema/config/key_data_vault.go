@@ -5,6 +5,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"sort"
+	"strconv"
+	"strings"
 	"time"
 
 	vault "github.com/hashicorp/vault/api"
@@ -79,11 +82,112 @@ func (kv *KeyDataVault) fetchVersionInfo(ctx context.Context, version string) (K
 }
 
 func (kv *KeyDataVault) fetchListVersions(ctx context.Context) ([]KeyVersionInfo, error) {
-	v, err := kv.fetchCurrentVersion(ctx)
+	metaPath := kv.metadataPath()
+	if metaPath == "" {
+		// Not a KV v2 path — fall back to reporting the single value the
+		// current-version read returns.
+		v, err := kv.fetchCurrentVersion(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return []KeyVersionInfo{v}, nil
+	}
+
+	client, err := kv.newClient()
 	if err != nil {
 		return nil, err
 	}
-	return []KeyVersionInfo{v}, nil
+
+	meta, err := client.Logical().Read(metaPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to read vault metadata %s: %w", metaPath, err)
+	}
+
+	if meta == nil || meta.Data == nil {
+		// Path has no metadata yet (new secret) — fall back to current.
+		v, err := kv.fetchCurrentVersion(ctx)
+		if err != nil {
+			return nil, err
+		}
+		return []KeyVersionInfo{v}, nil
+	}
+
+	currentVersion := vaultVersionNumberString(meta.Data["current_version"])
+
+	versionsMap, ok := meta.Data["versions"].(map[string]interface{})
+	if !ok || len(versionsMap) == 0 {
+		return nil, fmt.Errorf("no versions returned at vault metadata path %s", metaPath)
+	}
+
+	versionKeys := make([]string, 0, len(versionsMap))
+	for v := range versionsMap {
+		versionKeys = append(versionKeys, v)
+	}
+	// Sort numerically so callers see versions in a predictable (oldest → newest) order.
+	sort.Slice(versionKeys, func(i, j int) bool {
+		a, _ := strconv.Atoi(versionKeys[i])
+		b, _ := strconv.Atoi(versionKeys[j])
+		return a < b
+	})
+
+	infos := make([]KeyVersionInfo, 0, len(versionKeys))
+	for _, versionStr := range versionKeys {
+		if versionMap, ok := versionsMap[versionStr].(map[string]interface{}); ok {
+			if deletionTime, _ := versionMap["deletion_time"].(string); deletionTime != "" {
+				continue
+			}
+			if destroyed, _ := versionMap["destroyed"].(bool); destroyed {
+				continue
+			}
+		}
+
+		data, err := kv.fetchVersionFromVault(versionStr)
+		if err != nil {
+			return nil, fmt.Errorf("failed to read vault version %s at %s: %w", versionStr, kv.VaultPath, err)
+		}
+
+		infos = append(infos, KeyVersionInfo{
+			Provider:        ProviderTypeHashicorpVault,
+			ProviderID:      kv.vaultProviderID(),
+			ProviderVersion: versionStr,
+			Data:            data,
+			IsCurrent:       versionStr == currentVersion,
+		})
+	}
+
+	if len(infos) == 0 {
+		return nil, fmt.Errorf("all versions at vault metadata path %s are deleted or destroyed", metaPath)
+	}
+
+	return infos, nil
+}
+
+// metadataPath returns the KV v2 metadata path corresponding to VaultPath,
+// or empty if VaultPath is not a KV v2 data path. It replaces the first
+// `/data/` segment with `/metadata/` (the standard KV v2 layout).
+func (kv *KeyDataVault) metadataPath() string {
+	const dataSegment = "/data/"
+	idx := strings.Index(kv.VaultPath, dataSegment)
+	if idx < 0 {
+		return ""
+	}
+	return kv.VaultPath[:idx] + "/metadata/" + kv.VaultPath[idx+len(dataSegment):]
+}
+
+// vaultVersionNumberString coerces a Vault version value (json.Number, float64,
+// int, or string) into a canonical string form.
+func vaultVersionNumberString(v interface{}) string {
+	switch x := v.(type) {
+	case json.Number:
+		return x.String()
+	case float64:
+		return fmt.Sprintf("%d", int64(x))
+	case int:
+		return fmt.Sprintf("%d", x)
+	case string:
+		return x
+	}
+	return ""
 }
 
 func (kv *KeyDataVault) GetCurrentVersion(ctx context.Context) (KeyVersionInfo, error) {
@@ -233,23 +337,7 @@ func extractVaultVersion(data map[string]interface{}) string {
 	if !ok {
 		return ""
 	}
-
-	version, ok := metadata["version"]
-	if !ok {
-		return ""
-	}
-
-	// Vault returns version as json.Number or float64 depending on how it's parsed
-	switch v := version.(type) {
-	case json.Number:
-		return v.String()
-	case float64:
-		return fmt.Sprintf("%d", int64(v))
-	case string:
-		return v
-	}
-
-	return ""
+	return vaultVersionNumberString(metadata["version"])
 }
 
 var _ KeyDataType = (*KeyDataVault)(nil)

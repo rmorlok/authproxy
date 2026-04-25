@@ -1,0 +1,98 @@
+# schema: https://json.schemastore.org/github-workflow.json
+name: HashiCorp Vault Integration Tests
+
+on:
+  push:
+    branches: [ "main" ]
+  workflow_dispatch:
+
+jobs:
+  vault-integration:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:16
+        ports:
+          - 5433:5432
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+          POSTGRES_DB: authproxy_integration
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      redis:
+        image: redis:latest
+        ports:
+          - 6380:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      clickhouse:
+        image: clickhouse/clickhouse-server:latest
+        ports:
+          - 8124:8123
+        env:
+          CLICKHOUSE_DB: authproxy
+          CLICKHOUSE_USER: authproxy
+          CLICKHOUSE_PASSWORD: authproxy
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+    - uses: actions/checkout@v4
+
+    - name: Set up Go
+      uses: actions/setup-go@v4
+      with:
+        go-version: '1.24'
+
+    - name: Start MinIO
+      run: |
+        docker run -d --name minio -p 9003:9000 \
+          -e MINIO_ROOT_USER=minioadmin \
+          -e MINIO_ROOT_PASSWORD=minioadmin \
+          minio/minio:latest server /data
+        for i in $(seq 1 30); do
+          curl -sf http://localhost:9003/minio/health/live && break
+          sleep 1
+        done
+
+    - name: Create MinIO bucket
+      run: |
+        docker run --rm --network host \
+          -e MC_HOST_minio=http://minioadmin:minioadmin@localhost:9003 \
+          minio/mc mb --ignore-existing minio/authproxy-request-logs
+
+    - name: Start Vault (dev mode)
+      run: |
+        docker run -d --name vault -p 8200:8200 \
+          -e VAULT_DEV_ROOT_TOKEN_ID=dev-only-token \
+          -e VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200 \
+          -e SKIP_SETCAP=true \
+          hashicorp/vault:latest server -dev
+        for i in $(seq 1 30); do
+          curl -sf http://localhost:8200/v1/sys/health && break
+          sleep 1
+        done
+
+    - name: HashiCorp Vault Integration Tests
+      working-directory: integration_tests
+      env:
+        AUTH_PROXY_TEST_DATABASE_PROVIDER: postgres
+        POSTGRES_TEST_HOST: localhost
+        POSTGRES_TEST_PORT: "5433"
+        POSTGRES_TEST_USER: postgres
+        POSTGRES_TEST_PASSWORD: postgres
+        POSTGRES_TEST_DATABASE: authproxy_integration
+        POSTGRES_TEST_OPTIONS: sslmode=disable
+        AUTH_PROXY_VAULT_TEST: "1"
+        VAULT_ADDR: http://127.0.0.1:8200
+        VAULT_TOKEN: dev-only-token
+      run: go test -tags "integration,vault" -v -timeout 10m ./encrypt/...
