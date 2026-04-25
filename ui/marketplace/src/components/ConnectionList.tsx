@@ -7,7 +7,9 @@ import {
   Alert,
   Box,
   Button,
+  CircularProgress,
   Dialog,
+  DialogActions,
   DialogTitle,
   DialogContent,
 } from '@mui/material';
@@ -25,6 +27,12 @@ import {
   submitConnectionFormAsync,
   getSetupStepAsync,
   clearFormStep,
+  selectVerifyingConnectionId,
+  selectVerifyError,
+  selectRetryingConnection,
+  retryConnectionAsync,
+  abortConnectionAsync,
+  clearVerifyState,
 } from '../store';
 import ConnectionCard, { ConnectionCardSkeleton } from './ConnectionCard';
 import ConnectionFormStep from './ConnectionFormStep';
@@ -45,6 +53,9 @@ const ConnectionList: React.FC = () => {
   const currentFormStep = useSelector(selectCurrentFormStep);
   const isSubmittingForm = useSelector(selectSubmittingForm);
   const formSubmitError = useSelector(selectFormSubmitError);
+  const verifyingConnectionId = useSelector(selectVerifyingConnectionId);
+  const verifyError = useSelector(selectVerifyError);
+  const isRetrying = useSelector(selectRetryingConnection);
 
   useEffect(() => {
     if (status === 'idle') {
@@ -71,6 +82,18 @@ const ConnectionList: React.FC = () => {
     }
   }, [searchParams, setSearchParams, dispatch]);
 
+  // Poll the setup-step endpoint while probes are running so the UI can advance to the
+  // next setup step (or surface a failure) as soon as the background task completes.
+  useEffect(() => {
+    if (!verifyingConnectionId) {
+      return;
+    }
+    const interval = window.setInterval(() => {
+      dispatch(getSetupStepAsync(verifyingConnectionId));
+    }, 2000);
+    return () => window.clearInterval(interval);
+  }, [verifyingConnectionId, dispatch]);
+
   const handleFormSubmit = useCallback((connectionId: string, data: unknown) => {
     const stepId = currentFormStep?.stepId ?? '';
     dispatch(submitConnectionFormAsync({ connectionId, stepId, data })).then((action) => {
@@ -89,6 +112,29 @@ const ConnectionList: React.FC = () => {
   const handleFormCancel = useCallback(() => {
     dispatch(clearFormStep());
   }, [dispatch]);
+
+  const handleRetryVerify = useCallback(() => {
+    if (!verifyError) return;
+    dispatch(retryConnectionAsync({
+      connectionId: verifyError.connectionId,
+      returnToUrl: window.location.href,
+    })).then((action) => {
+      if (action.meta.requestStatus === 'fulfilled') {
+        const response = action.payload as { type: string; redirect_url?: string };
+        if (response.type === 'redirect' && response.redirect_url) {
+          window.location.href = response.redirect_url;
+        }
+      }
+    });
+  }, [dispatch, verifyError]);
+
+  const handleCancelVerifyError = useCallback(() => {
+    if (!verifyError) return;
+    dispatch(abortConnectionAsync(verifyError.connectionId)).then(() => {
+      dispatch(clearVerifyState());
+      dispatch(fetchConnectionsAsync());
+    });
+  }, [dispatch, verifyError]);
 
   let content;
 
@@ -180,6 +226,42 @@ const ConnectionList: React.FC = () => {
             />
           )}
         </DialogContent>
+      </Dialog>
+
+      <Dialog open={verifyingConnectionId !== null} maxWidth="xs" fullWidth>
+        <DialogTitle>Verifying connection</DialogTitle>
+        <DialogContent>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 2 }}>
+            <CircularProgress size={24} />
+            <Typography variant="body1">
+              Checking that your credentials work with the provider…
+            </Typography>
+          </Box>
+        </DialogContent>
+      </Dialog>
+
+      <Dialog open={verifyError !== null} onClose={handleCancelVerifyError} maxWidth="sm" fullWidth>
+        <DialogTitle>Connection verification failed</DialogTitle>
+        <DialogContent>
+          <Alert severity="error" sx={{ mb: 2 }}>
+            {verifyError?.message ?? 'Verification failed'}
+          </Alert>
+          <Typography variant="body2" color="text.secondary">
+            {verifyError?.canRetry
+              ? 'You can retry the setup or cancel to delete this connection.'
+              : 'Please cancel and try again from scratch.'}
+          </Typography>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCancelVerifyError} disabled={isRetrying}>
+            Cancel
+          </Button>
+          {verifyError?.canRetry && (
+            <Button onClick={handleRetryVerify} disabled={isRetrying} variant="contained">
+              {isRetrying ? 'Retrying…' : 'Retry'}
+            </Button>
+          )}
+        </DialogActions>
       </Dialog>
     </Container>
   );

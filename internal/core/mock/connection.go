@@ -25,6 +25,7 @@ type Connection struct {
 	Labels           map[string]string
 	Annotations      map[string]string
 	SetupStep        *string
+	SetupError       *string
 	Configuration    map[string]any
 }
 
@@ -108,6 +109,15 @@ func (m *Connection) GetSetupStep() *string {
 
 func (m *Connection) SetSetupStep(ctx context.Context, setupStep *string) error {
 	m.SetupStep = setupStep
+	return nil
+}
+
+func (m *Connection) GetSetupError() *string {
+	return m.SetupError
+}
+
+func (m *Connection) SetSetupError(ctx context.Context, setupError *string) error {
+	m.SetupError = setupError
 	return nil
 }
 

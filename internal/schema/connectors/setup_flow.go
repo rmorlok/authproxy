@@ -121,9 +121,19 @@ func (sf *SetupFlow) FirstSetupStep() string {
 	return ""
 }
 
+// SetupStepVerify is the pseudo-step that indicates connection probes are running in the background
+// to verify credentials obtained during auth.
+const SetupStepVerify = "verify"
+
+// SetupStepVerifyFailed is a terminal pseudo-step that indicates probe verification failed.
+// The connection's setup_error column holds the failure message. It is not part of the normal
+// linear flow; the UI surfaces an error screen with retry/cancel options.
+const SetupStepVerifyFailed = "verify_failed"
+
 // NextSetupStep returns the next setup step after the given one, or empty string if done.
-// The auth phase is implicit between preconnect and configure phases.
-func (sf *SetupFlow) NextSetupStep(current string) (string, error) {
+// The auth phase is implicit between preconnect and configure phases. When the connector has
+// probes, a verify phase runs between auth and configure.
+func (sf *SetupFlow) NextSetupStep(current string, hasProbes bool) (string, error) {
 	phase, index, err := ParseSetupStep(current)
 	if err != nil {
 		return "", err
@@ -137,6 +147,14 @@ func (sf *SetupFlow) NextSetupStep(current string) (string, error) {
 		// Preconnect done — next is auth
 		return "auth", nil
 	case "auth":
+		if hasProbes {
+			return SetupStepVerify, nil
+		}
+		if sf.HasConfigure() {
+			return "configure:0", nil
+		}
+		return "", nil // Complete
+	case SetupStepVerify:
 		if sf.HasConfigure() {
 			return "configure:0", nil
 		}
@@ -152,10 +170,11 @@ func (sf *SetupFlow) NextSetupStep(current string) (string, error) {
 }
 
 // ParseSetupStep parses a setup step string like "preconnect:0" into phase and index.
-// For "auth", returns ("auth", 0, nil).
+// Singleton pseudo-steps "auth", "verify", and "verify_failed" return (phase, 0, nil).
 func ParseSetupStep(setupStep string) (phase string, index int, err error) {
-	if setupStep == "auth" {
-		return "auth", 0, nil
+	switch setupStep {
+	case "auth", SetupStepVerify, SetupStepVerifyFailed:
+		return setupStep, 0, nil
 	}
 
 	parts := strings.SplitN(setupStep, ":", 2)

@@ -1770,6 +1770,70 @@ const docTemplateApi = `{
                 }
             }
         },
+        "/connections/{id}/_retry": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Retry a connection setup that failed during probe verification. Clears the failure and either returns to the first preconnect step or re-initiates OAuth.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "connections"
+                ],
+                "summary": "Retry connection setup",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Retry request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/routes.RetryConnectionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/routes.InitiateConnectionForm"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/connections/{id}/_setup_step": {
             "get": {
                 "security": [
@@ -6765,6 +6829,14 @@ const docTemplateApi = `{
             "type": "object",
             "properties": {
                 "value": {
+                    "type": "string"
+                }
+            }
+        },
+        "routes.RetryConnectionRequest": {
+            "type": "object",
+            "properties": {
+                "return_to_url": {
                     "type": "string"
                 }
             }

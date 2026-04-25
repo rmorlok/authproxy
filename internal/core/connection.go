@@ -104,6 +104,18 @@ func (c *connection) SetSetupStep(ctx context.Context, setupStep *string) error 
 	return nil
 }
 
+func (c *connection) GetSetupError() *string {
+	return c.SetupError
+}
+
+func (c *connection) SetSetupError(ctx context.Context, setupError *string) error {
+	if err := c.s.db.SetConnectionSetupError(ctx, c.Id, setupError); err != nil {
+		return err
+	}
+	c.SetupError = setupError
+	return nil
+}
+
 func (c *connection) GetConfiguration(ctx context.Context) (map[string]any, error) {
 	if c.EncryptedConfiguration == nil || c.EncryptedConfiguration.IsZero() {
 		return nil, nil

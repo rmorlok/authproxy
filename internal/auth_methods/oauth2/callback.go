@@ -8,6 +8,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
 func (o *oAuth2Connection) getPublicCallbackUrl() (string, error) {
@@ -111,25 +112,35 @@ func (o *oAuth2Connection) CallbackFrom3rdParty(ctx context.Context, query url.V
 		return errorRedirectPage, fmt.Errorf("failed to create db token from response: %w", err)
 	}
 
-	// Check if the connector has configure steps to complete after auth
 	cv := o.connection.GetConnectorVersionEntity()
-	hasConfigure := cv != nil && cv.GetDefinition().SetupFlow.HasConfigure()
+	var connectorDef *cschema.Connector
+	if cv != nil {
+		connectorDef = cv.GetDefinition()
+	}
+	hasProbes := connectorDef != nil && len(connectorDef.Probes) > 0
+	hasConfigure := connectorDef != nil && connectorDef.SetupFlow.HasConfigure()
+
+	// If the connector has probes, run them in a background task before proceeding to configure.
+	if hasProbes {
+		verifyStep := cschema.SetupStepVerify
+		if err := o.connection.SetSetupStep(ctx, &verifyStep); err != nil {
+			return errorRedirectPage, fmt.Errorf("failed to set setup step to verify: %w", err)
+		}
+		if err := o.connectors.EnqueueVerifyConnection(ctx, o.connection.GetId()); err != nil {
+			return errorRedirectPage, fmt.Errorf("failed to enqueue verify connection task: %w", err)
+		}
+
+		// The UI will poll /_setup_step to observe verify outcome and transition to configure/ready/error.
+		return o.appendSetupPendingToReturnUrl(o.state.ReturnToUrl), nil
+	}
+
+	// No probes — proceed with the existing post-auth branches.
 	if hasConfigure {
 		configureStep := "configure:0"
 		if err := o.connection.SetSetupStep(ctx, &configureStep); err != nil {
 			return errorRedirectPage, fmt.Errorf("failed to set setup step to configure:0: %w", err)
 		}
-
-		// Append setup=pending to return URL so the UI knows to show configure forms
-		returnUrl, err := url.Parse(o.state.ReturnToUrl)
-		if err != nil {
-			return o.state.ReturnToUrl, nil // Fall back to the raw URL if parsing fails
-		}
-		q := returnUrl.Query()
-		q.Set("setup", "pending")
-		q.Set("connection_id", string(o.connection.GetId()))
-		returnUrl.RawQuery = q.Encode()
-		return returnUrl.String(), nil
+		return o.appendSetupPendingToReturnUrl(o.state.ReturnToUrl), nil
 	}
 
 	// No configure steps — clear setup step if it was set
@@ -140,4 +151,18 @@ func (o *oAuth2Connection) CallbackFrom3rdParty(ctx context.Context, query url.V
 	}
 
 	return o.state.ReturnToUrl, nil
+}
+
+// appendSetupPendingToReturnUrl augments the return URL with query params that signal the UI
+// to poll for setup-step advancement. Falls back to the raw URL if parsing fails.
+func (o *oAuth2Connection) appendSetupPendingToReturnUrl(raw string) string {
+	returnUrl, err := url.Parse(raw)
+	if err != nil {
+		return raw
+	}
+	q := returnUrl.Query()
+	q.Set("setup", "pending")
+	q.Set("connection_id", string(o.connection.GetId()))
+	returnUrl.RawQuery = q.Encode()
+	return returnUrl.String()
 }

@@ -289,6 +289,11 @@ definitions:
       value:
         type: string
     type: object
+  routes.RetryConnectionRequest:
+    properties:
+      return_to_url:
+        type: string
+    type: object
   routes.SubmitConnectionRequest:
     description: Form submission data
     properties:
@@ -2018,6 +2023,49 @@ paths:
       security:
       - BearerAuth: []
       summary: Reconfigure connection
+      tags:
+      - connections
+  /connections/{id}/_retry:
+    post:
+      consumes:
+      - application/json
+      description: Retry a connection setup that failed during probe verification.
+        Clears the failure and either returns to the first preconnect step or re-initiates
+        OAuth.
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Retry request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.RetryConnectionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.InitiateConnectionForm'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Retry connection setup
       tags:
       - connections
   /connections/{id}/_setup_step:

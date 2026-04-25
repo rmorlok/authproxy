@@ -6,7 +6,10 @@ import {
     ConnectionState,
     DisconnectResponseJson,
     InitiateConnectionFormResponse,
+    InitiateConnectionResponse,
+    isErrorResponse,
     isFormResponse,
+    isVerifyingResponse,
     ListConnectionsParams,
 } from '@authproxy/api';
 
@@ -34,6 +37,45 @@ function formStepFromResponse(response: InitiateConnectionFormResponse): FormSte
     };
 }
 
+// applySetupResponse updates state based on a setup-step response. Verifying responses
+// set the polling marker; error responses populate verifyError; form responses populate
+// currentFormStep; redirect and complete clear the in-flight setup UI.
+function applySetupResponse(state: ConnectionsState, response: InitiateConnectionResponse): void {
+    if (isFormResponse(response)) {
+        state.currentFormStep = formStepFromResponse(response);
+        state.verifyingConnectionId = null;
+        state.verifyError = null;
+        return;
+    }
+    if (isVerifyingResponse(response)) {
+        state.verifyingConnectionId = response.id;
+        state.currentFormStep = null;
+        state.verifyError = null;
+        return;
+    }
+    if (isErrorResponse(response)) {
+        state.verifyError = {
+            connectionId: response.id,
+            message: response.error,
+            canRetry: response.can_retry,
+        };
+        state.verifyingConnectionId = null;
+        state.currentFormStep = null;
+        return;
+    }
+
+    // Redirect or complete — clear in-flight UI.
+    state.currentFormStep = null;
+    state.verifyingConnectionId = null;
+    state.verifyError = null;
+}
+
+interface VerifyError {
+    connectionId: string;
+    message: string;
+    canRetry: boolean;
+}
+
 interface ConnectionsState {
     items: Connection[];
     status: 'idle' | 'loading' | 'succeeded' | 'failed';
@@ -46,6 +88,9 @@ interface ConnectionsState {
     currentFormStep: FormStep | null;
     submittingForm: boolean;
     formSubmitError: string | null;
+    verifyingConnectionId: string | null;
+    verifyError: VerifyError | null;
+    retryingConnection: boolean;
 }
 
 const initialState: ConnectionsState = {
@@ -60,6 +105,9 @@ const initialState: ConnectionsState = {
     currentFormStep: null,
     submittingForm: false,
     formSubmitError: null,
+    verifyingConnectionId: null,
+    verifyError: null,
+    retryingConnection: false,
 };
 
 export const fetchConnectionsAsync = createAsyncThunk(
@@ -125,6 +173,14 @@ export const reconfigureConnectionAsync = createAsyncThunk(
     }
 );
 
+export const retryConnectionAsync = createAsyncThunk(
+    'connections/retryConnection',
+    async ({connectionId, returnToUrl}: { connectionId: string, returnToUrl?: string }) => {
+        const response = await connections.retry(connectionId, returnToUrl);
+        return response.data;
+    }
+);
+
 export const disconnectConnectionAsync = createAsyncThunk(
     'connections/disconnectConnection',
     async (connectionId: string, _): Promise<DisconnectResponseJson> => {
@@ -148,6 +204,10 @@ export const connectionsSlice = createSlice({
             state.currentFormStep = null;
             state.formSubmitError = null;
         },
+        clearVerifyState: (state) => {
+            state.verifyingConnectionId = null;
+            state.verifyError = null;
+        },
     },
     extraReducers: (builder) => {
         builder
@@ -169,13 +229,12 @@ export const connectionsSlice = createSlice({
                 state.initiatingConnection = true;
                 state.initiationError = null;
                 state.currentFormStep = null;
+                state.verifyingConnectionId = null;
+                state.verifyError = null;
             })
             .addCase(initiateConnectionAsync.fulfilled, (state, action) => {
                 state.initiatingConnection = false;
-                const response = action.payload;
-                if (isFormResponse(response)) {
-                    state.currentFormStep = formStepFromResponse(response);
-                }
+                applySetupResponse(state, action.payload);
             })
             .addCase(initiateConnectionAsync.rejected, (state, action) => {
                 state.initiatingConnection = false;
@@ -189,12 +248,7 @@ export const connectionsSlice = createSlice({
             })
             .addCase(submitConnectionFormAsync.fulfilled, (state, action) => {
                 state.submittingForm = false;
-                const response = action.payload;
-                if (isFormResponse(response)) {
-                    state.currentFormStep = formStepFromResponse(response);
-                } else {
-                    state.currentFormStep = null;
-                }
+                applySetupResponse(state, action.payload);
             })
             .addCase(submitConnectionFormAsync.rejected, (state, action) => {
                 state.submittingForm = false;
@@ -204,15 +258,14 @@ export const connectionsSlice = createSlice({
             // Abort connection
             .addCase(abortConnectionAsync.fulfilled, (state, action) => {
                 state.currentFormStep = null;
+                state.verifyingConnectionId = null;
+                state.verifyError = null;
                 state.items = state.items.filter(conn => conn.id !== action.payload);
             })
 
-            // Get setup step (resume)
+            // Get setup step (resume / verify polling)
             .addCase(getSetupStepAsync.fulfilled, (state, action) => {
-                const response = action.payload;
-                if (isFormResponse(response)) {
-                    state.currentFormStep = formStepFromResponse(response);
-                }
+                applySetupResponse(state, action.payload);
             })
 
             // Reconfigure connection
@@ -222,14 +275,25 @@ export const connectionsSlice = createSlice({
             })
             .addCase(reconfigureConnectionAsync.fulfilled, (state, action) => {
                 state.initiatingConnection = false;
-                const response = action.payload;
-                if (isFormResponse(response)) {
-                    state.currentFormStep = formStepFromResponse(response);
-                }
+                applySetupResponse(state, action.payload);
             })
             .addCase(reconfigureConnectionAsync.rejected, (state, action) => {
                 state.initiatingConnection = false;
                 state.initiationError = action.error.message || 'Failed to reconfigure connection';
+            })
+
+            // Retry connection
+            .addCase(retryConnectionAsync.pending, (state) => {
+                state.retryingConnection = true;
+                state.verifyError = null;
+            })
+            .addCase(retryConnectionAsync.fulfilled, (state, action) => {
+                state.retryingConnection = false;
+                applySetupResponse(state, action.payload);
+            })
+            .addCase(retryConnectionAsync.rejected, (state, action) => {
+                state.retryingConnection = false;
+                state.initiationError = action.error.message || 'Failed to retry connection';
             })
 
             // Disconnect connection
@@ -254,7 +318,7 @@ export const connectionsSlice = createSlice({
     },
 });
 
-export const {clearInitiationError, clearDisconnectionError, clearFormStep} = connectionsSlice.actions;
+export const {clearInitiationError, clearDisconnectionError, clearFormStep, clearVerifyState} = connectionsSlice.actions;
 
 // Selectors
 export const selectConnections = (state: RootState) => state.connections.items;
@@ -269,6 +333,10 @@ export const selectCurrentTaskId = (state: RootState) => state.connections.curre
 export const selectCurrentFormStep = (state: RootState) => state.connections.currentFormStep;
 export const selectSubmittingForm = (state: RootState) => state.connections.submittingForm;
 export const selectFormSubmitError = (state: RootState) => state.connections.formSubmitError;
+
+export const selectVerifyingConnectionId = (state: RootState) => state.connections.verifyingConnectionId;
+export const selectVerifyError = (state: RootState) => state.connections.verifyError;
+export const selectRetryingConnection = (state: RootState) => state.connections.retryingConnection;
 
 // Helper selectors
 export const selectActiveConnections = (state: RootState) =>

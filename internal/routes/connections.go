@@ -250,6 +250,7 @@ type ConnectionJson struct {
 	Annotations map[string]string        `json:"annotations,omitempty"`
 	State       database.ConnectionState `json:"state"`
 	SetupStep   *string                  `json:"setup_step,omitempty"`
+	SetupError  *string                  `json:"setup_error,omitempty"`
 	Connector   ConnectorJson            `json:"connector"`
 	CreatedAt   time.Time                `json:"created_at"`
 	UpdatedAt   time.Time                `json:"updated_at"`
@@ -265,6 +266,7 @@ func ConnectionToJson(conn coreIface.Connection) ConnectionJson {
 		Annotations: conn.GetAnnotations(),
 		State:       conn.GetState(),
 		SetupStep:   conn.GetSetupStep(),
+		SetupError:  conn.GetSetupError(),
 		Connector:   connector,
 		CreatedAt:   conn.GetCreatedAt(),
 		UpdatedAt:   conn.GetUpdatedAt(),
@@ -610,6 +612,70 @@ func (r *ConnectionsRoutes) reconfigure(gctx *gin.Context) {
 	}
 
 	resp, err := c.Reconfigure(ctx)
+	if err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, resp)
+}
+
+type RetryConnectionRequest struct {
+	ReturnToUrl string `json:"return_to_url,omitempty"`
+}
+
+// @Summary		Retry connection setup
+// @Description	Retry a connection setup that failed during probe verification. Clears the failure and either returns to the first preconnect step or re-initiates OAuth.
+// @Tags			connections
+// @Accept			json
+// @Produce		json
+// @Param			id		path	string					true	"Connection UUID"
+// @Param			request	body	RetryConnectionRequest	true	"Retry request"
+// @Success		200	{object}	InitiateConnectionForm
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		404	{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/_retry [post]
+func (r *ConnectionsRoutes) retry(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := apid.Parse(gctx.Param("id"))
+	if err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == apid.Nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
+		val.MarkErrorReturn()
+		return
+	}
+
+	c, err := r.core.GetConnection(ctx, id)
+	if err != nil {
+		if errors.Is(err, coreIface.ErrNotFound) {
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
+		} else {
+			apgin.WriteErr(gctx, nil, err)
+		}
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		apgin.WriteError(gctx, nil, httpErr)
+		return
+	}
+
+	var req RetryConnectionRequest
+	// Body is optional — return_to_url is only needed when the connector has no preconnect steps.
+	_ = gctx.ShouldBindBodyWithJSON(&req)
+
+	resp, err := r.core.RetryConnectionSetup(ctx, id, req.ReturnToUrl)
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
@@ -1517,6 +1583,15 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 			ForIdField("id").
 			Build(),
 		r.reconfigure,
+	)
+	g.POST(
+		"/connections/:id/_retry",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("update").
+			ForIdField("id").
+			Build(),
+		r.retry,
 	)
 	g.PUT(
 		"/connections/:id/_force_state",

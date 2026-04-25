@@ -27,6 +27,7 @@ type Connection interface {
 	GetLabels() map[string]string
 	GetAnnotations() map[string]string
 	GetSetupStep() *string
+	GetSetupError() *string
 
 	/*
 	 * Nested entities
@@ -40,6 +41,7 @@ type Connection interface {
 
 	SetState(ctx context.Context, state database.ConnectionState) error
 	SetSetupStep(ctx context.Context, setupStep *string) error
+	SetSetupError(ctx context.Context, setupError *string) error
 	GetConfiguration(ctx context.Context) (map[string]any, error)
 	SetConfiguration(ctx context.Context, data map[string]any) error
 	GetMustacheContext(ctx context.Context) (map[string]any, error)

@@ -59,7 +59,7 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 	}
 
 	// Determine the next step
-	nextStep, err := connector.SetupFlow.NextSetupStep(*setupStep)
+	nextStep, err := connector.SetupFlow.NextSetupStep(*setupStep, len(connector.Probes) > 0)
 	if err != nil {
 		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to determine next step: %w", err))
 	}
@@ -176,6 +176,26 @@ func (c *connection) GetCurrentSetupStepResponse(ctx context.Context) (iface.Ini
 		return &iface.InitiateConnectionRedirect{
 			Id:   c.GetId(),
 			Type: iface.PreconnectionResponseTypeRedirect,
+		}, nil
+	}
+
+	if phase == cschema.SetupStepVerify {
+		return &iface.InitiateConnectionVerifying{
+			Id:   c.GetId(),
+			Type: iface.PreconnectionResponseTypeVerifying,
+		}, nil
+	}
+
+	if phase == cschema.SetupStepVerifyFailed {
+		msg := ""
+		if e := c.GetSetupError(); e != nil {
+			msg = *e
+		}
+		return &iface.InitiateConnectionError{
+			Id:       c.GetId(),
+			Type:     iface.PreconnectionResponseTypeError,
+			Error:    msg,
+			CanRetry: true,
 		}, nil
 	}
 

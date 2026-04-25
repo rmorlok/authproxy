@@ -51,9 +51,11 @@ func (icr *InitiateConnectionRequest) HasIntoNamespace() bool {
 type InitiateConnectionResponseType string
 
 const (
-	PreconnectionResponseTypeRedirect InitiateConnectionResponseType = "redirect"
-	PreconnectionResponseTypeForm     InitiateConnectionResponseType = "form"
-	PreconnectionResponseTypeComplete InitiateConnectionResponseType = "complete"
+	PreconnectionResponseTypeRedirect  InitiateConnectionResponseType = "redirect"
+	PreconnectionResponseTypeForm      InitiateConnectionResponseType = "form"
+	PreconnectionResponseTypeComplete  InitiateConnectionResponseType = "complete"
+	PreconnectionResponseTypeVerifying InitiateConnectionResponseType = "verifying"
+	PreconnectionResponseTypeError     InitiateConnectionResponseType = "error"
 )
 
 type InitiateConnectionResponse interface {
@@ -106,6 +108,38 @@ func (icc *InitiateConnectionComplete) GetId() apid.ID {
 
 func (icc *InitiateConnectionComplete) GetType() InitiateConnectionResponseType {
 	return icc.Type
+}
+
+// InitiateConnectionVerifying indicates that probes are running in the background to verify
+// the credentials obtained during auth. The UI should poll /_setup_step to observe the outcome.
+type InitiateConnectionVerifying struct {
+	Id   apid.ID                        `json:"id"`
+	Type InitiateConnectionResponseType `json:"type"`
+}
+
+func (icv *InitiateConnectionVerifying) GetId() apid.ID {
+	return icv.Id
+}
+
+func (icv *InitiateConnectionVerifying) GetType() InitiateConnectionResponseType {
+	return icv.Type
+}
+
+// InitiateConnectionError is a terminal error response during setup, e.g. when probe verification
+// fails. The UI should show the error and offer retry (POST /_retry) or cancel (POST /_abort).
+type InitiateConnectionError struct {
+	Id       apid.ID                        `json:"id"`
+	Type     InitiateConnectionResponseType `json:"type"`
+	Error    string                         `json:"error"`
+	CanRetry bool                           `json:"can_retry"`
+}
+
+func (ice *InitiateConnectionError) GetId() apid.ID {
+	return ice.Id
+}
+
+func (ice *InitiateConnectionError) GetType() InitiateConnectionResponseType {
+	return ice.Type
 }
 
 type SubmitConnectionRequest struct {

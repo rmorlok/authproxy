@@ -435,31 +435,52 @@ func TestSetupFlowNextSetupStep(t *testing.T) {
 	}
 
 	t.Run("preconnect:0 -> preconnect:1", func(t *testing.T) {
-		next, err := sf.NextSetupStep("preconnect:0")
+		next, err := sf.NextSetupStep("preconnect:0", false)
 		require.NoError(t, err)
 		assert.Equal(t, "preconnect:1", next)
 	})
 
 	t.Run("preconnect:1 -> auth", func(t *testing.T) {
-		next, err := sf.NextSetupStep("preconnect:1")
+		next, err := sf.NextSetupStep("preconnect:1", false)
 		require.NoError(t, err)
 		assert.Equal(t, "auth", next)
 	})
 
 	t.Run("auth -> configure:0", func(t *testing.T) {
-		next, err := sf.NextSetupStep("auth")
+		next, err := sf.NextSetupStep("auth", false)
 		require.NoError(t, err)
 		assert.Equal(t, "configure:0", next)
 	})
 
+	t.Run("auth -> verify when probes present", func(t *testing.T) {
+		next, err := sf.NextSetupStep("auth", true)
+		require.NoError(t, err)
+		assert.Equal(t, "verify", next)
+	})
+
+	t.Run("verify -> configure:0", func(t *testing.T) {
+		next, err := sf.NextSetupStep("verify", true)
+		require.NoError(t, err)
+		assert.Equal(t, "configure:0", next)
+	})
+
+	t.Run("verify with no configure -> empty (complete)", func(t *testing.T) {
+		sfNoConfig := &SetupFlow{
+			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "a"}}},
+		}
+		next, err := sfNoConfig.NextSetupStep("verify", true)
+		require.NoError(t, err)
+		assert.Equal(t, "", next)
+	})
+
 	t.Run("configure:0 -> configure:1", func(t *testing.T) {
-		next, err := sf.NextSetupStep("configure:0")
+		next, err := sf.NextSetupStep("configure:0", false)
 		require.NoError(t, err)
 		assert.Equal(t, "configure:1", next)
 	})
 
 	t.Run("configure:1 -> empty (complete)", func(t *testing.T) {
-		next, err := sf.NextSetupStep("configure:1")
+		next, err := sf.NextSetupStep("configure:1", false)
 		require.NoError(t, err)
 		assert.Equal(t, "", next)
 	})
@@ -468,7 +489,7 @@ func TestSetupFlowNextSetupStep(t *testing.T) {
 		sfNoConfig := &SetupFlow{
 			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "a"}}},
 		}
-		next, err := sfNoConfig.NextSetupStep("auth")
+		next, err := sfNoConfig.NextSetupStep("auth", false)
 		require.NoError(t, err)
 		assert.Equal(t, "", next)
 	})

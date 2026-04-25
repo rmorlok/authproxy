@@ -338,4 +338,36 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 		assert.Equal(t, "workspace", form.StepId)
 		assert.Equal(t, "Select Workspace", form.StepTitle)
 	})
+
+	t.Run("returns verifying for verify step", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		conn, _ := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
+		step := cschema.SetupStepVerify
+		conn.SetupStep = &step
+
+		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
+		require.NoError(t, err)
+		require.IsType(t, &iface.InitiateConnectionVerifying{}, resp)
+		assert.Equal(t, iface.PreconnectionResponseTypeVerifying, resp.GetType())
+	})
+
+	t.Run("returns error for verify_failed step with setup_error populated", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		conn, _ := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
+		step := cschema.SetupStepVerifyFailed
+		conn.SetupStep = &step
+		errMsg := `probe "ping" failed: 401 unauthorized`
+		conn.SetupError = &errMsg
+
+		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
+		require.NoError(t, err)
+		require.IsType(t, &iface.InitiateConnectionError{}, resp)
+		errResp := resp.(*iface.InitiateConnectionError)
+		assert.Equal(t, errMsg, errResp.Error)
+		assert.True(t, errResp.CanRetry)
+	})
 }
