@@ -26,6 +26,10 @@ type IActorData interface {
 	GetPermissions() []aschema.Permission
 	GetNamespace() string
 	GetLabels() map[string]string
+	// GetAnnotations returns the annotations to apply on upsert. A nil return means
+	// annotations should be left unchanged on existing actors (PATCH semantics);
+	// a non-nil map (including empty) is treated as a full replacement.
+	GetAnnotations() map[string]string
 }
 
 // IActorDataExtended extends IActorData with additional fields for labels and encrypted key.

@@ -372,6 +372,94 @@ func TestActor(t *testing.T) {
 				require.Equal(t, id3, retrieved3.Id)
 				require.Equal(t, originalPerms3, retrieved3.Permissions)
 			})
+			t.Run("annotations", func(t *testing.T) {
+				t.Run("set on create", func(t *testing.T) {
+					setup(t)
+
+					actor, err := db.UpsertActor(ctx, &Actor{
+						Namespace:   "root",
+						ExternalId:  "annotated",
+						Annotations: Annotations{"env": "prod"},
+					})
+					require.NoError(t, err)
+
+					retrieved, err := db.GetActor(ctx, actor.Id)
+					require.NoError(t, err)
+					require.Equal(t, Annotations{"env": "prod"}, retrieved.Annotations)
+				})
+				t.Run("replace on update", func(t *testing.T) {
+					setup(t)
+
+					id := apid.New(apid.PrefixActor)
+					require.NoError(t, db.CreateActor(ctx, &Actor{
+						Id:          id,
+						Namespace:   "root",
+						ExternalId:  "to-replace",
+						Annotations: Annotations{"env": "dev", "team": "x"},
+					}))
+
+					updated, err := db.UpsertActor(ctx, &Actor{
+						Id:          id,
+						Namespace:   "root",
+						ExternalId:  "to-replace",
+						Annotations: Annotations{"env": "prod"},
+					})
+					require.NoError(t, err)
+					require.Equal(t, Annotations{"env": "prod"}, updated.Annotations)
+
+					retrieved, err := db.GetActor(ctx, id)
+					require.NoError(t, err)
+					require.Equal(t, Annotations{"env": "prod"}, retrieved.Annotations)
+				})
+				t.Run("nil annotations leave existing unchanged", func(t *testing.T) {
+					setup(t)
+
+					id := apid.New(apid.PrefixActor)
+					require.NoError(t, db.CreateActor(ctx, &Actor{
+						Id:          id,
+						Namespace:   "root",
+						ExternalId:  "preserve",
+						Annotations: Annotations{"env": "prod"},
+					}))
+
+					// Pass data with nil annotations - simulates JWT-derived actors
+					// where annotations should never be touched.
+					_, err := db.UpsertActor(ctx, &core.Actor{
+						Id:         id,
+						Namespace:  "root",
+						ExternalId: "preserve",
+					})
+					require.NoError(t, err)
+
+					retrieved, err := db.GetActor(ctx, id)
+					require.NoError(t, err)
+					require.Equal(t, Annotations{"env": "prod"}, retrieved.Annotations)
+				})
+				t.Run("empty map clears annotations", func(t *testing.T) {
+					setup(t)
+
+					id := apid.New(apid.PrefixActor)
+					require.NoError(t, db.CreateActor(ctx, &Actor{
+						Id:          id,
+						Namespace:   "root",
+						ExternalId:  "to-clear",
+						Annotations: Annotations{"env": "prod"},
+					}))
+
+					updated, err := db.UpsertActor(ctx, &Actor{
+						Id:          id,
+						Namespace:   "root",
+						ExternalId:  "to-clear",
+						Annotations: Annotations{},
+					})
+					require.NoError(t, err)
+					require.Empty(t, updated.Annotations)
+
+					retrieved, err := db.GetActor(ctx, id)
+					require.NoError(t, err)
+					require.Empty(t, retrieved.Annotations)
+				})
+			})
 		})
 	})
 	t.Run("List", func(t *testing.T) {

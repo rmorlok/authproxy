@@ -44,6 +44,11 @@ func (a *Actor) GetNamespace() string {
 
 func (a *Actor) GetLabels() map[string]string { return a.Labels }
 
+// GetAnnotations always returns nil for JWT-derived actors. Annotations are
+// server-side metadata and do not propagate via JWT, so an upsert from a JWT
+// claim must not overwrite annotations on the stored actor.
+func (a *Actor) GetAnnotations() map[string]string { return nil }
+
 func CreateActor(data IActorData) *Actor {
 	if a, ok := data.(*Actor); ok {
 		return a

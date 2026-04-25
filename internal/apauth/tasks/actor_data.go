@@ -37,6 +37,10 @@ func (a *configuredActorData) GetLabels() map[string]string {
 	return a.labels
 }
 
+func (a *configuredActorData) GetAnnotations() map[string]string {
+	return nil
+}
+
 func (a *configuredActorData) GetEncryptedKey() *encfield.EncryptedField {
 	return a.encryptedKey
 }
