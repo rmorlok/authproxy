@@ -59,7 +59,7 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 	}
 
 	// Determine the next step
-	nextStep, err := connector.SetupFlow.NextSetupStep(*setupStep, len(connector.Probes) > 0)
+	nextStep, err := connector.SetupFlow.NextSetupStep(*setupStep, connector.HasProbes())
 	if err != nil {
 		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to determine next step: %w", err))
 	}

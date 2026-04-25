@@ -210,6 +210,15 @@ func (c *Connector) HasNamespace() bool {
 	return c.Namespace != nil
 }
 
+// HasProbes returns true if the connector has one or more probes, false otherwise
+func (c *Connector) HasProbes() bool {
+	if c == nil {
+		return false
+	}
+
+	return len(c.Probes) > 0
+}
+
 // IsDraft returns true if the connector has an explicitly defined state and that state is draft.
 func (c *Connector) IsDraft() bool {
 	if c == nil {

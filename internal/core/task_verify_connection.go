@@ -88,12 +88,11 @@ func (s *service) verifyConnection(ctx context.Context, t *asynq.Task) error {
 
 func (s *service) advanceAfterVerify(ctx context.Context, conn *connection) error {
 	connector := conn.cv.GetDefinition()
-	hasProbes := connector != nil && len(connector.Probes) > 0
 
 	var nextStep string
 	if connector != nil && connector.SetupFlow != nil {
 		var err error
-		nextStep, err = connector.SetupFlow.NextSetupStep(cschema.SetupStepVerify, hasProbes)
+		nextStep, err = connector.SetupFlow.NextSetupStep(cschema.SetupStepVerify, connector.HasProbes())
 		if err != nil {
 			return fmt.Errorf("failed to determine next step after verify: %w", err)
 		}
