@@ -8,7 +8,6 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
 func (o *oAuth2Connection) getPublicCallbackUrl() (string, error) {
@@ -112,44 +111,14 @@ func (o *oAuth2Connection) CallbackFrom3rdParty(ctx context.Context, query url.V
 		return errorRedirectPage, fmt.Errorf("failed to create db token from response: %w", err)
 	}
 
-	cv := o.connection.GetConnectorVersionEntity()
-	var connectorDef *cschema.Connector
-	if cv != nil {
-		connectorDef = cv.GetDefinition()
+	outcome, err := o.connection.HandleCredentialsEstablished(ctx)
+	if err != nil {
+		return errorRedirectPage, fmt.Errorf("failed to handle post-auth state transition: %w", err)
 	}
-	hasProbes := connectorDef != nil && len(connectorDef.Probes) > 0
-	hasConfigure := connectorDef != nil && connectorDef.SetupFlow.HasConfigure()
 
-	// If the connector has probes, run them in a background task before proceeding to configure.
-	if hasProbes {
-		verifyStep := cschema.SetupStepVerify
-		if err := o.connection.SetSetupStep(ctx, &verifyStep); err != nil {
-			return errorRedirectPage, fmt.Errorf("failed to set setup step to verify: %w", err)
-		}
-		if err := o.connectors.EnqueueVerifyConnection(ctx, o.connection.GetId()); err != nil {
-			return errorRedirectPage, fmt.Errorf("failed to enqueue verify connection task: %w", err)
-		}
-
-		// The UI will poll /_setup_step to observe verify outcome and transition to configure/ready/error.
+	if outcome.SetupPending {
 		return o.appendSetupPendingToReturnUrl(o.state.ReturnToUrl), nil
 	}
-
-	// No probes — proceed with the existing post-auth branches.
-	if hasConfigure {
-		configureStep := "configure:0"
-		if err := o.connection.SetSetupStep(ctx, &configureStep); err != nil {
-			return errorRedirectPage, fmt.Errorf("failed to set setup step to configure:0: %w", err)
-		}
-		return o.appendSetupPendingToReturnUrl(o.state.ReturnToUrl), nil
-	}
-
-	// No configure steps — clear setup step if it was set
-	if o.connection.GetSetupStep() != nil {
-		if err := o.connection.SetSetupStep(ctx, nil); err != nil {
-			return errorRedirectPage, fmt.Errorf("failed to clear setup step: %w", err)
-		}
-	}
-
 	return o.state.ReturnToUrl, nil
 }
 

@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	mockAsynq "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -41,8 +42,13 @@ var workspaceSchema = common.RawJSON(`{
 }`)
 
 func newTestConnectionWithSetupFlow(t *testing.T, ctrl *gomock.Controller, sf *cschema.SetupFlow) (*connection, *mockDb.MockDB) {
+	conn, db, _ := newTestConnectionWithSetupFlowAndAsynq(t, ctrl, sf)
+	return conn, db
+}
+
+func newTestConnectionWithSetupFlowAndAsynq(t *testing.T, ctrl *gomock.Controller, sf *cschema.SetupFlow) (*connection, *mockDb.MockDB, *mockAsynq.MockClient) {
 	e := encrypt.NewFakeEncryptService(false)
-	s, db, _, _, _, _ := FullMockService(t, ctrl)
+	s, db, _, _, ac, _ := FullMockService(t, ctrl)
 	s.encrypt = e
 
 	connector := cschema.Connector{
@@ -62,7 +68,7 @@ func newTestConnectionWithSetupFlow(t *testing.T, ctrl *gomock.Controller, sf *c
 		logger: aplog.NewNoopLogger(),
 	}
 
-	return conn, db
+	return conn, db, ac
 }
 
 func TestSubmitForm(t *testing.T) {

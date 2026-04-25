@@ -164,6 +164,10 @@ func (m *Connection) Reconfigure(ctx context.Context) (iface.InitiateConnectionR
 	return nil, fmt.Errorf("not implemented")
 }
 
+func (m *Connection) HandleCredentialsEstablished(ctx context.Context) (iface.PostAuthOutcome, error) {
+	return iface.PostAuthOutcome{SetupPending: false}, nil
+}
+
 var _ iface.Connection = (*Connection)(nil)
 
 type ConnectionMatcher struct {
