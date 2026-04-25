@@ -1777,7 +1777,7 @@ const docTemplateApi = `{
                         "BearerAuth": []
                     }
                 ],
-                "description": "Retry a connection setup that failed during probe verification. Clears the failure and either returns to the first preconnect step or re-initiates OAuth.",
+                "description": "Retry a connection setup that ended in a terminal failure state. Applies to any setup-phase failure: an auth-phase failure such as an OAuth token-exchange error (auth_failed) or a probe failure during verify (verify_failed). Clears the recorded error and either returns to the first preconnect step (if the connector defines one, so the user can correct any input that led to the failure) or re-initiates the auth flow from scratch.",
                 "consumes": [
                     "application/json"
                 ],

@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -79,5 +80,29 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 		require.NoError(t, err)
 		assert.False(t, outcome.SetupPending)
 		assert.Nil(t, conn.GetSetupStep())
+	})
+}
+
+func TestHandleAuthFailed(t *testing.T) {
+	t.Run("records error and moves to auth_failed", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		conn, db := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
+
+		db.EXPECT().SetConnectionSetupError(gomock.Any(), conn.Id, gomock.Any()).
+			DoAndReturn(func(_ context.Context, _ any, msg *string) error {
+				require.NotNil(t, msg)
+				assert.Contains(t, *msg, "token exchange boom")
+				return nil
+			})
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStr(cschema.SetupStepAuthFailed)).Return(nil)
+
+		err := conn.HandleAuthFailed(context.Background(), errors.New("token exchange boom"))
+		require.NoError(t, err)
+		require.NotNil(t, conn.GetSetupStep())
+		assert.Equal(t, cschema.SetupStepAuthFailed, *conn.GetSetupStep())
+		require.NotNil(t, conn.GetSetupError())
+		assert.Contains(t, *conn.GetSetupError(), "token exchange boom")
 	})
 }

@@ -46,3 +46,20 @@ func (c *connection) HandleCredentialsEstablished(ctx context.Context) (iface.Po
 	}
 	return iface.PostAuthOutcome{SetupPending: false}, nil
 }
+
+// HandleAuthFailed records an auth-phase failure on the connection so it lands in the same
+// retryable terminal state the verify phase uses. setup_error captures the message and
+// setup_step becomes auth_failed; the marketplace UI surfaces this via the standard failure
+// screen and offers retry/cancel via /connections/{id}/_retry.
+func (c *connection) HandleAuthFailed(ctx context.Context, authErr error) error {
+	msg := authErr.Error()
+	if err := c.SetSetupError(ctx, &msg); err != nil {
+		return fmt.Errorf("failed to record setup error after auth failure: %w", err)
+	}
+
+	failedStep := cschema.SetupStepAuthFailed
+	if err := c.SetSetupStep(ctx, &failedStep); err != nil {
+		return fmt.Errorf("failed to set setup step to auth_failed: %w", err)
+	}
+	return nil
+}

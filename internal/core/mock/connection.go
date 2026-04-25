@@ -168,6 +168,14 @@ func (m *Connection) HandleCredentialsEstablished(ctx context.Context) (iface.Po
 	return iface.PostAuthOutcome{SetupPending: false}, nil
 }
 
+func (m *Connection) HandleAuthFailed(ctx context.Context, authErr error) error {
+	msg := authErr.Error()
+	m.SetupError = &msg
+	failedStep := "auth_failed"
+	m.SetupStep = &failedStep
+	return nil
+}
+
 var _ iface.Connection = (*Connection)(nil)
 
 type ConnectionMatcher struct {

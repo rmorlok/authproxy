@@ -9,10 +9,11 @@ import (
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
-// RetryConnectionSetup resets a connection that is in the verify_failed terminal state so the
-// user can try setup again. If the connector has preconnect steps, the retry restarts from
-// preconnect:0 so the user can correct any input that led to invalid credentials. Otherwise,
-// retry re-initiates the OAuth flow from scratch.
+// RetryConnectionSetup resets a connection that is in a terminal failure state so the user
+// can try setup again. Both auth_failed (auth-phase failure such as an OAuth token-exchange
+// error) and verify_failed (probe failure after auth) are retryable. If the connector has
+// preconnect steps, retry restarts from preconnect:0 so the user can correct any input that
+// led to the failure. Otherwise, retry re-initiates the auth flow from scratch.
 func (s *service) RetryConnectionSetup(ctx context.Context, id apid.ID, returnToUrl string) (iface.InitiateConnectionResponse, error) {
 	conn, err := s.getConnection(ctx, id)
 	if err != nil {
@@ -20,7 +21,7 @@ func (s *service) RetryConnectionSetup(ctx context.Context, id apid.ID, returnTo
 	}
 
 	setupStep := conn.GetSetupStep()
-	if setupStep == nil || *setupStep != cschema.SetupStepVerifyFailed {
+	if setupStep == nil || (*setupStep != cschema.SetupStepVerifyFailed && *setupStep != cschema.SetupStepAuthFailed) {
 		return nil, httperr.BadRequest("connection is not in a retryable state")
 	}
 

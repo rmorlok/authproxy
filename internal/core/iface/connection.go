@@ -70,6 +70,12 @@ type Connection interface {
 	// considered ready. Auth methods invoke this so post-auth state transitions stay
 	// independent of the credential exchange mechanism.
 	HandleCredentialsEstablished(ctx context.Context) (PostAuthOutcome, error)
+
+	// HandleAuthFailed records a failure during the auth phase (e.g. an OAuth token exchange
+	// error). It populates setup_error and moves setup_step to the auth_failed terminal
+	// pseudo-step so the user is left in a retryable state — the marketplace UI surfaces the
+	// error and offers retry/cancel via the connection retry endpoint.
+	HandleAuthFailed(ctx context.Context, authErr error) error
 }
 
 // PostAuthOutcome describes what happened after credentials were established. SetupPending

@@ -130,6 +130,12 @@ const SetupStepVerify = "verify"
 // linear flow; the UI surfaces an error screen with retry/cancel options.
 const SetupStepVerifyFailed = "verify_failed"
 
+// SetupStepAuthFailed is a terminal pseudo-step that indicates the auth phase failed (e.g. an
+// OAuth token exchange returned an error). The connection's setup_error column holds the
+// failure message. Like verify_failed, it is outside the normal linear flow; the UI surfaces
+// an error screen with retry/cancel options.
+const SetupStepAuthFailed = "auth_failed"
+
 // NextSetupStep returns the next setup step after the given one, or empty string if done.
 // The auth phase is implicit between preconnect and configure phases. When the connector has
 // probes, a verify phase runs between auth and configure.
@@ -170,10 +176,10 @@ func (sf *SetupFlow) NextSetupStep(current string, hasProbes bool) (string, erro
 }
 
 // ParseSetupStep parses a setup step string like "preconnect:0" into phase and index.
-// Singleton pseudo-steps "auth", "verify", and "verify_failed" return (phase, 0, nil).
+// Singleton pseudo-steps "auth", "verify", "verify_failed", and "auth_failed" return (phase, 0, nil).
 func ParseSetupStep(setupStep string) (phase string, index int, err error) {
 	switch setupStep {
-	case "auth", SetupStepVerify, SetupStepVerifyFailed:
+	case "auth", SetupStepVerify, SetupStepVerifyFailed, SetupStepAuthFailed:
 		return setupStep, 0, nil
 	}
 
