@@ -11,6 +11,7 @@ import (
 	jsonschemav5 "github.com/santhosh-tekuri/jsonschema/v5"
 
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 // SetupFlow defines the multi-step setup flow for a connector. Customers define this in their
@@ -347,6 +348,69 @@ func extractSchemaPropertyNames(schema json.RawMessage) (map[string]bool, error)
 	return result, nil
 }
 
+// PreconnectFieldNames returns the union of top-level property names defined across
+// all preconnect steps' JSON schemas. These are the cfg fields available before the
+// auth flow runs. Steps with malformed JSON schemas are silently skipped — those are
+// caught by the per-step Validate.
+func (sf *SetupFlow) PreconnectFieldNames() map[string]bool {
+	result := make(map[string]bool)
+	if sf == nil || sf.Preconnect == nil {
+		return result
+	}
+	for i := range sf.Preconnect.Steps {
+		step := &sf.Preconnect.Steps[i]
+		if step.JsonSchema.IsEmpty() {
+			continue
+		}
+		names, err := extractSchemaPropertyNames(json.RawMessage(step.JsonSchema))
+		if err != nil {
+			continue
+		}
+		for k := range names {
+			result[k] = true
+		}
+	}
+	return result
+}
+
+// ConfigureFieldNamesUpTo returns the union of top-level property names defined by
+// configure steps with index < stepIndex. Used to determine which cfg fields are
+// available to a data source rendered while the user is filling out configure step N.
+// Pass len(steps) to get all configure fields.
+func (sf *SetupFlow) ConfigureFieldNamesUpTo(stepIndex int) map[string]bool {
+	result := make(map[string]bool)
+	if sf == nil || sf.Configure == nil {
+		return result
+	}
+	limit := stepIndex
+	if limit > len(sf.Configure.Steps) {
+		limit = len(sf.Configure.Steps)
+	}
+	for i := 0; i < limit; i++ {
+		step := &sf.Configure.Steps[i]
+		if step.JsonSchema.IsEmpty() {
+			continue
+		}
+		names, err := extractSchemaPropertyNames(json.RawMessage(step.JsonSchema))
+		if err != nil {
+			continue
+		}
+		for k := range names {
+			result[k] = true
+		}
+	}
+	return result
+}
+
+// AllConfigFieldNames returns the union of cfg fields available after the entire
+// setup flow completes (preconnect + all configure steps).
+func (sf *SetupFlow) AllConfigFieldNames() map[string]bool {
+	return util.UnionBoolMaps(
+		sf.PreconnectFieldNames(),
+		sf.ConfigureFieldNamesUpTo(1<<31-1),
+	)
+}
+
 // DataSourceDef defines how to fetch dynamic data for populating form fields.
 type DataSourceDef struct {
 	// ProxyRequest defines an HTTP request to make through the connection's authenticated proxy.
@@ -398,6 +462,31 @@ func (r *DataSourceProxyRequest) Validate(vc *common.ValidationContext) error {
 
 	if r.Url == "" {
 		result = multierror.Append(result, vc.NewErrorfForField("url", "url is required"))
+	}
+
+	return result.ErrorOrNil()
+}
+
+// ValidateMustacheReferences checks that every {{cfg.X}} reference in the URL and
+// header templates resolves against the cfg fields visible to a configure step at
+// the given index. Visibility = preconnect fields plus any prior configure step's
+// fields (the step's own fields are not yet committed when the data source runs).
+func (r *DataSourceProxyRequest) ValidateMustacheReferences(
+	vc *common.ValidationContext,
+	mctx *MustacheValidationContext,
+	stepIdx int,
+) error {
+	if r == nil || mctx == nil {
+		return nil
+	}
+
+	result := &multierror.Error{}
+	available := mctx.ConfigureStepFields(stepIdx)
+	scopeLabel := configureScopeLabel(stepIdx)
+
+	checkMustacheTemplate(vc.PushField("url"), r.Url, available, scopeLabel, result)
+	for k, v := range r.Headers {
+		checkMustacheTemplate(vc.PushField("headers").PushField(k), v, available, scopeLabel, result)
 	}
 
 	return result.ErrorOrNil()

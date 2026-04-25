@@ -144,6 +144,10 @@ func (c *Connector) Validate(vc *common.ValidationContext) error {
 		}
 	}
 
+	if err := c.validateMustacheReferences(vc); err != nil {
+		result = multierror.Append(result, err)
+	}
+
 	return result.ErrorOrNil()
 }
 
