@@ -75,7 +75,7 @@ func (s *service) verifyConnection(ctx context.Context, t *asynq.Task) error {
 			continue
 		}
 		logger.Error("probe failed during verify", "probe_id", probe.GetId(), "outcome", outcome, "error", invokeErr)
-		if failErr := s.markVerifyFailed(ctx, conn, probe.GetId(), invokeErr); failErr != nil {
+		if failErr := conn.onVerifyFailed(ctx, probe.GetId(), invokeErr); failErr != nil {
 			// Return the failErr so asynq retries — probe outcome is preserved for a later attempt.
 			return fmt.Errorf("failed to record verify failure: %w", failErr)
 		}
@@ -83,56 +83,5 @@ func (s *service) verifyConnection(ctx context.Context, t *asynq.Task) error {
 	}
 
 	// All probes passed. Advance to the next step in the flow.
-	return s.advanceAfterVerify(ctx, conn)
-}
-
-func (s *service) advanceAfterVerify(ctx context.Context, conn *connection) error {
-	connector := conn.cv.GetDefinition()
-
-	var nextStep string
-	if connector != nil && connector.SetupFlow != nil {
-		var err error
-		nextStep, err = connector.SetupFlow.NextSetupStep(cschema.SetupStepVerify, connector.HasProbes())
-		if err != nil {
-			return fmt.Errorf("failed to determine next step after verify: %w", err)
-		}
-	}
-
-	if nextStep == "" {
-		if err := conn.SetSetupStep(ctx, nil); err != nil {
-			return fmt.Errorf("failed to clear setup step after verify: %w", err)
-		}
-		if err := conn.SetState(ctx, database.ConnectionStateReady); err != nil {
-			return fmt.Errorf("failed to set connection ready after verify: %w", err)
-		}
-		return nil
-	}
-
-	if err := conn.SetSetupStep(ctx, &nextStep); err != nil {
-		return fmt.Errorf("failed to advance setup step after verify: %w", err)
-	}
-	return nil
-}
-
-func (s *service) markVerifyFailed(ctx context.Context, conn *connection, probeId string, invokeErr error) error {
-	// Revoke whatever credentials we obtained during auth so they cannot be reused. Retry will
-	// reauthenticate from scratch.
-	revokeOps := conn.getRevokeCredentialsOperations()
-	for _, op := range revokeOps {
-		if err := op(ctx); err != nil {
-			// Log and continue — we still want to record the failure state even if revoke fails.
-			conn.logger.Error("failed to revoke credentials during verify failure", "error", err)
-		}
-	}
-
-	msg := fmt.Sprintf("probe %q failed: %s", probeId, invokeErr.Error())
-	if err := conn.SetSetupError(ctx, &msg); err != nil {
-		return err
-	}
-
-	failedStep := cschema.SetupStepVerifyFailed
-	if err := conn.SetSetupStep(ctx, &failedStep); err != nil {
-		return err
-	}
-	return nil
+	return conn.onVerifyPassed(ctx)
 }
