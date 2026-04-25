@@ -1588,7 +1588,7 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 		"/connections/:id/_retry",
 		r.auth.NewRequiredBuilder().
 			ForResource("connections").
-			ForVerb("update").
+			ForVerb("create"). // should also be update
 			ForIdField("id").
 			Build(),
 		r.retry,
