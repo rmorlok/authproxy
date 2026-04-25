@@ -55,7 +55,7 @@ func TestDisconnectConnection(t *testing.T) {
 			EnqueueContext(gomock.Any(), taskMatcher, asynq.Retention(10*time.Minute)).
 			DoAndReturn(func(_ context.Context, task *asynq.Task, _ ...asynq.Option) (*asynq.TaskInfo, error) {
 				// Verify the task type
-				assert.Equal(t, "connectors:disconnect_connection", task.Type())
+				assert.Equal(t, "core:disconnect_connection", task.Type())
 
 				// Parse the payload to verify the connection ID
 				var payload struct {
