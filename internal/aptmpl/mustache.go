@@ -19,3 +19,43 @@ func ContainsMustache(s string) bool {
 	}
 	return false
 }
+
+// ExtractVariables parses the template and returns the de-duplicated list of variable
+// names referenced by it (including dotted paths like "cfg.tenant"). Section and inverted
+// section tags are included alongside variable tags. Returns an error if the template is
+// malformed.
+func ExtractVariables(template string) ([]string, error) {
+	if !ContainsMustache(template) {
+		return nil, nil
+	}
+
+	tmpl, err := mustache.ParseString(template)
+	if err != nil {
+		return nil, err
+	}
+
+	seen := map[string]struct{}{}
+	var out []string
+	collectTagNames(tmpl.Tags(), seen, &out)
+	return out, nil
+}
+
+func collectTagNames(tags []mustache.Tag, seen map[string]struct{}, out *[]string) {
+	for _, t := range tags {
+		switch t.Type() {
+		case mustache.Variable:
+			name := t.Name()
+			if _, ok := seen[name]; !ok {
+				seen[name] = struct{}{}
+				*out = append(*out, name)
+			}
+		case mustache.Section, mustache.InvertedSection:
+			name := t.Name()
+			if _, ok := seen[name]; !ok {
+				seen[name] = struct{}{}
+				*out = append(*out, name)
+			}
+			collectTagNames(t.Tags(), seen, out)
+		}
+	}
+}

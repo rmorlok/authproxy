@@ -71,3 +71,58 @@ func TestContainsMustache(t *testing.T) {
 	assert.False(t, ContainsMustache("{not mustache}"))
 	assert.False(t, ContainsMustache("{ {spaced} }"))
 }
+
+func TestExtractVariables(t *testing.T) {
+	t.Run("plain string returns nil", func(t *testing.T) {
+		vars, err := ExtractVariables("https://example.com/api")
+		require.NoError(t, err)
+		assert.Nil(t, vars)
+	})
+
+	t.Run("empty string returns nil", func(t *testing.T) {
+		vars, err := ExtractVariables("")
+		require.NoError(t, err)
+		assert.Nil(t, vars)
+	})
+
+	t.Run("single variable", func(t *testing.T) {
+		vars, err := ExtractVariables("https://{{tenant}}.example.com")
+		require.NoError(t, err)
+		assert.Equal(t, []string{"tenant"}, vars)
+	})
+
+	t.Run("dotted path", func(t *testing.T) {
+		vars, err := ExtractVariables("https://{{cfg.tenant}}.example.com")
+		require.NoError(t, err)
+		assert.Equal(t, []string{"cfg.tenant"}, vars)
+	})
+
+	t.Run("multiple variables", func(t *testing.T) {
+		vars, err := ExtractVariables("{{cfg.tenant}}.{{cfg.region}}.example.com/{{labels.env}}")
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{"cfg.tenant", "cfg.region", "labels.env"}, vars)
+	})
+
+	t.Run("deduplicates repeated references", func(t *testing.T) {
+		vars, err := ExtractVariables("{{cfg.tenant}}.{{cfg.tenant}}.example.com")
+		require.NoError(t, err)
+		assert.Equal(t, []string{"cfg.tenant"}, vars)
+	})
+
+	t.Run("walks section tags", func(t *testing.T) {
+		vars, err := ExtractVariables("{{#cfg.flag}}{{cfg.tenant}}{{/cfg.flag}}")
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{"cfg.flag", "cfg.tenant"}, vars)
+	})
+
+	t.Run("walks inverted section tags", func(t *testing.T) {
+		vars, err := ExtractVariables("{{^cfg.flag}}{{cfg.fallback}}{{/cfg.flag}}")
+		require.NoError(t, err)
+		assert.ElementsMatch(t, []string{"cfg.flag", "cfg.fallback"}, vars)
+	})
+
+	t.Run("malformed template returns error", func(t *testing.T) {
+		_, err := ExtractVariables("{{unclosed")
+		require.Error(t, err)
+	})
+}
