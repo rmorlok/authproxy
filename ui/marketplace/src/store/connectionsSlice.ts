@@ -5,8 +5,8 @@ import {
     connections,
     ConnectionState,
     DisconnectResponseJson,
-    InitiateConnectionFormResponse,
-    InitiateConnectionResponse,
+    ConnectionSetupFormResponse,
+    ConnectionSetupResponse,
     isErrorResponse,
     isFormResponse,
     isVerifyingResponse,
@@ -24,7 +24,7 @@ interface FormStep {
     uiSchema: Record<string, unknown>;
 }
 
-function formStepFromResponse(response: InitiateConnectionFormResponse): FormStep {
+function formStepFromResponse(response: ConnectionSetupFormResponse): FormStep {
     return {
         connectionId: response.id,
         stepId: response.step_id,
@@ -40,7 +40,7 @@ function formStepFromResponse(response: InitiateConnectionFormResponse): FormSte
 // applySetupResponse updates state based on a setup-step response. Verifying responses
 // set the polling marker; error responses populate verifyError; form responses populate
 // currentFormStep; redirect and complete clear the in-flight setup UI.
-function applySetupResponse(state: ConnectionsState, response: InitiateConnectionResponse): void {
+function applySetupResponse(state: ConnectionsState, response: ConnectionSetupResponse): void {
     if (isFormResponse(response)) {
         state.currentFormStep = formStepFromResponse(response);
         state.verifyingConnectionId = null;

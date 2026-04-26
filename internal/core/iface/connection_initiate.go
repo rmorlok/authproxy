@@ -48,97 +48,97 @@ func (icr *InitiateConnectionRequest) HasIntoNamespace() bool {
 	return icr.IntoNamespace != ""
 }
 
-type InitiateConnectionResponseType string
+type ConnectionSetupResponseType string
 
 const (
-	PreconnectionResponseTypeRedirect  InitiateConnectionResponseType = "redirect"
-	PreconnectionResponseTypeForm      InitiateConnectionResponseType = "form"
-	PreconnectionResponseTypeComplete  InitiateConnectionResponseType = "complete"
-	PreconnectionResponseTypeVerifying InitiateConnectionResponseType = "verifying"
-	PreconnectionResponseTypeError     InitiateConnectionResponseType = "error"
+	ConnectionSetupResponseTypeRedirect  ConnectionSetupResponseType = "redirect"
+	ConnectionSetupResponseTypeForm      ConnectionSetupResponseType = "form"
+	ConnectionSetupResponseTypeComplete  ConnectionSetupResponseType = "complete"
+	ConnectionSetupResponseTypeVerifying ConnectionSetupResponseType = "verifying"
+	ConnectionSetupResponseTypeError     ConnectionSetupResponseType = "error"
 )
 
-type InitiateConnectionResponse interface {
+type ConnectionSetupResponse interface {
 	GetId() apid.ID
-	GetType() InitiateConnectionResponseType
+	GetType() ConnectionSetupResponseType
 }
 
-type InitiateConnectionRedirect struct {
-	Id          apid.ID                        `json:"id"`
-	Type        InitiateConnectionResponseType `json:"type"`
-	RedirectUrl string                         `json:"redirect_url"`
+type ConnectionSetupRedirect struct {
+	Id          apid.ID                     `json:"id"`
+	Type        ConnectionSetupResponseType `json:"type"`
+	RedirectUrl string                      `json:"redirect_url"`
 }
 
-func (icr *InitiateConnectionRedirect) GetId() apid.ID {
+func (icr *ConnectionSetupRedirect) GetId() apid.ID {
 	return icr.Id
 }
 
-func (icr *InitiateConnectionRedirect) GetType() InitiateConnectionResponseType {
+func (icr *ConnectionSetupRedirect) GetType() ConnectionSetupResponseType {
 	return icr.Type
 }
 
-type InitiateConnectionForm struct {
-	Id              apid.ID                        `json:"id"`
-	Type            InitiateConnectionResponseType `json:"type"`
-	StepId          string                         `json:"step_id"`
-	StepTitle       string                         `json:"step_title,omitempty"`
-	StepDescription string                         `json:"step_description,omitempty"`
-	CurrentStep     int                            `json:"current_step"`
-	TotalSteps      int                            `json:"total_steps"`
-	JsonSchema      json.RawMessage                `json:"json_schema"`
-	UiSchema        json.RawMessage                `json:"ui_schema"`
+type ConnectionSetupForm struct {
+	Id              apid.ID                     `json:"id"`
+	Type            ConnectionSetupResponseType `json:"type"`
+	StepId          string                      `json:"step_id"`
+	StepTitle       string                      `json:"step_title,omitempty"`
+	StepDescription string                      `json:"step_description,omitempty"`
+	CurrentStep     int                         `json:"current_step"`
+	TotalSteps      int                         `json:"total_steps"`
+	JsonSchema      json.RawMessage             `json:"json_schema"`
+	UiSchema        json.RawMessage             `json:"ui_schema"`
 }
 
-func (icf *InitiateConnectionForm) GetId() apid.ID {
+func (icf *ConnectionSetupForm) GetId() apid.ID {
 	return icf.Id
 }
 
-func (icf *InitiateConnectionForm) GetType() InitiateConnectionResponseType {
+func (icf *ConnectionSetupForm) GetType() ConnectionSetupResponseType {
 	return icf.Type
 }
 
-type InitiateConnectionComplete struct {
-	Id   apid.ID                        `json:"id"`
-	Type InitiateConnectionResponseType `json:"type"`
+type ConnectionSetupComplete struct {
+	Id   apid.ID                     `json:"id"`
+	Type ConnectionSetupResponseType `json:"type"`
 }
 
-func (icc *InitiateConnectionComplete) GetId() apid.ID {
+func (icc *ConnectionSetupComplete) GetId() apid.ID {
 	return icc.Id
 }
 
-func (icc *InitiateConnectionComplete) GetType() InitiateConnectionResponseType {
+func (icc *ConnectionSetupComplete) GetType() ConnectionSetupResponseType {
 	return icc.Type
 }
 
-// InitiateConnectionVerifying indicates that probes are running in the background to verify
+// ConnectionSetupVerifying indicates that probes are running in the background to verify
 // the credentials obtained during auth. The UI should poll /_setup_step to observe the outcome.
-type InitiateConnectionVerifying struct {
-	Id   apid.ID                        `json:"id"`
-	Type InitiateConnectionResponseType `json:"type"`
+type ConnectionSetupVerifying struct {
+	Id   apid.ID                     `json:"id"`
+	Type ConnectionSetupResponseType `json:"type"`
 }
 
-func (icv *InitiateConnectionVerifying) GetId() apid.ID {
+func (icv *ConnectionSetupVerifying) GetId() apid.ID {
 	return icv.Id
 }
 
-func (icv *InitiateConnectionVerifying) GetType() InitiateConnectionResponseType {
+func (icv *ConnectionSetupVerifying) GetType() ConnectionSetupResponseType {
 	return icv.Type
 }
 
-// InitiateConnectionError is a terminal error response during setup, e.g. when probe verification
+// ConnectionSetupError is a terminal error response during setup, e.g. when probe verification
 // fails. The UI should show the error and offer retry (POST /_retry) or cancel (POST /_abort).
-type InitiateConnectionError struct {
-	Id       apid.ID                        `json:"id"`
-	Type     InitiateConnectionResponseType `json:"type"`
-	Error    string                         `json:"error"`
-	CanRetry bool                           `json:"can_retry"`
+type ConnectionSetupError struct {
+	Id       apid.ID                     `json:"id"`
+	Type     ConnectionSetupResponseType `json:"type"`
+	Error    string                      `json:"error"`
+	CanRetry bool                        `json:"can_retry"`
 }
 
-func (ice *InitiateConnectionError) GetId() apid.ID {
+func (ice *ConnectionSetupError) GetId() apid.ID {
 	return ice.Id
 }
 
-func (ice *InitiateConnectionError) GetType() InitiateConnectionResponseType {
+func (ice *ConnectionSetupError) GetType() ConnectionSetupResponseType {
 	return ice.Type
 }
 

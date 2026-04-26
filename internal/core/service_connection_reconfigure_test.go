@@ -79,7 +79,7 @@ func TestReconfigure(t *testing.T) {
 		resp, err := conn.Reconfigure(context.Background())
 		require.NoError(t, err)
 		require.NotNil(t, resp)
-		assert.Equal(t, iface.PreconnectionResponseTypeForm, resp.GetType())
+		assert.Equal(t, iface.ConnectionSetupResponseTypeForm, resp.GetType())
 	})
 
 	t.Run("returns first configure step when preconnect steps also exist", func(t *testing.T) {
@@ -106,7 +106,7 @@ func TestReconfigure(t *testing.T) {
 		resp, err := conn.Reconfigure(context.Background())
 		require.NoError(t, err)
 		require.NotNil(t, resp)
-		assert.Equal(t, iface.PreconnectionResponseTypeForm, resp.GetType())
+		assert.Equal(t, iface.ConnectionSetupResponseTypeForm, resp.GetType())
 	})
 }
 

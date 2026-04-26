@@ -37,6 +37,50 @@ definitions:
       value:
         type: string
     type: object
+  routes.ConnectionSetupComplete:
+    description: Completion response for connection setup
+    properties:
+      id:
+        description: Connection UUID
+        example: req_test550e8400abcde
+        type: string
+      type:
+        description: Response type (always "complete")
+        example: complete
+        type: string
+    type: object
+  routes.ConnectionSetupForm:
+    description: Form response for connection setup
+    properties:
+      id:
+        description: Connection UUID
+        example: req_test550e8400abcde
+        type: string
+      json_schema:
+        description: JSON Schema defining the form fields
+      type:
+        description: Response type (always "form")
+        example: form
+        type: string
+      ui_schema:
+        description: UI Schema for JSON Forms rendering
+    type: object
+  routes.ConnectionSetupRedirect:
+    description: Redirect response for connection setup
+    properties:
+      id:
+        description: Connection UUID
+        example: req_test550e8400abcde
+        type: string
+      redirect_url:
+        description: URL to redirect the user to
+        example: https://oauth.provider.com/authorize?...
+        type: string
+      type:
+        description: Response type (always "redirect")
+        example: redirect
+        type: string
+    type: object
   routes.ConnectorAnnotationJson:
     properties:
       key:
@@ -115,50 +159,6 @@ definitions:
         type: string
       stack_trace:
         description: Stack trace (only in debug mode)
-        type: string
-    type: object
-  routes.InitiateConnectionComplete:
-    description: Completion response for connection initiation
-    properties:
-      id:
-        description: Connection UUID
-        example: req_test550e8400abcde
-        type: string
-      type:
-        description: Response type (always "complete")
-        example: complete
-        type: string
-    type: object
-  routes.InitiateConnectionForm:
-    description: Form response for connection initiation
-    properties:
-      id:
-        description: Connection UUID
-        example: req_test550e8400abcde
-        type: string
-      json_schema:
-        description: JSON Schema defining the form fields
-      type:
-        description: Response type (always "form")
-        example: form
-        type: string
-      ui_schema:
-        description: UI Schema for JSON Forms rendering
-    type: object
-  routes.InitiateConnectionRedirect:
-    description: Redirect response for connection initiation
-    properties:
-      id:
-        description: Connection UUID
-        example: req_test550e8400abcde
-        type: string
-      redirect_url:
-        description: URL to redirect the user to
-        example: https://oauth.provider.com/authorize?...
-        type: string
-      type:
-        description: Response type (always "redirect")
-        example: redirect
         type: string
     type: object
   routes.InitiateConnectionRequest:
@@ -1675,7 +1675,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.InitiateConnectionRedirect'
+            $ref: '#/definitions/routes.ConnectionSetupRedirect'
         "400":
           description: Bad Request
           schema:
@@ -2040,7 +2040,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.InitiateConnectionForm'
+            $ref: '#/definitions/routes.ConnectionSetupForm'
         "400":
           description: Bad Request
           schema:
@@ -2086,7 +2086,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.InitiateConnectionForm'
+            $ref: '#/definitions/routes.ConnectionSetupForm'
         "400":
           description: Bad Request
           schema:
@@ -2120,7 +2120,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.InitiateConnectionComplete'
+            $ref: '#/definitions/routes.ConnectionSetupComplete'
         "400":
           description: Bad Request
           schema:
@@ -2161,7 +2161,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.InitiateConnectionComplete'
+            $ref: '#/definitions/routes.ConnectionSetupComplete'
         "400":
           description: Bad Request
           schema:

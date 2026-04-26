@@ -59,10 +59,10 @@ type Connection interface {
 		req *ProxyRequest,
 		w http.ResponseWriter,
 	) error
-	SubmitForm(ctx context.Context, req SubmitConnectionRequest) (InitiateConnectionResponse, error)
-	GetCurrentSetupStepResponse(ctx context.Context) (InitiateConnectionResponse, error)
+	SubmitForm(ctx context.Context, req SubmitConnectionRequest) (ConnectionSetupResponse, error)
+	GetCurrentSetupStepResponse(ctx context.Context) (ConnectionSetupResponse, error)
 	GetDataSource(ctx context.Context, sourceId string) ([]apjs.DataSourceOption, error)
-	Reconfigure(ctx context.Context) (InitiateConnectionResponse, error)
+	Reconfigure(ctx context.Context) (ConnectionSetupResponse, error)
 
 	// CancelSetup abandons an in-flight reconfigure on a ready connection by clearing
 	// its setup_step and setup_error. The connection remains ready and its previously

@@ -77,8 +77,8 @@ func TestRetryConnectionSetup(t *testing.T) {
 		resp, err := conn.s.RetryConnectionSetup(context.Background(), conn.Id, "")
 		require.NoError(t, err)
 		require.NotNil(t, resp)
-		assert.Equal(t, iface.PreconnectionResponseTypeForm, resp.GetType())
-		form := resp.(*iface.InitiateConnectionForm)
+		assert.Equal(t, iface.ConnectionSetupResponseTypeForm, resp.GetType())
+		form := resp.(*iface.ConnectionSetupForm)
 		assert.Equal(t, "tenant", form.StepId)
 	})
 
@@ -115,8 +115,8 @@ func TestRetryConnectionSetup(t *testing.T) {
 		resp, err := conn.s.RetryConnectionSetup(context.Background(), conn.Id, "")
 		require.NoError(t, err)
 		require.NotNil(t, resp)
-		assert.Equal(t, iface.PreconnectionResponseTypeForm, resp.GetType())
-		form := resp.(*iface.InitiateConnectionForm)
+		assert.Equal(t, iface.ConnectionSetupResponseTypeForm, resp.GetType())
+		form := resp.(*iface.ConnectionSetupForm)
 		assert.Equal(t, "tenant", form.StepId)
 	})
 }

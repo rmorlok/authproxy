@@ -40,7 +40,7 @@ type ConnectionsRoutes struct {
 // @Accept			json
 // @Produce		json
 // @Param			request	body		InitiateConnectionRequest	true	"Connection initiation request"
-// @Success		200		{object}	InitiateConnectionRedirect
+// @Success		200		{object}	ConnectionSetupRedirect
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
@@ -75,7 +75,7 @@ func (r *ConnectionsRoutes) initiate(gctx *gin.Context) {
 // @Produce		json
 // @Param			id		path		string					true	"Connection ID"
 // @Param			request	body		SubmitConnectionRequest	true	"Form submission data"
-// @Success		200		{object}	InitiateConnectionComplete
+// @Success		200		{object}	ConnectionSetupComplete
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		501		{object}	ErrorResponse
@@ -132,7 +132,7 @@ func (r *ConnectionsRoutes) submit(gctx *gin.Context) {
 // @Tags			connections
 // @Produce		json
 // @Param			id	path		string	true	"Connection ID"
-// @Success		200	{object}	InitiateConnectionComplete
+// @Success		200	{object}	ConnectionSetupComplete
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
@@ -572,7 +572,7 @@ func (r *ConnectionsRoutes) abort(gctx *gin.Context) {
 // @Tags			connections
 // @Produce		json
 // @Param			id	path		string	true	"Connection UUID"
-// @Success		200	{object}	InitiateConnectionForm
+// @Success		200	{object}	ConnectionSetupForm
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
@@ -685,7 +685,7 @@ type RetryConnectionRequest struct {
 // @Produce		json
 // @Param			id		path	string					true	"Connection UUID"
 // @Param			request	body	RetryConnectionRequest	true	"Retry request"
-// @Success		200	{object}	InitiateConnectionForm
+// @Success		200	{object}	ConnectionSetupForm
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse

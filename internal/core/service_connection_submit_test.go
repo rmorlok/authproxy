@@ -134,9 +134,9 @@ func TestSubmitForm(t *testing.T) {
 			Data:   json.RawMessage(`{"tenant":"acme"}`),
 		})
 		require.NoError(t, err)
-		require.IsType(t, &iface.InitiateConnectionForm{}, resp)
+		require.IsType(t, &iface.ConnectionSetupForm{}, resp)
 
-		form := resp.(*iface.InitiateConnectionForm)
+		form := resp.(*iface.ConnectionSetupForm)
 		assert.Equal(t, "region", form.StepId)
 		assert.Equal(t, "Region", form.StepTitle)
 		assert.Equal(t, 1, form.CurrentStep)
@@ -194,8 +194,8 @@ func TestSubmitForm(t *testing.T) {
 			Data:   json.RawMessage(`{"workspace_id":"ws-123"}`),
 		})
 		require.NoError(t, err)
-		require.IsType(t, &iface.InitiateConnectionComplete{}, resp)
-		assert.Equal(t, iface.PreconnectionResponseTypeComplete, resp.GetType())
+		require.IsType(t, &iface.ConnectionSetupComplete{}, resp)
+		assert.Equal(t, iface.ConnectionSetupResponseTypeComplete, resp.GetType())
 	})
 
 	t.Run("merges data from multiple steps", func(t *testing.T) {
@@ -238,7 +238,7 @@ func TestSubmitForm(t *testing.T) {
 			Data:   json.RawMessage(`{"tenant":"acme"}`),
 		})
 		require.NoError(t, err)
-		require.IsType(t, &iface.InitiateConnectionForm{}, resp)
+		require.IsType(t, &iface.ConnectionSetupForm{}, resp)
 
 		// Second submit — merges workspace into existing config
 		db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, gomock.Any()).Return(nil)
@@ -250,7 +250,7 @@ func TestSubmitForm(t *testing.T) {
 			Data:   json.RawMessage(`{"workspace":"main"}`),
 		})
 		require.NoError(t, err)
-		require.IsType(t, &iface.InitiateConnectionComplete{}, resp)
+		require.IsType(t, &iface.ConnectionSetupComplete{}, resp)
 
 		// Verify both values are in config
 		cfg, err := conn.GetConfiguration(context.Background())
@@ -269,7 +269,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 
 		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
 		require.NoError(t, err)
-		assert.Equal(t, iface.PreconnectionResponseTypeComplete, resp.GetType())
+		assert.Equal(t, iface.ConnectionSetupResponseTypeComplete, resp.GetType())
 	})
 
 	t.Run("returns form for preconnect step", func(t *testing.T) {
@@ -291,9 +291,9 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 
 		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
 		require.NoError(t, err)
-		require.IsType(t, &iface.InitiateConnectionForm{}, resp)
+		require.IsType(t, &iface.ConnectionSetupForm{}, resp)
 
-		form := resp.(*iface.InitiateConnectionForm)
+		form := resp.(*iface.ConnectionSetupForm)
 		assert.Equal(t, "tenant", form.StepId)
 		assert.Equal(t, "Enter Tenant", form.StepTitle)
 		assert.Equal(t, 0, form.CurrentStep)
@@ -316,7 +316,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 
 		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
 		require.NoError(t, err)
-		assert.Equal(t, iface.PreconnectionResponseTypeRedirect, resp.GetType())
+		assert.Equal(t, iface.ConnectionSetupResponseTypeRedirect, resp.GetType())
 	})
 
 	t.Run("returns form for configure step", func(t *testing.T) {
@@ -338,9 +338,9 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 
 		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
 		require.NoError(t, err)
-		require.IsType(t, &iface.InitiateConnectionForm{}, resp)
+		require.IsType(t, &iface.ConnectionSetupForm{}, resp)
 
-		form := resp.(*iface.InitiateConnectionForm)
+		form := resp.(*iface.ConnectionSetupForm)
 		assert.Equal(t, "workspace", form.StepId)
 		assert.Equal(t, "Select Workspace", form.StepTitle)
 	})
@@ -355,8 +355,8 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 
 		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
 		require.NoError(t, err)
-		require.IsType(t, &iface.InitiateConnectionVerifying{}, resp)
-		assert.Equal(t, iface.PreconnectionResponseTypeVerifying, resp.GetType())
+		require.IsType(t, &iface.ConnectionSetupVerifying{}, resp)
+		assert.Equal(t, iface.ConnectionSetupResponseTypeVerifying, resp.GetType())
 	})
 
 	t.Run("returns error for verify_failed step with setup_error populated", func(t *testing.T) {
@@ -371,8 +371,8 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 
 		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
 		require.NoError(t, err)
-		require.IsType(t, &iface.InitiateConnectionError{}, resp)
-		errResp := resp.(*iface.InitiateConnectionError)
+		require.IsType(t, &iface.ConnectionSetupError{}, resp)
+		errResp := resp.(*iface.ConnectionSetupError)
 		assert.Equal(t, errMsg, errResp.Error)
 		assert.True(t, errResp.CanRetry)
 	})

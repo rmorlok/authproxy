@@ -15,7 +15,7 @@ import (
 // SubmitForm handles form data submission for a connection setup flow step.
 // It merges the submitted data into the connection's configuration, advances to the next step,
 // and returns the appropriate response (next form, auth redirect, or complete).
-func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionRequest) (iface.InitiateConnectionResponse, error) {
+func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionRequest) (iface.ConnectionSetupResponse, error) {
 	setupStep := c.GetSetupStep()
 	if setupStep == nil {
 		return nil, httperr.BadRequest("connection has no active setup step")
@@ -75,9 +75,9 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 			return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to set connection state to ready: %w", err))
 		}
 
-		return &iface.InitiateConnectionComplete{
+		return &iface.ConnectionSetupComplete{
 			Id:   c.GetId(),
-			Type: iface.PreconnectionResponseTypeComplete,
+			Type: iface.ConnectionSetupResponseTypeComplete,
 		}, nil
 	}
 
@@ -91,7 +91,7 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 }
 
 // initiateAuthStep starts the OAuth flow after preconnect steps are complete.
-func (c *connection) initiateAuthStep(ctx context.Context, returnToUrl string, connector *cschema.Connector) (iface.InitiateConnectionResponse, error) {
+func (c *connection) initiateAuthStep(ctx context.Context, returnToUrl string, connector *cschema.Connector) (iface.ConnectionSetupResponse, error) {
 	if returnToUrl == "" {
 		return nil, httperr.BadRequest("return_to_url is required for auth step")
 	}
@@ -115,15 +115,15 @@ func (c *connection) initiateAuthStep(ctx context.Context, returnToUrl string, c
 		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to generate OAuth redirect URL: %w", err))
 	}
 
-	return &iface.InitiateConnectionRedirect{
+	return &iface.ConnectionSetupRedirect{
 		Id:          c.GetId(),
-		Type:        iface.PreconnectionResponseTypeRedirect,
+		Type:        iface.ConnectionSetupResponseTypeRedirect,
 		RedirectUrl: url,
 	}, nil
 }
 
 // buildFormResponse creates a form response for the given setup step.
-func (c *connection) buildFormResponse(ctx context.Context, setupStep cschema.SetupStep, sf *cschema.SetupFlow) (iface.InitiateConnectionResponse, error) {
+func (c *connection) buildFormResponse(ctx context.Context, setupStep cschema.SetupStep, sf *cschema.SetupFlow) (iface.ConnectionSetupResponse, error) {
 	step, globalIndex, err := sf.GetStepBySetupStep(setupStep)
 	if err != nil {
 		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to get step definition: %w", err))
@@ -133,9 +133,9 @@ func (c *connection) buildFormResponse(ctx context.Context, setupStep cschema.Se
 		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to update setup step: %w", err))
 	}
 
-	return &iface.InitiateConnectionForm{
+	return &iface.ConnectionSetupForm{
 		Id:              c.GetId(),
-		Type:            iface.PreconnectionResponseTypeForm,
+		Type:            iface.ConnectionSetupResponseTypeForm,
 		StepId:          step.Id,
 		StepTitle:       step.Title,
 		StepDescription: step.Description,
@@ -148,20 +148,20 @@ func (c *connection) buildFormResponse(ctx context.Context, setupStep cschema.Se
 
 // GetCurrentSetupStepResponse returns the response for the current setup step,
 // allowing the UI to resume an interrupted flow.
-func (c *connection) GetCurrentSetupStepResponse(ctx context.Context) (iface.InitiateConnectionResponse, error) {
+func (c *connection) GetCurrentSetupStepResponse(ctx context.Context) (iface.ConnectionSetupResponse, error) {
 	setupStep := c.GetSetupStep()
 	if setupStep == nil {
-		return &iface.InitiateConnectionComplete{
+		return &iface.ConnectionSetupComplete{
 			Id:   c.GetId(),
-			Type: iface.PreconnectionResponseTypeComplete,
+			Type: iface.ConnectionSetupResponseTypeComplete,
 		}, nil
 	}
 
 	connector := c.cv.GetDefinition()
 	if connector.SetupFlow == nil {
-		return &iface.InitiateConnectionComplete{
+		return &iface.ConnectionSetupComplete{
 			Id:   c.GetId(),
-			Type: iface.PreconnectionResponseTypeComplete,
+			Type: iface.ConnectionSetupResponseTypeComplete,
 		}, nil
 	}
 
@@ -173,23 +173,23 @@ func (c *connection) GetCurrentSetupStepResponse(ctx context.Context) (iface.Ini
 	switch parsed.Phase() {
 	case cschema.SetupPhaseAuth:
 		// The connection is waiting for the OAuth callback — tell the UI
-		return &iface.InitiateConnectionRedirect{
+		return &iface.ConnectionSetupRedirect{
 			Id:   c.GetId(),
-			Type: iface.PreconnectionResponseTypeRedirect,
+			Type: iface.ConnectionSetupResponseTypeRedirect,
 		}, nil
 	case cschema.SetupPhaseVerify:
-		return &iface.InitiateConnectionVerifying{
+		return &iface.ConnectionSetupVerifying{
 			Id:   c.GetId(),
-			Type: iface.PreconnectionResponseTypeVerifying,
+			Type: iface.ConnectionSetupResponseTypeVerifying,
 		}, nil
 	case cschema.SetupPhaseVerifyFailed, cschema.SetupPhaseAuthFailed:
 		msg := ""
 		if e := c.GetSetupError(); e != nil {
 			msg = *e
 		}
-		return &iface.InitiateConnectionError{
+		return &iface.ConnectionSetupError{
 			Id:       c.GetId(),
-			Type:     iface.PreconnectionResponseTypeError,
+			Type:     iface.ConnectionSetupResponseTypeError,
 			Error:    msg,
 			CanRetry: true,
 		}, nil

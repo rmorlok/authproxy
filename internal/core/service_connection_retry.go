@@ -14,7 +14,7 @@ import (
 // error) and verify_failed (probe failure after auth) are retryable. If the connector has
 // preconnect steps, retry restarts from preconnect:0 so the user can correct any input that
 // led to the failure. Otherwise, retry re-initiates the auth flow from scratch.
-func (s *service) RetryConnectionSetup(ctx context.Context, id apid.ID, returnToUrl string) (iface.InitiateConnectionResponse, error) {
+func (s *service) RetryConnectionSetup(ctx context.Context, id apid.ID, returnToUrl string) (iface.ConnectionSetupResponse, error) {
 	conn, err := s.getConnection(ctx, id)
 	if err != nil {
 		return nil, err

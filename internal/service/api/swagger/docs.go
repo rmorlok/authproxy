@@ -1235,7 +1235,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.InitiateConnectionRedirect"
+                            "$ref": "#/definitions/routes.ConnectionSetupRedirect"
                         }
                     },
                     "400": {
@@ -1795,7 +1795,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.InitiateConnectionForm"
+                            "$ref": "#/definitions/routes.ConnectionSetupForm"
                         }
                     },
                     "400": {
@@ -1859,7 +1859,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.InitiateConnectionForm"
+                            "$ref": "#/definitions/routes.ConnectionSetupForm"
                         }
                     },
                     "400": {
@@ -1911,7 +1911,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.InitiateConnectionComplete"
+                            "$ref": "#/definitions/routes.ConnectionSetupComplete"
                         }
                     },
                     "400": {
@@ -1975,7 +1975,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.InitiateConnectionComplete"
+                            "$ref": "#/definitions/routes.ConnectionSetupComplete"
                         }
                     },
                     "400": {
@@ -6520,6 +6520,65 @@ const docTemplateApi = `{
                 }
             }
         },
+        "routes.ConnectionSetupComplete": {
+            "description": "Completion response for connection setup",
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "Connection UUID",
+                    "type": "string",
+                    "example": "req_test550e8400abcde"
+                },
+                "type": {
+                    "description": "Response type (always \"complete\")",
+                    "type": "string",
+                    "example": "complete"
+                }
+            }
+        },
+        "routes.ConnectionSetupForm": {
+            "description": "Form response for connection setup",
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "Connection UUID",
+                    "type": "string",
+                    "example": "req_test550e8400abcde"
+                },
+                "json_schema": {
+                    "description": "JSON Schema defining the form fields"
+                },
+                "type": {
+                    "description": "Response type (always \"form\")",
+                    "type": "string",
+                    "example": "form"
+                },
+                "ui_schema": {
+                    "description": "UI Schema for JSON Forms rendering"
+                }
+            }
+        },
+        "routes.ConnectionSetupRedirect": {
+            "description": "Redirect response for connection setup",
+            "type": "object",
+            "properties": {
+                "id": {
+                    "description": "Connection UUID",
+                    "type": "string",
+                    "example": "req_test550e8400abcde"
+                },
+                "redirect_url": {
+                    "description": "URL to redirect the user to",
+                    "type": "string",
+                    "example": "https://oauth.provider.com/authorize?..."
+                },
+                "type": {
+                    "description": "Response type (always \"redirect\")",
+                    "type": "string",
+                    "example": "redirect"
+                }
+            }
+        },
         "routes.ConnectorAnnotationJson": {
             "type": "object",
             "properties": {
@@ -6636,65 +6695,6 @@ const docTemplateApi = `{
                 "stack_trace": {
                     "description": "Stack trace (only in debug mode)",
                     "type": "string"
-                }
-            }
-        },
-        "routes.InitiateConnectionComplete": {
-            "description": "Completion response for connection initiation",
-            "type": "object",
-            "properties": {
-                "id": {
-                    "description": "Connection UUID",
-                    "type": "string",
-                    "example": "req_test550e8400abcde"
-                },
-                "type": {
-                    "description": "Response type (always \"complete\")",
-                    "type": "string",
-                    "example": "complete"
-                }
-            }
-        },
-        "routes.InitiateConnectionForm": {
-            "description": "Form response for connection initiation",
-            "type": "object",
-            "properties": {
-                "id": {
-                    "description": "Connection UUID",
-                    "type": "string",
-                    "example": "req_test550e8400abcde"
-                },
-                "json_schema": {
-                    "description": "JSON Schema defining the form fields"
-                },
-                "type": {
-                    "description": "Response type (always \"form\")",
-                    "type": "string",
-                    "example": "form"
-                },
-                "ui_schema": {
-                    "description": "UI Schema for JSON Forms rendering"
-                }
-            }
-        },
-        "routes.InitiateConnectionRedirect": {
-            "description": "Redirect response for connection initiation",
-            "type": "object",
-            "properties": {
-                "id": {
-                    "description": "Connection UUID",
-                    "type": "string",
-                    "example": "req_test550e8400abcde"
-                },
-                "redirect_url": {
-                    "description": "URL to redirect the user to",
-                    "type": "string",
-                    "example": "https://oauth.provider.com/authorize?..."
-                },
-                "type": {
-                    "description": "Response type (always \"redirect\")",
-                    "type": "string",
-                    "example": "redirect"
                 }
             }
         },

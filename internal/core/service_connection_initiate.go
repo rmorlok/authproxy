@@ -23,7 +23,7 @@ import (
 
 // InitiateConnection starts the process of initiating the connection. This method provides auth validation as part of
 // the logic.
-func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConnectionRequest) (iface.InitiateConnectionResponse, error) {
+func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConnectionRequest) (iface.ConnectionSetupResponse, error) {
 	val := auth.MustGetValidatorFromContext(ctx)
 	if err := req.Validate(); err != nil {
 		val.MarkErrorReturn()
@@ -93,9 +93,9 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 			return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
 		}
 
-		return &iface.InitiateConnectionForm{
+		return &iface.ConnectionSetupForm{
 			Id:              connection.GetId(),
-			Type:            iface.PreconnectionResponseTypeForm,
+			Type:            iface.ConnectionSetupResponseTypeForm,
 			StepId:          firstStep.Id,
 			StepTitle:       firstStep.Title,
 			StepDescription: firstStep.Description,
@@ -120,9 +120,9 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 			return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
 		}
 
-		return &iface.InitiateConnectionRedirect{
+		return &iface.ConnectionSetupRedirect{
 			Id:          connection.GetId(),
-			Type:        iface.PreconnectionResponseTypeRedirect,
+			Type:        iface.ConnectionSetupResponseTypeRedirect,
 			RedirectUrl: url,
 		}, nil
 	}
