@@ -15,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 
@@ -249,7 +250,7 @@ type ConnectionJson struct {
 	Labels      map[string]string        `json:"labels,omitempty"`
 	Annotations map[string]string        `json:"annotations,omitempty"`
 	State       database.ConnectionState `json:"state"`
-	SetupStep   *string                  `json:"setup_step,omitempty"`
+	SetupStep   *cschema.SetupStep       `json:"setup_step,omitempty" swaggertype:"string"`
 	SetupError  *string                  `json:"setup_error,omitempty"`
 	Connector   ConnectorJson            `json:"connector"`
 	CreatedAt   time.Time                `json:"created_at"`
@@ -259,19 +260,13 @@ type ConnectionJson struct {
 func ConnectionToJson(conn coreIface.Connection) ConnectionJson {
 	connector := ConnectorVersionToConnectorJson(conn.GetConnectorVersionEntity())
 
-	var setupStep *string
-	if s := conn.GetSetupStep(); s != nil {
-		str := s.String()
-		setupStep = &str
-	}
-
 	return ConnectionJson{
 		Id:          conn.GetId(),
 		Namespace:   conn.GetNamespace(),
 		Labels:      conn.GetLabels(),
 		Annotations: conn.GetAnnotations(),
 		State:       conn.GetState(),
-		SetupStep:   setupStep,
+		SetupStep:   conn.GetSetupStep(),
 		SetupError:  conn.GetSetupError(),
 		Connector:   connector,
 		CreatedAt:   conn.GetCreatedAt(),
