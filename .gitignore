@@ -35,3 +35,5 @@ tmp
 node_modules
 
 dev_config/keys/tls
+
+.claude/scheduled_tasks.lock
