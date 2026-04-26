@@ -10,6 +10,7 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	jsonschemav5 "github.com/santhosh-tekuri/jsonschema/v5"
+	"gopkg.in/yaml.v3"
 
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -219,6 +220,77 @@ func (s *SetupStep) Scan(value interface{}) error {
 		str = string(v)
 	default:
 		return fmt.Errorf("cannot scan %T into SetupStep", value)
+	}
+
+	if str == "" {
+		*s = SetupStep{}
+		return nil
+	}
+
+	parsed, err := ParseSetupStep(str)
+	if err != nil {
+		return err
+	}
+	*s = parsed
+	return nil
+}
+
+// MarshalJSON renders SetupStep as the canonical setup-step string. The zero
+// SetupStep marshals as JSON null so it round-trips cleanly with omitempty
+// pointer fields and database NULL.
+func (s SetupStep) MarshalJSON() ([]byte, error) {
+	if s.IsZero() {
+		return []byte("null"), nil
+	}
+	return json.Marshal(s.String())
+}
+
+// UnmarshalJSON parses a SetupStep from a JSON string, accepting null and the
+// empty string as the zero SetupStep.
+func (s *SetupStep) UnmarshalJSON(data []byte) error {
+	if len(data) == 0 || bytes.Equal(data, []byte("null")) {
+		*s = SetupStep{}
+		return nil
+	}
+
+	var str string
+	if err := json.Unmarshal(data, &str); err != nil {
+		return fmt.Errorf("setup step must be a JSON string: %w", err)
+	}
+
+	if str == "" {
+		*s = SetupStep{}
+		return nil
+	}
+
+	parsed, err := ParseSetupStep(str)
+	if err != nil {
+		return err
+	}
+	*s = parsed
+	return nil
+}
+
+// MarshalYAML renders SetupStep as the canonical setup-step string. The zero
+// SetupStep marshals as YAML null.
+func (s SetupStep) MarshalYAML() (interface{}, error) {
+	if s.IsZero() {
+		return nil, nil
+	}
+	return s.String(), nil
+}
+
+// UnmarshalYAML parses a SetupStep from a YAML scalar, accepting null and the
+// empty string as the zero SetupStep.
+func (s *SetupStep) UnmarshalYAML(value *yaml.Node) error {
+	if value == nil || value.Tag == "!!null" {
+		*s = SetupStep{}
+		return nil
+	}
+
+	var str string
+	if err := value.Decode(&str); err != nil {
+		return fmt.Errorf("setup step must be a YAML string: %w", err)
 	}
 
 	if str == "" {

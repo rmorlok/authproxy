@@ -501,6 +501,123 @@ func TestSetupStepZero(t *testing.T) {
 	assert.Equal(t, "", z.String())
 }
 
+func TestSetupStepJSONMarshal(t *testing.T) {
+	t.Run("indexed phase marshals as canonical string", func(t *testing.T) {
+		s := MustNewIndexedSetupStep(SetupPhaseConfigure, 2)
+		b, err := json.Marshal(s)
+		require.NoError(t, err)
+		assert.Equal(t, `"configure:2"`, string(b))
+	})
+
+	t.Run("singleton phase marshals as canonical string", func(t *testing.T) {
+		b, err := json.Marshal(SetupStepAuth)
+		require.NoError(t, err)
+		assert.Equal(t, `"auth"`, string(b))
+	})
+
+	t.Run("zero value marshals as null", func(t *testing.T) {
+		var z SetupStep
+		b, err := json.Marshal(z)
+		require.NoError(t, err)
+		assert.Equal(t, `null`, string(b))
+	})
+
+	t.Run("pointer to zero with omitempty is omitted", func(t *testing.T) {
+		type wrapper struct {
+			Step *SetupStep `json:"step,omitempty"`
+		}
+		b, err := json.Marshal(wrapper{Step: nil})
+		require.NoError(t, err)
+		assert.Equal(t, `{}`, string(b))
+	})
+
+	t.Run("pointer to non-zero marshals as string", func(t *testing.T) {
+		type wrapper struct {
+			Step *SetupStep `json:"step,omitempty"`
+		}
+		s := MustNewIndexedSetupStep(SetupPhasePreconnect, 0)
+		b, err := json.Marshal(wrapper{Step: &s})
+		require.NoError(t, err)
+		assert.Equal(t, `{"step":"preconnect:0"}`, string(b))
+	})
+}
+
+func TestSetupStepJSONUnmarshal(t *testing.T) {
+	cases := []string{"preconnect:0", "preconnect:7", "configure:0", "configure:2", "auth", "verify", "verify_failed", "auth_failed"}
+	for _, c := range cases {
+		t.Run(c, func(t *testing.T) {
+			input := []byte(`"` + c + `"`)
+			var s SetupStep
+			require.NoError(t, json.Unmarshal(input, &s))
+			assert.Equal(t, c, s.String())
+
+			// And round-trip
+			b, err := json.Marshal(s)
+			require.NoError(t, err)
+			assert.Equal(t, string(input), string(b))
+		})
+	}
+
+	t.Run("null produces zero", func(t *testing.T) {
+		var s SetupStep
+		require.NoError(t, json.Unmarshal([]byte(`null`), &s))
+		assert.True(t, s.IsZero())
+	})
+
+	t.Run("empty string produces zero", func(t *testing.T) {
+		var s SetupStep
+		require.NoError(t, json.Unmarshal([]byte(`""`), &s))
+		assert.True(t, s.IsZero())
+	})
+
+	t.Run("invalid string returns error", func(t *testing.T) {
+		var s SetupStep
+		err := json.Unmarshal([]byte(`"unknown:0"`), &s)
+		assert.Error(t, err)
+	})
+
+	t.Run("non-string value returns error", func(t *testing.T) {
+		var s SetupStep
+		err := json.Unmarshal([]byte(`123`), &s)
+		assert.Error(t, err)
+	})
+}
+
+func TestSetupStepYAMLRoundTrip(t *testing.T) {
+	cases := []string{"preconnect:0", "configure:2", "auth", "verify_failed"}
+	for _, c := range cases {
+		t.Run(c, func(t *testing.T) {
+			parsed, err := ParseSetupStep(c)
+			require.NoError(t, err)
+
+			out, err := yaml.Marshal(parsed)
+			require.NoError(t, err)
+
+			var back SetupStep
+			require.NoError(t, yaml.Unmarshal(out, &back))
+			assert.Equal(t, c, back.String())
+		})
+	}
+
+	t.Run("null yaml decodes to zero", func(t *testing.T) {
+		var s SetupStep
+		require.NoError(t, yaml.Unmarshal([]byte(`null`), &s))
+		assert.True(t, s.IsZero())
+	})
+
+	t.Run("empty string yaml decodes to zero", func(t *testing.T) {
+		var s SetupStep
+		require.NoError(t, yaml.Unmarshal([]byte(`""`), &s))
+		assert.True(t, s.IsZero())
+	})
+
+	t.Run("invalid string returns error", func(t *testing.T) {
+		var s SetupStep
+		err := yaml.Unmarshal([]byte(`unknown:0`), &s)
+		assert.Error(t, err)
+	})
+}
+
 func TestSetupStepPhaseHelpers(t *testing.T) {
 	assert.True(t, SetupPhasePreconnect.IsIndexed())
 	assert.True(t, SetupPhaseConfigure.IsIndexed())
