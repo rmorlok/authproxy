@@ -7,6 +7,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
 )
@@ -281,7 +282,7 @@ func TestEncryptionKey(t *testing.T) {
 			depth int
 		}
 
-		orphans, err := db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*EncryptionKey, depth int) (bool, error) {
+		orphans, err := db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*EncryptionKey, depth int) (pagination.KeepGoing, error) {
 			var ids []apid.ID
 			for _, k := range keys {
 				ids = append(ids, k.Id)
@@ -290,7 +291,7 @@ func TestEncryptionKey(t *testing.T) {
 				ids   []apid.ID
 				depth int
 			}{ids, depth})
-			return false, nil
+			return true, nil
 		})
 		require.NoError(t, err)
 		require.Empty(t, orphans)
@@ -377,13 +378,13 @@ func TestEncryptionKey(t *testing.T) {
 		}
 		var levels []level
 
-		orphans, err := db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*EncryptionKey, depth int) (bool, error) {
+		orphans, err := db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*EncryptionKey, depth int) (pagination.KeepGoing, error) {
 			ids := make(map[apid.ID]bool)
 			for _, k := range keys {
 				ids[k.Id] = true
 			}
 			levels = append(levels, level{ids, depth})
-			return false, nil
+			return true, nil
 		})
 		require.NoError(t, err)
 		require.Empty(t, orphans)
@@ -408,7 +409,7 @@ func TestEncryptionKey(t *testing.T) {
 	})
 
 	t.Run("EnumerateInDependencyOrder/early_stop", func(t *testing.T) {
-		// Verify that returning stop=true halts after that level.
+		// Verify that returning keepGoing=false halts after that level.
 		_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
@@ -437,9 +438,9 @@ func TestEncryptionKey(t *testing.T) {
 		require.NoError(t, db.CreateEncryptionKey(ctx, child))
 
 		callCount := 0
-		_, err := db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*EncryptionKey, depth int) (bool, error) {
+		_, err := db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*EncryptionKey, depth int) (pagination.KeepGoing, error) {
 			callCount++
-			return true, nil // stop immediately after first level
+			return false, nil // stop immediately after first level
 		})
 		require.NoError(t, err)
 		require.Equal(t, 1, callCount)
@@ -477,11 +478,11 @@ func TestEncryptionKey(t *testing.T) {
 		require.NoError(t, db.DeleteEncryptionKey(ctx, child.Id))
 
 		var allIDs []apid.ID
-		orphans, err := db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*EncryptionKey, depth int) (bool, error) {
+		orphans, err := db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*EncryptionKey, depth int) (pagination.KeepGoing, error) {
 			for _, k := range keys {
 				allIDs = append(allIDs, k.Id)
 			}
-			return false, nil
+			return true, nil
 		})
 		require.NoError(t, err)
 		require.Empty(t, orphans)
@@ -507,11 +508,11 @@ func TestEncryptionKey(t *testing.T) {
 		require.NoError(t, db.CreateEncryptionKey(ctx, orphan))
 
 		var allIDs []apid.ID
-		orphans, err := db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*EncryptionKey, depth int) (bool, error) {
+		orphans, err := db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*EncryptionKey, depth int) (pagination.KeepGoing, error) {
 			for _, k := range keys {
 				allIDs = append(allIDs, k.Id)
 			}
-			return false, nil
+			return true, nil
 		})
 		require.NoError(t, err)
 		// Only root in the walk; orphan is not walked

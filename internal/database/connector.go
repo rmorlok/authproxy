@@ -53,7 +53,7 @@ func IsValidConnectorOrderByField[T string | ConnectorOrderByField](field T) boo
 
 type ListConnectorsExecutor interface {
 	FetchPage(context.Context) pagination.PageResult[Connector]
-	Enumerate(context.Context, func(pagination.PageResult[Connector]) (keepGoing bool, err error)) error
+	Enumerate(context.Context, func(pagination.PageResult[Connector]) (keepGoing pagination.KeepGoing, err error)) error
 }
 
 type ListConnectorsBuilder interface {
@@ -324,7 +324,7 @@ func (l *listConnectorsFilters) FetchPage(ctx context.Context) pagination.PageRe
 	return l.fetchPage(ctx)
 }
 
-func (l *listConnectorsFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[Connector]) (keepGoing bool, err error)) error {
+func (l *listConnectorsFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[Connector]) (keepGoing pagination.KeepGoing, err error)) error {
 	var err error
 	keepGoing := true
 	hasMore := true

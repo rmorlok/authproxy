@@ -15,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/util"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 func init() {
@@ -307,7 +308,7 @@ type OAuth2TokenWithConnection struct {
 func (s *service) EnumerateOAuth2TokensExpiringWithin(
 	ctx context.Context,
 	duration time.Duration,
-	callback func(tokens []*OAuth2TokenWithConnection, lastPage bool) (stop bool, err error),
+	callback func(tokens []*OAuth2TokenWithConnection, lastPage bool) (keepGoing pagination.KeepGoing, err error),
 ) error {
 	const pageSize = 100
 	now := apctx.GetClock(ctx).Now()
@@ -356,12 +357,12 @@ func (s *service) EnumerateOAuth2TokensExpiringWithin(
 			results = results[:pageSize]
 		}
 
-		stop, err := callback(results, lastPage)
+		keepGoing, err := callback(results, lastPage)
 		if err != nil {
 			return err
 		}
 
-		if stop || lastPage {
+		if !keepGoing || lastPage {
 			break
 		}
 

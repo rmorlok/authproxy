@@ -12,6 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 // EncryptedFieldRegistration declares which columns on a table contain encrypted fields
@@ -133,7 +134,7 @@ type ReEncryptedFieldUpdate struct {
 
 func (s *service) EnumerateFieldsRequiringReEncryption(
 	ctx context.Context,
-	callback func(targets []ReEncryptionTarget, lastPage bool) (stop bool, err error),
+	callback func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error),
 ) error {
 	regs := GetEncryptedFieldRegistrations()
 	if len(regs) == 0 {
@@ -156,12 +157,12 @@ func (s *service) EnumerateFieldsRequiringReEncryption(
 			lastPageForTable := totalRows <= pageSize
 			isLastPage := isLastReg && lastPageForTable
 
-			stop, err := callback(targets, isLastPage)
+			keepGoing, err := callback(targets, isLastPage)
 			if err != nil {
 				return err
 			}
 
-			if stop || lastPageForTable {
+			if !keepGoing || lastPageForTable {
 				break
 			}
 

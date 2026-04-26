@@ -167,7 +167,7 @@ INSERT INTO namespaces
 		count := 0
 		err = db.
 			ListNamespacesBuilder().
-			Enumerate(ctx, func(page pagination.PageResult[Namespace]) (bool, error) {
+			Enumerate(ctx, func(page pagination.PageResult[Namespace]) (pagination.KeepGoing, error) {
 				count += len(page.Results)
 				return true, nil
 			})
@@ -1619,9 +1619,9 @@ INSERT INTO namespaces
 
 			var collected []NamespaceEncryptionTarget
 			err = db.EnumerateNamespaceEncryptionTargets(ctx,
-				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, bool, error) {
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 					collected = append(collected, targets...)
-					return nil, false, nil
+					return nil, true, nil
 				},
 			)
 			require.NoError(t, err)
@@ -1670,7 +1670,7 @@ INSERT INTO namespaces
 			require.NoError(t, err)
 
 			err = db.EnumerateNamespaceEncryptionTargets(ctx,
-				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, bool, error) {
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 					var updates []NamespaceTargetEncryptionKeyVersionUpdate
 					for _, t := range targets {
 						if t.EncryptionKeyId != nil {
@@ -1680,7 +1680,7 @@ INSERT INTO namespaces
 							})
 						}
 					}
-					return updates, false, nil
+					return updates, true, nil
 				},
 			)
 			require.NoError(t, err)
@@ -1727,9 +1727,9 @@ INSERT INTO namespaces
 
 			callCount := 0
 			err = db.EnumerateNamespaceEncryptionTargets(ctx,
-				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, bool, error) {
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 					callCount++
-					return nil, true, nil // stop immediately
+					return nil, false, nil // stop immediately
 				},
 			)
 			require.NoError(t, err)
@@ -1753,8 +1753,8 @@ INSERT INTO namespaces
 
 			expectedErr := fmt.Errorf("test error")
 			err = db.EnumerateNamespaceEncryptionTargets(ctx,
-				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, bool, error) {
-					return nil, false, expectedErr
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
+					return nil, true, expectedErr
 				},
 			)
 			require.ErrorIs(t, err, expectedErr)
@@ -1770,11 +1770,11 @@ INSERT INTO namespaces
 
 			callCount := 0
 			err = db.EnumerateNamespaceEncryptionTargets(ctx,
-				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, bool, error) {
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 					callCount++
 					require.Empty(t, targets)
 					require.True(t, lastPage)
-					return nil, false, nil
+					return nil, true, nil
 				},
 			)
 			require.NoError(t, err)
@@ -1801,9 +1801,9 @@ INSERT INTO namespaces
 
 			var lastPageValues []bool
 			err = db.EnumerateNamespaceEncryptionTargets(ctx,
-				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, bool, error) {
+				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 					lastPageValues = append(lastPageValues, lastPage)
-					return nil, false, nil
+					return nil, true, nil
 				},
 			)
 			require.NoError(t, err)

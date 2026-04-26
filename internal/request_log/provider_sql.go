@@ -616,7 +616,7 @@ func (l *sqlListRequestsBuilder) FetchPage(ctx context.Context) pagination.PageR
 	}
 }
 
-func (l *sqlListRequestsBuilder) Enumerate(ctx context.Context, callback func(pagination.PageResult[*LogRecord]) (keepGoing bool, err error)) error {
+func (l *sqlListRequestsBuilder) Enumerate(ctx context.Context, callback func(pagination.PageResult[*LogRecord]) (keepGoing pagination.KeepGoing, err error)) error {
 	var err error
 	keepGoing := true
 	hasMore := true

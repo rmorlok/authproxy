@@ -67,7 +67,7 @@ type DB interface {
 	ListNamespacesFromCursor(ctx context.Context, cursor string) (ListNamespacesExecutor, error)
 	EnumerateNamespaceEncryptionTargets(
 		ctx context.Context,
-		callback func(targets []NamespaceEncryptionTarget, lastPage bool) (updates []NamespaceTargetEncryptionKeyVersionUpdate, stop bool, err error),
+		callback func(targets []NamespaceEncryptionTarget, lastPage bool) (updates []NamespaceTargetEncryptionKeyVersionUpdate, keepGoing pagination.KeepGoing, err error),
 	) error
 
 	/*
@@ -147,7 +147,7 @@ type DB interface {
 	EnumerateOAuth2TokensExpiringWithin(
 		ctx context.Context,
 		duration time.Duration,
-		callback func(tokens []*OAuth2TokenWithConnection, lastPage bool) (stop bool, err error),
+		callback func(tokens []*OAuth2TokenWithConnection, lastPage bool) (keepGoing pagination.KeepGoing, err error),
 	) error
 
 	/*
@@ -174,7 +174,7 @@ type DB interface {
 	// Returns a slice of orphaned keys whose parent encryption key version could not be resolved.
 	EnumerateEncryptionKeysInDependencyOrder(
 		ctx context.Context,
-		callback func(keys []*EncryptionKey, depth int) (stop bool, err error),
+		callback func(keys []*EncryptionKey, depth int) (keepGoing pagination.KeepGoing, err error),
 	) ([]*EncryptionKey, error)
 
 	/*
@@ -200,7 +200,7 @@ type DB interface {
 	EnumerateEncryptionKeyVersionsForKey(
 		ctx context.Context,
 		ekId apid.ID,
-		callback func(ekvs []*EncryptionKeyVersion, lastPage bool) (stop bool, err error),
+		callback func(ekvs []*EncryptionKeyVersion, lastPage bool) (keepGoing pagination.KeepGoing, err error),
 	) error
 
 	/*
@@ -211,7 +211,7 @@ type DB interface {
 	// finding rows whose encrypted field EKV ID does not match the namespace's target EKV ID.
 	EnumerateFieldsRequiringReEncryption(
 		ctx context.Context,
-		callback func(targets []ReEncryptionTarget, lastPage bool) (stop bool, err error),
+		callback func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error),
 	) error
 
 	// BatchUpdateReEncryptedFields updates encrypted field values after re-encryption,

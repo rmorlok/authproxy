@@ -593,7 +593,7 @@ func (s *service) DeleteEncryptionKeyAnnotations(ctx context.Context, id apid.ID
 
 type ListEncryptionKeysExecutor interface {
 	FetchPage(context.Context) pagination.PageResult[EncryptionKey]
-	Enumerate(context.Context, func(pagination.PageResult[EncryptionKey]) (keepGoing bool, err error)) error
+	Enumerate(context.Context, func(pagination.PageResult[EncryptionKey]) (keepGoing pagination.KeepGoing, err error)) error
 }
 
 type ListEncryptionKeysBuilder interface {
@@ -768,7 +768,7 @@ func (l *listEncryptionKeysFilters) FetchPage(ctx context.Context) pagination.Pa
 	return l.fetchPage(ctx)
 }
 
-func (l *listEncryptionKeysFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[EncryptionKey]) (keepGoing bool, err error)) error {
+func (l *listEncryptionKeysFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[EncryptionKey]) (keepGoing pagination.KeepGoing, err error)) error {
 	var err error
 	keepGoing := true
 	hasMore := true
@@ -809,11 +809,11 @@ func (s *service) ListEncryptionKeysFromCursor(ctx context.Context, cursor strin
 // key-version mappings into memory, builds this tree, then invokes the callback once per depth level
 // starting at depth 0 (the root). Keys whose parent cannot be resolved — because their
 // EncryptedKeyData.ID references a missing or deleted encryption key version — are collected and
-// returned as orphans. Return stop=true from the callback to halt the walk early; orphans are still
-// returned in that case.
+// returned as orphans. Return keepGoing=false from the callback to halt the walk early; orphans are
+// still returned in that case.
 func (s *service) EnumerateEncryptionKeysInDependencyOrder(
 	ctx context.Context,
-	callback func(keys []*EncryptionKey, depth int) (stop bool, err error),
+	callback func(keys []*EncryptionKey, depth int) (keepGoing pagination.KeepGoing, err error),
 ) ([]*EncryptionKey, error) {
 	// Load all non-deleted encryption keys
 	rows, err := s.sq.
@@ -894,11 +894,11 @@ func (s *service) EnumerateEncryptionKeysInDependencyOrder(
 	depth := 0
 
 	for len(currentLevel) > 0 {
-		stop, err := callback(currentLevel, depth)
+		keepGoing, err := callback(currentLevel, depth)
 		if err != nil {
 			return orphans, err
 		}
-		if stop {
+		if !keepGoing {
 			return orphans, nil
 		}
 

@@ -6,6 +6,7 @@ import (
 
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 const (
@@ -25,7 +26,7 @@ func (h *EncryptServiceTaskHandler) handleReencryptAll(ctx context.Context, task
 
 	var totalProcessed, totalSkipped, totalErrors int
 
-	err := h.db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []database.ReEncryptionTarget, lastPage bool) (stop bool, err error) {
+	err := h.db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []database.ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 		var updates []database.ReEncryptedFieldUpdate
 
 		for _, target := range targets {
@@ -64,7 +65,7 @@ func (h *EncryptServiceTaskHandler) handleReencryptAll(ctx context.Context, task
 			}
 		}
 
-		return false, nil
+		return true, nil
 	})
 
 	if err != nil {

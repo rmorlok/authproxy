@@ -19,6 +19,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 const (
@@ -185,7 +186,7 @@ func syncKeysVersionsToDatabase(
 
 	var result *multierror.Error
 
-	_, err = db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*database.EncryptionKey, _ int) (stop bool, err error) {
+	_, err = db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*database.EncryptionKey, _ int) (keepGoing pagination.KeepGoing, err error) {
 		for _, key := range keys {
 			if key.EncryptedKeyData == nil {
 				// Global key already synced
@@ -225,7 +226,7 @@ func syncKeysVersionsToDatabase(
 			}
 		}
 
-		return false, nil
+		return true, nil
 	})
 
 	if err != nil {
@@ -238,7 +239,7 @@ func syncKeysVersionsToDatabase(
 	effectiveEKV := make(map[string]apid.ID)
 
 	err = db.EnumerateNamespaceEncryptionTargets(ctx,
-		func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, bool, error) {
+		func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 			var updates []database.NamespaceTargetEncryptionKeyVersionUpdate
 
 			for _, target := range targets {
@@ -293,7 +294,7 @@ func syncKeysVersionsToDatabase(
 				}
 			}
 
-			return updates, false, nil
+			return updates, true, nil
 		},
 	)
 	if err != nil {

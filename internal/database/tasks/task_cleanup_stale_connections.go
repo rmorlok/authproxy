@@ -23,7 +23,7 @@ func (th *taskHandler) cleanupStaleConnections(ctx context.Context, t *asynq.Tas
 		ForStates([]database.ConnectionState{database.ConnectionStateCreated}).
 		WithSetupStepNotNull().
 		UpdatedBefore(cutoff).
-		Enumerate(ctx, func(pr pagination.PageResult[database.Connection]) (bool, error) {
+		Enumerate(ctx, func(pr pagination.PageResult[database.Connection]) (pagination.KeepGoing, error) {
 			for _, conn := range pr.Results {
 				th.logger.Info("cleaning up stale connection", "id", conn.Id, "updated_at", conn.UpdatedAt)
 

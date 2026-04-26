@@ -9,6 +9,7 @@ import (
 
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
 )
 
@@ -23,13 +24,13 @@ func randomBytes(t *testing.T, n int) []byte {
 }
 
 func runReencryptAll(ctx context.Context, env *helpers.IntegrationTestEnv) error {
-	return env.Db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []database.ReEncryptionTarget, lastPage bool) (stop bool, err error) {
+	return env.Db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []database.ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 		var updates []database.ReEncryptedFieldUpdate
 
 		for _, target := range targets {
 			newEF, reencryptErr := env.DM.GetEncryptService().ReEncryptField(ctx, target.EncryptedFieldValue, target.TargetEncryptionKeyVersionId)
 			if reencryptErr != nil {
-				return true, reencryptErr
+				return false, reencryptErr
 			}
 
 			if newEF.ID == target.EncryptedFieldValue.ID {
@@ -47,10 +48,10 @@ func runReencryptAll(ctx context.Context, env *helpers.IntegrationTestEnv) error
 
 		if len(updates) > 0 {
 			if updateErr := env.Db.BatchUpdateReEncryptedFields(ctx, updates); updateErr != nil {
-				return true, updateErr
+				return false, updateErr
 			}
 		}
 
-		return false, nil
+		return true, nil
 	})
 }
