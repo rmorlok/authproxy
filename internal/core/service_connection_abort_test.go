@@ -13,7 +13,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func setupAbortTest(t *testing.T, ctrl *gomock.Controller, sf *cschema.SetupFlow, setupStep *string) (*connection, *mockDb.MockDB) {
+func setupAbortTest(t *testing.T, ctrl *gomock.Controller, sf *cschema.SetupFlow, setupStep *cschema.SetupStep) (*connection, *mockDb.MockDB) {
 	conn, db := newTestConnectionWithSetupFlow(t, ctrl, sf)
 	conn.SetupStep = setupStep
 
@@ -50,7 +50,7 @@ func TestAbortConnection(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		step := "preconnect:0"
+		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
 		conn, db := setupAbortTest(t, ctrl, &cschema.SetupFlow{
 			Preconnect: &cschema.SetupFlowPhase{
 				Steps: []cschema.SetupFlowStep{
@@ -70,7 +70,7 @@ func TestAbortConnection(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		step := "auth"
+		step := cschema.SetupStepAuth
 		conn, db := setupAbortTest(t, ctrl, &cschema.SetupFlow{
 			Preconnect: &cschema.SetupFlowPhase{
 				Steps: []cschema.SetupFlowStep{
@@ -90,7 +90,7 @@ func TestAbortConnection(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		step := "configure:0"
+		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0)
 		conn, db := setupAbortTest(t, ctrl, &cschema.SetupFlow{
 			Configure: &cschema.SetupFlowPhase{
 				Steps: []cschema.SetupFlowStep{

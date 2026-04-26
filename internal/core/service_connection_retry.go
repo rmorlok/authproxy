@@ -21,11 +21,7 @@ func (s *service) RetryConnectionSetup(ctx context.Context, id apid.ID, returnTo
 	}
 
 	setupStep := conn.GetSetupStep()
-	if setupStep == nil {
-		return nil, httperr.BadRequest("connection is not in a retryable state")
-	}
-	parsed, err := cschema.ParseSetupStep(*setupStep)
-	if err != nil || !parsed.IsTerminalFailure() {
+	if setupStep == nil || !setupStep.IsTerminalFailure() {
 		return nil, httperr.BadRequest("connection is not in a retryable state")
 	}
 

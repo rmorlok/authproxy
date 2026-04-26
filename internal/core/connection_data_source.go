@@ -20,12 +20,7 @@ func (c *connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 		return nil, httperr.BadRequest("connection has no active setup step")
 	}
 
-	parsed, err := cschema.ParseSetupStep(*setupStep)
-	if err != nil {
-		return nil, httperr.BadRequestf("invalid setup step: %s", err)
-	}
-
-	if parsed.Phase() != cschema.SetupPhaseConfigure {
+	if setupStep.Phase() != cschema.SetupPhaseConfigure {
 		return nil, httperr.BadRequest("data sources are only available during configure steps")
 	}
 
@@ -34,7 +29,7 @@ func (c *connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 		return nil, httperr.BadRequest("connector has no setup flow")
 	}
 
-	step, _, err := connector.SetupFlow.GetStepBySetupStep(parsed)
+	step, _, err := connector.SetupFlow.GetStepBySetupStep(*setupStep)
 	if err != nil {
 		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to get current step: %w", err))
 	}

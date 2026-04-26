@@ -2,6 +2,7 @@ package connectors
 
 import (
 	"bytes"
+	"database/sql/driver"
 	"encoding/json"
 	"fmt"
 	"strconv"
@@ -192,6 +193,46 @@ func (s SetupStep) Equals(other SetupStep) bool { return s == other }
 
 // IsTerminalFailure reports whether the step is in a terminal failure phase.
 func (s SetupStep) IsTerminalFailure() bool { return s.phase.IsTerminalFailure() }
+
+// Value implements driver.Valuer so SetupStep can be stored as a database column.
+// The zero SetupStep round-trips as SQL NULL.
+func (s SetupStep) Value() (driver.Value, error) {
+	if s.IsZero() {
+		return nil, nil
+	}
+	return s.String(), nil
+}
+
+// Scan implements sql.Scanner so SetupStep can be read from a database column.
+// NULL and empty values produce the zero SetupStep.
+func (s *SetupStep) Scan(value interface{}) error {
+	if value == nil {
+		*s = SetupStep{}
+		return nil
+	}
+
+	var str string
+	switch v := value.(type) {
+	case string:
+		str = v
+	case []byte:
+		str = string(v)
+	default:
+		return fmt.Errorf("cannot scan %T into SetupStep", value)
+	}
+
+	if str == "" {
+		*s = SetupStep{}
+		return nil
+	}
+
+	parsed, err := ParseSetupStep(str)
+	if err != nil {
+		return err
+	}
+	*s = parsed
+	return nil
+}
 
 // ParseSetupStep parses a setup-step string into a SetupStep. Indexed forms must be
 // "phase:index" (e.g. "preconnect:0", "configure:3"); singleton phases ("auth", "verify",

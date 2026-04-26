@@ -12,6 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -60,7 +61,7 @@ type Connection struct {
 	Annotations             Annotations
 	EncryptedConfiguration  *encfield.EncryptedField
 	EncryptedAt             *time.Time
-	SetupStep               *string
+	SetupStep               *cschema.SetupStep
 	SetupError              *string
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
@@ -304,7 +305,7 @@ func (s *service) SetConnectionState(ctx context.Context, id apid.ID, state Conn
 	return nil
 }
 
-func (s *service) SetConnectionSetupStep(ctx context.Context, id apid.ID, setupStep *string) error {
+func (s *service) SetConnectionSetupStep(ctx context.Context, id apid.ID, setupStep *cschema.SetupStep) error {
 	if id == apid.Nil {
 		return errors.New("connection id is required")
 	}

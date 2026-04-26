@@ -25,12 +25,12 @@ func TestOnVerifyPassed(t *testing.T) {
 			},
 		})
 
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStr("configure:0")).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0))).Return(nil)
 
 		err := conn.onVerifyPassed(context.Background())
 		require.NoError(t, err)
 		require.NotNil(t, conn.GetSetupStep())
-		assert.Equal(t, "configure:0", *conn.GetSetupStep())
+		assert.Equal(t, "configure:0", conn.GetSetupStep().String())
 	})
 
 	t.Run("clears setup step and marks ready when no further steps", func(t *testing.T) {
@@ -39,7 +39,7 @@ func TestOnVerifyPassed(t *testing.T) {
 
 		conn, db := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
 
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
 		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateReady).Return(nil)
 
 		err := conn.onVerifyPassed(context.Background())
@@ -63,12 +63,12 @@ func TestOnVerifyFailed(t *testing.T) {
 				assert.Contains(t, *msg, "boom")
 				return nil
 			})
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStr(cschema.SetupStepVerifyFailed.String())).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.SetupStepVerifyFailed)).Return(nil)
 
 		err := conn.onVerifyFailed(context.Background(), "ping", errors.New("boom"))
 		require.NoError(t, err)
 		require.NotNil(t, conn.GetSetupStep())
-		assert.Equal(t, cschema.SetupStepVerifyFailed.String(), *conn.GetSetupStep())
+		assert.Equal(t, cschema.SetupStepVerifyFailed, *conn.GetSetupStep())
 		require.NotNil(t, conn.GetSetupError())
 		assert.Contains(t, *conn.GetSetupError(), "boom")
 	})
