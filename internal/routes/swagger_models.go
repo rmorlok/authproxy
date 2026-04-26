@@ -30,10 +30,10 @@ type InitiateConnectionRequest struct {
 	ReturnToUrl string `json:"return_to_url" example:"https://example.com/callback"`
 }
 
-// InitiateConnectionRedirect represents the response when a connection requires a redirect for OAuth.
+// ConnectionSetupRedirect represents the response when a connection requires a redirect for OAuth.
 //
-//	@Description	Redirect response for connection initiation
-type InitiateConnectionRedirect struct {
+//	@Description	Redirect response for connection setup
+type ConnectionSetupRedirect struct {
 	// Connection UUID
 	Id apid.ID `swaggertype:"string" json:"id" example:"req_test550e8400abcde"`
 	// Response type (always "redirect")
@@ -42,10 +42,10 @@ type InitiateConnectionRedirect struct {
 	RedirectUrl string `json:"redirect_url" example:"https://oauth.provider.com/authorize?..."`
 }
 
-// InitiateConnectionForm represents the response when a connection requires form input.
+// ConnectionSetupForm represents the response when a connection requires form input.
 //
-//	@Description	Form response for connection initiation
-type InitiateConnectionForm struct {
+//	@Description	Form response for connection setup
+type ConnectionSetupForm struct {
 	// Connection UUID
 	Id apid.ID `swaggertype:"string" json:"id" example:"req_test550e8400abcde"`
 	// Response type (always "form")
@@ -56,10 +56,10 @@ type InitiateConnectionForm struct {
 	UiSchema interface{} `json:"ui_schema"`
 }
 
-// InitiateConnectionComplete represents the response when a connection setup is complete.
+// ConnectionSetupComplete represents the response when a connection setup is complete.
 //
-//	@Description	Completion response for connection initiation
-type InitiateConnectionComplete struct {
+//	@Description	Completion response for connection setup
+type ConnectionSetupComplete struct {
 	// Connection UUID
 	Id apid.ID `swaggertype:"string" json:"id" example:"req_test550e8400abcde"`
 	// Response type (always "complete")

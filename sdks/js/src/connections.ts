@@ -61,7 +61,7 @@ export interface InitiateConnectionRequest {
     labels?: Record<string, string>;
 }
 
-export enum InitiateConnectionResponseType {
+export enum ConnectionSetupResponseType {
     REDIRECT = 'redirect',
     FORM = 'form',
     COMPLETE = 'complete',
@@ -69,18 +69,18 @@ export enum InitiateConnectionResponseType {
     ERROR = 'error',
 }
 
-export interface InitiateConnectionResponse {
+export interface ConnectionSetupResponse {
     id: string;
-    type: InitiateConnectionResponseType;
+    type: ConnectionSetupResponseType;
 }
 
-export interface InitiateConnectionRedirectResponse extends InitiateConnectionResponse {
-    type: InitiateConnectionResponseType.REDIRECT;
+export interface ConnectionSetupRedirectResponse extends ConnectionSetupResponse {
+    type: ConnectionSetupResponseType.REDIRECT;
     redirect_url: string;
 }
 
-export interface InitiateConnectionFormResponse extends InitiateConnectionResponse {
-    type: InitiateConnectionResponseType.FORM;
+export interface ConnectionSetupFormResponse extends ConnectionSetupResponse {
+    type: ConnectionSetupResponseType.FORM;
     step_id: string;
     step_title?: string;
     step_description?: string;
@@ -90,38 +90,38 @@ export interface InitiateConnectionFormResponse extends InitiateConnectionRespon
     ui_schema: Record<string, unknown>;
 }
 
-export interface InitiateConnectionCompleteResponse extends InitiateConnectionResponse {
-    type: InitiateConnectionResponseType.COMPLETE;
+export interface ConnectionSetupCompleteResponse extends ConnectionSetupResponse {
+    type: ConnectionSetupResponseType.COMPLETE;
 }
 
-export interface InitiateConnectionVerifyingResponse extends InitiateConnectionResponse {
-    type: InitiateConnectionResponseType.VERIFYING;
+export interface ConnectionSetupVerifyingResponse extends ConnectionSetupResponse {
+    type: ConnectionSetupResponseType.VERIFYING;
 }
 
-export interface InitiateConnectionErrorResponse extends InitiateConnectionResponse {
-    type: InitiateConnectionResponseType.ERROR;
+export interface ConnectionSetupErrorResponse extends ConnectionSetupResponse {
+    type: ConnectionSetupResponseType.ERROR;
     error: string;
     can_retry: boolean;
 }
 
-export function isRedirectResponse(response: InitiateConnectionResponse): response is InitiateConnectionRedirectResponse {
-    return response.type === InitiateConnectionResponseType.REDIRECT;
+export function isRedirectResponse(response: ConnectionSetupResponse): response is ConnectionSetupRedirectResponse {
+    return response.type === ConnectionSetupResponseType.REDIRECT;
 }
 
-export function isFormResponse(response: InitiateConnectionResponse): response is InitiateConnectionFormResponse {
-    return response.type === InitiateConnectionResponseType.FORM;
+export function isFormResponse(response: ConnectionSetupResponse): response is ConnectionSetupFormResponse {
+    return response.type === ConnectionSetupResponseType.FORM;
 }
 
-export function isCompleteResponse(response: InitiateConnectionResponse): response is InitiateConnectionCompleteResponse {
-    return response.type === InitiateConnectionResponseType.COMPLETE;
+export function isCompleteResponse(response: ConnectionSetupResponse): response is ConnectionSetupCompleteResponse {
+    return response.type === ConnectionSetupResponseType.COMPLETE;
 }
 
-export function isVerifyingResponse(response: InitiateConnectionResponse): response is InitiateConnectionVerifyingResponse {
-    return response.type === InitiateConnectionResponseType.VERIFYING;
+export function isVerifyingResponse(response: ConnectionSetupResponse): response is ConnectionSetupVerifyingResponse {
+    return response.type === ConnectionSetupResponseType.VERIFYING;
 }
 
-export function isErrorResponse(response: InitiateConnectionResponse): response is InitiateConnectionErrorResponse {
-    return response.type === InitiateConnectionResponseType.ERROR;
+export function isErrorResponse(response: ConnectionSetupResponse): response is ConnectionSetupErrorResponse {
+    return response.type === ConnectionSetupResponseType.ERROR;
 }
 
 export interface SubmitConnectionRequest {
@@ -190,7 +190,7 @@ export const initiateConnection = (
         labels,
     };
 
-    return client.post<InitiateConnectionResponse>(
+    return client.post<ConnectionSetupResponse>(
         '/api/v1/connections/_initiate',
         request
     );
@@ -202,7 +202,7 @@ export const initiateConnection = (
 export const submitConnection = (connectionId: string, stepId: string, data: unknown) => {
     const request: SubmitConnectionRequest = { step_id: stepId, data };
 
-    return client.post<InitiateConnectionResponse>(
+    return client.post<ConnectionSetupResponse>(
         `/api/v1/connections/${connectionId}/_submit`,
         request
     );
@@ -302,7 +302,7 @@ export const abortConnection = (id: string) => {
  * Get the current setup step for a connection
  */
 export const getSetupStep = (connectionId: string) => {
-    return client.get<InitiateConnectionResponse>(`/api/v1/connections/${connectionId}/_setup_step`);
+    return client.get<ConnectionSetupResponse>(`/api/v1/connections/${connectionId}/_setup_step`);
 };
 
 /**
@@ -316,7 +316,7 @@ export const getDataSource = (connectionId: string, sourceId: string) => {
  * Reconfigure a completed connection by restarting its configure phase
  */
 export const reconfigureConnection = (id: string) => {
-    return client.post<InitiateConnectionResponse>(`/api/v1/connections/${id}/_reconfigure`);
+    return client.post<ConnectionSetupResponse>(`/api/v1/connections/${id}/_reconfigure`);
 };
 
 /**
@@ -334,7 +334,7 @@ export const cancelSetupConnection = (id: string) => {
  */
 export const retryConnection = (id: string, returnToUrl?: string) => {
     const request: RetryConnectionRequest = { return_to_url: returnToUrl };
-    return client.post<InitiateConnectionResponse>(
+    return client.post<ConnectionSetupResponse>(
         `/api/v1/connections/${id}/_retry`,
         request
     );

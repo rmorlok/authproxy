@@ -99,7 +99,7 @@ type C interface {
 	// ListConnectionsFromCursor continues listing connections from a cursor to support pagination.
 	ListConnectionsFromCursor(ctx context.Context, cursor string) (ListConnectionsExecutor, error)
 
-	InitiateConnection(ctx context.Context, req InitiateConnectionRequest) (InitiateConnectionResponse, error)
+	InitiateConnection(ctx context.Context, req InitiateConnectionRequest) (ConnectionSetupResponse, error)
 
 	// EnqueueVerifyConnection enqueues a background task to run all probes for a connection as part of
 	// the verify step of the setup flow. The task advances the connection's setup step based on the outcome.
@@ -108,7 +108,7 @@ type C interface {
 	// RetryConnectionSetup resets a connection that is in the verify_failed terminal state so the user
 	// can try setup again — either restarting preconnect forms, or re-initiating OAuth if the connector
 	// has no preconnect steps. Returns the initial setup step response for the retry.
-	RetryConnectionSetup(ctx context.Context, id apid.ID, returnToUrl string) (InitiateConnectionResponse, error)
+	RetryConnectionSetup(ctx context.Context, id apid.ID, returnToUrl string) (ConnectionSetupResponse, error)
 
 	/*
 	 *

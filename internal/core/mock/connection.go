@@ -154,11 +154,11 @@ func (m *Connection) GetMustacheContext(ctx context.Context) (map[string]any, er
 	return data, nil
 }
 
-func (m *Connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionRequest) (iface.InitiateConnectionResponse, error) {
+func (m *Connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionRequest) (iface.ConnectionSetupResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *Connection) GetCurrentSetupStepResponse(ctx context.Context) (iface.InitiateConnectionResponse, error) {
+func (m *Connection) GetCurrentSetupStepResponse(ctx context.Context) (iface.ConnectionSetupResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
@@ -166,7 +166,7 @@ func (m *Connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 	return nil, fmt.Errorf("not implemented")
 }
 
-func (m *Connection) Reconfigure(ctx context.Context) (iface.InitiateConnectionResponse, error) {
+func (m *Connection) Reconfigure(ctx context.Context) (iface.ConnectionSetupResponse, error) {
 	return nil, fmt.Errorf("not implemented")
 }
 
