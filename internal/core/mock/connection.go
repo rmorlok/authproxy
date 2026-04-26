@@ -11,6 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
 type Connection struct {
@@ -107,8 +108,13 @@ func (m *Connection) GetSetupStep() *string {
 	return m.SetupStep
 }
 
-func (m *Connection) SetSetupStep(ctx context.Context, setupStep *string) error {
-	m.SetupStep = setupStep
+func (m *Connection) SetSetupStep(ctx context.Context, setupStep *cschema.SetupStep) error {
+	if setupStep == nil {
+		m.SetupStep = nil
+	} else {
+		s := setupStep.String()
+		m.SetupStep = &s
+	}
 	return nil
 }
 

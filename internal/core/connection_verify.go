@@ -33,8 +33,7 @@ func (c *connection) onVerifyPassed(ctx context.Context) error {
 		return nil
 	}
 
-	nextStr := nextStep.String()
-	if err := c.SetSetupStep(ctx, &nextStr); err != nil {
+	if err := c.SetSetupStep(ctx, &nextStep); err != nil {
 		return fmt.Errorf("failed to advance setup step after verify: %w", err)
 	}
 	return nil
@@ -56,8 +55,7 @@ func (c *connection) onVerifyFailed(ctx context.Context, probeId string, invokeE
 		return err
 	}
 
-	failedStep := cschema.SetupStepVerifyFailed.String()
-	if err := c.SetSetupStep(ctx, &failedStep); err != nil {
+	if err := c.SetSetupStep(ctx, &cschema.SetupStepVerifyFailed); err != nil {
 		return err
 	}
 	return nil

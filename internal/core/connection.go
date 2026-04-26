@@ -14,6 +14,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/connectors"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	"github.com/rmorlok/authproxy/internal/util"
 )
 
 // Connection is a wrapper for the lower level database equivalent that handles wiring up logic specified in this
@@ -96,11 +98,16 @@ func (c *connection) Logger() *slog.Logger {
 	return c.logger
 }
 
-func (c *connection) SetSetupStep(ctx context.Context, setupStep *string) error {
-	if err := c.s.db.SetConnectionSetupStep(ctx, c.Id, setupStep); err != nil {
+func (c *connection) SetSetupStep(ctx context.Context, setupStep *cschema.SetupStep) error {
+	var setupStepStr *string
+	if setupStep != nil {
+		setupStepStr = util.ToPtr(setupStep.String())
+	}
+
+	if err := c.s.db.SetConnectionSetupStep(ctx, c.Id, setupStepStr); err != nil {
 		return err
 	}
-	c.SetupStep = setupStep
+	c.SetupStep = setupStepStr
 	return nil
 }
 

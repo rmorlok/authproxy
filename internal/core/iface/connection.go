@@ -9,6 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apjs"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
 type Connection interface {
@@ -40,7 +41,7 @@ type Connection interface {
 	 */
 
 	SetState(ctx context.Context, state database.ConnectionState) error
-	SetSetupStep(ctx context.Context, setupStep *string) error
+	SetSetupStep(ctx context.Context, setupStep *cschema.SetupStep) error
 	SetSetupError(ctx context.Context, setupError *string) error
 	GetConfiguration(ctx context.Context) (map[string]any, error)
 	SetConfiguration(ctx context.Context, data map[string]any) error

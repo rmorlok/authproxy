@@ -104,8 +104,7 @@ func (c *connection) initiateAuthStep(ctx context.Context, returnToUrl string, c
 		return nil, httperr.InternalServerErrorMsg("unsupported connector auth type for setup flow")
 	}
 
-	authStep := cschema.SetupStepAuth.String()
-	if err := c.SetSetupStep(ctx, &authStep); err != nil {
+	if err := c.SetSetupStep(ctx, &cschema.SetupStepAuth); err != nil {
 		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to set setup step to auth: %w", err))
 	}
 
@@ -130,8 +129,7 @@ func (c *connection) buildFormResponse(ctx context.Context, setupStep cschema.Se
 		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to get step definition: %w", err))
 	}
 
-	stepStr := setupStep.String()
-	if err := c.SetSetupStep(ctx, &stepStr); err != nil {
+	if err := c.SetSetupStep(ctx, &setupStep); err != nil {
 		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to update setup step: %w", err))
 	}
 

@@ -92,8 +92,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 			val.MarkErrorReturn()
 			return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
 		}
-		setupStep := first.String()
-		if err := connection.SetSetupStep(ctx, &setupStep); err != nil {
+		if err := connection.SetSetupStep(ctx, &first); err != nil {
 			val.MarkErrorReturn()
 			return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
 		}
