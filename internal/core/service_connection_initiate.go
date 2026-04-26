@@ -8,9 +8,9 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
-	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
@@ -87,11 +87,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 	// If the connector has preconnect steps, return the first form instead of proceeding to auth
 	if connector.SetupFlow.HasPreconnect() {
 		firstStep := connector.SetupFlow.Preconnect.Steps[0]
-		first, err := cschema.NewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
-		if err != nil {
-			val.MarkErrorReturn()
-			return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
-		}
+		first := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
 		if err := connection.SetSetupStep(ctx, &first); err != nil {
 			val.MarkErrorReturn()
 			return nil, httperr.InternalServerError(httperr.WithInternalErr(err))

@@ -56,12 +56,11 @@ func TestConnectionSetSetupStep(t *testing.T) {
 		s, db, _, _, _, _ := FullMockService(t, ctrl)
 		conn := newTestConnectionWithService(s)
 
-		step, err := cschema.NewIndexedSetupStep(cschema.SetupPhaseConfigure, 1)
-		require.NoError(t, err)
+		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 1)
 		stepStr := step.String()
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &stepStr).Return(nil)
 
-		err = conn.SetSetupStep(context.Background(), &step)
+		err := conn.SetSetupStep(context.Background(), &step)
 		require.NoError(t, err)
 		require.NotNil(t, conn.SetupStep)
 		assert.Equal(t, "configure:1", *conn.SetupStep)
@@ -90,12 +89,11 @@ func TestConnectionSetSetupStep(t *testing.T) {
 		s, db, _, _, _, _ := FullMockService(t, ctrl)
 		conn := newTestConnectionWithService(s)
 
-		step, err := cschema.NewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
-		require.NoError(t, err)
+		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
 		stepStr := step.String()
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &stepStr).Return(database.ErrNotFound)
 
-		err = conn.SetSetupStep(context.Background(), &step)
+		err := conn.SetSetupStep(context.Background(), &step)
 		assert.ErrorIs(t, err, database.ErrNotFound)
 		// Local state should not be updated on error
 		assert.Nil(t, conn.SetupStep)

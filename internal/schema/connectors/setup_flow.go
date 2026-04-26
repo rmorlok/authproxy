@@ -148,6 +148,15 @@ func NewIndexedSetupStep(phase SetupStepPhase, index int) (SetupStep, error) {
 	return SetupStep{phase: phase, index: index}, nil
 }
 
+// MustNewIndexedSetupStep is like NewIndexedSetupStep but panics on error.
+func MustNewIndexedSetupStep(phase SetupStepPhase, index int) SetupStep {
+	step, err := NewIndexedSetupStep(phase, index)
+	if err != nil {
+		panic(err)
+	}
+	return step
+}
+
 // Predefined SetupSteps for the singleton phases.
 var (
 	SetupStepAuth         = SetupStep{phase: SetupPhaseAuth}

@@ -461,6 +461,40 @@ func TestSetupStepConstructors(t *testing.T) {
 	})
 }
 
+func TestMustNewIndexedSetupStep(t *testing.T) {
+	t.Run("returns step for valid indexed phase", func(t *testing.T) {
+		s := MustNewIndexedSetupStep(SetupPhaseConfigure, 0)
+		assert.Equal(t, SetupPhaseConfigure, s.Phase())
+		assert.Equal(t, 0, s.Index())
+		assert.Equal(t, "configure:0", s.String())
+	})
+
+	t.Run("returns step for preconnect with non-zero index", func(t *testing.T) {
+		s := MustNewIndexedSetupStep(SetupPhasePreconnect, 3)
+		assert.Equal(t, SetupPhasePreconnect, s.Phase())
+		assert.Equal(t, 3, s.Index())
+		assert.Equal(t, "preconnect:3", s.String())
+	})
+
+	t.Run("panics on singleton phase", func(t *testing.T) {
+		assert.Panics(t, func() {
+			MustNewIndexedSetupStep(SetupPhaseAuth, 0)
+		})
+	})
+
+	t.Run("panics on negative index", func(t *testing.T) {
+		assert.Panics(t, func() {
+			MustNewIndexedSetupStep(SetupPhasePreconnect, -1)
+		})
+	})
+
+	t.Run("panics on unknown phase", func(t *testing.T) {
+		assert.Panics(t, func() {
+			MustNewIndexedSetupStep(SetupStepPhase("nope"), 0)
+		})
+	})
+}
+
 func TestSetupStepZero(t *testing.T) {
 	var z SetupStep
 	assert.True(t, z.IsZero())

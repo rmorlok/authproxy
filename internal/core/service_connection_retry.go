@@ -40,10 +40,7 @@ func (s *service) RetryConnectionSetup(ctx context.Context, id apid.ID, returnTo
 	}
 
 	if connector.SetupFlow.HasPreconnect() {
-		first, err := cschema.NewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
-		if err != nil {
-			return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to construct preconnect:0 setup step: %w", err))
-		}
+		first := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
 		return conn.buildFormResponse(ctx, first, connector.SetupFlow)
 	}
 
