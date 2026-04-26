@@ -289,6 +289,11 @@ definitions:
       value:
         type: string
     type: object
+  routes.RetryConnectionRequest:
+    properties:
+      return_to_url:
+        type: string
+    type: object
   routes.SubmitConnectionRequest:
     description: Form submission data
     properties:
@@ -1807,6 +1812,39 @@ paths:
       summary: Abort connection setup
       tags:
       - connections
+  /connections/{id}/_cancel_setup:
+    post:
+      description: Abandon a reconfigure attempt on a ready connection by clearing
+        setup_step and setup_error. The connection remains ready and its previously
+        stored configuration continues to apply.
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cancel in-flight setup
+      tags:
+      - connections
   /connections/{id}/_data_source/{source_id}:
     get:
       description: Fetch dynamic options for a data source defined in the current
@@ -2018,6 +2056,52 @@ paths:
       security:
       - BearerAuth: []
       summary: Reconfigure connection
+      tags:
+      - connections
+  /connections/{id}/_retry:
+    post:
+      consumes:
+      - application/json
+      description: 'Retry a connection setup that ended in a terminal failure state.
+        Applies to any setup-phase failure: an auth-phase failure such as an OAuth
+        token-exchange error (auth_failed) or a probe failure during verify (verify_failed).
+        Clears the recorded error and either returns to the first preconnect step
+        (if the connector defines one, so the user can correct any input that led
+        to the failure) or re-initiates the auth flow from scratch.'
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Retry request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.RetryConnectionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.InitiateConnectionForm'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Retry connection setup
       tags:
       - connections
   /connections/{id}/_setup_step:

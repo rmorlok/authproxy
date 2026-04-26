@@ -61,6 +61,7 @@ type Connection struct {
 	EncryptedConfiguration  *encfield.EncryptedField
 	EncryptedAt             *time.Time
 	SetupStep               *string
+	SetupError              *string
 	CreatedAt               time.Time
 	UpdatedAt               time.Time
 	DeletedAt               *time.Time
@@ -78,6 +79,7 @@ func (c *Connection) cols() []string {
 		"encrypted_configuration",
 		"encrypted_at",
 		"setup_step",
+		"setup_error",
 		"created_at",
 		"updated_at",
 		"deleted_at",
@@ -96,6 +98,7 @@ func (c *Connection) fields() []any {
 		&c.EncryptedConfiguration,
 		&c.EncryptedAt,
 		&c.SetupStep,
+		&c.SetupError,
 		&c.CreatedAt,
 		&c.UpdatedAt,
 		&c.DeletedAt,
@@ -114,6 +117,7 @@ func (c *Connection) values() []any {
 		c.EncryptedConfiguration,
 		c.EncryptedAt,
 		c.SetupStep,
+		c.SetupError,
 		c.CreatedAt,
 		c.UpdatedAt,
 		c.DeletedAt,
@@ -328,6 +332,39 @@ func (s *service) SetConnectionSetupStep(ctx context.Context, id apid.ID, setupS
 
 	if affected > 1 {
 		return fmt.Errorf("multiple connections had setup step updated: %w", ErrViolation)
+	}
+
+	return nil
+}
+
+func (s *service) SetConnectionSetupError(ctx context.Context, id apid.ID, setupError *string) error {
+	if id == apid.Nil {
+		return errors.New("connection id is required")
+	}
+
+	now := apctx.GetClock(ctx).Now()
+	dbResult, err := s.sq.
+		Update(ConnectionsTable).
+		Set("updated_at", now).
+		Set("setup_error", setupError).
+		Where(sq.Eq{"id": id, "deleted_at": nil}).
+		RunWith(s.db).
+		Exec()
+	if err != nil {
+		return fmt.Errorf("failed to update connection setup error: %w", err)
+	}
+
+	affected, err := dbResult.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to update connection setup error: %w", err)
+	}
+
+	if affected == 0 {
+		return ErrNotFound
+	}
+
+	if affected > 1 {
+		return fmt.Errorf("multiple connections had setup error updated: %w", ErrViolation)
 	}
 
 	return nil

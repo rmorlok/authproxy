@@ -7,7 +7,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/aplog"
 )
 
-const taskTypeMigrateConnectionsBetweenConnectorVersions = "connectors:migrate_connections_between_connector_versions"
+const taskTypeMigrateConnectionsBetweenConnectorVersions = "core:migrate_connections_between_connector_versions"
 
 func newMigrateConnectionsBetweenConnectorVersionsTask() (*asynq.Task, error) {
 	return asynq.NewTask(taskTypeMigrateConnectionsBetweenConnectorVersions, nil), nil

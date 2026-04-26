@@ -349,45 +349,171 @@ func TestSetupFlowHelpers(t *testing.T) {
 
 func TestParseSetupStep(t *testing.T) {
 	t.Run("valid preconnect", func(t *testing.T) {
-		phase, index, err := ParseSetupStep("preconnect:0")
+		s, err := ParseSetupStep("preconnect:0")
 		require.NoError(t, err)
-		assert.Equal(t, "preconnect", phase)
-		assert.Equal(t, 0, index)
+		assert.Equal(t, SetupPhasePreconnect, s.Phase())
+		assert.Equal(t, 0, s.Index())
 	})
 
 	t.Run("valid configure with higher index", func(t *testing.T) {
-		phase, index, err := ParseSetupStep("configure:3")
+		s, err := ParseSetupStep("configure:3")
 		require.NoError(t, err)
-		assert.Equal(t, "configure", phase)
-		assert.Equal(t, 3, index)
+		assert.Equal(t, SetupPhaseConfigure, s.Phase())
+		assert.Equal(t, 3, s.Index())
 	})
 
 	t.Run("auth phase", func(t *testing.T) {
-		phase, index, err := ParseSetupStep("auth")
+		s, err := ParseSetupStep("auth")
 		require.NoError(t, err)
-		assert.Equal(t, "auth", phase)
-		assert.Equal(t, 0, index)
+		assert.Equal(t, SetupPhaseAuth, s.Phase())
+		assert.Equal(t, 0, s.Index())
+		assert.True(t, s.Equals(SetupStepAuth))
+	})
+
+	t.Run("verify phase", func(t *testing.T) {
+		s, err := ParseSetupStep("verify")
+		require.NoError(t, err)
+		assert.True(t, s.Equals(SetupStepVerify))
+	})
+
+	t.Run("verify_failed phase", func(t *testing.T) {
+		s, err := ParseSetupStep("verify_failed")
+		require.NoError(t, err)
+		assert.True(t, s.Equals(SetupStepVerifyFailed))
+		assert.True(t, s.IsTerminalFailure())
+	})
+
+	t.Run("auth_failed phase", func(t *testing.T) {
+		s, err := ParseSetupStep("auth_failed")
+		require.NoError(t, err)
+		assert.True(t, s.Equals(SetupStepAuthFailed))
+		assert.True(t, s.IsTerminalFailure())
 	})
 
 	t.Run("invalid format", func(t *testing.T) {
-		_, _, err := ParseSetupStep("bad")
+		_, err := ParseSetupStep("bad")
 		assert.Error(t, err)
 	})
 
 	t.Run("invalid phase", func(t *testing.T) {
-		_, _, err := ParseSetupStep("unknown:0")
+		_, err := ParseSetupStep("unknown:0")
 		assert.Error(t, err)
 	})
 
 	t.Run("invalid index", func(t *testing.T) {
-		_, _, err := ParseSetupStep("preconnect:abc")
+		_, err := ParseSetupStep("preconnect:abc")
 		assert.Error(t, err)
 	})
 
 	t.Run("negative index", func(t *testing.T) {
-		_, _, err := ParseSetupStep("preconnect:-1")
+		_, err := ParseSetupStep("preconnect:-1")
 		assert.Error(t, err)
 	})
+
+	t.Run("singleton with index suffix is rejected", func(t *testing.T) {
+		_, err := ParseSetupStep("auth:0")
+		assert.Error(t, err)
+	})
+}
+
+func TestSetupStepRoundTrip(t *testing.T) {
+	cases := []string{"preconnect:0", "preconnect:7", "configure:0", "configure:2", "auth", "verify", "verify_failed", "auth_failed"}
+	for _, c := range cases {
+		t.Run(c, func(t *testing.T) {
+			s, err := ParseSetupStep(c)
+			require.NoError(t, err)
+			assert.Equal(t, c, s.String())
+		})
+	}
+}
+
+func TestSetupStepConstructors(t *testing.T) {
+	t.Run("NewSetupStep accepts singleton phases", func(t *testing.T) {
+		s, err := NewSetupStep(SetupPhaseAuth)
+		require.NoError(t, err)
+		assert.Equal(t, "auth", s.String())
+	})
+
+	t.Run("NewSetupStep rejects indexed phase", func(t *testing.T) {
+		_, err := NewSetupStep(SetupPhasePreconnect)
+		assert.Error(t, err)
+	})
+
+	t.Run("NewSetupStep rejects unknown phase", func(t *testing.T) {
+		_, err := NewSetupStep(SetupStepPhase("nope"))
+		assert.Error(t, err)
+	})
+
+	t.Run("NewIndexedSetupStep accepts indexed phase", func(t *testing.T) {
+		s, err := NewIndexedSetupStep(SetupPhaseConfigure, 4)
+		require.NoError(t, err)
+		assert.Equal(t, "configure:4", s.String())
+	})
+
+	t.Run("NewIndexedSetupStep rejects singleton phase", func(t *testing.T) {
+		_, err := NewIndexedSetupStep(SetupPhaseAuth, 0)
+		assert.Error(t, err)
+	})
+
+	t.Run("NewIndexedSetupStep rejects negative index", func(t *testing.T) {
+		_, err := NewIndexedSetupStep(SetupPhasePreconnect, -1)
+		assert.Error(t, err)
+	})
+}
+
+func TestMustNewIndexedSetupStep(t *testing.T) {
+	t.Run("returns step for valid indexed phase", func(t *testing.T) {
+		s := MustNewIndexedSetupStep(SetupPhaseConfigure, 0)
+		assert.Equal(t, SetupPhaseConfigure, s.Phase())
+		assert.Equal(t, 0, s.Index())
+		assert.Equal(t, "configure:0", s.String())
+	})
+
+	t.Run("returns step for preconnect with non-zero index", func(t *testing.T) {
+		s := MustNewIndexedSetupStep(SetupPhasePreconnect, 3)
+		assert.Equal(t, SetupPhasePreconnect, s.Phase())
+		assert.Equal(t, 3, s.Index())
+		assert.Equal(t, "preconnect:3", s.String())
+	})
+
+	t.Run("panics on singleton phase", func(t *testing.T) {
+		assert.Panics(t, func() {
+			MustNewIndexedSetupStep(SetupPhaseAuth, 0)
+		})
+	})
+
+	t.Run("panics on negative index", func(t *testing.T) {
+		assert.Panics(t, func() {
+			MustNewIndexedSetupStep(SetupPhasePreconnect, -1)
+		})
+	})
+
+	t.Run("panics on unknown phase", func(t *testing.T) {
+		assert.Panics(t, func() {
+			MustNewIndexedSetupStep(SetupStepPhase("nope"), 0)
+		})
+	})
+}
+
+func TestSetupStepZero(t *testing.T) {
+	var z SetupStep
+	assert.True(t, z.IsZero())
+	assert.Equal(t, "", z.String())
+}
+
+func TestSetupStepPhaseHelpers(t *testing.T) {
+	assert.True(t, SetupPhasePreconnect.IsIndexed())
+	assert.True(t, SetupPhaseConfigure.IsIndexed())
+	assert.False(t, SetupPhaseAuth.IsIndexed())
+	assert.False(t, SetupPhaseVerify.IsIndexed())
+
+	assert.True(t, SetupPhaseVerifyFailed.IsTerminalFailure())
+	assert.True(t, SetupPhaseAuthFailed.IsTerminalFailure())
+	assert.False(t, SetupPhaseAuth.IsTerminalFailure())
+	assert.False(t, SetupPhasePreconnect.IsTerminalFailure())
+
+	assert.False(t, SetupStepPhase("garbage").IsValid())
+	assert.True(t, SetupPhaseAuth.IsValid())
 }
 
 func TestSetupFlowTotalSteps(t *testing.T) {
@@ -406,21 +532,21 @@ func TestSetupFlowTotalSteps(t *testing.T) {
 }
 
 func TestSetupFlowFirstSetupStep(t *testing.T) {
-	assert.Equal(t, "", (*SetupFlow)(nil).FirstSetupStep())
+	assert.True(t, (*SetupFlow)(nil).FirstSetupStep().IsZero())
 
 	t.Run("preconnect first", func(t *testing.T) {
 		sf := &SetupFlow{
 			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "a"}}},
 			Configure:  &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "b"}}},
 		}
-		assert.Equal(t, "preconnect:0", sf.FirstSetupStep())
+		assert.Equal(t, "preconnect:0", sf.FirstSetupStep().String())
 	})
 
 	t.Run("configure only", func(t *testing.T) {
 		sf := &SetupFlow{
 			Configure: &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "a"}}},
 		}
-		assert.Equal(t, "configure:0", sf.FirstSetupStep())
+		assert.Equal(t, "configure:0", sf.FirstSetupStep().String())
 	})
 }
 
@@ -434,43 +560,71 @@ func TestSetupFlowNextSetupStep(t *testing.T) {
 		},
 	}
 
-	t.Run("preconnect:0 -> preconnect:1", func(t *testing.T) {
-		next, err := sf.NextSetupStep("preconnect:0")
+	mustParse := func(t *testing.T, s string) SetupStep {
+		t.Helper()
+		v, err := ParseSetupStep(s)
 		require.NoError(t, err)
-		assert.Equal(t, "preconnect:1", next)
+		return v
+	}
+
+	t.Run("preconnect:0 -> preconnect:1", func(t *testing.T) {
+		next, err := sf.NextSetupStep(mustParse(t, "preconnect:0"), false)
+		require.NoError(t, err)
+		assert.Equal(t, "preconnect:1", next.String())
 	})
 
 	t.Run("preconnect:1 -> auth", func(t *testing.T) {
-		next, err := sf.NextSetupStep("preconnect:1")
+		next, err := sf.NextSetupStep(mustParse(t, "preconnect:1"), false)
 		require.NoError(t, err)
-		assert.Equal(t, "auth", next)
+		assert.True(t, next.Equals(SetupStepAuth))
 	})
 
 	t.Run("auth -> configure:0", func(t *testing.T) {
-		next, err := sf.NextSetupStep("auth")
+		next, err := sf.NextSetupStep(SetupStepAuth, false)
 		require.NoError(t, err)
-		assert.Equal(t, "configure:0", next)
+		assert.Equal(t, "configure:0", next.String())
 	})
 
-	t.Run("configure:0 -> configure:1", func(t *testing.T) {
-		next, err := sf.NextSetupStep("configure:0")
+	t.Run("auth -> verify when probes present", func(t *testing.T) {
+		next, err := sf.NextSetupStep(SetupStepAuth, true)
 		require.NoError(t, err)
-		assert.Equal(t, "configure:1", next)
+		assert.True(t, next.Equals(SetupStepVerify))
 	})
 
-	t.Run("configure:1 -> empty (complete)", func(t *testing.T) {
-		next, err := sf.NextSetupStep("configure:1")
+	t.Run("verify -> configure:0", func(t *testing.T) {
+		next, err := sf.NextSetupStep(SetupStepVerify, true)
 		require.NoError(t, err)
-		assert.Equal(t, "", next)
+		assert.Equal(t, "configure:0", next.String())
 	})
 
-	t.Run("auth with no configure -> empty (complete)", func(t *testing.T) {
+	t.Run("verify with no configure -> zero (complete)", func(t *testing.T) {
 		sfNoConfig := &SetupFlow{
 			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "a"}}},
 		}
-		next, err := sfNoConfig.NextSetupStep("auth")
+		next, err := sfNoConfig.NextSetupStep(SetupStepVerify, true)
 		require.NoError(t, err)
-		assert.Equal(t, "", next)
+		assert.True(t, next.IsZero())
+	})
+
+	t.Run("configure:0 -> configure:1", func(t *testing.T) {
+		next, err := sf.NextSetupStep(mustParse(t, "configure:0"), false)
+		require.NoError(t, err)
+		assert.Equal(t, "configure:1", next.String())
+	})
+
+	t.Run("configure:1 -> zero (complete)", func(t *testing.T) {
+		next, err := sf.NextSetupStep(mustParse(t, "configure:1"), false)
+		require.NoError(t, err)
+		assert.True(t, next.IsZero())
+	})
+
+	t.Run("auth with no configure -> zero (complete)", func(t *testing.T) {
+		sfNoConfig := &SetupFlow{
+			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "a"}}},
+		}
+		next, err := sfNoConfig.NextSetupStep(SetupStepAuth, false)
+		require.NoError(t, err)
+		assert.True(t, next.IsZero())
 	})
 }
 
@@ -484,34 +638,41 @@ func TestSetupFlowGetStepBySetupStep(t *testing.T) {
 		},
 	}
 
+	mustParse := func(t *testing.T, s string) SetupStep {
+		t.Helper()
+		v, err := ParseSetupStep(s)
+		require.NoError(t, err)
+		return v
+	}
+
 	t.Run("preconnect:0", func(t *testing.T) {
-		step, idx, err := sf.GetStepBySetupStep("preconnect:0")
+		step, idx, err := sf.GetStepBySetupStep(mustParse(t, "preconnect:0"))
 		require.NoError(t, err)
 		assert.Equal(t, "tenant", step.Id)
 		assert.Equal(t, 0, idx)
 	})
 
 	t.Run("preconnect:1", func(t *testing.T) {
-		step, idx, err := sf.GetStepBySetupStep("preconnect:1")
+		step, idx, err := sf.GetStepBySetupStep(mustParse(t, "preconnect:1"))
 		require.NoError(t, err)
 		assert.Equal(t, "region", step.Id)
 		assert.Equal(t, 1, idx)
 	})
 
 	t.Run("configure:0 global index includes preconnect", func(t *testing.T) {
-		step, idx, err := sf.GetStepBySetupStep("configure:0")
+		step, idx, err := sf.GetStepBySetupStep(mustParse(t, "configure:0"))
 		require.NoError(t, err)
 		assert.Equal(t, "workspace", step.Id)
 		assert.Equal(t, 2, idx) // 2 preconnect steps before this
 	})
 
 	t.Run("out of range", func(t *testing.T) {
-		_, _, err := sf.GetStepBySetupStep("preconnect:5")
+		_, _, err := sf.GetStepBySetupStep(mustParse(t, "preconnect:5"))
 		assert.Error(t, err)
 	})
 
-	t.Run("invalid step", func(t *testing.T) {
-		_, _, err := sf.GetStepBySetupStep("bad")
+	t.Run("rejects singleton phase", func(t *testing.T) {
+		_, _, err := sf.GetStepBySetupStep(SetupStepAuth)
 		assert.Error(t, err)
 	})
 }

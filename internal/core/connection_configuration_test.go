@@ -56,8 +56,9 @@ func TestConnectionSetSetupStep(t *testing.T) {
 		s, db, _, _, _, _ := FullMockService(t, ctrl)
 		conn := newTestConnectionWithService(s)
 
-		step := "configure:1"
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &step).Return(nil)
+		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 1)
+		stepStr := step.String()
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &stepStr).Return(nil)
 
 		err := conn.SetSetupStep(context.Background(), &step)
 		require.NoError(t, err)
@@ -88,8 +89,9 @@ func TestConnectionSetSetupStep(t *testing.T) {
 		s, db, _, _, _, _ := FullMockService(t, ctrl)
 		conn := newTestConnectionWithService(s)
 
-		step := "preconnect:0"
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &step).Return(database.ErrNotFound)
+		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		stepStr := step.String()
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &stepStr).Return(database.ErrNotFound)
 
 		err := conn.SetSetupStep(context.Background(), &step)
 		assert.ErrorIs(t, err, database.ErrNotFound)

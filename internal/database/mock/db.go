@@ -1421,6 +1421,20 @@ func (mr *MockDBMockRecorder) SetConnectionSetupStep(ctx, id, setupStep interfac
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectionSetupStep", reflect.TypeOf((*MockDB)(nil).SetConnectionSetupStep), ctx, id, setupStep)
 }
 
+// SetConnectionSetupError mocks base method.
+func (m *MockDB) SetConnectionSetupError(ctx context.Context, id apid.ID, setupError *string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetConnectionSetupError", ctx, id, setupError)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetConnectionSetupError indicates an expected call of SetConnectionSetupError.
+func (mr *MockDBMockRecorder) SetConnectionSetupError(ctx, id, setupError interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectionSetupError", reflect.TypeOf((*MockDB)(nil).SetConnectionSetupError), ctx, id, setupError)
+}
+
 // SetConnectionState mocks base method.
 func (m *MockDB) SetConnectionState(ctx context.Context, id apid.ID, state database.ConnectionState) error {
 	m.ctrl.T.Helper()

@@ -13,7 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 )
 
-const taskTypeProbe = "connectors:probe"
+const taskTypeProbe = "core:probe"
 
 func newProbeTask(connectionId apid.ID, probeId string) (*asynq.Task, error) {
 	payload, err := json.Marshal(probeTaskPayload{ConnectionId: connectionId, ProbeId: probeId})

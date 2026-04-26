@@ -40,6 +40,7 @@ export interface Connection {
     connector: Connector;
     state: ConnectionState;
     setup_step?: string;
+    setup_error?: string;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
     created_at: string;
@@ -64,6 +65,8 @@ export enum InitiateConnectionResponseType {
     REDIRECT = 'redirect',
     FORM = 'form',
     COMPLETE = 'complete',
+    VERIFYING = 'verifying',
+    ERROR = 'error',
 }
 
 export interface InitiateConnectionResponse {
@@ -91,6 +94,16 @@ export interface InitiateConnectionCompleteResponse extends InitiateConnectionRe
     type: InitiateConnectionResponseType.COMPLETE;
 }
 
+export interface InitiateConnectionVerifyingResponse extends InitiateConnectionResponse {
+    type: InitiateConnectionResponseType.VERIFYING;
+}
+
+export interface InitiateConnectionErrorResponse extends InitiateConnectionResponse {
+    type: InitiateConnectionResponseType.ERROR;
+    error: string;
+    can_retry: boolean;
+}
+
 export function isRedirectResponse(response: InitiateConnectionResponse): response is InitiateConnectionRedirectResponse {
     return response.type === InitiateConnectionResponseType.REDIRECT;
 }
@@ -103,9 +116,21 @@ export function isCompleteResponse(response: InitiateConnectionResponse): respon
     return response.type === InitiateConnectionResponseType.COMPLETE;
 }
 
+export function isVerifyingResponse(response: InitiateConnectionResponse): response is InitiateConnectionVerifyingResponse {
+    return response.type === InitiateConnectionResponseType.VERIFYING;
+}
+
+export function isErrorResponse(response: InitiateConnectionResponse): response is InitiateConnectionErrorResponse {
+    return response.type === InitiateConnectionResponseType.ERROR;
+}
+
 export interface SubmitConnectionRequest {
     step_id: string;
     data: unknown;
+}
+
+export interface RetryConnectionRequest {
+    return_to_url?: string;
 }
 
 export interface DataSourceOption {
@@ -294,6 +319,27 @@ export const reconfigureConnection = (id: string) => {
     return client.post<InitiateConnectionResponse>(`/api/v1/connections/${id}/_reconfigure`);
 };
 
+/**
+ * Cancel an in-flight reconfigure on a ready connection by clearing setup_step and setup_error.
+ * The connection remains ready and its previously stored configuration continues to apply.
+ */
+export const cancelSetupConnection = (id: string) => {
+    return client.post<void>(`/api/v1/connections/${id}/_cancel_setup`);
+};
+
+/**
+ * Retry a connection that failed during probe verification. For connectors with preconnect steps,
+ * returns to preconnect:0 so the user can correct inputs. For connectors without preconnect steps,
+ * re-initiates OAuth (return_to_url is required in that case).
+ */
+export const retryConnection = (id: string, returnToUrl?: string) => {
+    const request: RetryConnectionRequest = { return_to_url: returnToUrl };
+    return client.post<InitiateConnectionResponse>(
+        `/api/v1/connections/${id}/_retry`,
+        request
+    );
+};
+
 export const connections = {
     list: listConnections,
     get: getConnection,
@@ -306,6 +352,8 @@ export const connections = {
     getSetupStep: getSetupStep,
     getDataSource: getDataSource,
     reconfigure: reconfigureConnection,
+    cancelSetup: cancelSetupConnection,
+    retry: retryConnection,
     getLabels: getConnectionLabels,
     getLabel: getConnectionLabel,
     putLabel: putConnectionLabel,

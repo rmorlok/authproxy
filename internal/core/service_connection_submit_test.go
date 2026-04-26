@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	mockAsynq "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -41,8 +42,13 @@ var workspaceSchema = common.RawJSON(`{
 }`)
 
 func newTestConnectionWithSetupFlow(t *testing.T, ctrl *gomock.Controller, sf *cschema.SetupFlow) (*connection, *mockDb.MockDB) {
+	conn, db, _ := newTestConnectionWithSetupFlowAndAsynq(t, ctrl, sf)
+	return conn, db
+}
+
+func newTestConnectionWithSetupFlowAndAsynq(t *testing.T, ctrl *gomock.Controller, sf *cschema.SetupFlow) (*connection, *mockDb.MockDB, *mockAsynq.MockClient) {
 	e := encrypt.NewFakeEncryptService(false)
-	s, db, _, _, _, _ := FullMockService(t, ctrl)
+	s, db, _, _, ac, _ := FullMockService(t, ctrl)
 	s.encrypt = e
 
 	connector := cschema.Connector{
@@ -62,7 +68,7 @@ func newTestConnectionWithSetupFlow(t *testing.T, ctrl *gomock.Controller, sf *c
 		logger: aplog.NewNoopLogger(),
 	}
 
-	return conn, db
+	return conn, db, ac
 }
 
 func TestSubmitForm(t *testing.T) {
@@ -337,5 +343,37 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 		form := resp.(*iface.InitiateConnectionForm)
 		assert.Equal(t, "workspace", form.StepId)
 		assert.Equal(t, "Select Workspace", form.StepTitle)
+	})
+
+	t.Run("returns verifying for verify step", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		conn, _ := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
+		step := cschema.SetupStepVerify.String()
+		conn.SetupStep = &step
+
+		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
+		require.NoError(t, err)
+		require.IsType(t, &iface.InitiateConnectionVerifying{}, resp)
+		assert.Equal(t, iface.PreconnectionResponseTypeVerifying, resp.GetType())
+	})
+
+	t.Run("returns error for verify_failed step with setup_error populated", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		conn, _ := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
+		step := cschema.SetupStepVerifyFailed.String()
+		conn.SetupStep = &step
+		errMsg := `probe "ping" failed: 401 unauthorized`
+		conn.SetupError = &errMsg
+
+		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
+		require.NoError(t, err)
+		require.IsType(t, &iface.InitiateConnectionError{}, resp)
+		errResp := resp.(*iface.InitiateConnectionError)
+		assert.Equal(t, errMsg, errResp.Error)
+		assert.True(t, errResp.CanRetry)
 	})
 }

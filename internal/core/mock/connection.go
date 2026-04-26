@@ -11,6 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
 type Connection struct {
@@ -25,6 +26,7 @@ type Connection struct {
 	Labels           map[string]string
 	Annotations      map[string]string
 	SetupStep        *string
+	SetupError       *string
 	Configuration    map[string]any
 }
 
@@ -106,8 +108,22 @@ func (m *Connection) GetSetupStep() *string {
 	return m.SetupStep
 }
 
-func (m *Connection) SetSetupStep(ctx context.Context, setupStep *string) error {
-	m.SetupStep = setupStep
+func (m *Connection) SetSetupStep(ctx context.Context, setupStep *cschema.SetupStep) error {
+	if setupStep == nil {
+		m.SetupStep = nil
+	} else {
+		s := setupStep.String()
+		m.SetupStep = &s
+	}
+	return nil
+}
+
+func (m *Connection) GetSetupError() *string {
+	return m.SetupError
+}
+
+func (m *Connection) SetSetupError(ctx context.Context, setupError *string) error {
+	m.SetupError = setupError
 	return nil
 }
 
@@ -152,6 +168,27 @@ func (m *Connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 
 func (m *Connection) Reconfigure(ctx context.Context) (iface.InitiateConnectionResponse, error) {
 	return nil, fmt.Errorf("not implemented")
+}
+
+func (m *Connection) CancelSetup(ctx context.Context) error {
+	if m.State != database.ConnectionStateReady {
+		return fmt.Errorf("connection is not in a state that can cancel setup")
+	}
+	m.SetupStep = nil
+	m.SetupError = nil
+	return nil
+}
+
+func (m *Connection) HandleCredentialsEstablished(ctx context.Context) (iface.PostAuthOutcome, error) {
+	return iface.PostAuthOutcome{SetupPending: false}, nil
+}
+
+func (m *Connection) HandleAuthFailed(ctx context.Context, authErr error) error {
+	msg := authErr.Error()
+	m.SetupError = &msg
+	failedStep := "auth_failed"
+	m.SetupStep = &failedStep
+	return nil
 }
 
 var _ iface.Connection = (*Connection)(nil)

@@ -50,21 +50,28 @@ const makeConnection = (overrides: Partial<Connection> = {}): Connection => ({
 });
 
 describe('ConnectionList', () => {
+    const baseConnectionsState = {
+        initiatingConnection: false,
+        initiationError: null,
+        disconnectingConnection: false,
+        disconnectionError: null,
+        currentTaskId: null,
+        currentFormStep: null,
+        submittingForm: false,
+        formSubmitError: null,
+        verifyingConnectionId: null,
+        verifyError: null,
+        retryingConnection: false,
+    };
+
     test('renders skeletons when loading', () => {
         const store = createStore({
             connectors: {items: [], status: 'succeeded', error: null},
             connections: {
+                ...baseConnectionsState,
                 items: [],
                 status: 'loading',
                 error: null,
-                initiatingConnection: false,
-                initiationError: null,
-                disconnectingConnection: false,
-                disconnectionError: null,
-                currentTaskId: null,
-                currentFormStep: null,
-                submittingForm: false,
-                formSubmitError: null,
             },
             toasts: {items: []},
         });
@@ -84,17 +91,10 @@ describe('ConnectionList', () => {
         const store = createStore({
             connectors: {items: [], status: 'succeeded', error: null},
             connections: {
+                ...baseConnectionsState,
                 items: [],
                 status: 'failed',
                 error: 'Failed to fetch connections',
-                initiatingConnection: false,
-                initiationError: null,
-                disconnectingConnection: false,
-                disconnectionError: null,
-                currentTaskId: null,
-                currentFormStep: null,
-                submittingForm: false,
-                formSubmitError: null,
             },
             toasts: {items: []},
         });
@@ -114,17 +114,10 @@ describe('ConnectionList', () => {
         const store = createStore({
             connectors: {items: [], status: 'succeeded', error: null},
             connections: {
+                ...baseConnectionsState,
                 items: [],
                 status: 'succeeded',
                 error: null,
-                initiatingConnection: false,
-                initiationError: null,
-                disconnectingConnection: false,
-                disconnectionError: null,
-                currentTaskId: null,
-                currentFormStep: null,
-                submittingForm: false,
-                formSubmitError: null,
             },
             toasts: {items: []},
         });
@@ -146,17 +139,10 @@ describe('ConnectionList', () => {
         const store = createStore({
             connectors: {items: [connector], status: 'succeeded', error: null},
             connections: {
+                ...baseConnectionsState,
                 items,
                 status: 'succeeded',
                 error: null,
-                initiatingConnection: false,
-                initiationError: null,
-                disconnectingConnection: false,
-                disconnectionError: null,
-                currentTaskId: null,
-                currentFormStep: null,
-                submittingForm: false,
-                formSubmitError: null,
             },
             toasts: {items: []},
         });
