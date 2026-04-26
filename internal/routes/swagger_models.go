@@ -162,6 +162,8 @@ type SwaggerConnectorJson struct {
 	StatusPageUrl string `json:"status_page_url,omitempty" example:"https://status.salesforce.com"`
 	// Logo URL
 	Logo string `json:"logo,omitempty" example:"https://example.com/logo.png"`
+	// Whether the connector defines configure setup steps (controls reconfigure availability)
+	HasConfigure bool `json:"has_configure" example:"false"`
 	// Labels assigned to the connector
 	Labels map[string]string `json:"labels,omitempty"`
 	// Annotations assigned to the connector

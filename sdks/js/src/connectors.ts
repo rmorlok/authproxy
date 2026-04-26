@@ -24,6 +24,7 @@ export interface Connector {
     highlight?: string;
     status_page_url?: string;
     logo: string;
+    has_configure: boolean;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
     created_at: string;
