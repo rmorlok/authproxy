@@ -7012,6 +7012,11 @@ const docTemplateadmin_api = `{
                     "type": "string",
                     "example": "Salesforce"
                 },
+                "has_configure": {
+                    "description": "Whether the connector defines configure setup steps (controls reconfigure availability)",
+                    "type": "boolean",
+                    "example": false
+                },
                 "highlight": {
                     "description": "Short highlight text",
                     "type": "string",

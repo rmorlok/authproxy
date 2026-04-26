@@ -31,6 +31,7 @@ type ConnectorJson struct {
 	Description   string                         `json:"description"`
 	StatusPageUrl string                         `json:"status_page_url,omitempty"`
 	Logo          string                         `json:"logo"`
+	HasConfigure  bool                           `json:"has_configure"`
 	Labels        map[string]string              `json:"labels,omitempty"`
 	Annotations   map[string]string              `json:"annotations,omitempty"`
 	CreatedAt     time.Time                      `json:"created_at"`
@@ -64,6 +65,7 @@ func ConnectorVersionToConnectorJson(cv connIface.ConnectorVersion) ConnectorJso
 		Description:   def.Description,
 		StatusPageUrl: def.StatusPageUrl,
 		Logo:          logo,
+		HasConfigure:  def.SetupFlow.HasConfigure(),
 		Labels:        cv.GetLabels(),
 		Annotations:   cv.GetAnnotations(),
 		CreatedAt:     cv.GetCreatedAt(),

@@ -384,6 +384,11 @@ definitions:
         description: Display name
         example: Salesforce
         type: string
+      has_configure:
+        description: Whether the connector defines configure setup steps (controls
+          reconfigure availability)
+        example: false
+        type: boolean
       highlight:
         description: Short highlight text
         example: CRM platform

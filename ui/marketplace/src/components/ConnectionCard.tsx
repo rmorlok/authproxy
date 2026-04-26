@@ -190,7 +190,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
 
       {canBeDisconnected(connection) && (
         <CardActions>
-          {connection.state === ConnectionState.READY && (
+          {connection.state === ConnectionState.READY && connector?.has_configure && (
             <Button
               size="small"
               startIcon={<SettingsIcon />}
