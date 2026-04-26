@@ -64,6 +64,11 @@ type Connection interface {
 	GetDataSource(ctx context.Context, sourceId string) ([]apjs.DataSourceOption, error)
 	Reconfigure(ctx context.Context) (InitiateConnectionResponse, error)
 
+	// CancelSetup abandons an in-flight reconfigure on a ready connection by clearing
+	// its setup_step and setup_error. The connection remains ready and its previously
+	// stored configuration continues to apply.
+	CancelSetup(ctx context.Context) error
+
 	// HandleCredentialsEstablished advances the connection to the next setup phase after an
 	// auth method has stored valid credentials. It transitions the connection to verify (and
 	// enqueues probes) when the connector has probes, otherwise to configure:0 when the

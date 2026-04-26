@@ -5,6 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rmorlok/authproxy/internal/core/iface"
+	"github.com/rmorlok/authproxy/internal/database"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
@@ -13,7 +14,7 @@ import (
 // credentials were acquired:
 //   - probes defined → enter verify phase and enqueue the verify task
 //   - else configure steps defined → enter configure:0
-//   - else → clear setup step (connection is effectively ready)
+//   - else → clear setup step and mark the connection ready
 func (c *connection) HandleCredentialsEstablished(ctx context.Context) (iface.PostAuthOutcome, error) {
 	connectorDef := c.cv.GetDefinition()
 	if connectorDef == nil {
@@ -41,6 +42,11 @@ func (c *connection) HandleCredentialsEstablished(ctx context.Context) (iface.Po
 	if c.GetSetupStep() != nil {
 		if err := c.SetSetupStep(ctx, nil); err != nil {
 			return iface.PostAuthOutcome{}, fmt.Errorf("failed to clear setup step: %w", err)
+		}
+	}
+	if c.GetState() != database.ConnectionStateReady {
+		if err := c.SetState(ctx, database.ConnectionStateReady); err != nil {
+			return iface.PostAuthOutcome{}, fmt.Errorf("failed to set connection ready: %w", err)
 		}
 	}
 	return iface.PostAuthOutcome{SetupPending: false}, nil

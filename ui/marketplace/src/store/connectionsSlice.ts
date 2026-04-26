@@ -157,6 +157,14 @@ export const abortConnectionAsync = createAsyncThunk(
     }
 );
 
+export const cancelSetupConnectionAsync = createAsyncThunk(
+    'connections/cancelSetupConnection',
+    async (connectionId: string) => {
+        await connections.cancelSetup(connectionId);
+        return connectionId;
+    }
+);
+
 export const getSetupStepAsync = createAsyncThunk(
     'connections/getSetupStep',
     async (connectionId: string) => {
@@ -261,6 +269,21 @@ export const connectionsSlice = createSlice({
                 state.verifyingConnectionId = null;
                 state.verifyError = null;
                 state.items = state.items.filter(conn => conn.id !== action.payload);
+            })
+
+            // Cancel setup (reconfigure abandonment on a ready connection)
+            .addCase(cancelSetupConnectionAsync.fulfilled, (state, action) => {
+                state.currentFormStep = null;
+                state.verifyingConnectionId = null;
+                state.verifyError = null;
+                const idx = state.items.findIndex(c => c.id === action.payload);
+                if (idx !== -1) {
+                    state.items[idx] = {
+                        ...state.items[idx],
+                        setup_step: undefined,
+                        setup_error: undefined,
+                    };
+                }
             })
 
             // Get setup step (resume / verify polling)

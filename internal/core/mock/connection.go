@@ -170,6 +170,15 @@ func (m *Connection) Reconfigure(ctx context.Context) (iface.InitiateConnectionR
 	return nil, fmt.Errorf("not implemented")
 }
 
+func (m *Connection) CancelSetup(ctx context.Context) error {
+	if m.State != database.ConnectionStateReady {
+		return fmt.Errorf("connection is not in a state that can cancel setup")
+	}
+	m.SetupStep = nil
+	m.SetupError = nil
+	return nil
+}
+
 func (m *Connection) HandleCredentialsEstablished(ctx context.Context) (iface.PostAuthOutcome, error) {
 	return iface.PostAuthOutcome{SetupPending: false}, nil
 }

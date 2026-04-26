@@ -621,6 +621,59 @@ func (r *ConnectionsRoutes) reconfigure(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, resp)
 }
 
+// @Summary		Cancel in-flight setup
+// @Description	Abandon a reconfigure attempt on a ready connection by clearing setup_step and setup_error. The connection remains ready and its previously stored configuration continues to apply.
+// @Tags			connections
+// @Produce		json
+// @Param			id	path		string	true	"Connection UUID"
+// @Success		204
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		404	{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/_cancel_setup [post]
+func (r *ConnectionsRoutes) cancelSetup(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := apid.Parse(gctx.Param("id"))
+	if err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == apid.Nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
+		val.MarkErrorReturn()
+		return
+	}
+
+	c, err := r.core.GetConnection(ctx, id)
+	if err != nil {
+		if errors.Is(err, coreIface.ErrNotFound) {
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
+		} else {
+			apgin.WriteErr(gctx, nil, err)
+		}
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		apgin.WriteError(gctx, nil, httpErr)
+		return
+	}
+
+	if err := c.CancelSetup(ctx); err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.Status(http.StatusNoContent)
+}
+
 type RetryConnectionRequest struct {
 	ReturnToUrl string `json:"return_to_url,omitempty"`
 }
@@ -1583,6 +1636,15 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 			ForIdField("id").
 			Build(),
 		r.reconfigure,
+	)
+	g.POST(
+		"/connections/:id/_cancel_setup",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("update").
+			ForIdField("id").
+			Build(),
+		r.cancelSetup,
 	)
 	g.POST(
 		"/connections/:id/_retry",

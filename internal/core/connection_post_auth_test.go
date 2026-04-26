@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/hibiken/asynq"
+	"github.com/rmorlok/authproxy/internal/database"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -54,7 +55,7 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 		assert.Equal(t, "configure:0", *conn.GetSetupStep())
 	})
 
-	t.Run("clears setup step when connector has neither probes nor configure", func(t *testing.T) {
+	t.Run("clears setup step and marks ready when connector has neither probes nor configure", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -63,23 +64,28 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 		conn.SetupStep = &authStep
 
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)
+		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateReady).Return(nil)
 
 		outcome, err := conn.HandleCredentialsEstablished(context.Background())
 		require.NoError(t, err)
 		assert.False(t, outcome.SetupPending)
 		assert.Nil(t, conn.GetSetupStep())
+		assert.Equal(t, database.ConnectionStateReady, conn.GetState())
 	})
 
-	t.Run("no-op when no setup step and no probes/configure", func(t *testing.T) {
+	t.Run("marks ready when no setup step and no probes/configure", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		conn, _ := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
+		conn, db := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
+
+		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateReady).Return(nil)
 
 		outcome, err := conn.HandleCredentialsEstablished(context.Background())
 		require.NoError(t, err)
 		assert.False(t, outcome.SetupPending)
 		assert.Nil(t, conn.GetSetupStep())
+		assert.Equal(t, database.ConnectionStateReady, conn.GetState())
 	})
 }
 

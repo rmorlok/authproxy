@@ -1812,6 +1812,39 @@ paths:
       summary: Abort connection setup
       tags:
       - connections
+  /connections/{id}/_cancel_setup:
+    post:
+      description: Abandon a reconfigure attempt on a ready connection by clearing
+        setup_step and setup_error. The connection remains ready and its previously
+        stored configuration continues to apply.
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Cancel in-flight setup
+      tags:
+      - connections
   /connections/{id}/_data_source/{source_id}:
     get:
       description: Fetch dynamic options for a data source defined in the current

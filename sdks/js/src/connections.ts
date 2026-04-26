@@ -320,6 +320,14 @@ export const reconfigureConnection = (id: string) => {
 };
 
 /**
+ * Cancel an in-flight reconfigure on a ready connection by clearing setup_step and setup_error.
+ * The connection remains ready and its previously stored configuration continues to apply.
+ */
+export const cancelSetupConnection = (id: string) => {
+    return client.post<void>(`/api/v1/connections/${id}/_cancel_setup`);
+};
+
+/**
  * Retry a connection that failed during probe verification. For connectors with preconnect steps,
  * returns to preconnect:0 so the user can correct inputs. For connectors without preconnect steps,
  * re-initiates OAuth (return_to_url is required in that case).
@@ -344,6 +352,7 @@ export const connections = {
     getSetupStep: getSetupStep,
     getDataSource: getDataSource,
     reconfigure: reconfigureConnection,
+    cancelSetup: cancelSetupConnection,
     retry: retryConnection,
     getLabels: getConnectionLabels,
     getLabel: getConnectionLabel,

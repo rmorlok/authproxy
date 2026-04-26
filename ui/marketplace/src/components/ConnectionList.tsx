@@ -13,7 +13,7 @@ import {
   DialogTitle,
   DialogContent,
 } from '@mui/material';
-import { isRedirectResponse } from '@authproxy/api';
+import { ConnectionState, isRedirectResponse } from '@authproxy/api';
 import {
   selectConnections,
   selectConnectionsStatus,
@@ -32,6 +32,7 @@ import {
   selectRetryingConnection,
   retryConnectionAsync,
   abortConnectionAsync,
+  cancelSetupConnectionAsync,
   clearVerifyState,
 } from '../store';
 import ConnectionCard, { ConnectionCardSkeleton } from './ConnectionCard';
@@ -110,8 +111,18 @@ const ConnectionList: React.FC = () => {
   }, [dispatch, currentFormStep]);
 
   const handleFormCancel = useCallback(() => {
+    const connectionId = currentFormStep?.connectionId;
+    const conn = connectionId
+      ? connections.find((c) => c.id === connectionId)
+      : undefined;
+    // If the connection is already ready, the form is from a reconfigure flow.
+    // Clearing the form step alone leaves setup_step=configure:0 on the server,
+    // so the dialog reappears on next load — call cancel_setup to clear it server-side.
+    if (conn && conn.state === ConnectionState.READY) {
+      dispatch(cancelSetupConnectionAsync(conn.id));
+    }
     dispatch(clearFormStep());
-  }, [dispatch]);
+  }, [dispatch, currentFormStep, connections]);
 
   const handleRetryVerify = useCallback(() => {
     if (!verifyError) return;
