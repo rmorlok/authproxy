@@ -25,7 +25,7 @@ func TestRetryConnectionSetup(t *testing.T) {
 				},
 			},
 		})
-		step := "preconnect:0"
+		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
 		conn.SetupStep = &step
 		conn.s.encrypt = encrypt.NewFakeEncryptService(false)
 
@@ -55,7 +55,7 @@ func TestRetryConnectionSetup(t *testing.T) {
 				},
 			},
 		})
-		step := cschema.SetupStepVerifyFailed.String()
+		step := cschema.SetupStepVerifyFailed
 		conn.SetupStep = &step
 		errMsg := "probe failed"
 		conn.SetupError = &errMsg
@@ -72,7 +72,7 @@ func TestRetryConnectionSetup(t *testing.T) {
 		}, nil).AnyTimes()
 
 		db.EXPECT().SetConnectionSetupError(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStr("preconnect:0")).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0))).Return(nil)
 
 		resp, err := conn.s.RetryConnectionSetup(context.Background(), conn.Id, "")
 		require.NoError(t, err)
@@ -93,7 +93,7 @@ func TestRetryConnectionSetup(t *testing.T) {
 				},
 			},
 		})
-		step := cschema.SetupStepAuthFailed.String()
+		step := cschema.SetupStepAuthFailed
 		conn.SetupStep = &step
 		errMsg := "token exchange failed"
 		conn.SetupError = &errMsg
@@ -110,7 +110,7 @@ func TestRetryConnectionSetup(t *testing.T) {
 		}, nil).AnyTimes()
 
 		db.EXPECT().SetConnectionSetupError(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStr("preconnect:0")).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0))).Return(nil)
 
 		resp, err := conn.s.RetryConnectionSetup(context.Background(), conn.Id, "")
 		require.NoError(t, err)

@@ -259,13 +259,19 @@ type ConnectionJson struct {
 func ConnectionToJson(conn coreIface.Connection) ConnectionJson {
 	connector := ConnectorVersionToConnectorJson(conn.GetConnectorVersionEntity())
 
+	var setupStep *string
+	if s := conn.GetSetupStep(); s != nil {
+		str := s.String()
+		setupStep = &str
+	}
+
 	return ConnectionJson{
 		Id:          conn.GetId(),
 		Namespace:   conn.GetNamespace(),
 		Labels:      conn.GetLabels(),
 		Annotations: conn.GetAnnotations(),
 		State:       conn.GetState(),
-		SetupStep:   conn.GetSetupStep(),
+		SetupStep:   setupStep,
 		SetupError:  conn.GetSetupError(),
 		Connector:   connector,
 		CreatedAt:   conn.GetCreatedAt(),

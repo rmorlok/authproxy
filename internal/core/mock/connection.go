@@ -25,7 +25,7 @@ type Connection struct {
 	DeletedAt        *time.Time
 	Labels           map[string]string
 	Annotations      map[string]string
-	SetupStep        *string
+	SetupStep        *cschema.SetupStep
 	SetupError       *string
 	Configuration    map[string]any
 }
@@ -104,17 +104,12 @@ func (m *Connection) ProxyRequestRaw(
 	return nil
 }
 
-func (m *Connection) GetSetupStep() *string {
+func (m *Connection) GetSetupStep() *cschema.SetupStep {
 	return m.SetupStep
 }
 
 func (m *Connection) SetSetupStep(ctx context.Context, setupStep *cschema.SetupStep) error {
-	if setupStep == nil {
-		m.SetupStep = nil
-	} else {
-		s := setupStep.String()
-		m.SetupStep = &s
-	}
+	m.SetupStep = setupStep
 	return nil
 }
 
@@ -186,7 +181,7 @@ func (m *Connection) HandleCredentialsEstablished(ctx context.Context) (iface.Po
 func (m *Connection) HandleAuthFailed(ctx context.Context, authErr error) error {
 	msg := authErr.Error()
 	m.SetupError = &msg
-	failedStep := "auth_failed"
+	failedStep := cschema.SetupStepAuthFailed
 	m.SetupStep = &failedStep
 	return nil
 }

@@ -14,6 +14,7 @@ import (
 	database "github.com/rmorlok/authproxy/internal/database"
 	encfield "github.com/rmorlok/authproxy/internal/encfield"
 	auth "github.com/rmorlok/authproxy/internal/schema/auth"
+	connectors "github.com/rmorlok/authproxy/internal/schema/connectors"
 	pagination "github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -1408,7 +1409,7 @@ func (mr *MockDBMockRecorder) SetConnectionEncryptedConfiguration(ctx, id, encry
 }
 
 // SetConnectionSetupStep mocks base method.
-func (m *MockDB) SetConnectionSetupStep(ctx context.Context, id apid.ID, setupStep *string) error {
+func (m *MockDB) SetConnectionSetupStep(ctx context.Context, id apid.ID, setupStep *connectors.SetupStep) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "SetConnectionSetupStep", ctx, id, setupStep)
 	ret0, _ := ret[0].(error)

@@ -22,7 +22,7 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 		conn, db, ac := newTestConnectionWithSetupFlowAndAsynq(t, ctrl, &cschema.SetupFlow{})
 		conn.cv.GetDefinition().Probes = []cschema.Probe{{Id: "ping"}}
 
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStr(cschema.SetupStepVerify.String())).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.SetupStepVerify)).Return(nil)
 		ac.EXPECT().
 			EnqueueContext(gomock.Any(), gomock.AssignableToTypeOf(&asynq.Task{}), asynq.Retention(10*time.Minute)).
 			Return(&asynq.TaskInfo{ID: "mock-task-id"}, nil)
@@ -31,7 +31,7 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 		require.NoError(t, err)
 		assert.True(t, outcome.SetupPending)
 		require.NotNil(t, conn.GetSetupStep())
-		assert.Equal(t, cschema.SetupStepVerify.String(), *conn.GetSetupStep())
+		assert.Equal(t, cschema.SetupStepVerify, *conn.GetSetupStep())
 	})
 
 	t.Run("enters configure:0 when connector has configure but no probes", func(t *testing.T) {
@@ -46,13 +46,13 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 			},
 		})
 
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStr("configure:0")).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0))).Return(nil)
 
 		outcome, err := conn.HandleCredentialsEstablished(context.Background())
 		require.NoError(t, err)
 		assert.True(t, outcome.SetupPending)
 		require.NotNil(t, conn.GetSetupStep())
-		assert.Equal(t, "configure:0", *conn.GetSetupStep())
+		assert.Equal(t, "configure:0", conn.GetSetupStep().String())
 	})
 
 	t.Run("clears setup step and marks ready when connector has neither probes nor configure", func(t *testing.T) {
@@ -60,10 +60,10 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 		defer ctrl.Finish()
 
 		conn, db := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
-		authStep := "auth"
+		authStep := cschema.SetupStepAuth
 		conn.SetupStep = &authStep
 
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
 		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateReady).Return(nil)
 
 		outcome, err := conn.HandleCredentialsEstablished(context.Background())
@@ -102,12 +102,12 @@ func TestHandleAuthFailed(t *testing.T) {
 				assert.Contains(t, *msg, "token exchange boom")
 				return nil
 			})
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStr(cschema.SetupStepAuthFailed.String())).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.SetupStepAuthFailed)).Return(nil)
 
 		err := conn.HandleAuthFailed(context.Background(), errors.New("token exchange boom"))
 		require.NoError(t, err)
 		require.NotNil(t, conn.GetSetupStep())
-		assert.Equal(t, cschema.SetupStepAuthFailed.String(), *conn.GetSetupStep())
+		assert.Equal(t, cschema.SetupStepAuthFailed, *conn.GetSetupStep())
 		require.NotNil(t, conn.GetSetupError())
 		assert.Contains(t, *conn.GetSetupError(), "token exchange boom")
 	})

@@ -22,12 +22,12 @@ func TestCancelSetup(t *testing.T) {
 			},
 		})
 		conn.State = database.ConnectionStateReady
-		step := "configure:0"
+		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0)
 		conn.SetupStep = &step
 		errMsg := "stale"
 		conn.SetupError = &errMsg
 
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
 		db.EXPECT().SetConnectionSetupError(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)
 
 		require.NoError(t, conn.CancelSetup(context.Background()))

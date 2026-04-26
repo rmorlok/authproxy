@@ -27,7 +27,7 @@ type Connection interface {
 	GetDeletedAt() *time.Time
 	GetLabels() map[string]string
 	GetAnnotations() map[string]string
-	GetSetupStep() *string
+	GetSetupStep() *cschema.SetupStep
 	GetSetupError() *string
 
 	/*

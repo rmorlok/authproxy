@@ -26,10 +26,7 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 		return nil, httperr.BadRequest("connector has no setup flow")
 	}
 
-	currentSetupStep, err := cschema.ParseSetupStep(*setupStep)
-	if err != nil {
-		return nil, httperr.BadRequestf("invalid setup step: %s", err)
-	}
+	currentSetupStep := *setupStep
 
 	// Only preconnect and configure phases accept form submissions
 	if !currentSetupStep.Phase().IsIndexed() {
@@ -165,10 +162,7 @@ func (c *connection) GetCurrentSetupStepResponse(ctx context.Context) (iface.Con
 		}, nil
 	}
 
-	parsed, err := cschema.ParseSetupStep(*setupStep)
-	if err != nil {
-		return nil, httperr.BadRequestf("invalid setup step: %s", err)
-	}
+	parsed := *setupStep
 
 	switch parsed.Phase() {
 	case cschema.SetupPhaseAuth:

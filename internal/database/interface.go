@@ -7,6 +7,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -112,7 +113,7 @@ type DB interface {
 	CreateConnection(ctx context.Context, c *Connection) error
 	DeleteConnection(ctx context.Context, id apid.ID) error
 	SetConnectionState(ctx context.Context, id apid.ID, state ConnectionState) error
-	SetConnectionSetupStep(ctx context.Context, id apid.ID, setupStep *string) error
+	SetConnectionSetupStep(ctx context.Context, id apid.ID, setupStep *cschema.SetupStep) error
 	SetConnectionSetupError(ctx context.Context, id apid.ID, setupError *string) error
 	SetConnectionEncryptedConfiguration(ctx context.Context, id apid.ID, encryptedConfig *encfield.EncryptedField) error
 	UpdateConnectionLabels(ctx context.Context, id apid.ID, labels map[string]string) (*Connection, error)
