@@ -1588,7 +1588,7 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 		"/connections/:id/_submit",
 		r.auth.NewRequiredBuilder().
 			ForResource("connections").
-			ForVerb("update").
+			ForVerbs("create", "update").
 			ForIdField("id").
 			Build(),
 		r.submit,
@@ -1597,7 +1597,7 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 		"/connections/:id/_setup_step",
 		r.auth.NewRequiredBuilder().
 			ForResource("connections").
-			ForVerb("get").
+			ForVerbs("create", "update").
 			ForIdField("id").
 			Build(),
 		r.getSetupStep,
@@ -1606,7 +1606,7 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 		"/connections/:id/_data_source/:source_id",
 		r.auth.NewRequiredBuilder().
 			ForResource("connections").
-			ForVerb("get").
+			ForVerbs("create", "update").
 			ForIdField("id").
 			Build(),
 		r.getDataSource,
@@ -1651,7 +1651,7 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 		"/connections/:id/_retry",
 		r.auth.NewRequiredBuilder().
 			ForResource("connections").
-			ForVerb("create"). // should also be update
+			ForVerbs("create", "update").
 			ForIdField("id").
 			Build(),
 		r.retry,
