@@ -483,79 +483,6 @@ Run the admin UI:
 yarn workspace @authproxy/admin dev
 ```
 
-### Viewing Redis Data
-
-If using Docker Compose, start RedisInsight with:
-
-```bash
-docker compose --profile tools up -d
-```
-
-Then open http://localhost:5540 and connect to `redis://default@redis:6379`.
-
-Alternatively, run RedisInsight manually:
-
-```bash
-docker run -d --name redisinsight -p 5540:5540 -v redisinsight:/data --network authproxy redis/redisinsight:latest
-```
-
-Add a connection to redis. Connect to the redis server using the following URI:
-
-```
-redis://default@redis-server:6379
-```
-
-![redis-insight-add-db.jpg](docs/images/redis-insight-add-db.jpg)
-
-### Viewing MinIO Data
-
-MinIO includes a web-based console for browsing stored objects (e.g. full request/response logs).
-
-Open the MinIO Console:
-
-```bash
-open http://localhost:9001
-```
-
-Log in with:
-- **Username:** `minioadmin`
-- **Password:** `minioadmin`
-
-Navigate to **Object Browser** and select the `authproxy-request-logs` bucket to view stored request log entries.
-
-### Viewing Background Tasks
-To manage tasks in asynq, install the [asynq cli](https://github.com/hibiken/asynq/blob/master/tools/asynq/README.md):
-
-```bash
-go install github.com/hibiken/asynq/tools/asynq@latest
-```
-
-and run the cli:
-
-```bash
-asynq dash
-````
-
-run the web monitoring tool:
-
-```bash
-docker run --rm \
-    -d \
-    --name asynqmon \
-    --network authproxy \
-    -p 8090:8080 \
-    hibiken/asynqmon \
-    --redis-addr=redis-server:6379
-```
-
-open the web ui:
-
-```bash
-open http://localhost:8090
-```
-
-![asynqmon.jpg](docs/images/asynqmon.jpg)
-
 ## Client Config
 
 The client cli looks for a config file at `~/.authproxy.yaml`:
@@ -574,3 +501,9 @@ See [RELATED.md](RELATED.md) for a list of related products in the API integrati
 ## License
 
 AuthProxy is open source. See [LICENSE](LICENSE) for details.
+
+## Additional Documentation
+
+* [Managing background tasks](docs/background_tasks.md)
+* [Viewing data stored in Blob Storage such as request logs](docs/blob_storage.md)
+* [Viewing data stored in Redis](docs/redis_insight.md)

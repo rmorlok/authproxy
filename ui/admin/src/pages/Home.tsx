@@ -49,7 +49,7 @@ export default function Home() {
     <Box sx={{ width: '100%', maxWidth: { sm: '100%', md: '1700px' } }}>
       {/* cards */}
       <Typography component="h2" variant="h6" sx={{ mb: 2 }}>
-        Overview
+        Overview - note this page is fake data right now
       </Typography>
       <Grid
         container
