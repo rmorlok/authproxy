@@ -164,10 +164,10 @@ type ConnectorsRoutes struct {
 	cfg                  config.C
 	connectors           connIface.C
 	authService          auth.A
-	labelsAdapter        labels.Adapter[apid.ID]
-	annotsAdapter        labels.Adapter[apid.ID]
-	versionLabelsAdapter labels.Adapter[connectorVersionID]
-	versionAnnotsAdapter labels.Adapter[connectorVersionID]
+	labelsAdapter        key_value.Adapter[apid.ID]
+	annotsAdapter        key_value.Adapter[apid.ID]
+	versionLabelsAdapter key_value.Adapter[connectorVersionID]
+	versionAnnotsAdapter key_value.Adapter[connectorVersionID]
 }
 
 // @Summary		Get connector
@@ -1061,7 +1061,9 @@ func (r *ConnectorsRoutes) deleteLabel(gctx *gin.Context) { r.labelsAdapter.Hand
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connectors/{id}/versions/{version}/labels [get]
-func (r *ConnectorsRoutes) getVersionLabels(gctx *gin.Context) { r.versionLabelsAdapter.HandleList(gctx) }
+func (r *ConnectorsRoutes) getVersionLabels(gctx *gin.Context) {
+	r.versionLabelsAdapter.HandleList(gctx)
+}
 
 // @Summary		Get a specific label for a connector version
 // @Description	Get a specific label value by key for a specific version of a connector
@@ -1116,7 +1118,9 @@ func (r *ConnectorsRoutes) putVersionLabel(gctx *gin.Context) { r.versionLabelsA
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connectors/{id}/versions/{version}/labels/{label} [delete]
-func (r *ConnectorsRoutes) deleteVersionLabel(gctx *gin.Context) { r.versionLabelsAdapter.HandleDelete(gctx) }
+func (r *ConnectorsRoutes) deleteVersionLabel(gctx *gin.Context) {
+	r.versionLabelsAdapter.HandleDelete(gctx)
+}
 
 type ForceConnectorVersionStateRequestJson struct {
 	State database.ConnectorVersionState `json:"state"`
@@ -1609,7 +1613,7 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *Conne
 		return connectorVersionID{ConnectorID: id, Version: version}, nil
 	}
 
-	getConnector := func(ctx context.Context, id apid.ID) (labels.Resource, error) {
+	getConnector := func(ctx context.Context, id apid.ID) (key_value.Resource, error) {
 		result := c.ListConnectorsBuilder().
 			ForId(id).
 			Limit(1).
@@ -1623,7 +1627,7 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *Conne
 		return result.Results[0], nil
 	}
 
-	getConnectorVersion := func(ctx context.Context, id connectorVersionID) (labels.Resource, error) {
+	getConnectorVersion := func(ctx context.Context, id connectorVersionID) (key_value.Resource, error) {
 		cv, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
@@ -1666,7 +1670,7 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *Conne
 		ForVerb("update").
 		Build()
 
-	putConnectorLabels := func(ctx context.Context, id apid.ID, kv map[string]string) (labels.Resource, error) {
+	putConnectorLabels := func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
 		draft, err := c.GetOrCreateDraftConnectorVersion(ctx, id)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
@@ -1684,7 +1688,7 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *Conne
 		return c.UpdateDraftConnectorVersion(ctx, id, draft.GetVersion(), draft.GetDefinition(), merged, draft.GetAnnotations())
 	}
 
-	deleteConnectorLabels := func(ctx context.Context, id apid.ID, keys []string) (labels.Resource, error) {
+	deleteConnectorLabels := func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
 		draft, err := c.GetOrCreateDraftConnectorVersion(ctx, id)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
@@ -1702,7 +1706,7 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *Conne
 		return c.UpdateDraftConnectorVersion(ctx, id, draft.GetVersion(), draft.GetDefinition(), merged, draft.GetAnnotations())
 	}
 
-	putConnectorAnnotations := func(ctx context.Context, id apid.ID, kv map[string]string) (labels.Resource, error) {
+	putConnectorAnnotations := func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
 		draft, err := c.GetOrCreateDraftConnectorVersion(ctx, id)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
@@ -1720,7 +1724,7 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *Conne
 		return c.UpdateDraftConnectorVersion(ctx, id, draft.GetVersion(), draft.GetDefinition(), draft.GetLabels(), merged)
 	}
 
-	deleteConnectorAnnotations := func(ctx context.Context, id apid.ID, keys []string) (labels.Resource, error) {
+	deleteConnectorAnnotations := func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
 		draft, err := c.GetOrCreateDraftConnectorVersion(ctx, id)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
@@ -1738,7 +1742,7 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *Conne
 		return c.UpdateDraftConnectorVersion(ctx, id, draft.GetVersion(), draft.GetDefinition(), draft.GetLabels(), merged)
 	}
 
-	putVersionLabels := func(ctx context.Context, id connectorVersionID, kv map[string]string) (labels.Resource, error) {
+	putVersionLabels := func(ctx context.Context, id connectorVersionID, kv map[string]string) (key_value.Resource, error) {
 		cv, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
@@ -1759,7 +1763,7 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *Conne
 		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, cv.GetDefinition(), merged, cv.GetAnnotations())
 	}
 
-	deleteVersionLabels := func(ctx context.Context, id connectorVersionID, keys []string) (labels.Resource, error) {
+	deleteVersionLabels := func(ctx context.Context, id connectorVersionID, keys []string) (key_value.Resource, error) {
 		cv, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
@@ -1780,7 +1784,7 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *Conne
 		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, cv.GetDefinition(), merged, cv.GetAnnotations())
 	}
 
-	putVersionAnnotations := func(ctx context.Context, id connectorVersionID, kv map[string]string) (labels.Resource, error) {
+	putVersionAnnotations := func(ctx context.Context, id connectorVersionID, kv map[string]string) (key_value.Resource, error) {
 		cv, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
@@ -1801,7 +1805,7 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *Conne
 		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, cv.GetDefinition(), cv.GetLabels(), merged)
 	}
 
-	deleteVersionAnnotations := func(ctx context.Context, id connectorVersionID, keys []string) (labels.Resource, error) {
+	deleteVersionAnnotations := func(ctx context.Context, id connectorVersionID, keys []string) (key_value.Resource, error) {
 		cv, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
@@ -1822,8 +1826,8 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *Conne
 		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, cv.GetDefinition(), cv.GetLabels(), merged)
 	}
 
-	labelsAdapter := labels.Adapter[apid.ID]{
-		Kind:         labels.Label,
+	labelsAdapter := key_value.Adapter[apid.ID]{
+		Kind:         key_value.Label,
 		ResourceName: "connector",
 		PathPrefix:   "/connectors/:id",
 		AuthGet:      connectorAuthGet,
@@ -1834,8 +1838,8 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *Conne
 		Delete:       deleteConnectorLabels,
 	}
 
-	annotsAdapter := labels.Adapter[apid.ID]{
-		Kind:         labels.Annotation,
+	annotsAdapter := key_value.Adapter[apid.ID]{
+		Kind:         key_value.Annotation,
 		ResourceName: "connector",
 		PathPrefix:   "/connectors/:id",
 		AuthGet:      connectorAuthGet,
@@ -1846,8 +1850,8 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *Conne
 		Delete:       deleteConnectorAnnotations,
 	}
 
-	versionLabelsAdapter := labels.Adapter[connectorVersionID]{
-		Kind:         labels.Label,
+	versionLabelsAdapter := key_value.Adapter[connectorVersionID]{
+		Kind:         key_value.Label,
 		ResourceName: "connector version",
 		PathPrefix:   "/connectors/:id/versions/:version",
 		AuthGet:      versionAuthGet,
@@ -1858,8 +1862,8 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *Conne
 		Delete:       deleteVersionLabels,
 	}
 
-	versionAnnotsAdapter := labels.Adapter[connectorVersionID]{
-		Kind:         labels.Annotation,
+	versionAnnotsAdapter := key_value.Adapter[connectorVersionID]{
+		Kind:         key_value.Annotation,
 		ResourceName: "connector version",
 		PathPrefix:   "/connectors/:id/versions/:version",
 		AuthGet:      versionAuthGet,

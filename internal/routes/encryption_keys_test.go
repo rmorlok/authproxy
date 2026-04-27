@@ -18,7 +18,6 @@ import (
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apgin"
-	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"
@@ -27,6 +26,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/core"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	httpf2 "github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/routes/labels"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
@@ -939,7 +939,7 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp labels.KeyValueJson
+			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "env", resp.Key)
 			require.Equal(t, "staging", resp.Value)
@@ -1035,7 +1035,7 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp labels.KeyValueJson
+			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "env", resp.Key)
 			require.Equal(t, "production", resp.Value)
@@ -1063,7 +1063,7 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp labels.KeyValueJson
+			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "env", resp.Key)
 			require.Equal(t, "staging", resp.Value)
@@ -1442,7 +1442,7 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp labels.KeyValueJson
+			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "description", resp.Key)
 			require.Equal(t, "staging key", resp.Value)
@@ -1538,7 +1538,7 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp labels.KeyValueJson
+			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "description", resp.Key)
 			require.Equal(t, "primary encryption key", resp.Value)
@@ -1566,7 +1566,7 @@ func TestEncryptionKeys(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp labels.KeyValueJson
+			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "description", resp.Key)
 			require.Equal(t, "updated description", resp.Value)

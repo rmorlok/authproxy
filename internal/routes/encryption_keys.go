@@ -33,10 +33,10 @@ type EncryptionKeyJson struct {
 }
 
 type CreateEncryptionKeyRequestJson struct {
-	Namespace   string            `json:"namespace"`
+	Namespace   string             `json:"namespace"`
 	KeyData     *cfgschema.KeyData `json:"key_data,omitempty"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
+	Labels      map[string]string  `json:"labels,omitempty"`
+	Annotations map[string]string  `json:"annotations,omitempty"`
 }
 
 type UpdateEncryptionKeyRequestJson struct {
@@ -75,8 +75,8 @@ type EncryptionKeysRoutes struct {
 	cfg           config.C
 	core          coreIface.C
 	authService   auth.A
-	labelsAdapter labels.Adapter[apid.ID]
-	annotsAdapter labels.Adapter[apid.ID]
+	labelsAdapter key_value.Adapter[apid.ID]
+	annotsAdapter key_value.Adapter[apid.ID]
 }
 
 // @Summary		Get encryption key
@@ -598,7 +598,9 @@ func (r *EncryptionKeysRoutes) putAnnotation(gctx *gin.Context) { r.annotsAdapte
 // @Failure		500			{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/encryption-keys/{id}/annotations/{annotation} [delete]
-func (r *EncryptionKeysRoutes) deleteAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleDelete(gctx) }
+func (r *EncryptionKeysRoutes) deleteAnnotation(gctx *gin.Context) {
+	r.annotsAdapter.HandleDelete(gctx)
+}
 
 func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 	g.GET(
@@ -740,7 +742,7 @@ func NewEncryptionKeysRoutes(cfg config.C, authService auth.A, c coreIface.C) *E
 		return id, nil
 	}
 
-	getEncryptionKey := func(ctx context.Context, id apid.ID) (labels.Resource, error) {
+	getEncryptionKey := func(ctx context.Context, id apid.ID) (key_value.Resource, error) {
 		ek, err := c.GetEncryptionKey(ctx, id)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
@@ -769,34 +771,34 @@ func NewEncryptionKeysRoutes(cfg config.C, authService auth.A, c coreIface.C) *E
 		ForVerb("update").
 		Build()
 
-	labelsAdapter := labels.Adapter[apid.ID]{
-		Kind:         labels.Label,
+	labelsAdapter := key_value.Adapter[apid.ID]{
+		Kind:         key_value.Label,
 		ResourceName: "encryption key",
 		PathPrefix:   "/encryption-keys/:id",
 		AuthGet:      authGet,
 		AuthMutate:   authMutate,
 		ParseID:      parseEncryptionKeyID,
 		Get:          getEncryptionKey,
-		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (labels.Resource, error) {
+		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
 			return c.PutEncryptionKeyLabels(ctx, id, kv)
 		},
-		Delete: func(ctx context.Context, id apid.ID, keys []string) (labels.Resource, error) {
+		Delete: func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
 			return c.DeleteEncryptionKeyLabels(ctx, id, keys)
 		},
 	}
 
-	annotsAdapter := labels.Adapter[apid.ID]{
-		Kind:         labels.Annotation,
+	annotsAdapter := key_value.Adapter[apid.ID]{
+		Kind:         key_value.Annotation,
 		ResourceName: "encryption key",
 		PathPrefix:   "/encryption-keys/:id",
 		AuthGet:      authGet,
 		AuthMutate:   authMutate,
 		ParseID:      parseEncryptionKeyID,
 		Get:          getEncryptionKey,
-		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (labels.Resource, error) {
+		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
 			return c.PutEncryptionKeyAnnotations(ctx, id, kv)
 		},
-		Delete: func(ctx context.Context, id apid.ID, keys []string) (labels.Resource, error) {
+		Delete: func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
 			return c.DeleteEncryptionKeyAnnotations(ctx, id, keys)
 		},
 	}

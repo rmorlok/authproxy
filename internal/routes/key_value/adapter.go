@@ -1,4 +1,4 @@
-package labels
+package key_value
 
 import (
 	"context"
@@ -33,6 +33,7 @@ type Adapter[ID any] struct {
 
 	// AuthGet is the auth middleware for read endpoints (GET).
 	AuthGet gin.HandlerFunc
+
 	// AuthMutate is the auth middleware for write endpoints (PUT/DELETE).
 	AuthMutate gin.HandlerFunc
 

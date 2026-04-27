@@ -862,7 +862,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp labels.KeyValueJson
+			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "env", resp.Key)
 			require.Equal(t, "staging", resp.Value)
@@ -961,7 +961,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp labels.KeyValueJson
+			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "env", resp.Key)
 			require.Equal(t, "production", resp.Value)
@@ -996,7 +996,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp labels.KeyValueJson
+			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "version", resp.Key)
 			require.Equal(t, "v2", resp.Value)
@@ -1438,7 +1438,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp labels.KeyValueJson
+			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "env", resp.Key)
 			require.Equal(t, "staging", resp.Value)
@@ -1537,7 +1537,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp labels.KeyValueJson
+			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "env", resp.Key)
 			require.Equal(t, "production", resp.Value)
@@ -1572,7 +1572,7 @@ func TestNamespaces(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp labels.KeyValueJson
+			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "version", resp.Key)
 			require.Equal(t, "v2", resp.Value)

@@ -32,8 +32,8 @@ type ActorsRoutes struct {
 	httpf         httpf.F
 	encrypt       encrypt.E
 	logger        *slog.Logger
-	labelsAdapter labels.Adapter[apid.ID]
-	annotsAdapter labels.Adapter[apid.ID]
+	labelsAdapter key_value.Adapter[apid.ID]
+	annotsAdapter key_value.Adapter[apid.ID]
 }
 
 type ActorJson struct {
@@ -1043,7 +1043,7 @@ func NewActorsRoutes(
 		return id, nil
 	}
 
-	getActor := func(ctx context.Context, id apid.ID) (labels.Resource, error) {
+	getActor := func(ctx context.Context, id apid.ID) (key_value.Resource, error) {
 		actor, err := db.GetActor(ctx, id)
 		if err != nil {
 			return nil, err
@@ -1065,34 +1065,34 @@ func NewActorsRoutes(
 		ForVerb("update").
 		Build()
 
-	labelsAdapter := labels.Adapter[apid.ID]{
-		Kind:         labels.Label,
+	labelsAdapter := key_value.Adapter[apid.ID]{
+		Kind:         key_value.Label,
 		ResourceName: "actor",
 		PathPrefix:   "/actors/:id",
 		AuthGet:      authGet,
 		AuthMutate:   authMutate,
 		ParseID:      parseActorID,
 		Get:          getActor,
-		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (labels.Resource, error) {
+		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
 			return db.PutActorLabels(ctx, id, kv)
 		},
-		Delete: func(ctx context.Context, id apid.ID, keys []string) (labels.Resource, error) {
+		Delete: func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
 			return db.DeleteActorLabels(ctx, id, keys)
 		},
 	}
 
-	annotsAdapter := labels.Adapter[apid.ID]{
-		Kind:         labels.Annotation,
+	annotsAdapter := key_value.Adapter[apid.ID]{
+		Kind:         key_value.Annotation,
 		ResourceName: "actor",
 		PathPrefix:   "/actors/:id",
 		AuthGet:      authGet,
 		AuthMutate:   authMutate,
 		ParseID:      parseActorID,
 		Get:          getActor,
-		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (labels.Resource, error) {
+		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
 			return db.PutActorAnnotations(ctx, id, kv)
 		},
-		Delete: func(ctx context.Context, id apid.ID, keys []string) (labels.Resource, error) {
+		Delete: func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
 			return db.DeleteActorAnnotations(ctx, id, keys)
 		},
 	}

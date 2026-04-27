@@ -1152,7 +1152,7 @@ func TestConnectors(t *testing.T) {
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp labels.KeyValueJson
+				var resp key_value.KeyValueJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Equal(t, "type", resp.Key)
@@ -1180,7 +1180,7 @@ func TestConnectors(t *testing.T) {
 		t.Run("put label", func(t *testing.T) {
 			t.Run("bad uuid", func(t *testing.T) {
 				tu := setup(t, nil)
-				body := labels.PutKeyValueRequestJson{Value: "val"}
+				body := key_value.PutKeyValueRequestJson{Value: "val"}
 				jsonBody, _ := json.Marshal(body)
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1200,7 +1200,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("invalid key", func(t *testing.T) {
 				tu := setup(t, nil)
-				body := labels.PutKeyValueRequestJson{Value: "val"}
+				body := key_value.PutKeyValueRequestJson{Value: "val"}
 				jsonBody, _ := json.Marshal(body)
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1220,7 +1220,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("not found", func(t *testing.T) {
 				tu := setup(t, nil)
-				body := labels.PutKeyValueRequestJson{Value: "val"}
+				body := key_value.PutKeyValueRequestJson{Value: "val"}
 				jsonBody, _ := json.Marshal(body)
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1240,7 +1240,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("valid - creates draft and sets label", func(t *testing.T) {
 				tu := setup(t, nil)
-				body := labels.PutKeyValueRequestJson{Value: "production"}
+				body := key_value.PutKeyValueRequestJson{Value: "production"}
 				jsonBody, _ := json.Marshal(body)
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1257,7 +1257,7 @@ func TestConnectors(t *testing.T) {
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp labels.KeyValueJson
+				var resp key_value.KeyValueJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Equal(t, "env", resp.Key)
@@ -1403,7 +1403,7 @@ func TestConnectors(t *testing.T) {
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp labels.KeyValueJson
+				var resp key_value.KeyValueJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Equal(t, "type", resp.Key)
@@ -1431,7 +1431,7 @@ func TestConnectors(t *testing.T) {
 		t.Run("put version label", func(t *testing.T) {
 			t.Run("conflict - not a draft", func(t *testing.T) {
 				tu := setup(t, nil)
-				body := labels.PutKeyValueRequestJson{Value: "val"}
+				body := key_value.PutKeyValueRequestJson{Value: "val"}
 				jsonBody, _ := json.Marshal(body)
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1472,7 +1472,7 @@ func TestConnectors(t *testing.T) {
 				draftVersion := createResp.Version
 
 				// Put a label on the draft version
-				body := labels.PutKeyValueRequestJson{Value: "staging"}
+				body := key_value.PutKeyValueRequestJson{Value: "staging"}
 				jsonBody, _ := json.Marshal(body)
 				w = httptest.NewRecorder()
 				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1489,7 +1489,7 @@ func TestConnectors(t *testing.T) {
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp labels.KeyValueJson
+				var resp key_value.KeyValueJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Equal(t, "env", resp.Key)
@@ -1795,7 +1795,7 @@ func TestConnectors(t *testing.T) {
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp labels.KeyValueJson
+				var resp key_value.KeyValueJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Equal(t, "my-annotation", resp.Key)
@@ -1823,7 +1823,7 @@ func TestConnectors(t *testing.T) {
 		t.Run("put annotation", func(t *testing.T) {
 			t.Run("valid", func(t *testing.T) {
 				tu := setup(t, nil)
-				body := labels.PutKeyValueRequestJson{Value: "production"}
+				body := key_value.PutKeyValueRequestJson{Value: "production"}
 				jsonBody, _ := json.Marshal(body)
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1840,7 +1840,7 @@ func TestConnectors(t *testing.T) {
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp labels.KeyValueJson
+				var resp key_value.KeyValueJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Equal(t, "env", resp.Key)
@@ -1849,7 +1849,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("valid - creates draft and sets annotation", func(t *testing.T) {
 				tu := setup(t, nil)
-				body := labels.PutKeyValueRequestJson{Value: "my-description"}
+				body := key_value.PutKeyValueRequestJson{Value: "my-description"}
 				jsonBody, _ := json.Marshal(body)
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1866,7 +1866,7 @@ func TestConnectors(t *testing.T) {
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp labels.KeyValueJson
+				var resp key_value.KeyValueJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Equal(t, "description", resp.Key)
@@ -1898,7 +1898,7 @@ func TestConnectors(t *testing.T) {
 				tu := setup(t, nil)
 
 				// First put an annotation
-				body := labels.PutKeyValueRequestJson{Value: "to-delete"}
+				body := key_value.PutKeyValueRequestJson{Value: "to-delete"}
 				jsonBody, _ := json.Marshal(body)
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1934,7 +1934,7 @@ func TestConnectors(t *testing.T) {
 				tu := setup(t, nil)
 
 				// First put an annotation so it exists (this creates draft version 2)
-				body := labels.PutKeyValueRequestJson{Value: "will-be-removed"}
+				body := key_value.PutKeyValueRequestJson{Value: "will-be-removed"}
 				jsonBody, _ := json.Marshal(body)
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -2039,7 +2039,7 @@ func TestConnectors(t *testing.T) {
 				draftVersion := createResp.Version
 
 				// Put an annotation on the draft
-				body := labels.PutKeyValueRequestJson{Value: "draft-value"}
+				body := key_value.PutKeyValueRequestJson{Value: "draft-value"}
 				jsonBody, _ := json.Marshal(body)
 				w = httptest.NewRecorder()
 				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -2070,7 +2070,7 @@ func TestConnectors(t *testing.T) {
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp labels.KeyValueJson
+				var resp key_value.KeyValueJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Equal(t, "info", resp.Key)
@@ -2119,7 +2119,7 @@ func TestConnectors(t *testing.T) {
 				draftVersion := createResp.Version
 
 				// Put an annotation on the draft version
-				body := labels.PutKeyValueRequestJson{Value: "staging"}
+				body := key_value.PutKeyValueRequestJson{Value: "staging"}
 				jsonBody, _ := json.Marshal(body)
 				w = httptest.NewRecorder()
 				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -2136,7 +2136,7 @@ func TestConnectors(t *testing.T) {
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp labels.KeyValueJson
+				var resp key_value.KeyValueJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Equal(t, "env", resp.Key)
@@ -2168,7 +2168,7 @@ func TestConnectors(t *testing.T) {
 				draftVersion := createResp.Version
 
 				// Put an annotation on the draft
-				body := labels.PutKeyValueRequestJson{Value: "to-delete"}
+				body := key_value.PutKeyValueRequestJson{Value: "to-delete"}
 				jsonBody, _ := json.Marshal(body)
 				w = httptest.NewRecorder()
 				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(

@@ -27,16 +27,16 @@ import (
 )
 
 type ConnectionsRoutes struct {
-	cfg              config.C
-	auth             auth.A
-	core             coreIface.C
-	db               database.DB
-	r                apredis.Client
-	httpf            httpf.F
-	encrypt          encrypt.E
-	oauthf           oauth2.Factory
-	labelsAdapter    labels.Adapter[apid.ID]
-	annotsAdapter    labels.Adapter[apid.ID]
+	cfg           config.C
+	auth          auth.A
+	core          coreIface.C
+	db            database.DB
+	r             apredis.Client
+	httpf         httpf.F
+	encrypt       encrypt.E
+	oauthf        oauth2.Factory
+	labelsAdapter key_value.Adapter[apid.ID]
+	annotsAdapter key_value.Adapter[apid.ID]
 }
 
 // @Summary		Initiate connection
@@ -1253,7 +1253,7 @@ func NewConnectionsRoutes(
 		return id, nil
 	}
 
-	getConn := func(ctx context.Context, id apid.ID) (labels.Resource, error) {
+	getConn := func(ctx context.Context, id apid.ID) (key_value.Resource, error) {
 		conn, err := c.GetConnection(ctx, id)
 		if err != nil {
 			return nil, err
@@ -1275,34 +1275,34 @@ func NewConnectionsRoutes(
 		ForIdField("id").
 		Build()
 
-	labelsAdapter := labels.Adapter[apid.ID]{
-		Kind:         labels.Label,
+	labelsAdapter := key_value.Adapter[apid.ID]{
+		Kind:         key_value.Label,
 		ResourceName: "connection",
 		PathPrefix:   "/connections/:id",
 		AuthGet:      authGet,
 		AuthMutate:   authMutate,
 		ParseID:      parseConnID,
 		Get:          getConn,
-		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (labels.Resource, error) {
+		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
 			return db.PutConnectionLabels(ctx, id, kv)
 		},
-		Delete: func(ctx context.Context, id apid.ID, keys []string) (labels.Resource, error) {
+		Delete: func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
 			return db.DeleteConnectionLabels(ctx, id, keys)
 		},
 	}
 
-	annotsAdapter := labels.Adapter[apid.ID]{
-		Kind:         labels.Annotation,
+	annotsAdapter := key_value.Adapter[apid.ID]{
+		Kind:         key_value.Annotation,
 		ResourceName: "connection",
 		PathPrefix:   "/connections/:id",
 		AuthGet:      authGet,
 		AuthMutate:   authMutate,
 		ParseID:      parseConnID,
 		Get:          getConn,
-		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (labels.Resource, error) {
+		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (key_value.Resource, error) {
 			return db.PutConnectionAnnotations(ctx, id, kv)
 		},
-		Delete: func(ctx context.Context, id apid.ID, keys []string) (labels.Resource, error) {
+		Delete: func(ctx context.Context, id apid.ID, keys []string) (key_value.Resource, error) {
 			return db.DeleteConnectionAnnotations(ctx, id, keys)
 		},
 	}

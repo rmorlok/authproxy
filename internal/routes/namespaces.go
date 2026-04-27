@@ -80,8 +80,8 @@ type NamespacesRoutes struct {
 	cfg           config.C
 	core          coreIface.C
 	authService   auth.A
-	labelsAdapter labels.Adapter[string]
-	annotsAdapter labels.Adapter[string]
+	labelsAdapter key_value.Adapter[string]
+	annotsAdapter key_value.Adapter[string]
 }
 
 // @Summary		Get namespace
@@ -422,7 +422,6 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 // @Security		BearerAuth
 // @Router			/namespaces/{path}/labels [get]
 func (r *NamespacesRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.HandleList(gctx) }
-
 
 // @Summary		Get a specific label for a namespace
 // @Description	Get a specific label value by key for a namespace
@@ -855,7 +854,7 @@ func NewNamespacesRoutes(cfg config.C, authService auth.A, c coreIface.C) *Names
 		return path, nil
 	}
 
-	getNamespace := func(ctx context.Context, path string) (labels.Resource, error) {
+	getNamespace := func(ctx context.Context, path string) (key_value.Resource, error) {
 		ns, err := c.GetNamespace(ctx, path)
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
@@ -884,34 +883,34 @@ func NewNamespacesRoutes(cfg config.C, authService auth.A, c coreIface.C) *Names
 		ForVerb("update").
 		Build()
 
-	labelsAdapter := labels.Adapter[string]{
-		Kind:         labels.Label,
+	labelsAdapter := key_value.Adapter[string]{
+		Kind:         key_value.Label,
 		ResourceName: "namespace",
 		PathPrefix:   "/namespaces/:path",
 		AuthGet:      authGet,
 		AuthMutate:   authMutate,
 		ParseID:      parseNamespaceID,
 		Get:          getNamespace,
-		Put: func(ctx context.Context, path string, kv map[string]string) (labels.Resource, error) {
+		Put: func(ctx context.Context, path string, kv map[string]string) (key_value.Resource, error) {
 			return c.PutNamespaceLabels(ctx, path, kv)
 		},
-		Delete: func(ctx context.Context, path string, keys []string) (labels.Resource, error) {
+		Delete: func(ctx context.Context, path string, keys []string) (key_value.Resource, error) {
 			return c.DeleteNamespaceLabels(ctx, path, keys)
 		},
 	}
 
-	annotsAdapter := labels.Adapter[string]{
-		Kind:         labels.Annotation,
+	annotsAdapter := key_value.Adapter[string]{
+		Kind:         key_value.Annotation,
 		ResourceName: "namespace",
 		PathPrefix:   "/namespaces/:path",
 		AuthGet:      authGet,
 		AuthMutate:   authMutate,
 		ParseID:      parseNamespaceID,
 		Get:          getNamespace,
-		Put: func(ctx context.Context, path string, kv map[string]string) (labels.Resource, error) {
+		Put: func(ctx context.Context, path string, kv map[string]string) (key_value.Resource, error) {
 			return c.PutNamespaceAnnotations(ctx, path, kv)
 		},
-		Delete: func(ctx context.Context, path string, keys []string) (labels.Resource, error) {
+		Delete: func(ctx context.Context, path string, keys []string) (key_value.Resource, error) {
 			return c.DeleteNamespaceAnnotations(ctx, path, keys)
 		},
 	}

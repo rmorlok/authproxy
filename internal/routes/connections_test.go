@@ -802,7 +802,7 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp labels.KeyValueJson
+			var resp key_value.KeyValueJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "env", resp.Key)
@@ -918,7 +918,7 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp labels.KeyValueJson
+			var resp key_value.KeyValueJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "env", resp.Key)
@@ -946,7 +946,7 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp labels.KeyValueJson
+			var resp key_value.KeyValueJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "env", resp.Key)
@@ -1425,7 +1425,7 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp labels.KeyValueJson
+			var resp key_value.KeyValueJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "note", resp.Key)
@@ -1524,7 +1524,7 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp labels.KeyValueJson
+			var resp key_value.KeyValueJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "note", resp.Key)

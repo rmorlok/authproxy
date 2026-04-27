@@ -1,4 +1,4 @@
-// Package labels provides a generic adapter for exposing the standard
+// Package key_value provides a generic adapter for exposing the standard
 // labels and annotations endpoints on resources that store key/value
 // metadata in a uniform way:
 //
@@ -9,7 +9,7 @@
 //
 // Each resource provides an Adapter wired to its own ID type, fetcher,
 // and persistence functions; the handler implementations live here once.
-package labels
+package key_value
 
 import (
 	"github.com/rmorlok/authproxy/internal/database"
