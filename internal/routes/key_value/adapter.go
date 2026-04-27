@@ -3,6 +3,7 @@ package key_value
 import (
 	"context"
 	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/gin-gonic/gin"
@@ -52,6 +53,10 @@ type Adapter[ID any] struct {
 
 	// Delete removes the supplied keys from the resource.
 	Delete func(ctx context.Context, id ID, keys []string) (Resource, error)
+
+	// Logger is the optional logger forwarded to apgin.WriteError when the
+	// adapter writes error responses. May be nil.
+	Logger *slog.Logger
 }
 
 // Register adds the four endpoints for this kind to the router.
@@ -66,19 +71,26 @@ func (a Adapter[ID]) Register(g gin.IRouter) {
 }
 
 // fetchAndAuthorize loads the resource and runs the permission
-// validator. Returns the resource on success. On failure it has already
-// written the error response and returns a nil resource.
+// validator.
 //
-// notFoundStatus controls whether a missing resource produces a 404
-// (returnNotFound=true) or 204 (returnNotFound=false, used by DELETE
-// for idempotent semantics).
-func (a Adapter[ID]) fetchAndAuthorize(gctx *gin.Context, id ID, val *auth.ResourcePermissionValidator, returnNotFound bool) (Resource, bool) {
+// On success it returns (resource, true) and the caller continues
+// handling the request.
+//
+// On failure it returns (nil, false) and has already written the
+// terminal HTTP response (error body or 204) and updated the validator
+// state. The caller MUST return immediately without writing anything
+// further to gctx.
+//
+// returnNotFound selects the response when the resource is missing:
+//   - true: 404 Not Found (used by GET and PUT)
+//   - false: 204 No Content (used by DELETE for idempotent semantics)
+func (a Adapter[ID]) fetchAndAuthorize(gctx *gin.Context, id ID, val *auth.ResourcePermissionValidator, returnNotFound bool) (resource Resource, ok bool) {
 	ctx := gctx.Request.Context()
 	r, err := a.Get(ctx, id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			if returnNotFound {
-				apgin.WriteError(gctx, nil, httperr.NotFoundf("%s not found", a.ResourceName))
+				apgin.WriteError(gctx, a.Logger, httperr.NotFoundf("%s not found", a.ResourceName))
 				val.MarkErrorReturn()
 			} else {
 				gctx.Status(http.StatusNoContent)
@@ -86,14 +98,14 @@ func (a Adapter[ID]) fetchAndAuthorize(gctx *gin.Context, id ID, val *auth.Resou
 			}
 			return nil, false
 		}
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, a.Logger, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return nil, false
 	}
 
 	if r == nil {
 		if returnNotFound {
-			apgin.WriteError(gctx, nil, httperr.NotFoundf("%s not found", a.ResourceName))
+			apgin.WriteError(gctx, a.Logger, httperr.NotFoundf("%s not found", a.ResourceName))
 			val.MarkErrorReturn()
 		} else {
 			gctx.Status(http.StatusNoContent)
@@ -103,7 +115,7 @@ func (a Adapter[ID]) fetchAndAuthorize(gctx *gin.Context, id ID, val *auth.Resou
 	}
 
 	if httpErr := val.ValidateHttpStatusError(r); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
+		apgin.WriteError(gctx, a.Logger, httpErr)
 		return nil, false
 	}
 
@@ -117,7 +129,7 @@ func (a Adapter[ID]) HandleList(gctx *gin.Context) {
 
 	id, herr := a.ParseID(gctx)
 	if herr != nil {
-		apgin.WriteError(gctx, nil, herr)
+		apgin.WriteError(gctx, a.Logger, herr)
 		val.MarkErrorReturn()
 		return
 	}
@@ -141,14 +153,14 @@ func (a Adapter[ID]) HandleGet(gctx *gin.Context) {
 
 	id, herr := a.ParseID(gctx)
 	if herr != nil {
-		apgin.WriteError(gctx, nil, herr)
+		apgin.WriteError(gctx, a.Logger, herr)
 		val.MarkErrorReturn()
 		return
 	}
 
 	key := gctx.Param(a.Kind.ParamName)
 	if key == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("%s key is required", a.Kind.Singular))
+		apgin.WriteError(gctx, a.Logger, httperr.BadRequestf("%s key is required", a.Kind.Singular))
 		val.MarkErrorReturn()
 		return
 	}
@@ -160,7 +172,7 @@ func (a Adapter[ID]) HandleGet(gctx *gin.Context) {
 
 	value, exists := a.Kind.Get(r)[key]
 	if !exists {
-		apgin.WriteError(gctx, nil, httperr.NotFoundf("%s '%s' not found", a.Kind.Singular, key))
+		apgin.WriteError(gctx, a.Logger, httperr.NotFoundf("%s '%s' not found", a.Kind.Singular, key))
 		val.MarkErrorReturn()
 		return
 	}
@@ -176,33 +188,33 @@ func (a Adapter[ID]) HandlePut(gctx *gin.Context) {
 
 	id, herr := a.ParseID(gctx)
 	if herr != nil {
-		apgin.WriteError(gctx, nil, herr)
+		apgin.WriteError(gctx, a.Logger, herr)
 		val.MarkErrorReturn()
 		return
 	}
 
 	key := gctx.Param(a.Kind.ParamName)
 	if key == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("%s key is required", a.Kind.Singular))
+		apgin.WriteError(gctx, a.Logger, httperr.BadRequestf("%s key is required", a.Kind.Singular))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := a.Kind.ValidateKey(key); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid %s key: %s", a.Kind.Singular, err.Error()))
+		apgin.WriteError(gctx, a.Logger, httperr.BadRequestf("invalid %s key: %s", a.Kind.Singular, err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
 
 	var req PutKeyValueRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
+		apgin.WriteError(gctx, a.Logger, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
 
 	if err := a.Kind.ValidateValue(req.Value); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid %s value: %s", a.Kind.Singular, err.Error()))
+		apgin.WriteError(gctx, a.Logger, httperr.BadRequestf("invalid %s value: %s", a.Kind.Singular, err.Error()))
 		val.MarkErrorReturn()
 		return
 	}
@@ -214,11 +226,11 @@ func (a Adapter[ID]) HandlePut(gctx *gin.Context) {
 	updated, err := a.Put(ctx, id, map[string]string{key: req.Value})
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFoundf("%s not found", a.ResourceName))
+			apgin.WriteError(gctx, a.Logger, httperr.NotFoundf("%s not found", a.ResourceName))
 			val.MarkErrorReturn()
 			return
 		}
-		apgin.WriteErr(gctx, nil, err)
+		apgin.WriteErr(gctx, a.Logger, err)
 		val.MarkErrorReturn()
 		return
 	}
@@ -238,14 +250,14 @@ func (a Adapter[ID]) HandleDelete(gctx *gin.Context) {
 
 	id, herr := a.ParseID(gctx)
 	if herr != nil {
-		apgin.WriteError(gctx, nil, herr)
+		apgin.WriteError(gctx, a.Logger, herr)
 		val.MarkErrorReturn()
 		return
 	}
 
 	key := gctx.Param(a.Kind.ParamName)
 	if key == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("%s key is required", a.Kind.Singular))
+		apgin.WriteError(gctx, a.Logger, httperr.BadRequestf("%s key is required", a.Kind.Singular))
 		val.MarkErrorReturn()
 		return
 	}
@@ -259,7 +271,7 @@ func (a Adapter[ID]) HandleDelete(gctx *gin.Context) {
 			gctx.Status(http.StatusNoContent)
 			return
 		}
-		apgin.WriteErr(gctx, nil, err)
+		apgin.WriteErr(gctx, a.Logger, err)
 		val.MarkErrorReturn()
 		return
 	}

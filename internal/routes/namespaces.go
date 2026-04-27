@@ -406,7 +406,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 }
 
 // Label and annotation handlers for namespaces delegate to a shared
-// generic adapter (see internal/routes/labels). The doc comments below
+// generic adapter (see internal/routes/key_value). The doc comments below
 // drive the OpenAPI spec; the bodies forward to the adapter.
 
 // @Summary		Get all labels for a namespace

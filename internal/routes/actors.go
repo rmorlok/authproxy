@@ -747,7 +747,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 }
 
 // Label and annotation handlers for actors delegate to a shared
-// generic adapter (see internal/routes/labels). The doc comments below
+// generic adapter (see internal/routes/key_value). The doc comments below
 // drive the OpenAPI spec; the bodies forward to the adapter.
 
 // @Summary		Get all labels for an actor
