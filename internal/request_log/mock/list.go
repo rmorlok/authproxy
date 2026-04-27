@@ -145,10 +145,10 @@ func (l *MockListRequestBuilderExecutor) FetchPage(ctx context.Context) paginati
 
 func (l *MockListRequestBuilderExecutor) Enumerate(ctx context.Context, callback func(pagination.PageResult[*request_log.LogRecord]) (keepGoing pagination.KeepGoing, err error)) error {
 	var err error
-	keepGoing := true
+	keepGoing := pagination.Continue
 	hasMore := true
 
-	for err == nil && hasMore && keepGoing {
+	for err == nil && hasMore && bool(keepGoing) {
 		result := l.FetchPage(ctx)
 		hasMore = result.HasMore
 

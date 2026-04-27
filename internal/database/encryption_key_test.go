@@ -291,7 +291,7 @@ func TestEncryptionKey(t *testing.T) {
 				ids   []apid.ID
 				depth int
 			}{ids, depth})
-			return true, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.Empty(t, orphans)
@@ -384,7 +384,7 @@ func TestEncryptionKey(t *testing.T) {
 				ids[k.Id] = true
 			}
 			levels = append(levels, level{ids, depth})
-			return true, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.Empty(t, orphans)
@@ -440,7 +440,7 @@ func TestEncryptionKey(t *testing.T) {
 		callCount := 0
 		_, err := db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*EncryptionKey, depth int) (pagination.KeepGoing, error) {
 			callCount++
-			return false, nil // stop immediately after first level
+			return pagination.Stop, nil // stop immediately after first level
 		})
 		require.NoError(t, err)
 		require.Equal(t, 1, callCount)
@@ -482,7 +482,7 @@ func TestEncryptionKey(t *testing.T) {
 			for _, k := range keys {
 				allIDs = append(allIDs, k.Id)
 			}
-			return true, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.Empty(t, orphans)
@@ -512,7 +512,7 @@ func TestEncryptionKey(t *testing.T) {
 			for _, k := range keys {
 				allIDs = append(allIDs, k.Id)
 			}
-			return true, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		// Only root in the walk; orphan is not walked

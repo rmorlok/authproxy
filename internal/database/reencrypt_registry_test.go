@@ -55,7 +55,7 @@ func TestReEncryptRegistry(t *testing.T) {
 		var allTargets []ReEncryptionTarget
 		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 			allTargets = append(allTargets, targets...)
-			return true, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 
@@ -104,7 +104,7 @@ func TestReEncryptRegistry(t *testing.T) {
 					}
 				}
 			}
-			return true, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.Empty(t, actorTargets, "actor at target EKV should not appear")
@@ -146,7 +146,7 @@ func TestReEncryptRegistry(t *testing.T) {
 					}
 				}
 			}
-			return true, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.Len(t, tokenTargets, 1, "only the mismatched field should appear")
@@ -187,7 +187,7 @@ func TestReEncryptRegistry(t *testing.T) {
 					}
 				}
 			}
-			return true, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.Len(t, tokenTargets, 2, "both mismatched fields should appear")
@@ -235,7 +235,7 @@ func TestReEncryptRegistry(t *testing.T) {
 					}
 				}
 			}
-			return true, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.True(t, found, "oauth2 token should resolve namespace via connections JOIN")
@@ -274,7 +274,7 @@ func TestReEncryptRegistry(t *testing.T) {
 					}
 				}
 			}
-			return true, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.Len(t, cvTargets, 1)
@@ -309,7 +309,7 @@ func TestReEncryptRegistry(t *testing.T) {
 					}
 				}
 			}
-			return true, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.Empty(t, actorTargets, "actor with NULL encrypted_key should not appear")
@@ -371,7 +371,7 @@ func TestReEncryptRegistry(t *testing.T) {
 		var allTargets []ReEncryptionTarget
 		err := db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 			allTargets = append(allTargets, targets...)
-			return true, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.Empty(t, allTargets)
@@ -404,7 +404,7 @@ func TestReEncryptRegistry(t *testing.T) {
 					}
 				}
 			}
-			return true, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.Empty(t, actorTargets, "namespace with NULL target should not produce targets")

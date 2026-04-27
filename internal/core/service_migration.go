@@ -365,7 +365,7 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 		results := make([]database.Connector, 0)
 		err := b.Enumerate(ctx, func(result pagination.PageResult[database.Connector]) (keepGoing pagination.KeepGoing, err error) {
 			results = append(results, result.Results...)
-			return true, nil
+			return pagination.Continue, nil
 		})
 		if err != nil {
 			return fmt.Errorf("failed to check for existing connector for precheck: %w", err)

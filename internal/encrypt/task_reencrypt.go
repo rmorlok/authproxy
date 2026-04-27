@@ -65,7 +65,7 @@ func (h *EncryptServiceTaskHandler) handleReencryptAll(ctx context.Context, task
 			}
 		}
 
-		return true, nil
+		return pagination.Continue, nil
 	})
 
 	if err != nil {

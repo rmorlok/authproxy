@@ -169,7 +169,7 @@ INSERT INTO namespaces
 			ListNamespacesBuilder().
 			Enumerate(ctx, func(page pagination.PageResult[Namespace]) (pagination.KeepGoing, error) {
 				count += len(page.Results)
-				return true, nil
+				return pagination.Continue, nil
 			})
 		require.NoError(t, err)
 		require.Equal(t, count, 8)
@@ -1621,7 +1621,7 @@ INSERT INTO namespaces
 			err = db.EnumerateNamespaceEncryptionTargets(ctx,
 				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 					collected = append(collected, targets...)
-					return nil, true, nil
+					return nil, pagination.Continue, nil
 				},
 			)
 			require.NoError(t, err)
@@ -1680,7 +1680,7 @@ INSERT INTO namespaces
 							})
 						}
 					}
-					return updates, true, nil
+					return updates, pagination.Continue, nil
 				},
 			)
 			require.NoError(t, err)
@@ -1729,7 +1729,7 @@ INSERT INTO namespaces
 			err = db.EnumerateNamespaceEncryptionTargets(ctx,
 				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 					callCount++
-					return nil, false, nil // stop immediately
+					return nil, pagination.Stop, nil // stop immediately
 				},
 			)
 			require.NoError(t, err)
@@ -1754,7 +1754,7 @@ INSERT INTO namespaces
 			expectedErr := fmt.Errorf("test error")
 			err = db.EnumerateNamespaceEncryptionTargets(ctx,
 				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
-					return nil, true, expectedErr
+					return nil, pagination.Stop, expectedErr
 				},
 			)
 			require.ErrorIs(t, err, expectedErr)
@@ -1774,7 +1774,7 @@ INSERT INTO namespaces
 					callCount++
 					require.Empty(t, targets)
 					require.True(t, lastPage)
-					return nil, true, nil
+					return nil, pagination.Continue, nil
 				},
 			)
 			require.NoError(t, err)
@@ -1803,7 +1803,7 @@ INSERT INTO namespaces
 			err = db.EnumerateNamespaceEncryptionTargets(ctx,
 				func(targets []NamespaceEncryptionTarget, lastPage bool) ([]NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 					lastPageValues = append(lastPageValues, lastPage)
-					return nil, true, nil
+					return nil, pagination.Continue, nil
 				},
 			)
 			require.NoError(t, err)

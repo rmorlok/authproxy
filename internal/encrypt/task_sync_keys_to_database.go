@@ -226,7 +226,7 @@ func syncKeysVersionsToDatabase(
 			}
 		}
 
-		return true, nil
+		return pagination.Continue, nil
 	})
 
 	if err != nil {
@@ -294,7 +294,7 @@ func syncKeysVersionsToDatabase(
 				}
 			}
 
-			return updates, true, nil
+			return updates, pagination.Continue, nil
 		},
 	)
 	if err != nil {

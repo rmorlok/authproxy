@@ -191,12 +191,12 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 						}
 					}
 
-					return true, nil
+					return pagination.Continue, nil
 				},
 			)
 		}
 
-		return true, nil
+		return pagination.Continue, nil
 	})
 
 	if err != nil {
@@ -211,7 +211,7 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 			}
 		}
 
-		return true, nil
+		return pagination.Continue, nil
 	})
 
 	if err != nil {

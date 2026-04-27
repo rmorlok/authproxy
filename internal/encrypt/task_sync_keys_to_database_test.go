@@ -600,7 +600,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err = db.EnumerateNamespaceEncryptionTargets(ctx,
 			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 				collected = append(collected, targets...)
-				return nil, true, nil
+				return nil, pagination.Continue, nil
 			},
 		)
 		require.NoError(t, err)
@@ -680,7 +680,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err = db.EnumerateNamespaceEncryptionTargets(ctx,
 			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 				collected = append(collected, targets...)
-				return nil, true, nil
+				return nil, pagination.Continue, nil
 			},
 		)
 		require.NoError(t, err)
@@ -734,7 +734,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err = db.EnumerateNamespaceEncryptionTargets(ctx,
 			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 				collected = append(collected, targets...)
-				return nil, true, nil
+				return nil, pagination.Continue, nil
 			},
 		)
 		require.NoError(t, err)
@@ -778,7 +778,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err = db.EnumerateNamespaceEncryptionTargets(ctx,
 			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 				firstCollected = append(firstCollected, targets...)
-				return nil, true, nil
+				return nil, pagination.Continue, nil
 			},
 		)
 		require.NoError(t, err)
@@ -791,7 +791,7 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		err = db.EnumerateNamespaceEncryptionTargets(ctx,
 			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 				secondCollected = append(secondCollected, targets...)
-				return nil, true, nil
+				return nil, pagination.Continue, nil
 			},
 		)
 		require.NoError(t, err)

@@ -39,7 +39,7 @@ func (th *taskHandler) cleanupStaleConnections(ctx context.Context, t *asynq.Tas
 
 				cleaned++
 			}
-			return true, nil
+			return pagination.Continue, nil
 		})
 
 	if err != nil {

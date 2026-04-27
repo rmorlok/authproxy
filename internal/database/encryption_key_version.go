@@ -436,7 +436,7 @@ func (s *service) EnumerateEncryptionKeyVersionsForKey(
 			return err
 		}
 
-		if !keepGoing || lastPage {
+		if keepGoing == pagination.Stop || lastPage {
 			break
 		}
 

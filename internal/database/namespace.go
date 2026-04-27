@@ -679,10 +679,10 @@ func (l *listNamespacesFilters) FetchPage(ctx context.Context) pagination.PageRe
 
 func (l *listNamespacesFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[Namespace]) (keepGoing pagination.KeepGoing, err error)) error {
 	var err error
-	keepGoing := true
+	keepGoing := pagination.Continue
 	hasMore := true
 
-	for err == nil && hasMore && keepGoing {
+	for err == nil && hasMore && bool(keepGoing) {
 		result := l.FetchPage(ctx)
 		hasMore = result.HasMore
 
@@ -1002,7 +1002,7 @@ func (s *service) EnumerateNamespaceEncryptionTargets(
 			}
 		}
 
-		if !keepGoing || lastPage {
+		if keepGoing == pagination.Stop || lastPage {
 			break
 		}
 

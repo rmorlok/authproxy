@@ -1,11 +1,11 @@
 package pagination
 
 // KeepGoing is the bool returned by Enumerate-style callbacks to control iteration.
-// Return true to continue to the next page; return false to stop early.
+// Return Continue to fetch the next page; return Stop to halt early.
 //
-// Using this named type (instead of a bare bool) gives Enumerate callbacks across
-// the codebase a consistent semantic: true means "keep going."
-type KeepGoing = bool
+// Defined as a named type (not an alias) so callbacks must return the exported
+// constants — bare true/false won't compile, which keeps intent explicit.
+type KeepGoing bool
 
 const (
 	// Continue tells an Enumerate-style iterator to fetch the next page.

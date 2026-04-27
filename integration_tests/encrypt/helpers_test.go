@@ -30,7 +30,7 @@ func runReencryptAll(ctx context.Context, env *helpers.IntegrationTestEnv) error
 		for _, target := range targets {
 			newEF, reencryptErr := env.DM.GetEncryptService().ReEncryptField(ctx, target.EncryptedFieldValue, target.TargetEncryptionKeyVersionId)
 			if reencryptErr != nil {
-				return false, reencryptErr
+				return pagination.Stop, reencryptErr
 			}
 
 			if newEF.ID == target.EncryptedFieldValue.ID {
@@ -48,10 +48,10 @@ func runReencryptAll(ctx context.Context, env *helpers.IntegrationTestEnv) error
 
 		if len(updates) > 0 {
 			if updateErr := env.Db.BatchUpdateReEncryptedFields(ctx, updates); updateErr != nil {
-				return false, updateErr
+				return pagination.Stop, updateErr
 			}
 		}
 
-		return true, nil
+		return pagination.Continue, nil
 	})
 }

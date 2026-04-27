@@ -595,10 +595,10 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 				count := 0
 				err = db.EnumerateOAuth2TokensExpiringWithin(ctx, tc.duration, func(tokens []*OAuth2TokenWithConnection, lastPage bool) (pagination.KeepGoing, error) {
 					if tc.callbackError {
-						return false, fmt.Errorf("callback error")
+						return pagination.Stop, fmt.Errorf("callback error")
 					}
 					count += len(tokens)
-					return true, nil
+					return pagination.Continue, nil
 				})
 
 				if tc.callbackError {

@@ -162,7 +162,7 @@ func (s *service) EnumerateFieldsRequiringReEncryption(
 				return err
 			}
 
-			if !keepGoing || lastPageForTable {
+			if keepGoing == pagination.Stop || lastPageForTable {
 				break
 			}
 

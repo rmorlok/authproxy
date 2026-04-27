@@ -54,12 +54,12 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 			for _, tokenWithConnection := range tokensWithConnections {
 				t, err := newRefreshOauth2TokenTask(tokenWithConnection.Token.ConnectionId)
 				if err != nil {
-					return false, err
+					return pagination.Stop, err
 				}
 
 				ti, err := th.asynq.EnqueueContext(ctx, t)
 				if err != nil {
-					return false, err
+					return pagination.Stop, err
 				}
 				logger.Debug(
 					"token refresh task enqueued for connection",
@@ -70,7 +70,7 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 				queuedForRefresh++
 			}
 
-			return true, nil
+			return pagination.Continue, nil
 		},
 	)
 

@@ -517,7 +517,7 @@ func TestActor(t *testing.T) {
 			q := db.ListActorsBuilder().Limit(7).OrderBy(ActorOrderByCreatedAt, pagination.OrderByDesc)
 			err := q.Enumerate(ctx, func(result pagination.PageResult[*Actor]) (pagination.KeepGoing, error) {
 				allResults = append(allResults, result.Results...)
-				return true, nil
+				return pagination.Continue, nil
 			})
 
 			require.NoError(t, err)
