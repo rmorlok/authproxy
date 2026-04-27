@@ -2,13 +2,6 @@ basePath: /api/v1
 definitions:
   github_com_rmorlok_authproxy_internal_schema_config.KeyData:
     type: object
-  routes.ActorAnnotationJson:
-    properties:
-      key:
-        type: string
-      value:
-        type: string
-    type: object
   routes.ActorJson:
     properties:
       annotations:
@@ -28,13 +21,6 @@ definitions:
       namespace:
         type: string
       updated_at:
-        type: string
-    type: object
-  routes.ActorLabelJson:
-    properties:
-      key:
-        type: string
-      value:
         type: string
     type: object
   routes.ConnectionSetupComplete:
@@ -79,13 +65,6 @@ definitions:
       type:
         description: Response type (always "redirect")
         example: redirect
-        type: string
-    type: object
-  routes.ConnectorAnnotationJson:
-    properties:
-      key:
-        type: string
-      value:
         type: string
     type: object
   routes.CreateActorRequestJson:
@@ -141,13 +120,6 @@ definitions:
       value:
         description: Option value
         example: ws-123
-        type: string
-    type: object
-  routes.EncryptionKeyLabelJson:
-    properties:
-      key:
-        type: string
-      value:
         type: string
     type: object
   routes.ErrorResponse:
@@ -207,13 +179,6 @@ definitions:
           $ref: '#/definitions/routes.ActorJson'
         type: array
     type: object
-  routes.NamespaceLabelJson:
-    properties:
-      key:
-        type: string
-      value:
-        type: string
-    type: object
   routes.ProxyRequest:
     description: Request to proxy an HTTP request through a connection
     properties:
@@ -264,31 +229,6 @@ definitions:
         example: 200
         type: integer
     type: object
-  routes.PutActorAnnotationRequestJson:
-    properties:
-      value:
-        type: string
-    type: object
-  routes.PutActorLabelRequestJson:
-    properties:
-      value:
-        type: string
-    type: object
-  routes.PutConnectorAnnotationRequestJson:
-    properties:
-      value:
-        type: string
-    type: object
-  routes.PutEncryptionKeyLabelRequestJson:
-    properties:
-      value:
-        type: string
-    type: object
-  routes.PutNamespaceLabelRequestJson:
-    properties:
-      value:
-        type: string
-    type: object
   routes.RetryConnectionRequest:
     properties:
       return_to_url:
@@ -299,18 +239,6 @@ definitions:
     properties:
       data:
         description: Form data matching the JSON Schema provided in the form response
-    type: object
-  routes.SwaggerConnectionAnnotationJson:
-    description: Connection annotation key-value pair
-    properties:
-      key:
-        description: Annotation key
-        example: description
-        type: string
-      value:
-        description: Annotation value
-        example: Primary production connection
-        type: string
     type: object
   routes.SwaggerConnectionJson:
     description: Connection to an external service
@@ -351,18 +279,6 @@ definitions:
         type: string
       updated_at:
         description: Last update timestamp
-        type: string
-    type: object
-  routes.SwaggerConnectionLabelJson:
-    description: Connection label key-value pair
-    properties:
-      key:
-        description: Label key
-        example: env
-        type: string
-      value:
-        description: Label value
-        example: production
         type: string
     type: object
   routes.SwaggerConnectorJson:
@@ -425,18 +341,6 @@ definitions:
         description: Connector version number
         example: 1
         type: integer
-    type: object
-  routes.SwaggerConnectorLabelJson:
-    description: Connector label key-value pair
-    properties:
-      key:
-        description: Label key
-        example: env
-        type: string
-      value:
-        description: Label value
-        example: production
-        type: string
     type: object
   routes.SwaggerConnectorVersionJson:
     description: Detailed connector version information
@@ -525,18 +429,6 @@ definitions:
         description: Task ID for tracking the disconnect operation
         type: string
     type: object
-  routes.SwaggerEncryptionKeyAnnotationJson:
-    description: Encryption key annotation key-value pair
-    properties:
-      key:
-        description: Annotation key
-        example: description
-        type: string
-      value:
-        description: Annotation value
-        example: Primary encryption key
-        type: string
-    type: object
   routes.SwaggerEncryptionKeyJson:
     description: Encryption key configuration
     properties:
@@ -584,6 +476,18 @@ definitions:
         description: Target state (pending, connected, disconnecting, disconnected,
           error)
         example: connected
+        type: string
+    type: object
+  routes.SwaggerKeyValueJson:
+    description: Key-value pair (label or annotation)
+    properties:
+      key:
+        description: Key
+        example: env
+        type: string
+      value:
+        description: Value
+        example: production
         type: string
     type: object
   routes.SwaggerListConnectionResponse:
@@ -661,18 +565,6 @@ definitions:
         description: Total count of matching records (if requested)
         type: integer
     type: object
-  routes.SwaggerNamespaceAnnotationJson:
-    description: Namespace annotation key-value pair
-    properties:
-      key:
-        description: Annotation key
-        example: description
-        type: string
-      value:
-        description: Annotation value
-        example: Production namespace
-        type: string
-    type: object
   routes.SwaggerNamespaceJson:
     description: Namespace for organizing resources
     properties:
@@ -701,44 +593,12 @@ definitions:
         description: Last update timestamp
         type: string
     type: object
-  routes.SwaggerPutConnectionAnnotationRequest:
-    description: Request to set an annotation value
+  routes.SwaggerPutKeyValueRequest:
+    description: Request to set a label or annotation value
     properties:
       value:
-        description: Annotation value
-        example: Primary production connection
-        type: string
-    type: object
-  routes.SwaggerPutConnectionLabelRequest:
-    description: Request to set a label value
-    properties:
-      value:
-        description: Label value
+        description: Value to set
         example: production
-        type: string
-    type: object
-  routes.SwaggerPutConnectorLabelRequest:
-    description: Request to set a connector label value
-    properties:
-      value:
-        description: Label value
-        example: production
-        type: string
-    type: object
-  routes.SwaggerPutEncryptionKeyAnnotationRequest:
-    description: Request to set an encryption key annotation value
-    properties:
-      value:
-        description: Annotation value
-        example: Primary encryption key
-        type: string
-    type: object
-  routes.SwaggerPutNamespaceAnnotationRequest:
-    description: Request to set a namespace annotation value
-    properties:
-      value:
-        description: Annotation value
-        example: Production namespace
         type: string
     type: object
   routes.SwaggerRequestLogEntry:
@@ -1117,8 +977,6 @@ paths:
       - actors
   /actors/{id}/annotations:
     get:
-      consumes:
-      - application/json
       description: Get all annotations for an actor by ID
       parameters:
       - description: Actor UUID
@@ -1158,8 +1016,6 @@ paths:
       - actors
   /actors/{id}/annotations/{annotation}:
     delete:
-      consumes:
-      - application/json
       description: Delete a specific annotation by key from an actor
       parameters:
       - description: Actor UUID
@@ -1172,8 +1028,6 @@ paths:
         name: annotation
         required: true
         type: string
-      produces:
-      - application/json
       responses:
         "204":
           description: No Content
@@ -1199,8 +1053,6 @@ paths:
       tags:
       - actors
     get:
-      consumes:
-      - application/json
       description: Get a specific annotation value by key for an actor
       parameters:
       - description: Actor UUID
@@ -1219,7 +1071,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ActorAnnotationJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -1261,14 +1113,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.PutActorAnnotationRequestJson'
+          $ref: '#/definitions/routes.SwaggerPutKeyValueRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ActorAnnotationJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -1296,8 +1148,6 @@ paths:
       - actors
   /actors/{id}/labels:
     get:
-      consumes:
-      - application/json
       description: Get all labels associated with a specific actor
       parameters:
       - description: Actor UUID
@@ -1337,8 +1187,6 @@ paths:
       - actors
   /actors/{id}/labels/{label}:
     delete:
-      consumes:
-      - application/json
       description: Delete a specific label by key from an actor
       parameters:
       - description: Actor UUID
@@ -1351,8 +1199,6 @@ paths:
         name: label
         required: true
         type: string
-      produces:
-      - application/json
       responses:
         "204":
           description: No Content
@@ -1378,8 +1224,6 @@ paths:
       tags:
       - actors
     get:
-      consumes:
-      - application/json
       description: Get a specific label value by key for an actor
       parameters:
       - description: Actor UUID
@@ -1398,7 +1242,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ActorLabelJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -1440,14 +1284,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.PutActorLabelRequestJson'
+          $ref: '#/definitions/routes.SwaggerPutKeyValueRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ActorLabelJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -2186,8 +2030,6 @@ paths:
       - connections
   /connections/{id}/annotations:
     get:
-      consumes:
-      - application/json
       description: Get all annotations associated with a specific connection
       parameters:
       - description: Connection UUID
@@ -2227,8 +2069,6 @@ paths:
       - connections
   /connections/{id}/annotations/{annotation}:
     delete:
-      consumes:
-      - application/json
       description: Delete a specific annotation by key from a connection
       parameters:
       - description: Connection UUID
@@ -2241,8 +2081,6 @@ paths:
         name: annotation
         required: true
         type: string
-      produces:
-      - application/json
       responses:
         "204":
           description: No Content
@@ -2268,8 +2106,6 @@ paths:
       tags:
       - connections
     get:
-      consumes:
-      - application/json
       description: Get a specific annotation value by key for a connection
       parameters:
       - description: Connection UUID
@@ -2288,7 +2124,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.SwaggerConnectionAnnotationJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -2330,14 +2166,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.SwaggerPutConnectionAnnotationRequest'
+          $ref: '#/definitions/routes.SwaggerPutKeyValueRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.SwaggerConnectionAnnotationJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -2365,8 +2201,6 @@ paths:
       - connections
   /connections/{id}/labels:
     get:
-      consumes:
-      - application/json
       description: Get all labels associated with a specific connection
       parameters:
       - description: Connection UUID
@@ -2406,8 +2240,6 @@ paths:
       - connections
   /connections/{id}/labels/{label}:
     delete:
-      consumes:
-      - application/json
       description: Delete a specific label by key from a connection
       parameters:
       - description: Connection UUID
@@ -2420,8 +2252,6 @@ paths:
         name: label
         required: true
         type: string
-      produces:
-      - application/json
       responses:
         "204":
           description: No Content
@@ -2447,8 +2277,6 @@ paths:
       tags:
       - connections
     get:
-      consumes:
-      - application/json
       description: Get a specific label value by key for a connection
       parameters:
       - description: Connection UUID
@@ -2467,7 +2295,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.SwaggerConnectionLabelJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -2509,14 +2337,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.SwaggerPutConnectionLabelRequest'
+          $ref: '#/definitions/routes.SwaggerPutKeyValueRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.SwaggerConnectionLabelJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -2827,7 +2655,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectorAnnotationJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -2870,14 +2698,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.PutConnectorAnnotationRequestJson'
+          $ref: '#/definitions/routes.SwaggerPutKeyValueRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectorAnnotationJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -3009,7 +2837,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.SwaggerConnectorLabelJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -3052,14 +2880,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.SwaggerPutConnectorLabelRequest'
+          $ref: '#/definitions/routes.SwaggerPutKeyValueRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.SwaggerConnectorLabelJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -3475,7 +3303,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectorAnnotationJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -3523,14 +3351,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.PutConnectorAnnotationRequestJson'
+          $ref: '#/definitions/routes.SwaggerPutKeyValueRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ConnectorAnnotationJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -3683,7 +3511,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.SwaggerConnectorLabelJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -3731,14 +3559,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.SwaggerPutConnectorLabelRequest'
+          $ref: '#/definitions/routes.SwaggerPutKeyValueRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.SwaggerConnectorLabelJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -3974,8 +3802,6 @@ paths:
       - encryption_keys
   /encryption-keys/{id}/annotations:
     get:
-      consumes:
-      - application/json
       description: Get all annotations associated with a specific encryption key
       parameters:
       - description: Encryption key ID
@@ -4015,8 +3841,6 @@ paths:
       - encryption_keys
   /encryption-keys/{id}/annotations/{annotation}:
     delete:
-      consumes:
-      - application/json
       description: Delete a specific annotation by key from an encryption key
       parameters:
       - description: Encryption key ID
@@ -4029,8 +3853,6 @@ paths:
         name: annotation
         required: true
         type: string
-      produces:
-      - application/json
       responses:
         "204":
           description: No Content
@@ -4040,6 +3862,10 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/routes.ErrorResponse'
         "500":
@@ -4052,8 +3878,6 @@ paths:
       tags:
       - encryption_keys
     get:
-      consumes:
-      - application/json
       description: Get a specific annotation value by key for an encryption key
       parameters:
       - description: Encryption key ID
@@ -4072,7 +3896,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.SwaggerEncryptionKeyAnnotationJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -4115,20 +3939,24 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.SwaggerPutEncryptionKeyAnnotationRequest'
+          $ref: '#/definitions/routes.SwaggerPutKeyValueRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.SwaggerEncryptionKeyAnnotationJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/routes.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/routes.ErrorResponse'
         "404":
@@ -4146,8 +3974,6 @@ paths:
       - encryption_keys
   /encryption-keys/{id}/labels:
     get:
-      consumes:
-      - application/json
       description: Get all labels associated with a specific encryption key
       parameters:
       - description: Encryption key ID
@@ -4187,8 +4013,6 @@ paths:
       - encryption_keys
   /encryption-keys/{id}/labels/{label}:
     delete:
-      consumes:
-      - application/json
       description: Delete a specific label by key from an encryption key
       parameters:
       - description: Encryption key ID
@@ -4201,8 +4025,6 @@ paths:
         name: label
         required: true
         type: string
-      produces:
-      - application/json
       responses:
         "204":
           description: No Content
@@ -4212,6 +4034,10 @@ paths:
             $ref: '#/definitions/routes.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/routes.ErrorResponse'
         "500":
@@ -4224,8 +4050,6 @@ paths:
       tags:
       - encryption_keys
     get:
-      consumes:
-      - application/json
       description: Get a specific label value by key for an encryption key
       parameters:
       - description: Encryption key ID
@@ -4244,7 +4068,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.EncryptionKeyLabelJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -4286,20 +4110,24 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.PutEncryptionKeyLabelRequestJson'
+          $ref: '#/definitions/routes.SwaggerPutKeyValueRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.EncryptionKeyLabelJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
             $ref: '#/definitions/routes.ErrorResponse'
         "401":
           description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
           schema:
             $ref: '#/definitions/routes.ErrorResponse'
         "404":
@@ -4497,8 +4325,6 @@ paths:
       - namespaces
   /namespaces/{path}/annotations:
     get:
-      consumes:
-      - application/json
       description: Get all annotations associated with a specific namespace
       parameters:
       - description: Namespace path
@@ -4538,8 +4364,6 @@ paths:
       - namespaces
   /namespaces/{path}/annotations/{annotation}:
     delete:
-      consumes:
-      - application/json
       description: Delete a specific annotation by key from a namespace
       parameters:
       - description: Namespace path
@@ -4552,8 +4376,6 @@ paths:
         name: annotation
         required: true
         type: string
-      produces:
-      - application/json
       responses:
         "204":
           description: No Content
@@ -4579,8 +4401,6 @@ paths:
       tags:
       - namespaces
     get:
-      consumes:
-      - application/json
       description: Get a specific annotation value by key for a namespace
       parameters:
       - description: Namespace path
@@ -4599,7 +4419,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.SwaggerNamespaceAnnotationJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -4641,14 +4461,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.SwaggerPutNamespaceAnnotationRequest'
+          $ref: '#/definitions/routes.SwaggerPutKeyValueRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.SwaggerNamespaceAnnotationJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -4676,8 +4496,6 @@ paths:
       - namespaces
   /namespaces/{path}/labels:
     get:
-      consumes:
-      - application/json
       description: Get all labels associated with a specific namespace
       parameters:
       - description: Namespace path
@@ -4717,8 +4535,6 @@ paths:
       - namespaces
   /namespaces/{path}/labels/{label}:
     delete:
-      consumes:
-      - application/json
       description: Delete a specific label by key from a namespace
       parameters:
       - description: Namespace path
@@ -4731,8 +4547,6 @@ paths:
         name: label
         required: true
         type: string
-      produces:
-      - application/json
       responses:
         "204":
           description: No Content
@@ -4758,8 +4572,6 @@ paths:
       tags:
       - namespaces
     get:
-      consumes:
-      - application/json
       description: Get a specific label value by key for a namespace
       parameters:
       - description: Namespace path
@@ -4778,7 +4590,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.NamespaceLabelJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:
@@ -4820,14 +4632,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.PutNamespaceLabelRequestJson'
+          $ref: '#/definitions/routes.SwaggerPutKeyValueRequest'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.NamespaceLabelJson'
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
         "400":
           description: Bad Request
           schema:

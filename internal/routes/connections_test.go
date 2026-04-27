@@ -24,6 +24,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/routes/labels"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
@@ -801,7 +802,7 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ConnectionLabelJson
+			var resp labels.KeyValueJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "env", resp.Key)
@@ -917,7 +918,7 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ConnectionLabelJson
+			var resp labels.KeyValueJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "env", resp.Key)
@@ -945,7 +946,7 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ConnectionLabelJson
+			var resp labels.KeyValueJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "env", resp.Key)
@@ -1424,7 +1425,7 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ConnectionAnnotationJson
+			var resp labels.KeyValueJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "note", resp.Key)
@@ -1523,7 +1524,7 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ConnectionAnnotationJson
+			var resp labels.KeyValueJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "note", resp.Key)

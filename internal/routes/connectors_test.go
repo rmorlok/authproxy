@@ -22,6 +22,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/routes/labels"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
@@ -1151,7 +1152,7 @@ func TestConnectors(t *testing.T) {
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp ConnectorLabelJson
+				var resp labels.KeyValueJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Equal(t, "type", resp.Key)
@@ -1179,7 +1180,7 @@ func TestConnectors(t *testing.T) {
 		t.Run("put label", func(t *testing.T) {
 			t.Run("bad uuid", func(t *testing.T) {
 				tu := setup(t, nil)
-				body := PutConnectorLabelRequestJson{Value: "val"}
+				body := labels.PutKeyValueRequestJson{Value: "val"}
 				jsonBody, _ := json.Marshal(body)
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1199,7 +1200,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("invalid key", func(t *testing.T) {
 				tu := setup(t, nil)
-				body := PutConnectorLabelRequestJson{Value: "val"}
+				body := labels.PutKeyValueRequestJson{Value: "val"}
 				jsonBody, _ := json.Marshal(body)
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1219,7 +1220,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("not found", func(t *testing.T) {
 				tu := setup(t, nil)
-				body := PutConnectorLabelRequestJson{Value: "val"}
+				body := labels.PutKeyValueRequestJson{Value: "val"}
 				jsonBody, _ := json.Marshal(body)
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1239,7 +1240,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("valid - creates draft and sets label", func(t *testing.T) {
 				tu := setup(t, nil)
-				body := PutConnectorLabelRequestJson{Value: "production"}
+				body := labels.PutKeyValueRequestJson{Value: "production"}
 				jsonBody, _ := json.Marshal(body)
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1256,7 +1257,7 @@ func TestConnectors(t *testing.T) {
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp ConnectorLabelJson
+				var resp labels.KeyValueJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Equal(t, "env", resp.Key)
@@ -1402,7 +1403,7 @@ func TestConnectors(t *testing.T) {
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp ConnectorLabelJson
+				var resp labels.KeyValueJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Equal(t, "type", resp.Key)
@@ -1430,7 +1431,7 @@ func TestConnectors(t *testing.T) {
 		t.Run("put version label", func(t *testing.T) {
 			t.Run("conflict - not a draft", func(t *testing.T) {
 				tu := setup(t, nil)
-				body := PutConnectorLabelRequestJson{Value: "val"}
+				body := labels.PutKeyValueRequestJson{Value: "val"}
 				jsonBody, _ := json.Marshal(body)
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1471,7 +1472,7 @@ func TestConnectors(t *testing.T) {
 				draftVersion := createResp.Version
 
 				// Put a label on the draft version
-				body := PutConnectorLabelRequestJson{Value: "staging"}
+				body := labels.PutKeyValueRequestJson{Value: "staging"}
 				jsonBody, _ := json.Marshal(body)
 				w = httptest.NewRecorder()
 				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1488,7 +1489,7 @@ func TestConnectors(t *testing.T) {
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp ConnectorLabelJson
+				var resp labels.KeyValueJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Equal(t, "env", resp.Key)
@@ -1794,7 +1795,7 @@ func TestConnectors(t *testing.T) {
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp ConnectorAnnotationJson
+				var resp labels.KeyValueJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Equal(t, "my-annotation", resp.Key)
@@ -1822,7 +1823,7 @@ func TestConnectors(t *testing.T) {
 		t.Run("put annotation", func(t *testing.T) {
 			t.Run("valid", func(t *testing.T) {
 				tu := setup(t, nil)
-				body := PutConnectorAnnotationRequestJson{Value: "production"}
+				body := labels.PutKeyValueRequestJson{Value: "production"}
 				jsonBody, _ := json.Marshal(body)
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1839,7 +1840,7 @@ func TestConnectors(t *testing.T) {
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp ConnectorAnnotationJson
+				var resp labels.KeyValueJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Equal(t, "env", resp.Key)
@@ -1848,7 +1849,7 @@ func TestConnectors(t *testing.T) {
 
 			t.Run("valid - creates draft and sets annotation", func(t *testing.T) {
 				tu := setup(t, nil)
-				body := PutConnectorAnnotationRequestJson{Value: "my-description"}
+				body := labels.PutKeyValueRequestJson{Value: "my-description"}
 				jsonBody, _ := json.Marshal(body)
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1865,7 +1866,7 @@ func TestConnectors(t *testing.T) {
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp ConnectorAnnotationJson
+				var resp labels.KeyValueJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Equal(t, "description", resp.Key)
@@ -1897,7 +1898,7 @@ func TestConnectors(t *testing.T) {
 				tu := setup(t, nil)
 
 				// First put an annotation
-				body := PutConnectorAnnotationRequestJson{Value: "to-delete"}
+				body := labels.PutKeyValueRequestJson{Value: "to-delete"}
 				jsonBody, _ := json.Marshal(body)
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -1933,7 +1934,7 @@ func TestConnectors(t *testing.T) {
 				tu := setup(t, nil)
 
 				// First put an annotation so it exists (this creates draft version 2)
-				body := PutConnectorAnnotationRequestJson{Value: "will-be-removed"}
+				body := labels.PutKeyValueRequestJson{Value: "will-be-removed"}
 				jsonBody, _ := json.Marshal(body)
 				w := httptest.NewRecorder()
 				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -2038,7 +2039,7 @@ func TestConnectors(t *testing.T) {
 				draftVersion := createResp.Version
 
 				// Put an annotation on the draft
-				body := PutConnectorAnnotationRequestJson{Value: "draft-value"}
+				body := labels.PutKeyValueRequestJson{Value: "draft-value"}
 				jsonBody, _ := json.Marshal(body)
 				w = httptest.NewRecorder()
 				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -2069,7 +2070,7 @@ func TestConnectors(t *testing.T) {
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp ConnectorAnnotationJson
+				var resp labels.KeyValueJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Equal(t, "info", resp.Key)
@@ -2118,7 +2119,7 @@ func TestConnectors(t *testing.T) {
 				draftVersion := createResp.Version
 
 				// Put an annotation on the draft version
-				body := PutConnectorAnnotationRequestJson{Value: "staging"}
+				body := labels.PutKeyValueRequestJson{Value: "staging"}
 				jsonBody, _ := json.Marshal(body)
 				w = httptest.NewRecorder()
 				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
@@ -2135,7 +2136,7 @@ func TestConnectors(t *testing.T) {
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusOK, w.Code)
 
-				var resp ConnectorAnnotationJson
+				var resp labels.KeyValueJson
 				err = json.Unmarshal(w.Body.Bytes(), &resp)
 				require.NoError(t, err)
 				require.Equal(t, "env", resp.Key)
@@ -2167,7 +2168,7 @@ func TestConnectors(t *testing.T) {
 				draftVersion := createResp.Version
 
 				// Put an annotation on the draft
-				body := PutConnectorAnnotationRequestJson{Value: "to-delete"}
+				body := labels.PutKeyValueRequestJson{Value: "to-delete"}
 				jsonBody, _ := json.Marshal(body)
 				w = httptest.NewRecorder()
 				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(

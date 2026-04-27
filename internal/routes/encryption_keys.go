@@ -1,20 +1,22 @@
 package routes
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
 	"time"
 
 	"github.com/gin-gonic/gin"
-	"github.com/rmorlok/authproxy/internal/apgin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/httperr"
+	"github.com/rmorlok/authproxy/internal/routes/labels"
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -57,24 +59,6 @@ type ListEncryptionKeysResponseJson struct {
 	Cursor string              `json:"cursor,omitempty"`
 }
 
-type PutEncryptionKeyLabelRequestJson struct {
-	Value string `json:"value"`
-}
-
-type EncryptionKeyLabelJson struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
-type PutEncryptionKeyAnnotationRequestJson struct {
-	Value string `json:"value"`
-}
-
-type EncryptionKeyAnnotationJson struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
 func EncryptionKeyToJson(ek coreIface.EncryptionKey) EncryptionKeyJson {
 	return EncryptionKeyJson{
 		Id:          ek.GetId(),
@@ -88,9 +72,11 @@ func EncryptionKeyToJson(ek coreIface.EncryptionKey) EncryptionKeyJson {
 }
 
 type EncryptionKeysRoutes struct {
-	cfg         config.C
-	core        coreIface.C
-	authService auth.A
+	cfg           config.C
+	core          coreIface.C
+	authService   auth.A
+	labelsAdapter labels.Adapter[apid.ID]
+	annotsAdapter labels.Adapter[apid.ID]
 }
 
 // @Summary		Get encryption key
@@ -488,551 +474,131 @@ func (r *EncryptionKeysRoutes) delete(gctx *gin.Context) {
 	gctx.Status(http.StatusNoContent)
 }
 
+// Label and annotation handlers for encryption keys delegate to a shared
+// generic adapter (see internal/routes/labels). The doc comments below
+// drive the OpenAPI spec; the bodies forward to the adapter.
+
 // @Summary		Get all labels for an encryption key
 // @Description	Get all labels associated with a specific encryption key
 // @Tags			encryption_keys
-// @Accept			json
 // @Produce		json
 // @Param			id	path		string	true	"Encryption key ID"
-// @Success		200		{object}	map[string]string
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		404		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
+// @Success		200	{object}	map[string]string
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		404	{object}	ErrorResponse
+// @Failure		500	{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/encryption-keys/{id}/labels [get]
-func (r *EncryptionKeysRoutes) getLabels(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	id := apid.ID(gctx.Param("id"))
-
-	if id.IsNil() {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	ek, err := r.core.GetEncryptionKey(ctx, id)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
-			val.MarkErrorReturn()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	labels := ek.GetLabels()
-	if labels == nil {
-		labels = make(map[string]string)
-	}
-
-	gctx.PureJSON(http.StatusOK, labels)
-}
+func (r *EncryptionKeysRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.HandleList(gctx) }
 
 // @Summary		Get a specific label for an encryption key
 // @Description	Get a specific label value by key for an encryption key
 // @Tags			encryption_keys
-// @Accept			json
 // @Produce		json
 // @Param			id		path		string	true	"Encryption key ID"
 // @Param			label	path		string	true	"Label key"
-// @Success		200		{object}	EncryptionKeyLabelJson
+// @Success		200		{object}	SwaggerKeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/encryption-keys/{id}/labels/{label} [get]
-func (r *EncryptionKeysRoutes) getLabel(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	id := apid.ID(gctx.Param("id"))
-
-	if id.IsNil() {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	labelKey := gctx.Param("label")
-	if labelKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	ek, err := r.core.GetEncryptionKey(ctx, id)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
-			val.MarkErrorReturn()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	labels := ek.GetLabels()
-	value, exists := labels[labelKey]
-	if !exists {
-		apgin.WriteError(gctx, nil, httperr.NotFoundf("label '%s' not found", labelKey))
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.PureJSON(http.StatusOK, EncryptionKeyLabelJson{
-		Key:   labelKey,
-		Value: value,
-	})
-}
+func (r *EncryptionKeysRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.HandleGet(gctx) }
 
 // @Summary		Set a label for an encryption key
 // @Description	Set or update a specific label value by key for an encryption key
 // @Tags			encryption_keys
 // @Accept			json
 // @Produce		json
-// @Param			id		path		string								true	"Encryption key ID"
-// @Param			label	path		string								true	"Label key"
-// @Param			request	body		PutEncryptionKeyLabelRequestJson	true	"Label value"
-// @Success		200		{object}	EncryptionKeyLabelJson
+// @Param			id		path		string						true	"Encryption key ID"
+// @Param			label	path		string						true	"Label key"
+// @Param			request	body		SwaggerPutKeyValueRequest	true	"Label value"
+// @Success		200		{object}	SwaggerKeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/encryption-keys/{id}/labels/{label} [put]
-func (r *EncryptionKeysRoutes) putLabel(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	id := apid.ID(gctx.Param("id"))
-
-	if id.IsNil() {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	labelKey := gctx.Param("label")
-	if labelKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if err := database.ValidateLabelKey(labelKey); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid label key: %s", err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	var req PutEncryptionKeyLabelRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if err := database.ValidateLabelValue(req.Value); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid label value: %s", err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	// Get existing key for authorization check
-	ek, err := r.core.GetEncryptionKey(ctx, id)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
-			val.MarkErrorReturn()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	updatedEk, err := r.core.PutEncryptionKeyLabels(ctx, id, map[string]string{labelKey: req.Value})
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
-			val.MarkErrorReturn()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.PureJSON(http.StatusOK, EncryptionKeyLabelJson{
-		Key:   labelKey,
-		Value: updatedEk.GetLabels()[labelKey],
-	})
-}
+func (r *EncryptionKeysRoutes) putLabel(gctx *gin.Context) { r.labelsAdapter.HandlePut(gctx) }
 
 // @Summary		Delete a label from an encryption key
 // @Description	Delete a specific label by key from an encryption key
 // @Tags			encryption_keys
-// @Accept			json
-// @Produce		json
 // @Param			id		path	string	true	"Encryption key ID"
 // @Param			label	path	string	true	"Label key"
 // @Success		204		"No Content"
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/encryption-keys/{id}/labels/{label} [delete]
-func (r *EncryptionKeysRoutes) deleteLabel(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	id := apid.ID(gctx.Param("id"))
-
-	if id.IsNil() {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	labelKey := gctx.Param("label")
-	if labelKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	// Get existing key for authorization check
-	ek, err := r.core.GetEncryptionKey(ctx, id)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			gctx.Status(http.StatusNoContent)
-			val.MarkValidated()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	_, err = r.core.DeleteEncryptionKeyLabels(ctx, id, []string{labelKey})
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			gctx.Status(http.StatusNoContent)
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.Status(http.StatusNoContent)
-}
+func (r *EncryptionKeysRoutes) deleteLabel(gctx *gin.Context) { r.labelsAdapter.HandleDelete(gctx) }
 
 // @Summary		Get all annotations for an encryption key
 // @Description	Get all annotations associated with a specific encryption key
 // @Tags			encryption_keys
-// @Accept			json
 // @Produce		json
 // @Param			id	path		string	true	"Encryption key ID"
-// @Success		200		{object}	map[string]string
-// @Failure		400		{object}	ErrorResponse
-// @Failure		401		{object}	ErrorResponse
-// @Failure		404		{object}	ErrorResponse
-// @Failure		500		{object}	ErrorResponse
+// @Success		200	{object}	map[string]string
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		404	{object}	ErrorResponse
+// @Failure		500	{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/encryption-keys/{id}/annotations [get]
-func (r *EncryptionKeysRoutes) getAnnotations(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	id := apid.ID(gctx.Param("id"))
-
-	if id.IsNil() {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	ek, err := r.core.GetEncryptionKey(ctx, id)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
-			val.MarkErrorReturn()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	annotations := ek.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-
-	gctx.PureJSON(http.StatusOK, annotations)
-}
+func (r *EncryptionKeysRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapter.HandleList(gctx) }
 
 // @Summary		Get a specific annotation for an encryption key
 // @Description	Get a specific annotation value by key for an encryption key
 // @Tags			encryption_keys
-// @Accept			json
 // @Produce		json
 // @Param			id			path		string	true	"Encryption key ID"
 // @Param			annotation	path		string	true	"Annotation key"
-// @Success		200			{object}	SwaggerEncryptionKeyAnnotationJson
+// @Success		200			{object}	SwaggerKeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		404			{object}	ErrorResponse
 // @Failure		500			{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/encryption-keys/{id}/annotations/{annotation} [get]
-func (r *EncryptionKeysRoutes) getAnnotation(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	id := apid.ID(gctx.Param("id"))
-
-	if id.IsNil() {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	annotationKey := gctx.Param("annotation")
-	if annotationKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	ek, err := r.core.GetEncryptionKey(ctx, id)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
-			val.MarkErrorReturn()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	annotations := ek.GetAnnotations()
-	value, exists := annotations[annotationKey]
-	if !exists {
-		apgin.WriteError(gctx, nil, httperr.NotFoundf("annotation '%s' not found", annotationKey))
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.PureJSON(http.StatusOK, EncryptionKeyAnnotationJson{
-		Key:   annotationKey,
-		Value: value,
-	})
-}
+func (r *EncryptionKeysRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleGet(gctx) }
 
 // @Summary		Set an annotation for an encryption key
 // @Description	Set or update a specific annotation value by key for an encryption key
 // @Tags			encryption_keys
 // @Accept			json
 // @Produce		json
-// @Param			id			path		string										true	"Encryption key ID"
-// @Param			annotation	path		string										true	"Annotation key"
-// @Param			request		body		SwaggerPutEncryptionKeyAnnotationRequest	true	"Annotation value"
-// @Success		200			{object}	SwaggerEncryptionKeyAnnotationJson
+// @Param			id			path		string						true	"Encryption key ID"
+// @Param			annotation	path		string						true	"Annotation key"
+// @Param			request		body		SwaggerPutKeyValueRequest	true	"Annotation value"
+// @Success		200			{object}	SwaggerKeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
+// @Failure		403			{object}	ErrorResponse
 // @Failure		404			{object}	ErrorResponse
 // @Failure		500			{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/encryption-keys/{id}/annotations/{annotation} [put]
-func (r *EncryptionKeysRoutes) putAnnotation(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	id := apid.ID(gctx.Param("id"))
-
-	if id.IsNil() {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	annotationKey := gctx.Param("annotation")
-	if annotationKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if err := database.ValidateAnnotationKey(annotationKey); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotation key: %s", err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	var req PutEncryptionKeyAnnotationRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if err := database.ValidateAnnotationValue(req.Value); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotation value: %s", err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	// Get existing key for authorization check
-	ek, err := r.core.GetEncryptionKey(ctx, id)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
-			val.MarkErrorReturn()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	updatedEk, err := r.core.PutEncryptionKeyAnnotations(ctx, id, map[string]string{annotationKey: req.Value})
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))
-			val.MarkErrorReturn()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.PureJSON(http.StatusOK, EncryptionKeyAnnotationJson{
-		Key:   annotationKey,
-		Value: updatedEk.GetAnnotations()[annotationKey],
-	})
-}
+func (r *EncryptionKeysRoutes) putAnnotation(gctx *gin.Context) { r.annotsAdapter.HandlePut(gctx) }
 
 // @Summary		Delete an annotation from an encryption key
 // @Description	Delete a specific annotation by key from an encryption key
 // @Tags			encryption_keys
-// @Accept			json
-// @Produce		json
 // @Param			id			path	string	true	"Encryption key ID"
 // @Param			annotation	path	string	true	"Annotation key"
 // @Success		204			"No Content"
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
+// @Failure		403			{object}	ErrorResponse
 // @Failure		500			{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/encryption-keys/{id}/annotations/{annotation} [delete]
-func (r *EncryptionKeysRoutes) deleteAnnotation(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	id := apid.ID(gctx.Param("id"))
-
-	if id.IsNil() {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	annotationKey := gctx.Param("annotation")
-	if annotationKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	// Get existing key for authorization check
-	ek, err := r.core.GetEncryptionKey(ctx, id)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			gctx.Status(http.StatusNoContent)
-			val.MarkValidated()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(ek); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	_, err = r.core.DeleteEncryptionKeyAnnotations(ctx, id, []string{annotationKey})
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			gctx.Status(http.StatusNoContent)
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.Status(http.StatusNoContent)
-}
+func (r *EncryptionKeysRoutes) deleteAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleDelete(gctx) }
 
 func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 	g.GET(
@@ -1166,9 +732,80 @@ func (r *EncryptionKeysRoutes) Register(g gin.IRouter) {
 }
 
 func NewEncryptionKeysRoutes(cfg config.C, authService auth.A, c coreIface.C) *EncryptionKeysRoutes {
+	parseEncryptionKeyID := func(gctx *gin.Context) (apid.ID, *httperr.Error) {
+		id := apid.ID(gctx.Param("id"))
+		if id.IsNil() {
+			return apid.Nil, httperr.BadRequest("id is required")
+		}
+		return id, nil
+	}
+
+	getEncryptionKey := func(ctx context.Context, id apid.ID) (labels.Resource, error) {
+		ek, err := c.GetEncryptionKey(ctx, id)
+		if err != nil {
+			if errors.Is(err, core.ErrNotFound) {
+				return nil, database.ErrNotFound
+			}
+			return nil, err
+		}
+		if ek == nil {
+			return nil, nil
+		}
+		return ek, nil
+	}
+
+	idExtractor := func(ek interface{}) string { return string(ek.(coreIface.EncryptionKey).GetId()) }
+
+	authGet := authService.NewRequiredBuilder().
+		ForResource("encryption_keys").
+		ForIdField("id").
+		ForIdExtractor(idExtractor).
+		ForVerb("get").
+		Build()
+	authMutate := authService.NewRequiredBuilder().
+		ForResource("encryption_keys").
+		ForIdField("id").
+		ForIdExtractor(idExtractor).
+		ForVerb("update").
+		Build()
+
+	labelsAdapter := labels.Adapter[apid.ID]{
+		Kind:         labels.Label,
+		ResourceName: "encryption key",
+		PathPrefix:   "/encryption-keys/:id",
+		AuthGet:      authGet,
+		AuthMutate:   authMutate,
+		ParseID:      parseEncryptionKeyID,
+		Get:          getEncryptionKey,
+		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (labels.Resource, error) {
+			return c.PutEncryptionKeyLabels(ctx, id, kv)
+		},
+		Delete: func(ctx context.Context, id apid.ID, keys []string) (labels.Resource, error) {
+			return c.DeleteEncryptionKeyLabels(ctx, id, keys)
+		},
+	}
+
+	annotsAdapter := labels.Adapter[apid.ID]{
+		Kind:         labels.Annotation,
+		ResourceName: "encryption key",
+		PathPrefix:   "/encryption-keys/:id",
+		AuthGet:      authGet,
+		AuthMutate:   authMutate,
+		ParseID:      parseEncryptionKeyID,
+		Get:          getEncryptionKey,
+		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (labels.Resource, error) {
+			return c.PutEncryptionKeyAnnotations(ctx, id, kv)
+		},
+		Delete: func(ctx context.Context, id apid.ID, keys []string) (labels.Resource, error) {
+			return c.DeleteEncryptionKeyAnnotations(ctx, id, keys)
+		},
+	}
+
 	return &EncryptionKeysRoutes{
-		cfg:         cfg,
-		authService: authService,
-		core:        c,
+		cfg:           cfg,
+		authService:   authService,
+		core:          c,
+		labelsAdapter: labelsAdapter,
+		annotsAdapter: annotsAdapter,
 	}
 }

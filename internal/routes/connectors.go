@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"errors"
 	"net/http"
 	"strconv"
@@ -10,11 +11,12 @@ import (
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	connIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/httperr"
+	"github.com/rmorlok/authproxy/internal/routes/labels"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -151,32 +153,21 @@ type CreateConnectorVersionRequestJson struct {
 	Annotations *map[string]string `json:"annotations,omitempty"`
 }
 
-// ConnectorLabelJson is a single label key-value pair for a connector
-type ConnectorLabelJson struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
-// PutConnectorLabelRequestJson is the request body for PUT /connectors/:id/labels/:label
-type PutConnectorLabelRequestJson struct {
-	Value string `json:"value"`
-}
-
-// ConnectorAnnotationJson is a single annotation key-value pair for a connector
-type ConnectorAnnotationJson struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
-// PutConnectorAnnotationRequestJson is the request body for PUT /connectors/:id/annotations/:annotation
-type PutConnectorAnnotationRequestJson struct {
-	Value string `json:"value"`
+// connectorVersionID is the composite identifier used by the version-level
+// label/annotation adapters.
+type connectorVersionID struct {
+	ConnectorID apid.ID
+	Version     uint64
 }
 
 type ConnectorsRoutes struct {
-	cfg         config.C
-	connectors  connIface.C
-	authService auth.A
+	cfg                  config.C
+	connectors           connIface.C
+	authService          auth.A
+	labelsAdapter        labels.Adapter[apid.ID]
+	annotsAdapter        labels.Adapter[apid.ID]
+	versionLabelsAdapter labels.Adapter[connectorVersionID]
+	versionAnnotsAdapter labels.Adapter[connectorVersionID]
 }
 
 // @Summary		Get connector
@@ -1004,62 +995,7 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 // @Failure		500	{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connectors/{id}/labels [get]
-func (r *ConnectorsRoutes) getLabels(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	result := r.connectors.
-		ListConnectorsBuilder().
-		ForId(connectorId).
-		Limit(1).
-		FetchPage(ctx)
-
-	if result.Error != nil {
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(result.Error)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if len(result.Results) == 0 {
-		apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
-		val.MarkErrorReturn()
-		return
-	}
-
-	c := result.Results[0]
-
-	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	labels := c.GetLabels()
-	if labels == nil {
-		labels = make(map[string]string)
-	}
-
-	gctx.PureJSON(http.StatusOK, labels)
-}
+func (r *ConnectorsRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.HandleList(gctx) }
 
 // @Summary		Get a specific label for a connector
 // @Description	Get a specific label value by key for the primary version of a connector
@@ -1068,92 +1004,24 @@ func (r *ConnectorsRoutes) getLabels(gctx *gin.Context) {
 // @Produce		json
 // @Param			id		path		string	true	"Connector UUID"
 // @Param			label	path		string	true	"Label key"
-// @Success		200		{object}	SwaggerConnectorLabelJson
+// @Success		200		{object}	SwaggerKeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connectors/{id}/labels/{label} [get]
-func (r *ConnectorsRoutes) getLabel(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	labelKey := gctx.Param("label")
-	if labelKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	result := r.connectors.
-		ListConnectorsBuilder().
-		ForId(connectorId).
-		Limit(1).
-		FetchPage(ctx)
-
-	if result.Error != nil {
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(result.Error)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if len(result.Results) == 0 {
-		apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
-		val.MarkErrorReturn()
-		return
-	}
-
-	c := result.Results[0]
-
-	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	labels := c.GetLabels()
-	value, exists := labels[labelKey]
-	if !exists {
-		apgin.WriteError(gctx, nil, httperr.NotFoundf("label '%s' not found", labelKey))
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.PureJSON(http.StatusOK, ConnectorLabelJson{
-		Key:   labelKey,
-		Value: value,
-	})
-}
+func (r *ConnectorsRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.HandleGet(gctx) }
 
 // @Summary		Set a label for a connector
 // @Description	Set or update a specific label on a connector's draft version, creating one if needed
 // @Tags			connectors
 // @Accept			json
 // @Produce		json
-// @Param			id		path		string								true	"Connector UUID"
-// @Param			label	path		string								true	"Label key"
-// @Param			request	body		SwaggerPutConnectorLabelRequest		true	"Label value"
-// @Success		200		{object}	SwaggerConnectorLabelJson
+// @Param			id		path		string						true	"Connector UUID"
+// @Param			label	path		string						true	"Label key"
+// @Param			request	body		SwaggerPutKeyValueRequest	true	"Label value"
+// @Success		200		{object}	SwaggerKeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -1161,91 +1029,7 @@ func (r *ConnectorsRoutes) getLabel(gctx *gin.Context) {
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connectors/{id}/labels/{label} [put]
-func (r *ConnectorsRoutes) putLabel(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	labelKey := gctx.Param("label")
-	if labelKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if err := database.ValidateLabelKey(labelKey); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid label key: %s", err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	var req PutConnectorLabelRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if err := database.ValidateLabelValue(req.Value); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid label value: %s", err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	draft, err := r.connectors.GetOrCreateDraftConnectorVersion(ctx, connectorId)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
-			val.MarkErrorReturn()
-			return
-		}
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(draft); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	labels := make(map[string]string)
-	for k, v := range draft.GetLabels() {
-		labels[k] = v
-	}
-	labels[labelKey] = req.Value
-
-	_, err = r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, draft.GetVersion(), draft.GetDefinition(), labels, draft.GetAnnotations())
-	if err != nil {
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.PureJSON(http.StatusOK, ConnectorLabelJson{
-		Key:   labelKey,
-		Value: req.Value,
-	})
-}
+func (r *ConnectorsRoutes) putLabel(gctx *gin.Context) { r.labelsAdapter.HandlePut(gctx) }
 
 // @Summary		Delete a label from a connector
 // @Description	Delete a specific label from a connector's draft version, creating one if needed
@@ -1261,69 +1045,7 @@ func (r *ConnectorsRoutes) putLabel(gctx *gin.Context) {
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connectors/{id}/labels/{label} [delete]
-func (r *ConnectorsRoutes) deleteLabel(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	labelKey := gctx.Param("label")
-	if labelKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	draft, err := r.connectors.GetOrCreateDraftConnectorVersion(ctx, connectorId)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			gctx.Status(http.StatusNoContent)
-			val.MarkValidated()
-			return
-		}
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(draft); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	labels := make(map[string]string)
-	for k, v := range draft.GetLabels() {
-		labels[k] = v
-	}
-	delete(labels, labelKey)
-
-	_, err = r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, draft.GetVersion(), draft.GetDefinition(), labels, draft.GetAnnotations())
-	if err != nil {
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.Status(http.StatusNoContent)
-}
+func (r *ConnectorsRoutes) deleteLabel(gctx *gin.Context) { r.labelsAdapter.HandleDelete(gctx) }
 
 // @Summary		Get all labels for a connector version
 // @Description	Get all labels associated with a specific version of a connector
@@ -1339,68 +1061,7 @@ func (r *ConnectorsRoutes) deleteLabel(gctx *gin.Context) {
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connectors/{id}/versions/{version}/labels [get]
-func (r *ConnectorsRoutes) getVersionLabels(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	versionStr := gctx.Param("version")
-	if versionStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	version, err := strconv.ParseUint(versionStr, 10, 64)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	cv, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
-			val.MarkErrorReturn()
-			return
-		}
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(cv); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	labels := cv.GetLabels()
-	if labels == nil {
-		labels = make(map[string]string)
-	}
-
-	gctx.PureJSON(http.StatusOK, labels)
-}
+func (r *ConnectorsRoutes) getVersionLabels(gctx *gin.Context) { r.versionLabelsAdapter.HandleList(gctx) }
 
 // @Summary		Get a specific label for a connector version
 // @Description	Get a specific label value by key for a specific version of a connector
@@ -1410,99 +1071,25 @@ func (r *ConnectorsRoutes) getVersionLabels(gctx *gin.Context) {
 // @Param			id		path		string	true	"Connector UUID"
 // @Param			version	path		integer	true	"Version number"
 // @Param			label	path		string	true	"Label key"
-// @Success		200		{object}	SwaggerConnectorLabelJson
+// @Success		200		{object}	SwaggerKeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connectors/{id}/versions/{version}/labels/{label} [get]
-func (r *ConnectorsRoutes) getVersionLabel(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	versionStr := gctx.Param("version")
-	if versionStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	version, err := strconv.ParseUint(versionStr, 10, 64)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	labelKey := gctx.Param("label")
-	if labelKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	cv, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
-			val.MarkErrorReturn()
-			return
-		}
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(cv); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	labels := cv.GetLabels()
-	value, exists := labels[labelKey]
-	if !exists {
-		apgin.WriteError(gctx, nil, httperr.NotFoundf("label '%s' not found", labelKey))
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.PureJSON(http.StatusOK, ConnectorLabelJson{
-		Key:   labelKey,
-		Value: value,
-	})
-}
+func (r *ConnectorsRoutes) getVersionLabel(gctx *gin.Context) { r.versionLabelsAdapter.HandleGet(gctx) }
 
 // @Summary		Set a label for a connector version
 // @Description	Set or update a specific label on a specific draft version of a connector
 // @Tags			connectors
 // @Accept			json
 // @Produce		json
-// @Param			id		path		string								true	"Connector UUID"
-// @Param			version	path		integer								true	"Version number"
-// @Param			label	path		string								true	"Label key"
-// @Param			request	body		SwaggerPutConnectorLabelRequest		true	"Label value"
-// @Success		200		{object}	SwaggerConnectorLabelJson
+// @Param			id		path		string						true	"Connector UUID"
+// @Param			version	path		integer						true	"Version number"
+// @Param			label	path		string						true	"Label key"
+// @Param			request	body		SwaggerPutKeyValueRequest	true	"Label value"
+// @Success		200		{object}	SwaggerKeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -1511,111 +1098,7 @@ func (r *ConnectorsRoutes) getVersionLabel(gctx *gin.Context) {
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connectors/{id}/versions/{version}/labels/{label} [put]
-func (r *ConnectorsRoutes) putVersionLabel(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	versionStr := gctx.Param("version")
-	if versionStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	version, err := strconv.ParseUint(versionStr, 10, 64)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	labelKey := gctx.Param("label")
-	if labelKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if err := database.ValidateLabelKey(labelKey); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid label key: %s", err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	var req PutConnectorLabelRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if err := database.ValidateLabelValue(req.Value); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid label value: %s", err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	existing, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
-			val.MarkErrorReturn()
-			return
-		}
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(existing); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	if existing.GetState() != database.ConnectorVersionStateDraft {
-		apgin.WriteError(gctx, nil, httperr.Conflictf("connector version '%s:%d' is not a draft", connectorId, version))
-		val.MarkErrorReturn()
-		return
-	}
-
-	labels := make(map[string]string)
-	for k, v := range existing.GetLabels() {
-		labels[k] = v
-	}
-	labels[labelKey] = req.Value
-
-	_, err = r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, version, existing.GetDefinition(), labels, existing.GetAnnotations())
-	if err != nil {
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.PureJSON(http.StatusOK, ConnectorLabelJson{
-		Key:   labelKey,
-		Value: req.Value,
-	})
-}
+func (r *ConnectorsRoutes) putVersionLabel(gctx *gin.Context) { r.versionLabelsAdapter.HandlePut(gctx) }
 
 // @Summary		Delete a label from a connector version
 // @Description	Delete a specific label from a specific draft version of a connector
@@ -1633,89 +1116,7 @@ func (r *ConnectorsRoutes) putVersionLabel(gctx *gin.Context) {
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connectors/{id}/versions/{version}/labels/{label} [delete]
-func (r *ConnectorsRoutes) deleteVersionLabel(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	versionStr := gctx.Param("version")
-	if versionStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	version, err := strconv.ParseUint(versionStr, 10, 64)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	labelKey := gctx.Param("label")
-	if labelKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	existing, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			gctx.Status(http.StatusNoContent)
-			val.MarkValidated()
-			return
-		}
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(existing); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	if existing.GetState() != database.ConnectorVersionStateDraft {
-		apgin.WriteError(gctx, nil, httperr.Conflictf("connector version '%s:%d' is not a draft", connectorId, version))
-		val.MarkErrorReturn()
-		return
-	}
-
-	labels := make(map[string]string)
-	for k, v := range existing.GetLabels() {
-		labels[k] = v
-	}
-	delete(labels, labelKey)
-
-	_, err = r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, version, existing.GetDefinition(), labels, existing.GetAnnotations())
-	if err != nil {
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.Status(http.StatusNoContent)
-}
+func (r *ConnectorsRoutes) deleteVersionLabel(gctx *gin.Context) { r.versionLabelsAdapter.HandleDelete(gctx) }
 
 type ForceConnectorVersionStateRequestJson struct {
 	State database.ConnectorVersionState `json:"state"`
@@ -1841,62 +1242,7 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 // @Failure		500	{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connectors/{id}/annotations [get]
-func (r *ConnectorsRoutes) getAnnotations(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	result := r.connectors.
-		ListConnectorsBuilder().
-		ForId(connectorId).
-		Limit(1).
-		FetchPage(ctx)
-
-	if result.Error != nil {
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(result.Error)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if len(result.Results) == 0 {
-		apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
-		val.MarkErrorReturn()
-		return
-	}
-
-	c := result.Results[0]
-
-	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	annotations := c.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-
-	gctx.PureJSON(http.StatusOK, annotations)
-}
+func (r *ConnectorsRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapter.HandleList(gctx) }
 
 // @Summary		Get a specific annotation for a connector
 // @Description	Get a specific annotation value by key for a connector
@@ -1905,92 +1251,24 @@ func (r *ConnectorsRoutes) getAnnotations(gctx *gin.Context) {
 // @Produce		json
 // @Param			id			path		string	true	"Connector UUID"
 // @Param			annotation	path		string	true	"Annotation key"
-// @Success		200			{object}	ConnectorAnnotationJson
+// @Success		200			{object}	SwaggerKeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		404			{object}	ErrorResponse
 // @Failure		500			{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connectors/{id}/annotations/{annotation} [get]
-func (r *ConnectorsRoutes) getAnnotation(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	annotationKey := gctx.Param("annotation")
-	if annotationKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	result := r.connectors.
-		ListConnectorsBuilder().
-		ForId(connectorId).
-		Limit(1).
-		FetchPage(ctx)
-
-	if result.Error != nil {
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(result.Error)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if len(result.Results) == 0 {
-		apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
-		val.MarkErrorReturn()
-		return
-	}
-
-	c := result.Results[0]
-
-	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	annotations := c.GetAnnotations()
-	value, exists := annotations[annotationKey]
-	if !exists {
-		apgin.WriteError(gctx, nil, httperr.NotFoundf("annotation '%s' not found", annotationKey))
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.PureJSON(http.StatusOK, ConnectorAnnotationJson{
-		Key:   annotationKey,
-		Value: value,
-	})
-}
+func (r *ConnectorsRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleGet(gctx) }
 
 // @Summary		Set an annotation for a connector
 // @Description	Set or update a specific annotation value by key for a connector's draft version, creating one if needed
 // @Tags			connectors
 // @Accept			json
 // @Produce		json
-// @Param			id			path		string								true	"Connector UUID"
-// @Param			annotation	path		string								true	"Annotation key"
-// @Param			request		body		PutConnectorAnnotationRequestJson	true	"Annotation value"
-// @Success		200			{object}	ConnectorAnnotationJson
+// @Param			id			path		string						true	"Connector UUID"
+// @Param			annotation	path		string						true	"Annotation key"
+// @Param			request		body		SwaggerPutKeyValueRequest	true	"Annotation value"
+// @Success		200			{object}	SwaggerKeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		403			{object}	ErrorResponse
@@ -1998,86 +1276,7 @@ func (r *ConnectorsRoutes) getAnnotation(gctx *gin.Context) {
 // @Failure		500			{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connectors/{id}/annotations/{annotation} [put]
-func (r *ConnectorsRoutes) putAnnotation(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	annotationKey := gctx.Param("annotation")
-	if annotationKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	// Validate annotation key (same rules as label keys)
-	if err := database.ValidateAnnotationKey(annotationKey); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotation key: %s", err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	var req PutConnectorAnnotationRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	draft, err := r.connectors.GetOrCreateDraftConnectorVersion(ctx, connectorId)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
-			val.MarkErrorReturn()
-			return
-		}
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(draft); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	annotations := make(map[string]string)
-	for k, v := range draft.GetAnnotations() {
-		annotations[k] = v
-	}
-	annotations[annotationKey] = req.Value
-
-	_, err = r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, draft.GetVersion(), draft.GetDefinition(), draft.GetLabels(), annotations)
-	if err != nil {
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.PureJSON(http.StatusOK, ConnectorAnnotationJson{
-		Key:   annotationKey,
-		Value: req.Value,
-	})
-}
+func (r *ConnectorsRoutes) putAnnotation(gctx *gin.Context) { r.annotsAdapter.HandlePut(gctx) }
 
 // @Summary		Delete an annotation from a connector
 // @Description	Delete a specific annotation from a connector's draft version, creating one if needed
@@ -2093,69 +1292,7 @@ func (r *ConnectorsRoutes) putAnnotation(gctx *gin.Context) {
 // @Failure		500			{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connectors/{id}/annotations/{annotation} [delete]
-func (r *ConnectorsRoutes) deleteAnnotation(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	annotationKey := gctx.Param("annotation")
-	if annotationKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	draft, err := r.connectors.GetOrCreateDraftConnectorVersion(ctx, connectorId)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			gctx.Status(http.StatusNoContent)
-			val.MarkValidated()
-			return
-		}
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(draft); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	annotations := make(map[string]string)
-	for k, v := range draft.GetAnnotations() {
-		annotations[k] = v
-	}
-	delete(annotations, annotationKey)
-
-	_, err = r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, draft.GetVersion(), draft.GetDefinition(), draft.GetLabels(), annotations)
-	if err != nil {
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.Status(http.StatusNoContent)
-}
+func (r *ConnectorsRoutes) deleteAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleDelete(gctx) }
 
 // @Summary		Get all annotations for a connector version
 // @Description	Get all annotations associated with a specific version of a connector
@@ -2172,66 +1309,7 @@ func (r *ConnectorsRoutes) deleteAnnotation(gctx *gin.Context) {
 // @Security		BearerAuth
 // @Router			/connectors/{id}/versions/{version}/annotations [get]
 func (r *ConnectorsRoutes) getVersionAnnotations(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	versionStr := gctx.Param("version")
-	if versionStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	version, err := strconv.ParseUint(versionStr, 10, 64)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	existing, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
-			val.MarkErrorReturn()
-			return
-		}
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(existing); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	annotations := existing.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-
-	gctx.PureJSON(http.StatusOK, annotations)
+	r.versionAnnotsAdapter.HandleList(gctx)
 }
 
 // @Summary		Get a specific annotation for a connector version
@@ -2242,7 +1320,7 @@ func (r *ConnectorsRoutes) getVersionAnnotations(gctx *gin.Context) {
 // @Param			id			path		string	true	"Connector UUID"
 // @Param			version		path		integer	true	"Version number"
 // @Param			annotation	path		string	true	"Annotation key"
-// @Success		200			{object}	ConnectorAnnotationJson
+// @Success		200			{object}	SwaggerKeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		404			{object}	ErrorResponse
@@ -2250,79 +1328,7 @@ func (r *ConnectorsRoutes) getVersionAnnotations(gctx *gin.Context) {
 // @Security		BearerAuth
 // @Router			/connectors/{id}/versions/{version}/annotations/{annotation} [get]
 func (r *ConnectorsRoutes) getVersionAnnotation(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	versionStr := gctx.Param("version")
-	if versionStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	version, err := strconv.ParseUint(versionStr, 10, 64)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	annotationKey := gctx.Param("annotation")
-	if annotationKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	existing, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
-			val.MarkErrorReturn()
-			return
-		}
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(existing); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	annotations := existing.GetAnnotations()
-	value, exists := annotations[annotationKey]
-	if !exists {
-		apgin.WriteError(gctx, nil, httperr.NotFoundf("annotation '%s' not found", annotationKey))
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.PureJSON(http.StatusOK, ConnectorAnnotationJson{
-		Key:   annotationKey,
-		Value: value,
-	})
+	r.versionAnnotsAdapter.HandleGet(gctx)
 }
 
 // @Summary		Set an annotation for a connector version
@@ -2330,11 +1336,11 @@ func (r *ConnectorsRoutes) getVersionAnnotation(gctx *gin.Context) {
 // @Tags			connectors
 // @Accept			json
 // @Produce		json
-// @Param			id			path		string								true	"Connector UUID"
-// @Param			version		path		integer								true	"Version number"
-// @Param			annotation	path		string								true	"Annotation key"
-// @Param			request		body		PutConnectorAnnotationRequestJson	true	"Annotation value"
-// @Success		200			{object}	ConnectorAnnotationJson
+// @Param			id			path		string						true	"Connector UUID"
+// @Param			version		path		integer						true	"Version number"
+// @Param			annotation	path		string						true	"Annotation key"
+// @Param			request		body		SwaggerPutKeyValueRequest	true	"Annotation value"
+// @Success		200			{object}	SwaggerKeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		403			{object}	ErrorResponse
@@ -2344,103 +1350,7 @@ func (r *ConnectorsRoutes) getVersionAnnotation(gctx *gin.Context) {
 // @Security		BearerAuth
 // @Router			/connectors/{id}/versions/{version}/annotations/{annotation} [put]
 func (r *ConnectorsRoutes) putVersionAnnotation(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	versionStr := gctx.Param("version")
-	if versionStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	version, err := strconv.ParseUint(versionStr, 10, 64)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	annotationKey := gctx.Param("annotation")
-	if annotationKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if err := database.ValidateAnnotationKey(annotationKey); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotation key: %s", err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	var req PutConnectorAnnotationRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	existing, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector version '%s:%d' not found", connectorId, version))
-			val.MarkErrorReturn()
-			return
-		}
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(existing); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	if existing.GetState() != database.ConnectorVersionStateDraft {
-		apgin.WriteError(gctx, nil, httperr.Conflictf("connector version '%s:%d' is not a draft", connectorId, version))
-		val.MarkErrorReturn()
-		return
-	}
-
-	annotations := make(map[string]string)
-	for k, v := range existing.GetAnnotations() {
-		annotations[k] = v
-	}
-	annotations[annotationKey] = req.Value
-
-	_, err = r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, version, existing.GetDefinition(), existing.GetLabels(), annotations)
-	if err != nil {
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.PureJSON(http.StatusOK, ConnectorAnnotationJson{
-		Key:   annotationKey,
-		Value: req.Value,
-	})
+	r.versionAnnotsAdapter.HandlePut(gctx)
 }
 
 // @Summary		Delete an annotation from a connector version
@@ -2460,87 +1370,7 @@ func (r *ConnectorsRoutes) putVersionAnnotation(gctx *gin.Context) {
 // @Security		BearerAuth
 // @Router			/connectors/{id}/versions/{version}/annotations/{annotation} [delete]
 func (r *ConnectorsRoutes) deleteVersionAnnotation(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	versionStr := gctx.Param("version")
-	if versionStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	version, err := strconv.ParseUint(versionStr, 10, 64)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	annotationKey := gctx.Param("annotation")
-	if annotationKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	existing, err := r.connectors.GetConnectorVersion(ctx, connectorId, version)
-	if err != nil {
-		if errors.Is(err, core.ErrNotFound) {
-			gctx.Status(http.StatusNoContent)
-			val.MarkValidated()
-			return
-		}
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(existing); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	if existing.GetState() != database.ConnectorVersionStateDraft {
-		apgin.WriteError(gctx, nil, httperr.Conflictf("connector version '%s:%d' is not a draft", connectorId, version))
-		val.MarkErrorReturn()
-		return
-	}
-
-	annotations := make(map[string]string)
-	for k, v := range existing.GetAnnotations() {
-		annotations[k] = v
-	}
-	delete(annotations, annotationKey)
-
-	_, err = r.connectors.UpdateDraftConnectorVersion(ctx, connectorId, version, existing.GetDefinition(), existing.GetLabels(), annotations)
-	if err != nil {
-		apgin.WriteErr(gctx, nil, err)
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.Status(http.StatusNoContent)
+	r.versionAnnotsAdapter.HandleDelete(gctx)
 }
 
 func (r *ConnectorsRoutes) Register(g gin.IRouter) {
@@ -2748,9 +1578,305 @@ func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 }
 
 func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *ConnectorsRoutes {
+	parseConnectorID := func(gctx *gin.Context) (apid.ID, *httperr.Error) {
+		idStr := gctx.Param("id")
+		if idStr == "" {
+			return apid.Nil, httperr.BadRequest("id is required")
+		}
+		id, err := apid.Parse(idStr)
+		if err != nil {
+			return apid.Nil, httperr.BadRequest("invalid id format")
+		}
+		if id == apid.Nil {
+			return apid.Nil, httperr.BadRequest("id is required")
+		}
+		return id, nil
+	}
+
+	parseConnectorVersionID := func(gctx *gin.Context) (connectorVersionID, *httperr.Error) {
+		id, herr := parseConnectorID(gctx)
+		if herr != nil {
+			return connectorVersionID{}, herr
+		}
+		versionStr := gctx.Param("version")
+		if versionStr == "" {
+			return connectorVersionID{}, httperr.BadRequest("version is required")
+		}
+		version, err := strconv.ParseUint(versionStr, 10, 64)
+		if err != nil {
+			return connectorVersionID{}, httperr.BadRequest("failed to parse version as an integer")
+		}
+		return connectorVersionID{ConnectorID: id, Version: version}, nil
+	}
+
+	getConnector := func(ctx context.Context, id apid.ID) (labels.Resource, error) {
+		result := c.ListConnectorsBuilder().
+			ForId(id).
+			Limit(1).
+			FetchPage(ctx)
+		if result.Error != nil {
+			return nil, result.Error
+		}
+		if len(result.Results) == 0 {
+			return nil, database.ErrNotFound
+		}
+		return result.Results[0], nil
+	}
+
+	getConnectorVersion := func(ctx context.Context, id connectorVersionID) (labels.Resource, error) {
+		cv, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
+		if err != nil {
+			if errors.Is(err, core.ErrNotFound) {
+				return nil, database.ErrNotFound
+			}
+			return nil, err
+		}
+		if cv == nil {
+			return nil, nil
+		}
+		return cv, nil
+	}
+
+	connectorIDExtractor := func(v interface{}) string {
+		return string(v.(connIface.ConnectorVersion).GetId())
+	}
+
+	connectorAuthGet := authService.NewRequiredBuilder().
+		ForResource("connectors").
+		ForIdField("id").
+		ForIdExtractor(connectorIDExtractor).
+		ForVerb("get").
+		Build()
+	connectorAuthMutate := authService.NewRequiredBuilder().
+		ForResource("connectors").
+		ForIdField("id").
+		ForIdExtractor(connectorIDExtractor).
+		ForVerb("update").
+		Build()
+	versionAuthGet := authService.NewRequiredBuilder().
+		ForResource("connectors").
+		ForIdField("id").
+		ForIdExtractor(connectorIDExtractor).
+		ForVerb("list/versions").
+		Build()
+	versionAuthMutate := authService.NewRequiredBuilder().
+		ForResource("connectors").
+		ForIdField("id").
+		ForIdExtractor(connectorIDExtractor).
+		ForVerb("update").
+		Build()
+
+	putConnectorLabels := func(ctx context.Context, id apid.ID, kv map[string]string) (labels.Resource, error) {
+		draft, err := c.GetOrCreateDraftConnectorVersion(ctx, id)
+		if err != nil {
+			if errors.Is(err, core.ErrNotFound) {
+				return nil, database.ErrNotFound
+			}
+			return nil, err
+		}
+		merged := make(map[string]string)
+		for k, v := range draft.GetLabels() {
+			merged[k] = v
+		}
+		for k, v := range kv {
+			merged[k] = v
+		}
+		return c.UpdateDraftConnectorVersion(ctx, id, draft.GetVersion(), draft.GetDefinition(), merged, draft.GetAnnotations())
+	}
+
+	deleteConnectorLabels := func(ctx context.Context, id apid.ID, keys []string) (labels.Resource, error) {
+		draft, err := c.GetOrCreateDraftConnectorVersion(ctx, id)
+		if err != nil {
+			if errors.Is(err, core.ErrNotFound) {
+				return nil, database.ErrNotFound
+			}
+			return nil, err
+		}
+		merged := make(map[string]string)
+		for k, v := range draft.GetLabels() {
+			merged[k] = v
+		}
+		for _, k := range keys {
+			delete(merged, k)
+		}
+		return c.UpdateDraftConnectorVersion(ctx, id, draft.GetVersion(), draft.GetDefinition(), merged, draft.GetAnnotations())
+	}
+
+	putConnectorAnnotations := func(ctx context.Context, id apid.ID, kv map[string]string) (labels.Resource, error) {
+		draft, err := c.GetOrCreateDraftConnectorVersion(ctx, id)
+		if err != nil {
+			if errors.Is(err, core.ErrNotFound) {
+				return nil, database.ErrNotFound
+			}
+			return nil, err
+		}
+		merged := make(map[string]string)
+		for k, v := range draft.GetAnnotations() {
+			merged[k] = v
+		}
+		for k, v := range kv {
+			merged[k] = v
+		}
+		return c.UpdateDraftConnectorVersion(ctx, id, draft.GetVersion(), draft.GetDefinition(), draft.GetLabels(), merged)
+	}
+
+	deleteConnectorAnnotations := func(ctx context.Context, id apid.ID, keys []string) (labels.Resource, error) {
+		draft, err := c.GetOrCreateDraftConnectorVersion(ctx, id)
+		if err != nil {
+			if errors.Is(err, core.ErrNotFound) {
+				return nil, database.ErrNotFound
+			}
+			return nil, err
+		}
+		merged := make(map[string]string)
+		for k, v := range draft.GetAnnotations() {
+			merged[k] = v
+		}
+		for _, k := range keys {
+			delete(merged, k)
+		}
+		return c.UpdateDraftConnectorVersion(ctx, id, draft.GetVersion(), draft.GetDefinition(), draft.GetLabels(), merged)
+	}
+
+	putVersionLabels := func(ctx context.Context, id connectorVersionID, kv map[string]string) (labels.Resource, error) {
+		cv, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
+		if err != nil {
+			if errors.Is(err, core.ErrNotFound) {
+				return nil, database.ErrNotFound
+			}
+			return nil, err
+		}
+		if cv.GetState() != database.ConnectorVersionStateDraft {
+			return nil, httperr.Conflictf("connector version '%s:%d' is not a draft", id.ConnectorID, id.Version)
+		}
+		merged := make(map[string]string)
+		for k, v := range cv.GetLabels() {
+			merged[k] = v
+		}
+		for k, v := range kv {
+			merged[k] = v
+		}
+		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, cv.GetDefinition(), merged, cv.GetAnnotations())
+	}
+
+	deleteVersionLabels := func(ctx context.Context, id connectorVersionID, keys []string) (labels.Resource, error) {
+		cv, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
+		if err != nil {
+			if errors.Is(err, core.ErrNotFound) {
+				return nil, database.ErrNotFound
+			}
+			return nil, err
+		}
+		if cv.GetState() != database.ConnectorVersionStateDraft {
+			return nil, httperr.Conflictf("connector version '%s:%d' is not a draft", id.ConnectorID, id.Version)
+		}
+		merged := make(map[string]string)
+		for k, v := range cv.GetLabels() {
+			merged[k] = v
+		}
+		for _, k := range keys {
+			delete(merged, k)
+		}
+		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, cv.GetDefinition(), merged, cv.GetAnnotations())
+	}
+
+	putVersionAnnotations := func(ctx context.Context, id connectorVersionID, kv map[string]string) (labels.Resource, error) {
+		cv, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
+		if err != nil {
+			if errors.Is(err, core.ErrNotFound) {
+				return nil, database.ErrNotFound
+			}
+			return nil, err
+		}
+		if cv.GetState() != database.ConnectorVersionStateDraft {
+			return nil, httperr.Conflictf("connector version '%s:%d' is not a draft", id.ConnectorID, id.Version)
+		}
+		merged := make(map[string]string)
+		for k, v := range cv.GetAnnotations() {
+			merged[k] = v
+		}
+		for k, v := range kv {
+			merged[k] = v
+		}
+		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, cv.GetDefinition(), cv.GetLabels(), merged)
+	}
+
+	deleteVersionAnnotations := func(ctx context.Context, id connectorVersionID, keys []string) (labels.Resource, error) {
+		cv, err := c.GetConnectorVersion(ctx, id.ConnectorID, id.Version)
+		if err != nil {
+			if errors.Is(err, core.ErrNotFound) {
+				return nil, database.ErrNotFound
+			}
+			return nil, err
+		}
+		if cv.GetState() != database.ConnectorVersionStateDraft {
+			return nil, httperr.Conflictf("connector version '%s:%d' is not a draft", id.ConnectorID, id.Version)
+		}
+		merged := make(map[string]string)
+		for k, v := range cv.GetAnnotations() {
+			merged[k] = v
+		}
+		for _, k := range keys {
+			delete(merged, k)
+		}
+		return c.UpdateDraftConnectorVersion(ctx, id.ConnectorID, id.Version, cv.GetDefinition(), cv.GetLabels(), merged)
+	}
+
+	labelsAdapter := labels.Adapter[apid.ID]{
+		Kind:         labels.Label,
+		ResourceName: "connector",
+		PathPrefix:   "/connectors/:id",
+		AuthGet:      connectorAuthGet,
+		AuthMutate:   connectorAuthMutate,
+		ParseID:      parseConnectorID,
+		Get:          getConnector,
+		Put:          putConnectorLabels,
+		Delete:       deleteConnectorLabels,
+	}
+
+	annotsAdapter := labels.Adapter[apid.ID]{
+		Kind:         labels.Annotation,
+		ResourceName: "connector",
+		PathPrefix:   "/connectors/:id",
+		AuthGet:      connectorAuthGet,
+		AuthMutate:   connectorAuthMutate,
+		ParseID:      parseConnectorID,
+		Get:          getConnector,
+		Put:          putConnectorAnnotations,
+		Delete:       deleteConnectorAnnotations,
+	}
+
+	versionLabelsAdapter := labels.Adapter[connectorVersionID]{
+		Kind:         labels.Label,
+		ResourceName: "connector version",
+		PathPrefix:   "/connectors/:id/versions/:version",
+		AuthGet:      versionAuthGet,
+		AuthMutate:   versionAuthMutate,
+		ParseID:      parseConnectorVersionID,
+		Get:          getConnectorVersion,
+		Put:          putVersionLabels,
+		Delete:       deleteVersionLabels,
+	}
+
+	versionAnnotsAdapter := labels.Adapter[connectorVersionID]{
+		Kind:         labels.Annotation,
+		ResourceName: "connector version",
+		PathPrefix:   "/connectors/:id/versions/:version",
+		AuthGet:      versionAuthGet,
+		AuthMutate:   versionAuthMutate,
+		ParseID:      parseConnectorVersionID,
+		Get:          getConnectorVersion,
+		Put:          putVersionAnnotations,
+		Delete:       deleteVersionAnnotations,
+	}
+
 	return &ConnectorsRoutes{
-		cfg:         cfg,
-		authService: authService,
-		connectors:  c,
+		cfg:                  cfg,
+		authService:          authService,
+		connectors:           c,
+		labelsAdapter:        labelsAdapter,
+		annotsAdapter:        annotsAdapter,
+		versionLabelsAdapter: versionLabelsAdapter,
+		versionAnnotsAdapter: versionAnnotsAdapter,
 	}
 }

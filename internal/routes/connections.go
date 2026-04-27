@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"context"
 	"errors"
 
 	"github.com/gin-gonic/gin"
@@ -15,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/routes/labels"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 
@@ -24,14 +26,16 @@ import (
 )
 
 type ConnectionsRoutes struct {
-	cfg     config.C
-	auth    auth.A
-	core    coreIface.C
-	db      database.DB
-	r       apredis.Client
-	httpf   httpf.F
-	encrypt encrypt.E
-	oauthf  oauth2.Factory
+	cfg              config.C
+	auth             auth.A
+	core             coreIface.C
+	db               database.DB
+	r                apredis.Client
+	httpf            httpf.F
+	encrypt          encrypt.E
+	oauthf           oauth2.Factory
+	labelsAdapter    labels.Adapter[apid.ID]
+	annotsAdapter    labels.Adapter[apid.ID]
 }
 
 // @Summary		Initiate connection
@@ -832,24 +836,6 @@ type UpdateConnectionRequestJson struct {
 	Annotations map[string]string `json:"annotations"`
 }
 
-type PutConnectionLabelRequestJson struct {
-	Value string `json:"value"`
-}
-
-type ConnectionLabelJson struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
-type PutConnectionAnnotationRequestJson struct {
-	Value string `json:"value"`
-}
-
-type ConnectionAnnotationJson struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
-
 // @Summary		Update connection
 // @Description	Update a connection's labels
 // @Tags			connections
@@ -935,10 +921,13 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, ConnectionToJson(c))
 }
 
+// Label and annotation handlers for connections delegate to a shared
+// generic adapter (see internal/routes/labels). The doc comments below
+// drive the OpenAPI spec; the bodies forward to the adapter.
+
 // @Summary		Get all labels for a connection
 // @Description	Get all labels associated with a specific connection
 // @Tags			connections
-// @Accept			json
 // @Produce		json
 // @Param			id	path		string	true	"Connection UUID"
 // @Success		200	{object}	map[string]string
@@ -948,140 +937,32 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 // @Failure		500	{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connections/{id}/labels [get]
-func (r *ConnectionsRoutes) getLabels(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	id, err := apid.Parse(gctx.Param("id"))
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if id == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	c, err := r.core.GetConnection(ctx, id)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
-			val.MarkErrorReturn()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if c == nil {
-		apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	labels := c.GetLabels()
-	if labels == nil {
-		labels = make(map[string]string)
-	}
-
-	gctx.PureJSON(http.StatusOK, labels)
-}
+func (r *ConnectionsRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.HandleList(gctx) }
 
 // @Summary		Get a specific label for a connection
 // @Description	Get a specific label value by key for a connection
 // @Tags			connections
-// @Accept			json
 // @Produce		json
 // @Param			id		path		string	true	"Connection UUID"
 // @Param			label	path		string	true	"Label key"
-// @Success		200		{object}	SwaggerConnectionLabelJson
+// @Success		200		{object}	SwaggerKeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connections/{id}/labels/{label} [get]
-func (r *ConnectionsRoutes) getLabel(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	id, err := apid.Parse(gctx.Param("id"))
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if id == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	labelKey := gctx.Param("label")
-	if labelKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	c, err := r.core.GetConnection(ctx, id)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
-			val.MarkErrorReturn()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if c == nil {
-		apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	labels := c.GetLabels()
-	value, exists := labels[labelKey]
-	if !exists {
-		apgin.WriteError(gctx, nil, httperr.NotFoundf("label '%s' not found", labelKey))
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.PureJSON(http.StatusOK, ConnectionLabelJson{
-		Key:   labelKey,
-		Value: value,
-	})
-}
+func (r *ConnectionsRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.HandleGet(gctx) }
 
 // @Summary		Set a label for a connection
 // @Description	Set or update a specific label value by key for a connection
 // @Tags			connections
 // @Accept			json
 // @Produce		json
-// @Param			id		path		string								true	"Connection UUID"
-// @Param			label	path		string								true	"Label key"
-// @Param			request	body		SwaggerPutConnectionLabelRequest	true	"Label value"
-// @Success		200		{object}	SwaggerConnectionLabelJson
+// @Param			id		path		string						true	"Connection UUID"
+// @Param			label	path		string						true	"Label key"
+// @Param			request	body		SwaggerPutKeyValueRequest	true	"Label value"
+// @Success		200		{object}	SwaggerKeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -1089,97 +970,11 @@ func (r *ConnectionsRoutes) getLabel(gctx *gin.Context) {
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connections/{id}/labels/{label} [put]
-func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	id, err := apid.Parse(gctx.Param("id"))
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if id == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	labelKey := gctx.Param("label")
-	if labelKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if err := database.ValidateLabelKey(labelKey); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid label key: %s", err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	var req PutConnectionLabelRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if err := database.ValidateLabelValue(req.Value); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid label value: %s", err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	c, err := r.core.GetConnection(ctx, id)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
-			val.MarkErrorReturn()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if c == nil {
-		apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	updatedConn, err := r.db.PutConnectionLabels(ctx, id, map[string]string{labelKey: req.Value})
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
-			val.MarkErrorReturn()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.PureJSON(http.StatusOK, ConnectionLabelJson{
-		Key:   labelKey,
-		Value: updatedConn.Labels[labelKey],
-	})
-}
+func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) { r.labelsAdapter.HandlePut(gctx) }
 
 // @Summary		Delete a label from a connection
 // @Description	Delete a specific label by key from a connection
 // @Tags			connections
-// @Accept			json
-// @Produce		json
 // @Param			id		path	string	true	"Connection UUID"
 // @Param			label	path	string	true	"Label key"
 // @Success		204		"No Content"
@@ -1189,73 +984,11 @@ func (r *ConnectionsRoutes) putLabel(gctx *gin.Context) {
 // @Failure		500		{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connections/{id}/labels/{label} [delete]
-func (r *ConnectionsRoutes) deleteLabel(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	id, err := apid.Parse(gctx.Param("id"))
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if id == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	labelKey := gctx.Param("label")
-	if labelKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("label key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	c, err := r.core.GetConnection(ctx, id)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			gctx.Status(http.StatusNoContent)
-			val.MarkValidated()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if c == nil {
-		gctx.Status(http.StatusNoContent)
-		val.MarkValidated()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	_, err = r.db.DeleteConnectionLabels(ctx, id, []string{labelKey})
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			gctx.Status(http.StatusNoContent)
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.Status(http.StatusNoContent)
-}
+func (r *ConnectionsRoutes) deleteLabel(gctx *gin.Context) { r.labelsAdapter.HandleDelete(gctx) }
 
 // @Summary		Get all annotations for a connection
 // @Description	Get all annotations associated with a specific connection
 // @Tags			connections
-// @Accept			json
 // @Produce		json
 // @Param			id	path		string	true	"Connection UUID"
 // @Success		200	{object}	map[string]string
@@ -1265,140 +998,32 @@ func (r *ConnectionsRoutes) deleteLabel(gctx *gin.Context) {
 // @Failure		500	{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connections/{id}/annotations [get]
-func (r *ConnectionsRoutes) getAnnotations(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	id, err := apid.Parse(gctx.Param("id"))
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if id == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	c, err := r.core.GetConnection(ctx, id)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
-			val.MarkErrorReturn()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if c == nil {
-		apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	annotations := c.GetAnnotations()
-	if annotations == nil {
-		annotations = make(map[string]string)
-	}
-
-	gctx.PureJSON(http.StatusOK, annotations)
-}
+func (r *ConnectionsRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapter.HandleList(gctx) }
 
 // @Summary		Get a specific annotation for a connection
 // @Description	Get a specific annotation value by key for a connection
 // @Tags			connections
-// @Accept			json
 // @Produce		json
 // @Param			id			path		string	true	"Connection UUID"
 // @Param			annotation	path		string	true	"Annotation key"
-// @Success		200			{object}	SwaggerConnectionAnnotationJson
+// @Success		200			{object}	SwaggerKeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		404			{object}	ErrorResponse
 // @Failure		500			{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connections/{id}/annotations/{annotation} [get]
-func (r *ConnectionsRoutes) getAnnotation(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	id, err := apid.Parse(gctx.Param("id"))
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if id == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	annotationKey := gctx.Param("annotation")
-	if annotationKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	c, err := r.core.GetConnection(ctx, id)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
-			val.MarkErrorReturn()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if c == nil {
-		apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	annotations := c.GetAnnotations()
-	value, exists := annotations[annotationKey]
-	if !exists {
-		apgin.WriteError(gctx, nil, httperr.NotFoundf("annotation '%s' not found", annotationKey))
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.PureJSON(http.StatusOK, ConnectionAnnotationJson{
-		Key:   annotationKey,
-		Value: value,
-	})
-}
+func (r *ConnectionsRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleGet(gctx) }
 
 // @Summary		Set an annotation for a connection
 // @Description	Set or update a specific annotation value by key for a connection
 // @Tags			connections
 // @Accept			json
 // @Produce		json
-// @Param			id			path		string									true	"Connection UUID"
-// @Param			annotation	path		string									true	"Annotation key"
-// @Param			request		body		SwaggerPutConnectionAnnotationRequest	true	"Annotation value"
-// @Success		200			{object}	SwaggerConnectionAnnotationJson
+// @Param			id			path		string						true	"Connection UUID"
+// @Param			annotation	path		string						true	"Annotation key"
+// @Param			request		body		SwaggerPutKeyValueRequest	true	"Annotation value"
+// @Success		200			{object}	SwaggerKeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		403			{object}	ErrorResponse
@@ -1406,91 +1031,11 @@ func (r *ConnectionsRoutes) getAnnotation(gctx *gin.Context) {
 // @Failure		500			{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connections/{id}/annotations/{annotation} [put]
-func (r *ConnectionsRoutes) putAnnotation(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	id, err := apid.Parse(gctx.Param("id"))
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if id == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	annotationKey := gctx.Param("annotation")
-	if annotationKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if err := database.ValidateAnnotationKey(annotationKey); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid annotation key: %s", err.Error()))
-		val.MarkErrorReturn()
-		return
-	}
-
-	var req PutConnectionAnnotationRequestJson
-	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid request body", httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	c, err := r.core.GetConnection(ctx, id)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
-			val.MarkErrorReturn()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if c == nil {
-		apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	updatedConn, err := r.db.PutConnectionAnnotations(ctx, id, map[string]string{annotationKey: req.Value})
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
-			val.MarkErrorReturn()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.PureJSON(http.StatusOK, ConnectionAnnotationJson{
-		Key:   annotationKey,
-		Value: updatedConn.Annotations[annotationKey],
-	})
-}
+func (r *ConnectionsRoutes) putAnnotation(gctx *gin.Context) { r.annotsAdapter.HandlePut(gctx) }
 
 // @Summary		Delete an annotation from a connection
 // @Description	Delete a specific annotation by key from a connection
 // @Tags			connections
-// @Accept			json
-// @Produce		json
 // @Param			id			path	string	true	"Connection UUID"
 // @Param			annotation	path	string	true	"Annotation key"
 // @Success		204			"No Content"
@@ -1500,68 +1045,7 @@ func (r *ConnectionsRoutes) putAnnotation(gctx *gin.Context) {
 // @Failure		500			{object}	ErrorResponse
 // @Security		BearerAuth
 // @Router			/connections/{id}/annotations/{annotation} [delete]
-func (r *ConnectionsRoutes) deleteAnnotation(gctx *gin.Context) {
-	ctx := gctx.Request.Context()
-	val := auth.MustGetValidatorFromGinContext(gctx)
-
-	id, err := apid.Parse(gctx.Param("id"))
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if id == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	annotationKey := gctx.Param("annotation")
-	if annotationKey == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("annotation key is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	c, err := r.core.GetConnection(ctx, id)
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			gctx.Status(http.StatusNoContent)
-			val.MarkValidated()
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if c == nil {
-		gctx.Status(http.StatusNoContent)
-		val.MarkValidated()
-		return
-	}
-
-	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
-		apgin.WriteError(gctx, nil, httpErr)
-		return
-	}
-
-	_, err = r.db.DeleteConnectionAnnotations(ctx, id, []string{annotationKey})
-	if err != nil {
-		if errors.Is(err, database.ErrNotFound) {
-			gctx.Status(http.StatusNoContent)
-			return
-		}
-
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	gctx.Status(http.StatusNoContent)
-}
+func (r *ConnectionsRoutes) deleteAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleDelete(gctx) }
 
 func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 	g.POST(
@@ -1763,14 +1247,81 @@ func NewConnectionsRoutes(
 	encrypt encrypt.E,
 	logger *slog.Logger,
 ) *ConnectionsRoutes {
+	parseConnID := func(gctx *gin.Context) (apid.ID, *httperr.Error) {
+		id, err := apid.Parse(gctx.Param("id"))
+		if err != nil {
+			return apid.Nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err))
+		}
+		if id == apid.Nil {
+			return apid.Nil, httperr.BadRequest("id is required")
+		}
+		return id, nil
+	}
+
+	getConn := func(ctx context.Context, id apid.ID) (labels.Resource, error) {
+		conn, err := c.GetConnection(ctx, id)
+		if err != nil {
+			return nil, err
+		}
+		if conn == nil {
+			return nil, nil
+		}
+		return conn, nil
+	}
+
+	authGet := authService.NewRequiredBuilder().
+		ForResource("connections").
+		ForVerb("get").
+		ForIdField("id").
+		Build()
+	authMutate := authService.NewRequiredBuilder().
+		ForResource("connections").
+		ForVerb("update").
+		ForIdField("id").
+		Build()
+
+	labelsAdapter := labels.Adapter[apid.ID]{
+		Kind:         labels.Label,
+		ResourceName: "connection",
+		PathPrefix:   "/connections/:id",
+		AuthGet:      authGet,
+		AuthMutate:   authMutate,
+		ParseID:      parseConnID,
+		Get:          getConn,
+		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (labels.Resource, error) {
+			return db.PutConnectionLabels(ctx, id, kv)
+		},
+		Delete: func(ctx context.Context, id apid.ID, keys []string) (labels.Resource, error) {
+			return db.DeleteConnectionLabels(ctx, id, keys)
+		},
+	}
+
+	annotsAdapter := labels.Adapter[apid.ID]{
+		Kind:         labels.Annotation,
+		ResourceName: "connection",
+		PathPrefix:   "/connections/:id",
+		AuthGet:      authGet,
+		AuthMutate:   authMutate,
+		ParseID:      parseConnID,
+		Get:          getConn,
+		Put: func(ctx context.Context, id apid.ID, kv map[string]string) (labels.Resource, error) {
+			return db.PutConnectionAnnotations(ctx, id, kv)
+		},
+		Delete: func(ctx context.Context, id apid.ID, keys []string) (labels.Resource, error) {
+			return db.DeleteConnectionAnnotations(ctx, id, keys)
+		},
+	}
+
 	return &ConnectionsRoutes{
-		cfg:     cfg,
-		auth:    authService,
-		core:    c,
-		db:      db,
-		r:       r,
-		httpf:   httpf,
-		encrypt: encrypt,
-		oauthf:  oauth2.NewFactory(cfg, db, r, c, httpf, encrypt, logger),
+		cfg:           cfg,
+		auth:          authService,
+		core:          c,
+		db:            db,
+		r:             r,
+		httpf:         httpf,
+		encrypt:       encrypt,
+		oauthf:        oauth2.NewFactory(cfg, db, r, c, httpf, encrypt, logger),
+		labelsAdapter: labelsAdapter,
+		annotsAdapter: annotsAdapter,
 	}
 }
