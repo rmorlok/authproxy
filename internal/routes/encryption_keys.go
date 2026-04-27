@@ -16,7 +16,7 @@ import (
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
-	"github.com/rmorlok/authproxy/internal/routes/labels"
+	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"

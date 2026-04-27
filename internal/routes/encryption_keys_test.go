@@ -28,7 +28,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	httpf2 "github.com/rmorlok/authproxy/internal/httpf"
-	"github.com/rmorlok/authproxy/internal/routes/labels"
+	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"

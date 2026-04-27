@@ -16,7 +16,7 @@ import (
 	connIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
-	"github.com/rmorlok/authproxy/internal/routes/labels"
+	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/rmorlok/authproxy/internal/util"
