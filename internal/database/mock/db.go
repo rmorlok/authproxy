@@ -657,7 +657,7 @@ func (mr *MockDBMockRecorder) EnsureNamespaceByPath(ctx, path interface{}) *gomo
 }
 
 // EnumerateEncryptionKeyVersionsForKey mocks base method.
-func (m *MockDB) EnumerateEncryptionKeyVersionsForKey(ctx context.Context, ekId apid.ID, callback func([]*database.EncryptionKeyVersion, bool) (bool, error)) error {
+func (m *MockDB) EnumerateEncryptionKeyVersionsForKey(ctx context.Context, ekId apid.ID, callback func([]*database.EncryptionKeyVersion, bool) (pagination.KeepGoing, error)) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EnumerateEncryptionKeyVersionsForKey", ctx, ekId, callback)
 	ret0, _ := ret[0].(error)
@@ -671,7 +671,7 @@ func (mr *MockDBMockRecorder) EnumerateEncryptionKeyVersionsForKey(ctx, ekId, ca
 }
 
 // EnumerateEncryptionKeysInDependencyOrder mocks base method.
-func (m *MockDB) EnumerateEncryptionKeysInDependencyOrder(ctx context.Context, callback func([]*database.EncryptionKey, int) (bool, error)) ([]*database.EncryptionKey, error) {
+func (m *MockDB) EnumerateEncryptionKeysInDependencyOrder(ctx context.Context, callback func([]*database.EncryptionKey, int) (pagination.KeepGoing, error)) ([]*database.EncryptionKey, error) {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EnumerateEncryptionKeysInDependencyOrder", ctx, callback)
 	ret0, _ := ret[0].([]*database.EncryptionKey)
@@ -686,7 +686,7 @@ func (mr *MockDBMockRecorder) EnumerateEncryptionKeysInDependencyOrder(ctx, call
 }
 
 // EnumerateFieldsRequiringReEncryption mocks base method.
-func (m *MockDB) EnumerateFieldsRequiringReEncryption(ctx context.Context, callback func([]database.ReEncryptionTarget, bool) (bool, error)) error {
+func (m *MockDB) EnumerateFieldsRequiringReEncryption(ctx context.Context, callback func([]database.ReEncryptionTarget, bool) (pagination.KeepGoing, error)) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EnumerateFieldsRequiringReEncryption", ctx, callback)
 	ret0, _ := ret[0].(error)
@@ -700,7 +700,7 @@ func (mr *MockDBMockRecorder) EnumerateFieldsRequiringReEncryption(ctx, callback
 }
 
 // EnumerateNamespaceEncryptionTargets mocks base method.
-func (m *MockDB) EnumerateNamespaceEncryptionTargets(ctx context.Context, callback func([]database.NamespaceEncryptionTarget, bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, bool, error)) error {
+func (m *MockDB) EnumerateNamespaceEncryptionTargets(ctx context.Context, callback func([]database.NamespaceEncryptionTarget, bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error)) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EnumerateNamespaceEncryptionTargets", ctx, callback)
 	ret0, _ := ret[0].(error)
@@ -714,7 +714,7 @@ func (mr *MockDBMockRecorder) EnumerateNamespaceEncryptionTargets(ctx, callback 
 }
 
 // EnumerateOAuth2TokensExpiringWithin mocks base method.
-func (m *MockDB) EnumerateOAuth2TokensExpiringWithin(ctx context.Context, duration time.Duration, callback func([]*database.OAuth2TokenWithConnection, bool) (bool, error)) error {
+func (m *MockDB) EnumerateOAuth2TokensExpiringWithin(ctx context.Context, duration time.Duration, callback func([]*database.OAuth2TokenWithConnection, bool) (pagination.KeepGoing, error)) error {
 	m.ctrl.T.Helper()
 	ret := m.ctrl.Call(m, "EnumerateOAuth2TokensExpiringWithin", ctx, duration, callback)
 	ret0, _ := ret[0].(error)
@@ -1408,20 +1408,6 @@ func (mr *MockDBMockRecorder) SetConnectionEncryptedConfiguration(ctx, id, encry
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectionEncryptedConfiguration", reflect.TypeOf((*MockDB)(nil).SetConnectionEncryptedConfiguration), ctx, id, encryptedConfig)
 }
 
-// SetConnectionSetupStep mocks base method.
-func (m *MockDB) SetConnectionSetupStep(ctx context.Context, id apid.ID, setupStep *connectors.SetupStep) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetConnectionSetupStep", ctx, id, setupStep)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetConnectionSetupStep indicates an expected call of SetConnectionSetupStep.
-func (mr *MockDBMockRecorder) SetConnectionSetupStep(ctx, id, setupStep interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectionSetupStep", reflect.TypeOf((*MockDB)(nil).SetConnectionSetupStep), ctx, id, setupStep)
-}
-
 // SetConnectionSetupError mocks base method.
 func (m *MockDB) SetConnectionSetupError(ctx context.Context, id apid.ID, setupError *string) error {
 	m.ctrl.T.Helper()
@@ -1434,6 +1420,20 @@ func (m *MockDB) SetConnectionSetupError(ctx context.Context, id apid.ID, setupE
 func (mr *MockDBMockRecorder) SetConnectionSetupError(ctx, id, setupError interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectionSetupError", reflect.TypeOf((*MockDB)(nil).SetConnectionSetupError), ctx, id, setupError)
+}
+
+// SetConnectionSetupStep mocks base method.
+func (m *MockDB) SetConnectionSetupStep(ctx context.Context, id apid.ID, setupStep *connectors.SetupStep) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetConnectionSetupStep", ctx, id, setupStep)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetConnectionSetupStep indicates an expected call of SetConnectionSetupStep.
+func (mr *MockDBMockRecorder) SetConnectionSetupStep(ctx, id, setupStep interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectionSetupStep", reflect.TypeOf((*MockDB)(nil).SetConnectionSetupStep), ctx, id, setupStep)
 }
 
 // SetConnectionState mocks base method.

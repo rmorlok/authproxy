@@ -14,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encfield"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
 )
@@ -597,9 +598,9 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		// Verify the namespace got the correct target
 		var collected []database.NamespaceEncryptionTarget
 		err = db.EnumerateNamespaceEncryptionTargets(ctx,
-			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, bool, error) {
+			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 				collected = append(collected, targets...)
-				return nil, false, nil
+				return nil, pagination.Continue, nil
 			},
 		)
 		require.NoError(t, err)
@@ -677,9 +678,9 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		// Verify child inherited from parent
 		var collected []database.NamespaceEncryptionTarget
 		err = db.EnumerateNamespaceEncryptionTargets(ctx,
-			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, bool, error) {
+			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 				collected = append(collected, targets...)
-				return nil, false, nil
+				return nil, pagination.Continue, nil
 			},
 		)
 		require.NoError(t, err)
@@ -731,9 +732,9 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		// Verify namespace uses global key version
 		var collected []database.NamespaceEncryptionTarget
 		err = db.EnumerateNamespaceEncryptionTargets(ctx,
-			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, bool, error) {
+			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 				collected = append(collected, targets...)
-				return nil, false, nil
+				return nil, pagination.Continue, nil
 			},
 		)
 		require.NoError(t, err)
@@ -775,9 +776,9 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 		// Capture state after first sync
 		var firstCollected []database.NamespaceEncryptionTarget
 		err = db.EnumerateNamespaceEncryptionTargets(ctx,
-			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, bool, error) {
+			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 				firstCollected = append(firstCollected, targets...)
-				return nil, false, nil
+				return nil, pagination.Continue, nil
 			},
 		)
 		require.NoError(t, err)
@@ -788,9 +789,9 @@ func TestSyncKeysVersionsToDatabase(t *testing.T) {
 
 		var secondCollected []database.NamespaceEncryptionTarget
 		err = db.EnumerateNamespaceEncryptionTargets(ctx,
-			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, bool, error) {
+			func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
 				secondCollected = append(secondCollected, targets...)
-				return nil, false, nil
+				return nil, pagination.Continue, nil
 			},
 		)
 		require.NoError(t, err)

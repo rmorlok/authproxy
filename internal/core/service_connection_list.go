@@ -83,8 +83,8 @@ func (l *listConnectionsWrapper) FetchPage(ctx context.Context) pagination.PageR
 	return l.convertPageResult(ctx, l.executor().FetchPage(ctx))
 }
 
-func (l *listConnectionsWrapper) Enumerate(ctx context.Context, callback func(pagination.PageResult[iface.Connection]) (keepGoing bool, err error)) error {
-	return l.executor().Enumerate(ctx, func(result pagination.PageResult[database.Connection]) (keepGoing bool, err error) {
+func (l *listConnectionsWrapper) Enumerate(ctx context.Context, callback func(pagination.PageResult[iface.Connection]) (keepGoing pagination.KeepGoing, err error)) error {
+	return l.executor().Enumerate(ctx, func(result pagination.PageResult[database.Connection]) (keepGoing pagination.KeepGoing, err error) {
 		return callback(l.convertPageResult(ctx, result))
 	})
 }

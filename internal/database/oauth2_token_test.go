@@ -10,6 +10,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
 )
@@ -592,12 +593,12 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 				}
 
 				count := 0
-				err = db.EnumerateOAuth2TokensExpiringWithin(ctx, tc.duration, func(tokens []*OAuth2TokenWithConnection, lastPage bool) (bool, error) {
+				err = db.EnumerateOAuth2TokensExpiringWithin(ctx, tc.duration, func(tokens []*OAuth2TokenWithConnection, lastPage bool) (pagination.KeepGoing, error) {
 					if tc.callbackError {
-						return true, fmt.Errorf("callback error")
+						return pagination.Stop, fmt.Errorf("callback error")
 					}
 					count += len(tokens)
-					return false, nil
+					return pagination.Continue, nil
 				})
 
 				if tc.callbackError {

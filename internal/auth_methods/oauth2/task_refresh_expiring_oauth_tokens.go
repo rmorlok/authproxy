@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 const taskTypeRefreshExpiringOAuthTokens = "oauth2:refresh_expiring_oauth_tokens"
@@ -49,16 +50,16 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 	err := th.db.EnumerateOAuth2TokensExpiringWithin(
 		ctx,
 		refreshWithin,
-		func(tokensWithConnections []*database.OAuth2TokenWithConnection, lastPage bool) (stop bool, err error) {
+		func(tokensWithConnections []*database.OAuth2TokenWithConnection, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 			for _, tokenWithConnection := range tokensWithConnections {
 				t, err := newRefreshOauth2TokenTask(tokenWithConnection.Token.ConnectionId)
 				if err != nil {
-					return true, err
+					return pagination.Stop, err
 				}
 
 				ti, err := th.asynq.EnqueueContext(ctx, t)
 				if err != nil {
-					return true, err
+					return pagination.Stop, err
 				}
 				logger.Debug(
 					"token refresh task enqueued for connection",
@@ -69,7 +70,7 @@ func (th *taskHandler) refreshExpiringOauth2Tokens(ctx context.Context, t *asynq
 				queuedForRefresh++
 			}
 
-			return false, nil
+			return pagination.Continue, nil
 		},
 	)
 
