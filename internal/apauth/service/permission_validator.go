@@ -83,15 +83,22 @@ func (rpv *ResourcePermissionValidator) ContextWith(ctx context.Context) context
 
 // ValidateNamespaceResourceId validates that the actor has permission to perform the route's action on the specified
 // resource in the given namespace. A non-nil error implies the actor does not have access to the resource.
+//
+// When the route is configured with multiple verbs (ForVerbs), the action is allowed if any one
+// of the verbs is permitted (logical OR).
 func (rpv *ResourcePermissionValidator) ValidateNamespaceResourceId(ns, resourceId string) error {
 	rpv.hasBeenValidated = true
 
-	allowed, reason := rpv.ra.AllowsReason(ns, rpv.pvb.resource, rpv.pvb.verb, resourceId)
-	if !allowed {
-		return fmt.Errorf("permission denied: %s", reason)
+	var lastReason string
+	for _, verb := range rpv.pvb.verbs {
+		allowed, reason := rpv.ra.AllowsReason(ns, rpv.pvb.resource, verb, resourceId)
+		if allowed {
+			return nil
+		}
+		lastReason = reason
 	}
 
-	return nil
+	return fmt.Errorf("permission denied: %s", lastReason)
 }
 
 // ValidateNamespace validates that the actor has permission to perform the verb for the route in the specified
@@ -143,8 +150,20 @@ func (rpv *ResourcePermissionValidator) GetEffectiveNamespaceMatchers(queryMatch
 		return []string{aschema.NamespaceNoMatchSentinel} // No access if not authenticated
 	}
 
-	// Get the namespaces this actor can access for this resource/verb
-	allowedNamespaces := rpv.ra.GetNamespacesAllowed(rpv.pvb.resource, rpv.pvb.verb)
+	// Get the namespaces this actor can access for this resource and any of the configured verbs.
+	// When multiple verbs are configured, the result is the union of namespaces allowed for any
+	// single verb (logical OR).
+	var allowedNamespaces []string
+	seen := make(map[string]struct{})
+	for _, verb := range rpv.pvb.verbs {
+		for _, ns := range rpv.ra.GetNamespacesAllowed(rpv.pvb.resource, verb) {
+			if _, ok := seen[ns]; ok {
+				continue
+			}
+			seen[ns] = struct{}{}
+			allowedNamespaces = append(allowedNamespaces, ns)
+		}
+	}
 	if len(allowedNamespaces) == 0 {
 		return []string{} // Empty slice means no access
 	}
@@ -195,7 +214,7 @@ func (rpv *ResourcePermissionValidator) GetEffectiveNamespaceMatchers(queryMatch
 type PermissionValidatorBuilder struct {
 	s                   *service
 	resource            string
-	verb                string
+	verbs               []string
 	idField             string
 	namespace           string
 	namespaceQueryParam string
@@ -212,9 +231,17 @@ func (pb *PermissionValidatorBuilder) ForResource(resource string) *PermissionVa
 }
 
 // ForVerb sets the action being performed (e.g., "get", "list", "create", "delete").
-// This is required.
+// Either ForVerb or ForVerbs is required.
 func (pb *PermissionValidatorBuilder) ForVerb(verb string) *PermissionValidatorBuilder {
-	pb.verb = verb
+	pb.verbs = []string{verb}
+	return pb
+}
+
+// ForVerbs sets multiple actions, any of which may satisfy the permission check
+// (logical OR). Use this for endpoints that serve more than one activity — e.g.,
+// connection setup steps that participate in both create and update flows.
+func (pb *PermissionValidatorBuilder) ForVerbs(verbs ...string) *PermissionValidatorBuilder {
+	pb.verbs = verbs
 	return pb
 }
 
@@ -316,7 +343,7 @@ func (pb *PermissionValidatorBuilder) Build() gin.HandlerFunc {
 		panic("resource must be specified")
 	}
 
-	if pb.verb == "" {
+	if len(pb.verbs) == 0 {
 		panic("verb must be specified")
 	}
 
@@ -333,7 +360,19 @@ func (pb *PermissionValidatorBuilder) Build() gin.HandlerFunc {
 
 		applyValidatorToGinContext(gctx, validator)
 
-		return ra.AllowsReason(pb.getNamespace(gctx), pb.resource, pb.verb, pb.getResourceId(gctx))
+		ns := pb.getNamespace(gctx)
+		resourceId := pb.getResourceId(gctx)
+
+		var lastReason string
+		for _, verb := range pb.verbs {
+			allowed, r := ra.AllowsReason(ns, pb.resource, verb, resourceId)
+			if allowed {
+				return true, ""
+			}
+			lastReason = r
+		}
+
+		return false, lastReason
 	}
 
 	postValidator := func(gctx *gin.Context, ra *core.RequestAuth) {
