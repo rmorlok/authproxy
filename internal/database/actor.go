@@ -576,7 +576,7 @@ func (s *service) DeleteActor(ctx context.Context, id apid.ID) error {
 
 type ListActorsExecutor interface {
 	FetchPage(context.Context) pagination.PageResult[*Actor]
-	Enumerate(context.Context, func(pagination.PageResult[*Actor]) (keepGoing bool, err error)) error
+	Enumerate(context.Context, func(pagination.PageResult[*Actor]) (keepGoing pagination.KeepGoing, err error)) error
 }
 
 type ListActorsBuilder interface {
@@ -751,12 +751,12 @@ func (l *listActorsFilters) FetchPage(ctx context.Context) pagination.PageResult
 	return l.fetchPage(ctx)
 }
 
-func (l *listActorsFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[*Actor]) (keepGoing bool, err error)) error {
+func (l *listActorsFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[*Actor]) (keepGoing pagination.KeepGoing, err error)) error {
 	var err error
-	keepGoing := true
+	keepGoing := pagination.Continue
 	hasMore := true
 
-	for err == nil && hasMore && keepGoing {
+	for err == nil && hasMore && bool(keepGoing) {
 		result := l.FetchPage(ctx)
 		hasMore = result.HasMore
 

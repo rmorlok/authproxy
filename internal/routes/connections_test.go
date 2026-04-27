@@ -1716,5 +1716,219 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusBadRequest, w.Code)
 		})
+
+		// _submit accepts either "create" or "update" so the same endpoint serves both
+		// initial setup (driven by a create-only actor) and reconfigure (update-only actor).
+		t.Run("forbidden with unrelated verb", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connections/"+connId.String()+"/_submit",
+				util.JsonToReader(map[string]interface{}{
+					"data": map[string]interface{}{"key": "value"},
+				}),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connections", "list"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("create-only actor passes auth", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connections/"+connId.String()+"/_submit",
+				util.JsonToReader(map[string]interface{}{
+					"data": map[string]interface{}{"key": "value"},
+				}),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connections", "create"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			// Auth allowed (would otherwise be 403); request still 400 since no active setup step.
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("update-only actor passes auth", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connections/"+connId.String()+"/_submit",
+				util.JsonToReader(map[string]interface{}{
+					"data": map[string]interface{}{"key": "value"},
+				}),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connections", "update"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+	})
+
+	t.Run("get setup step", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		connId := apid.New(apid.PrefixConnection)
+		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
+			Id:               connId,
+			Namespace:        sconfig.RootNamespace,
+			ConnectorId:      connectorId,
+			ConnectorVersion: connectorVersion,
+			State:            database.ConnectionStateCreated,
+		})
+		require.NoError(t, err)
+
+		// _setup_step is part of the setup flow, so it accepts create or update —
+		// not get, since reading the in-progress setup state is gated on the same
+		// activity that produces it.
+		for _, verb := range []string{"create", "update"} {
+			t.Run(verb+"-only actor passes auth", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connections/"+connId.String()+"/_setup_step",
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connections", verb),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.NotEqual(t, http.StatusForbidden, w.Code)
+				require.NotEqual(t, http.StatusUnauthorized, w.Code)
+			})
+		}
+
+		t.Run("forbidden with get-only", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/"+connId.String()+"/_setup_step",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connections", "get"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+	})
+
+	t.Run("get data source", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		connId := apid.New(apid.PrefixConnection)
+		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
+			Id:               connId,
+			Namespace:        sconfig.RootNamespace,
+			ConnectorId:      connectorId,
+			ConnectorVersion: connectorVersion,
+			State:            database.ConnectionStateCreated,
+		})
+		require.NoError(t, err)
+
+		// _data_source serves dynamic options for the active setup step, so it accepts
+		// create or update — not get.
+		for _, verb := range []string{"create", "update"} {
+			t.Run(verb+"-only actor passes auth", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connections/"+connId.String()+"/_data_source/some-source",
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connections", verb),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.NotEqual(t, http.StatusForbidden, w.Code)
+				require.NotEqual(t, http.StatusUnauthorized, w.Code)
+			})
+		}
+
+		t.Run("forbidden with get-only", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/"+connId.String()+"/_data_source/some-source",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connections", "get"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+	})
+
+	t.Run("retry connection setup", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		connId := apid.New(apid.PrefixConnection)
+		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
+			Id:               connId,
+			Namespace:        sconfig.RootNamespace,
+			ConnectorId:      connectorId,
+			ConnectorVersion: connectorVersion,
+			State:            database.ConnectionStateCreated,
+		})
+		require.NoError(t, err)
+
+		// _retry accepts create or update so it serves both the initial-setup retry path
+		// and a reconfigure retry.
+		for _, verb := range []string{"create", "update"} {
+			t.Run(verb+"-only actor passes auth", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodPost,
+					"/connections/"+connId.String()+"/_retry",
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.**", "connections", verb),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.NotEqual(t, http.StatusForbidden, w.Code)
+				require.NotEqual(t, http.StatusUnauthorized, w.Code)
+			})
+		}
+
+		t.Run("forbidden with unrelated verb", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connections/"+connId.String()+"/_retry",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connections", "get"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
 	})
 }

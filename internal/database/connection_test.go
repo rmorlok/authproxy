@@ -381,9 +381,9 @@ func TestConnections(t *testing.T) {
 				ListConnectionsBuilder().
 				Limit(7).
 				OrderBy(ConnectionOrderByCreatedAt, pagination.OrderByDesc)
-			err := q.Enumerate(ctx, func(result pagination.PageResult[Connection]) (bool, error) {
+			err := q.Enumerate(ctx, func(result pagination.PageResult[Connection]) (pagination.KeepGoing, error) {
 				allResults = append(allResults, result.Results...)
-				return true, nil
+				return pagination.Continue, nil
 			})
 
 			assert.NoError(t, err)
@@ -862,9 +862,9 @@ func TestConnections(t *testing.T) {
 			err := db.
 				ListConnectionsBuilder().
 				WithDeletedHandling(DeletedHandlingInclude).
-				Enumerate(ctx, func(pr pagination.PageResult[Connection]) (keepGoing bool, err error) {
+				Enumerate(ctx, func(pr pagination.PageResult[Connection]) (keepGoing pagination.KeepGoing, err error) {
 					total += len(pr.Results)
-					return true, nil
+					return pagination.Continue, nil
 				})
 			assert.NoError(t, err)
 			assert.Equal(t, 203, total)
@@ -874,9 +874,9 @@ func TestConnections(t *testing.T) {
 			err := db.
 				ListConnectionsBuilder().
 				WithDeletedHandling(DeletedHandlingExclude).
-				Enumerate(ctx, func(pr pagination.PageResult[Connection]) (keepGoing bool, err error) {
+				Enumerate(ctx, func(pr pagination.PageResult[Connection]) (keepGoing pagination.KeepGoing, err error) {
 					total += len(pr.Results)
-					return true, nil
+					return pagination.Continue, nil
 				})
 			assert.NoError(t, err)
 			assert.Equal(t, 202, total)
@@ -887,9 +887,9 @@ func TestConnections(t *testing.T) {
 				ListConnectionsBuilder().
 				ForStates([]ConnectionState{ConnectionStateCreated, ConnectionStateReady}).
 				WithDeletedHandling(DeletedHandlingExclude).
-				Enumerate(ctx, func(pr pagination.PageResult[Connection]) (keepGoing bool, err error) {
+				Enumerate(ctx, func(pr pagination.PageResult[Connection]) (keepGoing pagination.KeepGoing, err error) {
 					total += len(pr.Results)
-					return true, nil
+					return pagination.Continue, nil
 				})
 			assert.NoError(t, err)
 			assert.Equal(t, 201, total)
@@ -900,9 +900,9 @@ func TestConnections(t *testing.T) {
 				ListConnectionsBuilder().
 				ForStates([]ConnectionState{ConnectionStateReady}).
 				WithDeletedHandling(DeletedHandlingExclude).
-				Enumerate(ctx, func(pr pagination.PageResult[Connection]) (keepGoing bool, err error) {
+				Enumerate(ctx, func(pr pagination.PageResult[Connection]) (keepGoing pagination.KeepGoing, err error) {
 					total += len(pr.Results)
-					return false, nil
+					return pagination.Stop, nil
 				})
 			assert.NoError(t, err)
 			assert.Equal(t, 100, total)

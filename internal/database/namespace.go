@@ -460,7 +460,7 @@ func (s *service) SetNamespaceState(ctx context.Context, path string, state Name
 
 type ListNamespacesExecutor interface {
 	FetchPage(context.Context) pagination.PageResult[Namespace]
-	Enumerate(context.Context, func(pagination.PageResult[Namespace]) (keepGoing bool, err error)) error
+	Enumerate(context.Context, func(pagination.PageResult[Namespace]) (keepGoing pagination.KeepGoing, err error)) error
 }
 
 type ListNamespacesBuilder interface {
@@ -677,12 +677,12 @@ func (l *listNamespacesFilters) FetchPage(ctx context.Context) pagination.PageRe
 	return l.fetchPage(ctx)
 }
 
-func (l *listNamespacesFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[Namespace]) (keepGoing bool, err error)) error {
+func (l *listNamespacesFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[Namespace]) (keepGoing pagination.KeepGoing, err error)) error {
 	var err error
-	keepGoing := true
+	keepGoing := pagination.Continue
 	hasMore := true
 
-	for err == nil && hasMore && keepGoing {
+	for err == nil && hasMore && bool(keepGoing) {
 		result := l.FetchPage(ctx)
 		hasMore = result.HasMore
 
@@ -944,7 +944,7 @@ type NamespaceTargetEncryptionKeyVersionUpdate struct {
 
 func (s *service) EnumerateNamespaceEncryptionTargets(
 	ctx context.Context,
-	callback func(targets []NamespaceEncryptionTarget, lastPage bool) (updates []NamespaceTargetEncryptionKeyVersionUpdate, stop bool, err error),
+	callback func(targets []NamespaceEncryptionTarget, lastPage bool) (updates []NamespaceTargetEncryptionKeyVersionUpdate, keepGoing pagination.KeepGoing, err error),
 ) error {
 	const pageSize = 100
 	offset := uint64(0)
@@ -979,7 +979,7 @@ func (s *service) EnumerateNamespaceEncryptionTargets(
 			results = results[:pageSize]
 		}
 
-		updates, stop, err := callback(results, lastPage)
+		updates, keepGoing, err := callback(results, lastPage)
 		if err != nil {
 			return err
 		}
@@ -1002,7 +1002,7 @@ func (s *service) EnumerateNamespaceEncryptionTargets(
 			}
 		}
 
-		if stop || lastPage {
+		if keepGoing == pagination.Stop || lastPage {
 			break
 		}
 

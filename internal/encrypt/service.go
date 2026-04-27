@@ -130,7 +130,7 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 		}
 	}()
 
-	_, err := s.db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*database.EncryptionKey, _ int) (stop bool, err error) {
+	_, err := s.db.EnumerateEncryptionKeysInDependencyOrder(ctx, func(keys []*database.EncryptionKey, _ int) (keepGoing pagination.KeepGoing, err error) {
 		for _, key := range keys {
 			var keyData *sconfig.KeyData
 			if key.Id == globalEncryptionKeyID {
@@ -171,7 +171,7 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 			// in the database will be ignored as it is the database sync that defines when new versions become
 			// available.
 			_ = s.db.EnumerateEncryptionKeyVersionsForKey(ctx, key.Id,
-				func(ekvs []*database.EncryptionKeyVersion, lastPage bool) (stop bool, err error) {
+				func(ekvs []*database.EncryptionKeyVersion, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 					for _, ekv := range ekvs {
 						if ekv.IsCurrent {
 							newEkToEkvCurrentVersionCache[ekv.EncryptionKeyId] = ekv.Id
@@ -191,12 +191,12 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 						}
 					}
 
-					return false, nil
+					return pagination.Continue, nil
 				},
 			)
 		}
 
-		return false, nil
+		return pagination.Continue, nil
 	})
 
 	if err != nil {
@@ -204,14 +204,14 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 	}
 
 	// Identify all the keys used for the namespaces
-	err = s.db.ListNamespacesBuilder().Enumerate(ctx, func(pr pagination.PageResult[database.Namespace]) (keepGoing bool, err error) {
+	err = s.db.ListNamespacesBuilder().Enumerate(ctx, func(pr pagination.PageResult[database.Namespace]) (keepGoing pagination.KeepGoing, err error) {
 		for _, ns := range pr.Results {
 			if ns.EncryptionKeyId != nil {
 				newNamespaceToEkCache[ns.Path] = *ns.EncryptionKeyId
 			}
 		}
 
-		return true, nil
+		return pagination.Continue, nil
 	})
 
 	if err != nil {

@@ -209,7 +209,7 @@ func TestResourcePermissionValidator_Validate(t *testing.T) {
 				}),
 				pvb: &PermissionValidatorBuilder{
 					resource:    tt.resource,
-					verb:        tt.verb,
+					verbs:       []string{tt.verb},
 					idExtractor: tt.idExtractor,
 				},
 			}
@@ -416,7 +416,7 @@ func TestGetEffectiveNamespaceMatchers(t *testing.T) {
 				ra: ra,
 				pvb: &PermissionValidatorBuilder{
 					resource: tt.resource,
-					verb:     tt.verb,
+					verbs:    []string{tt.verb},
 				},
 			}
 
@@ -428,6 +428,79 @@ func TestGetEffectiveNamespaceMatchers(t *testing.T) {
 
 func strPtr(s string) *string {
 	return &s
+}
+
+func TestGetEffectiveNamespaceMatchers_MultiVerb(t *testing.T) {
+	tests := []struct {
+		name         string
+		permissions  []aschema.Permission
+		verbs        []string
+		queryMatcher *string
+		expected     []string
+	}{
+		{
+			name: "union of namespaces across verbs",
+			permissions: []aschema.Permission{
+				{Namespace: "root.prod", Resources: []string{"connections"}, Verbs: []string{"create"}},
+				{Namespace: "root.staging", Resources: []string{"connections"}, Verbs: []string{"update"}},
+			},
+			verbs:    []string{"create", "update"},
+			expected: []string{"root.prod", "root.staging"},
+		},
+		{
+			name: "deduplicates namespaces granted by multiple verbs",
+			permissions: []aschema.Permission{
+				{Namespace: "root.prod", Resources: []string{"connections"}, Verbs: []string{"create", "update"}},
+			},
+			verbs:    []string{"create", "update"},
+			expected: []string{"root.prod"},
+		},
+		{
+			name: "single matching verb suffices",
+			permissions: []aschema.Permission{
+				{Namespace: "root.prod", Resources: []string{"connections"}, Verbs: []string{"create"}},
+			},
+			verbs:    []string{"create", "update"},
+			expected: []string{"root.prod"},
+		},
+		{
+			name: "no permissions for any verb returns empty",
+			permissions: []aschema.Permission{
+				{Namespace: "root.prod", Resources: []string{"connections"}, Verbs: []string{"get"}},
+			},
+			verbs:    []string{"create", "update"},
+			expected: []string{},
+		},
+		{
+			name: "query matcher intersects union",
+			permissions: []aschema.Permission{
+				{Namespace: "root.prod.**", Resources: []string{"connections"}, Verbs: []string{"create"}},
+				{Namespace: "root.staging.**", Resources: []string{"connections"}, Verbs: []string{"update"}},
+			},
+			verbs:        []string{"create", "update"},
+			queryMatcher: strPtr("root.prod.tenant1"),
+			expected:     []string{"root.prod.tenant1"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			ra := core.NewAuthenticatedRequestAuth(&core.Actor{
+				Permissions: tt.permissions,
+			})
+
+			validator := &ResourcePermissionValidator{
+				ra: ra,
+				pvb: &PermissionValidatorBuilder{
+					resource: "connections",
+					verbs:    tt.verbs,
+				},
+			}
+
+			result := validator.GetEffectiveNamespaceMatchers(tt.queryMatcher)
+			assert.ElementsMatch(t, tt.expected, result)
+		})
+	}
 }
 
 // filterTestResource implements hasNamespace and hasId for testing FilterForValidatedResources
@@ -508,7 +581,7 @@ func TestFilterForValidatedResources(t *testing.T) {
 				ra: ra,
 				pvb: &PermissionValidatorBuilder{
 					resource: tt.resource,
-					verb:     tt.verb,
+					verbs:    []string{tt.verb},
 				},
 			}
 
@@ -758,6 +831,101 @@ func TestValidatorOnRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 
 			require.True(t, panicOccurred)
+		})
+	})
+
+	t.Run("ForVerbs accepts any matching verb", func(t *testing.T) {
+		fakeRouteThatValidates := func(gctx *gin.Context) {
+			fm := &fakeModel{
+				namespace: "root.test",
+				id:        apid.MustParse("cxr_test0000000000001"),
+			}
+
+			val := MustGetValidatorFromGinContext(gctx)
+			httpErr := val.ValidateHttpStatusError(fm)
+			if httpErr != nil {
+				apgin.WriteError(gctx, nil, httpErr)
+				return
+			}
+
+			gctx.PureJSON(200, gin.H{"status": "ok"})
+		}
+
+		register := func(g gin.IRouter, auth A) {
+			g.GET(
+				"/cats",
+				auth.NewRequiredBuilder().
+					ForResource("cats").
+					ForVerbs("meow", "purr").
+					Build(),
+				fakeRouteThatValidates,
+			)
+		}
+
+		tu := setup(t, register)
+
+		t.Run("allowed - first verb only", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/cats",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "cats", "meow"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+		})
+
+		t.Run("allowed - second verb only", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/cats",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "cats", "purr"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+		})
+
+		t.Run("forbidden - none of the verbs", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/cats",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "cats", "woof"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("forbidden - resource id mismatch even with verb", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/cats",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingleWithResourceIds("root.**", "cats", "meow", "cxr_test0000000000002"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
 		})
 	})
 }

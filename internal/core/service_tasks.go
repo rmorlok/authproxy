@@ -33,7 +33,7 @@ func (s *service) GetCronTasks() []*asynq.PeriodicTaskConfig {
 		}).
 		Enumerate(
 			context.Background(),
-			func(pr pagination.PageResult[database.Connection]) (keepGoing bool, err error) {
+			func(pr pagination.PageResult[database.Connection]) (keepGoing pagination.KeepGoing, err error) {
 				for _, dbConn := range pr.Results {
 					logger := aplog.NewBuilder(s.logger).
 						WithConnectionId(dbConn.Id).
@@ -62,7 +62,7 @@ func (s *service) GetCronTasks() []*asynq.PeriodicTaskConfig {
 					}
 				}
 
-				return true, nil
+				return pagination.Continue, nil
 			},
 		)
 

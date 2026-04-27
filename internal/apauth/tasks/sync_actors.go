@@ -125,17 +125,17 @@ func (s *service) syncConfiguredActors(ctx context.Context, actors []*sconfig.Co
 	// Delete stale actors (those with the sync label but not in current config)
 	err := s.db.ListActorsBuilder().
 		ForLabelSelector(LabelConfiguredActorSyncSource).
-		Enumerate(ctx, func(result pagination.PageResult[*database.Actor]) (keepGoing bool, err error) {
+		Enumerate(ctx, func(result pagination.PageResult[*database.Actor]) (keepGoing pagination.KeepGoing, err error) {
 			for _, dbActor := range result.Results {
 				// Only delete actors with matching source label that aren't in current config
 				if dbActor.Labels[LabelConfiguredActorSyncSource] == sourceLabel && !expectedExternalIds[dbActor.ExternalId] {
 					s.logger.Info("deleting stale configured actor", "external_id", dbActor.ExternalId)
 					if err := s.db.DeleteActor(ctx, dbActor.Id); err != nil {
-						return false, fmt.Errorf("failed to delete stale actor %s: %w", dbActor.ExternalId, err)
+						return pagination.Stop, fmt.Errorf("failed to delete stale actor %s: %w", dbActor.ExternalId, err)
 					}
 				}
 			}
-			return true, nil
+			return pagination.Continue, nil
 		})
 
 	if err != nil {

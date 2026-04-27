@@ -694,7 +694,7 @@ func IsValidConnectorVersionOrderByField[T string | ConnectorVersionOrderByField
 
 type ListConnectorVersionsExecutor interface {
 	FetchPage(context.Context) pagination.PageResult[ConnectorVersion]
-	Enumerate(context.Context, func(pagination.PageResult[ConnectorVersion]) (keepGoing bool, err error)) error
+	Enumerate(context.Context, func(pagination.PageResult[ConnectorVersion]) (keepGoing pagination.KeepGoing, err error)) error
 }
 
 type ListConnectorVersionsBuilder interface {
@@ -903,12 +903,12 @@ func (l *listConnectorVersionsFilters) FetchPage(ctx context.Context) pagination
 	return l.fetchPage(ctx)
 }
 
-func (l *listConnectorVersionsFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[ConnectorVersion]) (keepGoing bool, err error)) error {
+func (l *listConnectorVersionsFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[ConnectorVersion]) (keepGoing pagination.KeepGoing, err error)) error {
 	var err error
-	keepGoing := true
+	keepGoing := pagination.Continue
 	hasMore := true
 
-	for err == nil && hasMore && keepGoing {
+	for err == nil && hasMore && bool(keepGoing) {
 		result := l.FetchPage(ctx)
 		hasMore = result.HasMore
 

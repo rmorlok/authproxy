@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"
 )
@@ -52,9 +53,9 @@ func TestReEncryptRegistry(t *testing.T) {
 		require.NoError(t, err)
 
 		var allTargets []ReEncryptionTarget
-		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (stop bool, err error) {
+		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 			allTargets = append(allTargets, targets...)
-			return false, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 
@@ -95,7 +96,7 @@ func TestReEncryptRegistry(t *testing.T) {
 		require.NoError(t, err)
 
 		var actorTargets []ReEncryptionTarget
-		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (stop bool, err error) {
+		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 			for _, tgt := range targets {
 				if tgt.Table == ActorTable {
 					if id, ok := tgt.PrimaryKeyValues[0].(string); ok && apid.ID(id) == actorId {
@@ -103,7 +104,7 @@ func TestReEncryptRegistry(t *testing.T) {
 					}
 				}
 			}
-			return false, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.Empty(t, actorTargets, "actor at target EKV should not appear")
@@ -137,7 +138,7 @@ func TestReEncryptRegistry(t *testing.T) {
 		require.NoError(t, err)
 
 		var tokenTargets []ReEncryptionTarget
-		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (stop bool, err error) {
+		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 			for _, tgt := range targets {
 				if tgt.Table == OAuth2TokensTable {
 					if id, ok := tgt.PrimaryKeyValues[0].(string); ok && apid.ID(id) == token.Id {
@@ -145,7 +146,7 @@ func TestReEncryptRegistry(t *testing.T) {
 					}
 				}
 			}
-			return false, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.Len(t, tokenTargets, 1, "only the mismatched field should appear")
@@ -178,7 +179,7 @@ func TestReEncryptRegistry(t *testing.T) {
 		require.NoError(t, err)
 
 		var tokenTargets []ReEncryptionTarget
-		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (stop bool, err error) {
+		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 			for _, tgt := range targets {
 				if tgt.Table == OAuth2TokensTable {
 					if id, ok := tgt.PrimaryKeyValues[0].(string); ok && apid.ID(id) == token.Id {
@@ -186,7 +187,7 @@ func TestReEncryptRegistry(t *testing.T) {
 					}
 				}
 			}
-			return false, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.Len(t, tokenTargets, 2, "both mismatched fields should appear")
@@ -225,7 +226,7 @@ func TestReEncryptRegistry(t *testing.T) {
 		require.NoError(t, err)
 
 		var found bool
-		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (stop bool, err error) {
+		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 			for _, tgt := range targets {
 				if tgt.Table == OAuth2TokensTable {
 					if id, ok := tgt.PrimaryKeyValues[0].(string); ok && apid.ID(id) == token.Id {
@@ -234,7 +235,7 @@ func TestReEncryptRegistry(t *testing.T) {
 					}
 				}
 			}
-			return false, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.True(t, found, "oauth2 token should resolve namespace via connections JOIN")
@@ -265,7 +266,7 @@ func TestReEncryptRegistry(t *testing.T) {
 		require.NoError(t, err)
 
 		var cvTargets []ReEncryptionTarget
-		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (stop bool, err error) {
+		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 			for _, tgt := range targets {
 				if tgt.Table == ConnectorVersionsTable {
 					if id, ok := tgt.PrimaryKeyValues[0].(string); ok && apid.ID(id) == cvId {
@@ -273,7 +274,7 @@ func TestReEncryptRegistry(t *testing.T) {
 					}
 				}
 			}
-			return false, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.Len(t, cvTargets, 1)
@@ -300,7 +301,7 @@ func TestReEncryptRegistry(t *testing.T) {
 		require.NoError(t, err)
 
 		var actorTargets []ReEncryptionTarget
-		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (stop bool, err error) {
+		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 			for _, tgt := range targets {
 				if tgt.Table == ActorTable {
 					if id, ok := tgt.PrimaryKeyValues[0].(string); ok && apid.ID(id) == actorId {
@@ -308,7 +309,7 @@ func TestReEncryptRegistry(t *testing.T) {
 					}
 				}
 			}
-			return false, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.Empty(t, actorTargets, "actor with NULL encrypted_key should not appear")
@@ -368,9 +369,9 @@ func TestReEncryptRegistry(t *testing.T) {
 
 		// No target EKV set on any namespace, so nothing should be returned
 		var allTargets []ReEncryptionTarget
-		err := db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (stop bool, err error) {
+		err := db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 			allTargets = append(allTargets, targets...)
-			return false, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.Empty(t, allTargets)
@@ -395,7 +396,7 @@ func TestReEncryptRegistry(t *testing.T) {
 		require.NoError(t, err)
 
 		var actorTargets []ReEncryptionTarget
-		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (stop bool, err error) {
+		err = db.EnumerateFieldsRequiringReEncryption(ctx, func(targets []ReEncryptionTarget, lastPage bool) (keepGoing pagination.KeepGoing, err error) {
 			for _, tgt := range targets {
 				if tgt.Table == ActorTable {
 					if id, ok := tgt.PrimaryKeyValues[0].(string); ok && apid.ID(id) == actorId {
@@ -403,7 +404,7 @@ func TestReEncryptRegistry(t *testing.T) {
 					}
 				}
 			}
-			return false, nil
+			return pagination.Continue, nil
 		})
 		require.NoError(t, err)
 		require.Empty(t, actorTargets, "namespace with NULL target should not produce targets")

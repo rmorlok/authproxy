@@ -12,6 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/util"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
 const EncryptionKeyVersionsTable = "encryption_key_versions"
@@ -392,7 +393,7 @@ func (s *service) SetEncryptionKeyVersionCurrentFlag(ctx context.Context, id api
 func (s *service) EnumerateEncryptionKeyVersionsForKey(
 	ctx context.Context,
 	ekId apid.ID,
-	callback func(ekvs []*EncryptionKeyVersion, lastPage bool) (stop bool, err error),
+	callback func(ekvs []*EncryptionKeyVersion, lastPage bool) (keepGoing pagination.KeepGoing, err error),
 ) error {
 	const pageSize = 100
 	offset := uint64(0)
@@ -430,12 +431,12 @@ func (s *service) EnumerateEncryptionKeyVersionsForKey(
 			results = results[:pageSize]
 		}
 
-		stop, err := callback(results, lastPage)
+		keepGoing, err := callback(results, lastPage)
 		if err != nil {
 			return err
 		}
 
-		if stop || lastPage {
+		if keepGoing == pagination.Stop || lastPage {
 			break
 		}
 
