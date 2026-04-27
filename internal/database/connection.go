@@ -141,6 +141,14 @@ func (c *Connection) GetNamespace() string {
 	return c.Namespace
 }
 
+func (c *Connection) GetLabels() map[string]string {
+	return c.Labels
+}
+
+func (c *Connection) GetAnnotations() map[string]string {
+	return c.Annotations
+}
+
 func (c *Connection) Validate() error {
 	result := &multierror.Error{}
 

@@ -408,110 +408,22 @@ type SwaggerUpdateConnectionRequest struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 }
 
-// SwaggerPutConnectionLabelRequest is the request to set a single label on a connection
+// SwaggerKeyValueJson is a single key-value pair, used by both label
+// and annotation endpoints across all resource types.
 //
-//	@Description	Request to set a label value
-type SwaggerPutConnectionLabelRequest struct {
-	// Label value
-	Value string `json:"value" example:"production"`
-}
-
-// SwaggerConnectionLabelJson is a single label key-value pair
-//
-//	@Description	Connection label key-value pair
-type SwaggerConnectionLabelJson struct {
-	// Label key
+//	@Description	Key-value pair (label or annotation)
+type SwaggerKeyValueJson struct {
+	// Key
 	Key string `json:"key" example:"env"`
-	// Label value
+	// Value
 	Value string `json:"value" example:"production"`
 }
 
-// SwaggerConnectionAnnotationJson is a single connection annotation key-value pair
+// SwaggerPutKeyValueRequest is the body for PUT label/annotation
+// endpoints across all resource types.
 //
-//	@Description	Connection annotation key-value pair
-type SwaggerConnectionAnnotationJson struct {
-	// Annotation key
-	Key string `json:"key" example:"description"`
-	// Annotation value
-	Value string `json:"value" example:"Primary production connection"`
-}
-
-// SwaggerPutConnectionAnnotationRequest is the request to set a single annotation on a connection
-//
-//	@Description	Request to set an annotation value
-type SwaggerPutConnectionAnnotationRequest struct {
-	// Annotation value
-	Value string `json:"value" example:"Primary production connection"`
-}
-
-// SwaggerNamespaceAnnotationJson is a single namespace annotation key-value pair
-//
-//	@Description	Namespace annotation key-value pair
-type SwaggerNamespaceAnnotationJson struct {
-	// Annotation key
-	Key string `json:"key" example:"description"`
-	// Annotation value
-	Value string `json:"value" example:"Production namespace"`
-}
-
-// SwaggerPutNamespaceAnnotationRequest is the request to set a single annotation on a namespace
-//
-//	@Description	Request to set a namespace annotation value
-type SwaggerPutNamespaceAnnotationRequest struct {
-	// Annotation value
-	Value string `json:"value" example:"Production namespace"`
-}
-
-// SwaggerEncryptionKeyAnnotationJson is a single encryption key annotation key-value pair
-//
-//	@Description	Encryption key annotation key-value pair
-type SwaggerEncryptionKeyAnnotationJson struct {
-	// Annotation key
-	Key string `json:"key" example:"description"`
-	// Annotation value
-	Value string `json:"value" example:"Primary encryption key"`
-}
-
-// SwaggerPutEncryptionKeyAnnotationRequest is the request to set a single annotation on an encryption key
-//
-//	@Description	Request to set an encryption key annotation value
-type SwaggerPutEncryptionKeyAnnotationRequest struct {
-	// Annotation value
-	Value string `json:"value" example:"Primary encryption key"`
-}
-
-// SwaggerConnectorAnnotationJson is a single connector annotation key-value pair
-//
-//	@Description	Connector annotation key-value pair
-type SwaggerConnectorAnnotationJson struct {
-	// Annotation key
-	Key string `json:"key" example:"description"`
-	// Annotation value
-	Value string `json:"value" example:"Salesforce CRM connector"`
-}
-
-// SwaggerPutConnectorAnnotationRequest is the request to set a single annotation on a connector
-//
-//	@Description	Request to set a connector annotation value
-type SwaggerPutConnectorAnnotationRequest struct {
-	// Annotation value
-	Value string `json:"value" example:"Salesforce CRM connector"`
-}
-
-// SwaggerPutConnectorLabelRequest is the request to set a single label on a connector
-//
-//	@Description	Request to set a connector label value
-type SwaggerPutConnectorLabelRequest struct {
-	// Label value
-	Value string `json:"value" example:"production"`
-}
-
-// SwaggerConnectorLabelJson is a single connector label key-value pair
-//
-//	@Description	Connector label key-value pair
-type SwaggerConnectorLabelJson struct {
-	// Label key
-	Key string `json:"key" example:"env"`
-	// Label value
+//	@Description	Request to set a label or annotation value
+type SwaggerPutKeyValueRequest struct {
+	// Value to set
 	Value string `json:"value" example:"production"`
 }
