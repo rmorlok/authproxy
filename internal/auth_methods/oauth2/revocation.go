@@ -60,11 +60,6 @@ func (o *oAuth2Connection) revokeRefreshToken(ctx context.Context, token *databa
 		return err
 	}
 
-	accessToken, err := o.encrypt.DecryptString(ctx, token.EncryptedAccessToken)
-	if err != nil {
-		return err
-	}
-
 	c := o.httpf.
 		ForRequestType(httpf.RequestTypeOAuth).
 		ForConnection(o.connection).
@@ -80,10 +75,9 @@ func (o *oAuth2Connection) revokeRefreshToken(ctx context.Context, token *databa
 		Method("POST").
 		URL(revocationEndpoint).
 		Type("application/x-www-form-urlencoded").
-		AddHeader("accept", "application/json").
-		SetHeader("Authorization", "Bearer "+accessToken)
+		AddHeader("accept", "application/json")
 
-	for k, v := range o.auth.Token.QueryOverrides {
+	for k, v := range o.auth.Revocation.QueryOverrides {
 		req = req.SetQuery(k, v)
 	}
 
@@ -147,10 +141,9 @@ func (o *oAuth2Connection) revokeAccessToken(ctx context.Context, token *databas
 		Method("POST").
 		URL(revocationEndpoint).
 		Type("application/x-www-form-urlencoded").
-		AddHeader("accept", "application/json").
-		SetHeader("Authorization", "Bearer "+accessToken)
+		AddHeader("accept", "application/json")
 
-	for k, v := range o.auth.Token.QueryOverrides {
+	for k, v := range o.auth.Revocation.QueryOverrides {
 		req = req.SetQuery(k, v)
 	}
 

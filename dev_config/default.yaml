@@ -165,6 +165,7 @@ connectors:
         endpoint: https://oauth2.googleapis.com/token
       revocation:
         endpoint: https://oauth2.googleapis.com/revoke
+        supported_tokens: refresh_token
       scopes:
         - id: https://www.googleapis.com/auth/drive.readonly
           reason: |
@@ -206,6 +207,7 @@ connectors:
         endpoint: https://oauth2.googleapis.com/token
       revocation:
         endpoint: https://oauth2.googleapis.com/revoke
+        supported_tokens: refresh_token
       scopes:
         - id: https://www.googleapis.com/auth/calendar.readonly
           reason: |
@@ -274,6 +276,7 @@ connectors:
         endpoint: https://oauth2.googleapis.com/token
       revocation:
         endpoint: https://oauth2.googleapis.com/revoke
+        supported_tokens: refresh_token
       scopes:
         - id: https://www.googleapis.com/auth/gmail.readonly
           reason: |
