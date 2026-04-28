@@ -39,6 +39,22 @@ func TestAuthService(t *testing.T, serviceId sconfig.ServiceId, cfg config.C) (c
 	return TestAuthServiceWithDb(serviceId, cfg, db)
 }
 
+// NewResourcePermissionValidatorForTest constructs a ResourcePermissionValidator
+// suitable for unit tests that exercise handlers calling
+// MustGetValidatorFromGinContext / ValidateHttpStatusError without spinning up
+// the full auth service. Pass an authenticated *core.RequestAuth (typically
+// built from core.NewAuthenticatedRequestAuthWithPermissions) along with the
+// resource and verb the handler will check against.
+func NewResourcePermissionValidatorForTest(ra *core.RequestAuth, resource, verb string) *ResourcePermissionValidator {
+	return &ResourcePermissionValidator{
+		pvb: &PermissionValidatorBuilder{
+			resource: resource,
+			verbs:    []string{verb},
+		},
+		ra: ra,
+	}
+}
+
 func TestAuthServiceWithDb(serviceId sconfig.ServiceId, cfg config.C, db database.DB) (config.C, A, *AuthTestUtil) {
 	if cfg == nil {
 		cfg = config.FromRoot(&sconfig.Root{})

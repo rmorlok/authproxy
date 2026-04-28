@@ -574,9 +574,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Get all annotations for an actor by ID",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -638,9 +635,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Get a specific annotation value by key for an actor",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -668,7 +662,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ActorAnnotationJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -735,7 +729,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.PutActorAnnotationRequestJson"
+                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
                         }
                     }
                 ],
@@ -743,7 +737,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ActorAnnotationJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -785,12 +779,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Delete a specific annotation by key from an actor",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "actors"
                 ],
@@ -850,9 +838,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Get all labels associated with a specific actor",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -914,9 +899,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Get a specific label value by key for an actor",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -944,7 +926,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ActorLabelJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -1011,7 +993,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.PutActorLabelRequestJson"
+                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
                         }
                     }
                 ],
@@ -1019,7 +1001,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ActorLabelJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -1061,12 +1043,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Delete a specific label by key from an actor",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "actors"
                 ],
@@ -2007,9 +1983,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Get all annotations associated with a specific connection",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -2071,9 +2044,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Get a specific annotation value by key for a connection",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -2101,7 +2071,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerConnectionAnnotationJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -2168,7 +2138,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutConnectionAnnotationRequest"
+                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
                         }
                     }
                 ],
@@ -2176,7 +2146,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerConnectionAnnotationJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -2218,12 +2188,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Delete a specific annotation by key from a connection",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "connections"
                 ],
@@ -2283,9 +2247,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Get all labels associated with a specific connection",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -2347,9 +2308,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Get a specific label value by key for a connection",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -2377,7 +2335,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerConnectionLabelJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -2444,7 +2402,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutConnectionLabelRequest"
+                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
                         }
                     }
                 ],
@@ -2452,7 +2410,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerConnectionLabelJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -2494,12 +2452,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Delete a specific label by key from a connection",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "connections"
                 ],
@@ -2933,7 +2885,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ConnectorAnnotationJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -3000,7 +2952,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.PutConnectorAnnotationRequestJson"
+                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
                         }
                     }
                 ],
@@ -3008,7 +2960,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ConnectorAnnotationJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -3209,7 +3161,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerConnectorLabelJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -3276,7 +3228,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutConnectorLabelRequest"
+                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
                         }
                     }
                 ],
@@ -3284,7 +3236,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerConnectorLabelJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -3907,7 +3859,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ConnectorAnnotationJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -3981,7 +3933,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.PutConnectorAnnotationRequestJson"
+                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
                         }
                     }
                 ],
@@ -3989,7 +3941,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ConnectorAnnotationJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -4223,7 +4175,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerConnectorLabelJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -4297,7 +4249,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutConnectorLabelRequest"
+                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
                         }
                     }
                 ],
@@ -4305,7 +4257,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerConnectorLabelJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -4749,9 +4701,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Get all annotations associated with a specific encryption key",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -4813,9 +4762,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Get a specific annotation value by key for an encryption key",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -4843,7 +4789,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerEncryptionKeyAnnotationJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -4910,7 +4856,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutEncryptionKeyAnnotationRequest"
+                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
                         }
                     }
                 ],
@@ -4918,7 +4864,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerEncryptionKeyAnnotationJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -4929,6 +4875,12 @@ const docTemplateadmin_api = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/routes.ErrorResponse"
                         }
@@ -4954,12 +4906,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Delete a specific annotation by key from an encryption key",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "encryption_keys"
                 ],
@@ -4996,6 +4942,12 @@ const docTemplateadmin_api = `{
                             "$ref": "#/definitions/routes.ErrorResponse"
                         }
                     },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
                     "500": {
                         "description": "Internal Server Error",
                         "schema": {
@@ -5013,9 +4965,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Get all labels associated with a specific encryption key",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -5077,9 +5026,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Get a specific label value by key for an encryption key",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -5107,7 +5053,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.EncryptionKeyLabelJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -5174,7 +5120,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.PutEncryptionKeyLabelRequestJson"
+                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
                         }
                     }
                 ],
@@ -5182,7 +5128,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.EncryptionKeyLabelJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -5193,6 +5139,12 @@ const docTemplateadmin_api = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/routes.ErrorResponse"
                         }
@@ -5218,12 +5170,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Delete a specific label by key from an encryption key",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "encryption_keys"
                 ],
@@ -5256,6 +5202,12 @@ const docTemplateadmin_api = `{
                     },
                     "401": {
                         "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
                         "schema": {
                             "$ref": "#/definitions/routes.ErrorResponse"
                         }
@@ -5557,9 +5509,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Get all annotations associated with a specific namespace",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -5621,9 +5570,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Get a specific annotation value by key for a namespace",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -5651,7 +5597,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerNamespaceAnnotationJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -5718,7 +5664,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutNamespaceAnnotationRequest"
+                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
                         }
                     }
                 ],
@@ -5726,7 +5672,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerNamespaceAnnotationJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -5768,12 +5714,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Delete a specific annotation by key from a namespace",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "namespaces"
                 ],
@@ -5833,9 +5773,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Get all labels associated with a specific namespace",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -5897,9 +5834,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Get a specific label value by key for a namespace",
-                "consumes": [
-                    "application/json"
-                ],
                 "produces": [
                     "application/json"
                 ],
@@ -5927,7 +5861,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.NamespaceLabelJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -5994,7 +5928,7 @@ const docTemplateadmin_api = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.PutNamespaceLabelRequestJson"
+                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
                         }
                     }
                 ],
@@ -6002,7 +5936,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.NamespaceLabelJson"
+                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
                         }
                     },
                     "400": {
@@ -6044,12 +5978,6 @@ const docTemplateadmin_api = `{
                     }
                 ],
                 "description": "Delete a specific label by key from a namespace",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
                 "tags": [
                     "namespaces"
                 ],
@@ -6466,17 +6394,6 @@ const docTemplateadmin_api = `{
         "github_com_rmorlok_authproxy_internal_schema_config.KeyData": {
             "type": "object"
         },
-        "routes.ActorAnnotationJson": {
-            "type": "object",
-            "properties": {
-                "key": {
-                    "type": "string"
-                },
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
         "routes.ActorJson": {
             "type": "object",
             "properties": {
@@ -6505,17 +6422,6 @@ const docTemplateadmin_api = `{
                     "type": "string"
                 },
                 "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "routes.ActorLabelJson": {
-            "type": "object",
-            "properties": {
-                "key": {
-                    "type": "string"
-                },
-                "value": {
                     "type": "string"
                 }
             }
@@ -6576,17 +6482,6 @@ const docTemplateadmin_api = `{
                     "description": "Response type (always \"redirect\")",
                     "type": "string",
                     "example": "redirect"
-                }
-            }
-        },
-        "routes.ConnectorAnnotationJson": {
-            "type": "object",
-            "properties": {
-                "key": {
-                    "type": "string"
-                },
-                "value": {
-                    "type": "string"
                 }
             }
         },
@@ -6672,17 +6567,6 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.EncryptionKeyLabelJson": {
-            "type": "object",
-            "properties": {
-                "key": {
-                    "type": "string"
-                },
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
         "routes.ErrorResponse": {
             "description": "Standardized error response",
             "type": "object",
@@ -6763,17 +6647,6 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.NamespaceLabelJson": {
-            "type": "object",
-            "properties": {
-                "key": {
-                    "type": "string"
-                },
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
         "routes.ProxyRequest": {
             "description": "Request to proxy an HTTP request through a connection",
             "type": "object",
@@ -6842,46 +6715,6 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.PutActorAnnotationRequestJson": {
-            "type": "object",
-            "properties": {
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
-        "routes.PutActorLabelRequestJson": {
-            "type": "object",
-            "properties": {
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
-        "routes.PutConnectorAnnotationRequestJson": {
-            "type": "object",
-            "properties": {
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
-        "routes.PutEncryptionKeyLabelRequestJson": {
-            "type": "object",
-            "properties": {
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
-        "routes.PutNamespaceLabelRequestJson": {
-            "type": "object",
-            "properties": {
-                "value": {
-                    "type": "string"
-                }
-            }
-        },
         "routes.RetryConnectionRequest": {
             "type": "object",
             "properties": {
@@ -6896,22 +6729,6 @@ const docTemplateadmin_api = `{
             "properties": {
                 "data": {
                     "description": "Form data matching the JSON Schema provided in the form response"
-                }
-            }
-        },
-        "routes.SwaggerConnectionAnnotationJson": {
-            "description": "Connection annotation key-value pair",
-            "type": "object",
-            "properties": {
-                "key": {
-                    "description": "Annotation key",
-                    "type": "string",
-                    "example": "description"
-                },
-                "value": {
-                    "description": "Annotation value",
-                    "type": "string",
-                    "example": "Primary production connection"
                 }
             }
         },
@@ -6968,22 +6785,6 @@ const docTemplateadmin_api = `{
                 "updated_at": {
                     "description": "Last update timestamp",
                     "type": "string"
-                }
-            }
-        },
-        "routes.SwaggerConnectionLabelJson": {
-            "description": "Connection label key-value pair",
-            "type": "object",
-            "properties": {
-                "key": {
-                    "description": "Label key",
-                    "type": "string",
-                    "example": "env"
-                },
-                "value": {
-                    "description": "Label value",
-                    "type": "string",
-                    "example": "production"
                 }
             }
         },
@@ -7062,22 +6863,6 @@ const docTemplateadmin_api = `{
                     "description": "Connector version number",
                     "type": "integer",
                     "example": 1
-                }
-            }
-        },
-        "routes.SwaggerConnectorLabelJson": {
-            "description": "Connector label key-value pair",
-            "type": "object",
-            "properties": {
-                "key": {
-                    "description": "Label key",
-                    "type": "string",
-                    "example": "env"
-                },
-                "value": {
-                    "description": "Label value",
-                    "type": "string",
-                    "example": "production"
                 }
             }
         },
@@ -7201,22 +6986,6 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.SwaggerEncryptionKeyAnnotationJson": {
-            "description": "Encryption key annotation key-value pair",
-            "type": "object",
-            "properties": {
-                "key": {
-                    "description": "Annotation key",
-                    "type": "string",
-                    "example": "description"
-                },
-                "value": {
-                    "description": "Annotation value",
-                    "type": "string",
-                    "example": "Primary encryption key"
-                }
-            }
-        },
         "routes.SwaggerEncryptionKeyJson": {
             "description": "Encryption key configuration",
             "type": "object",
@@ -7279,6 +7048,22 @@ const docTemplateadmin_api = `{
                     "description": "Target state (pending, connected, disconnecting, disconnected, error)",
                     "type": "string",
                     "example": "connected"
+                }
+            }
+        },
+        "routes.SwaggerKeyValueJson": {
+            "description": "Key-value pair (label or annotation)",
+            "type": "object",
+            "properties": {
+                "key": {
+                    "description": "Key",
+                    "type": "string",
+                    "example": "env"
+                },
+                "value": {
+                    "description": "Value",
+                    "type": "string",
+                    "example": "production"
                 }
             }
         },
@@ -7388,22 +7173,6 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.SwaggerNamespaceAnnotationJson": {
-            "description": "Namespace annotation key-value pair",
-            "type": "object",
-            "properties": {
-                "key": {
-                    "description": "Annotation key",
-                    "type": "string",
-                    "example": "description"
-                },
-                "value": {
-                    "description": "Annotation value",
-                    "type": "string",
-                    "example": "Production namespace"
-                }
-            }
-        },
         "routes.SwaggerNamespaceJson": {
             "description": "Namespace for organizing resources",
             "type": "object",
@@ -7442,58 +7211,14 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.SwaggerPutConnectionAnnotationRequest": {
-            "description": "Request to set an annotation value",
+        "routes.SwaggerPutKeyValueRequest": {
+            "description": "Request to set a label or annotation value",
             "type": "object",
             "properties": {
                 "value": {
-                    "description": "Annotation value",
-                    "type": "string",
-                    "example": "Primary production connection"
-                }
-            }
-        },
-        "routes.SwaggerPutConnectionLabelRequest": {
-            "description": "Request to set a label value",
-            "type": "object",
-            "properties": {
-                "value": {
-                    "description": "Label value",
+                    "description": "Value to set",
                     "type": "string",
                     "example": "production"
-                }
-            }
-        },
-        "routes.SwaggerPutConnectorLabelRequest": {
-            "description": "Request to set a connector label value",
-            "type": "object",
-            "properties": {
-                "value": {
-                    "description": "Label value",
-                    "type": "string",
-                    "example": "production"
-                }
-            }
-        },
-        "routes.SwaggerPutEncryptionKeyAnnotationRequest": {
-            "description": "Request to set an encryption key annotation value",
-            "type": "object",
-            "properties": {
-                "value": {
-                    "description": "Annotation value",
-                    "type": "string",
-                    "example": "Primary encryption key"
-                }
-            }
-        },
-        "routes.SwaggerPutNamespaceAnnotationRequest": {
-            "description": "Request to set a namespace annotation value",
-            "type": "object",
-            "properties": {
-                "value": {
-                    "description": "Annotation value",
-                    "type": "string",
-                    "example": "Production namespace"
                 }
             }
         },

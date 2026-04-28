@@ -23,6 +23,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
@@ -1194,7 +1195,7 @@ func TestActorsRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ActorLabelJson
+			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "env", resp.Key)
 			require.Equal(t, "staging", resp.Value)
@@ -1284,7 +1285,7 @@ func TestActorsRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ActorLabelJson
+			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "env", resp.Key)
 			require.Equal(t, "production", resp.Value)
@@ -1317,7 +1318,7 @@ func TestActorsRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ActorLabelJson
+			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "version", resp.Key)
 			require.Equal(t, "v2", resp.Value)
@@ -1592,7 +1593,7 @@ func TestActorsRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ActorAnnotationJson
+			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "env", resp.Key)
 			require.Equal(t, "staging", resp.Value)
@@ -1669,7 +1670,7 @@ func TestActorsRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ActorAnnotationJson
+			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "env", resp.Key)
 			require.Equal(t, "production", resp.Value)
@@ -1697,7 +1698,7 @@ func TestActorsRoutes(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusOK, w.Code)
 
-			var resp ActorAnnotationJson
+			var resp key_value.KeyValueJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, "version", resp.Key)
 			require.Equal(t, "v2", resp.Value)
