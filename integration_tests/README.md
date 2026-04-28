@@ -136,6 +136,7 @@ This is a separate Go module (`integration_tests/go.mod`) that depends on the ma
 - **Redis Stack** on port 6380 (avoids conflicts with local dev on 6379)
 - **ClickHouse** on port 8124 (avoids conflicts with local dev on 8123)
 - **MinIO** on port 9003 (avoids conflicts with local dev on 9000/9002)
+- **OAuth test provider** ([rmorlok/go-oauth2-server](https://github.com/rmorlok/go-oauth2-server)) on port 8086, plus its own etcd and postgres (internal-only). Brought up as part of the OAuth integration test work in [#159](https://github.com/rmorlok/authproxy/issues/159). Currently transitional — see `docs/oauth_test_provider_gaps.md` for the planned upstream changes that will let tests drive it.
 
 Each test gets a full authproxy server started in-process using `service.DependencyManager` and the real `GetGinServer()` functions. The server connects to the Docker services above.
 
@@ -150,6 +151,7 @@ integration_tests/
 ├── README.md
 ├── go.mod                       # Separate Go module
 ├── docker-compose.yml           # Test infrastructure
+├── oauth-etcd-config/           # One-shot image that seeds etcd config for the OAuth test provider
 ├── config/
 │   └── integration.yaml         # AuthProxy config for tests
 ├── helpers/                     # Shared test infrastructure
