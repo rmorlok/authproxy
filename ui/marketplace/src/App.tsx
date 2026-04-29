@@ -6,10 +6,15 @@ import { selectAuthStatus } from "./store";
 import Layout from './components/Layout';
 import ConnectorList from './components/ConnectorList';
 import ConnectionList from './components/ConnectionList';
+import Dev from './components/Dev';
 import { Error } from "./Error";
 
 export default function App() {
     const authStatus = useSelector(selectAuthStatus);
+
+    if (import.meta.env.DEV && window.location.pathname === '/dev') {
+        return <Dev />;
+    }
 
     if(authStatus === 'checking' || authStatus === 'redirecting') {
         return (
