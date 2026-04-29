@@ -1,21 +1,31 @@
 # $schema: ../config/schema.json
 
 public:
-  port: 8080
+  port:
+    env_var: AUTHPROXY_PUBLIC_PORT
+    default: 8080
   cookie:
     same_site: none
   tls:
     auto_gen_path: ./dev_config/keys/tls/
 
 api:
-  port: 8081
+  port:
+    env_var: AUTHPROXY_API_PORT
+    default: 8081
 
 admin_api:
-  port: 8082
+  port:
+    env_var: AUTHPROXY_ADMIN_API_PORT
+    default: 8082
   ui:
     enabled: true
-    base_url: http://localhost:5174
-    initiate_session_url: http://127.0.0.1:8888/login-redirect
+    base_url:
+      env_var: AUTHPROXY_ADMIN_UI_BASE_URL
+      default: http://localhost:5174
+    initiate_session_url:
+      env_var: AUTHPROXY_HOST_APP_INITIATE_SESSION_URL
+      default: http://127.0.0.1:8888/login-redirect
   cookie:
     same_site: none
   tls:
@@ -23,18 +33,22 @@ admin_api:
 
 worker:
   health_check_port:
-    env_var: HEALTH_CHECK_PORT
+    env_var: AUTHPROXY_WORKER_HEALTH_PORT
     default: 8083
   cron_sync_interval: 1m
 
 tasks:
   default_retention: 24h
-  
+
 host_application:
-  initiate_session_url: http://127.0.0.1:8888/login-redirect
+  initiate_session_url:
+    env_var: AUTHPROXY_HOST_APP_INITIATE_SESSION_URL
+    default: http://127.0.0.1:8888/login-redirect
 
 marketplace:
-  base_url: http://localhost:5173
+  base_url:
+    env_var: AUTHPROXY_MARKETPLACE_BASE_URL
+    default: http://localhost:5173
 
 system_auth:
   jwt_signing_key:

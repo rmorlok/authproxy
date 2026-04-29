@@ -7,7 +7,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gin-contrib/cors"
 	"github.com/gin-gonic/gin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apgin"
@@ -38,8 +37,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 
 	corsConfig := root.Api.CorsVal.ToGinCorsConfig(nil)
 	if corsConfig != nil {
-		logger.Info("Enabling CORS")
-		server.Use(cors.New(*corsConfig))
+		server.Use(apgin.NewCorsMiddleware(*corsConfig, logger))
 	}
 
 	// Swagger documentation endpoint

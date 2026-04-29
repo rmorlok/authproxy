@@ -60,8 +60,7 @@ func GetGinServer(
 
 	corsConfig := GetCorsConfig(dm.GetConfig())
 	if corsConfig != nil {
-		logger.Info("Enabling CORS")
-		server.Use(cors.New(*corsConfig))
+		server.Use(apgin.NewCorsMiddleware(*corsConfig, logger))
 	}
 
 	// Swagger documentation endpoint

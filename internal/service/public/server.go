@@ -66,8 +66,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 
 	corsConfig := GetCorsConfig(dm.GetConfig())
 	if corsConfig != nil {
-		logger.Info("Enabling CORS")
-		server.Use(cors.New(*corsConfig))
+		server.Use(apgin.NewCorsMiddleware(*corsConfig, logger))
 	}
 
 	if service.StaticVal != nil {
