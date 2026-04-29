@@ -4,14 +4,22 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"time"
 
 	"github.com/hibiken/asynq"
+	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/database"
 )
 
 const taskTypeDisconnectConnection = "core:disconnect_connection"
+
+// maxRevokeAttempts caps the number of times a revoke operation is retried
+// inside a single disconnect task invocation. After exhausting attempts, the
+// disconnect proceeds so a connection cannot get stuck in `disconnecting`
+// because a 3rd-party revoke endpoint is misbehaving.
+const maxRevokeAttempts = 3
 
 func newDisconnectConnectionTask(connectionId apid.ID) (*asynq.Task, error) {
 	payload, err := json.Marshal(disconnectConnectionTaskPayload{connectionId})
@@ -50,11 +58,35 @@ func (s *service) disconnectConnection(ctx context.Context, t *asynq.Task) error
 	revokeOps := conn.getRevokeCredentialsOperations()
 	if len(revokeOps) > 0 {
 		logger.Info("revoking credentials")
+		clk := apctx.GetClock(ctx)
 		for _, op := range revokeOps {
-			err = op(ctx)
-			if err != nil {
-				logger.Error("failed to revoke credentials", "error", err)
-				return fmt.Errorf("failed to revoke credentials: %w", err)
+			var lastErr error
+			for attempt := 1; attempt <= maxRevokeAttempts; attempt++ {
+				if ctxErr := ctx.Err(); ctxErr != nil {
+					return ctxErr
+				}
+				lastErr = op(ctx)
+				if lastErr == nil {
+					break
+				}
+				logger.Warn(
+					"revoke attempt failed",
+					"error", lastErr,
+					"attempt", attempt,
+					"max_attempts", maxRevokeAttempts,
+				)
+				if attempt < maxRevokeAttempts {
+					clk.Sleep(time.Duration(attempt) * time.Second)
+				}
+			}
+			if lastErr != nil {
+				// Proceed with the rest of the disconnect so the connection
+				// does not stay stuck in `disconnecting` forever.
+				logger.Error(
+					"revocation failed after max attempts; proceeding with disconnect",
+					"error", lastErr,
+					"attempts", maxRevokeAttempts,
+				)
 			}
 		}
 	}
