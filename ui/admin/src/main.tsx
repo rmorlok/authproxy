@@ -46,7 +46,11 @@ if ((window as any).AUTHPROXY_AUTH_TOKEN) {
 }
 
 // Trigger auth state to load as soon as the page loads.
-store.dispatch(initiateSessionAsync(params));
+// Skip auth in dev mode for the /dev inspection page so cookies/state can be inspected
+// without being redirected away.
+if (!(import.meta.env.DEV && window.location.pathname === '/dev')) {
+    store.dispatch(initiateSessionAsync(params));
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
     <React.StrictMode>
