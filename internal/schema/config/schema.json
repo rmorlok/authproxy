@@ -267,7 +267,7 @@
     "HostApplication": {
       "properties": {
         "initiate_session_url": {
-          "type": "string"
+          "$ref": "../common/schema.json#/$defs/StringValue"
         }
       },
       "additionalProperties": false,
@@ -530,7 +530,7 @@
           "$ref": "../common/schema.json#/$defs/StringValue"
         },
         "initiate_session_url": {
-          "type": "string"
+          "$ref": "../common/schema.json#/$defs/StringValue"
         }
       },
       "additionalProperties": false,

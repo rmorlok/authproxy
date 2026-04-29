@@ -149,13 +149,18 @@ type ServiceAdminUi struct {
 	// When redirecting to `redirect_url`, the host application should append an `auth_token` query param with a signed
 	// JWT for authenticating the user. This JWT should use a nonce and expiration to protect against session
 	// hijacking
-	InitiateSessionUrl string `json:"initiate_session_url" yaml:"initiate_session_url"`
+	InitiateSessionUrl *StringValue `json:"initiate_session_url" yaml:"initiate_session_url"`
 }
 
 func (s *ServiceAdminUi) GetInitiateSessionUrl(returnTo string) string {
-	u, err := url.Parse(s.InitiateSessionUrl)
+	raw := ""
+	if s.InitiateSessionUrl != nil {
+		raw, _ = s.InitiateSessionUrl.GetValue(context.Background())
+	}
+
+	u, err := url.Parse(raw)
 	if err != nil {
-		return s.InitiateSessionUrl
+		return raw
 	}
 
 	q := u.Query()

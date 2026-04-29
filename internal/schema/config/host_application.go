@@ -1,9 +1,10 @@
 package config
 
 import (
-	"github.com/rmorlok/authproxy/internal/schema/common"
-
+	"context"
 	"net/url"
+
+	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
 type HostApplication struct {
@@ -13,7 +14,7 @@ type HostApplication struct {
 	// When redirecting to `redirect_url`, the host application should append an `auth_token` query param with a signed
 	// JWT for authenticating the user. This JWT should use a nonce and expiration to protect against session
 	// hijacking
-	InitiateSessionUrl string `json:"initiate_session_url" yaml:"initiate_session_url"`
+	InitiateSessionUrl *StringValue `json:"initiate_session_url" yaml:"initiate_session_url"`
 }
 
 func (ha *HostApplication) Validate(vc *common.ValidationContext) error {
@@ -21,7 +22,7 @@ func (ha *HostApplication) Validate(vc *common.ValidationContext) error {
 		return vc.NewError("host_application must be specified")
 	}
 
-	if ha.InitiateSessionUrl == "" {
+	if ha.InitiateSessionUrl == nil || !ha.InitiateSessionUrl.HasValue(context.Background()) {
 		return vc.NewError("initiate_session_url must be specified")
 	}
 
@@ -29,9 +30,14 @@ func (ha *HostApplication) Validate(vc *common.ValidationContext) error {
 }
 
 func (ha *HostApplication) GetInitiateSessionUrl(returnTo string) string {
-	u, err := url.Parse(ha.InitiateSessionUrl)
+	raw := ""
+	if ha.InitiateSessionUrl != nil {
+		raw, _ = ha.InitiateSessionUrl.GetValue(context.Background())
+	}
+
+	u, err := url.Parse(raw)
 	if err != nil {
-		return ha.InitiateSessionUrl
+		return raw
 	}
 
 	q := u.Query()

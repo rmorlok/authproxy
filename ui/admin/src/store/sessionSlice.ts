@@ -33,16 +33,22 @@ export const initiateSessionAsync = createAsyncThunk<
             if (isInitiateSessionSuccessResponse(response.data)) {
                 return response.data;
             } else {
+                console.warn('[AuthProxy admin] session initiate returned a redirect', response.data);
                 return rejectWithValue(response.data);
             }
         } catch (error: any) {
-            // Handle unexpected errors
+            // Handle unexpected errors. The SDK already logged the underlying
+            // request failure; here we just record what we're going to do next.
             if (error.response?.data && !isInitiateSessionSuccessResponse(error.response.data)) {
+                console.warn('[AuthProxy admin] session initiate failed; using server-provided redirect', error.response.data);
                 return rejectWithValue(error.response.data);
             }
 
-            // Default error response
-            return rejectWithValue({ redirect_url: new URL('error', import.meta.env.VITE_ADMIN_BASE_URL).toString() });
+            const fallback = new URL('error', import.meta.env.VITE_ADMIN_BASE_URL).toString();
+            console.error(
+                `[AuthProxy admin] session initiate failed with no usable response; falling back to ${fallback}`,
+            );
+            return rejectWithValue({ redirect_url: fallback });
         }
     }
 );
@@ -73,8 +79,10 @@ export const sessionSlice = createSlice({
             .addCase(initiateSessionAsync.rejected, (state, action) => {
                 state.status = 'unauthenticated';
                 state.actor_id = null;
+                const target = action.payload?.redirect_url || import.meta.env.VITE_ADMIN_BASE_URL + '/error';
+                console.warn(`[AuthProxy admin] not authenticated; redirecting to ${target}`);
                 setTimeout(() => {
-                    window.location.href = action.payload?.redirect_url || import.meta.env.VITE_ADMIN_BASE_URL + '/error';
+                    window.location.href = target;
                 }, 0);
         });
     },

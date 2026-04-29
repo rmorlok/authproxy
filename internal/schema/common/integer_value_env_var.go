@@ -13,8 +13,10 @@ type IntegerValueEnvVar struct {
 }
 
 func (kev *IntegerValueEnvVar) HasValue(ctx context.Context) bool {
-	val, present := os.LookupEnv(kev.EnvVar)
-	return present && len(val) > 0
+	if val, present := os.LookupEnv(kev.EnvVar); present && len(val) > 0 {
+		return true
+	}
+	return kev.Default != nil
 }
 
 func (kev *IntegerValueEnvVar) GetValue(ctx context.Context) (int64, error) {

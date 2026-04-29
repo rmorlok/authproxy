@@ -12,8 +12,10 @@ type StringValueEnvVar struct {
 }
 
 func (kev *StringValueEnvVar) HasValue(ctx context.Context) bool {
-	val, present := os.LookupEnv(kev.EnvVar)
-	return present && len(val) > 0
+	if val, present := os.LookupEnv(kev.EnvVar); present && len(val) > 0 {
+		return true
+	}
+	return kev.Default != nil && len(*kev.Default) > 0
 }
 
 func (kev *StringValueEnvVar) GetValue(ctx context.Context) (string, error) {

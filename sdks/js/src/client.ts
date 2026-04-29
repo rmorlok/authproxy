@@ -31,6 +31,49 @@ const shouldIncludeXsrfToken = (config: any): boolean => {
   return true;
 };
 
+// Resolve the full request URL from an axios config, joining baseURL + url
+// the same way axios does, so log lines show what the browser actually sent.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const resolveRequestUrl = (config: any): string => {
+  const url: string = config?.url ?? '';
+  const baseURL: string = config?.baseURL ?? '';
+  if (!url) return baseURL;
+  if (/^https?:\/\//i.test(url) || !baseURL) return url;
+  return baseURL.replace(/\/+$/, '') + (url.startsWith('/') ? url : '/' + url);
+};
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const logRequestError = (error: any): void => {
+  if (typeof console === 'undefined') return;
+  const config = error?.config ?? {};
+  const method = (config.method ?? 'request').toString().toUpperCase();
+  const url = resolveRequestUrl(config);
+  const status = error?.response?.status;
+  const data = error?.response?.data;
+  const pageOrigin =
+    typeof window !== 'undefined' && window.location ? window.location.origin : '(non-browser)';
+
+  if (status) {
+    console.error(
+      `[AuthProxy SDK] ${method} ${url} failed: HTTP ${status}`,
+      { status, data, pageOrigin },
+    );
+    return;
+  }
+
+  // No response received — most commonly a CORS preflight rejection or the
+  // server being unreachable. The browser does not expose CORS errors to
+  // JS, so we have to infer; log enough to make the cause obvious.
+  console.error(
+    `[AuthProxy SDK] ${method} ${url} failed with no response. ` +
+      `This is usually a CORS rejection (the server returned no Access-Control-Allow-Origin ` +
+      `for page origin ${pageOrigin}) or the server being unreachable. ` +
+      `Check that the server's CORS allow list includes ${pageOrigin}, and that ` +
+      `the configured baseURL (${config.baseURL ?? '(unset)'}) is reachable.`,
+    { error },
+  );
+};
+
 // Wire up interceptors to an axios instance
 function attachInterceptors(instance: AxiosInstance) {
   // Response interceptor to extract XSRF tokens
@@ -45,6 +88,7 @@ function attachInterceptors(instance: AxiosInstance) {
       // Also check for XSRF tokens in error responses
       const token = extractXsrfToken(error?.response?.headers ?? {});
       if (token) xsrfToken = token;
+      logRequestError(error);
       return Promise.reject(error);
     }
   );
@@ -106,6 +150,15 @@ export function configureClient(opts: AuthProxyClientOptions = {}) {
   // Create new instance and attach interceptors
   client = axios.create(config);
   attachInterceptors(client);
+
+  if (typeof console !== 'undefined') {
+    const pageOrigin =
+      typeof window !== 'undefined' && window.location ? window.location.origin : '(non-browser)';
+    console.info(
+      `[AuthProxy SDK] client configured: baseURL=${baseURL ?? '(unset)'}, ` +
+        `withCredentials=${withCredentials}, page origin=${pageOrigin}`,
+    );
+  }
 }
 
 // Export function to manually set XSRF token (useful for testing or manual token management)
