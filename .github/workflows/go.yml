@@ -138,6 +138,25 @@ jobs:
       with:
         go-version: '1.24'
 
+    - name: Set up Node + Yarn
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install marketplace deps + build
+      run: |
+        corepack enable
+        yarn install --immutable
+        yarn workspace @authproxy/marketplace build
+
+    - name: Install Chromium for chromedp
+      run: |
+        sudo apt-get update
+        sudo apt-get install -y --no-install-recommends \
+          chromium-browser libnss3 libxss1 libasound2t64 libatk-bridge2.0-0 \
+          libgtk-3-0 libgbm1 fonts-liberation
+        which chromium-browser || which chromium || true
+
     - name: Start MinIO
       run: |
         docker run -d --name minio -p 9003:9000 \

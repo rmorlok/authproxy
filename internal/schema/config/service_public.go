@@ -94,8 +94,12 @@ func (s *ServicePublic) CookieSameSite() http.SameSite {
 	}
 
 	if s.StaticVal != nil {
-		// Assume the marketplace is being served from public service, so same site is ok
-		return http.SameSiteStrictMode
+		// Marketplace shares the public origin, but OAuth providers redirect the
+		// browser back to /oauth2/callback as a cross-site top-level navigation.
+		// Strict drops the session cookie on that hop and dead-ends the flow at
+		// the unauth redirect; Lax keeps CSRF protection on subresource POSTs
+		// while allowing the callback to authenticate.
+		return http.SameSiteLaxMode
 	}
 
 	return http.SameSiteNoneMode

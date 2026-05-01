@@ -3,6 +3,8 @@ package admin_api
 import (
 	"context"
 	"net/http"
+	"path/filepath"
+	"strings"
 	"sync"
 	"time"
 
@@ -180,6 +182,30 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		)
 		proxyRoutes.Register(api)
 	}
+
+	if service.StaticVal != nil {
+		// SPA fallback: a marketplace SPA owns its own client-side routing,
+		// so deep links like /connectors or /connections must serve the
+		// SPA's index.html (the SPA reads the URL itself). Without this,
+		// the static middleware would fall through to a 404 for those paths.
+		indexPath := filepath.Join(service.StaticVal.ServeFromPath, "index.html")
+		mountPrefix := strings.TrimSuffix(service.StaticVal.MountAtPath, "/")
+		server.NoRoute(func(c *gin.Context) {
+			if c.Request.Method != http.MethodGet {
+				return
+			}
+			p := c.Request.URL.Path
+			// Don't shadow API or OAuth flows — they should keep returning their own 404s.
+			if strings.HasPrefix(p, "/api/") || strings.HasPrefix(p, "/oauth2/") {
+				return
+			}
+			if mountPrefix != "" && !strings.HasPrefix(p, mountPrefix) {
+				return
+			}
+			c.File(indexPath)
+		})
+	}
+
 	return service.GetServerAndHealthChecker(server, healthChecker)
 }
 

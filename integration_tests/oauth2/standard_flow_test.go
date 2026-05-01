@@ -3,13 +3,16 @@
 package oauth2
 
 import (
+	"context"
 	"fmt"
 	"net/url"
 	"strings"
 	"testing"
 	"time"
 
+	"github.com/chromedp/chromedp"
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
@@ -18,8 +21,13 @@ import (
 )
 
 // TestStandardAuthorizationCodeFlow walks the standard authorization-code flow
-// end-to-end. See standard_flow_test.md for the scenario specification, the
-// component-deployment breakdown, and a sequence diagram.
+// end-to-end through real UIs: a headless Chrome opens the marketplace SPA,
+// clicks Connect on the connector card, the proxy redirects to the upstream
+// provider, the user logs in and approves the consent screen, and the proxy
+// stores tokens and lands the browser back on the return-to URL.
+//
+// See standard_flow_test.md for the scenario specification, component
+// breakdown, and sequence diagram.
 func TestStandardAuthorizationCodeFlow(t *testing.T) {
 	provider := helpers.NewOAuth2TestProvider(t)
 
@@ -28,7 +36,8 @@ func TestStandardAuthorizationCodeFlow(t *testing.T) {
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	clientKey := "standard-flow-client-" + suffix
 	clientSecret := "standard-flow-secret-" + suffix
-	const returnToUrl = "https://app.example.com/done"
+	userPassword := "p4ssw0rd-" + suffix
+	userEmail := "alice-" + suffix + "@example.com"
 
 	connectorID := apid.New(apid.PrefixConnectorVersion)
 	connector := helpers.NewOAuth2Connector(connectorID, "standard-flow-test", provider, helpers.OAuth2ConnectorOptions{
@@ -38,9 +47,11 @@ func TestStandardAuthorizationCodeFlow(t *testing.T) {
 	})
 
 	env := helpers.Setup(t, helpers.SetupOptions{
-		Service:       helpers.ServiceTypeAPI,
-		IncludePublic: true,
-		Connectors:    []sconfig.Connector{connector},
+		Service:            helpers.ServiceTypeAPI,
+		StartHTTPServer:    true,
+		IncludePublic:      true,
+		ServeMarketplaceUI: true,
+		Connectors:         []sconfig.Connector{connector},
 	})
 	defer env.Cleanup()
 
@@ -57,62 +68,78 @@ func TestStandardAuthorizationCodeFlow(t *testing.T) {
 	require.Equal(t, clientKey, registered.Key)
 
 	user := provider.CreateUser(helpers.CreateUserRequest{
-		Username: "alice-" + suffix + "@example.com",
-		Password: "p4ssw0rd",
-		Email:    "alice-" + suffix + "@example.com",
+		Username: userEmail,
+		Password: userPassword,
+		Email:    userEmail,
 	})
+	require.NotEmpty(t, user.ID)
 
-	// 1. Initiate the connection.
-	connectionID, redirectURL := env.InitiateOAuth2Connection(t, connectorID, returnToUrl)
-	require.NotEmpty(t, connectionID)
-
-	// The redirect points at the public service's /oauth2/redirect with a
-	// state_id and signed JWT.
-	parsedRedirect, err := url.Parse(redirectURL)
+	// Sign a marketplace auth_token for the test actor. The SPA's
+	// session._initiate exchanges this for a SESSION-ID cookie on first load.
+	authToken, err := env.PublicAuthUtil.GenerateBearerToken(
+		context.Background(),
+		"test-actor",
+		sconfig.RootNamespace,
+		aschema.AllPermissions(),
+	)
 	require.NoError(t, err)
-	assert.Contains(t, parsedRedirect.Path, "/oauth2/redirect")
-	assert.NotEmpty(t, parsedRedirect.Query().Get("state_id"))
-	assert.NotEmpty(t, parsedRedirect.Query().Get("auth_token"))
 
-	// 2. Follow the public redirect → expect Location pointing at the provider
-	// authorize endpoint with the OAuth params we care about.
-	providerAuthURL := env.FollowOAuth2Redirect(t, redirectURL)
-	parsedAuth, err := url.Parse(providerAuthURL)
-	require.NoError(t, err)
-	authQ := parsedAuth.Query()
+	// 1. Open the marketplace, signed in as the test actor.
+	browserCtx, _ := helpers.NewBrowser(t)
 
-	// Spec #1 — required authorize-URL params.
-	assert.Equal(t, clientKey, authQ.Get("client_id"))
-	assert.Equal(t, "code", authQ.Get("response_type"))
-	assert.Equal(t, callbackURL, authQ.Get("redirect_uri"))
-	assert.Equal(t, "read", authQ.Get("scope"))
-	stateParam := authQ.Get("state")
-	assert.NotEmpty(t, stateParam, "state must be present so the callback can correlate")
+	connectorsURL := env.PublicURL + "/connectors?auth_token=" + url.QueryEscape(authToken)
+	require.NoError(t, chromedp.Run(browserCtx,
+		chromedp.Navigate(connectorsURL),
+		// The Connect button only renders after the SPA's session._initiate
+		// resolves and the connectors API returns the test connector.
+		chromedp.WaitVisible(`//button[normalize-space()='Connect']`, chromedp.BySearch),
+	))
 
-	// 3. Drive provider authorize → user approves.
-	authResp := provider.Authorize(helpers.AuthorizeRequest{
-		ClientID:    clientKey,
-		UserID:      user.ID,
-		RedirectURI: callbackURL,
-		Scope:       "read",
-		State:       stateParam,
-		Decision:    helpers.AuthorizeApprove,
-	})
-	require.NotEmpty(t, authResp.RedirectURL)
+	// 2. Click Connect — the SPA initiates the connection and navigates to the
+	//    public service's /oauth2/redirect, which 302s to the provider.
+	require.NoError(t, chromedp.Run(browserCtx,
+		chromedp.Click(`//button[normalize-space()='Connect']`, chromedp.BySearch),
+		// Wait until we've left the marketplace; the redirect chain ends on
+		// the provider's /web/login form.
+		chromedp.WaitVisible(`input[name="email"]`, chromedp.ByQuery),
+	))
 
-	parsedCallback, err := url.Parse(authResp.RedirectURL)
-	require.NoError(t, err)
-	cbQ := parsedCallback.Query()
-	require.NotEmpty(t, cbQ.Get("code"), "approve must include code")
-	assert.Equal(t, stateParam, cbQ.Get("state"), "state must round-trip from authorize to callback")
+	// 3. Log in as the test user.
+	require.NoError(t, chromedp.Run(browserCtx,
+		chromedp.SendKeys(`input[name="email"]`, userEmail, chromedp.ByQuery),
+		chromedp.SendKeys(`input[name="password"]`, userPassword, chromedp.ByQuery),
+		chromedp.Submit(`input[name="email"]`, chromedp.ByQuery),
+		// Login redirects to /web/authorize, which renders the consent form.
+		chromedp.WaitVisible(`input[name="allow"]`, chromedp.ByQuery),
+	))
 
-	// 4. Deliver the callback to the proxy. The proxy exchanges the code for
-	// tokens, persists them, and redirects the user back to return_to_url.
-	finalURL := env.DeliverOAuth2Callback(t, authResp.RedirectURL)
-	assert.True(t, strings.HasPrefix(finalURL, returnToUrl),
-		"final redirect should target return_to_url, got %q", finalURL)
+	// 4. Click Allow. The provider redirects back to the proxy's callback,
+	//    which exchanges the code for tokens and lands the browser on
+	//    return_to_url (the marketplace's /connections page). Wait for the
+	//    "Your Connections" heading rendered by ConnectionList so we don't
+	//    inspect the URL mid-navigation.
+	expectedReturnPrefix := env.PublicURL + "/connections"
+	require.NoError(t, chromedp.Run(browserCtx,
+		chromedp.Click(`input[name="allow"]`, chromedp.ByQuery),
+		chromedp.WaitVisible(`//h1[normalize-space()='Your Connections']`, chromedp.BySearch),
+	))
 
-	// 5. Token persisted with non-empty encrypted material and a future expiry.
+	var finalURL string
+	require.NoError(t, chromedp.Run(browserCtx, chromedp.Location(&finalURL)))
+	assert.Truef(t, strings.HasPrefix(finalURL, expectedReturnPrefix),
+		"expected to land on return_to_url (%s), got %q", expectedReturnPrefix, finalURL)
+
+	// 5. Locate the new connection. The marketplace creates one new connection
+	//    per Connect click, so we list and pick the only one.
+	page := env.Db.ListConnectionsBuilder().
+		ForNamespaceMatcher(sconfig.RootNamespace).
+		Limit(10).
+		FetchPage(context.Background())
+	require.NoError(t, page.Error)
+	require.Lenf(t, page.Results, 1, "expected exactly one connection after Connect; got %d", len(page.Results))
+	connectionID := page.Results[0].Id.String()
+
+	// 6. Token persisted with non-empty encrypted material and a future expiry.
 	token := env.GetOAuth2Token(t, connectionID)
 	require.NotNil(t, token, "OAuth token row must be persisted after a successful callback")
 	assert.False(t, token.EncryptedAccessToken.IsZero(), "access token must be stored encrypted")
@@ -121,17 +148,17 @@ func TestStandardAuthorizationCodeFlow(t *testing.T) {
 	assert.True(t, token.AccessTokenExpiresAt.After(time.Now()),
 		"stored access token should not yet be expired (expires_at=%s)", token.AccessTokenExpiresAt)
 
-	// 6. Connection lands in `ready` (no probes/configure on this connector).
+	// 7. Connection lands in `ready` (no probes/configure on this connector).
 	conn := env.GetConnection(t, connectionID)
 	assert.Equal(t, database.ConnectionStateReady, conn.State,
 		"connection should be ready after a successful flow with no probes/configure steps")
 
-	// 7. Proxy a request to the provider's resource endpoint and expect 200.
+	// 8. Proxy a request to the provider's resource endpoint and expect 200.
 	w := env.DoProxyRequest(t, connectionID, provider.ResourceURL("/echo"), "GET")
 	require.Equalf(t, 200, w.Code, "proxy endpoint should return 200; body=%s", w.Body.String())
 
-	// 8. The provider must have observed both the token exchange and the
-	// proxied request, and the proxied request must have carried a Bearer.
+	// 9. The provider must have observed both the token exchange and the
+	//    proxied request, and the proxied request must have carried a Bearer.
 	tokenReqs := provider.Requests(helpers.RequestsFilter{
 		Endpoint: helpers.EndpointToken,
 		ClientID: clientKey,

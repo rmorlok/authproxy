@@ -369,10 +369,11 @@ func (p *OAuth2TestProvider) Requests(filter RequestsFilter) []RecordedRequest {
 // ----- URL helpers -----------------------------------------------------------
 
 // AuthorizationEndpoint is the URL the proxy points its authorize step at.
-// In test mode this is /v1/oauth/authorize on the same host (test mode does
-// not change the standard endpoints).
+// go-oauth2-server serves the human-facing authorize/consent flow under
+// /web/authorize (GET shows the consent form, POST submits the decision);
+// /v1/oauth/* hosts the machine endpoints (tokens, introspect, revoke).
 func (p *OAuth2TestProvider) AuthorizationEndpoint() string {
-	return p.BaseURL + "/v1/oauth/authorize"
+	return p.BaseURL + "/web/authorize"
 }
 
 // TokenEndpoint is the URL for /v1/oauth/tokens.
