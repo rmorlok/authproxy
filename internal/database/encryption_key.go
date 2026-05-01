@@ -190,31 +190,45 @@ func (s *service) CreateEncryptionKey(ctx context.Context, ek *EncryptionKey) er
 		return err
 	}
 
-	ek.Labels = InjectSelfImplicitLabels(ek.Id, ek.Namespace, ek.Labels)
-	now := apctx.GetClock(ctx).Now()
-	ek.CreatedAt = now
-	ek.UpdatedAt = now
+	return s.transaction(func(tx *sql.Tx) error {
+		nsLabels, err := s.fetchLabelsForCarryForward(ctx, tx, NamespacesTable, sq.Eq{
+			"path":       ek.Namespace,
+			"deleted_at": nil,
+		})
+		if err != nil {
+			return err
+		}
 
-	dbResult, err := s.sq.
-		Insert(EncryptionKeysTable).
-		Columns(ek.cols()...).
-		Values(ek.values()...).
-		RunWith(s.db).
-		Exec()
-	if err != nil {
-		return fmt.Errorf("failed to create encryption key: %w", err)
-	}
+		ek.Labels = ApplyParentCarryForward(
+			ek.Labels,
+			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
+		)
+		ek.Labels = InjectSelfImplicitLabels(ek.Id, ek.Namespace, ek.Labels)
+		now := apctx.GetClock(ctx).Now()
+		ek.CreatedAt = now
+		ek.UpdatedAt = now
 
-	affected, err := dbResult.RowsAffected()
-	if err != nil {
-		return fmt.Errorf("failed to create encryption key: %w", err)
-	}
+		dbResult, err := s.sq.
+			Insert(EncryptionKeysTable).
+			Columns(ek.cols()...).
+			Values(ek.values()...).
+			RunWith(tx).
+			Exec()
+		if err != nil {
+			return fmt.Errorf("failed to create encryption key: %w", err)
+		}
 
-	if affected == 0 {
-		return errors.New("failed to create encryption key; no rows inserted")
-	}
+		affected, err := dbResult.RowsAffected()
+		if err != nil {
+			return fmt.Errorf("failed to create encryption key: %w", err)
+		}
 
-	return nil
+		if affected == 0 {
+			return errors.New("failed to create encryption key; no rows inserted")
+		}
+
+		return nil
+	})
 }
 
 func (s *service) UpdateEncryptionKey(ctx context.Context, id apid.ID, updates map[string]interface{}) (*EncryptionKey, error) {

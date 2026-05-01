@@ -670,6 +670,43 @@ func MergeApxyAndUserLabels(user, apxy Labels) Labels {
 	return out
 }
 
+// ParentCarryForward bundles a parent's resource-type token with the
+// parent's stored labels for use with ApplyParentCarryForward.
+type ParentCarryForward struct {
+	Rt     string
+	Labels Labels
+}
+
+// ApplyParentCarryForward composes a child resource's labels from the
+// parents listed and the user-supplied labels. For each parent it calls
+// BuildCarriedLabels(parent.Rt, parent.Labels) and merges the result; the
+// user's own labels are merged last among non-self entries (they cannot
+// collide with apxy/ keys because user input cannot reference the apxy/
+// namespace). Parents are applied in order, so a later parent's apxy/
+// pass-through overrides an earlier parent's — list parents from most
+// distant to most direct so the most direct ancestor wins on conflicts
+// (deeper-overrides-shallower).
+//
+// Callers should follow with InjectSelfImplicitLabels (or
+// InjectNamespaceSelfImplicitLabels for path-keyed namespaces) so the
+// child's own self-implicit labels override any same-keyed pass-through
+// from a parent.
+func ApplyParentCarryForward(userLabels Labels, parents ...ParentCarryForward) Labels {
+	out := make(Labels)
+	for _, p := range parents {
+		for k, v := range BuildCarriedLabels(p.Rt, p.Labels) {
+			out[k] = v
+		}
+	}
+	for k, v := range userLabels {
+		out[k] = v
+	}
+	if len(out) == 0 {
+		return nil
+	}
+	return out
+}
+
 // BuildCarriedLabels takes a parent's labels and returns the carry-forward
 // labels for a child of the parent.
 //
@@ -695,4 +732,27 @@ func BuildCarriedLabels(parentRt string, parentLabels Labels) Labels {
 		out[fmt.Sprintf("%s%s/%s", ApxyReservedPrefix, parentRt, k)] = v
 	}
 	return out
+}
+
+// fetchLabelsForCarryForward returns the labels column for a row identified
+// by `where` in `table`, or nil if the row does not exist. Parent rows are
+// expected for carry-forward materialization but are not strictly required —
+// a missing parent simply yields no carry-forward and the daily consistency
+// checker can reconcile later if the parent appears.
+func (s *service) fetchLabelsForCarryForward(ctx context.Context, runner sq.BaseRunner, table string, where sq.Eq) (Labels, error) {
+	var labels Labels
+	err := s.sq.
+		Select("labels").
+		From(table).
+		Where(where).
+		RunWith(runner).
+		QueryRow().
+		Scan(&labels)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil
+		}
+		return nil, err
+	}
+	return labels, nil
 }

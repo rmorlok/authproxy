@@ -265,6 +265,24 @@ func (s *service) createNamespace(ctx context.Context, tx *sql.Tx, ns *Namespace
 	// Update the state so that we are always bound by the parent namespace state
 	ns.State = state
 
+	// Materialize parent-namespace carry-forward. Each ancestor namespace
+	// already stored its own ancestor chain at create time, so it suffices
+	// to pull labels from the immediate parent and re-key its user portion
+	// under apxy/ns/<k> while forwarding apxy/ entries as-is.
+	if len(prefixes) > 1 {
+		parentPath := prefixes[len(prefixes)-2]
+		parentLabels, err := s.fetchLabelsForCarryForward(ctx, tx, NamespacesTable, sq.Eq{
+			"path":       parentPath,
+			"deleted_at": nil,
+		})
+		if err != nil {
+			return err
+		}
+		ns.Labels = ApplyParentCarryForward(
+			ns.Labels,
+			ParentCarryForward{Rt: NamespaceLabelToken, Labels: parentLabels},
+		)
+	}
 	ns.Labels = InjectNamespaceSelfImplicitLabels(ns.Path, ns.Labels)
 
 	now := apctx.GetClock(ctx).Now()
