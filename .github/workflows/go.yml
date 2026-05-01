@@ -149,13 +149,10 @@ jobs:
         yarn install --immutable
         yarn workspace @authproxy/marketplace build
 
-    - name: Install Chromium for chromedp
-      run: |
-        sudo apt-get update
-        sudo apt-get install -y --no-install-recommends \
-          chromium-browser libnss3 libxss1 libasound2t64 libatk-bridge2.0-0 \
-          libgtk-3-0 libgbm1 fonts-liberation
-        which chromium-browser || which chromium || true
+    - name: Install Chrome for chromedp
+      uses: browser-actions/setup-chrome@v1
+      with:
+        chrome-version: stable
 
     - name: Start MinIO
       run: |
