@@ -136,6 +136,7 @@ This is a separate Go module (`integration_tests/go.mod`) that depends on the ma
 - **Redis Stack** on port 6380 (avoids conflicts with local dev on 6379)
 - **ClickHouse** on port 8124 (avoids conflicts with local dev on 8123)
 - **MinIO** on port 9003 (avoids conflicts with local dev on 9000/9002)
+- **OAuth test provider** ([rmorlok/go-oauth2-server](https://github.com/rmorlok/go-oauth2-server)) on port 8086, running in `--test-mode` (embedded SQLite, no remote config). The `/test/*` control plane lets tests register clients/users, drive authorize programmatically, script responses, and inspect recorded requests. See [test_mode_api.md](https://github.com/rmorlok/go-oauth2-server/blob/main/docs/test_mode_api.md) for the full API; `helpers.OAuth2TestProvider` wraps it.
 
 Each test gets a full authproxy server started in-process using `service.DependencyManager` and the real `GetGinServer()` functions. The server connects to the Docker services above.
 
@@ -153,10 +154,12 @@ integration_tests/
 ├── config/
 │   └── integration.yaml         # AuthProxy config for tests
 ├── helpers/                     # Shared test infrastructure
-│   ├── setup.go                 # IntegrationTestEnv creation and helpers
+│   ├── setup.go                 # IntegrationTestEnv creation, NewNoAuthConnector, NewOAuth2Connector
+│   ├── oauth2_provider.go       # OAuth2TestProvider — wraps go-oauth2-server's /test/* control plane
 │   ├── testserver.go            # In-process configurable HTTP test servers
 │   ├── noop_roundtripper.go     # No-op request log middleware
 │   └── util.go                  # Small utilities (JSON marshaling, etc.)
+├── oauth2/                      # OAuth2 integration tests (drive go-oauth2-server in test mode)
 ├── proxy/                       # Proxy/rate-limiting tests
 │   └── ratelimit_test.go
 ├── terraform/                   # Terraform provider acceptance tests

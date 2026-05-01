@@ -94,3 +94,25 @@ services:
       interval: 3s
       timeout: 3s
       retries: 10
+
+  # OAuth test provider (rmorlok/go-oauth2-server, --test-mode).
+  #
+  # Run with the test-mode control plane enabled: the server uses an embedded
+  # in-memory SQLite DB, skips remote config, and exposes /test/* control-plane
+  # endpoints for registering clients, users, scripting responses, and driving
+  # authorize programmatically. See:
+  #   https://github.com/rmorlok/go-oauth2-server/blob/main/docs/test_mode_api.md
+  oauth-server:
+    build:
+      context: https://github.com/rmorlok/go-oauth2-server.git#97552ba20cfb7c367b95db0b500c239a99c3d155
+    ports:
+      - "8086:8080"
+    # Bypass the upstream docker-entrypoint.sh: it waits for postgres+etcd
+    # before invoking the binary, which test-mode does not need (it uses an
+    # embedded SQLite DB and skips the remote-config backend).
+    entrypoint: ["go-oauth2-server"]
+    command: ["runserver", "--test-mode", "--test-port", "8080"]
+    # The upstream bookworm-slim runtime image has no wget/curl/python/nc, so
+    # an in-container healthcheck would need extra packages. Skip it — the
+    # OAuth2TestProvider helper polls /test/health from the host before the
+    # first request, and CI does the same after `docker compose up -d`.
