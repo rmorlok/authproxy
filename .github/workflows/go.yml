@@ -158,12 +158,21 @@ jobs:
     - name: Start OAuth2 test provider
       working-directory: integration_tests
       run: |
-        docker compose up -d --build --wait oauth-server
-        for i in $(seq 1 30); do
-          curl -sf http://localhost:8086/test/health && break
+        docker compose up -d --build oauth-server
+        # Poll from the host — the upstream runtime image ships without
+        # wget/curl/python so an in-container healthcheck would need extra
+        # packages.
+        for i in $(seq 1 60); do
+          if curl -sf http://localhost:8086/test/health; then
+            echo
+            echo "OAuth2 test provider is ready"
+            exit 0
+          fi
           sleep 1
         done
-        curl -sf http://localhost:8086/test/health
+        echo "OAuth2 test provider never became healthy — last container logs:"
+        docker logs integration_tests-oauth-server-1 2>&1 | tail -50
+        exit 1
 
     - name: Integration Tests
       working-directory: integration_tests
