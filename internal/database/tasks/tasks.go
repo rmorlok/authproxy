@@ -38,6 +38,8 @@ func NewTaskHandler(
 func (th *taskHandler) RegisterTasks(mux *asynq.ServeMux) {
 	mux.HandleFunc(taskTypePurgeSoftDeleted, th.purgeSoftDeletedRecords)
 	mux.HandleFunc(taskTypeCleanupStaleConnections, th.cleanupStaleConnections)
+	mux.HandleFunc(taskTypePropagateNamespaceLabels, th.propagateNamespaceLabels)
+	mux.HandleFunc(taskTypePropagateConnectorVersionLabels, th.propagateConnectorVersionLabels)
 }
 
 // GetCronTasks returns the cron task configurations for database maintenance.

@@ -1394,6 +1394,34 @@ func (mr *MockDBMockRecorder) PutNamespaceLabels(ctx, path, labels interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutNamespaceLabels", reflect.TypeOf((*MockDB)(nil).PutNamespaceLabels), ctx, path, labels)
 }
 
+// RefreshConnectionsForConnectorVersion mocks base method.
+func (m *MockDB) RefreshConnectionsForConnectorVersion(ctx context.Context, id apid.ID, version uint64) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RefreshConnectionsForConnectorVersion", ctx, id, version)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RefreshConnectionsForConnectorVersion indicates an expected call of RefreshConnectionsForConnectorVersion.
+func (mr *MockDBMockRecorder) RefreshConnectionsForConnectorVersion(ctx, id, version interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshConnectionsForConnectorVersion", reflect.TypeOf((*MockDB)(nil).RefreshConnectionsForConnectorVersion), ctx, id, version)
+}
+
+// RefreshNamespaceLabelsCarryForward mocks base method.
+func (m *MockDB) RefreshNamespaceLabelsCarryForward(ctx context.Context, nsPath string) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RefreshNamespaceLabelsCarryForward", ctx, nsPath)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// RefreshNamespaceLabelsCarryForward indicates an expected call of RefreshNamespaceLabelsCarryForward.
+func (mr *MockDBMockRecorder) RefreshNamespaceLabelsCarryForward(ctx, nsPath interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshNamespaceLabelsCarryForward", reflect.TypeOf((*MockDB)(nil).RefreshNamespaceLabelsCarryForward), ctx, nsPath)
+}
+
 // SetConnectionEncryptedConfiguration mocks base method.
 func (m *MockDB) SetConnectionEncryptedConfiguration(ctx context.Context, id apid.ID, encryptedConfig *encfield.EncryptedField) error {
 	m.ctrl.T.Helper()

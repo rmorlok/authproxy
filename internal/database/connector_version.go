@@ -414,14 +414,6 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				logger.Error("expected to update 1 row for connector version", "got", count)
 				return fmt.Errorf("expected to update 1 row for connector version, got %d", count)
 			}
-
-			// Propagate the label change to any connections pointing at this
-			// (id, version). In practice this only fires for draft connector
-			// versions — primary and active versions are immutable, and the
-			// guard above rejects modifications to those.
-			if err := s.refreshConnectionsForConnectorVersion(ctx, tx, cv.Id, cv.Version); err != nil {
-				return err
-			}
 		} else {
 			// No existing row at this version. Need to verify if there are existing rows, the new version is
 			// existing version + 1

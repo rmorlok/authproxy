@@ -8,9 +8,26 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	dbtasks "github.com/rmorlok/authproxy/internal/database/tasks"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
+
+// enqueueNamespaceLabelPropagation enqueues an asynq task that walks every
+// resource and child namespace under nsPath and re-derives the materialized
+// apxy/ns/* portion. Failures to enqueue are logged but do not fail the
+// originating user request — the daily consistency checker (#198) will
+// catch any drift if the task is dropped.
+func (s *service) enqueueNamespaceLabelPropagation(ctx context.Context, nsPath string) {
+	task, err := dbtasks.NewPropagateNamespaceLabelsTask(nsPath)
+	if err != nil {
+		s.logger.Error("failed to build namespace label propagation task", "namespace_path", nsPath, "error", err)
+		return
+	}
+	if _, err := s.ac.EnqueueContext(ctx, task); err != nil {
+		s.logger.Error("failed to enqueue namespace label propagation task", "namespace_path", nsPath, "error", err)
+	}
+}
 
 func (s *service) EnsureNamespaceAncestorPath(ctx context.Context, targetNamespace string, labels map[string]string) (iface.Namespace, error) {
 	if err := aschema.ValidateNamespacePath(targetNamespace); err != nil {
@@ -70,6 +87,7 @@ func (s *service) UpdateNamespaceLabels(ctx context.Context, path string, labels
 		return nil, err
 	}
 
+	s.enqueueNamespaceLabelPropagation(ctx, path)
 	return wrapNamespace(*ns, s), nil
 }
 
@@ -83,6 +101,7 @@ func (s *service) PutNamespaceLabels(ctx context.Context, path string, labels ma
 		return nil, err
 	}
 
+	s.enqueueNamespaceLabelPropagation(ctx, path)
 	return wrapNamespace(*ns, s), nil
 }
 
@@ -96,6 +115,7 @@ func (s *service) DeleteNamespaceLabels(ctx context.Context, path string, keys [
 		return nil, err
 	}
 
+	s.enqueueNamespaceLabelPropagation(ctx, path)
 	return wrapNamespace(*ns, s), nil
 }
 

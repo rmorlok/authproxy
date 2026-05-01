@@ -71,6 +71,10 @@ func TestConnectors(t *testing.T) {
 
 		ctrl := gomock.NewController(t)
 		ac := asynqmock.NewMockClient(ctrl)
+		// Connector-version label changes enqueue a propagation task. The
+		// route-level tests are not interested in the asynq side; allow any
+		// number of enqueue calls and let them succeed silently.
+		ac.EXPECT().EnqueueContext(gomock.Any(), gomock.Any()).AnyTimes().Return(nil, nil)
 		cfg, db := database.MustApplyBlankTestDbConfig(t, cfg)
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)

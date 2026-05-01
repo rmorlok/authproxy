@@ -2011,6 +2011,10 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 }
 
 func TestNamespaceLabelChangePropagation(t *testing.T) {
+	// These tests exercise RefreshNamespaceLabelsCarryForward directly. In
+	// production the asynq task scheduled by the core layer invokes it; we
+	// drive it inline here to assert the propagation primitive itself.
+
 	t.Run("Update propagates new user labels to descendants", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(2024, time.February, 1, 12, 0, 0, 0, time.UTC)
@@ -2049,6 +2053,8 @@ func TestNamespaceLabelChangePropagation(t *testing.T) {
 		// Replace root.t's labels — dog goes away, cow comes in.
 		_, err = db.UpdateNamespaceLabels(ctx, "root.t", map[string]string{"cow": "moo"})
 		require.NoError(t, err)
+		// Background propagation would normally run here; drive it inline.
+		require.NoError(t, db.RefreshNamespaceLabelsCarryForward(ctx, "root.t"))
 
 		// Actor in root.t: should see cow, not dog.
 		a, err = db.GetActor(ctx, actorIn_t)
@@ -2090,6 +2096,7 @@ func TestNamespaceLabelChangePropagation(t *testing.T) {
 
 		_, err := db.PutNamespaceLabels(ctx, "root.put", map[string]string{"team": "platform"})
 		require.NoError(t, err)
+		require.NoError(t, db.RefreshNamespaceLabelsCarryForward(ctx, "root.put"))
 
 		a, err := db.GetActor(ctx, actorID)
 		require.NoError(t, err)
@@ -2114,6 +2121,7 @@ func TestNamespaceLabelChangePropagation(t *testing.T) {
 
 		_, err := db.DeleteNamespaceLabels(ctx, "root.del", []string{"team"})
 		require.NoError(t, err)
+		require.NoError(t, db.RefreshNamespaceLabelsCarryForward(ctx, "root.del"))
 
 		a, err := db.GetActor(ctx, actorID)
 		require.NoError(t, err)
@@ -2124,6 +2132,8 @@ func TestNamespaceLabelChangePropagation(t *testing.T) {
 }
 
 func TestConnectorVersionLabelChangePropagation(t *testing.T) {
+	// As above, exercises RefreshConnectionsForConnectorVersion directly.
+
 	t.Run("Updating a draft cv refreshes connections that point at it", func(t *testing.T) {
 		_, db := MustApplyBlankTestDbConfig(t, nil)
 		now := time.Date(2024, time.February, 1, 12, 0, 0, 0, time.UTC)
@@ -2167,6 +2177,7 @@ func TestConnectorVersionLabelChangePropagation(t *testing.T) {
 			Hash:                "h2",
 			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "d2"},
 		}))
+		require.NoError(t, db.RefreshConnectionsForConnectorVersion(ctx, cvID, 1))
 
 		c, err = db.GetConnection(ctx, connID)
 		require.NoError(t, err)
