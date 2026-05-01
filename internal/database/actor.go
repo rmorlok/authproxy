@@ -393,7 +393,19 @@ func (s *service) CreateActor(ctx context.Context, a *Actor) error {
 			return fmt.Errorf("actor namespace does not exist: %w", ErrNamespaceDoesNotExist)
 		}
 
+		nsLabels, err := s.fetchLabelsForCarryForward(ctx, tx, NamespacesTable, sq.Eq{
+			"path":       a.Namespace,
+			"deleted_at": nil,
+		})
+		if err != nil {
+			return err
+		}
+
 		cpy := *a
+		cpy.Labels = ApplyParentCarryForward(
+			cpy.Labels,
+			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
+		)
 		cpy.Labels = InjectSelfImplicitLabels(cpy.Id, cpy.Namespace, cpy.Labels)
 		now := apctx.GetClock(ctx).Now()
 		cpy.CreatedAt = now
@@ -475,6 +487,17 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 				}
 				newActor.setFromData(d)
 				newActor.normalize()
+				nsLabels, err := s.fetchLabelsForCarryForward(ctx, tx, NamespacesTable, sq.Eq{
+					"path":       newActor.Namespace,
+					"deleted_at": nil,
+				})
+				if err != nil {
+					return err
+				}
+				newActor.Labels = ApplyParentCarryForward(
+					newActor.Labels,
+					ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
+				)
 				newActor.Labels = InjectSelfImplicitLabels(newActor.Id, newActor.Namespace, newActor.Labels)
 				validationErr := newActor.validate()
 				if validationErr != nil {

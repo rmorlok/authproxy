@@ -1858,6 +1858,49 @@ INSERT INTO namespaces
 			require.Equal(t, "root.n2", pr.Results[0].Path)
 		})
 	})
+
+	t.Run("CarryForwardOnCreate", func(t *testing.T) {
+		_, db, _ := MustApplyBlankTestDbConfigRaw(t, nil)
+		now := time.Date(2023, 10, 15, 12, 0, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		// Parent: root.foo with two user labels.
+		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+			Path:   "root.foo",
+			State:  NamespaceStateActive,
+			Labels: Labels{"dog": "woof", "cat": "meow"},
+		}))
+
+		// Child: root.foo.bar with one new user label. It should carry
+		// forward dog and cat from the parent under apxy/ns/, plus its own
+		// pig user label, plus the apxy/ns/-/* self-implicit pointing at
+		// root.foo.bar (which overrides any pass-through of root.foo's
+		// self-implicit on the same keys).
+		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+			Path:   "root.foo.bar",
+			State:  NamespaceStateActive,
+			Labels: Labels{"pig": "oink"},
+		}))
+
+		bar, err := db.GetNamespace(ctx, "root.foo.bar")
+		require.NoError(t, err)
+
+		// Own user label.
+		require.Equal(t, "oink", bar.Labels["pig"])
+
+		// Parent user labels carried forward under apxy/ns/.
+		require.Equal(t, "woof", bar.Labels["apxy/ns/dog"])
+		require.Equal(t, "meow", bar.Labels["apxy/ns/cat"])
+
+		// Child's own self-implicit wins over the parent's pass-through.
+		require.Equal(t, "root.foo.bar", bar.Labels["apxy/ns/-/id"])
+		require.Equal(t, "root.foo.bar", bar.Labels["apxy/ns/-/ns"])
+
+		// And the parent's user labels did NOT silently leak into the
+		// child's user portion.
+		_, hasDog := bar.Labels["dog"]
+		require.False(t, hasDog)
+	})
 }
 
 func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {

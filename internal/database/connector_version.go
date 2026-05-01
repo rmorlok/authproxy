@@ -433,7 +433,19 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				return errors.New("cannot insert connector version at non-sequential version")
 			}
 
+			nsLabels, err := s.fetchLabelsForCarryForward(ctx, tx, NamespacesTable, sq.Eq{
+				"path":       cv.Namespace,
+				"deleted_at": nil,
+			})
+			if err != nil {
+				return err
+			}
+
 			cpy := *cv
+			cpy.Labels = ApplyParentCarryForward(
+				cpy.Labels,
+				ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
+			)
 			cpy.Labels = InjectSelfImplicitLabels(cpy.Id, cpy.Namespace, cpy.Labels)
 			now := apctx.GetClock(ctx).Now()
 			cpy.CreatedAt = now

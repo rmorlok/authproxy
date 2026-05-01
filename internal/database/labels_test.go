@@ -611,3 +611,49 @@ func TestInjectNamespaceSelfImplicitLabels(t *testing.T) {
 	require.Equal(t, "root.foo.bar", out["apxy/ns/-/ns"])
 	require.Equal(t, "oink", out["pig"])
 }
+
+func TestApplyParentCarryForward(t *testing.T) {
+	t.Run("merges user labels with parent carry-forward", func(t *testing.T) {
+		parent := Labels{
+			"type":          "google_drive",
+			"apxy/ns/-/id":  "root",
+			"apxy/ns/-/ns":  "root",
+			"apxy/ns/dog":   "woof",
+		}
+		out := ApplyParentCarryForward(
+			Labels{"subscription_level": "pro"},
+			ParentCarryForward{Rt: "cxr", Labels: parent},
+		)
+		require.Equal(t, "pro", out["subscription_level"])
+		require.Equal(t, "google_drive", out["apxy/cxr/type"])
+		require.Equal(t, "root", out["apxy/ns/-/id"])
+		require.Equal(t, "woof", out["apxy/ns/dog"])
+	})
+
+	t.Run("later parent overrides earlier on apxy/ collisions", func(t *testing.T) {
+		// Two parents both forwarding apxy/ns/-/ns. The "more direct" parent
+		// (listed last) wins.
+		cv := Labels{"apxy/ns/-/id": "root", "apxy/ns/-/ns": "root"}
+		ns := Labels{"apxy/ns/-/id": "root.foo", "apxy/ns/-/ns": "root.foo"}
+		out := ApplyParentCarryForward(
+			nil,
+			ParentCarryForward{Rt: "cxr", Labels: cv},
+			ParentCarryForward{Rt: "ns", Labels: ns},
+		)
+		require.Equal(t, "root.foo", out["apxy/ns/-/id"])
+		require.Equal(t, "root.foo", out["apxy/ns/-/ns"])
+	})
+
+	t.Run("returns nil when nothing to apply", func(t *testing.T) {
+		require.Nil(t, ApplyParentCarryForward(nil))
+		require.Nil(t, ApplyParentCarryForward(nil, ParentCarryForward{Rt: "cxr", Labels: nil}))
+	})
+
+	t.Run("user labels survive when no parent labels", func(t *testing.T) {
+		out := ApplyParentCarryForward(
+			Labels{"team": "platform"},
+			ParentCarryForward{Rt: "cxr", Labels: nil},
+		)
+		require.Equal(t, Labels{"team": "platform"}, out)
+	})
+}

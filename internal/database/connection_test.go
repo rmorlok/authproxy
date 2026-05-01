@@ -1114,4 +1114,123 @@ func TestConnections(t *testing.T) {
 		require.NotNil(t, c.EncryptedAt)
 		assert.True(t, c.EncryptedAt.Equal(now))
 	})
+
+	t.Run("carry-forward labels from connector version and namespace on create", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig(t, nil)
+		now := time.Date(2024, time.January, 1, 12, 0, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		// Set up parents: namespace with user labels, then a connector
+		// version inside it with its own user label.
+		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+			Path:   "root.tenant-a",
+			State:  NamespaceStateActive,
+			Labels: Labels{"tier": "pro"},
+		}))
+
+		connectorID := apid.New(apid.PrefixConnectorVersion)
+		require.NoError(t, db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			Id:                  connectorID,
+			Version:             1,
+			Namespace:           "root.tenant-a",
+			State:               ConnectorVersionStateDraft,
+			Labels:              Labels{"type": "google-drive"},
+			Hash:                "h",
+			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "d"},
+		}))
+
+		// Create a connection that points at the connector version above.
+		connID := apid.New(apid.PrefixConnection)
+		require.NoError(t, db.CreateConnection(ctx, &Connection{
+			Id:               connID,
+			Namespace:        "root.tenant-a",
+			ConnectorId:      connectorID,
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+			Labels:           Labels{"subscription": "gold"},
+		}))
+
+		c, err := db.GetConnection(ctx, connID)
+		require.NoError(t, err)
+
+		// User labels survive.
+		assert.Equal(t, "gold", c.Labels["subscription"])
+
+		// Connection's own self-implicit labels.
+		assert.Equal(t, string(connID), c.Labels["apxy/cxn/-/id"])
+		assert.Equal(t, "root.tenant-a", c.Labels["apxy/cxn/-/ns"])
+
+		// Connector-version carry-forward: user labels re-keyed under apxy/cxr/
+		// plus the cv's self-implicit ids forwarded as-is.
+		assert.Equal(t, "google-drive", c.Labels["apxy/cxr/type"])
+		assert.Equal(t, string(connectorID), c.Labels["apxy/cxr/-/id"])
+		assert.Equal(t, "root.tenant-a", c.Labels["apxy/cxr/-/ns"])
+
+		// Namespace carry-forward: user label re-keyed under apxy/ns/, plus
+		// the ns self-implicit ids. The connection's own namespace
+		// (root.tenant-a) wins over the cv's pass-through (which also points
+		// at root.tenant-a here, so the value is the same; the ordering is
+		// covered by TestApplyParentCarryForward).
+		assert.Equal(t, "pro", c.Labels["apxy/ns/tier"])
+		assert.Equal(t, "root.tenant-a", c.Labels["apxy/ns/-/id"])
+		assert.Equal(t, "root.tenant-a", c.Labels["apxy/ns/-/ns"])
+	})
+
+	t.Run("selector queries hit materialized parent labels", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig(t, nil)
+		now := time.Date(2024, time.January, 1, 12, 0, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+			Path:  "root.sel",
+			State: NamespaceStateActive,
+		}))
+
+		cvDrive := apid.New(apid.PrefixConnectorVersion)
+		require.NoError(t, db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			Id:                  cvDrive,
+			Version:             1,
+			Namespace:           "root.sel",
+			State:               ConnectorVersionStateDraft,
+			Labels:              Labels{"type": "google-drive"},
+			Hash:                "h",
+			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "d"},
+		}))
+		cvSlack := apid.New(apid.PrefixConnectorVersion)
+		require.NoError(t, db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			Id:                  cvSlack,
+			Version:             1,
+			Namespace:           "root.sel",
+			State:               ConnectorVersionStateDraft,
+			Labels:              Labels{"type": "slack"},
+			Hash:                "h2",
+			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000002"), Data: "d"},
+		}))
+
+		driveConn := apid.New(apid.PrefixConnection)
+		require.NoError(t, db.CreateConnection(ctx, &Connection{
+			Id:               driveConn,
+			Namespace:        "root.sel",
+			ConnectorId:      cvDrive,
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+		}))
+		require.NoError(t, db.CreateConnection(ctx, &Connection{
+			Id:               apid.New(apid.PrefixConnection),
+			Namespace:        "root.sel",
+			ConnectorId:      cvSlack,
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+		}))
+
+		// Filter connections by the parent connector version's user label —
+		// works for free because Step 2b materializes the carry-forward into
+		// each connection's own labels column.
+		page := db.ListConnectionsBuilder().
+			ForLabelSelector("apxy/cxr/type=google-drive").
+			FetchPage(ctx)
+		require.NoError(t, page.Error)
+		require.Len(t, page.Results, 1)
+		assert.Equal(t, driveConn, page.Results[0].Id)
+	})
 }

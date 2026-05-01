@@ -200,32 +200,62 @@ func (s *service) CreateConnection(ctx context.Context, c *Connection) error {
 		return err
 	}
 
-	cpy := *c
-	cpy.Labels = InjectSelfImplicitLabels(cpy.Id, cpy.Namespace, cpy.Labels)
-	now := apctx.GetClock(ctx).Now()
-	cpy.CreatedAt = now
-	cpy.UpdatedAt = now
+	return s.transaction(func(tx *sql.Tx) error {
+		// Fetch parent labels for carry-forward materialization. Missing
+		// parents yield nil — the daily consistency checker reconciles any
+		// drift if the parent appears later.
+		cvLabels, err := s.fetchLabelsForCarryForward(ctx, tx, ConnectorVersionsTable, sq.Eq{
+			"id":         c.ConnectorId,
+			"version":    c.ConnectorVersion,
+			"deleted_at": nil,
+		})
+		if err != nil {
+			return err
+		}
+		nsLabels, err := s.fetchLabelsForCarryForward(ctx, tx, NamespacesTable, sq.Eq{
+			"path":       c.Namespace,
+			"deleted_at": nil,
+		})
+		if err != nil {
+			return err
+		}
 
-	result, err := s.sq.
-		Insert(ConnectionsTable).
-		Columns(cpy.cols()...).
-		Values(cpy.values()...).
-		RunWith(s.db).
-		Exec()
-	if err != nil {
-		return err
-	}
+		cpy := *c
+		// Order: cv first, ns second so the connection's own namespace
+		// overrides the cv's namespace pass-through on apxy/ns/-/* keys.
+		// Then InjectSelfImplicitLabels writes apxy/cxn/-/* on top.
+		cpy.Labels = ApplyParentCarryForward(
+			cpy.Labels,
+			ParentCarryForward{Rt: ApidPrefixToLabelToken(apid.PrefixConnectorVersion), Labels: cvLabels},
+			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
+		)
+		cpy.Labels = InjectSelfImplicitLabels(cpy.Id, cpy.Namespace, cpy.Labels)
 
-	affected, err := result.RowsAffected()
-	if err != nil {
-		return err
-	}
+		now := apctx.GetClock(ctx).Now()
+		cpy.CreatedAt = now
+		cpy.UpdatedAt = now
 
-	if affected == 0 {
-		return errors.New("failed to create connection; no rows inserted")
-	}
+		result, err := s.sq.
+			Insert(ConnectionsTable).
+			Columns(cpy.cols()...).
+			Values(cpy.values()...).
+			RunWith(tx).
+			Exec()
+		if err != nil {
+			return err
+		}
 
-	return nil
+		affected, err := result.RowsAffected()
+		if err != nil {
+			return err
+		}
+
+		if affected == 0 {
+			return errors.New("failed to create connection; no rows inserted")
+		}
+
+		return nil
+	})
 }
 
 func (s *service) GetConnection(ctx context.Context, id apid.ID) (*Connection, error) {
