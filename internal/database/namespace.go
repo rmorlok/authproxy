@@ -703,7 +703,7 @@ func (s *service) UpdateNamespaceLabels(ctx context.Context, path string, labels
 	}
 
 	if labels != nil {
-		if err := ValidateLabels(labels); err != nil {
+		if err := ValidateUserLabels(labels); err != nil {
 			return nil, fmt.Errorf("invalid labels: %w", err)
 		}
 	}
@@ -745,7 +745,7 @@ func (s *service) PutNamespaceLabels(ctx context.Context, path string, labels ma
 		return s.GetNamespace(ctx, path)
 	}
 
-	if err := ValidateLabels(labels); err != nil {
+	if err := ValidateUserLabels(labels); err != nil {
 		return nil, fmt.Errorf("invalid labels: %w", err)
 	}
 
@@ -784,6 +784,10 @@ func (s *service) DeleteNamespaceLabels(ctx context.Context, path string, keys [
 
 	if len(keys) == 0 {
 		return s.GetNamespace(ctx, path)
+	}
+
+	if err := ValidateUserLabelDeletionKeys(keys); err != nil {
+		return nil, fmt.Errorf("invalid label keys: %w", err)
 	}
 
 	var result *Namespace

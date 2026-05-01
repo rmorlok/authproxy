@@ -684,7 +684,7 @@ func (s *service) UpdateConnectionLabels(ctx context.Context, id apid.ID, labels
 	}
 
 	if labels != nil {
-		if err := ValidateLabels(labels); err != nil {
+		if err := ValidateUserLabels(labels); err != nil {
 			return nil, fmt.Errorf("invalid labels: %w", err)
 		}
 	}
@@ -737,7 +737,7 @@ func (s *service) PutConnectionLabels(ctx context.Context, id apid.ID, labels ma
 		return s.GetConnection(ctx, id)
 	}
 
-	if err := ValidateLabels(labels); err != nil {
+	if err := ValidateUserLabels(labels); err != nil {
 		return nil, fmt.Errorf("invalid labels: %w", err)
 	}
 
@@ -931,6 +931,10 @@ func (s *service) DeleteConnectionLabels(ctx context.Context, id apid.ID, keys [
 
 	if len(keys) == 0 {
 		return s.GetConnection(ctx, id)
+	}
+
+	if err := ValidateUserLabelDeletionKeys(keys); err != nil {
+		return nil, fmt.Errorf("invalid label keys: %w", err)
 	}
 
 	var result *Connection
