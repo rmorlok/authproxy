@@ -155,6 +155,16 @@ jobs:
           -e MC_HOST_minio=http://minioadmin:minioadmin@localhost:9003 \
           minio/mc mb --ignore-existing minio/authproxy-request-logs
 
+    - name: Start OAuth2 test provider
+      working-directory: integration_tests
+      run: |
+        docker compose up -d --build --wait oauth-server
+        for i in $(seq 1 30); do
+          curl -sf http://localhost:8086/test/health && break
+          sleep 1
+        done
+        curl -sf http://localhost:8086/test/health
+
     - name: Integration Tests
       working-directory: integration_tests
       env:
