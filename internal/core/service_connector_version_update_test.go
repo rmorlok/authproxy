@@ -18,10 +18,14 @@ import (
 func TestUpdateDraftConnectorVersion(t *testing.T) {
 	t.Run("success", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		s, db, _, _, _, e := FullMockService(t, ctrl)
+		s, db, _, _, ac, e := FullMockService(t, ctrl)
 
 		id := apid.MustParse("cxr_testaaaaaaaaaaaa")
 		ctx := context.Background()
+
+		// Successful update enqueues an asynq propagation task. The body
+		// of the task is opaque to this test; just verify it's submitted.
+		ac.EXPECT().EnqueueContext(gomock.Any(), gomock.Any()).Return(nil, nil)
 
 		// Existing draft version
 		db.EXPECT().
@@ -68,11 +72,13 @@ func TestUpdateDraftConnectorVersion(t *testing.T) {
 
 	t.Run("success keeps existing labels when nil", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
-		s, db, _, _, _, e := FullMockService(t, ctrl)
+		s, db, _, _, ac, e := FullMockService(t, ctrl)
 
 		id := apid.MustParse("cxr_testbbbbbbbbbbbb")
 		ctx := context.Background()
 		existingLabels := map[string]string{"env": "kept"}
+
+		ac.EXPECT().EnqueueContext(gomock.Any(), gomock.Any()).Return(nil, nil)
 
 		db.EXPECT().
 			GetConnectorVersion(gomock.Any(), id, uint64(1)).

@@ -54,6 +54,10 @@ func TestNamespaces(t *testing.T) {
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
 		ctrl := gomock.NewController(t)
 		ac := asynqmock.NewMockClient(ctrl)
+		// Namespace label changes enqueue a propagation task. The route-level
+		// tests are not interested in the asynq side; allow any number of
+		// enqueue calls and let them succeed silently.
+		ac.EXPECT().EnqueueContext(gomock.Any(), gomock.Any()).AnyTimes().Return(nil, nil)
 		rs := mock.NewMockClient(ctrl)
 		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		assert.NoError(t, c.Migrate(ctx))

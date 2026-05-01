@@ -8,9 +8,26 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	dbtasks "github.com/rmorlok/authproxy/internal/database/tasks"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/rmorlok/authproxy/internal/util"
 )
+
+// enqueueConnectorVersionLabelPropagation enqueues an asynq task that
+// refreshes the materialized apxy/cxr/* portion of every connection
+// pointing at (id, version). Failures to enqueue are logged but do not
+// fail the originating request — the daily consistency checker (#198)
+// covers any drift if the task is dropped.
+func (s *service) enqueueConnectorVersionLabelPropagation(ctx context.Context, id apid.ID, version uint64) {
+	task, err := dbtasks.NewPropagateConnectorVersionLabelsTask(id, version)
+	if err != nil {
+		s.logger.Error("failed to build connector version label propagation task", "id", id, "version", version, "error", err)
+		return
+	}
+	if _, err := s.ac.EnqueueContext(ctx, task); err != nil {
+		s.logger.Error("failed to enqueue connector version label propagation task", "id", id, "version", version, "error", err)
+	}
+}
 
 func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, version uint64, definition *cschema.Connector, labels map[string]string, annotations map[string]string) (iface.ConnectorVersion, error) {
 	existing, err := s.db.GetConnectorVersion(ctx, id, version)
@@ -57,6 +74,7 @@ func (s *service) UpdateDraftConnectorVersion(ctx context.Context, id apid.ID, v
 		return nil, fmt.Errorf("failed to upsert connector version: %w", err)
 	}
 
+	s.enqueueConnectorVersionLabelPropagation(ctx, id, version)
 	return s.getConnectorVersion(ctx, id, version)
 }
 

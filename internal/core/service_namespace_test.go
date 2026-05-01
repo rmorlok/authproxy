@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/golang/mock/gomock"
+	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -154,6 +155,62 @@ func TestEnsureNamespaceAncestorPath(t *testing.T) {
 				assert.NotNil(t, ns)
 				assert.Equal(t, tc.expectedPath, ns.GetPath())
 			}
+		})
+	}
+}
+
+func TestNamespaceLabelEndpointsEnqueuePropagation(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name string
+		call func(svc *service, ctx context.Context, mockDB *dbMock.MockDB)
+	}{
+		{
+			name: "UpdateNamespaceLabels",
+			call: func(svc *service, ctx context.Context, mockDB *dbMock.MockDB) {
+				mockDB.EXPECT().
+					UpdateNamespaceLabels(ctx, "root.foo", map[string]string{"team": "platform"}).
+					Return(&database.Namespace{Path: "root.foo"}, nil)
+				_, err := svc.UpdateNamespaceLabels(ctx, "root.foo", map[string]string{"team": "platform"})
+				assert.NoError(t, err)
+			},
+		},
+		{
+			name: "PutNamespaceLabels",
+			call: func(svc *service, ctx context.Context, mockDB *dbMock.MockDB) {
+				mockDB.EXPECT().
+					PutNamespaceLabels(ctx, "root.foo", map[string]string{"team": "platform"}).
+					Return(&database.Namespace{Path: "root.foo"}, nil)
+				_, err := svc.PutNamespaceLabels(ctx, "root.foo", map[string]string{"team": "platform"})
+				assert.NoError(t, err)
+			},
+		},
+		{
+			name: "DeleteNamespaceLabels",
+			call: func(svc *service, ctx context.Context, mockDB *dbMock.MockDB) {
+				mockDB.EXPECT().
+					DeleteNamespaceLabels(ctx, "root.foo", []string{"team"}).
+					Return(&database.Namespace{Path: "root.foo"}, nil)
+				_, err := svc.DeleteNamespaceLabels(ctx, "root.foo", []string{"team"})
+				assert.NoError(t, err)
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			ctrl := gomock.NewController(t)
+			svc, mockDB, _, _, ac, _ := FullMockService(t, ctrl)
+
+			ac.EXPECT().
+				EnqueueContext(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ context.Context, task *asynq.Task, _ ...asynq.Option) (*asynq.TaskInfo, error) {
+					assert.Equal(t, "database:propagate_namespace_labels", task.Type())
+					return nil, nil
+				})
+
+			tc.call(svc, context.Background(), mockDB)
 		})
 	}
 }

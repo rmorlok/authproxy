@@ -226,6 +226,22 @@ type DB interface {
 	// Returns the total number of records deleted across all tables.
 	PurgeSoftDeletedRecords(ctx context.Context, olderThan time.Time) (int64, error)
 
+	// RefreshNamespaceLabelsCarryForward re-derives the materialized apxy/
+	// portion of every resource that inherits from nsPath, then walks each
+	// direct child namespace, recomputes its labels, and recurses. Each
+	// row's update runs in its own short transaction. Intended to be
+	// invoked from a background asynq task — a label change on a deeply
+	// nested namespace can fan out to many descendants.
+	RefreshNamespaceLabelsCarryForward(ctx context.Context, nsPath string) error
+
+	// RefreshConnectionsForConnectorVersion re-derives the materialized
+	// apxy/ portion of every connection pointing at the given (id,
+	// version). Each connection's update runs in its own short
+	// transaction. Intended to be invoked from a background asynq task
+	// after a connector version's user labels change (only meaningful for
+	// draft versions; primary and active are immutable).
+	RefreshConnectionsForConnectorVersion(ctx context.Context, id apid.ID, version uint64) error
+
 	/*
 	 *  Nonces
 	 */
