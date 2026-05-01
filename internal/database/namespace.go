@@ -744,7 +744,10 @@ func (s *service) UpdateNamespaceLabels(ctx context.Context, path string, labels
 		ns.Labels = merged
 		ns.UpdatedAt = now
 		result = ns
-		return nil
+
+		// Propagate the user-label change to every descendant resource and
+		// child namespace so the materialized apxy/ns/* portion stays in sync.
+		return s.propagateNamespaceLabelsChange(ctx, tx, path)
 	})
 
 	if err != nil {
@@ -785,7 +788,8 @@ func (s *service) PutNamespaceLabels(ctx context.Context, path string, labels ma
 		ns.Labels = mergedLabels
 		ns.UpdatedAt = now
 		result = ns
-		return nil
+
+		return s.propagateNamespaceLabelsChange(ctx, tx, path)
 	})
 
 	if err != nil {
@@ -826,7 +830,8 @@ func (s *service) DeleteNamespaceLabels(ctx context.Context, path string, keys [
 		ns.Labels = remainingLabels
 		ns.UpdatedAt = now
 		result = ns
-		return nil
+
+		return s.propagateNamespaceLabelsChange(ctx, tx, path)
 	})
 
 	if err != nil {

@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apctx"
-	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/encfield"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -2006,5 +2007,170 @@ func TestSetNamespaceEncryptionKeyIdAncestorValidation(t *testing.T) {
 		require.NoError(t, err)
 		require.NotNil(t, ns)
 		require.Nil(t, ns.EncryptionKeyId)
+	})
+}
+
+func TestNamespaceLabelChangePropagation(t *testing.T) {
+	t.Run("Update propagates new user labels to descendants", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig(t, nil)
+		now := time.Date(2024, time.February, 1, 12, 0, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		// Tree:
+		//   root.t      labels: {dog: woof}
+		//   root.t.b    labels: {pig: oink}      child of root.t
+		//   resources in root.t and root.t.b inherit accordingly.
+		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+			Path: "root.t", State: NamespaceStateActive, Labels: Labels{"dog": "woof"},
+		}))
+		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+			Path: "root.t.b", State: NamespaceStateActive, Labels: Labels{"pig": "oink"},
+		}))
+
+		actorIn_t := apid.New(apid.PrefixActor)
+		require.NoError(t, db.CreateActor(ctx, &Actor{
+			Id: actorIn_t, ExternalId: "act-t", Namespace: "root.t",
+		}))
+
+		ekIn_b := apid.New(apid.PrefixEncryptionKey)
+		require.NoError(t, db.CreateEncryptionKey(ctx, &EncryptionKey{
+			Id: ekIn_b, Namespace: "root.t.b", State: EncryptionKeyStateActive,
+		}))
+
+		// Sanity: before the update, descendants reflect the original labels.
+		a, err := db.GetActor(ctx, actorIn_t)
+		require.NoError(t, err)
+		require.Equal(t, "woof", a.Labels["apxy/ns/dog"])
+		ek, err := db.GetEncryptionKey(ctx, ekIn_b)
+		require.NoError(t, err)
+		require.Equal(t, "woof", ek.Labels["apxy/ns/dog"])
+		require.Equal(t, "oink", ek.Labels["apxy/ns/pig"])
+
+		// Replace root.t's labels — dog goes away, cow comes in.
+		_, err = db.UpdateNamespaceLabels(ctx, "root.t", map[string]string{"cow": "moo"})
+		require.NoError(t, err)
+
+		// Actor in root.t: should see cow, not dog.
+		a, err = db.GetActor(ctx, actorIn_t)
+		require.NoError(t, err)
+		require.Equal(t, "moo", a.Labels["apxy/ns/cow"])
+		_, hasDog := a.Labels["apxy/ns/dog"]
+		require.False(t, hasDog, "stale apxy/ns/dog should be gone")
+
+		// Encryption key in root.t.b: cow propagates through root.t.b's
+		// chain (its own pig label + parent's cow). Old dog is gone.
+		ek, err = db.GetEncryptionKey(ctx, ekIn_b)
+		require.NoError(t, err)
+		require.Equal(t, "moo", ek.Labels["apxy/ns/cow"])
+		require.Equal(t, "oink", ek.Labels["apxy/ns/pig"])
+		_, hasDog = ek.Labels["apxy/ns/dog"]
+		require.False(t, hasDog, "stale apxy/ns/dog should be gone")
+
+		// The child namespace itself also reflects the change.
+		ns, err := db.GetNamespace(ctx, "root.t.b")
+		require.NoError(t, err)
+		require.Equal(t, "moo", ns.Labels["apxy/ns/cow"])
+		_, hasDog = ns.Labels["apxy/ns/dog"]
+		require.False(t, hasDog)
+	})
+
+	t.Run("Put adds new label to descendants", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig(t, nil)
+		now := time.Date(2024, time.February, 1, 12, 0, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+			Path: "root.put", State: NamespaceStateActive,
+		}))
+
+		actorID := apid.New(apid.PrefixActor)
+		require.NoError(t, db.CreateActor(ctx, &Actor{
+			Id: actorID, ExternalId: "act-put", Namespace: "root.put",
+		}))
+
+		_, err := db.PutNamespaceLabels(ctx, "root.put", map[string]string{"team": "platform"})
+		require.NoError(t, err)
+
+		a, err := db.GetActor(ctx, actorID)
+		require.NoError(t, err)
+		require.Equal(t, "platform", a.Labels["apxy/ns/team"])
+	})
+
+	t.Run("Delete removes label from descendants", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig(t, nil)
+		now := time.Date(2024, time.February, 1, 12, 0, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+			Path:   "root.del",
+			State:  NamespaceStateActive,
+			Labels: Labels{"team": "platform", "env": "prod"},
+		}))
+
+		actorID := apid.New(apid.PrefixActor)
+		require.NoError(t, db.CreateActor(ctx, &Actor{
+			Id: actorID, ExternalId: "act-del", Namespace: "root.del",
+		}))
+
+		_, err := db.DeleteNamespaceLabels(ctx, "root.del", []string{"team"})
+		require.NoError(t, err)
+
+		a, err := db.GetActor(ctx, actorID)
+		require.NoError(t, err)
+		_, hasTeam := a.Labels["apxy/ns/team"]
+		require.False(t, hasTeam, "deleted user label should propagate out")
+		require.Equal(t, "prod", a.Labels["apxy/ns/env"])
+	})
+}
+
+func TestConnectorVersionLabelChangePropagation(t *testing.T) {
+	t.Run("Updating a draft cv refreshes connections that point at it", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig(t, nil)
+		now := time.Date(2024, time.February, 1, 12, 0, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+			Path: "root.cv", State: NamespaceStateActive,
+		}))
+
+		cvID := apid.New(apid.PrefixConnectorVersion)
+		require.NoError(t, db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			Id:                  cvID,
+			Version:             1,
+			Namespace:           "root.cv",
+			State:               ConnectorVersionStateDraft,
+			Labels:              Labels{"type": "google-drive"},
+			Hash:                "h1",
+			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "d"},
+		}))
+
+		connID := apid.New(apid.PrefixConnection)
+		require.NoError(t, db.CreateConnection(ctx, &Connection{
+			Id:               connID,
+			Namespace:        "root.cv",
+			ConnectorId:      cvID,
+			ConnectorVersion: 1,
+			State:            ConnectionStateCreated,
+		}))
+
+		c, err := db.GetConnection(ctx, connID)
+		require.NoError(t, err)
+		require.Equal(t, "google-drive", c.Labels["apxy/cxr/type"])
+
+		// Re-upsert the draft cv with new user labels.
+		require.NoError(t, db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			Id:                  cvID,
+			Version:             1,
+			Namespace:           "root.cv",
+			State:               ConnectorVersionStateDraft,
+			Labels:              Labels{"type": "slack", "extra": "x"},
+			Hash:                "h2",
+			EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "d2"},
+		}))
+
+		c, err = db.GetConnection(ctx, connID)
+		require.NoError(t, err)
+		require.Equal(t, "slack", c.Labels["apxy/cxr/type"])
+		require.Equal(t, "x", c.Labels["apxy/cxr/extra"])
 	})
 }
