@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,6 +27,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/service"
 	"github.com/rmorlok/authproxy/internal/service/admin_api"
 	api_service "github.com/rmorlok/authproxy/internal/service/api"
+	public_service "github.com/rmorlok/authproxy/internal/service/public"
 	"github.com/stretchr/testify/require"
 )
 
@@ -42,14 +44,26 @@ const (
 
 // IntegrationTestEnv holds all the components needed for an integration test.
 type IntegrationTestEnv struct {
-	// Gin is the HTTP router for in-process request testing (when StartHTTPServer is false).
-	Gin *gin.Engine
+	// ApiGin is the HTTP router for in-process request testing against the
+	// service named by SetupOptions.Service (default: API). Populated when
+	// SetupOptions.StartHTTPServer is false.
+	ApiGin *gin.Engine
+
+	// PublicGin is the public service router. Only populated when SetupOptions.IncludePublic
+	// is true. Tests that drive an OAuth flow need this to deliver `/oauth2/redirect` and
+	// `/oauth2/callback` requests, which only the public service hosts.
+	PublicGin *gin.Engine
 
 	// Cfg is the loaded configuration.
 	Cfg config.C
 
-	// AuthUtil provides JWT signing helpers for test requests.
-	AuthUtil *auth2.AuthTestUtil
+	// ApiAuthUtil provides JWT signing helpers for the primary service
+	// (audience matches SetupOptions.Service).
+	ApiAuthUtil *auth2.AuthTestUtil
+
+	// PublicAuthUtil signs requests for the public service (audience=public). Only
+	// populated when SetupOptions.IncludePublic is true.
+	PublicAuthUtil *auth2.AuthTestUtil
 
 	// Db is the database connection.
 	Db database.DB
@@ -60,9 +74,14 @@ type IntegrationTestEnv struct {
 	// Logger is the test logger.
 	Logger *slog.Logger
 
-	// ServerURL is the base URL of the real HTTP server (e.g. "http://127.0.0.1:54321").
-	// Only set when StartHTTPServer is true.
+	// ServerURL is the base URL of the real HTTP server hosting the primary
+	// service (api or admin-api per SetupOptions.Service). Only set when
+	// StartHTTPServer is true.
 	ServerURL string
+
+	// PublicURL is the base URL of the real HTTP server hosting the public
+	// service. Only set when StartHTTPServer && IncludePublic.
+	PublicURL string
 
 	// BearerToken is a pre-signed admin JWT for making HTTP requests to ServerURL.
 	BearerToken string
@@ -88,8 +107,23 @@ type SetupOptions struct {
 
 	// StartHTTPServer starts a real HTTP server on a random port.
 	// When true, ServerURL and BearerToken are populated.
-	// When false, use Gin with httptest.ResponseRecorder for in-process testing.
+	// When false, use ApiGin with httptest.ResponseRecorder for in-process testing.
 	StartHTTPServer bool
+
+	// IncludePublic also wires up the public service alongside the primary
+	// service so tests can drive `/oauth2/redirect`, `/oauth2/callback`, and
+	// (when ServeMarketplaceUI is true) the marketplace SPA. The public service
+	// shares the same DependencyManager (DB, Redis, core, encryption) as the
+	// primary service. With StartHTTPServer=true, public is started on its
+	// own listener and exposed via env.PublicURL; otherwise it's served
+	// in-process via env.PublicGin.
+	IncludePublic bool
+
+	// ServeMarketplaceUI configures the public service to serve the built
+	// marketplace SPA at "/" (in addition to its API routes). Implies
+	// IncludePublic. The vite build runs once per `go test` process if
+	// `ui/marketplace/dist/index.html` is missing.
+	ServeMarketplaceUI bool
 }
 
 // repoRoot returns the absolute path to the repository root.
@@ -97,6 +131,45 @@ func repoRoot() string {
 	_, filename, _, _ := runtime.Caller(0)
 	// helpers/setup.go -> integration_tests/ -> repo root
 	return filepath.Dir(filepath.Dir(filepath.Dir(filename)))
+}
+
+// mustListen reserves a random localhost port and hands back the listener.
+// The caller is responsible for handing it to http.Server.Serve and for
+// closing it via env.Cleanup.
+func mustListen(t *testing.T) net.Listener {
+	t.Helper()
+	l, err := net.Listen("tcp", "127.0.0.1:0")
+	require.NoError(t, err)
+	return l
+}
+
+// serviceIdFor maps the SetupOptions.Service knob to its config ServiceId.
+func serviceIdFor(s ServiceType) sconfig.ServiceId {
+	switch s {
+	case ServiceTypeAdminAPI:
+		return sconfig.ServiceIdAdminApi
+	default:
+		return sconfig.ServiceIdApi
+	}
+}
+
+// applyListenerToService writes the listener's port back into the service's
+// config so GetBaseUrl() returns a navigable URL. Without this the OAuth
+// `redirect_uri` the proxy emits — which is built from Public.GetBaseUrl() —
+// would be `http://localhost:0/...` because integration.yaml uses port 0.
+func applyListenerToService(cfg config.C, id sconfig.ServiceId, l net.Listener) {
+	port := l.Addr().(*net.TCPAddr).Port
+	root := cfg.GetRoot()
+	switch id {
+	case sconfig.ServiceIdApi:
+		root.Api.PortVal = common.NewIntegerValueDirectInline(int64(port))
+	case sconfig.ServiceIdAdminApi:
+		root.AdminApi.PortVal = common.NewIntegerValueDirectInline(int64(port))
+	case sconfig.ServiceIdPublic:
+		root.Public.PortVal = common.NewIntegerValueDirectInline(int64(port))
+	default:
+		panic(fmt.Sprintf("applyListenerToService: unsupported service id %s", id))
+	}
 }
 
 // Setup creates a full integration test environment backed by real infrastructure
@@ -139,6 +212,37 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 			cfgRoot.Connectors = &sconfig.Connectors{}
 		}
 		cfgRoot.Connectors.LoadFromList = append(cfgRoot.Connectors.LoadFromList, opts.Connectors...)
+	}
+
+	// ServeMarketplaceUI requires both the public service running and a real
+	// HTTP listener (chromedp needs a navigable URL).
+	if opts.ServeMarketplaceUI {
+		require.True(t, opts.StartHTTPServer, "ServeMarketplaceUI requires StartHTTPServer=true")
+		opts.IncludePublic = true
+	}
+
+	// When starting real HTTP servers, pre-allocate listeners and write the
+	// resulting ports back into the config so each service's GetBaseUrl()
+	// returns a navigable URL — the proxy uses Public.GetBaseUrl() to build
+	// the OAuth `redirect_uri` it sends to the provider, and the marketplace
+	// SPA's same-origin assumption depends on it.
+	var primaryListener, publicListener net.Listener
+	if opts.StartHTTPServer {
+		primaryListener = mustListen(t)
+		applyListenerToService(cfg, serviceIdFor(opts.Service), primaryListener)
+
+		if opts.IncludePublic {
+			publicListener = mustListen(t)
+			applyListenerToService(cfg, sconfig.ServiceIdPublic, publicListener)
+		}
+	}
+
+	if opts.ServeMarketplaceUI {
+		EnsureMarketplaceBuilt(t)
+		cfg.GetRoot().Public.StaticVal = &sconfig.ServicePublicStaticContentConfig{
+			MountAtPath:   "/",
+			ServeFromPath: MarketplaceDistPath(),
+		}
 	}
 
 	// Create dependency manager and run migrations
@@ -190,28 +294,61 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 	authUtil := auth2.NewAuthTestUtil(cfg, authService, serviceIdForAuth)
 
 	env := &IntegrationTestEnv{
-		Cfg:      cfg,
-		AuthUtil: authUtil,
-		Db:       dm.GetDatabase(),
-		Core:     dm.GetCoreService(),
-		Logger:   dm.GetLogger(),
-		DM:       dm,
-		Cleanup:  func() {},
+		Cfg:         cfg,
+		ApiAuthUtil: authUtil,
+		Db:          dm.GetDatabase(),
+		Core:        dm.GetCoreService(),
+		Logger:      dm.GetLogger(),
+		DM:          dm,
+		Cleanup:     func() {},
+	}
+
+	var publicServer *http.Server
+	if opts.IncludePublic {
+		var publicErr error
+		publicServer, _, publicErr = public_service.GetGinServer(dm)
+		require.NoError(t, publicErr, "failed to create public server")
+		if handler, ok := publicServer.Handler.(*gin.Engine); ok {
+			env.PublicGin = handler
+		}
+		publicHttpSvc := cfg.MustGetService(sconfig.ServiceIdPublic).(sconfig.HttpService)
+		publicAuthService := auth2.NewService(
+			cfg,
+			publicHttpSvc,
+			dm.GetDatabase(),
+			dm.GetRedisClient(),
+			dm.GetEncryptService(),
+			dm.GetLogger(),
+		)
+		env.PublicAuthUtil = auth2.NewAuthTestUtil(cfg, publicAuthService, sconfig.ServiceIdPublic)
 	}
 
 	if opts.StartHTTPServer {
-		// Start a real HTTP server on a random port
-		listener, listenErr := net.Listen("tcp", "127.0.0.1:0")
-		require.NoError(t, listenErr)
-		port := listener.Addr().(*net.TCPAddr).Port
+		port := primaryListener.Addr().(*net.TCPAddr).Port
 		env.ServerURL = fmt.Sprintf("http://127.0.0.1:%d", port)
 
-		httpServer.Addr = listener.Addr().String()
+		httpServer.Addr = primaryListener.Addr().String()
 		go func() {
-			if serveErr := httpServer.Serve(listener); serveErr != nil && serveErr != http.ErrServerClosed {
+			if serveErr := httpServer.Serve(primaryListener); serveErr != nil && serveErr != http.ErrServerClosed {
 				// Server stopped
 			}
 		}()
+
+		if opts.IncludePublic {
+			// Use localhost (not 127.0.0.1) so env.PublicURL matches what
+			// Public.GetBaseUrl() returns — the proxy's OAuth `redirect_uri`
+			// is built from GetBaseUrl(), and the SPA's same-origin
+			// return_to_url depends on the browser starting from the same
+			// host name we register at the provider.
+			publicPort := publicListener.Addr().(*net.TCPAddr).Port
+			env.PublicURL = fmt.Sprintf("http://localhost:%d", publicPort)
+			publicServer.Addr = publicListener.Addr().String()
+			go func() {
+				if serveErr := publicServer.Serve(publicListener); serveErr != nil && serveErr != http.ErrServerClosed {
+					// Server stopped
+				}
+			}()
+		}
 
 		// Generate a bearer token for admin access
 		token, tokenErr := authUtil.GenerateBearerToken(
@@ -225,12 +362,15 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 
 		env.Cleanup = func() {
 			httpServer.Close()
+			if publicServer != nil {
+				publicServer.Close()
+			}
 			dm.GetEncryptService().Shutdown()
 		}
 	} else {
 		// Extract the gin engine from the http.Server handler for in-process testing
 		if handler, ok := httpServer.Handler.(*gin.Engine); ok {
-			env.Gin = handler
+			env.ApiGin = handler
 		}
 		env.Cleanup = func() {
 			dm.GetEncryptService().Shutdown()
@@ -327,10 +467,13 @@ func NewOAuth2Connector(connectorID apid.ID, displayName string, provider *OAuth
 	}
 }
 
-// DoProxyRequest performs a proxy request through the integration test environment using in-process gin.
+// DoProxyRequest performs a proxy request through the integration test environment.
+// Routes through the in-process gin engine when StartHTTPServer=false, or hits the
+// real HTTP server at env.ServerURL when StartHTTPServer=true. Returns a recorder
+// either way so callers can read status/body uniformly.
 func (env *IntegrationTestEnv) DoProxyRequest(t *testing.T, connectionID, targetURL, method string) *httptest.ResponseRecorder {
 	t.Helper()
-	require.NotNil(t, env.Gin, "DoProxyRequest requires in-process gin (StartHTTPServer must be false)")
+	require.Truef(t, env.ApiGin != nil || env.ServerURL != "", "DoProxyRequest requires either in-process gin or a running HTTP server")
 
 	proxyReq := coreIface.ProxyRequest{
 		URL:    targetURL,
@@ -340,10 +483,10 @@ func (env *IntegrationTestEnv) DoProxyRequest(t *testing.T, connectionID, target
 	body, err := jsonMarshal(proxyReq)
 	require.NoError(t, err)
 
-	w := httptest.NewRecorder()
-	req, err := env.AuthUtil.NewSignedRequestForActorExternalId(
+	path := "/api/v1/connections/" + connectionID + "/_proxy"
+	req, err := env.ApiAuthUtil.NewSignedRequestForActorExternalId(
 		http.MethodPost,
-		"/api/v1/connections/"+connectionID+"/_proxy",
+		path,
 		body,
 		sconfig.RootNamespace,
 		"test-actor",
@@ -351,7 +494,30 @@ func (env *IntegrationTestEnv) DoProxyRequest(t *testing.T, connectionID, target
 	)
 	require.NoError(t, err)
 
-	env.Gin.ServeHTTP(w, req)
+	w := httptest.NewRecorder()
+	if env.ApiGin != nil {
+		env.ApiGin.ServeHTTP(w, req)
+		return w
+	}
+
+	// HTTP mode: rewrite the path-only URL onto env.ServerURL and send.
+	abs, err := url.Parse(env.ServerURL + path)
+	require.NoError(t, err)
+	req.URL = abs
+	req.Host = abs.Host
+	req.RequestURI = ""
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	w.Code = resp.StatusCode
+	for k, vs := range resp.Header {
+		for _, v := range vs {
+			w.Header().Add(k, v)
+		}
+	}
+	if _, err := w.Body.ReadFrom(resp.Body); err != nil {
+		require.NoError(t, err)
+	}
 	return w
 }
 
@@ -371,4 +537,129 @@ func (env *IntegrationTestEnv) CreateConnection(t *testing.T, connectorID apid.I
 	require.NoError(t, err)
 
 	return id.String()
+}
+
+// PublicOAuthCallbackURL returns the URL the proxy emits as the OAuth `redirect_uri`.
+// The OAuth provider must be configured with this exact URL so authorize matches
+// (helper exists because public.GetBaseUrl() depends on resolved config — port 0
+// in integration.yaml means the URL is "http://localhost:0/oauth2/callback").
+func (env *IntegrationTestEnv) PublicOAuthCallbackURL() string {
+	return env.Cfg.GetRoot().Public.GetBaseUrl() + "/oauth2/callback"
+}
+
+// InitiateOAuth2Connection POSTs to /api/v1/connections/_initiate and returns
+// the new connection's ID and the redirect URL the user would be sent to. The
+// redirect URL points at the public service's /oauth2/redirect endpoint.
+func (env *IntegrationTestEnv) InitiateOAuth2Connection(t *testing.T, connectorID apid.ID, returnToUrl string) (connectionID, redirectURL string) {
+	t.Helper()
+	require.NotNil(t, env.ApiGin, "InitiateOAuth2Connection requires in-process gin (StartHTTPServer must be false)")
+
+	body, err := jsonMarshal(coreIface.InitiateConnectionRequest{
+		ConnectorId: connectorID,
+		ReturnToUrl: returnToUrl,
+	})
+	require.NoError(t, err)
+
+	req, err := env.ApiAuthUtil.NewSignedRequestForActorExternalId(
+		http.MethodPost,
+		"/api/v1/connections/_initiate",
+		body,
+		sconfig.RootNamespace,
+		"test-actor",
+		aschema.AllPermissions(),
+	)
+	require.NoError(t, err)
+
+	w := httptest.NewRecorder()
+	env.ApiGin.ServeHTTP(w, req)
+	require.Equalf(t, http.StatusOK, w.Code, "initiate failed: %s", w.Body.String())
+
+	var resp coreIface.ConnectionSetupRedirect
+	require.NoError(t, jsonUnmarshal(w.Body.Bytes(), &resp))
+	require.Equal(t, coreIface.ConnectionSetupResponseTypeRedirect, resp.Type, "expected OAuth2 connector to return redirect")
+	require.NotEmpty(t, resp.RedirectUrl)
+
+	return resp.Id.String(), resp.RedirectUrl
+}
+
+// FollowOAuth2Redirect issues an in-process GET to the public service's
+// `/oauth2/redirect` endpoint with the same state_id and signed JWT the user's
+// browser would carry, and returns the Location header — the URL of the OAuth
+// provider's authorize endpoint. The proxy generates the upstream URL from the
+// connector config, so callers can assert on its query parameters.
+func (env *IntegrationTestEnv) FollowOAuth2Redirect(t *testing.T, redirectURL string) string {
+	t.Helper()
+	require.NotNil(t, env.PublicGin, "FollowOAuth2Redirect requires SetupOptions.IncludePublic=true")
+
+	parsed, err := url.Parse(redirectURL)
+	require.NoError(t, err)
+
+	req, err := env.PublicAuthUtil.NewSignedRequestForActorExternalId(
+		http.MethodGet,
+		parsed.RequestURI(),
+		nil,
+		sconfig.RootNamespace,
+		"test-actor",
+		aschema.AllPermissions(),
+	)
+	require.NoError(t, err)
+
+	w := httptest.NewRecorder()
+	env.PublicGin.ServeHTTP(w, req)
+	require.Equalf(t, http.StatusFound, w.Code, "/oauth2/redirect should 302; got %d body=%s", w.Code, w.Body.String())
+
+	loc := w.Header().Get("Location")
+	require.NotEmpty(t, loc, "/oauth2/redirect should set Location")
+	return loc
+}
+
+// DeliverOAuth2Callback issues an in-process GET to the public service's
+// `/oauth2/callback` endpoint with the code+state the OAuth provider would
+// have redirected the user to. Returns the final Location header — typically
+// the test's return_to_url, possibly augmented with setup=pending.
+func (env *IntegrationTestEnv) DeliverOAuth2Callback(t *testing.T, callbackURL string) string {
+	t.Helper()
+	require.NotNil(t, env.PublicGin, "DeliverOAuth2Callback requires SetupOptions.IncludePublic=true")
+
+	parsed, err := url.Parse(callbackURL)
+	require.NoError(t, err)
+
+	req, err := env.PublicAuthUtil.NewSignedRequestForActorExternalId(
+		http.MethodGet,
+		parsed.RequestURI(),
+		nil,
+		sconfig.RootNamespace,
+		"test-actor",
+		aschema.AllPermissions(),
+	)
+	require.NoError(t, err)
+
+	w := httptest.NewRecorder()
+	env.PublicGin.ServeHTTP(w, req)
+	require.Equalf(t, http.StatusFound, w.Code, "/oauth2/callback should 302; got %d body=%s", w.Code, w.Body.String())
+
+	loc := w.Header().Get("Location")
+	require.NotEmpty(t, loc, "/oauth2/callback should set Location")
+	return loc
+}
+
+// GetOAuth2Token reads the most recent OAuth2 token row stored for the
+// connection. Returns nil when no token exists yet.
+func (env *IntegrationTestEnv) GetOAuth2Token(t *testing.T, connectionID string) *database.OAuth2Token {
+	t.Helper()
+	id, err := apid.Parse(connectionID)
+	require.NoError(t, err)
+	tok, err := env.Db.GetOAuth2Token(context.Background(), id)
+	require.NoError(t, err)
+	return tok
+}
+
+// GetConnection reads the connection row from the DB.
+func (env *IntegrationTestEnv) GetConnection(t *testing.T, connectionID string) *database.Connection {
+	t.Helper()
+	id, err := apid.Parse(connectionID)
+	require.NoError(t, err)
+	conn, err := env.Db.GetConnection(context.Background(), id)
+	require.NoError(t, err)
+	return conn
 }

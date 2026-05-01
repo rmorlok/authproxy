@@ -138,6 +138,22 @@ jobs:
       with:
         go-version: '1.24'
 
+    - name: Set up Node + Yarn
+      uses: actions/setup-node@v4
+      with:
+        node-version: '20'
+
+    - name: Install marketplace deps + build
+      run: |
+        corepack enable
+        yarn install --immutable
+        yarn workspace @authproxy/marketplace build
+
+    - name: Install Chrome for chromedp
+      uses: browser-actions/setup-chrome@v1
+      with:
+        chrome-version: stable
+
     - name: Start MinIO
       run: |
         docker run -d --name minio -p 9003:9000 \
