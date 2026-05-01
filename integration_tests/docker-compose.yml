@@ -95,80 +95,25 @@ services:
       timeout: 3s
       retries: 10
 
-  # OAuth test provider (rmorlok/go-oauth2-server, pinned to commit 3f566b94).
+  # OAuth test provider (rmorlok/go-oauth2-server, --test-mode).
   #
-  # TRANSITIONAL: The upstream is a real OAuth2 server, not a test harness. It
-  # cannot drive the test scenarios in issue #159 until the test-mode control
-  # plane lands upstream (see docs/oauth_test_provider_gaps.md, gaps G1-G12).
-  # The plumbing here brings the server up so the harness work in #162 can
-  # iterate; once upstream PR-1 (test-mode bootstrap) lands we'll drop the
-  # etcd/postgres dependencies below and switch to --test-mode.
-  oauth-etcd:
-    image: gcr.io/etcd-development/etcd:v3.5.17
-    command: >
-      etcd
-      --initial-cluster-state new
-      --listen-client-urls http://0.0.0.0:2379
-      --advertise-client-urls http://oauth-etcd:2379
-    environment:
-      ETCDCTL_API: "3"
-    healthcheck:
-      test: ["CMD", "etcdctl", "endpoint", "health"]
-      interval: 3s
-      timeout: 3s
-      retries: 10
-
-  oauth-postgres:
-    image: postgres:16
-    environment:
-      POSTGRES_USER: go_oauth2_server
-      POSTGRES_DB: go_oauth2_server
-      POSTGRES_HOST_AUTH_METHOD: trust
-    tmpfs:
-      - /var/lib/postgresql/data
-    healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U go_oauth2_server"]
-      interval: 3s
-      timeout: 3s
-      retries: 10
-
-  oauth-etcd-config:
-    build:
-      context: ./oauth-etcd-config
-    depends_on:
-      oauth-etcd:
-        condition: service_healthy
-    environment:
-      ETCDCTL_API: "3"
-      ETCD_ENDPOINTS: "http://oauth-etcd:2379"
-
+  # Run with the test-mode control plane enabled: the server uses an embedded
+  # in-memory SQLite DB, skips remote config, and exposes /test/* control-plane
+  # endpoints for registering clients, users, scripting responses, and driving
+  # authorize programmatically. See:
+  #   https://github.com/rmorlok/go-oauth2-server/blob/main/docs/test_mode_api.md
   oauth-server:
     build:
-      context: https://github.com/rmorlok/go-oauth2-server.git#3f566b94e7cb651412a768ddceb9ccb85fa7191b
-    depends_on:
-      oauth-postgres:
-        condition: service_healthy
-      oauth-etcd-config:
-        condition: service_completed_successfully
+      context: https://github.com/rmorlok/go-oauth2-server.git#97552ba20cfb7c367b95db0b500c239a99c3d155
     ports:
       - "8086:8080"
-    environment:
-      ETCD_ENDPOINTS: "http://oauth-etcd:2379"
-    command: ["runserver"]
+    # Bypass the upstream docker-entrypoint.sh: it waits for postgres+etcd
+    # before invoking the binary, which test-mode does not need (it uses an
+    # embedded SQLite DB and skips the remote-config backend).
+    entrypoint: ["go-oauth2-server"]
+    command: ["runserver", "--test-mode", "--test-port", "8080"]
     healthcheck:
-      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/v1/health || exit 1"]
+      test: ["CMD-SHELL", "wget -qO- http://127.0.0.1:8080/test/health || exit 1"]
       interval: 3s
       timeout: 3s
       retries: 30
-
-  oauth-server-fixtures:
-    build:
-      context: https://github.com/rmorlok/go-oauth2-server.git#3f566b94e7cb651412a768ddceb9ccb85fa7191b
-    depends_on:
-      oauth-postgres:
-        condition: service_healthy
-      oauth-etcd-config:
-        condition: service_completed_successfully
-    environment:
-      ETCD_ENDPOINTS: "http://oauth-etcd:2379"
-    command: ["loaddata", "oauth/fixtures/test_clients.yml"]

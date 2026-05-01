@@ -20,6 +20,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/rmorlok/authproxy/internal/service"
@@ -252,6 +253,77 @@ func NewNoAuthConnector(connectorID apid.ID, displayName string, rateLimiting *c
 			},
 		},
 		RateLimiting: rateLimiting,
+	}
+}
+
+// OAuth2ConnectorOptions configures NewOAuth2Connector. Endpoints default to
+// the test provider's URLs (provider.AuthorizationEndpoint(),
+// provider.TokenEndpoint(), provider.RevocationEndpoint()) when zero.
+type OAuth2ConnectorOptions struct {
+	ClientID     string
+	ClientSecret string
+	Scopes       []string
+	// IncludeRevocation, when true, fills in the standard /v1/oauth/revoke
+	// endpoint so revoke flows are exercised.
+	IncludeRevocation bool
+	// AuthorizationEndpoint overrides provider.AuthorizationEndpoint().
+	AuthorizationEndpoint string
+	// TokenEndpoint overrides provider.TokenEndpoint().
+	TokenEndpoint string
+	// RevocationEndpoint overrides provider.RevocationEndpoint() (only used
+	// when IncludeRevocation is true).
+	RevocationEndpoint string
+}
+
+// NewOAuth2Connector builds an authproxy connector wired to the given
+// OAuth2TestProvider. The endpoints default to the provider's standard
+// /v1/oauth/* URLs.
+func NewOAuth2Connector(connectorID apid.ID, displayName string, provider *OAuth2TestProvider, opts OAuth2ConnectorOptions) sconfig.Connector {
+	authEndpoint := opts.AuthorizationEndpoint
+	if authEndpoint == "" {
+		authEndpoint = provider.AuthorizationEndpoint()
+	}
+	tokenEndpoint := opts.TokenEndpoint
+	if tokenEndpoint == "" {
+		tokenEndpoint = provider.TokenEndpoint()
+	}
+
+	scopes := make([]connectors.Scope, 0, len(opts.Scopes))
+	for _, id := range opts.Scopes {
+		scopes = append(scopes, connectors.Scope{Id: id, Reason: "integration test"})
+	}
+
+	auth := &connectors.AuthOAuth2{
+		Type:         connectors.AuthTypeOAuth2,
+		ClientId:     &common.StringValue{InnerVal: &common.StringValueDirect{Value: opts.ClientID}},
+		ClientSecret: &common.StringValue{InnerVal: &common.StringValueDirect{Value: opts.ClientSecret}},
+		Scopes:       scopes,
+		Authorization: connectors.AuthOauth2Authorization{
+			Endpoint: authEndpoint,
+		},
+		Token: connectors.AuthOauth2Token{
+			Endpoint: tokenEndpoint,
+		},
+	}
+
+	if opts.IncludeRevocation {
+		revocationEndpoint := opts.RevocationEndpoint
+		if revocationEndpoint == "" {
+			revocationEndpoint = provider.RevocationEndpoint()
+		}
+		auth.Revocation = &connectors.AuthOauth2Revocation{
+			Endpoint: revocationEndpoint,
+		}
+	}
+
+	return sconfig.Connector{
+		Id:          connectorID,
+		Version:     1,
+		Labels:      map[string]string{"type": displayName},
+		DisplayName: displayName,
+		Auth: &connectors.Auth{
+			InnerVal: auth,
+		},
 	}
 }
 
