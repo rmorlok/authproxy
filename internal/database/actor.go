@@ -796,7 +796,7 @@ func (s *service) PutActorLabels(ctx context.Context, id apid.ID, labels map[str
 		return s.GetActor(ctx, id)
 	}
 
-	if err := ValidateLabels(labels); err != nil {
+	if err := ValidateUserLabels(labels); err != nil {
 		return nil, fmt.Errorf("invalid labels: %w", err)
 	}
 
@@ -992,6 +992,10 @@ func (s *service) DeleteActorLabels(ctx context.Context, id apid.ID, keys []stri
 
 	if len(keys) == 0 {
 		return s.GetActor(ctx, id)
+	}
+
+	if err := ValidateUserLabelDeletionKeys(keys); err != nil {
+		return nil, fmt.Errorf("invalid label keys: %w", err)
 	}
 
 	var result *Actor

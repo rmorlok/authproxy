@@ -4,6 +4,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/stretchr/testify/require"
 )
 
@@ -70,6 +71,97 @@ func TestLabels(t *testing.T) {
 					require.Error(t, err, "key %q should be invalid: %s", tc.key, tc.reason)
 				})
 			}
+		})
+
+		t.Run("apxy/ multi-segment keys", func(t *testing.T) {
+			t.Run("valid", func(t *testing.T) {
+				validKeys := []string{
+					"apxy/cxr/-/id",
+					"apxy/cxr/-/ns",
+					"apxy/cxn/-/id",
+					"apxy/ns/-/id",
+					"apxy/cxr/type",
+					"apxy/cxr/my-key",
+					"apxy/cxr/my.key",
+					"apxy/cxr/my_key",
+					"apxy/ns/dog",
+					"apxy/cxr/cxn/userkey",
+				}
+				for _, key := range validKeys {
+					t.Run(key, func(t *testing.T) {
+						require.NoError(t, ValidateLabelKey(key), "key %q should be valid", key)
+					})
+				}
+			})
+
+			t.Run("invalid", func(t *testing.T) {
+				invalidKeys := []struct {
+					key    string
+					reason string
+				}{
+					{"apxy/", "no segments after apxy/"},
+					{"apxy//id", "empty intermediate segment"},
+					{"apxy/cxr//id", "empty intermediate segment in middle"},
+					{"apxy/cxr/", "empty name"},
+					{"apxy/cxr/-/", "empty name after sentinel"},
+					{"apxy/cx@r/id", "invalid character in segment"},
+					{"apxy/cxr/-/-bad", "name starts with hyphen"},
+				}
+				for _, tc := range invalidKeys {
+					t.Run(tc.reason, func(t *testing.T) {
+						err := ValidateLabelKey(tc.key)
+						require.Error(t, err, "key %q should be invalid: %s", tc.key, tc.reason)
+					})
+				}
+			})
+		})
+	})
+
+	t.Run("ValidateUserLabelKey", func(t *testing.T) {
+		t.Run("rejects apxy/ prefix", func(t *testing.T) {
+			err := ValidateUserLabelKey("apxy/cxr/type")
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "reserved")
+		})
+
+		t.Run("accepts non-apxy keys", func(t *testing.T) {
+			require.NoError(t, ValidateUserLabelKey("my-key"))
+			require.NoError(t, ValidateUserLabelKey("example.com/key"))
+		})
+
+		t.Run("still rejects invalid keys", func(t *testing.T) {
+			require.Error(t, ValidateUserLabelKey("-bad"))
+			require.Error(t, ValidateUserLabelKey(""))
+		})
+	})
+
+	t.Run("ValidateUserLabels", func(t *testing.T) {
+		t.Run("rejects map containing apxy/ key", func(t *testing.T) {
+			err := ValidateUserLabels(map[string]string{
+				"good":         "ok",
+				"apxy/cxr/bad": "nope",
+			})
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "reserved")
+		})
+
+		t.Run("accepts pure user labels", func(t *testing.T) {
+			require.NoError(t, ValidateUserLabels(map[string]string{
+				"team": "platform",
+				"env":  "prod",
+			}))
+		})
+	})
+
+	t.Run("ValidateUserLabelDeletionKeys", func(t *testing.T) {
+		t.Run("rejects apxy/ keys", func(t *testing.T) {
+			err := ValidateUserLabelDeletionKeys([]string{"team", "apxy/cxr/type"})
+			require.Error(t, err)
+			require.Contains(t, err.Error(), "reserved")
+		})
+
+		t.Run("accepts user keys", func(t *testing.T) {
+			require.NoError(t, ValidateUserLabelDeletionKeys([]string{"team", "env"}))
 		})
 	})
 
@@ -344,5 +436,78 @@ func TestLabels(t *testing.T) {
 		// Test nil labels
 		var nilLabels Labels
 		require.Nil(t, nilLabels.Copy())
+	})
+}
+
+func TestApidPrefixToLabelToken(t *testing.T) {
+	require.Equal(t, "cxr", ApidPrefixToLabelToken(apid.PrefixConnectorVersion))
+	require.Equal(t, "cxn", ApidPrefixToLabelToken(apid.PrefixConnection))
+	require.Equal(t, "act", ApidPrefixToLabelToken(apid.PrefixActor))
+	require.Equal(t, "ek", ApidPrefixToLabelToken(apid.PrefixEncryptionKey))
+	require.Equal(t, "", ApidPrefixToLabelToken(apid.Prefix("")))
+}
+
+func TestBuildImplicitIdentifierLabels(t *testing.T) {
+	t.Run("builds id and ns labels", func(t *testing.T) {
+		id := apid.MustParse("cxn_test1234567890ab")
+		labels := BuildImplicitIdentifierLabels(id, "root.foo.bar")
+		require.Equal(t, Labels{
+			"apxy/cxn/-/id": "cxn_test1234567890ab",
+			"apxy/cxn/-/ns": "root.foo.bar",
+		}, labels)
+		// Result must validate under the system rules.
+		require.NoError(t, labels.Validate())
+	})
+
+	t.Run("nil id returns nil", func(t *testing.T) {
+		require.Nil(t, BuildImplicitIdentifierLabels(apid.Nil, "/foo"))
+	})
+
+	t.Run("uses correct rt token per resource type", func(t *testing.T) {
+		labels := BuildImplicitIdentifierLabels(apid.MustParse("cxr_test1234567890ab"), "root")
+		_, ok := labels["apxy/cxr/-/id"]
+		require.True(t, ok)
+		_, ok = labels["apxy/cxr/-/ns"]
+		require.True(t, ok)
+	})
+}
+
+func TestBuildCarriedLabels(t *testing.T) {
+	t.Run("re-keys user labels under parent rt", func(t *testing.T) {
+		parent := Labels{
+			"type":    "google_drive",
+			"variant": "shared",
+		}
+		out := BuildCarriedLabels("cxr", parent)
+		require.Equal(t, Labels{
+			"apxy/cxr/type":    "google_drive",
+			"apxy/cxr/variant": "shared",
+		}, out)
+		require.NoError(t, out.Validate())
+	})
+
+	t.Run("forwards apxy/ keys as-is", func(t *testing.T) {
+		parent := Labels{
+			"pig":            "oink",
+			"apxy/ns/dog":    "woof",
+			"apxy/cxr/-/id":  "cxr_abc",
+			"apxy/cxr/-/ns":  "/foo",
+		}
+		out := BuildCarriedLabels("cxr", parent)
+		require.Equal(t, Labels{
+			"apxy/cxr/pig":  "oink",
+			"apxy/ns/dog":   "woof",
+			"apxy/cxr/-/id": "cxr_abc",
+			"apxy/cxr/-/ns": "/foo",
+		}, out)
+	})
+
+	t.Run("empty parent labels returns nil", func(t *testing.T) {
+		require.Nil(t, BuildCarriedLabels("cxr", nil))
+		require.Nil(t, BuildCarriedLabels("cxr", Labels{}))
+	})
+
+	t.Run("empty parent rt returns nil", func(t *testing.T) {
+		require.Nil(t, BuildCarriedLabels("", Labels{"type": "google_drive"}))
 	})
 }

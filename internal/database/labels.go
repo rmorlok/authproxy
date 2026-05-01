@@ -14,6 +14,7 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/apid"
 )
 
 // Kubernetes-style label restrictions
@@ -26,6 +27,15 @@ const (
 
 	// LabelValueMaxLength is the maximum length for a label value
 	LabelValueMaxLength = 63
+
+	// ApxyReservedPrefix is the reserved label-key prefix for system-managed
+	// labels (implicit identifier labels and parent carry-forward labels).
+	// User-supplied label keys may not begin with this prefix.
+	ApxyReservedPrefix = "apxy/"
+
+	// ApxyImplicitSegment is the segment used inside apxy/ keys to mark an
+	// implicit identifier label, e.g. apxy/<rt>/-/id.
+	ApxyImplicitSegment = "-"
 )
 
 var (
@@ -45,6 +55,12 @@ var (
 	// - 0-63 characters (can be empty)
 	// - if non-empty: must start and end with alphanumeric, may contain alphanumeric, '-', '_', '.'
 	labelValueRegex = regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9._-]{0,61}[a-zA-Z0-9])?)?$|^[a-zA-Z0-9]?$`)
+
+	// apxyPathSegmentRegex validates a single segment inside an apxy/ path.
+	// A segment is either a DNS-label-like token (alphanumeric start/end, may
+	// contain '-' in the middle) or the literal "-" sentinel used to mark
+	// implicit identifier labels (e.g. apxy/cxr/-/id).
+	apxyPathSegmentRegex = regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?|-)$`)
 )
 
 // Labels is a map of key-value pairs following Kubernetes label restrictions.
@@ -92,13 +108,30 @@ func (l *Labels) Scan(value interface{}) error {
 	}
 }
 
-// ValidateLabelKey validates a single label key according to Kubernetes restrictions.
-// Format: [prefix/]name
-// - prefix (optional): valid DNS subdomain, max 253 characters
-// - name (required): 1-63 characters, must start/end with alphanumeric, may contain '-', '_', '.'
+// ValidateLabelKey validates a single label key.
+//
+// Two grammars are accepted:
+//
+//  1. Standard Kubernetes-style key: [prefix/]name
+//     - prefix (optional): valid DNS subdomain, max 253 characters
+//     - name (required): 1-63 characters, must start/end with alphanumeric,
+//     may contain '-', '_', '.'
+//
+//  2. Reserved apxy/ multi-segment key: apxy/<seg>(/<seg>)*/<name>
+//     - each <seg> is a DNS-label-like token or the literal "-" sentinel
+//     - <name> follows the standard name rule above
+//     - total prefix portion (everything before the final '/') still capped
+//     at LabelKeyPrefixMaxLength characters
+//
+// This function accepts apxy/ keys; user-input call sites should use
+// ValidateUserLabelKey to additionally reject the reserved namespace.
 func ValidateLabelKey(key string) error {
 	if key == "" {
 		return errors.New("label key cannot be empty")
+	}
+
+	if strings.HasPrefix(key, ApxyReservedPrefix) {
+		return validateApxyLabelKey(key)
 	}
 
 	var prefix, name string
@@ -138,6 +171,60 @@ func ValidateLabelKey(key string) error {
 	return nil
 }
 
+// validateApxyLabelKey validates a key already known to start with apxy/.
+// The grammar is apxy/<seg>(/<seg>)*/<name>.
+func validateApxyLabelKey(key string) error {
+	idx := strings.LastIndex(key, "/")
+	// idx must exist because the key starts with "apxy/"; the final '/'
+	// separates the (possibly multi-segment) prefix from the name.
+	prefix := key[:idx]
+	name := key[idx+1:]
+
+	if len(prefix) > LabelKeyPrefixMaxLength {
+		return fmt.Errorf("label key prefix exceeds maximum length of %d characters", LabelKeyPrefixMaxLength)
+	}
+
+	// Trim the leading "apxy" segment (we know it's there) and require at
+	// least one further segment before the name — apxy/<rt>/...
+	innerPath := strings.TrimPrefix(prefix, "apxy")
+	if innerPath == "" {
+		return errors.New("apxy/ label key requires at least one segment after apxy/")
+	}
+	// innerPath now starts with '/'.
+	innerSegments := strings.Split(innerPath[1:], "/")
+	for _, seg := range innerSegments {
+		if seg == "" {
+			return errors.New("apxy/ label key has empty path segment")
+		}
+		if !apxyPathSegmentRegex.MatchString(seg) {
+			return fmt.Errorf("apxy/ label key segment %q must be a DNS label or the '-' sentinel", seg)
+		}
+	}
+
+	if name == "" {
+		return errors.New("label key name cannot be empty")
+	}
+	if len(name) > LabelKeyNameMaxLength {
+		return fmt.Errorf("label key name exceeds maximum length of %d characters", LabelKeyNameMaxLength)
+	}
+	if !labelKeyNameRegex.MatchString(name) {
+		return fmt.Errorf("label key name %q must start and end with alphanumeric and contain only alphanumeric, '-', '_', or '.'", name)
+	}
+
+	return nil
+}
+
+// ValidateUserLabelKey validates a label key supplied directly by an end user.
+// In addition to the rules of ValidateLabelKey, it rejects any key in the
+// reserved apxy/ namespace — those keys are managed by the system and may not
+// be set, modified, or deleted through user-input endpoints.
+func ValidateUserLabelKey(key string) error {
+	if strings.HasPrefix(key, ApxyReservedPrefix) {
+		return fmt.Errorf("label key %q is in the reserved %q namespace and cannot be set by users", key, ApxyReservedPrefix)
+	}
+	return ValidateLabelKey(key)
+}
+
 // ValidateLabelValue validates a single label value according to Kubernetes restrictions.
 // - 0-63 characters (can be empty)
 // - if non-empty: must start and end with alphanumeric, may contain alphanumeric, '-', '_', '.'
@@ -153,7 +240,9 @@ func ValidateLabelValue(value string) error {
 	return nil
 }
 
-// ValidateLabels validates all labels in a map according to Kubernetes restrictions.
+// ValidateLabels validates all labels in a map according to Kubernetes
+// restrictions. apxy/-prefixed keys are accepted; this is the right validator
+// for system-managed writes (e.g. carry-forward materialization).
 func ValidateLabels(labels map[string]string) error {
 	var result *multierror.Error
 	for key, value := range labels {
@@ -165,6 +254,36 @@ func ValidateLabels(labels map[string]string) error {
 		}
 	}
 
+	return result.ErrorOrNil()
+}
+
+// ValidateUserLabels validates a labels map supplied by a user. It applies
+// the same key/value rules as ValidateLabels but rejects any key in the
+// reserved apxy/ namespace.
+func ValidateUserLabels(labels map[string]string) error {
+	var result *multierror.Error
+	for key, value := range labels {
+		if err := ValidateUserLabelKey(key); err != nil {
+			result = multierror.Append(result, fmt.Errorf("invalid label key %q: %w", key, err))
+		}
+		if err := ValidateLabelValue(value); err != nil {
+			result = multierror.Append(result, fmt.Errorf("invalid label value for key %q: %w", key, err))
+		}
+	}
+
+	return result.ErrorOrNil()
+}
+
+// ValidateUserLabelDeletionKeys validates a list of keys passed to a
+// user-facing label-deletion endpoint. Keys must be well-formed and must not
+// reference the reserved apxy/ namespace.
+func ValidateUserLabelDeletionKeys(keys []string) error {
+	var result *multierror.Error
+	for _, k := range keys {
+		if err := ValidateUserLabelKey(k); err != nil {
+			result = multierror.Append(result, fmt.Errorf("invalid label key %q: %w", k, err))
+		}
+	}
 	return result.ErrorOrNil()
 }
 
@@ -343,4 +462,58 @@ func (s *service) updateLabelsInTableTx(ctx context.Context, tx *sql.Tx, table s
 	}
 
 	return now, nil
+}
+
+// ApidPrefixToLabelToken returns the label-key token associated with an apid
+// prefix. It strips the trailing underscore so e.g. "cxr_" becomes "cxr" and
+// "cxn_" becomes "cxn". Used to build apxy/ keys whose <rt> segment matches
+// the resource's id prefix.
+func ApidPrefixToLabelToken(p apid.Prefix) string {
+	return strings.TrimSuffix(string(p), "_")
+}
+
+// BuildImplicitIdentifierLabels returns the two implicit identifier labels
+// for a resource: apxy/<rt>/-/id and apxy/<rt>/-/ns, where <rt> is derived
+// from the resource's id prefix. The id and namespacePath are stored as
+// label values verbatim — callers must ensure they have already been
+// validated by their respective rules.
+func BuildImplicitIdentifierLabels(id apid.ID, namespacePath string) Labels {
+	if id.IsNil() {
+		return nil
+	}
+	rt := ApidPrefixToLabelToken(id.Prefix())
+	if rt == "" {
+		return nil
+	}
+	return Labels{
+		fmt.Sprintf("%s%s/%s/id", ApxyReservedPrefix, rt, ApxyImplicitSegment): string(id),
+		fmt.Sprintf("%s%s/%s/ns", ApxyReservedPrefix, rt, ApxyImplicitSegment): namespacePath,
+	}
+}
+
+// BuildCarriedLabels takes a parent's labels and returns the carry-forward
+// labels for a child of the parent.
+//
+//   - User labels on the parent (any key NOT starting with apxy/) are
+//     re-keyed under apxy/<parentRt>/<key>.
+//   - apxy/-prefixed labels on the parent are forwarded as-is so that
+//     ancestors further up the chain remain visible. The child is expected
+//     to merge its own self-implicit labels on top of this map (deeper
+//     overrides shallower).
+//
+// parentRt is the resource-type token of the parent (e.g. "cxr", "cxn",
+// "ns") — typically obtained via ApidPrefixToLabelToken.
+func BuildCarriedLabels(parentRt string, parentLabels Labels) Labels {
+	if parentRt == "" || len(parentLabels) == 0 {
+		return nil
+	}
+	out := make(Labels, len(parentLabels))
+	for k, v := range parentLabels {
+		if strings.HasPrefix(k, ApxyReservedPrefix) {
+			out[k] = v
+			continue
+		}
+		out[fmt.Sprintf("%s%s/%s", ApxyReservedPrefix, parentRt, k)] = v
+	}
+	return out
 }

@@ -51,7 +51,7 @@ var Label = Kind{
 	PathSegment:   "labels",
 	ParamName:     "label",
 	Singular:      "label",
-	ValidateKey:   database.ValidateLabelKey,
+	ValidateKey:   database.ValidateUserLabelKey,
 	ValidateValue: database.ValidateLabelValue,
 	Get:           func(r Resource) map[string]string { return r.GetLabels() },
 }

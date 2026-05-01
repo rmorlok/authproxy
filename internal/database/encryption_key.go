@@ -315,7 +315,7 @@ func (s *service) UpdateEncryptionKeyLabels(ctx context.Context, id apid.ID, lab
 	}
 
 	if labels != nil {
-		if err := ValidateLabels(labels); err != nil {
+		if err := ValidateUserLabels(labels); err != nil {
 			return nil, fmt.Errorf("invalid labels: %w", err)
 		}
 	}
@@ -366,7 +366,7 @@ func (s *service) PutEncryptionKeyLabels(ctx context.Context, id apid.ID, labels
 		return s.GetEncryptionKey(ctx, id)
 	}
 
-	if err := ValidateLabels(labels); err != nil {
+	if err := ValidateUserLabels(labels); err != nil {
 		return nil, fmt.Errorf("invalid labels: %w", err)
 	}
 
@@ -413,6 +413,10 @@ func (s *service) DeleteEncryptionKeyLabels(ctx context.Context, id apid.ID, key
 
 	if len(keys) == 0 {
 		return s.GetEncryptionKey(ctx, id)
+	}
+
+	if err := ValidateUserLabelDeletionKeys(keys); err != nil {
+		return nil, fmt.Errorf("invalid label keys: %w", err)
 	}
 
 	var result *EncryptionKey

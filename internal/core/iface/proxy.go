@@ -69,7 +69,7 @@ func (r *ProxyRequest) Validate() error {
 	}
 
 	if r.Labels != nil {
-		if err := database.Labels(r.Labels).Validate(); err != nil {
+		if err := database.ValidateUserLabels(r.Labels); err != nil {
 			errors = append(errors, "invalid labels: "+err.Error())
 		}
 	}
