@@ -17,9 +17,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestStandardAuthorizationCodeFlow exercises spec #1 from issue #159:
-// authorize URL has the right params, approve → callback → token stored,
-// connection becomes ready, proxied API call succeeds with the bearer token.
+// TestStandardAuthorizationCodeFlow walks the standard authorization-code flow
+// end-to-end. See standard_flow_test.md for the scenario specification, the
+// component-deployment breakdown, and a sequence diagram.
 func TestStandardAuthorizationCodeFlow(t *testing.T) {
 	provider := helpers.NewOAuth2TestProvider(t)
 
@@ -46,7 +46,7 @@ func TestStandardAuthorizationCodeFlow(t *testing.T) {
 
 	// Register the OAuth client at the test provider with the same redirect URI
 	// the proxy will emit, so authorize matches.
-	callbackURL := env.PublicCallbackURL()
+	callbackURL := env.PublicOAuthCallbackURL()
 	registered := provider.CreateClient(helpers.CreateClientRequest{
 		Key:                     clientKey,
 		Secret:                  clientSecret,

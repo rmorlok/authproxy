@@ -44,8 +44,10 @@ const (
 
 // IntegrationTestEnv holds all the components needed for an integration test.
 type IntegrationTestEnv struct {
-	// Gin is the HTTP router for in-process request testing (when StartHTTPServer is false).
-	Gin *gin.Engine
+	// ApiGin is the HTTP router for in-process request testing against the
+	// service named by SetupOptions.Service (default: API). Populated when
+	// SetupOptions.StartHTTPServer is false.
+	ApiGin *gin.Engine
 
 	// PublicGin is the public service router. Only populated when SetupOptions.IncludePublic
 	// is true. Tests that drive an OAuth flow need this to deliver `/oauth2/redirect` and
@@ -55,8 +57,9 @@ type IntegrationTestEnv struct {
 	// Cfg is the loaded configuration.
 	Cfg config.C
 
-	// AuthUtil provides JWT signing helpers for test requests.
-	AuthUtil *auth2.AuthTestUtil
+	// ApiAuthUtil provides JWT signing helpers for the primary service
+	// (audience matches SetupOptions.Service).
+	ApiAuthUtil *auth2.AuthTestUtil
 
 	// PublicAuthUtil signs requests for the public service (audience=public). Only
 	// populated when SetupOptions.IncludePublic is true.
@@ -99,7 +102,7 @@ type SetupOptions struct {
 
 	// StartHTTPServer starts a real HTTP server on a random port.
 	// When true, ServerURL and BearerToken are populated.
-	// When false, use Gin with httptest.ResponseRecorder for in-process testing.
+	// When false, use ApiGin with httptest.ResponseRecorder for in-process testing.
 	StartHTTPServer bool
 
 	// IncludePublic also wires up the public service's gin engine so tests can
@@ -207,13 +210,13 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 	authUtil := auth2.NewAuthTestUtil(cfg, authService, serviceIdForAuth)
 
 	env := &IntegrationTestEnv{
-		Cfg:      cfg,
-		AuthUtil: authUtil,
-		Db:       dm.GetDatabase(),
-		Core:     dm.GetCoreService(),
-		Logger:   dm.GetLogger(),
-		DM:       dm,
-		Cleanup:  func() {},
+		Cfg:         cfg,
+		ApiAuthUtil: authUtil,
+		Db:          dm.GetDatabase(),
+		Core:        dm.GetCoreService(),
+		Logger:      dm.GetLogger(),
+		DM:          dm,
+		Cleanup:     func() {},
 	}
 
 	if opts.IncludePublic {
@@ -265,7 +268,7 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 	} else {
 		// Extract the gin engine from the http.Server handler for in-process testing
 		if handler, ok := httpServer.Handler.(*gin.Engine); ok {
-			env.Gin = handler
+			env.ApiGin = handler
 		}
 		env.Cleanup = func() {
 			dm.GetEncryptService().Shutdown()
@@ -365,7 +368,7 @@ func NewOAuth2Connector(connectorID apid.ID, displayName string, provider *OAuth
 // DoProxyRequest performs a proxy request through the integration test environment using in-process gin.
 func (env *IntegrationTestEnv) DoProxyRequest(t *testing.T, connectionID, targetURL, method string) *httptest.ResponseRecorder {
 	t.Helper()
-	require.NotNil(t, env.Gin, "DoProxyRequest requires in-process gin (StartHTTPServer must be false)")
+	require.NotNil(t, env.ApiGin, "DoProxyRequest requires in-process gin (StartHTTPServer must be false)")
 
 	proxyReq := coreIface.ProxyRequest{
 		URL:    targetURL,
@@ -376,7 +379,7 @@ func (env *IntegrationTestEnv) DoProxyRequest(t *testing.T, connectionID, target
 	require.NoError(t, err)
 
 	w := httptest.NewRecorder()
-	req, err := env.AuthUtil.NewSignedRequestForActorExternalId(
+	req, err := env.ApiAuthUtil.NewSignedRequestForActorExternalId(
 		http.MethodPost,
 		"/api/v1/connections/"+connectionID+"/_proxy",
 		body,
@@ -386,7 +389,7 @@ func (env *IntegrationTestEnv) DoProxyRequest(t *testing.T, connectionID, target
 	)
 	require.NoError(t, err)
 
-	env.Gin.ServeHTTP(w, req)
+	env.ApiGin.ServeHTTP(w, req)
 	return w
 }
 
@@ -408,11 +411,11 @@ func (env *IntegrationTestEnv) CreateConnection(t *testing.T, connectorID apid.I
 	return id.String()
 }
 
-// PublicCallbackURL returns the URL the proxy emits as the OAuth `redirect_uri`.
+// PublicOAuthCallbackURL returns the URL the proxy emits as the OAuth `redirect_uri`.
 // The OAuth provider must be configured with this exact URL so authorize matches
 // (helper exists because public.GetBaseUrl() depends on resolved config — port 0
 // in integration.yaml means the URL is "http://localhost:0/oauth2/callback").
-func (env *IntegrationTestEnv) PublicCallbackURL() string {
+func (env *IntegrationTestEnv) PublicOAuthCallbackURL() string {
 	return env.Cfg.GetRoot().Public.GetBaseUrl() + "/oauth2/callback"
 }
 
@@ -421,7 +424,7 @@ func (env *IntegrationTestEnv) PublicCallbackURL() string {
 // redirect URL points at the public service's /oauth2/redirect endpoint.
 func (env *IntegrationTestEnv) InitiateOAuth2Connection(t *testing.T, connectorID apid.ID, returnToUrl string) (connectionID, redirectURL string) {
 	t.Helper()
-	require.NotNil(t, env.Gin, "InitiateOAuth2Connection requires in-process gin (StartHTTPServer must be false)")
+	require.NotNil(t, env.ApiGin, "InitiateOAuth2Connection requires in-process gin (StartHTTPServer must be false)")
 
 	body, err := jsonMarshal(coreIface.InitiateConnectionRequest{
 		ConnectorId: connectorID,
@@ -429,7 +432,7 @@ func (env *IntegrationTestEnv) InitiateOAuth2Connection(t *testing.T, connectorI
 	})
 	require.NoError(t, err)
 
-	req, err := env.AuthUtil.NewSignedRequestForActorExternalId(
+	req, err := env.ApiAuthUtil.NewSignedRequestForActorExternalId(
 		http.MethodPost,
 		"/api/v1/connections/_initiate",
 		body,
@@ -440,7 +443,7 @@ func (env *IntegrationTestEnv) InitiateOAuth2Connection(t *testing.T, connectorI
 	require.NoError(t, err)
 
 	w := httptest.NewRecorder()
-	env.Gin.ServeHTTP(w, req)
+	env.ApiGin.ServeHTTP(w, req)
 	require.Equalf(t, http.StatusOK, w.Code, "initiate failed: %s", w.Body.String())
 
 	var resp coreIface.ConnectionSetupRedirect

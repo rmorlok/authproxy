@@ -202,7 +202,7 @@ env := helpers.Setup(t, helpers.SetupOptions{
     },
 })
 defer env.Cleanup()
-// Use env.Gin with httptest.ResponseRecorder
+// Use env.ApiGin with httptest.ResponseRecorder
 ```
 
 ### 3. Make requests
