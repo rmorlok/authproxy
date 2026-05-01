@@ -13,3 +13,7 @@ func jsonMarshal(v interface{}) (io.Reader, error) {
 	}
 	return bytes.NewReader(b), nil
 }
+
+func jsonUnmarshal(data []byte, v interface{}) error {
+	return json.Unmarshal(data, v)
+}

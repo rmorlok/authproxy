@@ -7,6 +7,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"net/url"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -26,6 +27,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/service"
 	"github.com/rmorlok/authproxy/internal/service/admin_api"
 	api_service "github.com/rmorlok/authproxy/internal/service/api"
+	public_service "github.com/rmorlok/authproxy/internal/service/public"
 	"github.com/stretchr/testify/require"
 )
 
@@ -45,11 +47,20 @@ type IntegrationTestEnv struct {
 	// Gin is the HTTP router for in-process request testing (when StartHTTPServer is false).
 	Gin *gin.Engine
 
+	// PublicGin is the public service router. Only populated when SetupOptions.IncludePublic
+	// is true. Tests that drive an OAuth flow need this to deliver `/oauth2/redirect` and
+	// `/oauth2/callback` requests, which only the public service hosts.
+	PublicGin *gin.Engine
+
 	// Cfg is the loaded configuration.
 	Cfg config.C
 
 	// AuthUtil provides JWT signing helpers for test requests.
 	AuthUtil *auth2.AuthTestUtil
+
+	// PublicAuthUtil signs requests for the public service (audience=public). Only
+	// populated when SetupOptions.IncludePublic is true.
+	PublicAuthUtil *auth2.AuthTestUtil
 
 	// Db is the database connection.
 	Db database.DB
@@ -90,6 +101,12 @@ type SetupOptions struct {
 	// When true, ServerURL and BearerToken are populated.
 	// When false, use Gin with httptest.ResponseRecorder for in-process testing.
 	StartHTTPServer bool
+
+	// IncludePublic also wires up the public service's gin engine so tests can
+	// drive `/oauth2/redirect` and `/oauth2/callback`. The public engine shares
+	// the same DependencyManager (DB, Redis, core, encryption) as the primary
+	// service. Only meaningful for in-process testing (StartHTTPServer=false).
+	IncludePublic bool
 }
 
 // repoRoot returns the absolute path to the repository root.
@@ -197,6 +214,24 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 		Logger:   dm.GetLogger(),
 		DM:       dm,
 		Cleanup:  func() {},
+	}
+
+	if opts.IncludePublic {
+		publicServer, _, publicErr := public_service.GetGinServer(dm)
+		require.NoError(t, publicErr, "failed to create public server")
+		if handler, ok := publicServer.Handler.(*gin.Engine); ok {
+			env.PublicGin = handler
+		}
+		publicHttpSvc := cfg.MustGetService(sconfig.ServiceIdPublic).(sconfig.HttpService)
+		publicAuthService := auth2.NewService(
+			cfg,
+			publicHttpSvc,
+			dm.GetDatabase(),
+			dm.GetRedisClient(),
+			dm.GetEncryptService(),
+			dm.GetLogger(),
+		)
+		env.PublicAuthUtil = auth2.NewAuthTestUtil(cfg, publicAuthService, sconfig.ServiceIdPublic)
 	}
 
 	if opts.StartHTTPServer {
@@ -371,4 +406,129 @@ func (env *IntegrationTestEnv) CreateConnection(t *testing.T, connectorID apid.I
 	require.NoError(t, err)
 
 	return id.String()
+}
+
+// PublicCallbackURL returns the URL the proxy emits as the OAuth `redirect_uri`.
+// The OAuth provider must be configured with this exact URL so authorize matches
+// (helper exists because public.GetBaseUrl() depends on resolved config — port 0
+// in integration.yaml means the URL is "http://localhost:0/oauth2/callback").
+func (env *IntegrationTestEnv) PublicCallbackURL() string {
+	return env.Cfg.GetRoot().Public.GetBaseUrl() + "/oauth2/callback"
+}
+
+// InitiateOAuth2Connection POSTs to /api/v1/connections/_initiate and returns
+// the new connection's ID and the redirect URL the user would be sent to. The
+// redirect URL points at the public service's /oauth2/redirect endpoint.
+func (env *IntegrationTestEnv) InitiateOAuth2Connection(t *testing.T, connectorID apid.ID, returnToUrl string) (connectionID, redirectURL string) {
+	t.Helper()
+	require.NotNil(t, env.Gin, "InitiateOAuth2Connection requires in-process gin (StartHTTPServer must be false)")
+
+	body, err := jsonMarshal(coreIface.InitiateConnectionRequest{
+		ConnectorId: connectorID,
+		ReturnToUrl: returnToUrl,
+	})
+	require.NoError(t, err)
+
+	req, err := env.AuthUtil.NewSignedRequestForActorExternalId(
+		http.MethodPost,
+		"/api/v1/connections/_initiate",
+		body,
+		sconfig.RootNamespace,
+		"test-actor",
+		aschema.AllPermissions(),
+	)
+	require.NoError(t, err)
+
+	w := httptest.NewRecorder()
+	env.Gin.ServeHTTP(w, req)
+	require.Equalf(t, http.StatusOK, w.Code, "initiate failed: %s", w.Body.String())
+
+	var resp coreIface.ConnectionSetupRedirect
+	require.NoError(t, jsonUnmarshal(w.Body.Bytes(), &resp))
+	require.Equal(t, coreIface.ConnectionSetupResponseTypeRedirect, resp.Type, "expected OAuth2 connector to return redirect")
+	require.NotEmpty(t, resp.RedirectUrl)
+
+	return resp.Id.String(), resp.RedirectUrl
+}
+
+// FollowOAuth2Redirect issues an in-process GET to the public service's
+// `/oauth2/redirect` endpoint with the same state_id and signed JWT the user's
+// browser would carry, and returns the Location header — the URL of the OAuth
+// provider's authorize endpoint. The proxy generates the upstream URL from the
+// connector config, so callers can assert on its query parameters.
+func (env *IntegrationTestEnv) FollowOAuth2Redirect(t *testing.T, redirectURL string) string {
+	t.Helper()
+	require.NotNil(t, env.PublicGin, "FollowOAuth2Redirect requires SetupOptions.IncludePublic=true")
+
+	parsed, err := url.Parse(redirectURL)
+	require.NoError(t, err)
+
+	req, err := env.PublicAuthUtil.NewSignedRequestForActorExternalId(
+		http.MethodGet,
+		parsed.RequestURI(),
+		nil,
+		sconfig.RootNamespace,
+		"test-actor",
+		aschema.AllPermissions(),
+	)
+	require.NoError(t, err)
+
+	w := httptest.NewRecorder()
+	env.PublicGin.ServeHTTP(w, req)
+	require.Equalf(t, http.StatusFound, w.Code, "/oauth2/redirect should 302; got %d body=%s", w.Code, w.Body.String())
+
+	loc := w.Header().Get("Location")
+	require.NotEmpty(t, loc, "/oauth2/redirect should set Location")
+	return loc
+}
+
+// DeliverOAuth2Callback issues an in-process GET to the public service's
+// `/oauth2/callback` endpoint with the code+state the OAuth provider would
+// have redirected the user to. Returns the final Location header — typically
+// the test's return_to_url, possibly augmented with setup=pending.
+func (env *IntegrationTestEnv) DeliverOAuth2Callback(t *testing.T, callbackURL string) string {
+	t.Helper()
+	require.NotNil(t, env.PublicGin, "DeliverOAuth2Callback requires SetupOptions.IncludePublic=true")
+
+	parsed, err := url.Parse(callbackURL)
+	require.NoError(t, err)
+
+	req, err := env.PublicAuthUtil.NewSignedRequestForActorExternalId(
+		http.MethodGet,
+		parsed.RequestURI(),
+		nil,
+		sconfig.RootNamespace,
+		"test-actor",
+		aschema.AllPermissions(),
+	)
+	require.NoError(t, err)
+
+	w := httptest.NewRecorder()
+	env.PublicGin.ServeHTTP(w, req)
+	require.Equalf(t, http.StatusFound, w.Code, "/oauth2/callback should 302; got %d body=%s", w.Code, w.Body.String())
+
+	loc := w.Header().Get("Location")
+	require.NotEmpty(t, loc, "/oauth2/callback should set Location")
+	return loc
+}
+
+// GetOAuth2Token reads the most recent OAuth2 token row stored for the
+// connection. Returns nil when no token exists yet.
+func (env *IntegrationTestEnv) GetOAuth2Token(t *testing.T, connectionID string) *database.OAuth2Token {
+	t.Helper()
+	id, err := apid.Parse(connectionID)
+	require.NoError(t, err)
+	tok, err := env.Db.GetOAuth2Token(context.Background(), id)
+	require.NoError(t, err)
+	return tok
+}
+
+// GetConnection reads the connection row from the DB.
+func (env *IntegrationTestEnv) GetConnection(t *testing.T, connectionID string) *database.Connection {
+	t.Helper()
+	id, err := apid.Parse(connectionID)
+	require.NoError(t, err)
+	conn, err := env.Db.GetConnection(context.Background(), id)
+	require.NoError(t, err)
+	return conn
 }
