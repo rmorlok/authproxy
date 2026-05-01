@@ -511,3 +511,103 @@ func TestBuildCarriedLabels(t *testing.T) {
 		require.Nil(t, BuildCarriedLabels("", Labels{"type": "google_drive"}))
 	})
 }
+
+func TestSplitAndMergeUserAndApxyLabels(t *testing.T) {
+	t.Run("split partitions by prefix", func(t *testing.T) {
+		all := Labels{
+			"team":           "platform",
+			"env":            "prod",
+			"apxy/cxn/-/id":  "cxn_abc",
+			"apxy/cxr/type":  "google_drive",
+		}
+		user, apxy := SplitUserAndApxyLabels(all)
+		require.Equal(t, Labels{"team": "platform", "env": "prod"}, user)
+		require.Equal(t, Labels{"apxy/cxn/-/id": "cxn_abc", "apxy/cxr/type": "google_drive"}, apxy)
+	})
+
+	t.Run("split returns nil for empty halves", func(t *testing.T) {
+		user, apxy := SplitUserAndApxyLabels(Labels{"team": "platform"})
+		require.Equal(t, Labels{"team": "platform"}, user)
+		require.Nil(t, apxy)
+
+		user, apxy = SplitUserAndApxyLabels(Labels{"apxy/cxn/-/id": "cxn_abc"})
+		require.Nil(t, user)
+		require.Equal(t, Labels{"apxy/cxn/-/id": "cxn_abc"}, apxy)
+	})
+
+	t.Run("merge round-trips", func(t *testing.T) {
+		all := Labels{
+			"team":           "platform",
+			"apxy/cxn/-/id":  "cxn_abc",
+		}
+		user, apxy := SplitUserAndApxyLabels(all)
+		merged := MergeApxyAndUserLabels(user, apxy)
+		require.Equal(t, all, merged)
+	})
+
+	t.Run("merge returns nil for empty inputs", func(t *testing.T) {
+		require.Nil(t, MergeApxyAndUserLabels(nil, nil))
+		require.Nil(t, MergeApxyAndUserLabels(Labels{}, Labels{}))
+	})
+}
+
+func TestApxyLabelValueValidation(t *testing.T) {
+	// A namespace path that exceeds the standard 63-char user-value cap.
+	longPath := "root." + strings.Repeat("a", 60) + ".more"
+	require.Greater(t, len(longPath), LabelValueMaxLength)
+
+	t.Run("user-mode rejects long values", func(t *testing.T) {
+		require.Error(t, ValidateLabelValue(longPath))
+	})
+
+	t.Run("apxy mode accepts long namespace path", func(t *testing.T) {
+		require.NoError(t, ValidateApxyLabelValue(longPath))
+	})
+
+	t.Run("apxy mode rejects values exceeding apxy cap", func(t *testing.T) {
+		// 254 chars: starts/ends alphanumeric so the regex is the only constraint.
+		tooLong := "a" + strings.Repeat("b", 252) + "c"
+		require.Equal(t, ApxyLabelValueMaxLength+1, len(tooLong))
+		require.Error(t, ValidateApxyLabelValue(tooLong))
+	})
+
+	t.Run("ValidateLabels uses apxy cap for apxy keys only", func(t *testing.T) {
+		// Long value under an apxy/ key is valid.
+		require.NoError(t, ValidateLabels(map[string]string{
+			"apxy/cxn/-/ns": longPath,
+		}))
+		// Same long value under a user key is rejected.
+		require.Error(t, ValidateLabels(map[string]string{
+			"team": longPath,
+		}))
+	})
+}
+
+func TestInjectSelfImplicitLabels(t *testing.T) {
+	t.Run("adds id and ns labels", func(t *testing.T) {
+		id := apid.MustParse("cxn_test1234567890ab")
+		out := InjectSelfImplicitLabels(id, "root.foo", Labels{"team": "platform"})
+		require.Equal(t, "cxn_test1234567890ab", out["apxy/cxn/-/id"])
+		require.Equal(t, "root.foo", out["apxy/cxn/-/ns"])
+		require.Equal(t, "platform", out["team"])
+	})
+
+	t.Run("nil input still produces implicit labels", func(t *testing.T) {
+		id := apid.MustParse("cxn_test1234567890ab")
+		out := InjectSelfImplicitLabels(id, "root", nil)
+		require.Len(t, out, 2)
+		require.Equal(t, "root", out["apxy/cxn/-/ns"])
+	})
+
+	t.Run("nil id is a no-op pass-through", func(t *testing.T) {
+		out := InjectSelfImplicitLabels(apid.Nil, "root", Labels{"team": "platform"})
+		require.Equal(t, Labels{"team": "platform"}, out)
+	})
+}
+
+func TestInjectNamespaceSelfImplicitLabels(t *testing.T) {
+	out := InjectNamespaceSelfImplicitLabels("root.foo.bar", Labels{"pig": "oink"})
+	require.Equal(t, "root.foo.bar", out["apxy/ns/-/id"])
+	require.Equal(t, "root.foo.bar", out["apxy/ns/-/ns"])
+	require.Equal(t, "oink", out["pig"])
+}

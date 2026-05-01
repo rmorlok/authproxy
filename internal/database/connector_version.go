@@ -379,9 +379,25 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				return errors.New("cannot modify non-draft connector")
 			}
 
+			// Preserve existing apxy/ system labels — the caller passes only
+			// the user-portion. Re-inject self-implicit labels in case the
+			// stored row predates Step 2a or namespace was somehow changed.
+			var existingLabels Labels
+			if scanErr := sqb.
+				Select("labels").
+				From(ConnectorVersionsTable).
+				Where(sq.Eq{"id": cv.Id, "version": cv.Version, "deleted_at": nil}).
+				QueryRowContext(ctx).
+				Scan(&existingLabels); scanErr != nil {
+				return scanErr
+			}
+			_, existingApxy := SplitUserAndApxyLabels(existingLabels)
+			mergedLabels := MergeApxyAndUserLabels(cv.Labels, existingApxy)
+			mergedLabels = InjectSelfImplicitLabels(cv.Id, cv.Namespace, mergedLabels)
+
 			result, err := sqb.Update(ConnectorVersionsTable).
 				Set("state", cv.State).
-				Set("labels", cv.Labels).
+				Set("labels", mergedLabels).
 				Set("annotations", cv.Annotations).
 				Set("encrypted_definition", cv.EncryptedDefinition).
 				Set("updated_at", apctx.GetClock(ctx).Now()).
@@ -420,6 +436,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 			}
 
 			cpy := *cv
+			cpy.Labels = InjectSelfImplicitLabels(cpy.Id, cpy.Namespace, cpy.Labels)
 			now := apctx.GetClock(ctx).Now()
 			cpy.CreatedAt = now
 			cpy.UpdatedAt = now

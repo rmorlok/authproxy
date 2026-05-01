@@ -1096,13 +1096,14 @@ func TestActor(t *testing.T) {
 
 			updated, err := db.DeleteActorLabels(ctx, actor.Id, []string{"a", "c"})
 			require.NoError(t, err)
-			require.Len(t, updated.Labels, 2)
-			_, existsA := updated.Labels["a"]
-			_, existsC := updated.Labels["c"]
+			updatedUser, _ := SplitUserAndApxyLabels(updated.Labels)
+			require.Len(t, updatedUser, 2)
+			_, existsA := updatedUser["a"]
+			_, existsC := updatedUser["c"]
 			require.False(t, existsA)
 			require.False(t, existsC)
-			require.Equal(t, "2", updated.Labels["b"])
-			require.Equal(t, "4", updated.Labels["d"])
+			require.Equal(t, "2", updatedUser["b"])
+			require.Equal(t, "4", updatedUser["d"])
 		})
 
 		t.Run("delete non-existent label is no-op", func(t *testing.T) {
@@ -1133,7 +1134,8 @@ func TestActor(t *testing.T) {
 
 			updated, err := db.DeleteActorLabels(ctx, actor.Id, []string{"any"})
 			require.NoError(t, err)
-			require.Empty(t, updated.Labels)
+			updatedUser, _ := SplitUserAndApxyLabels(updated.Labels)
+			require.Empty(t, updatedUser)
 		})
 
 		t.Run("empty keys slice returns current actor", func(t *testing.T) {

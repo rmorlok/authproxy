@@ -187,13 +187,16 @@ func (a *Actor) setFromData(d IActorData) {
 }
 
 func (a *Actor) sameAsData(d IActorData) bool {
-	// Compare labels
+	// Compare labels — only the user portion. apxy/ labels are system-managed
+	// and never appear in IActorData, so excluding them avoids spurious
+	// updates after Step 2 carry-forward materialization.
+	aUserLabels, _ := SplitUserAndApxyLabels(a.Labels)
 	dLabels := d.GetLabels()
 
-	if len(a.Labels) != len(dLabels) {
+	if len(aUserLabels) != len(dLabels) {
 		return false
 	}
-	for k, v := range a.Labels {
+	for k, v := range aUserLabels {
 		if dv, ok := dLabels[k]; !ok || dv != v {
 			return false
 		}
@@ -392,6 +395,7 @@ func (s *service) CreateActor(ctx context.Context, a *Actor) error {
 		}
 
 		cpy := *a
+		cpy.Labels = InjectSelfImplicitLabels(cpy.Id, cpy.Namespace, cpy.Labels)
 		now := apctx.GetClock(ctx).Now()
 		cpy.CreatedAt = now
 		cpy.UpdatedAt = now
@@ -472,6 +476,7 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 				}
 				newActor.setFromData(d)
 				newActor.normalize()
+				newActor.Labels = InjectSelfImplicitLabels(newActor.Id, newActor.Namespace, newActor.Labels)
 				validationErr := newActor.validate()
 				if validationErr != nil {
 					return validationErr
@@ -504,8 +509,13 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 		}
 
 		if !existingActor.sameAsData(d) {
+			// Preserve existing system-managed apxy/ labels — setFromData
+			// replaces Labels wholesale with the data's user-portion.
+			_, existingApxy := SplitUserAndApxyLabels(existingActor.Labels)
 			existingActor.setFromData(d)
 			existingActor.normalize()
+			existingActor.Labels = MergeApxyAndUserLabels(existingActor.Labels, existingApxy)
+			existingActor.Labels = InjectSelfImplicitLabels(existingActor.Id, existingActor.Namespace, existingActor.Labels)
 			validationErr := existingActor.validate()
 			if validationErr != nil {
 				return validationErr

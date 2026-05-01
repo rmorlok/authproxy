@@ -28,6 +28,13 @@ const (
 	// LabelValueMaxLength is the maximum length for a label value
 	LabelValueMaxLength = 63
 
+	// ApxyLabelValueMaxLength is the maximum length for a label value stored
+	// under an apxy/-prefixed key. System-managed labels such as
+	// apxy/<rt>/-/ns can hold a namespace path that may exceed the standard
+	// LabelValueMaxLength. User-supplied values are still capped at
+	// LabelValueMaxLength via ValidateLabelValue.
+	ApxyLabelValueMaxLength = 253
+
 	// ApxyReservedPrefix is the reserved label-key prefix for system-managed
 	// labels (implicit identifier labels and parent carry-forward labels).
 	// User-supplied label keys may not begin with this prefix.
@@ -61,6 +68,11 @@ var (
 	// contain '-' in the middle) or the literal "-" sentinel used to mark
 	// implicit identifier labels (e.g. apxy/cxr/-/id).
 	apxyPathSegmentRegex = regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9-]{0,61}[a-zA-Z0-9])?|-)$`)
+
+	// apxyLabelValueRegex matches the same character classes as labelValueRegex
+	// but allows up to ApxyLabelValueMaxLength characters total. Used for
+	// system-managed apxy/-prefixed values such as namespace paths.
+	apxyLabelValueRegex = regexp.MustCompile(`^([a-zA-Z0-9]([a-zA-Z0-9._-]{0,251}[a-zA-Z0-9])?)?$|^[a-zA-Z0-9]?$`)
 )
 
 // Labels is a map of key-value pairs following Kubernetes label restrictions.
@@ -240,21 +252,47 @@ func ValidateLabelValue(value string) error {
 	return nil
 }
 
-// ValidateLabels validates all labels in a map according to Kubernetes
-// restrictions. apxy/-prefixed keys are accepted; this is the right validator
-// for system-managed writes (e.g. carry-forward materialization).
+// ValidateApxyLabelValue validates a label value stored under an apxy/-prefixed
+// key. It allows up to ApxyLabelValueMaxLength characters so namespace paths
+// (e.g. root.foo.bar.baz...) can fit. Character rules are otherwise the same
+// as ValidateLabelValue.
+func ValidateApxyLabelValue(value string) error {
+	if len(value) > ApxyLabelValueMaxLength {
+		return fmt.Errorf("apxy label value exceeds maximum length of %d characters", ApxyLabelValueMaxLength)
+	}
+
+	if value != "" && !apxyLabelValueRegex.MatchString(value) {
+		return fmt.Errorf("apxy label value %q must start and end with alphanumeric and contain only alphanumeric, '-', '_', or '.'", value)
+	}
+
+	return nil
+}
+
+// ValidateLabels validates all labels in a map. apxy/-prefixed keys are
+// accepted (use ValidateUserLabels at user-input boundaries instead) and
+// values stored under apxy/ keys are validated against the longer
+// ApxyLabelValueMaxLength cap.
 func ValidateLabels(labels map[string]string) error {
 	var result *multierror.Error
 	for key, value := range labels {
 		if err := ValidateLabelKey(key); err != nil {
 			result = multierror.Append(result, fmt.Errorf("invalid label key %q: %w", key, err))
 		}
-		if err := ValidateLabelValue(value); err != nil {
+		if err := validateValueForKey(key, value); err != nil {
 			result = multierror.Append(result, fmt.Errorf("invalid label value for key %q: %w", key, err))
 		}
 	}
 
 	return result.ErrorOrNil()
+}
+
+// validateValueForKey selects the appropriate value validator based on
+// whether the key is in the apxy/ namespace.
+func validateValueForKey(key, value string) error {
+	if strings.HasPrefix(key, ApxyReservedPrefix) {
+		return ValidateApxyLabelValue(value)
+	}
+	return ValidateLabelValue(value)
 }
 
 // ValidateUserLabels validates a labels map supplied by a user. It applies
@@ -287,24 +325,14 @@ func ValidateUserLabelDeletionKeys(keys []string) error {
 	return result.ErrorOrNil()
 }
 
-// Validate validates all labels according to Kubernetes restrictions.
+// Validate validates all labels (system mode — apxy/ keys allowed, with the
+// longer ApxyLabelValueMaxLength value cap for those keys).
 func (l Labels) Validate() error {
 	if l == nil {
 		return nil
 	}
 
-	result := &multierror.Error{}
-
-	for key, value := range l {
-		if err := ValidateLabelKey(key); err != nil {
-			result = multierror.Append(result, fmt.Errorf("invalid label key %q: %w", key, err))
-		}
-		if err := ValidateLabelValue(value); err != nil {
-			result = multierror.Append(result, fmt.Errorf("invalid label value for key %q: %w", key, err))
-		}
-	}
-
-	return result.ErrorOrNil()
+	return ValidateLabels(map[string]string(l))
 }
 
 // Get returns the value for a label key, and whether the key exists.
@@ -436,6 +464,56 @@ func (s *service) deleteLabelsInTableTx(ctx context.Context, tx *sql.Tx, table s
 	return currentLabels, now, nil
 }
 
+// replaceUserLabelsInTableTx replaces only the user-portion of an existing
+// row's labels, preserving any apxy/-prefixed system labels. Used by
+// UpdateXLabels endpoints (which expose a full-replace semantic to users
+// over the user-managed portion only — system labels are untouchable from
+// user input).
+//
+// Returns the merged final label set written and the new updated_at time.
+func (s *service) replaceUserLabelsInTableTx(ctx context.Context, tx *sql.Tx, table string, where sq.Eq, newUserLabels Labels) (Labels, time.Time, error) {
+	var currentLabels Labels
+	err := s.sq.
+		Select("labels").
+		From(table).
+		Where(where).
+		RunWith(tx).
+		QueryRow().
+		Scan(&currentLabels)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, time.Time{}, ErrNotFound
+		}
+		return nil, time.Time{}, err
+	}
+
+	_, apxy := SplitUserAndApxyLabels(currentLabels)
+	merged := MergeApxyAndUserLabels(newUserLabels, apxy)
+
+	now := apctx.GetClock(ctx).Now()
+	dbResult, err := s.sq.
+		Update(table).
+		Set("labels", merged).
+		Set("updated_at", now).
+		Where(where).
+		RunWith(tx).
+		Exec()
+	if err != nil {
+		return nil, time.Time{}, fmt.Errorf("failed to replace user labels in %s: %w", table, err)
+	}
+
+	affected, err := dbResult.RowsAffected()
+	if err != nil {
+		return nil, time.Time{}, fmt.Errorf("failed to replace user labels in %s: %w", table, err)
+	}
+
+	if affected == 0 {
+		return nil, time.Time{}, ErrNotFound
+	}
+
+	return merged, now, nil
+}
+
 // updateLabelsInTableTx replaces all labels on an existing row within a transaction.
 // Writes the provided labels and updated timestamp.
 // Returns the new updated_at time.
@@ -464,6 +542,11 @@ func (s *service) updateLabelsInTableTx(ctx context.Context, tx *sql.Tx, table s
 	return now, nil
 }
 
+// NamespaceLabelToken is the <rt> token used in apxy/ keys that reference a
+// namespace. Namespaces are path-keyed (not apid-keyed) so the token is
+// hard-coded rather than derived from an apid prefix.
+const NamespaceLabelToken = "ns"
+
 // ApidPrefixToLabelToken returns the label-key token associated with an apid
 // prefix. It strips the trailing underscore so e.g. "cxr_" becomes "cxr" and
 // "cxn_" becomes "cxn". Used to build apxy/ keys whose <rt> segment matches
@@ -472,23 +555,119 @@ func ApidPrefixToLabelToken(p apid.Prefix) string {
 	return strings.TrimSuffix(string(p), "_")
 }
 
+// BuildImplicitIdentifierLabelsForToken builds the apxy/<rt>/-/id and
+// apxy/<rt>/-/ns implicit identifier labels for any resource type, keyed by
+// the supplied <rt> token and identifier string. This is the underlying
+// builder used by both apid-keyed and path-keyed resources.
+func BuildImplicitIdentifierLabelsForToken(rt, id, namespacePath string) Labels {
+	if rt == "" || id == "" {
+		return nil
+	}
+	return Labels{
+		fmt.Sprintf("%s%s/%s/id", ApxyReservedPrefix, rt, ApxyImplicitSegment): id,
+		fmt.Sprintf("%s%s/%s/ns", ApxyReservedPrefix, rt, ApxyImplicitSegment): namespacePath,
+	}
+}
+
+// BuildNamespaceImplicitIdentifierLabels builds the self-implicit identifier
+// labels for a namespace. Both the -/id and -/ns labels carry the namespace's
+// own path (a namespace is its own namespace).
+func BuildNamespaceImplicitIdentifierLabels(path string) Labels {
+	return BuildImplicitIdentifierLabelsForToken(NamespaceLabelToken, path, path)
+}
+
+// InjectNamespaceSelfImplicitLabels returns a copy of existing with a
+// namespace's own apxy/ns/-/id and apxy/ns/-/ns labels added. Mirrors
+// InjectSelfImplicitLabels but for path-keyed namespace resources.
+func InjectNamespaceSelfImplicitLabels(path string, existing Labels) Labels {
+	implicit := BuildNamespaceImplicitIdentifierLabels(path)
+	if len(implicit) == 0 {
+		if existing == nil {
+			return nil
+		}
+		return existing.Copy()
+	}
+	out := make(Labels, len(existing)+len(implicit))
+	for k, v := range existing {
+		out[k] = v
+	}
+	for k, v := range implicit {
+		out[k] = v
+	}
+	return out
+}
+
 // BuildImplicitIdentifierLabels returns the two implicit identifier labels
-// for a resource: apxy/<rt>/-/id and apxy/<rt>/-/ns, where <rt> is derived
-// from the resource's id prefix. The id and namespacePath are stored as
-// label values verbatim — callers must ensure they have already been
-// validated by their respective rules.
+// for an apid-keyed resource: apxy/<rt>/-/id and apxy/<rt>/-/ns, where <rt>
+// is derived from the resource's id prefix. The id and namespacePath are
+// stored as label values verbatim — callers must ensure they have already
+// been validated by their respective rules.
 func BuildImplicitIdentifierLabels(id apid.ID, namespacePath string) Labels {
 	if id.IsNil() {
 		return nil
 	}
-	rt := ApidPrefixToLabelToken(id.Prefix())
-	if rt == "" {
+	return BuildImplicitIdentifierLabelsForToken(ApidPrefixToLabelToken(id.Prefix()), string(id), namespacePath)
+}
+
+// InjectSelfImplicitLabels returns a copy of existing with the resource's own
+// apxy/<rt>/-/id and apxy/<rt>/-/ns labels added. The self-implicit labels
+// override any same-keyed entries already in existing (deeper-overrides-
+// shallower across the carry-forward chain). Callers pass this to the create
+// path so the row is persisted with the implicit identifier labels in place.
+func InjectSelfImplicitLabels(id apid.ID, namespacePath string, existing Labels) Labels {
+	implicit := BuildImplicitIdentifierLabels(id, namespacePath)
+	if len(implicit) == 0 {
+		if existing == nil {
+			return nil
+		}
+		return existing.Copy()
+	}
+	out := make(Labels, len(existing)+len(implicit))
+	for k, v := range existing {
+		out[k] = v
+	}
+	for k, v := range implicit {
+		out[k] = v
+	}
+	return out
+}
+
+// SplitUserAndApxyLabels partitions a labels map into the user-provided
+// portion (no apxy/ prefix) and the system-managed portion (apxy/ prefix).
+// The two returned maps are disjoint and together reconstitute the input.
+// Either map may be nil if its half is empty.
+func SplitUserAndApxyLabels(labels Labels) (user, apxy Labels) {
+	for k, v := range labels {
+		if strings.HasPrefix(k, ApxyReservedPrefix) {
+			if apxy == nil {
+				apxy = make(Labels)
+			}
+			apxy[k] = v
+		} else {
+			if user == nil {
+				user = make(Labels)
+			}
+			user[k] = v
+		}
+	}
+	return user, apxy
+}
+
+// MergeApxyAndUserLabels returns a single map containing both the user and
+// apxy portions. Because the two inputs are partitioned by key prefix, no
+// collisions are possible.
+func MergeApxyAndUserLabels(user, apxy Labels) Labels {
+	if len(user) == 0 && len(apxy) == 0 {
 		return nil
 	}
-	return Labels{
-		fmt.Sprintf("%s%s/%s/id", ApxyReservedPrefix, rt, ApxyImplicitSegment): string(id),
-		fmt.Sprintf("%s%s/%s/ns", ApxyReservedPrefix, rt, ApxyImplicitSegment): namespacePath,
+	out := make(Labels, len(user)+len(apxy))
+	for k, v := range user {
+		out[k] = v
 	}
+	for k, v := range apxy {
+		out[k] = v
+	}
+	return out
 }
 
 // BuildCarriedLabels takes a parent's labels and returns the carry-forward

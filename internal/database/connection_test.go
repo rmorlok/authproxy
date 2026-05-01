@@ -84,7 +84,10 @@ func TestConnections(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, c)
 		assert.Equal(t, c.Id, u)
-		assert.Equal(t, labels, c.Labels)
+		userLabels, _ := SplitUserAndApxyLabels(c.Labels)
+		assert.Equal(t, labels, userLabels)
+		assert.Equal(t, string(u), c.Labels["apxy/cxn/-/id"])
+		assert.Equal(t, "root.some-namespace", c.Labels["apxy/cxn/-/ns"])
 	})
 	t.Run("delete connection", func(t *testing.T) {
 		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
@@ -609,9 +612,13 @@ func TestConnections(t *testing.T) {
 			c, err := db.UpdateConnectionLabels(ctx2, u, map[string]string{"new": "labels"})
 			assert.NoError(t, err)
 			assert.NotNil(t, c)
-			assert.Equal(t, map[string]string{"new": "labels"}, map[string]string(c.Labels))
-			_, exists := c.Labels["old"]
+			userLabels, apxyLabels := SplitUserAndApxyLabels(c.Labels)
+			assert.Equal(t, map[string]string{"new": "labels"}, map[string]string(userLabels))
+			_, exists := userLabels["old"]
 			assert.False(t, exists)
+			// apxy/ self-implicit labels are preserved across user-driven updates.
+			assert.Equal(t, string(u), apxyLabels["apxy/cxn/-/id"])
+			assert.Equal(t, "root.some-namespace", apxyLabels["apxy/cxn/-/ns"])
 			assert.Equal(t, newNow, c.UpdatedAt)
 		})
 
@@ -619,7 +626,8 @@ func TestConnections(t *testing.T) {
 			c, err := db.UpdateConnectionLabels(ctx, u, map[string]string{})
 			assert.NoError(t, err)
 			assert.NotNil(t, c)
-			assert.Empty(t, c.Labels)
+			userLabels, _ := SplitUserAndApxyLabels(c.Labels)
+			assert.Empty(t, userLabels)
 		})
 
 		t.Run("clear with nil", func(t *testing.T) {
@@ -630,7 +638,8 @@ func TestConnections(t *testing.T) {
 			c, err := db.UpdateConnectionLabels(ctx, u, nil)
 			assert.NoError(t, err)
 			assert.NotNil(t, c)
-			assert.Nil(t, c.Labels)
+			userLabels, _ := SplitUserAndApxyLabels(c.Labels)
+			assert.Empty(t, userLabels)
 		})
 
 		t.Run("not found", func(t *testing.T) {

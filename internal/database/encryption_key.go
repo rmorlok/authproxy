@@ -190,6 +190,7 @@ func (s *service) CreateEncryptionKey(ctx context.Context, ek *EncryptionKey) er
 		return err
 	}
 
+	ek.Labels = InjectSelfImplicitLabels(ek.Id, ek.Namespace, ek.Labels)
 	now := apctx.GetClock(ctx).Now()
 	ek.CreatedAt = now
 	ek.UpdatedAt = now
@@ -338,12 +339,12 @@ func (s *service) UpdateEncryptionKeyLabels(ctx context.Context, id apid.ID, lab
 			return err
 		}
 
-		now, err := s.updateLabelsInTableTx(ctx, tx, EncryptionKeysTable, sq.Eq{"id": id, "deleted_at": nil}, Labels(labels))
+		merged, now, err := s.replaceUserLabelsInTableTx(ctx, tx, EncryptionKeysTable, sq.Eq{"id": id, "deleted_at": nil}, Labels(labels))
 		if err != nil {
 			return err
 		}
 
-		ek.Labels = labels
+		ek.Labels = merged
 		ek.UpdatedAt = now
 		result = &ek
 		return nil

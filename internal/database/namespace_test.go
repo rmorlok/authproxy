@@ -670,17 +670,21 @@ INSERT INTO namespaces
 				"new": "label",
 			})
 			require.NoError(t, err)
-			require.Equal(t, "label", updated.Labels["new"])
-			_, existsOld := updated.Labels["old"]
+			updatedUser, _ := SplitUserAndApxyLabels(updated.Labels)
+			require.Equal(t, "label", updatedUser["new"])
+			_, existsOld := updatedUser["old"]
 			require.False(t, existsOld)
-			_, existsAlsoOld := updated.Labels["also-old"]
+			_, existsAlsoOld := updatedUser["also-old"]
 			require.False(t, existsAlsoOld)
+			// apxy/ self-implicit labels are preserved across user-driven updates.
+			require.Equal(t, "root.updlabels2", updated.Labels["apxy/ns/-/id"])
 
 			// Verify in database
 			retrieved, err := db.GetNamespace(ctx, "root.updlabels2")
 			require.NoError(t, err)
-			require.Len(t, retrieved.Labels, 1)
-			require.Equal(t, "label", retrieved.Labels["new"])
+			retrievedUser, _ := SplitUserAndApxyLabels(retrieved.Labels)
+			require.Len(t, retrievedUser, 1)
+			require.Equal(t, "label", retrievedUser["new"])
 		})
 
 		t.Run("clear labels with empty map", func(t *testing.T) {
@@ -697,12 +701,14 @@ INSERT INTO namespaces
 
 			updated, err := db.UpdateNamespaceLabels(ctx, "root.updlabels3", map[string]string{})
 			require.NoError(t, err)
-			require.Empty(t, updated.Labels)
+			updatedUser, _ := SplitUserAndApxyLabels(updated.Labels)
+			require.Empty(t, updatedUser)
 
 			// Verify in database
 			retrieved, err := db.GetNamespace(ctx, "root.updlabels3")
 			require.NoError(t, err)
-			require.Empty(t, retrieved.Labels)
+			retrievedUser, _ := SplitUserAndApxyLabels(retrieved.Labels)
+			require.Empty(t, retrievedUser)
 		})
 
 		t.Run("nil labels clears labels", func(t *testing.T) {
@@ -719,7 +725,8 @@ INSERT INTO namespaces
 
 			updated, err := db.UpdateNamespaceLabels(ctx, "root.updlabels4", nil)
 			require.NoError(t, err)
-			require.Nil(t, updated.Labels)
+			updatedUser, _ := SplitUserAndApxyLabels(updated.Labels)
+			require.Empty(t, updatedUser)
 		})
 
 		t.Run("namespace not found", func(t *testing.T) {
@@ -989,13 +996,14 @@ INSERT INTO namespaces
 
 			updated, err := db.DeleteNamespaceLabels(ctx, "root.dellabels2", []string{"a", "c"})
 			require.NoError(t, err)
-			require.Len(t, updated.Labels, 2)
-			_, existsA := updated.Labels["a"]
-			_, existsC := updated.Labels["c"]
+			updatedUser, _ := SplitUserAndApxyLabels(updated.Labels)
+			require.Len(t, updatedUser, 2)
+			_, existsA := updatedUser["a"]
+			_, existsC := updatedUser["c"]
 			require.False(t, existsA)
 			require.False(t, existsC)
-			require.Equal(t, "2", updated.Labels["b"])
-			require.Equal(t, "4", updated.Labels["d"])
+			require.Equal(t, "2", updatedUser["b"])
+			require.Equal(t, "4", updatedUser["d"])
 		})
 
 		t.Run("delete non-existent label is no-op", func(t *testing.T) {
@@ -1028,7 +1036,8 @@ INSERT INTO namespaces
 
 			updated, err := db.DeleteNamespaceLabels(ctx, "root.dellabels4", []string{"any"})
 			require.NoError(t, err)
-			require.Empty(t, updated.Labels)
+			updatedUser, _ := SplitUserAndApxyLabels(updated.Labels)
+			require.Empty(t, updatedUser)
 		})
 
 		t.Run("empty keys slice returns current namespace", func(t *testing.T) {
