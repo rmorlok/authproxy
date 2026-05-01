@@ -3,10 +3,12 @@ package httpf
 import (
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"gopkg.in/h2non/gentleman.v2"
 	"gopkg.in/h2non/gentleman.v2/plugins/transport"
@@ -123,8 +125,14 @@ func (f *clientFactory) ForLabels(labels map[string]string) F {
 		}
 		ri.Labels = newLabels
 	}
-	// Request labels override connection labels
+	// Request labels override connection user labels — but apxy/ keys are
+	// system-managed and per-request input may not modify them.
+	// ProxyRequest.Validate already rejects apxy/ keys; this is
+	// defense-in-depth against internal callers that might bypass it.
 	for k, v := range labels {
+		if strings.HasPrefix(k, database.ApxyReservedPrefix) {
+			continue
+		}
 		ri.Labels[k] = v
 	}
 
