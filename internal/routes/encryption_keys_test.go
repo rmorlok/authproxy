@@ -659,7 +659,8 @@ func TestEncryptionKeys(t *testing.T) {
 			var resp EncryptionKeyJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, database.EncryptionKeyStateActive, resp.State)
-			require.Equal(t, map[string]string{"new-label": "value"}, resp.Labels)
+			respUser, _ := database.SplitUserAndApxyLabels(database.Labels(resp.Labels))
+			require.Equal(t, database.Labels{"new-label": "value"}, respUser)
 		})
 
 		t.Run("success - labels unchanged when not provided", func(t *testing.T) {
@@ -681,7 +682,8 @@ func TestEncryptionKeys(t *testing.T) {
 
 			var resp EncryptionKeyJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			require.Equal(t, map[string]string{"new-label": "value"}, resp.Labels)
+			respUser, _ := database.SplitUserAndApxyLabels(database.Labels(resp.Labels))
+			require.Equal(t, database.Labels{"new-label": "value"}, respUser)
 		})
 	})
 
@@ -872,7 +874,8 @@ func TestEncryptionKeys(t *testing.T) {
 
 			var resp map[string]string
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			require.Empty(t, resp)
+			respUser, _ := database.SplitUserAndApxyLabels(database.Labels(resp))
+			require.Empty(t, respUser)
 		})
 	})
 

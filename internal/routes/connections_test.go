@@ -712,7 +712,8 @@ func TestConnections(t *testing.T) {
 			var resp map[string]string
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Empty(t, resp)
+			respUser, _ := database.SplitUserAndApxyLabels(database.Labels(resp))
+			require.Empty(t, respUser)
 		})
 	})
 

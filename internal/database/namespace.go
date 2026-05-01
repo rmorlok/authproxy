@@ -265,6 +265,8 @@ func (s *service) createNamespace(ctx context.Context, tx *sql.Tx, ns *Namespace
 	// Update the state so that we are always bound by the parent namespace state
 	ns.State = state
 
+	ns.Labels = InjectNamespaceSelfImplicitLabels(ns.Path, ns.Labels)
+
 	now := apctx.GetClock(ctx).Now()
 	ns.CreatedAt = now
 	ns.UpdatedAt = now
@@ -716,12 +718,12 @@ func (s *service) UpdateNamespaceLabels(ctx context.Context, path string, labels
 			return err
 		}
 
-		now, err := s.updateLabelsInTableTx(ctx, tx, NamespacesTable, sq.Eq{"path": path, "deleted_at": nil}, Labels(labels))
+		merged, now, err := s.replaceUserLabelsInTableTx(ctx, tx, NamespacesTable, sq.Eq{"path": path, "deleted_at": nil}, Labels(labels))
 		if err != nil {
 			return err
 		}
 
-		ns.Labels = labels
+		ns.Labels = merged
 		ns.UpdatedAt = now
 		result = ns
 		return nil

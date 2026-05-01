@@ -924,12 +924,15 @@ func TestActorsRoutes(t *testing.T) {
 
 			var resp ActorJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			require.Empty(t, resp.Labels)
+			respUser, _ := database.SplitUserAndApxyLabels(database.Labels(resp.Labels))
+			require.Empty(t, respUser)
 
-			// Verify the labels are cleared in the database
+			// Verify the labels are cleared in the database (user portion only;
+			// apxy/ self-implicit labels remain).
 			updatedActor, err := tu.Db.GetActor(context.Background(), actorWithLabels.Id)
 			require.NoError(t, err)
-			require.Empty(t, updatedActor.Labels)
+			updatedUser, _ := database.SplitUserAndApxyLabels(updatedActor.Labels)
+			require.Empty(t, updatedUser)
 		})
 
 		t.Run("success - labels unchanged", func(t *testing.T) {
@@ -956,12 +959,14 @@ func TestActorsRoutes(t *testing.T) {
 
 			var resp ActorJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			require.Equal(t, resp.Labels, map[string]string{"old": "value"})
+			respUser, _ := database.SplitUserAndApxyLabels(database.Labels(resp.Labels))
+			require.Equal(t, database.Labels{"old": "value"}, respUser)
 
-			// Verify the labels are cleared in the database
+			// Verify the labels in the database (user portion only).
 			updatedActor, err := tu.Db.GetActor(context.Background(), actorWithLabels.Id)
 			require.NoError(t, err)
-			require.Equal(t, updatedActor.Labels, database.Labels{"old": "value"})
+			updatedUser, _ := database.SplitUserAndApxyLabels(updatedActor.Labels)
+			require.Equal(t, database.Labels{"old": "value"}, updatedUser)
 		})
 	})
 
@@ -1129,7 +1134,8 @@ func TestActorsRoutes(t *testing.T) {
 
 			var resp map[string]string
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			require.Empty(t, resp)
+			respUser, _ := database.SplitUserAndApxyLabels(database.Labels(resp))
+			require.Empty(t, respUser)
 		})
 	})
 

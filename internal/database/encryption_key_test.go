@@ -37,7 +37,10 @@ func TestEncryptionKey(t *testing.T) {
 		require.Equal(t, ek.Id, got.Id)
 		require.Equal(t, "root", got.Namespace)
 		require.Equal(t, EncryptionKeyStateActive, got.State)
-		require.Equal(t, Labels{"env": "test"}, got.Labels)
+		gotUser, _ := SplitUserAndApxyLabels(got.Labels)
+		require.Equal(t, Labels{"env": "test"}, gotUser)
+		require.Equal(t, string(ek.Id), got.Labels["apxy/ek/-/id"])
+		require.Equal(t, "root", got.Labels["apxy/ek/-/ns"])
 
 		// Update state via UpdateEncryptionKey
 		later := now.Add(time.Hour)
@@ -127,15 +130,18 @@ func TestEncryptionKey(t *testing.T) {
 		require.Equal(t, "test", updated.Labels["env"])
 		require.Equal(t, "us-east", updated.Labels["region"])
 
-		// UpdateLabels (full replace)
+		// UpdateLabels (full replace) — apxy/ system labels are preserved.
 		updated, err = db.UpdateEncryptionKeyLabels(ctx, ek.Id, map[string]string{"new-label": "value"})
 		require.NoError(t, err)
-		require.Equal(t, Labels{"new-label": "value"}, updated.Labels)
+		updatedUser, _ := SplitUserAndApxyLabels(updated.Labels)
+		require.Equal(t, Labels{"new-label": "value"}, updatedUser)
+		require.Equal(t, string(ek.Id), updated.Labels["apxy/ek/-/id"])
 
 		// DeleteLabels
 		updated, err = db.DeleteEncryptionKeyLabels(ctx, ek.Id, []string{"new-label"})
 		require.NoError(t, err)
-		require.Empty(t, updated.Labels)
+		updatedUser, _ = SplitUserAndApxyLabels(updated.Labels)
+		require.Empty(t, updatedUser)
 	})
 
 	t.Run("Annotations", func(t *testing.T) {

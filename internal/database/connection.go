@@ -201,6 +201,7 @@ func (s *service) CreateConnection(ctx context.Context, c *Connection) error {
 	}
 
 	cpy := *c
+	cpy.Labels = InjectSelfImplicitLabels(cpy.Id, cpy.Namespace, cpy.Labels)
 	now := apctx.GetClock(ctx).Now()
 	cpy.CreatedAt = now
 	cpy.UpdatedAt = now
@@ -708,12 +709,12 @@ func (s *service) UpdateConnectionLabels(ctx context.Context, id apid.ID, labels
 			return err
 		}
 
-		now, err := s.updateLabelsInTableTx(ctx, tx, ConnectionsTable, sq.Eq{"id": id, "deleted_at": nil}, Labels(labels))
+		merged, now, err := s.replaceUserLabelsInTableTx(ctx, tx, ConnectionsTable, sq.Eq{"id": id, "deleted_at": nil}, Labels(labels))
 		if err != nil {
 			return err
 		}
 
-		conn.Labels = labels
+		conn.Labels = merged
 		conn.UpdatedAt = now
 		result = &conn
 		return nil

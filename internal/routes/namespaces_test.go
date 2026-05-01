@@ -627,12 +627,14 @@ func TestNamespaces(t *testing.T) {
 
 			var resp NamespaceJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			require.Empty(t, resp.Labels)
+			respUser, _ := database.SplitUserAndApxyLabels(database.Labels(resp.Labels))
+			require.Empty(t, respUser)
 
-			// Verify in database
+			// Verify in database (user portion only).
 			ns, err := tu.Db.GetNamespace(context.Background(), "root.clearlabels")
 			require.NoError(t, err)
-			require.Empty(t, ns.Labels)
+			nsUser, _ := database.SplitUserAndApxyLabels(ns.Labels)
+			require.Empty(t, nsUser)
 		})
 
 		t.Run("success - labels unchanged when not provided", func(t *testing.T) {
@@ -661,12 +663,14 @@ func TestNamespaces(t *testing.T) {
 
 			var resp NamespaceJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			require.Equal(t, map[string]string{"old": "value"}, resp.Labels)
+			respUser, _ := database.SplitUserAndApxyLabels(database.Labels(resp.Labels))
+			require.Equal(t, database.Labels{"old": "value"}, respUser)
 
-			// Verify in database
+			// Verify in database (user portion only).
 			ns, err := tu.Db.GetNamespace(context.Background(), "root.unchangedlabels")
 			require.NoError(t, err)
-			require.Equal(t, database.Labels{"old": "value"}, ns.Labels)
+			nsUser, _ := database.SplitUserAndApxyLabels(ns.Labels)
+			require.Equal(t, database.Labels{"old": "value"}, nsUser)
 		})
 
 		t.Run("success - replaces labels entirely", func(t *testing.T) {
@@ -695,15 +699,17 @@ func TestNamespaces(t *testing.T) {
 
 			var resp NamespaceJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			require.Len(t, resp.Labels, 1)
-			require.Equal(t, "new-value", resp.Labels["new-key"])
+			respUser, _ := database.SplitUserAndApxyLabels(database.Labels(resp.Labels))
+			require.Len(t, respUser, 1)
+			require.Equal(t, "new-value", respUser["new-key"])
 
-			// Verify old labels are gone
+			// Verify old labels are gone (user portion only).
 			ns, err := tu.Db.GetNamespace(context.Background(), "root.replacelabels")
 			require.NoError(t, err)
-			require.Len(t, ns.Labels, 1)
-			require.Equal(t, "new-value", ns.Labels["new-key"])
-			_, exists := ns.Labels["old-key"]
+			nsUser, _ := database.SplitUserAndApxyLabels(ns.Labels)
+			require.Len(t, nsUser, 1)
+			require.Equal(t, "new-value", nsUser["new-key"])
+			_, exists := nsUser["old-key"]
 			require.False(t, exists)
 		})
 	})
@@ -790,7 +796,8 @@ func TestNamespaces(t *testing.T) {
 
 			var resp map[string]string
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			require.Empty(t, resp)
+			respUser, _ := database.SplitUserAndApxyLabels(database.Labels(resp))
+			require.Empty(t, respUser)
 		})
 	})
 
