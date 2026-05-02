@@ -143,7 +143,7 @@ func (l *MockListRequestBuilderExecutor) FetchPage(ctx context.Context) paginati
 	return l.ReturnResults
 }
 
-func (l *MockListRequestBuilderExecutor) Enumerate(ctx context.Context, callback func(pagination.PageResult[*request_log.LogRecord]) (keepGoing pagination.KeepGoing, err error)) error {
+func (l *MockListRequestBuilderExecutor) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[*request_log.LogRecord]) error {
 	var err error
 	keepGoing := pagination.Continue
 	hasMore := true

@@ -25,7 +25,7 @@ type Namespace interface {
 
 type ListNamespacesExecutor interface {
 	FetchPage(context.Context) pagination.PageResult[Namespace]
-	Enumerate(context.Context, func(pagination.PageResult[Namespace]) (keepGoing pagination.KeepGoing, err error)) error
+	Enumerate(context.Context, pagination.EnumerateCallback[Namespace]) error
 }
 
 type ListNamespacesBuilder interface {

@@ -14,7 +14,7 @@ import (
 
 type ListConnectorVersionsExecutor interface {
 	FetchPage(context.Context) pagination.PageResult[ConnectorVersion]
-	Enumerate(context.Context, func(pagination.PageResult[ConnectorVersion]) (keepGoing pagination.KeepGoing, err error)) error
+	Enumerate(context.Context, pagination.EnumerateCallback[ConnectorVersion]) error
 }
 
 type ListConnectorVersionsBuilder interface {

@@ -187,7 +187,7 @@ func (l *listEncryptionKeyWrapper) FetchPage(ctx context.Context) pagination.Pag
 	return l.convertPageResult(l.executor().FetchPage(ctx))
 }
 
-func (l *listEncryptionKeyWrapper) Enumerate(ctx context.Context, callback func(pagination.PageResult[iface.EncryptionKey]) (keepGoing pagination.KeepGoing, err error)) error {
+func (l *listEncryptionKeyWrapper) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[iface.EncryptionKey]) error {
 	return l.executor().Enumerate(ctx, func(result pagination.PageResult[database.EncryptionKey]) (keepGoing pagination.KeepGoing, err error) {
 		return callback(l.convertPageResult(result))
 	})

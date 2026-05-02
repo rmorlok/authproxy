@@ -9,6 +9,7 @@ import (
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
+	"golang.org/x/time/rate"
 )
 
 type DeletedHandling bool
@@ -241,6 +242,17 @@ type DB interface {
 	// after a connector version's user labels change (only meaningful for
 	// draft versions; primary and active are immutable).
 	RefreshConnectionsForConnectorVersion(ctx context.Context, id apid.ID, version uint64) error
+
+	// ReconcileCarryForwardLabels walks every labelled resource in batches
+	// of `batchSize` and re-derives the materialized apxy/ portion of
+	// each row. The optional `limiter` is consulted before each row is
+	// processed, providing a per-row records/sec rate limit; nil means
+	// unlimited. Drift is rare under normal operation, but this method
+	// is the safety net for any propagation task that misfired or any
+	// data path that bypassed the carry-forward triggers. Intended to be
+	// invoked from a daily asynq cron task. Returns the total number of
+	// rows whose labels were corrected.
+	ReconcileCarryForwardLabels(ctx context.Context, batchSize int32, limiter *rate.Limiter) (corrected int64, err error)
 
 	/*
 	 *  Nonces

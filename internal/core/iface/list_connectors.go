@@ -10,7 +10,7 @@ import (
 
 type ListConnectorsExecutor interface {
 	FetchPage(context.Context) pagination.PageResult[Connector]
-	Enumerate(context.Context, func(pagination.PageResult[Connector]) (keepGoing pagination.KeepGoing, err error)) error
+	Enumerate(context.Context, pagination.EnumerateCallback[Connector]) error
 }
 
 type ListConnectorsBuilder interface {

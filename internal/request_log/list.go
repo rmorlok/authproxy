@@ -52,7 +52,7 @@ func IsValidOrderByField(field RequestOrderByField) bool {
 
 type ListRequestExecutor interface {
 	FetchPage(ctx context.Context) pagination.PageResult[*LogRecord]
-	Enumerate(ctx context.Context, callback func(pagination.PageResult[*LogRecord]) (keepGoing pagination.KeepGoing, err error)) error
+	Enumerate(ctx context.Context, callback pagination.EnumerateCallback[*LogRecord]) error
 }
 
 type ListRequestBuilder interface {

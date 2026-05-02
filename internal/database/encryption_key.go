@@ -612,7 +612,7 @@ func (s *service) DeleteEncryptionKeyAnnotations(ctx context.Context, id apid.ID
 
 type ListEncryptionKeysExecutor interface {
 	FetchPage(context.Context) pagination.PageResult[EncryptionKey]
-	Enumerate(context.Context, func(pagination.PageResult[EncryptionKey]) (keepGoing pagination.KeepGoing, err error)) error
+	Enumerate(context.Context, pagination.EnumerateCallback[EncryptionKey]) error
 }
 
 type ListEncryptionKeysBuilder interface {
@@ -787,7 +787,7 @@ func (l *listEncryptionKeysFilters) FetchPage(ctx context.Context) pagination.Pa
 	return l.fetchPage(ctx)
 }
 
-func (l *listEncryptionKeysFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[EncryptionKey]) (keepGoing pagination.KeepGoing, err error)) error {
+func (l *listEncryptionKeysFilters) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[EncryptionKey]) error {
 	var err error
 	keepGoing := pagination.Continue
 	hasMore := true

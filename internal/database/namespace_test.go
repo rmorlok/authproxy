@@ -1,6 +1,7 @@
 package database
 
 import (
+	"context"
 	"errors"
 	"fmt"
 	"net/http"
@@ -15,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/stretchr/testify/require"
+	"golang.org/x/time/rate"
 	clock "k8s.io/utils/clock/testing"
 )
 
@@ -2183,5 +2185,105 @@ func TestConnectorVersionLabelChangePropagation(t *testing.T) {
 		require.NoError(t, err)
 		require.Equal(t, "slack", c.Labels["apxy/cxr/type"])
 		require.Equal(t, "x", c.Labels["apxy/cxr/extra"])
+	})
+}
+
+func TestReconcileCarryForwardLabels(t *testing.T) {
+	t.Run("corrects drifted apxy labels and reports the count", func(t *testing.T) {
+		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
+		defer rawDb.Close()
+		now := time.Date(2024, time.March, 1, 12, 0, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		// Build a tree: namespace, cv, connection, ek, actor.
+		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+			Path: "root.recon", State: NamespaceStateActive, Labels: Labels{"team": "platform"},
+		}))
+		cvID := apid.New(apid.PrefixConnectorVersion)
+		require.NoError(t, db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+			Id: cvID, Version: 1, Namespace: "root.recon",
+			State: ConnectorVersionStateDraft, Labels: Labels{"type": "google-drive"},
+			Hash: "h", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "d"},
+		}))
+		connID := apid.New(apid.PrefixConnection)
+		require.NoError(t, db.CreateConnection(ctx, &Connection{
+			Id: connID, Namespace: "root.recon", ConnectorId: cvID, ConnectorVersion: 1,
+			State: ConnectionStateCreated,
+		}))
+		require.NoError(t, db.CreateEncryptionKey(ctx, &EncryptionKey{
+			Id: apid.New(apid.PrefixEncryptionKey), Namespace: "root.recon", State: EncryptionKeyStateActive,
+		}))
+		require.NoError(t, db.CreateActor(ctx, &Actor{
+			Id: apid.New(apid.PrefixActor), ExternalId: "act-recon", Namespace: "root.recon",
+		}))
+
+		// First run may fix any pre-existing drift (e.g. on the auto-created
+		// root namespace from migrations). Drain it so we start clean.
+		_, err := db.ReconcileCarryForwardLabels(ctx, 100, nil)
+		require.NoError(t, err)
+		fixed, err := db.ReconcileCarryForwardLabels(ctx, 100, nil)
+		require.NoError(t, err)
+		require.Equal(t, int64(0), fixed, "second run should be a no-op once everything is materialized")
+
+		// Corrupt the connection's labels by writing a stale apxy/cxr/type.
+		// Bypasses the DB write paths so the reconciler has work to do.
+		_, err = rawDb.ExecContext(ctx, `UPDATE connections SET labels = $1 WHERE id = $2`,
+			`{"apxy/cxr/type":"stale","apxy/cxn/-/id":"`+string(connID)+`","apxy/cxn/-/ns":"root.recon"}`, connID)
+		require.NoError(t, err)
+
+		fixed, err = db.ReconcileCarryForwardLabels(ctx, 100, nil)
+		require.NoError(t, err)
+		require.Equal(t, int64(1), fixed, "exactly the drifted connection row should be corrected")
+
+		// Confirm the connection's apxy/cxr/type is back to what carry-forward dictates.
+		c, err := db.GetConnection(ctx, connID)
+		require.NoError(t, err)
+		require.Equal(t, "google-drive", c.Labels["apxy/cxr/type"])
+	})
+
+	t.Run("idempotent - subsequent runs after a clean pass find nothing", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig(t, nil)
+		now := time.Date(2024, time.March, 1, 12, 0, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+			Path: "root.idem", State: NamespaceStateActive, Labels: Labels{"team": "platform"},
+		}))
+		require.NoError(t, db.CreateNamespace(ctx, &Namespace{
+			Path: "root.idem.child", State: NamespaceStateActive, Labels: Labels{"env": "prod"},
+		}))
+
+		// Drain any pre-existing drift on the auto-created root namespace.
+		_, err := db.ReconcileCarryForwardLabels(ctx, 100, nil)
+		require.NoError(t, err)
+
+		fixed, err := db.ReconcileCarryForwardLabels(ctx, 100, nil)
+		require.NoError(t, err)
+		require.Equal(t, int64(0), fixed)
+	})
+
+	t.Run("rate limiter is consulted before each row", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig(t, nil)
+		now := time.Date(2024, time.March, 1, 12, 0, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		// Seed a few rows so the limiter is consulted multiple times.
+		for _, p := range []string{"root.rl1", "root.rl2", "root.rl3"} {
+			require.NoError(t, db.CreateNamespace(ctx, &Namespace{Path: p, State: NamespaceStateActive}))
+		}
+
+		// Build a no-burst limiter that forbids any waits — Wait blocks
+		// past the deadline so a context with a short deadline forces an
+		// error. Use a context with a deadline already in the past to
+		// guarantee the limiter rejects without needing real time.
+		limited := rate.NewLimiter(rate.Every(time.Hour), 1)
+		// Drain the burst so subsequent waits would block.
+		require.NoError(t, limited.Wait(context.Background()))
+
+		ctxWithDeadline, cancel := context.WithDeadline(ctx, time.Now().Add(-time.Second))
+		defer cancel()
+
+		_, err := db.ReconcileCarryForwardLabels(ctxWithDeadline, 100, limited)
+		require.Error(t, err, "a tripped limiter should propagate its error from the reconciler")
 	})
 }

@@ -16,6 +16,7 @@ import (
 	auth "github.com/rmorlok/authproxy/internal/schema/auth"
 	connectors "github.com/rmorlok/authproxy/internal/schema/connectors"
 	pagination "github.com/rmorlok/authproxy/internal/util/pagination"
+	rate "golang.org/x/time/rate"
 )
 
 // MockIActorData is a mock of IActorData interface.
@@ -1392,6 +1393,21 @@ func (m *MockDB) PutNamespaceLabels(ctx context.Context, path string, labels map
 func (mr *MockDBMockRecorder) PutNamespaceLabels(ctx, path, labels interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutNamespaceLabels", reflect.TypeOf((*MockDB)(nil).PutNamespaceLabels), ctx, path, labels)
+}
+
+// ReconcileCarryForwardLabels mocks base method.
+func (m *MockDB) ReconcileCarryForwardLabels(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ReconcileCarryForwardLabels", ctx, batchSize, limiter)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ReconcileCarryForwardLabels indicates an expected call of ReconcileCarryForwardLabels.
+func (mr *MockDBMockRecorder) ReconcileCarryForwardLabels(ctx, batchSize, limiter interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReconcileCarryForwardLabels", reflect.TypeOf((*MockDB)(nil).ReconcileCarryForwardLabels), ctx, batchSize, limiter)
 }
 
 // RefreshConnectionsForConnectorVersion mocks base method.

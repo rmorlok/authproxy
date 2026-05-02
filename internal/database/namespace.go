@@ -480,7 +480,7 @@ func (s *service) SetNamespaceState(ctx context.Context, path string, state Name
 
 type ListNamespacesExecutor interface {
 	FetchPage(context.Context) pagination.PageResult[Namespace]
-	Enumerate(context.Context, func(pagination.PageResult[Namespace]) (keepGoing pagination.KeepGoing, err error)) error
+	Enumerate(context.Context, pagination.EnumerateCallback[Namespace]) error
 }
 
 type ListNamespacesBuilder interface {
@@ -697,7 +697,7 @@ func (l *listNamespacesFilters) FetchPage(ctx context.Context) pagination.PageRe
 	return l.fetchPage(ctx)
 }
 
-func (l *listNamespacesFilters) Enumerate(ctx context.Context, callback func(pagination.PageResult[Namespace]) (keepGoing pagination.KeepGoing, err error)) error {
+func (l *listNamespacesFilters) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[Namespace]) error {
 	var err error
 	keepGoing := pagination.Continue
 	hasMore := true
