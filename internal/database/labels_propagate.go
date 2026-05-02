@@ -5,10 +5,12 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
@@ -57,7 +59,7 @@ func (s *service) RefreshNamespaceLabelsCarryForward(ctx context.Context, nsPath
 		return err
 	}
 	for _, childPath := range childPaths {
-		if err := s.recomputeNamespaceLabelsTx(ctx, childPath); err != nil {
+		if _, err := s.recomputeNamespaceLabelsTx(ctx, childPath); err != nil {
 			return err
 		}
 		if err := s.RefreshNamespaceLabelsCarryForward(ctx, childPath); err != nil {
@@ -99,7 +101,7 @@ func (s *service) RefreshConnectionsForConnectorVersion(ctx context.Context, id 
 	}
 	rows.Close()
 	for _, connID := range ids {
-		if err := s.recomputeConnectionLabelsTx(ctx, connID); err != nil {
+		if _, err := s.recomputeConnectionLabelsTx(ctx, connID); err != nil {
 			return err
 		}
 	}
@@ -164,7 +166,7 @@ func (s *service) refreshConnectionsInNamespace(ctx context.Context, nsPath stri
 		return err
 	}
 	for _, id := range ids {
-		if err := s.recomputeConnectionLabelsTx(ctx, id); err != nil {
+		if _, err := s.recomputeConnectionLabelsTx(ctx, id); err != nil {
 			return err
 		}
 	}
@@ -177,7 +179,7 @@ func (s *service) refreshActorsInNamespace(ctx context.Context, nsPath string) e
 		return err
 	}
 	for _, id := range ids {
-		if err := s.recomputeActorLabelsTx(ctx, id); err != nil {
+		if _, err := s.recomputeActorLabelsTx(ctx, id); err != nil {
 			return err
 		}
 	}
@@ -190,7 +192,7 @@ func (s *service) refreshEncryptionKeysInNamespace(ctx context.Context, nsPath s
 		return err
 	}
 	for _, id := range ids {
-		if err := s.recomputeEncryptionKeyLabelsTx(ctx, id); err != nil {
+		if _, err := s.recomputeEncryptionKeyLabelsTx(ctx, id); err != nil {
 			return err
 		}
 	}
@@ -226,7 +228,7 @@ func (s *service) refreshConnectorVersionsInNamespace(ctx context.Context, nsPat
 	}
 	rows.Close()
 	for _, ref := range refs {
-		if err := s.recomputeConnectorVersionLabelsTx(ctx, ref.id, ref.version); err != nil {
+		if _, err := s.recomputeConnectorVersionLabelsTx(ctx, ref.id, ref.version); err != nil {
 			return err
 		}
 	}
@@ -235,9 +237,11 @@ func (s *service) refreshConnectorVersionsInNamespace(ctx context.Context, nsPat
 
 // recomputeConnectionLabelsTx opens a short transaction, re-derives the
 // connection's full labels from its current connector version + namespace +
-// own user labels, and persists the result.
-func (s *service) recomputeConnectionLabelsTx(ctx context.Context, id apid.ID) error {
-	return s.transaction(func(tx *sql.Tx) error {
+// own user labels, and persists the result if it differs. Returns true if
+// drift was detected and corrected.
+func (s *service) recomputeConnectionLabelsTx(ctx context.Context, id apid.ID) (bool, error) {
+	var corrected bool
+	err := s.transaction(func(tx *sql.Tx) error {
 		var conn Connection
 		err := s.sq.
 			Select(conn.cols()...).
@@ -278,14 +282,19 @@ func (s *service) recomputeConnectionLabelsTx(ctx context.Context, id apid.ID) e
 		)
 		newLabels = InjectSelfImplicitLabels(conn.Id, conn.Namespace, newLabels)
 
-		return s.writeRecomputedLabels(ctx, tx, ConnectionsTable, sq.Eq{"id": id, "deleted_at": nil}, newLabels)
+		var werr error
+		corrected, werr = s.writeRecomputedLabels(ctx, tx, ConnectionsTable, sq.Eq{"id": id, "deleted_at": nil}, conn.Labels, newLabels)
+		return werr
 	})
+	return corrected, err
 }
 
 // recomputeActorLabelsTx opens a short transaction and re-derives an
-// actor's full labels from its namespace and own user labels.
-func (s *service) recomputeActorLabelsTx(ctx context.Context, id apid.ID) error {
-	return s.transaction(func(tx *sql.Tx) error {
+// actor's full labels from its namespace and own user labels. Returns true
+// if drift was detected and corrected.
+func (s *service) recomputeActorLabelsTx(ctx context.Context, id apid.ID) (bool, error) {
+	var corrected bool
+	err := s.transaction(func(tx *sql.Tx) error {
 		var a Actor
 		err := s.sq.
 			Select(a.cols()...).
@@ -316,14 +325,19 @@ func (s *service) recomputeActorLabelsTx(ctx context.Context, id apid.ID) error 
 		)
 		newLabels = InjectSelfImplicitLabels(a.Id, a.Namespace, newLabels)
 
-		return s.writeRecomputedLabels(ctx, tx, ActorTable, sq.Eq{"id": id, "deleted_at": nil}, newLabels)
+		var werr error
+		corrected, werr = s.writeRecomputedLabels(ctx, tx, ActorTable, sq.Eq{"id": id, "deleted_at": nil}, a.Labels, newLabels)
+		return werr
 	})
+	return corrected, err
 }
 
 // recomputeEncryptionKeyLabelsTx opens a short transaction and re-derives
 // an encryption key's full labels from its namespace and own user labels.
-func (s *service) recomputeEncryptionKeyLabelsTx(ctx context.Context, id apid.ID) error {
-	return s.transaction(func(tx *sql.Tx) error {
+// Returns true if drift was detected and corrected.
+func (s *service) recomputeEncryptionKeyLabelsTx(ctx context.Context, id apid.ID) (bool, error) {
+	var corrected bool
+	err := s.transaction(func(tx *sql.Tx) error {
 		var ek EncryptionKey
 		err := s.sq.
 			Select(ek.cols()...).
@@ -354,15 +368,19 @@ func (s *service) recomputeEncryptionKeyLabelsTx(ctx context.Context, id apid.ID
 		)
 		newLabels = InjectSelfImplicitLabels(ek.Id, ek.Namespace, newLabels)
 
-		return s.writeRecomputedLabels(ctx, tx, EncryptionKeysTable, sq.Eq{"id": id, "deleted_at": nil}, newLabels)
+		var werr error
+		corrected, werr = s.writeRecomputedLabels(ctx, tx, EncryptionKeysTable, sq.Eq{"id": id, "deleted_at": nil}, ek.Labels, newLabels)
+		return werr
 	})
+	return corrected, err
 }
 
 // recomputeConnectorVersionLabelsTx opens a short transaction and
 // re-derives a connector version's full labels from its namespace and own
-// user labels.
-func (s *service) recomputeConnectorVersionLabelsTx(ctx context.Context, id apid.ID, version uint64) error {
-	return s.transaction(func(tx *sql.Tx) error {
+// user labels. Returns true if drift was detected and corrected.
+func (s *service) recomputeConnectorVersionLabelsTx(ctx context.Context, id apid.ID, version uint64) (bool, error) {
+	var corrected bool
+	err := s.transaction(func(tx *sql.Tx) error {
 		var cv ConnectorVersion
 		err := s.sq.
 			Select(cv.cols()...).
@@ -393,18 +411,23 @@ func (s *service) recomputeConnectorVersionLabelsTx(ctx context.Context, id apid
 		)
 		newLabels = InjectSelfImplicitLabels(cv.Id, cv.Namespace, newLabels)
 
-		return s.writeRecomputedLabels(ctx, tx, ConnectorVersionsTable, sq.Eq{
+		var werr error
+		corrected, werr = s.writeRecomputedLabels(ctx, tx, ConnectorVersionsTable, sq.Eq{
 			"id":         id,
 			"version":    version,
 			"deleted_at": nil,
-		}, newLabels)
+		}, cv.Labels, newLabels)
+		return werr
 	})
+	return corrected, err
 }
 
 // recomputeNamespaceLabelsTx opens a short transaction and re-derives a
 // namespace's full labels from its immediate parent and its own user labels.
-func (s *service) recomputeNamespaceLabelsTx(ctx context.Context, path string) error {
-	return s.transaction(func(tx *sql.Tx) error {
+// Returns true if drift was detected and corrected.
+func (s *service) recomputeNamespaceLabelsTx(ctx context.Context, path string) (bool, error) {
+	var corrected bool
+	err := s.transaction(func(tx *sql.Tx) error {
 		var ns Namespace
 		err := s.sq.
 			Select(ns.cols()...).
@@ -440,22 +463,197 @@ func (s *service) recomputeNamespaceLabelsTx(ctx context.Context, path string) e
 		)
 		newLabels = InjectNamespaceSelfImplicitLabels(ns.Path, newLabels)
 
-		return s.writeRecomputedLabels(ctx, tx, NamespacesTable, sq.Eq{"path": path, "deleted_at": nil}, newLabels)
+		var werr error
+		corrected, werr = s.writeRecomputedLabels(ctx, tx, NamespacesTable, sq.Eq{"path": path, "deleted_at": nil}, ns.Labels, newLabels)
+		return werr
 	})
+	return corrected, err
 }
 
-// writeRecomputedLabels persists a recomputed labels map to a row. Updates
-// the updated_at timestamp.
-func (s *service) writeRecomputedLabels(ctx context.Context, tx *sql.Tx, table string, where sq.Eq, labels Labels) error {
+// writeRecomputedLabels persists a recomputed labels map to a row when it
+// differs from the row's current labels. Returns true if a row was actually
+// updated (drift was detected and corrected). Used by both the propagation
+// tasks (which expect drift after a parent change) and the daily
+// reconciler (which mostly finds none).
+func (s *service) writeRecomputedLabels(ctx context.Context, tx *sql.Tx, table string, where sq.Eq, current, newLabels Labels) (bool, error) {
+	if labelsEqual(current, newLabels) {
+		return false, nil
+	}
 	_, err := s.sq.
 		Update(table).
-		Set("labels", labels).
+		Set("labels", newLabels).
 		Set("updated_at", apctx.GetClock(ctx).Now()).
 		Where(where).
 		RunWith(tx).
 		Exec()
 	if err != nil {
-		return fmt.Errorf("failed to write recomputed labels in %s: %w", table, err)
+		return false, fmt.Errorf("failed to write recomputed labels in %s: %w", table, err)
 	}
-	return nil
+	return true, nil
+}
+
+// labelsEqual reports whether two label maps contain exactly the same
+// key/value pairs. nil and empty are treated as equal.
+func labelsEqual(a, b Labels) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if bv, ok := b[k]; !ok || bv != v {
+			return false
+		}
+	}
+	return true
+}
+
+// ReconcileCarryForwardLabels walks every labelled resource type in
+// batches and re-derives the materialized apxy/ portion of each row. Each
+// row's update runs in its own short transaction; rows whose computed
+// labels match the stored labels are not rewritten. Returns the total
+// number of rows corrected across all resource types.
+//
+// batchSize controls the page size for each list query. interBatchDelay
+// is slept between successive batches (within a resource type and between
+// resource types) to throttle DB load.
+func (s *service) ReconcileCarryForwardLabels(ctx context.Context, batchSize int32, interBatchDelay time.Duration) (int64, error) {
+	if batchSize <= 0 {
+		batchSize = 100
+	}
+	if interBatchDelay < 0 {
+		interBatchDelay = 0
+	}
+
+	s.logger.Info("starting carry-forward labels reconciliation", "batch_size", batchSize, "inter_batch_delay", interBatchDelay.String())
+
+	var totalCorrected int64
+
+	steps := []struct {
+		name string
+		walk func(ctx context.Context, batchSize int32) (int64, error)
+	}{
+		// Top-down: namespaces first (so child resources see fresh
+		// parent labels in subsequent passes), then per-resource walks.
+		{name: "namespaces", walk: s.reconcileNamespaces},
+		{name: "connector_versions", walk: s.reconcileConnectorVersions},
+		{name: "connections", walk: s.reconcileConnections},
+		{name: "actors", walk: s.reconcileActors},
+		{name: "encryption_keys", walk: s.reconcileEncryptionKeys},
+	}
+
+	clk := apctx.GetClock(ctx)
+	for i, step := range steps {
+		corrected, err := step.walk(ctx, batchSize)
+		if err != nil {
+			s.logger.Error("carry-forward labels reconciliation failed", "step", step.name, "corrected_so_far", totalCorrected, "error", err)
+			return totalCorrected, fmt.Errorf("reconcile %s: %w", step.name, err)
+		}
+		totalCorrected += corrected
+		s.logger.Info("reconciled resource type", "step", step.name, "corrected", corrected)
+		if interBatchDelay > 0 && i < len(steps)-1 {
+			clk.Sleep(interBatchDelay)
+		}
+	}
+
+	s.logger.Info("carry-forward labels reconciliation complete", "total_corrected", totalCorrected)
+	return totalCorrected, nil
+}
+
+func (s *service) reconcileNamespaces(ctx context.Context, batchSize int32) (int64, error) {
+	var corrected int64
+	err := s.ListNamespacesBuilder().
+		Limit(batchSize).
+		Enumerate(ctx, func(pr pagination.PageResult[Namespace]) (pagination.KeepGoing, error) {
+			for _, ns := range pr.Results {
+				wasCorrected, err := s.recomputeNamespaceLabelsTx(ctx, ns.Path)
+				if err != nil {
+					return pagination.Stop, err
+				}
+				if wasCorrected {
+					corrected++
+					s.logger.Info("reconciled drifted carry-forward labels", "type", "namespace", "path", ns.Path)
+				}
+			}
+			return pagination.Continue, nil
+		})
+	return corrected, err
+}
+
+func (s *service) reconcileConnectorVersions(ctx context.Context, batchSize int32) (int64, error) {
+	var corrected int64
+	err := s.ListConnectorVersionsBuilder().
+		Limit(batchSize).
+		Enumerate(ctx, func(pr pagination.PageResult[ConnectorVersion]) (pagination.KeepGoing, error) {
+			for _, cv := range pr.Results {
+				wasCorrected, err := s.recomputeConnectorVersionLabelsTx(ctx, cv.Id, cv.Version)
+				if err != nil {
+					return pagination.Stop, err
+				}
+				if wasCorrected {
+					corrected++
+					s.logger.Info("reconciled drifted carry-forward labels", "type", "connector_version", "id", cv.Id, "version", cv.Version)
+				}
+			}
+			return pagination.Continue, nil
+		})
+	return corrected, err
+}
+
+func (s *service) reconcileConnections(ctx context.Context, batchSize int32) (int64, error) {
+	var corrected int64
+	err := s.ListConnectionsBuilder().
+		Limit(batchSize).
+		Enumerate(ctx, func(pr pagination.PageResult[Connection]) (pagination.KeepGoing, error) {
+			for _, conn := range pr.Results {
+				wasCorrected, err := s.recomputeConnectionLabelsTx(ctx, conn.Id)
+				if err != nil {
+					return pagination.Stop, err
+				}
+				if wasCorrected {
+					corrected++
+					s.logger.Info("reconciled drifted carry-forward labels", "type", "connection", "id", conn.Id)
+				}
+			}
+			return pagination.Continue, nil
+		})
+	return corrected, err
+}
+
+func (s *service) reconcileActors(ctx context.Context, batchSize int32) (int64, error) {
+	var corrected int64
+	err := s.ListActorsBuilder().
+		Limit(batchSize).
+		Enumerate(ctx, func(pr pagination.PageResult[*Actor]) (pagination.KeepGoing, error) {
+			for _, a := range pr.Results {
+				wasCorrected, err := s.recomputeActorLabelsTx(ctx, a.Id)
+				if err != nil {
+					return pagination.Stop, err
+				}
+				if wasCorrected {
+					corrected++
+					s.logger.Info("reconciled drifted carry-forward labels", "type", "actor", "id", a.Id)
+				}
+			}
+			return pagination.Continue, nil
+		})
+	return corrected, err
+}
+
+func (s *service) reconcileEncryptionKeys(ctx context.Context, batchSize int32) (int64, error) {
+	var corrected int64
+	err := s.ListEncryptionKeysBuilder().
+		Limit(batchSize).
+		Enumerate(ctx, func(pr pagination.PageResult[EncryptionKey]) (pagination.KeepGoing, error) {
+			for _, ek := range pr.Results {
+				wasCorrected, err := s.recomputeEncryptionKeyLabelsTx(ctx, ek.Id)
+				if err != nil {
+					return pagination.Stop, err
+				}
+				if wasCorrected {
+					corrected++
+					s.logger.Info("reconciled drifted carry-forward labels", "type", "encryption_key", "id", ek.Id)
+				}
+			}
+			return pagination.Continue, nil
+		})
+	return corrected, err
 }

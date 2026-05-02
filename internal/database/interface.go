@@ -242,6 +242,16 @@ type DB interface {
 	// draft versions; primary and active are immutable).
 	RefreshConnectionsForConnectorVersion(ctx context.Context, id apid.ID, version uint64) error
 
+	// ReconcileCarryForwardLabels walks every labelled resource in batches
+	// of `batchSize`, sleeps `interBatchDelay` between batches, and
+	// re-derives the materialized apxy/ portion of each row. Drift is
+	// rare under normal operation, but this method is the safety net for
+	// any propagation task that misfired or any data path that bypassed
+	// the carry-forward triggers. Intended to be invoked from a daily
+	// asynq cron task. Returns the total number of rows whose labels
+	// were corrected.
+	ReconcileCarryForwardLabels(ctx context.Context, batchSize int32, interBatchDelay time.Duration) (corrected int64, err error)
+
 	/*
 	 *  Nonces
 	 */
