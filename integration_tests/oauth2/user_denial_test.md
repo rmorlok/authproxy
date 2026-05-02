@@ -26,8 +26,12 @@ denial is surfaced to the user via the standard return-URL.
    redirected with `error=`, since otherwise either a token would be
    stored or `setup_error` would say "no code in query" — see assertion
    5).
-3. **Final navigation** lands on the marketplace's `/connections` page
-   with `setup=pending` so the SPA knows to read the connection state.
+3. **Final navigation** lands on the marketplace's `/connections` page.
+   The proxy decorates the return URL with `?setup=pending&connection_id=…`
+   but the SPA strips those params as soon as it consumes them
+   (`ui/marketplace/src/components/ConnectionList.tsx`), so the test does
+   not assert the suffix — the connection-level checks (5) prove the
+   denial path executed.
 4. **No token row** exists for the connection — denial means no
    code-for-token exchange should have happened.
 5. **Connection** sits at `state=created` with
