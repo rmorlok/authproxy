@@ -5,13 +5,13 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"time"
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/util/pagination"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/util/pagination"
+	"golang.org/x/time/rate"
 )
 
 // Carry-forward propagation
@@ -512,24 +512,22 @@ func labelsEqual(a, b Labels) bool {
 // labels match the stored labels are not rewritten. Returns the total
 // number of rows corrected across all resource types.
 //
-// batchSize controls the page size for each list query. interBatchDelay
-// is slept between successive batches (within a resource type and between
-// resource types) to throttle DB load.
-func (s *service) ReconcileCarryForwardLabels(ctx context.Context, batchSize int32, interBatchDelay time.Duration) (int64, error) {
+// batchSize controls the page size for each list query. limiter, when
+// non-nil, is consulted before processing each row — providing a per-row
+// records/sec rate limit so a daily sweep over a large fleet is bounded
+// even though page reads are cheap. A nil limiter means unlimited.
+func (s *service) ReconcileCarryForwardLabels(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
 	if batchSize <= 0 {
 		batchSize = 100
 	}
-	if interBatchDelay < 0 {
-		interBatchDelay = 0
-	}
 
-	s.logger.Info("starting carry-forward labels reconciliation", "batch_size", batchSize, "inter_batch_delay", interBatchDelay.String())
+	s.logger.Info("starting carry-forward labels reconciliation", "batch_size", batchSize, "rate_limit", rateLimitLogValue(limiter))
 
 	var totalCorrected int64
 
 	steps := []struct {
 		name string
-		walk func(ctx context.Context, batchSize int32) (int64, error)
+		walk func(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error)
 	}{
 		// Top-down: namespaces first (so child resources see fresh
 		// parent labels in subsequent passes), then per-resource walks.
@@ -540,120 +538,123 @@ func (s *service) ReconcileCarryForwardLabels(ctx context.Context, batchSize int
 		{name: "encryption_keys", walk: s.reconcileEncryptionKeys},
 	}
 
-	clk := apctx.GetClock(ctx)
-	for i, step := range steps {
-		corrected, err := step.walk(ctx, batchSize)
+	for _, step := range steps {
+		corrected, err := step.walk(ctx, batchSize, limiter)
 		if err != nil {
 			s.logger.Error("carry-forward labels reconciliation failed", "step", step.name, "corrected_so_far", totalCorrected, "error", err)
 			return totalCorrected, fmt.Errorf("reconcile %s: %w", step.name, err)
 		}
 		totalCorrected += corrected
 		s.logger.Info("reconciled resource type", "step", step.name, "corrected", corrected)
-		if interBatchDelay > 0 && i < len(steps)-1 {
-			clk.Sleep(interBatchDelay)
-		}
 	}
 
 	s.logger.Info("carry-forward labels reconciliation complete", "total_corrected", totalCorrected)
 	return totalCorrected, nil
 }
 
-func (s *service) reconcileNamespaces(ctx context.Context, batchSize int32) (int64, error) {
+func rateLimitLogValue(limiter *rate.Limiter) string {
+	if limiter == nil {
+		return "unlimited"
+	}
+	return fmt.Sprintf("%v rps", limiter.Limit())
+}
+
+func (s *service) reconcileNamespaces(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
 	var corrected int64
-	err := s.ListNamespacesBuilder().
-		Limit(batchSize).
-		Enumerate(ctx, func(pr pagination.PageResult[Namespace]) (pagination.KeepGoing, error) {
-			for _, ns := range pr.Results {
-				wasCorrected, err := s.recomputeNamespaceLabelsTx(ctx, ns.Path)
-				if err != nil {
-					return pagination.Stop, err
-				}
-				if wasCorrected {
-					corrected++
-					s.logger.Info("reconciled drifted carry-forward labels", "type", "namespace", "path", ns.Path)
-				}
+	err := pagination.EnumerateThrottled(
+		ctx,
+		s.ListNamespacesBuilder().Limit(batchSize).Enumerate,
+		limiter,
+		func(ns Namespace) error {
+			wasCorrected, err := s.recomputeNamespaceLabelsTx(ctx, ns.Path)
+			if err != nil {
+				return err
 			}
-			return pagination.Continue, nil
+			if wasCorrected {
+				corrected++
+				s.logger.Info("reconciled drifted carry-forward labels", "type", "namespace", "path", ns.Path)
+			}
+			return nil
 		})
 	return corrected, err
 }
 
-func (s *service) reconcileConnectorVersions(ctx context.Context, batchSize int32) (int64, error) {
+func (s *service) reconcileConnectorVersions(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
 	var corrected int64
-	err := s.ListConnectorVersionsBuilder().
-		Limit(batchSize).
-		Enumerate(ctx, func(pr pagination.PageResult[ConnectorVersion]) (pagination.KeepGoing, error) {
-			for _, cv := range pr.Results {
-				wasCorrected, err := s.recomputeConnectorVersionLabelsTx(ctx, cv.Id, cv.Version)
-				if err != nil {
-					return pagination.Stop, err
-				}
-				if wasCorrected {
-					corrected++
-					s.logger.Info("reconciled drifted carry-forward labels", "type", "connector_version", "id", cv.Id, "version", cv.Version)
-				}
+	err := pagination.EnumerateThrottled(
+		ctx,
+		s.ListConnectorVersionsBuilder().Limit(batchSize).Enumerate,
+		limiter,
+		func(cv ConnectorVersion) error {
+			wasCorrected, err := s.recomputeConnectorVersionLabelsTx(ctx, cv.Id, cv.Version)
+			if err != nil {
+				return err
 			}
-			return pagination.Continue, nil
+			if wasCorrected {
+				corrected++
+				s.logger.Info("reconciled drifted carry-forward labels", "type", "connector_version", "id", cv.Id, "version", cv.Version)
+			}
+			return nil
 		})
 	return corrected, err
 }
 
-func (s *service) reconcileConnections(ctx context.Context, batchSize int32) (int64, error) {
+func (s *service) reconcileConnections(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
 	var corrected int64
-	err := s.ListConnectionsBuilder().
-		Limit(batchSize).
-		Enumerate(ctx, func(pr pagination.PageResult[Connection]) (pagination.KeepGoing, error) {
-			for _, conn := range pr.Results {
-				wasCorrected, err := s.recomputeConnectionLabelsTx(ctx, conn.Id)
-				if err != nil {
-					return pagination.Stop, err
-				}
-				if wasCorrected {
-					corrected++
-					s.logger.Info("reconciled drifted carry-forward labels", "type", "connection", "id", conn.Id)
-				}
+	err := pagination.EnumerateThrottled(
+		ctx,
+		s.ListConnectionsBuilder().Limit(batchSize).Enumerate,
+		limiter,
+		func(conn Connection) error {
+			wasCorrected, err := s.recomputeConnectionLabelsTx(ctx, conn.Id)
+			if err != nil {
+				return err
 			}
-			return pagination.Continue, nil
+			if wasCorrected {
+				corrected++
+				s.logger.Info("reconciled drifted carry-forward labels", "type", "connection", "id", conn.Id)
+			}
+			return nil
 		})
 	return corrected, err
 }
 
-func (s *service) reconcileActors(ctx context.Context, batchSize int32) (int64, error) {
+func (s *service) reconcileActors(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
 	var corrected int64
-	err := s.ListActorsBuilder().
-		Limit(batchSize).
-		Enumerate(ctx, func(pr pagination.PageResult[*Actor]) (pagination.KeepGoing, error) {
-			for _, a := range pr.Results {
-				wasCorrected, err := s.recomputeActorLabelsTx(ctx, a.Id)
-				if err != nil {
-					return pagination.Stop, err
-				}
-				if wasCorrected {
-					corrected++
-					s.logger.Info("reconciled drifted carry-forward labels", "type", "actor", "id", a.Id)
-				}
+	err := pagination.EnumerateThrottled(
+		ctx,
+		s.ListActorsBuilder().Limit(batchSize).Enumerate,
+		limiter,
+		func(a *Actor) error {
+			wasCorrected, err := s.recomputeActorLabelsTx(ctx, a.Id)
+			if err != nil {
+				return err
 			}
-			return pagination.Continue, nil
+			if wasCorrected {
+				corrected++
+				s.logger.Info("reconciled drifted carry-forward labels", "type", "actor", "id", a.Id)
+			}
+			return nil
 		})
 	return corrected, err
 }
 
-func (s *service) reconcileEncryptionKeys(ctx context.Context, batchSize int32) (int64, error) {
+func (s *service) reconcileEncryptionKeys(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
 	var corrected int64
-	err := s.ListEncryptionKeysBuilder().
-		Limit(batchSize).
-		Enumerate(ctx, func(pr pagination.PageResult[EncryptionKey]) (pagination.KeepGoing, error) {
-			for _, ek := range pr.Results {
-				wasCorrected, err := s.recomputeEncryptionKeyLabelsTx(ctx, ek.Id)
-				if err != nil {
-					return pagination.Stop, err
-				}
-				if wasCorrected {
-					corrected++
-					s.logger.Info("reconciled drifted carry-forward labels", "type", "encryption_key", "id", ek.Id)
-				}
+	err := pagination.EnumerateThrottled(
+		ctx,
+		s.ListEncryptionKeysBuilder().Limit(batchSize).Enumerate,
+		limiter,
+		func(ek EncryptionKey) error {
+			wasCorrected, err := s.recomputeEncryptionKeyLabelsTx(ctx, ek.Id)
+			if err != nil {
+				return err
 			}
-			return pagination.Continue, nil
+			if wasCorrected {
+				corrected++
+				s.logger.Info("reconciled drifted carry-forward labels", "type", "encryption_key", "id", ek.Id)
+			}
+			return nil
 		})
 	return corrected, err
 }
