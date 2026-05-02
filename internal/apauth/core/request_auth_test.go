@@ -1,12 +1,39 @@
 package core
 
 import (
+	"context"
 	"testing"
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/stretchr/testify/require"
 )
+
+func TestActorFromContext(t *testing.T) {
+	t.Run("returns nil for context without auth", func(t *testing.T) {
+		require.Nil(t, ActorFromContext(context.Background()))
+	})
+
+	t.Run("returns nil for unauthenticated request auth", func(t *testing.T) {
+		ctx := NewUnauthenticatedRequestAuth().ContextWith(context.Background())
+		require.Nil(t, ActorFromContext(ctx))
+	})
+
+	t.Run("returns the actor when authenticated", func(t *testing.T) {
+		actor := &Actor{
+			Id:         apid.MustParse("act_test1234567890ab"),
+			ExternalId: "ext-1",
+			Namespace:  "root.foo",
+			Labels:     map[string]string{"team": "platform"},
+		}
+		ctx := NewAuthenticatedRequestAuth(actor).ContextWith(context.Background())
+
+		got := ActorFromContext(ctx)
+		require.NotNil(t, got)
+		require.Equal(t, actor.Id, got.GetId())
+		require.Equal(t, "platform", got.GetLabels()["team"])
+	})
+}
 
 func TestRequestAuth_Allows(t *testing.T) {
 	tests := []struct {
