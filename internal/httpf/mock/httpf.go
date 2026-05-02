@@ -10,6 +10,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	apid "github.com/rmorlok/authproxy/internal/apid"
 	httpf "github.com/rmorlok/authproxy/internal/httpf"
+	connectors "github.com/rmorlok/authproxy/internal/schema/connectors"
 	gentleman "gopkg.in/h2non/gentleman.v2"
 )
 
@@ -115,6 +116,43 @@ func (mr *MockGettableConnectorVersionMockRecorder) GetConnectorVersionEntity() 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectorVersionEntity", reflect.TypeOf((*MockGettableConnectorVersion)(nil).GetConnectorVersionEntity))
 }
 
+// MockRateLimitConfigProvider is a mock of RateLimitConfigProvider interface.
+type MockRateLimitConfigProvider struct {
+	ctrl     *gomock.Controller
+	recorder *MockRateLimitConfigProviderMockRecorder
+}
+
+// MockRateLimitConfigProviderMockRecorder is the mock recorder for MockRateLimitConfigProvider.
+type MockRateLimitConfigProviderMockRecorder struct {
+	mock *MockRateLimitConfigProvider
+}
+
+// NewMockRateLimitConfigProvider creates a new mock instance.
+func NewMockRateLimitConfigProvider(ctrl *gomock.Controller) *MockRateLimitConfigProvider {
+	mock := &MockRateLimitConfigProvider{ctrl: ctrl}
+	mock.recorder = &MockRateLimitConfigProviderMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockRateLimitConfigProvider) EXPECT() *MockRateLimitConfigProviderMockRecorder {
+	return m.recorder
+}
+
+// GetRateLimitConfig mocks base method.
+func (m *MockRateLimitConfigProvider) GetRateLimitConfig() *connectors.RateLimiting {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRateLimitConfig")
+	ret0, _ := ret[0].(*connectors.RateLimiting)
+	return ret0
+}
+
+// GetRateLimitConfig indicates an expected call of GetRateLimitConfig.
+func (mr *MockRateLimitConfigProviderMockRecorder) GetRateLimitConfig() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRateLimitConfig", reflect.TypeOf((*MockRateLimitConfigProvider)(nil).GetRateLimitConfig))
+}
+
 // MockConnection is a mock of Connection interface.
 type MockConnection struct {
 	ctrl     *gomock.Controller
@@ -208,6 +246,71 @@ func (mr *MockConnectionMockRecorder) GetNamespace() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespace", reflect.TypeOf((*MockConnection)(nil).GetNamespace))
 }
 
+// MockActor is a mock of Actor interface.
+type MockActor struct {
+	ctrl     *gomock.Controller
+	recorder *MockActorMockRecorder
+}
+
+// MockActorMockRecorder is the mock recorder for MockActor.
+type MockActorMockRecorder struct {
+	mock *MockActor
+}
+
+// NewMockActor creates a new mock instance.
+func NewMockActor(ctrl *gomock.Controller) *MockActor {
+	mock := &MockActor{ctrl: ctrl}
+	mock.recorder = &MockActorMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockActor) EXPECT() *MockActorMockRecorder {
+	return m.recorder
+}
+
+// GetId mocks base method.
+func (m *MockActor) GetId() apid.ID {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetId")
+	ret0, _ := ret[0].(apid.ID)
+	return ret0
+}
+
+// GetId indicates an expected call of GetId.
+func (mr *MockActorMockRecorder) GetId() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetId", reflect.TypeOf((*MockActor)(nil).GetId))
+}
+
+// GetLabels mocks base method.
+func (m *MockActor) GetLabels() map[string]string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetLabels")
+	ret0, _ := ret[0].(map[string]string)
+	return ret0
+}
+
+// GetLabels indicates an expected call of GetLabels.
+func (mr *MockActorMockRecorder) GetLabels() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLabels", reflect.TypeOf((*MockActor)(nil).GetLabels))
+}
+
+// GetNamespace mocks base method.
+func (m *MockActor) GetNamespace() string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetNamespace")
+	ret0, _ := ret[0].(string)
+	return ret0
+}
+
+// GetNamespace indicates an expected call of GetNamespace.
+func (mr *MockActorMockRecorder) GetNamespace() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetNamespace", reflect.TypeOf((*MockActor)(nil).GetNamespace))
+}
+
 // MockF is a mock of F interface.
 type MockF struct {
 	ctrl     *gomock.Controller
@@ -231,18 +334,18 @@ func (m *MockF) EXPECT() *MockFMockRecorder {
 	return m.recorder
 }
 
-// ForLabels mocks base method.
-func (m *MockF) ForLabels(labels map[string]string) httpf.F {
+// ForActor mocks base method.
+func (m *MockF) ForActor(actor httpf.Actor) httpf.F {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ForLabels", labels)
+	ret := m.ctrl.Call(m, "ForActor", actor)
 	ret0, _ := ret[0].(httpf.F)
 	return ret0
 }
 
-// ForLabels indicates an expected call of ForLabels.
-func (mr *MockFMockRecorder) ForLabels(labels interface{}) *gomock.Call {
+// ForActor indicates an expected call of ForActor.
+func (mr *MockFMockRecorder) ForActor(actor interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ForLabels", reflect.TypeOf((*MockF)(nil).ForLabels), labels)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ForActor", reflect.TypeOf((*MockF)(nil).ForActor), actor)
 }
 
 // ForConnection mocks base method.
@@ -271,6 +374,20 @@ func (m *MockF) ForConnectorVersion(cv httpf.ConnectorVersion) httpf.F {
 func (mr *MockFMockRecorder) ForConnectorVersion(cv interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ForConnectorVersion", reflect.TypeOf((*MockF)(nil).ForConnectorVersion), cv)
+}
+
+// ForLabels mocks base method.
+func (m *MockF) ForLabels(labels map[string]string) httpf.F {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ForLabels", labels)
+	ret0, _ := ret[0].(httpf.F)
+	return ret0
+}
+
+// ForLabels indicates an expected call of ForLabels.
+func (mr *MockFMockRecorder) ForLabels(labels interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ForLabels", reflect.TypeOf((*MockF)(nil).ForLabels), labels)
 }
 
 // ForRequestInfo mocks base method.

@@ -1,12 +1,16 @@
 package httpf
 
 import (
+	"fmt"
 	"log/slog"
 	"net/http"
+	"strings"
 	"sync"
 
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"gopkg.in/h2non/gentleman.v2"
 	"gopkg.in/h2non/gentleman.v2/plugins/transport"
@@ -107,6 +111,54 @@ func (f *clientFactory) ForConnection(c Connection) F {
 	return fp.ForRequestInfo(ri)
 }
 
+// ForActor attaches the initiating actor's identity and labels to the
+// request snapshot. The actor's user labels are re-keyed under
+// apxy/act/<k> and the apxy/act/-/id and apxy/act/-/ns self-implicit
+// labels are added. Other apxy/-prefixed entries on the actor (e.g.
+// apxy/ns/<k> from the actor's namespace) are NOT forwarded — those
+// describe the actor's own context and would collide with the
+// connection's namespace context, which the request is acting under.
+//
+// A nil actor (or one with a nil id) is a no-op, so this can be safely
+// called from background paths where no actor initiated the request.
+func (f *clientFactory) ForActor(actor Actor) F {
+	if actor == nil || actor.GetId().IsNil() {
+		return f
+	}
+
+	actorContribution := make(map[string]string)
+	actToken := database.ApidPrefixToLabelToken(apid.PrefixActor)
+	for k, v := range actor.GetLabels() {
+		if strings.HasPrefix(k, database.ApxyReservedPrefix) {
+			continue
+		}
+		actorContribution[fmt.Sprintf("%s%s/%s", database.ApxyReservedPrefix, actToken, k)] = v
+	}
+	for k, v := range database.BuildImplicitIdentifierLabels(actor.GetId(), actor.GetNamespace()) {
+		actorContribution[k] = v
+	}
+
+	if len(actorContribution) == 0 {
+		return f
+	}
+
+	ri := f.requestInfo
+	if ri.Labels == nil {
+		ri.Labels = make(map[string]string, len(actorContribution))
+	} else {
+		copied := make(map[string]string, len(ri.Labels)+len(actorContribution))
+		for k, v := range ri.Labels {
+			copied[k] = v
+		}
+		ri.Labels = copied
+	}
+	for k, v := range actorContribution {
+		ri.Labels[k] = v
+	}
+
+	return f.ForRequestInfo(ri)
+}
+
 func (f *clientFactory) ForLabels(labels map[string]string) F {
 	if len(labels) == 0 {
 		return f
@@ -123,8 +175,14 @@ func (f *clientFactory) ForLabels(labels map[string]string) F {
 		}
 		ri.Labels = newLabels
 	}
-	// Request labels override connection labels
+	// Request labels override connection user labels — but apxy/ keys are
+	// system-managed and per-request input may not modify them.
+	// ProxyRequest.Validate already rejects apxy/ keys; this is
+	// defense-in-depth against internal callers that might bypass it.
 	for k, v := range labels {
+		if strings.HasPrefix(k, database.ApxyReservedPrefix) {
+			continue
+		}
 		ri.Labels[k] = v
 	}
 

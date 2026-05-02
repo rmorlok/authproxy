@@ -4,6 +4,7 @@ import (
 	"context"
 	"net/http"
 
+	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/httpf"
 )
@@ -12,6 +13,7 @@ func (n *noAuthConnection) ProxyRequest(ctx context.Context, reqType httpf.Reque
 	r := n.httpf.
 		ForRequestType(reqType).
 		ForConnection(n.c).
+		ForActor(apauthcore.ActorFromContext(ctx)).
 		ForLabels(req.Labels).
 		New().
 		UseContext(ctx).

@@ -19,6 +19,21 @@ func GetAuthFromContext(ctx context.Context) *RequestAuth {
 	return NewUnauthenticatedRequestAuth()
 }
 
+// ActorFromContext returns the initiating actor on the request context, or
+// nil if the request is unauthenticated. Returning an interface (rather
+// than *Actor) avoids passing a typed-nil pointer through an interface
+// argument elsewhere — a common pitfall where the wrapped interface is
+// non-nil despite the underlying pointer being nil. Callers can pass the
+// result directly to anything expecting an actor-shaped interface (e.g.
+// httpf.F.ForActor) and the nil-actor case will short-circuit cleanly.
+func ActorFromContext(ctx context.Context) IActorData {
+	auth := GetAuthFromContext(ctx)
+	if !auth.IsAuthenticated() {
+		return nil
+	}
+	return auth.GetActor()
+}
+
 // RequestAuth contains authentication and authorization information for a request.
 //
 // It includes the authenticated actor (user/service) and optionally request-level

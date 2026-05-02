@@ -71,6 +71,24 @@ func TestProxyRequest_Validate(t *testing.T) {
 			},
 			expectedError: "either body_raw or body_json is must be specified",
 		},
+		{
+			name: "valid user labels",
+			proxyRequest: ProxyRequest{
+				URL:    "http://example.com",
+				Method: http.MethodGet,
+				Labels: map[string]string{"purpose": "ad-hoc"},
+			},
+			expectedError: "",
+		},
+		{
+			name: "rejects apxy/ user labels",
+			proxyRequest: ProxyRequest{
+				URL:    "http://example.com",
+				Method: http.MethodGet,
+				Labels: map[string]string{"apxy/cxn/-/id": "cxn_test1234567890ab"},
+			},
+			expectedError: "reserved",
+		},
 	}
 
 	for _, tt := range tests {
