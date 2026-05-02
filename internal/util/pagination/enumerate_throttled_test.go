@@ -12,7 +12,7 @@ import (
 
 // staticEnumerate produces all items in a single page, then stops.
 func staticEnumerate[T any](items []T) EnumerateFunc[T] {
-	return func(ctx context.Context, cb func(PageResult[T]) (KeepGoing, error)) error {
+	return func(ctx context.Context, cb EnumerateCallback[T]) error {
 		_, err := cb(PageResult[T]{Results: items})
 		return err
 	}

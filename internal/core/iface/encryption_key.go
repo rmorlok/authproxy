@@ -21,7 +21,7 @@ type EncryptionKey interface {
 
 type ListEncryptionKeysExecutor interface {
 	FetchPage(context.Context) pagination.PageResult[EncryptionKey]
-	Enumerate(context.Context, func(pagination.PageResult[EncryptionKey]) (keepGoing pagination.KeepGoing, err error)) error
+	Enumerate(context.Context, pagination.EnumerateCallback[EncryptionKey]) error
 }
 
 type ListEncryptionKeysBuilder interface {

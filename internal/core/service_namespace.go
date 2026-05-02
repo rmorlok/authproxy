@@ -239,7 +239,7 @@ func (l *listNamespaceWrapper) FetchPage(ctx context.Context) pagination.PageRes
 	return l.convertPageResult(l.executor().FetchPage(ctx))
 }
 
-func (l *listNamespaceWrapper) Enumerate(ctx context.Context, callback func(pagination.PageResult[iface.Namespace]) (keepGoing pagination.KeepGoing, err error)) error {
+func (l *listNamespaceWrapper) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[iface.Namespace]) error {
 	return l.executor().Enumerate(ctx, func(result pagination.PageResult[database.Namespace]) (keepGoing pagination.KeepGoing, err error) {
 		return callback(l.convertPageResult(result))
 	})

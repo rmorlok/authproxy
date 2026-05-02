@@ -45,7 +45,7 @@ func (l *listConnectorVersionWrapper) FetchPage(ctx context.Context) pagination.
 	return l.convertPageResult(l.executor().FetchPage(ctx))
 }
 
-func (l *listConnectorVersionWrapper) Enumerate(ctx context.Context, callback func(pagination.PageResult[iface.ConnectorVersion]) (keepGoing pagination.KeepGoing, err error)) error {
+func (l *listConnectorVersionWrapper) Enumerate(ctx context.Context, callback pagination.EnumerateCallback[iface.ConnectorVersion]) error {
 	return l.executor().Enumerate(ctx, func(result pagination.PageResult[database.ConnectorVersion]) (keepGoing pagination.KeepGoing, err error) {
 		return callback(l.convertPageResult(result))
 	})
