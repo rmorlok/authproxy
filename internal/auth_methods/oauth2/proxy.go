@@ -7,11 +7,25 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/rmorlok/authproxy/internal/httperr"
+	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
 )
+
+// actorFromContext returns the initiating actor from request context as a
+// httpf.Actor, or nil if the request is unauthenticated. The explicit
+// authentication check avoids passing a typed-nil *apauthcore.Actor through
+// the httpf.Actor interface (which would defeat ForActor's nil-receiver
+// short-circuit).
+func actorFromContext(ctx context.Context) httpf.Actor {
+	auth := apauthcore.GetAuthFromContext(ctx)
+	if !auth.IsAuthenticated() {
+		return nil
+	}
+	return auth.GetActor()
+}
 
 type refreshMode int
 
@@ -137,6 +151,7 @@ func (o *oAuth2Connection) ProxyRequest(ctx context.Context, reqType httpf.Reque
 	r := o.httpf.
 		ForRequestType(reqType).
 		ForConnection(o.connection).
+		ForActor(actorFromContext(ctx)).
 		ForLabels(req.Labels).
 		New().
 		UseContext(ctx).
