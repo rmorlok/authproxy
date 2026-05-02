@@ -60,6 +60,18 @@ func (o *oAuth2Connection) exchangeCodeAndAdvance(ctx context.Context, query url
 		return "", fmt.Errorf("failed to clean up oauth state: %w", err)
 	}
 
+	// RFC 6749 §4.1.2.1 — when the resource owner denies the request (or the provider
+	// can't satisfy it), the authorization endpoint redirects with `error=` instead of
+	// `code=`. Surface that as a denial-shaped failure rather than a generic missing-code
+	// error so the marketplace UI can render an authorization-denied result.
+	if errCode := query.Get("error"); errCode != "" {
+		msg := errCode
+		if desc := query.Get("error_description"); desc != "" {
+			msg = errCode + ": " + desc
+		}
+		return "", fmt.Errorf("authorization denied by provider: %s", msg)
+	}
+
 	code := query.Get("code")
 	if code == "" {
 		return "", errors.New("no code in query")

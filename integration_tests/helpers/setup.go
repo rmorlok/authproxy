@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net"
@@ -650,6 +651,9 @@ func (env *IntegrationTestEnv) GetOAuth2Token(t *testing.T, connectionID string)
 	id, err := apid.Parse(connectionID)
 	require.NoError(t, err)
 	tok, err := env.Db.GetOAuth2Token(context.Background(), id)
+	if errors.Is(err, database.ErrNotFound) {
+		return nil
+	}
 	require.NoError(t, err)
 	return tok
 }
