@@ -21,6 +21,16 @@ import (
 // MigrateMutexKeyName is the key that can be used when locking to perform a migration in redis.
 const MigrateMutexKeyName = "connectors-migrate-lock"
 
+// connectorSourceLabelKey is an apxy/-prefixed system label written on every
+// connector version that originates from the config-file migration mechanism.
+// It lets the migration orphan-cleanup pass distinguish config-managed
+// connectors from those created via the API.
+const connectorSourceLabelKey = "apxy/cxr/source"
+
+// connectorSourceLabelValueConfig is the value written under
+// connectorSourceLabelKey for connector versions sourced from the config file.
+const connectorSourceLabelValueConfig = "config"
+
 // Migrate all resources from the config file into the system, triggering appropriate event hooks, etc.
 func (s *service) Migrate(ctx context.Context) error {
 	err := s.MigrateNamespaces(ctx)
@@ -115,13 +125,102 @@ func (s *service) MigrateConnectors(ctx context.Context) error {
 	}
 	s.logger.Info("precheck passed, migrating connectors", "connector_count", len(cfgRoot.Connectors.GetConnectors()))
 
+	seen := make(map[apid.ID]struct{}, len(cfgRoot.Connectors.GetConnectors()))
 	for _, configConnector := range cfgRoot.Connectors.GetConnectors() {
-		if err := s.migrateConnector(ctx, cfgRoot.Connectors, &configConnector); err != nil {
+		resolvedId, err := s.migrateConnector(ctx, cfgRoot.Connectors, &configConnector)
+		if err != nil {
 			return err
+		}
+		if resolvedId != apid.Nil {
+			seen[resolvedId] = struct{}{}
 		}
 	}
 
+	if err := s.cleanupOrphanedConfigConnectors(ctx, seen); err != nil {
+		return fmt.Errorf("failed to cleanup orphaned config connectors: %w", err)
+	}
+
 	return nil
+}
+
+// cleanupOrphanedConfigConnectors finds connectors that were previously
+// loaded from a config file (carry the apxy/cxr/source=config label) but are
+// no longer present in the current config. For each orphan:
+//   - if no live connections exist, the connector is soft-deleted;
+//   - if live connections remain, the most recent published version is
+//     transitioned from primary to active so no new connections can be
+//     created against it, and a warning is logged instructing the operator to
+//     remove the connections via the API before the connector can be removed.
+func (s *service) cleanupOrphanedConfigConnectors(ctx context.Context, seen map[apid.ID]struct{}) error {
+	selector := fmt.Sprintf("%s=%s", connectorSourceLabelKey, connectorSourceLabelValueConfig)
+
+	return s.db.ListConnectorsBuilder().
+		ForLabelSelector(selector).
+		Enumerate(ctx, func(page pagination.PageResult[database.Connector]) (pagination.KeepGoing, error) {
+			for _, connector := range page.Results {
+				if _, kept := seen[connector.Id]; kept {
+					continue
+				}
+
+				if err := s.handleOrphanedConfigConnector(ctx, &connector); err != nil {
+					return pagination.Stop, err
+				}
+			}
+			return pagination.Continue, nil
+		})
+}
+
+func (s *service) handleOrphanedConfigConnector(ctx context.Context, connector *database.Connector) error {
+	hasConnections, err := s.connectorHasLiveConnections(ctx, connector.Id)
+	if err != nil {
+		return fmt.Errorf("failed to check for connections on orphaned connector %s: %w", connector.Id, err)
+	}
+
+	if !hasConnections {
+		s.logger.Info(
+			"removing orphaned config-sourced connector with no remaining connections",
+			"connector_id", connector.Id,
+			"namespace", connector.Namespace,
+		)
+		if err := s.db.DeleteConnector(ctx, connector.Id); err != nil && !errors.Is(err, database.ErrNotFound) {
+			return fmt.Errorf("failed to delete orphaned connector %s: %w", connector.Id, err)
+		}
+		return nil
+	}
+
+	// Connections still reference this connector — demote the most recently
+	// published version from primary to active so no new connections can be
+	// created against it, then surface a warning instructing the operator
+	// what to do next.
+	newest, err := s.db.NewestPublishedConnectorVersionForId(ctx, connector.Id)
+	if err != nil && !errors.Is(err, database.ErrNotFound) {
+		return fmt.Errorf("failed to get newest published version of orphaned connector %s: %w", connector.Id, err)
+	}
+
+	if newest != nil && newest.State == database.ConnectorVersionStatePrimary {
+		if err := s.db.SetConnectorVersionState(ctx, newest.Id, newest.Version, database.ConnectorVersionStateActive); err != nil {
+			return fmt.Errorf("failed to demote orphaned connector %s version %d: %w", newest.Id, newest.Version, err)
+		}
+	}
+
+	s.logger.Warn(
+		"orphaned config-sourced connector retains live connections; demoted to active and awaiting API action to remove",
+		"connector_id", connector.Id,
+		"namespace", connector.Namespace,
+	)
+
+	return nil
+}
+
+func (s *service) connectorHasLiveConnections(ctx context.Context, id apid.ID) (bool, error) {
+	page := s.db.ListConnectionsBuilder().
+		ForConnectorId(id).
+		Limit(1).
+		FetchPage(ctx)
+	if page.Error != nil {
+		return false, page.Error
+	}
+	return len(page.Results) > 0, nil
 }
 
 func (s *service) configConnectorToVersion(configConnector *config.Connector) (*database.ConnectorVersion, error) {
@@ -384,8 +483,11 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 	return nil
 }
 
-// migrateConnector migrates a single connector from configuration to the database
-func (s *service) migrateConnector(ctx context.Context, configConnectors *config.Connectors, configConnector *config.Connector) error {
+// migrateConnector migrates a single connector from configuration to the database.
+// Returns the resolved connector id (the id this config entry maps to in the
+// database, whether newly generated or matched against an existing row) so the
+// caller can track which connectors are config-managed and detect orphans.
+func (s *service) migrateConnector(ctx context.Context, configConnectors *config.Connectors, configConnector *config.Connector) (apid.ID, error) {
 	b := newConnectorVersionBuilder(s)
 	identifyingLabels := configConnectors.GetIdentifyingLabels()
 
@@ -410,7 +512,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 	if configConnector.HasId() && configConnector.HasVersion() {
 		existingVersion, err = s.db.GetConnectorVersion(ctx, configConnector.Id, configConnector.Version)
 		if err != nil && !errors.Is(err, database.ErrNotFound) {
-			return fmt.Errorf("failed to get connector version: %w", err)
+			return apid.Nil, fmt.Errorf("failed to get connector version: %w", err)
 		}
 
 		if existingVersion != nil {
@@ -423,13 +525,13 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 
 			if err == nil && cv.Hash == existingVersion.Hash {
 				// No update required
-				return nil
+				return id, nil
 			}
 		}
 	} else if configConnector.HasId() {
 		existingVersion, err = s.db.NewestConnectorVersionForId(ctx, configConnector.Id)
 		if err != nil && !errors.Is(err, database.ErrNotFound) {
-			return fmt.Errorf("failed to get newest version of connector: %w", err)
+			return apid.Nil, fmt.Errorf("failed to get newest version of connector: %w", err)
 		}
 
 		if existingVersion != nil {
@@ -442,7 +544,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 
 			if err == nil && cv.Hash == existingVersion.Hash {
 				// No update required
-				return nil
+				return id, nil
 			}
 
 			version = existingVersion.Version + 1
@@ -453,12 +555,14 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 		labelSelector := database.BuildLabelSelectorFromMap(labelValues)
 		existingVersion, err := s.db.GetConnectorVersionForLabelsAndVersion(ctx, labelSelector, configConnector.Version)
 		if err != nil && !errors.Is(err, database.ErrNotFound) {
-			return fmt.Errorf("failed to get connector version for labels/version: %w", err)
+			return apid.Nil, fmt.Errorf("failed to get connector version for labels/version: %w", err)
 		}
 
 		if existingVersion != nil {
+			id = existingVersion.Id
+
 			cv, err := b.
-				WithId(existingVersion.Id).
+				WithId(id).
 				WithVersion(version).
 				WithConfig(configConnector).
 				WithState(state).
@@ -466,10 +570,8 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 
 			if err == nil && cv.Hash == existingVersion.Hash {
 				// No update required
-				return nil
+				return id, nil
 			}
-
-			id = existingVersion.Id
 		}
 	} else {
 		// Pattern D: no ID, no version - use label-based lookup
@@ -477,12 +579,14 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 		labelSelector := database.BuildLabelSelectorFromMap(labelValues)
 		existingVersion, err := s.db.GetConnectorVersionForLabels(ctx, labelSelector)
 		if err != nil && !errors.Is(err, database.ErrNotFound) {
-			return fmt.Errorf("failed to get connector version for labels: %w", err)
+			return apid.Nil, fmt.Errorf("failed to get connector version for labels: %w", err)
 		}
 
 		if existingVersion != nil {
+			id = existingVersion.Id
+
 			cv, err := b.
-				WithId(existingVersion.Id).
+				WithId(id).
 				WithVersion(existingVersion.Version).
 				WithConfig(configConnector).
 				WithState(state).
@@ -490,10 +594,9 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 
 			if err == nil && cv.Hash == existingVersion.Hash {
 				// No update required
-				return nil
+				return id, nil
 			}
 
-			id = existingVersion.Id
 			version = existingVersion.Version + 1
 		}
 	}
@@ -505,19 +608,30 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 		WithState(state).
 		Build()
 	if err != nil {
-		return fmt.Errorf("failed to build connector version: %w", err)
+		return apid.Nil, fmt.Errorf("failed to build connector version: %w", err)
 	}
 
 	// Final check, though this should be duplicative
 	if existingVersion != nil && existingVersion.Hash == cv.Hash {
 		// No update required
-		return nil
+		return id, nil
 	}
+
+	// Tag the version with the source marker so the orphan-cleanup pass can
+	// distinguish config-managed connectors from API-created ones. Copy the
+	// labels map first because the builder shared a reference with the
+	// caller-owned config struct.
+	taggedLabels := make(database.Labels, len(cv.ConnectorVersion.Labels)+1)
+	for k, v := range cv.ConnectorVersion.Labels {
+		taggedLabels[k] = v
+	}
+	taggedLabels[connectorSourceLabelKey] = connectorSourceLabelValueConfig
+	cv.ConnectorVersion.Labels = taggedLabels
 
 	err = s.db.UpsertConnectorVersion(ctx, &cv.ConnectorVersion)
 	if err != nil {
-		return fmt.Errorf("failed to upsert connector version: %w", err)
+		return apid.Nil, fmt.Errorf("failed to upsert connector version: %w", err)
 	}
 
-	return nil
+	return id, nil
 }
