@@ -39,17 +39,21 @@ func (r *PublicOauth2Routes) callback(gctx *gin.Context) {
 	auth.MustGetValidatorFromGinContext(gctx).MarkValidated()
 
 	if gctx.Query("state") == "" {
+		err := errors.New("failed to bind state param")
+		oauth2.EmitMissingStateRejection(ctx, r.logger, err)
 		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
 			Error: sconfig.ErrorPageInternalError,
-		}, errors.New("failed to bind state param"))
+		}, err)
 		return
 	}
 
 	stateUUID, err := apid.Parse(gctx.Query("state"))
 	if err != nil {
+		wrapped := fmt.Errorf("failed to parse state param to UUID: %w", err)
+		oauth2.EmitInvalidStateFormatRejection(ctx, r.logger, wrapped)
 		r.cfg.GetRoot().ErrorPages.RenderErrorOrRedirect(gctx, sconfig.ErrorTemplateValues{
 			Error: sconfig.ErrorPageInternalError,
-		}, fmt.Errorf("failed to parse state param to UUID: %w", err))
+		}, wrapped)
 		return
 	}
 
