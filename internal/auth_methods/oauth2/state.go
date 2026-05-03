@@ -33,7 +33,7 @@ type state struct {
 }
 
 func (s *state) IsValid() bool {
-	return s.ActorId != apid.Nil && s.ConnectorId != apid.Nil && s.ConnectionId != apid.Nil && !s.ExpiresAt.IsZero()
+	return s.Namespace != "" && s.ActorId != apid.Nil && s.ConnectorId != apid.Nil && s.ConnectionId != apid.Nil && !s.ExpiresAt.IsZero()
 }
 
 // writeStateToRedis encrypts the state with the global key (AES-GCM AEAD)

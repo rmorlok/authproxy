@@ -140,6 +140,50 @@ func TestState_TamperedCiphertextFailsToDecrypt(t *testing.T) {
 	assert.Contains(t, err.Error(), "decrypt")
 }
 
+func TestState_IsValidRequiresNamespace(t *testing.T) {
+	base := state{
+		ActorId:      apid.New(apid.PrefixActor),
+		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
+		ConnectionId: apid.New(apid.PrefixConnection),
+		ExpiresAt:    time.Now().Add(time.Minute),
+	}
+
+	withNs := base
+	withNs.Namespace = "root.tenant-a"
+	require.True(t, withNs.IsValid(), "state with all fields populated must be valid")
+
+	withoutNs := base
+	require.False(t, withoutNs.IsValid(), "empty namespace must invalidate the state")
+}
+
+func TestGetOAuth2State_RejectsEmptyNamespaceInState(t *testing.T) {
+	ctx := context.Background()
+	cfg, r := apredis.MustApplyTestConfig(nil)
+	e := encrypt.NewFakeEncryptService(false)
+	logger := slog.New(slog.NewTextHandler(testWriter{t}, nil))
+
+	stateId := apid.New(apid.PrefixOauth2State)
+	actorId := apid.New(apid.PrefixActor)
+	// A state forged or persisted without a namespace must not be accepted, even
+	// when the inbound actor's namespace happens to be empty too.
+	s := &state{
+		Id:           stateId,
+		Namespace:    "",
+		ActorId:      actorId,
+		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
+		ConnectionId: apid.New(apid.PrefixConnection),
+		ExpiresAt:    time.Now().Add(time.Minute).UTC(),
+	}
+	require.NoError(t, writeStateToRedis(ctx, r, e, s, time.Minute))
+
+	actor := stateTestActor{id: actorId, namespace: ""}
+	core := &stateTestCore{conn: &mockCore.Connection{Namespace: ""}}
+
+	_, err := getOAuth2State(ctx, cfg, nil, r, core, nil, e, logger, actor, stateId)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "invalid")
+}
+
 func TestGetOAuth2State_RejectsNamespaceMismatchOnActor(t *testing.T) {
 	ctx := context.Background()
 	cfg, r := apredis.MustApplyTestConfig(nil)
