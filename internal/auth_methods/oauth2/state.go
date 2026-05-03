@@ -2,7 +2,6 @@ package oauth2
 
 import (
 	"context"
-	"encoding"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
@@ -22,6 +22,7 @@ import (
 
 type state struct {
 	Id                     apid.ID   `json:"id"`
+	Namespace              string    `json:"namespace"`
 	ActorId                apid.ID   `json:"actor_id"`
 	ConnectorId            apid.ID   `json:"connector_id"`
 	ConnectorVersion       uint64    `json:"connector_version"`
@@ -31,20 +32,53 @@ type state struct {
 	ExpiresAt              time.Time `json:"expires_at"`
 }
 
-func (s *state) MarshalBinary() ([]byte, error) {
-	return json.Marshal(s)
-}
-
-func (s *state) UnmarshalBinary(data []byte) error {
-	return json.Unmarshal(data, s)
-}
-
-// Make sure we have implemented the interface correctly
-var _ encoding.BinaryMarshaler = (*state)(nil)
-var _ encoding.BinaryUnmarshaler = (*state)(nil)
-
 func (s *state) IsValid() bool {
-	return s.ActorId != apid.Nil && s.ConnectorId != apid.Nil && s.ConnectionId != apid.Nil && !s.ExpiresAt.IsZero()
+	return s.Namespace != "" && s.ActorId != apid.Nil && s.ConnectorId != apid.Nil && s.ConnectionId != apid.Nil && !s.ExpiresAt.IsZero()
+}
+
+// writeStateToRedis encrypts the state with the global key (AES-GCM AEAD)
+// and stores it under the state's Redis key. AEAD gives us both
+// confidentiality (the payload is unreadable in Redis) and integrity (a
+// payload mutated outside this proxy fails authentication on decrypt
+// rather than producing a forged state), closing the
+// tamper-via-redis-state attack vector.
+func writeStateToRedis(ctx context.Context, r apredis.Client, e encrypt.E, s *state, ttl time.Duration) error {
+	plaintext, err := json.Marshal(s)
+	if err != nil {
+		return fmt.Errorf("failed to marshal oauth2 state: %w", err)
+	}
+	ef, err := e.EncryptGlobal(ctx, plaintext)
+	if err != nil {
+		return fmt.Errorf("failed to encrypt oauth2 state: %w", err)
+	}
+	result := r.Set(ctx, getStateRedisKey(s.Id), ef.ToInlineString(), ttl)
+	if result.Err() != nil {
+		return fmt.Errorf("failed to set state in redis for state %s: %w", s.Id, result.Err())
+	}
+	return nil
+}
+
+// readStateFromRedis loads, decrypts, and unmarshals the state. A decrypt
+// failure (tampered ciphertext, wrong key, etc.) is reported as a generic
+// state error so callers don't leak the failure mode to clients.
+func readStateFromRedis(ctx context.Context, r apredis.Client, e encrypt.E, stateId apid.ID) (*state, error) {
+	raw, err := r.Get(ctx, getStateRedisKey(stateId)).Result()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get oauth state from redis for id %s: %w", stateId.String(), err)
+	}
+	ef, err := encfield.ParseInlineString(raw)
+	if err != nil {
+		return nil, fmt.Errorf("failed to parse oauth state envelope for id %s: %w", stateId.String(), err)
+	}
+	plaintext, err := e.Decrypt(ctx, ef)
+	if err != nil {
+		return nil, fmt.Errorf("failed to decrypt oauth state for id %s: %w", stateId.String(), err)
+	}
+	var s state
+	if err := json.Unmarshal(plaintext, &s); err != nil {
+		return nil, fmt.Errorf("failed to unmarshal oauth state for id %s: %w", stateId.String(), err)
+	}
+	return &s, nil
 }
 
 func getStateRedisKey(u apid.ID) string {
@@ -58,6 +92,7 @@ func (o *oAuth2Connection) saveStateToRedis(ctx context.Context, actor IActorDat
 	ttl := o.cfg.GetRoot().Oauth.GetRoundTripTtlOrDefault()
 	s := &state{
 		Id:               stateId,
+		Namespace:        actor.GetNamespace(),
 		ActorId:          actor.GetId(),
 		ConnectorId:      o.connection.GetConnectorVersionEntity().GetId(),
 		ConnectorVersion: o.connection.GetConnectorVersionEntity().GetVersion(),
@@ -65,9 +100,8 @@ func (o *oAuth2Connection) saveStateToRedis(ctx context.Context, actor IActorDat
 		ExpiresAt:        time.Now().Add(ttl),
 		ReturnToUrl:      returnToUrl,
 	}
-	result := o.r.Set(ctx, getStateRedisKey(stateId), s, ttl)
-	if result.Err() != nil {
-		return fmt.Errorf("failed to set state in redis for connection %s: %w", o.connection.GetId(), result.Err())
+	if err := writeStateToRedis(ctx, o.r, o.encrypt, s, ttl); err != nil {
+		return fmt.Errorf("failed to set state in redis for connection %s: %w", o.connection.GetId(), err)
 	}
 
 	o.state = s
@@ -92,15 +126,9 @@ func getOAuth2State(
 		"actor_id", actor.GetId(),
 	)
 
-	result := r.Get(ctx, getStateRedisKey(stateId))
-
-	if result.Err() != nil {
-		return nil, fmt.Errorf("failed to get oauth state from redis for id %s: %w", stateId.String(), result.Err())
-	}
-
-	var s state
-	if err := result.Scan(&s); err != nil {
-		return nil, fmt.Errorf("failed to parse state from redis value: %w", err)
+	s, err := readStateFromRedis(ctx, r, encrypt, stateId)
+	if err != nil {
+		return nil, err
 	}
 
 	if !s.IsValid() {
@@ -115,6 +143,10 @@ func getOAuth2State(
 		return nil, fmt.Errorf("actor id %s does not match state actor id %s", actor.GetId(), s.ActorId)
 	}
 
+	if s.Namespace != actor.GetNamespace() {
+		return nil, fmt.Errorf("actor namespace %q does not match state namespace %q", actor.GetNamespace(), s.Namespace)
+	}
+
 	connection, err := core.GetConnection(ctx, s.ConnectionId)
 	if err != nil {
 		if errors.Is(err, coreIface.ErrNotFound) {
@@ -122,6 +154,10 @@ func getOAuth2State(
 		}
 
 		return nil, fmt.Errorf("failed to get connection %s for state %s: %w", s.ConnectionId.String(), stateId.String(), err)
+	}
+
+	if s.Namespace != connection.GetNamespace() {
+		return nil, fmt.Errorf("connection namespace %q does not match state namespace %q", connection.GetNamespace(), s.Namespace)
 	}
 
 	cv := connection.GetConnectorVersionEntity()
@@ -133,7 +169,7 @@ func getOAuth2State(
 	// TODO: add actor auth validation once connections get ownership
 
 	o := newOAuth2(cfg, db, r, core, encrypt, logger, httpf, connection)
-	o.state = &s
+	o.state = s
 
 	return o, nil
 }
