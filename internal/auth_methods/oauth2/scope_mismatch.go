@@ -11,13 +11,10 @@ import (
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
 
-const annotationMissingOptionalScopes = "oauth2.missing_optional_scopes"
-
 // scopeMismatchOutcome captures the differences between the scopes the connector definition
 // requested and the scopes the provider actually granted. Required scopes that the provider
 // declined to grant are surfaced as errors so the connection lands in auth_failed; optional
-// scopes are recorded on the connection as an annotation so callers can decide which features
-// to expose.
+// scopes are logged so callers can correlate against the /scopes endpoint.
 type scopeMismatchOutcome struct {
 	missingRequired []string
 	missingOptional []string
@@ -54,17 +51,9 @@ func detectScopeMismatch(declared []sconfig.Scope, granted string) scopeMismatch
 	return outcome
 }
 
-func scopeSet(s string) map[string]struct{} {
-	out := map[string]struct{}{}
-	for _, tok := range strings.Fields(s) {
-		out[tok] = struct{}{}
-	}
-	return out
-}
-
 // applyScopeMismatch records the outcome on the connection. Required-scope misses produce an
-// error so the caller can route through HandleAuthFailed; optional misses are persisted as an
-// annotation and logged. Extra granted scopes are logged but never block.
+// error so the caller can route through HandleAuthFailed; optional misses and extra grants are
+// logged but never block — callers inspect the /scopes endpoint to see the divergence.
 func (o *oAuth2Connection) applyScopeMismatch(ctx context.Context, outcome scopeMismatchOutcome) error {
 	baseLogger := o.logger
 	if baseLogger == nil {
@@ -83,11 +72,6 @@ func (o *oAuth2Connection) applyScopeMismatch(ctx context.Context, outcome scope
 	if len(outcome.missingOptional) > 0 {
 		logger.Warn("provider did not grant some optional oauth2 scopes",
 			"missing_optional_scopes", strings.Join(outcome.missingOptional, " "))
-		if _, err := o.db.PutConnectionAnnotations(ctx, o.connection.GetId(), map[string]string{
-			annotationMissingOptionalScopes: strings.Join(outcome.missingOptional, " "),
-		}); err != nil {
-			return fmt.Errorf("failed to record missing optional scopes annotation: %w", err)
-		}
 	}
 
 	if len(outcome.missingRequired) > 0 {

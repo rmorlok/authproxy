@@ -19,11 +19,12 @@ The proxy must:
    land the connection in `auth_failed` with a descriptive
    `setup_error`.
 3. Treat **missing optional** scopes as a soft failure: the connection
-   goes ready, and an annotation
-   (`oauth2.missing_optional_scopes`) records which optional scopes
-   weren't granted so callers can decide which features to expose.
+   goes ready and the divergence is exposed via the `/scopes` endpoint
+   so callers can decide which features to expose. (A future
+   capabilities system, #209, will surface this to downstream systems
+   directly.)
 4. Treat **extra granted** scopes as informational: log them, store the
-   granted set verbatim, no annotation, no blocking.
+   granted set verbatim, no blocking.
 5. Treat an **omitted scope** field per RFC 6749 §5.1 as silent
    agreement — store `scopes = requested_scopes` and proceed normally.
 
@@ -37,14 +38,14 @@ endpoint returns 422 for non-OAuth2 connections.
 The file contains five flow tests (one per scope-shape case) and one
 endpoint-contract test:
 
-| Test                                      | Connector declares                       | Token-endpoint script   | Connection state | Annotation set | Notable assertion                                  |
-| ----------------------------------------- | ---------------------------------------- | ----------------------- | ---------------- | -------------- | -------------------------------------------------- |
-| `TestScopeMismatch_RequiredMissing`       | `read` (req), `write` (req)              | `scope=read`            | `auth_failed`    | no             | `setup_error` calls out the missing required scope |
-| `TestScopeMismatch_OptionalMissing`       | `read` (req), `write` (opt)              | `scope=read`            | `ready`          | yes (`write`)  | `/scopes` returns granted=`[read]`, requested=`[read, write]` |
-| `TestScopeMismatch_AllScopesGranted`      | `read` (req), `write` (opt)              | `scope=read write`      | `ready`          | no             | confirms no stale annotation when no mismatch      |
-| `TestScopeMismatch_ExtraGranted`          | `read` (req)                             | `scope=read admin`      | `ready`          | no             | `/scopes` granted=`[read, admin]`, requested=`[read]` |
-| `TestScopeMismatch_ProviderOmitsScope`    | `read` (req)                             | `scope=""` (RFC §5.1)   | `ready`          | no             | granted falls back to requested                    |
-| `TestConnectionScopesEndpoint_NonOAuth2`  | NoAuth connector                         | n/a                     | n/a              | n/a            | endpoint returns 422                               |
+| Test                                      | Connector declares                       | Token-endpoint script   | Connection state | Notable assertion                                  |
+| ----------------------------------------- | ---------------------------------------- | ----------------------- | ---------------- | -------------------------------------------------- |
+| `TestScopeMismatch_RequiredMissing`       | `read` (req), `write` (req)              | `scope=read`            | `auth_failed`    | `setup_error` calls out the missing required scope |
+| `TestScopeMismatch_OptionalMissing`       | `read` (req), `write` (opt)              | `scope=read`            | `ready`          | `/scopes` returns granted=`[read]`, requested=`[read, write]` |
+| `TestScopeMismatch_AllScopesGranted`      | `read` (req), `write` (opt)              | `scope=read write`      | `ready`          | granted set equals requested set                   |
+| `TestScopeMismatch_ExtraGranted`          | `read` (req)                             | `scope=read admin`      | `ready`          | `/scopes` granted=`[read, admin]`, requested=`[read]` |
+| `TestScopeMismatch_ProviderOmitsScope`    | `read` (req)                             | `scope=""` (RFC §5.1)   | `ready`          | granted falls back to requested                    |
+| `TestConnectionScopesEndpoint_NonOAuth2`  | NoAuth connector                         | n/a                     | n/a              | endpoint returns 422                               |
 
 For the success cases, each test additionally hits
 `GET /api/v1/connections/{id}/scopes` over the real HTTP server and
@@ -99,11 +100,8 @@ sequenceDiagram
 
     alt required missing
         PUB->>DB: HandleAuthFailed(setup_step=auth_failed,<br/>setup_error="required oauth2 scopes were not granted: write")
-    else optional missing
-        PUB->>DB: PutConnectionAnnotations(oauth2.missing_optional_scopes=write)
+    else optional missing / extra / all / omitted
         PUB->>DB: connection → ready
-    else extra / all / omitted
-        PUB->>DB: connection → ready (no annotation)
     end
     PUB-->>B: 302 → return_to_url
     B->>PUB: GET /connections → SPA "Your Connections"

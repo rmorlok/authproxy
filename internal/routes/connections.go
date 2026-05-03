@@ -23,7 +23,6 @@ import (
 
 	"log/slog"
 	"net/http"
-	"strings"
 	"time"
 )
 
@@ -1121,17 +1120,9 @@ func (r *ConnectionsRoutes) getScopes(gctx *gin.Context) {
 	}
 
 	gctx.PureJSON(http.StatusOK, ConnectionScopesJson{
-		Requested: splitScopes(token.RequestedScopes),
-		Granted:   splitScopes(token.Scopes),
+		Requested: oauth2.SplitScopes(token.RequestedScopes),
+		Granted:   oauth2.SplitScopes(token.Scopes),
 	})
-}
-
-func splitScopes(s string) []string {
-	out := strings.Fields(s)
-	if out == nil {
-		return []string{}
-	}
-	return out
 }
 
 func (r *ConnectionsRoutes) Register(g gin.IRouter) {

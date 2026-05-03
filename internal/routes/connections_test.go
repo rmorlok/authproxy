@@ -22,6 +22,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
@@ -44,6 +45,8 @@ func TestConnections(t *testing.T) {
 
 	connectorId := apid.MustParse("cxr_test0000000000001")
 	connectorVersion := uint64(1)
+	oauthConnectorId := apid.MustParse("cxr_test0000000000002")
+	oauthConnectorVersion := uint64(1)
 
 	setup := func(t *testing.T, cfg config.C) (*TestSetup, func()) {
 		cfg = config.FromRoot(&sconfig.Root{
@@ -54,6 +57,15 @@ func TestConnections(t *testing.T) {
 						Version:     connectorVersion,
 						Labels:      map[string]string{"type": "test-connector"},
 						DisplayName: "Test Connector",
+					},
+					{
+						Id:          oauthConnectorId,
+						Version:     oauthConnectorVersion,
+						Labels:      map[string]string{"type": "oauth2-connector"},
+						DisplayName: "OAuth2 Test Connector",
+						Auth: &sconfig.Auth{InnerVal: &sconfig.AuthOAuth2{
+							Type: sconfig.AuthTypeOAuth2,
+						}},
 					},
 				},
 			},
@@ -2004,6 +2016,49 @@ func TestConnections(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusUnprocessableEntity, w.Code)
+		})
+
+		t.Run("oauth2 connector returns requested and granted scopes", func(t *testing.T) {
+			oauthConnId := apid.New(apid.PrefixConnection)
+			err := tu.Db.CreateConnection(context.Background(), &database.Connection{
+				Id:               oauthConnId,
+				Namespace:        sconfig.RootNamespace,
+				ConnectorId:      oauthConnectorId,
+				ConnectorVersion: oauthConnectorVersion,
+				State:            database.ConnectionStateReady,
+			})
+			require.NoError(t, err)
+
+			_, err = tu.Db.InsertOAuth2Token(
+				context.Background(),
+				oauthConnId,
+				nil,
+				encfield.EncryptedField{ID: "ekv_test", Data: "encrypted_refresh"},
+				encfield.EncryptedField{ID: "ekv_test", Data: "encrypted_access"},
+				nil,
+				"read write",
+				"read write admin",
+			)
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/"+oauthConnId.String()+"/scopes",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ConnectionScopesJson
+			require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+			assert.Equal(t, []string{"read", "write", "admin"}, resp.Requested)
+			assert.Equal(t, []string{"read", "write"}, resp.Granted)
 		})
 	})
 }

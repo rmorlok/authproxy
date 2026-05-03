@@ -24,8 +24,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const annotationMissingOptionalScopes = "oauth2.missing_optional_scopes"
-
 // scopeMismatchSetup wires up a fresh provider client/user, env, and connector
 // for one of the scope-mismatch scenarios. Tests script the token endpoint
 // before invoking driveApprovalAndGetConnectionId so the token exchange that
@@ -224,15 +222,11 @@ func TestScopeMismatch_RequiredMissing(t *testing.T) {
 	assert.Equal(t, "read", token.Scopes, "stored scopes should reflect what the provider returned")
 	assert.Equal(t, "read write", token.RequestedScopes,
 		"requested_scopes should preserve the original request from the connector")
-
-	annotations := s.env.GetConnection(t, connectionID).Annotations
-	_, hasAnnotation := annotations[annotationMissingOptionalScopes]
-	assert.False(t, hasAnnotation, "missing-required path should not write the optional-scope annotation")
 }
 
 // TestScopeMismatch_OptionalMissing — connector declares {read (req), write
-// (opt)}, provider grants only {read}. Connection should land ready, with
-// the missing-optional-scopes annotation set to "write" so callers can decide
+// (opt)}, provider grants only {read}. Connection should land ready, and
+// callers can inspect the divergence through the /scopes endpoint to decide
 // which features to expose.
 func TestScopeMismatch_OptionalMissing(t *testing.T) {
 	s := newScopeMismatchSetup(t, "scope-optional-missing",
@@ -249,12 +243,6 @@ func TestScopeMismatch_OptionalMissing(t *testing.T) {
 	assert.Equal(t, database.ConnectionStateReady, conn.State,
 		"missing-optional should not block the connection from going ready")
 
-	annotations := conn.Annotations
-	require.Containsf(t, annotations, annotationMissingOptionalScopes,
-		"missing-optional should be recorded on the connection as an annotation; got %v", annotations)
-	assert.Equal(t, "write", annotations[annotationMissingOptionalScopes],
-		"annotation value should list the missing optional scope")
-
 	token := s.env.GetOAuth2Token(t, connectionID)
 	require.NotNil(t, token, "token must be persisted on the success path")
 	assert.Equal(t, "read", token.Scopes)
@@ -267,9 +255,8 @@ func TestScopeMismatch_OptionalMissing(t *testing.T) {
 }
 
 // TestScopeMismatch_AllScopesGranted — connector declares {read (req), write
-// (opt)} and the provider grants both. Connection ready, no annotation, no
-// extras logged. Confirms the no-mismatch path doesn't write the
-// missing-optional annotation.
+// (opt)} and the provider grants both. Connection ready and the granted set
+// equals the requested set as exposed via the /scopes endpoint.
 func TestScopeMismatch_AllScopesGranted(t *testing.T) {
 	s := newScopeMismatchSetup(t, "scope-all-granted",
 		[]string{"read"}, []string{"write"},
@@ -283,8 +270,6 @@ func TestScopeMismatch_AllScopesGranted(t *testing.T) {
 
 	conn := s.env.GetConnection(t, connectionID)
 	assert.Equal(t, database.ConnectionStateReady, conn.State)
-	_, hasAnnotation := conn.Annotations[annotationMissingOptionalScopes]
-	assert.False(t, hasAnnotation, "no annotation should be set when all declared scopes are granted")
 
 	token := s.env.GetOAuth2Token(t, connectionID)
 	require.NotNil(t, token)
@@ -315,8 +300,6 @@ func TestScopeMismatch_ExtraGranted(t *testing.T) {
 	conn := s.env.GetConnection(t, connectionID)
 	assert.Equal(t, database.ConnectionStateReady, conn.State,
 		"extra scopes should not block the connection from going ready")
-	_, hasAnnotation := conn.Annotations[annotationMissingOptionalScopes]
-	assert.False(t, hasAnnotation, "extra-granted should not set the missing-optional annotation")
 
 	token := s.env.GetOAuth2Token(t, connectionID)
 	require.NotNil(t, token)
@@ -350,8 +333,6 @@ func TestScopeMismatch_ProviderOmitsScope(t *testing.T) {
 
 	conn := s.env.GetConnection(t, connectionID)
 	assert.Equal(t, database.ConnectionStateReady, conn.State)
-	_, hasAnnotation := conn.Annotations[annotationMissingOptionalScopes]
-	assert.False(t, hasAnnotation)
 
 	token := s.env.GetOAuth2Token(t, connectionID)
 	require.NotNil(t, token)
