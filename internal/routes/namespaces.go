@@ -160,6 +160,14 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 		return
 	}
 
+	if req.Labels != nil {
+		if err := database.ValidateUserLabels(req.Labels); err != nil {
+			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
 	ns, err := r.core.GetNamespace(ctx, req.Path)
 	if err == nil {
 		// This means the namespace already exists
@@ -335,7 +343,7 @@ func (r *NamespacesRoutes) update(gctx *gin.Context) {
 
 	// Validate labels if provided
 	if req.Labels != nil {
-		if err := database.Labels(req.Labels).Validate(); err != nil {
+		if err := database.ValidateUserLabels(req.Labels); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 			val.MarkErrorReturn()
 			return

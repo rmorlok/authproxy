@@ -670,6 +670,30 @@ func MergeApxyAndUserLabels(user, apxy Labels) Labels {
 	return out
 }
 
+// MergeUpsertLabels composes the labels to persist on an upsert by
+// combining caller-supplied labels with the row's existing apxy/ labels.
+//
+// User-portion labels come from the caller — fully replacing what was stored
+// (write-API endpoints that PATCH user labels go through a different helper).
+// apxy/-prefixed labels merge: stored values are preserved by default, and
+// any apxy/-prefixed entries the caller passes in override the stored values
+// for those specific keys. This lets system code update its own provenance
+// markers (e.g. apxy/cxr/source) on an upsert without requiring a separate
+// label-mutation call, while still preserving apxy/ labels owned by other
+// subsystems (e.g. carry-forward materializations).
+func MergeUpsertLabels(callerLabels, existingLabels Labels) Labels {
+	newUser, newApxy := SplitUserAndApxyLabels(callerLabels)
+	_, existingApxy := SplitUserAndApxyLabels(existingLabels)
+	mergedApxy := make(Labels, len(existingApxy)+len(newApxy))
+	for k, v := range existingApxy {
+		mergedApxy[k] = v
+	}
+	for k, v := range newApxy {
+		mergedApxy[k] = v
+	}
+	return MergeApxyAndUserLabels(newUser, mergedApxy)
+}
+
 // ParentCarryForward bundles a parent's resource-type token with the
 // parent's stored labels for use with ApplyParentCarryForward.
 type ParentCarryForward struct {

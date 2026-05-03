@@ -16,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	hmock "github.com/rmorlok/authproxy/internal/httpf/mock"
@@ -1466,6 +1467,141 @@ func TestMigration(t *testing.T) {
 				assertSqlWithDisplayName(t, rawDb, cfg, `
 			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name FROM connector_versions ORDER BY version;
 		`, []connectorResult{})
+			})
+		})
+
+		t.Run("orphan cleanup", func(t *testing.T) {
+			t.Run("config-sourced connector with no connections is removed", func(t *testing.T) {
+				cleanup := setup(t, []cschema.Connector{
+					{
+						Id:      apid.MustParse("cxr_test0000000000001"),
+						Version: 1,
+						Labels:  map[string]string{"type": "fake1"},
+					},
+					{
+						Id:      apid.MustParse("cxr_test0000000000002"),
+						Version: 1,
+						Labels:  map[string]string{"type": "fake2"},
+					},
+				})
+				defer cleanup()
+
+				err := service.MigrateConnectors(context.Background())
+				require.NoError(t, err)
+
+				// Drop the second connector from the config and re-run.
+				cfg.GetRoot().Connectors.LoadFromList = cfg.GetRoot().Connectors.LoadFromList[:1]
+
+				err = service.MigrateConnectors(context.Background())
+				require.NoError(t, err)
+
+				type connectorResult struct {
+					Id      string
+					Version int64
+					State   string
+				}
+
+				// The orphan's row is soft-deleted; only the surviving connector remains.
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state FROM connector_versions WHERE deleted_at IS NULL ORDER BY id;
+		`, []connectorResult{
+					{Id: "cxr_test0000000000001", Version: 1, State: "primary"},
+				})
+			})
+
+			t.Run("config-sourced connector with live connections is demoted", func(t *testing.T) {
+				cleanup := setup(t, []cschema.Connector{
+					{
+						Id:      apid.MustParse("cxr_test0000000000001"),
+						Version: 1,
+						Labels:  map[string]string{"type": "fake1"},
+					},
+					{
+						Id:      apid.MustParse("cxr_test0000000000002"),
+						Version: 1,
+						Labels:  map[string]string{"type": "fake2"},
+					},
+				})
+				defer cleanup()
+
+				err := service.MigrateConnectors(context.Background())
+				require.NoError(t, err)
+
+				// Create a connection against the connector we are about to drop.
+				err = db.CreateConnection(context.Background(), &database.Connection{
+					Id:               apid.MustParse("cxn_test0000000000001"),
+					Namespace:        "root",
+					ConnectorId:      apid.MustParse("cxr_test0000000000002"),
+					ConnectorVersion: 1,
+					State:            database.ConnectionStateReady,
+				})
+				require.NoError(t, err)
+
+				cfg.GetRoot().Connectors.LoadFromList = cfg.GetRoot().Connectors.LoadFromList[:1]
+
+				err = service.MigrateConnectors(context.Background())
+				require.NoError(t, err)
+
+				type connectorResult struct {
+					Id      string
+					Version int64
+					State   string
+				}
+
+				// Orphan must NOT be deleted (still rows present), and its primary version
+				// must be demoted to active.
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state FROM connector_versions WHERE deleted_at IS NULL ORDER BY id;
+		`, []connectorResult{
+					{Id: "cxr_test0000000000001", Version: 1, State: "primary"},
+					{Id: "cxr_test0000000000002", Version: 1, State: "active"},
+				})
+			})
+
+			t.Run("api-created connectors are not touched", func(t *testing.T) {
+				cleanup := setup(t, []cschema.Connector{
+					{
+						Id:      apid.MustParse("cxr_test0000000000001"),
+						Version: 1,
+						Labels:  map[string]string{"type": "fake1"},
+					},
+				})
+				defer cleanup()
+
+				err := service.MigrateConnectors(context.Background())
+				require.NoError(t, err)
+
+				// Insert a connector version directly via the database, simulating
+				// an API-driven create. It carries no apxy/cxr/source label.
+				apiId := apid.MustParse("cxr_test0000000000099")
+				err = db.UpsertConnectorVersion(context.Background(), &database.ConnectorVersion{
+					Id:                  apiId,
+					Version:             1,
+					Namespace:           "root",
+					State:               database.ConnectorVersionStatePrimary,
+					Hash:                "api-created-hash",
+					EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "api-created"},
+					Labels:              database.Labels{"type": "api-only"},
+				})
+				require.NoError(t, err)
+
+				// Re-run migration with the same config — the API-created connector
+				// should remain untouched even though it is not in the config.
+				err = service.MigrateConnectors(context.Background())
+				require.NoError(t, err)
+
+				type connectorResult struct {
+					Id      string
+					Version int64
+					State   string
+				}
+
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state FROM connector_versions WHERE deleted_at IS NULL ORDER BY id;
+		`, []connectorResult{
+					{Id: "cxr_test0000000000001", Version: 1, State: "primary"},
+					{Id: "cxr_test0000000000099", Version: 1, State: "primary"},
+				})
 			})
 		})
 	})

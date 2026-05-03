@@ -379,8 +379,10 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				return errors.New("cannot modify non-draft connector")
 			}
 
-			// Preserve apxy/ system labels — the caller passes only the
-			// user portion.
+			// Preserve apxy/ system labels — the caller usually passes only
+			// the user portion, but if they include apxy/-prefixed entries
+			// (e.g. system-owned provenance markers), let those override the
+			// stored apxy values.
 			var existingLabels Labels
 			if scanErr := sqb.
 				Select("labels").
@@ -390,8 +392,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				Scan(&existingLabels); scanErr != nil {
 				return scanErr
 			}
-			_, existingApxy := SplitUserAndApxyLabels(existingLabels)
-			mergedLabels := MergeApxyAndUserLabels(cv.Labels, existingApxy)
+			mergedLabels := MergeUpsertLabels(cv.Labels, existingLabels)
 
 			result, err := sqb.Update(ConnectorVersionsTable).
 				Set("state", cv.State).
@@ -556,6 +557,37 @@ func (s *service) SetConnectorVersionState(ctx context.Context, id apid.ID, vers
 
 		return nil
 	})
+}
+
+// DeleteConnector soft-deletes all versions of the connector identified by id.
+// Returns ErrNotFound if no live versions exist for the id.
+func (s *service) DeleteConnector(ctx context.Context, id apid.ID) error {
+	if id == apid.Nil {
+		return errors.New("connector id is required")
+	}
+
+	now := apctx.GetClock(ctx).Now()
+	dbResult, err := s.sq.
+		Update(ConnectorVersionsTable).
+		Set("updated_at", now).
+		Set("deleted_at", now).
+		Where(sq.Eq{"id": id, "deleted_at": nil}).
+		RunWith(s.db).
+		Exec()
+	if err != nil {
+		return fmt.Errorf("failed to soft delete connector: %w", err)
+	}
+
+	affected, err := dbResult.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to soft delete connector: %w", err)
+	}
+
+	if affected == 0 {
+		return ErrNotFound
+	}
+
+	return nil
 }
 
 // GetConnectorVersionForLabels finds the newest connector version matching the label selector.

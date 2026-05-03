@@ -666,6 +666,24 @@ func TestActorsRoutes(t *testing.T) {
 			require.Equal(t, http.StatusBadRequest, w.Code)
 		})
 
+		t.Run("rejects apxy/-prefixed labels in request body", func(t *testing.T) {
+			reqBody := CreateActorRequestJson{
+				ExternalId: "apxy-blocked-actor",
+				Namespace:  "root",
+				Labels:     map[string]string{"apxy/cxr/source": "config"},
+			}
+			body := util.MustPrettyJSON(reqBody)
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPost, "/actors", bytes.NewBufferString(body))
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			req = authenticate(t, tu, req)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code, "API must reject apxy/-prefixed labels at the user-input boundary")
+			require.Contains(t, w.Body.String(), "reserved")
+		})
+
 		t.Run("conflict - duplicate external_id in same namespace", func(t *testing.T) {
 			// Create an actor first
 			createActor(t, tu.Db, "duplicate-actor", "root")

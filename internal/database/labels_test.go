@@ -551,6 +551,55 @@ func TestSplitAndMergeUserAndApxyLabels(t *testing.T) {
 	})
 }
 
+func TestMergeUpsertLabels(t *testing.T) {
+	t.Run("user portion fully comes from caller, dropping stored user labels", func(t *testing.T) {
+		caller := Labels{"team": "platform", "env": "staging"}
+		existing := Labels{"team": "old-team", "owner": "alice"}
+
+		merged := MergeUpsertLabels(caller, existing)
+
+		require.Equal(t, "platform", merged["team"])
+		require.Equal(t, "staging", merged["env"])
+		_, hasOwner := merged["owner"]
+		require.False(t, hasOwner, "stored user-only labels should not survive an upsert")
+	})
+
+	t.Run("stored apxy labels are preserved when caller does not pass them", func(t *testing.T) {
+		caller := Labels{"team": "platform"}
+		existing := Labels{
+			"apxy/cxr/-/id": "cxr_keep",
+			"apxy/cxr/-/ns": "root",
+		}
+
+		merged := MergeUpsertLabels(caller, existing)
+
+		require.Equal(t, "cxr_keep", merged["apxy/cxr/-/id"])
+		require.Equal(t, "root", merged["apxy/cxr/-/ns"])
+		require.Equal(t, "platform", merged["team"])
+	})
+
+	t.Run("caller apxy labels override stored apxy labels for the same key", func(t *testing.T) {
+		caller := Labels{
+			"team":             "platform",
+			"apxy/cxr/source":  "config",
+		}
+		existing := Labels{
+			"apxy/cxr/source": "api",
+			"apxy/cxr/-/id":   "cxr_keep",
+		}
+
+		merged := MergeUpsertLabels(caller, existing)
+
+		require.Equal(t, "config", merged["apxy/cxr/source"], "caller's apxy value must win")
+		require.Equal(t, "cxr_keep", merged["apxy/cxr/-/id"], "stored apxy keys not in caller stay intact")
+	})
+
+	t.Run("returns nil when both inputs are empty", func(t *testing.T) {
+		require.Nil(t, MergeUpsertLabels(nil, nil))
+		require.Nil(t, MergeUpsertLabels(Labels{}, Labels{}))
+	})
+}
+
 func TestApxyLabelValueValidation(t *testing.T) {
 	// A namespace path that exceeds the standard 63-char user-value cap.
 	longPath := "root." + strings.Repeat("a", 60) + ".more"

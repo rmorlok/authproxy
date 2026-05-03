@@ -871,7 +871,7 @@ func (r *ConnectionsRoutes) update(gctx *gin.Context) {
 	}
 
 	if req.Labels != nil {
-		if err := database.Labels(req.Labels).Validate(); err != nil {
+		if err := database.ValidateUserLabels(req.Labels); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 			val.MarkErrorReturn()
 			return

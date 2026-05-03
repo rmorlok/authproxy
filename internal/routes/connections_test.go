@@ -535,6 +535,26 @@ func TestConnections(t *testing.T) {
 			require.Equal(t, http.StatusNotFound, w.Code)
 		})
 
+		t.Run("rejects apxy/-prefixed labels in request body", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				"/connections/"+u.String(),
+				util.JsonToReader(map[string]interface{}{
+					"labels": map[string]string{"apxy/cxr/source": "config"},
+				}),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code, "API must reject apxy/-prefixed labels at the user-input boundary")
+			require.Contains(t, w.Body.String(), "reserved")
+		})
+
 		t.Run("invalid JSON", func(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(

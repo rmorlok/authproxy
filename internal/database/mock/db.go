@@ -499,6 +499,20 @@ func (mr *MockDBMockRecorder) DeleteConnectionLabels(ctx, id, keys interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteConnectionLabels", reflect.TypeOf((*MockDB)(nil).DeleteConnectionLabels), ctx, id, keys)
 }
 
+// DeleteConnector mocks base method.
+func (m *MockDB) DeleteConnector(ctx context.Context, id apid.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteConnector", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteConnector indicates an expected call of DeleteConnector.
+func (mr *MockDBMockRecorder) DeleteConnector(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteConnector", reflect.TypeOf((*MockDB)(nil).DeleteConnector), ctx, id)
+}
+
 // DeleteEncryptionKey mocks base method.
 func (m *MockDB) DeleteEncryptionKey(ctx context.Context, id apid.ID) error {
 	m.ctrl.T.Helper()

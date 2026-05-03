@@ -477,6 +477,7 @@ type ListConnectionsBuilder interface {
 	Limit(int32) ListConnectionsBuilder
 	ForState(ConnectionState) ListConnectionsBuilder
 	ForStates([]ConnectionState) ListConnectionsBuilder
+	ForConnectorId(id apid.ID) ListConnectionsBuilder
 	ForNamespaceMatcher(matcher string) ListConnectionsBuilder
 	ForNamespaceMatchers(matchers []string) ListConnectionsBuilder
 	OrderBy(ConnectionOrderByField, pagination.OrderBy) ListConnectionsBuilder
@@ -492,6 +493,7 @@ type listConnectionsFilters struct {
 	LimitVal             uint64                  `json:"limit"`
 	Offset               uint64                  `json:"offset"`
 	StatesVal            []ConnectionState       `json:"states,omitempty"`
+	ConnectorIdsVal      []apid.ID               `json:"connector_ids,omitempty"`
 	NamespaceMatchers    []string                `json:"namespace_matchers,omitempty"`
 	OrderByFieldVal      *ConnectionOrderByField `json:"order_by_field"`
 	OrderByVal           *pagination.OrderBy     `json:"order_by"`
@@ -514,6 +516,11 @@ func (l *listConnectionsFilters) Limit(limit int32) ListConnectionsBuilder {
 
 func (l *listConnectionsFilters) ForState(state ConnectionState) ListConnectionsBuilder {
 	return l.ForStates([]ConnectionState{state})
+}
+
+func (l *listConnectionsFilters) ForConnectorId(id apid.ID) ListConnectionsBuilder {
+	l.ConnectorIdsVal = []apid.ID{id}
+	return l
 }
 
 func (l *listConnectionsFilters) ForNamespaceMatcher(matcher string) ListConnectionsBuilder {
@@ -621,6 +628,10 @@ func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) sq.Selec
 
 	if len(l.StatesVal) > 0 {
 		q = q.Where(sq.Eq{"state": l.StatesVal})
+	}
+
+	if len(l.ConnectorIdsVal) > 0 {
+		q = q.Where(sq.Eq{"connector_id": l.ConnectorIdsVal})
 	}
 
 	if len(l.NamespaceMatchers) > 0 {

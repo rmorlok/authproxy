@@ -616,6 +616,25 @@ func TestEncryptionKeys(t *testing.T) {
 			require.Equal(t, database.EncryptionKeyStateDisabled, got.State)
 		})
 
+		t.Run("rejects apxy/-prefixed labels in request body", func(t *testing.T) {
+			body := `{"labels": {"apxy/cxr/source": "config"}}`
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPatch,
+				fmt.Sprintf("/encryption-keys/%s", created.Id),
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code, "API must reject apxy/-prefixed labels at the user-input boundary")
+			require.Contains(t, w.Body.String(), "reserved")
+		})
+
 		t.Run("success - update labels", func(t *testing.T) {
 			body := `{"labels": {"env": "production", "team": "backend"}}`
 			w := httptest.NewRecorder()
