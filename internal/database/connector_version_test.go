@@ -738,4 +738,215 @@ INSERT INTO connector_versions
 			assert.Equal(t, ConnectorVersionStateArchived, v2.State)
 		})
 	})
+
+	t.Run("DeleteConnector", func(t *testing.T) {
+		t.Run("soft-deletes every live version of the connector", func(t *testing.T) {
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
+			defer rawDb.Close()
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			connectorID := apid.New(apid.PrefixConnectorVersion)
+
+			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
+				State: ConnectorVersionStatePrimary, Labels: Labels{"type": "t"},
+				Hash: "h1", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e1"},
+			})
+			require.NoError(t, err)
+
+			err = db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+				Id: connectorID, Version: 2, Namespace: sconfig.RootNamespace,
+				State: ConnectorVersionStateDraft, Labels: Labels{"type": "t"},
+				Hash: "h2", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e2"},
+			})
+			require.NoError(t, err)
+
+			require.Equal(t, 2, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_versions WHERE deleted_at IS NULL"))
+
+			err = db.DeleteConnector(ctx, connectorID)
+			require.NoError(t, err)
+
+			require.Equal(t, 0, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_versions WHERE deleted_at IS NULL"))
+			require.Equal(t, 2, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_versions WHERE deleted_at IS NOT NULL"))
+
+			_, err = db.GetConnectorVersion(ctx, connectorID, 1)
+			require.ErrorIs(t, err, ErrNotFound)
+			_, err = db.GetConnectorVersion(ctx, connectorID, 2)
+			require.ErrorIs(t, err, ErrNotFound)
+		})
+
+		t.Run("returns ErrNotFound when no live versions exist", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			err := db.DeleteConnector(ctx, apid.New(apid.PrefixConnectorVersion))
+			require.ErrorIs(t, err, ErrNotFound)
+		})
+
+		t.Run("returns ErrNotFound when all versions are already soft-deleted", func(t *testing.T) {
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
+			defer rawDb.Close()
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			connectorID := apid.New(apid.PrefixConnectorVersion)
+			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
+				State: ConnectorVersionStatePrimary, Labels: Labels{"type": "t"},
+				Hash: "h1", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e1"},
+			})
+			require.NoError(t, err)
+
+			err = db.DeleteConnector(ctx, connectorID)
+			require.NoError(t, err)
+
+			err = db.DeleteConnector(ctx, connectorID)
+			require.ErrorIs(t, err, ErrNotFound)
+		})
+
+		t.Run("does not affect other connectors", func(t *testing.T) {
+			_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
+			defer rawDb.Close()
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			targetID := apid.New(apid.PrefixConnectorVersion)
+			survivorID := apid.New(apid.PrefixConnectorVersion)
+
+			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+				Id: targetID, Version: 1, Namespace: sconfig.RootNamespace,
+				State: ConnectorVersionStatePrimary, Labels: Labels{"type": "t1"},
+				Hash: "h1", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e1"},
+			})
+			require.NoError(t, err)
+
+			err = db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+				Id: survivorID, Version: 1, Namespace: sconfig.RootNamespace,
+				State: ConnectorVersionStatePrimary, Labels: Labels{"type": "t2"},
+				Hash: "h2", EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e2"},
+			})
+			require.NoError(t, err)
+
+			err = db.DeleteConnector(ctx, targetID)
+			require.NoError(t, err)
+
+			survivor, err := db.GetConnectorVersion(ctx, survivorID, 1)
+			require.NoError(t, err)
+			require.Equal(t, survivorID, survivor.Id)
+
+			require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connector_versions WHERE deleted_at IS NULL"))
+		})
+
+		t.Run("rejects nil id", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			ctx := apctx.NewBuilderBackground().Build()
+			require.Error(t, db.DeleteConnector(ctx, apid.Nil))
+		})
+	})
+
+	t.Run("UpsertConnectorVersion apxy label semantics", func(t *testing.T) {
+		t.Run("caller-supplied apxy labels persist on insert", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			connectorID := apid.New(apid.PrefixConnectorVersion)
+			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
+				State: ConnectorVersionStatePrimary,
+				Labels: Labels{
+					"type":            "t",
+					"apxy/cxr/source": "config",
+				},
+				Hash:                "h1",
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e1"},
+			})
+			require.NoError(t, err)
+
+			saved, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			require.NoError(t, err)
+			require.Equal(t, "config", saved.Labels["apxy/cxr/source"])
+			require.Equal(t, "t", saved.Labels["type"])
+			// self-implicit labels still injected
+			require.Equal(t, string(connectorID), saved.Labels["apxy/cxr/-/id"])
+		})
+
+		t.Run("caller-supplied apxy labels override stored apxy on update", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			connectorID := apid.New(apid.PrefixConnectorVersion)
+
+			// Insert as draft with one apxy value.
+			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
+				State: ConnectorVersionStateDraft,
+				Labels: Labels{
+					"type":            "t",
+					"apxy/cxr/source": "api",
+				},
+				Hash:                "h1",
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e1"},
+			})
+			require.NoError(t, err)
+
+			// Update the draft with a different apxy value for the same key.
+			err = db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
+				State: ConnectorVersionStateDraft,
+				Labels: Labels{
+					"type":            "t",
+					"apxy/cxr/source": "config",
+				},
+				Hash:                "h2",
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e2"},
+			})
+			require.NoError(t, err)
+
+			saved, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			require.NoError(t, err)
+			require.Equal(t, "config", saved.Labels["apxy/cxr/source"], "caller's apxy value must override stored")
+			// self-implicit labels stay intact
+			require.Equal(t, string(connectorID), saved.Labels["apxy/cxr/-/id"])
+		})
+
+		t.Run("stored apxy labels not in caller are preserved on update", func(t *testing.T) {
+			_, db := MustApplyBlankTestDbConfig(t, nil)
+			now := time.Date(2023, time.October, 15, 12, 0, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			connectorID := apid.New(apid.PrefixConnectorVersion)
+
+			// Insert as draft with an apxy value the caller will not pass on update.
+			err := db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
+				State: ConnectorVersionStateDraft,
+				Labels: Labels{
+					"type":            "t",
+					"apxy/cxr/source": "config",
+				},
+				Hash:                "h1",
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e1"},
+			})
+			require.NoError(t, err)
+
+			// Update with only user labels — stored apxy/cxr/source must survive.
+			err = db.UpsertConnectorVersion(ctx, &ConnectorVersion{
+				Id: connectorID, Version: 1, Namespace: sconfig.RootNamespace,
+				State:               ConnectorVersionStateDraft,
+				Labels:              Labels{"type": "t-changed"},
+				Hash:                "h2",
+				EncryptedDefinition: encfield.EncryptedField{ID: apid.MustParse("ekv_test000000000001"), Data: "e2"},
+			})
+			require.NoError(t, err)
+
+			saved, err := db.GetConnectorVersion(ctx, connectorID, 1)
+			require.NoError(t, err)
+			require.Equal(t, "config", saved.Labels["apxy/cxr/source"], "stored apxy label must survive an update that omits it")
+			require.Equal(t, "t-changed", saved.Labels["type"])
+		})
+	})
 }

@@ -392,16 +392,7 @@ func (s *service) UpsertConnectorVersion(ctx context.Context, cv *ConnectorVersi
 				Scan(&existingLabels); scanErr != nil {
 				return scanErr
 			}
-			newUser, newApxy := SplitUserAndApxyLabels(cv.Labels)
-			_, existingApxy := SplitUserAndApxyLabels(existingLabels)
-			mergedApxy := make(Labels, len(existingApxy)+len(newApxy))
-			for k, v := range existingApxy {
-				mergedApxy[k] = v
-			}
-			for k, v := range newApxy {
-				mergedApxy[k] = v
-			}
-			mergedLabels := MergeApxyAndUserLabels(newUser, mergedApxy)
+			mergedLabels := MergeUpsertLabels(cv.Labels, existingLabels)
 
 			result, err := sqb.Update(ConnectorVersionsTable).
 				Set("state", cv.State).

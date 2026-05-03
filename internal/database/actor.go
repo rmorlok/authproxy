@@ -532,11 +532,15 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 
 		if !existingActor.sameAsData(d) {
 			// Preserve apxy/ system labels — setFromData replaces Labels
-			// wholesale with the data's user portion.
-			_, existingApxy := SplitUserAndApxyLabels(existingActor.Labels)
+			// wholesale with the data's labels. Snapshot the existing labels
+			// first so MergeUpsertLabels can carry forward stored apxy/ values
+			// while still letting the caller override specific apxy/ keys
+			// (system code occasionally writes its own apxy/ provenance
+			// markers).
+			existingLabelsSnapshot := existingActor.Labels
 			existingActor.setFromData(d)
 			existingActor.normalize()
-			existingActor.Labels = MergeApxyAndUserLabels(existingActor.Labels, existingApxy)
+			existingActor.Labels = MergeUpsertLabels(existingActor.Labels, existingLabelsSnapshot)
 			validationErr := existingActor.validate()
 			if validationErr != nil {
 				return validationErr

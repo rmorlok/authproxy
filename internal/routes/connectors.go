@@ -567,7 +567,7 @@ func (r *ConnectorsRoutes) createConnector(gctx *gin.Context) {
 		return
 	}
 
-	if err := database.Labels(req.Labels).Validate(); err != nil {
+	if err := database.ValidateUserLabels(req.Labels); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 		val.MarkErrorReturn()
 		return
@@ -647,7 +647,7 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 	}
 
 	if req.Labels != nil {
-		if err := database.Labels(*req.Labels).Validate(); err != nil {
+		if err := database.ValidateUserLabels(*req.Labels); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
@@ -802,7 +802,7 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 	var labels map[string]string
 	if req.Labels != nil {
 		labels = *req.Labels
-		if err := database.Labels(labels).Validate(); err != nil {
+		if err := database.ValidateUserLabels(labels); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 			val.MarkErrorReturn()
 			return
@@ -902,7 +902,7 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 	}
 
 	if req.Labels != nil {
-		if err := database.Labels(*req.Labels).Validate(); err != nil {
+		if err := database.ValidateUserLabels(*req.Labels); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 			val.MarkErrorReturn()
 			return

@@ -467,7 +467,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 
 	// Validate labels if provided
 	if req.Labels != nil {
-		if err := database.Labels(req.Labels).Validate(); err != nil {
+		if err := database.ValidateUserLabels(req.Labels); err != nil {
 			apgin.WriteError(gctx, r.logger, httperr.BadRequest(fmt.Sprintf("invalid labels: %s", err.Error()), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
@@ -584,7 +584,7 @@ func (r *ActorsRoutes) update(gctx *gin.Context) {
 
 	// Validate labels if provided
 	if req.Labels != nil {
-		if err := database.Labels(req.Labels).Validate(); err != nil {
+		if err := database.ValidateUserLabels(req.Labels); err != nil {
 			apgin.WriteError(gctx, r.logger, httperr.BadRequest(fmt.Sprintf("invalid labels: %s", err.Error()), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return
@@ -686,7 +686,7 @@ func (r *ActorsRoutes) updateByExternalId(gctx *gin.Context) {
 
 	// Validate labels if provided
 	if req.Labels != nil {
-		if err := database.Labels(req.Labels).Validate(); err != nil {
+		if err := database.ValidateUserLabels(req.Labels); err != nil {
 			apgin.WriteError(gctx, r.logger, httperr.BadRequest(fmt.Sprintf("invalid labels: %s", err.Error()), httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return

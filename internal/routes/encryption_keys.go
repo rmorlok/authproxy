@@ -160,6 +160,14 @@ func (r *EncryptionKeysRoutes) create(gctx *gin.Context) {
 		return
 	}
 
+	if req.Labels != nil {
+		if err := database.ValidateUserLabels(req.Labels); err != nil {
+			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
 	ek, err := r.core.CreateEncryptionKey(ctx, req.Namespace, req.KeyData, req.Labels)
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)
@@ -317,7 +325,7 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 
 	// Validate labels if provided
 	if req.Labels != nil {
-		if err := database.Labels(*req.Labels).Validate(); err != nil {
+		if err := database.ValidateUserLabels(*req.Labels); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid labels: %s", err.Error()))
 			val.MarkErrorReturn()
 			return

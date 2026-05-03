@@ -461,6 +461,67 @@ func TestActor(t *testing.T) {
 				})
 			})
 		})
+
+		t.Run("apxy label semantics", func(t *testing.T) {
+			t.Run("caller-supplied apxy labels override stored apxy on update", func(t *testing.T) {
+				setup(t)
+
+				externalId := "label-actor"
+
+				// Create actor with an apxy/-prefixed label.
+				_, err := db.UpsertActor(ctx, &Actor{
+					ExternalId: externalId,
+					Namespace:  "root",
+					Labels: Labels{
+						"team":             "platform",
+						"apxy/cxr/source":  "api",
+					},
+				})
+				require.NoError(t, err)
+
+				// Upsert again with a different value for the same apxy key.
+				updated, err := db.UpsertActor(ctx, &Actor{
+					ExternalId: externalId,
+					Namespace:  "root",
+					Labels: Labels{
+						"team":             "platform-2",
+						"apxy/cxr/source":  "config",
+					},
+				})
+				require.NoError(t, err)
+
+				require.Equal(t, "config", updated.Labels["apxy/cxr/source"], "caller's apxy value must win")
+				require.Equal(t, "platform-2", updated.Labels["team"])
+			})
+
+			t.Run("stored apxy labels not in caller are preserved on update", func(t *testing.T) {
+				setup(t)
+
+				externalId := "label-preserve-actor"
+
+				// Create actor with an apxy/-prefixed label.
+				_, err := db.UpsertActor(ctx, &Actor{
+					ExternalId: externalId,
+					Namespace:  "root",
+					Labels: Labels{
+						"team":             "platform",
+						"apxy/cxr/source":  "config",
+					},
+				})
+				require.NoError(t, err)
+
+				// Upsert again with only a user label — the stored apxy must survive.
+				updated, err := db.UpsertActor(ctx, &Actor{
+					ExternalId: externalId,
+					Namespace:  "root",
+					Labels:     Labels{"team": "platform-2"},
+				})
+				require.NoError(t, err)
+
+				require.Equal(t, "config", updated.Labels["apxy/cxr/source"], "stored apxy label must survive an update that omits it")
+				require.Equal(t, "platform-2", updated.Labels["team"])
+			})
+		})
 	})
 	t.Run("List", func(t *testing.T) {
 		setup(t)

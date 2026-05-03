@@ -639,6 +639,34 @@ func TestConnectors(t *testing.T) {
 			require.Equal(t, "A brand new connector", resp.Definition.Description)
 			require.Equal(t, "test", resp.Labels["env"])
 		})
+
+		t.Run("rejects apxy/-prefixed labels in request body", func(t *testing.T) {
+			tu := setup(t, nil)
+			body := CreateConnectorRequestJson{
+				Namespace: "root",
+				Definition: cschema.Connector{
+					DisplayName: "New Connector",
+					Description: "A brand new connector",
+				},
+				Labels: map[string]string{"apxy/cxr/source": "config"},
+			}
+			jsonBody, _ := json.Marshal(body)
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connectors",
+				bytes.NewReader(jsonBody),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code, "API must reject apxy/-prefixed labels at the user-input boundary")
+			require.Contains(t, w.Body.String(), "reserved")
+		})
 	})
 
 	t.Run("update connector", func(t *testing.T) {

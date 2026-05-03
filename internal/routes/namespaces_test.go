@@ -316,6 +316,28 @@ func TestNamespaces(t *testing.T) {
 			require.Equal(t, "dev", resp.Labels["team"])
 		})
 
+		t.Run("rejects apxy/-prefixed labels in request body", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			body := CreateNamespaceRequestJson{
+				Path:   "root.apxy-blocked",
+				Labels: map[string]string{"apxy/cxr/source": "config"},
+			}
+			jsonBody, _ := json.Marshal(body)
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/namespaces",
+				bytes.NewReader(jsonBody),
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code, "API must reject apxy/-prefixed labels at the user-input boundary")
+			require.Contains(t, w.Body.String(), "reserved")
+		})
+
 		t.Run("conflict when namespace already exists", func(t *testing.T) {
 			// First create the namespace
 			err := tu.Db.CreateNamespace(context.Background(), &database.Namespace{
