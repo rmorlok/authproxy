@@ -35,8 +35,7 @@ endpoint returns 422 for non-OAuth2 connections.
 
 ## What is asserted
 
-The file contains five flow tests (one per scope-shape case) and one
-endpoint-contract test:
+The file contains five flow tests (one per scope-shape case):
 
 | Test                                      | Connector declares                       | Token-endpoint script   | Connection state | Notable assertion                                  |
 | ----------------------------------------- | ---------------------------------------- | ----------------------- | ---------------- | -------------------------------------------------- |
@@ -45,12 +44,15 @@ endpoint-contract test:
 | `TestScopeMismatch_AllScopesGranted`      | `read` (req), `write` (opt)              | `scope=read write`      | `ready`          | granted set equals requested set                   |
 | `TestScopeMismatch_ExtraGranted`          | `read` (req)                             | `scope=read admin`      | `ready`          | `/scopes` granted=`[read, admin]`, requested=`[read]` |
 | `TestScopeMismatch_ProviderOmitsScope`    | `read` (req)                             | `scope=""` (RFC §5.1)   | `ready`          | granted falls back to requested                    |
-| `TestConnectionScopesEndpoint_NonOAuth2`  | NoAuth connector                         | n/a                     | n/a              | endpoint returns 422                               |
 
 For the success cases, each test additionally hits
 `GET /api/v1/connections/{id}/scopes` over the real HTTP server and
 asserts the returned `requested` and `granted` arrays match the stored
 token state.
+
+The 422-on-non-OAuth2 contract check lives as a unit test in
+`internal/routes/connections_test.go` — it doesn't need an integration
+flow.
 
 ## Components
 
@@ -124,11 +126,6 @@ via `provider.Script(EndpointToken, ScriptAction{ScopeOverride: …})`,
 which the test provider applies on the next token request matching the
 client key. The script is enqueued before the browser clicks Allow so
 it's in place by the time the proxy posts to `/v1/oauth/tokens`.
-
-The non-OAuth2 endpoint case (`TestConnectionScopesEndpoint_NonOAuth2`)
-doesn't need a flow at all — it's a contract check for the route's
-422-on-wrong-auth-type guard — so it builds a NoAuth connector +
-connection programmatically and hits the endpoint directly.
 
 ## Per-run isolation
 
