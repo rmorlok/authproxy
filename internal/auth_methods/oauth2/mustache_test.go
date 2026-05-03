@@ -382,7 +382,7 @@ func TestCallbackFrom3rdParty_TemplatedEndpoint(t *testing.T) {
 
 		encrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "new-access-token").Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-access"}, nil)
 		encrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "new-refresh-token").Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-refresh"}, nil)
-		db.EXPECT().InsertOAuth2Token(gomock.Any(), connectionId, nil, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.OAuth2Token{Id: tokenId}, nil)
+		db.EXPECT().InsertOAuth2Token(gomock.Any(), connectionId, nil, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.OAuth2Token{Id: tokenId}, nil)
 
 		query := url.Values{"code": {"auth-code-123"}}
 		returnUrl, err := o2.CallbackFrom3rdParty(context.Background(), query)
@@ -407,7 +407,7 @@ func TestCallbackFrom3rdParty_TemplatedEndpoint(t *testing.T) {
 			BodyString(`{"access_token": "access-tok", "scope": "read", "expires_in": 3600}`)
 
 		encrypt.EXPECT().EncryptStringForEntity(gomock.Any(), gomock.Any(), "access-tok").Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted-access"}, nil)
-		db.EXPECT().InsertOAuth2Token(gomock.Any(), connectionId, nil, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.OAuth2Token{Id: tokenId}, nil)
+		db.EXPECT().InsertOAuth2Token(gomock.Any(), connectionId, nil, gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any(), gomock.Any()).Return(&database.OAuth2Token{Id: tokenId}, nil)
 
 		query := url.Values{"code": {"auth-code-456"}}
 		returnUrl, err := o2.CallbackFrom3rdParty(context.Background(), query)

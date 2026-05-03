@@ -4,14 +4,12 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"strings"
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encfield"
-	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 	"gopkg.in/h2non/gentleman.v2"
 )
@@ -26,8 +24,12 @@ type tokenResponse struct {
 }
 
 // createDbTokenFromResponse deserializes an oauth token from a refresh or authorization code response. It deserializes
-// the response, and then inserts a token into the databse. It returns the newly created token.
-func (o *oAuth2Connection) createDbTokenFromResponse(ctx context.Context, resp *gentleman.Response, refreshFrom *database.OAuth2Token) (*database.OAuth2Token, error) {
+// the response and then inserts a token into the database. It returns the newly created token.
+func (o *oAuth2Connection) createDbTokenFromResponse(
+	ctx context.Context,
+	resp *gentleman.Response,
+	refreshFrom *database.OAuth2Token,
+) (*database.OAuth2Token, error) {
 	jsonResp := tokenResponse{}
 	err := resp.JSON(&jsonResp)
 	if err != nil {
@@ -55,7 +57,8 @@ func (o *oAuth2Connection) createDbTokenFromResponse(ctx context.Context, resp *
 		encryptedRefreshToken = refreshFrom.EncryptedRefreshToken
 	}
 
-	scopes := strings.Join(util.Map(o.auth.Scopes, func(s config.Scope) string { return s.Id }), " ")
+	requestedScopes := JoinScopes(o.auth.Scopes)
+	scopes := requestedScopes
 	if jsonResp.Scope != "" {
 		scopes = jsonResp.Scope
 	}
@@ -78,9 +81,15 @@ func (o *oAuth2Connection) createDbTokenFromResponse(ctx context.Context, resp *
 		encryptedAccessToken,
 		expiresAt,
 		scopes,
+		requestedScopes,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert oauth2 token: %w", err)
+	}
+
+	mismatch := detectScopeMismatch(o.auth.Scopes, scopes)
+	if err := o.applyScopeMismatch(ctx, mismatch); err != nil {
+		return nil, err
 	}
 
 	return token, nil

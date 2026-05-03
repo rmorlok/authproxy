@@ -22,6 +22,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
@@ -44,6 +45,8 @@ func TestConnections(t *testing.T) {
 
 	connectorId := apid.MustParse("cxr_test0000000000001")
 	connectorVersion := uint64(1)
+	oauthConnectorId := apid.MustParse("cxr_test0000000000002")
+	oauthConnectorVersion := uint64(1)
 
 	setup := func(t *testing.T, cfg config.C) (*TestSetup, func()) {
 		cfg = config.FromRoot(&sconfig.Root{
@@ -54,6 +57,15 @@ func TestConnections(t *testing.T) {
 						Version:     connectorVersion,
 						Labels:      map[string]string{"type": "test-connector"},
 						DisplayName: "Test Connector",
+					},
+					{
+						Id:          oauthConnectorId,
+						Version:     oauthConnectorVersion,
+						Labels:      map[string]string{"type": "oauth2-connector"},
+						DisplayName: "OAuth2 Test Connector",
+						Auth: &sconfig.Auth{InnerVal: &sconfig.AuthOAuth2{
+							Type: sconfig.AuthTypeOAuth2,
+						}},
 					},
 				},
 			},
@@ -1950,6 +1962,123 @@ func TestConnections(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+	})
+
+	t.Run("get connection scopes", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		// The default test connector has no auth definition, so it stands in for the
+		// "non-OAuth2" case for this endpoint's contract check.
+		nonOauthConnId := apid.New(apid.PrefixConnection)
+		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
+			Id:               nonOauthConnId,
+			Namespace:        sconfig.RootNamespace,
+			ConnectorId:      connectorId,
+			ConnectorVersion: connectorVersion,
+			State:            database.ConnectionStateReady,
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/connections/"+nonOauthConnId.String()+"/scopes", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("bad uuid", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/not-a-uuid/scopes",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("connection not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/"+apid.New(apid.PrefixConnection).String()+"/scopes",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("non-oauth2 connector returns 422", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/"+nonOauthConnId.String()+"/scopes",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnprocessableEntity, w.Code)
+		})
+
+		t.Run("oauth2 connector returns requested and granted scopes", func(t *testing.T) {
+			oauthConnId := apid.New(apid.PrefixConnection)
+			err := tu.Db.CreateConnection(context.Background(), &database.Connection{
+				Id:               oauthConnId,
+				Namespace:        sconfig.RootNamespace,
+				ConnectorId:      oauthConnectorId,
+				ConnectorVersion: oauthConnectorVersion,
+				State:            database.ConnectionStateReady,
+			})
+			require.NoError(t, err)
+
+			_, err = tu.Db.InsertOAuth2Token(
+				context.Background(),
+				oauthConnId,
+				nil,
+				encfield.EncryptedField{ID: "ekv_test", Data: "encrypted_refresh"},
+				encfield.EncryptedField{ID: "ekv_test", Data: "encrypted_access"},
+				nil,
+				"read write",
+				"read write admin",
+			)
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/"+oauthConnId.String()+"/scopes",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ConnectionScopesJson
+			require.NoError(t, json.NewDecoder(w.Body).Decode(&resp))
+			assert.Equal(t, []string{"read", "write", "admin"}, resp.Requested)
+			assert.Equal(t, []string{"read", "write"}, resp.Granted)
 		})
 	})
 }

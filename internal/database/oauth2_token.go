@@ -40,6 +40,7 @@ type OAuth2Token struct {
 	EncryptedAccessToken  encfield.EncryptedField
 	AccessTokenExpiresAt  *time.Time
 	Scopes                string
+	RequestedScopes       string
 	CreatedAt             time.Time
 	EncryptedAt           *time.Time
 	DeletedAt             *time.Time
@@ -54,6 +55,7 @@ func (t *OAuth2Token) cols() []string {
 		"encrypted_access_token",
 		"access_token_expires_at",
 		"scopes",
+		"requested_scopes",
 		"created_at",
 		"encrypted_at",
 		"deleted_at",
@@ -69,6 +71,7 @@ func (t *OAuth2Token) fields() []any {
 		&t.EncryptedAccessToken,
 		&t.AccessTokenExpiresAt,
 		&t.Scopes,
+		&t.RequestedScopes,
 		&t.CreatedAt,
 		&t.EncryptedAt,
 		&t.DeletedAt,
@@ -84,6 +87,7 @@ func (t *OAuth2Token) values() []any {
 		t.EncryptedAccessToken,
 		t.AccessTokenExpiresAt,
 		t.Scopes,
+		t.RequestedScopes,
 		t.CreatedAt,
 		t.EncryptedAt,
 		t.DeletedAt,
@@ -224,6 +228,7 @@ func (s *service) InsertOAuth2Token(
 	encryptedAccessToken encfield.EncryptedField,
 	accessTokenExpiresAt *time.Time,
 	scopes string,
+	requestedScopes string,
 ) (*OAuth2Token, error) {
 	logger := aplog.NewBuilder(s.logger).
 		WithCtx(ctx).
@@ -264,6 +269,7 @@ func (s *service) InsertOAuth2Token(
 			EncryptedAccessToken:  encryptedAccessToken,
 			AccessTokenExpiresAt:  accessTokenExpiresAt,
 			Scopes:                scopes,
+			RequestedScopes:       requestedScopes,
 			CreatedAt:             now,
 		}
 

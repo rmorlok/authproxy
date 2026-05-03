@@ -23,6 +23,17 @@ definitions:
       updated_at:
         type: string
     type: object
+  routes.ConnectionScopesJson:
+    properties:
+      granted:
+        items:
+          type: string
+        type: array
+      requested:
+        items:
+          type: string
+        type: array
+    type: object
   routes.ConnectionSetupComplete:
     description: Completion response for connection setup
     properties:
@@ -2368,6 +2379,48 @@ paths:
       security:
       - BearerAuth: []
       summary: Set a label for a connection
+      tags:
+      - connections
+  /connections/{id}/scopes:
+    get:
+      description: Returns the requested and granted OAuth2 scopes for the connection's
+        current token. Only valid for OAuth2 connections.
+      parameters:
+      - description: Connection ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.ConnectionScopesJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "422":
+          description: Unprocessable Entity
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get OAuth2 scopes for a connection
       tags:
       - connections
   /connectors:
