@@ -1932,4 +1932,78 @@ func TestConnections(t *testing.T) {
 			require.Equal(t, http.StatusForbidden, w.Code)
 		})
 	})
+
+	t.Run("get connection scopes", func(t *testing.T) {
+		tu, done := setup(t, nil)
+		defer done()
+
+		// The default test connector has no auth definition, so it stands in for the
+		// "non-OAuth2" case for this endpoint's contract check.
+		nonOauthConnId := apid.New(apid.PrefixConnection)
+		err := tu.Db.CreateConnection(context.Background(), &database.Connection{
+			Id:               nonOauthConnId,
+			Namespace:        sconfig.RootNamespace,
+			ConnectorId:      connectorId,
+			ConnectorVersion: connectorVersion,
+			State:            database.ConnectionStateReady,
+		})
+		require.NoError(t, err)
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/connections/"+nonOauthConnId.String()+"/scopes", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("bad uuid", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/not-a-uuid/scopes",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("connection not found", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/"+apid.New(apid.PrefixConnection).String()+"/scopes",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("non-oauth2 connector returns 422", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections/"+nonOauthConnId.String()+"/scopes",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnprocessableEntity, w.Code)
+		})
+	})
 }

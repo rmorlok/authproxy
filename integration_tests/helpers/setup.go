@@ -403,7 +403,12 @@ func NewNoAuthConnector(connectorID apid.ID, displayName string, rateLimiting *c
 type OAuth2ConnectorOptions struct {
 	ClientID     string
 	ClientSecret string
-	Scopes       []string
+	// Scopes lists scope IDs that are required (Scope.Required defaults to
+	// true via IsRequired when unspecified).
+	Scopes []string
+	// OptionalScopes lists scope IDs marked as optional (Required=false).
+	// They are appended after Scopes in the connector definition.
+	OptionalScopes []string
 	// IncludeRevocation, when true, fills in the standard /v1/oauth/revoke
 	// endpoint so revoke flows are exercised.
 	IncludeRevocation bool
@@ -429,9 +434,13 @@ func NewOAuth2Connector(connectorID apid.ID, displayName string, provider *OAuth
 		tokenEndpoint = provider.TokenEndpoint()
 	}
 
-	scopes := make([]connectors.Scope, 0, len(opts.Scopes))
+	scopes := make([]connectors.Scope, 0, len(opts.Scopes)+len(opts.OptionalScopes))
 	for _, id := range opts.Scopes {
 		scopes = append(scopes, connectors.Scope{Id: id, Reason: "integration test"})
+	}
+	notRequired := false
+	for _, id := range opts.OptionalScopes {
+		scopes = append(scopes, connectors.Scope{Id: id, Required: &notRequired, Reason: "integration test"})
 	}
 
 	auth := &connectors.AuthOAuth2{

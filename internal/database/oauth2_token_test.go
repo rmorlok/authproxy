@@ -119,6 +119,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken"},
 			nil,
 			"scope1 scope2",
+			"scope1 scope2",
 		)
 		require.NoError(t, err)
 		require.NotNil(t, tok)
@@ -152,6 +153,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken"},
 			nil,
 			"scope1 scope2",
+			"scope1 scope2",
 		)
 		require.NoError(t, err)
 
@@ -174,6 +176,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken"},
 			nil,
 			"scope1 scope2",
+			"scope1 scope2",
 		)
 		require.NoError(t, err)
 		require.NotNil(t, tok1)
@@ -190,6 +193,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken2"},
 			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken2"},
 			nil,
+			"scope1 scope2",
 			"scope1 scope2",
 		)
 		require.NoError(t, err)
@@ -223,6 +227,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken"},
 			nil,
 			"scope1 scope2",
+			"scope1 scope2",
 		)
 		require.NoError(t, err)
 		require.NotNil(t, tok1)
@@ -239,6 +244,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken2"},
 			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken2"},
 			nil,
+			"scope1 scope2",
 			"scope1 scope2",
 		)
 		require.NoError(t, err)
@@ -272,6 +278,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken"},
 			nil,
 			"scope1 scope2",
+			"scope1 scope2",
 		)
 		require.NoError(t, err)
 
@@ -283,6 +290,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken2"},
 			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken2"},
 			nil,
+			"scope1",
 			"scope1",
 		)
 		require.NoError(t, err)
@@ -321,6 +329,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken"},
 			nil,
 			"scope1 scope2",
+			"scope1 scope2",
 		)
 		require.NoError(t, err)
 
@@ -331,6 +340,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken2"},
 			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken2"},
 			nil,
+			"scope1 scope2",
 			"scope1 scope2",
 		)
 		require.NoError(t, err)
@@ -343,6 +353,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken3"},
 			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken3"},
 			nil,
+			"scope1",
 			"scope1",
 		)
 		require.NoError(t, err)
@@ -587,6 +598,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 						encfield.EncryptedField{ID: "ekv_test", Data: "refreshToken"},
 						encfield.EncryptedField{ID: "ekv_test", Data: "accessToken"},
 						token.AccessTokenExpiresAt,
+						"scope1 scope2",
 						"scope1 scope2",
 					)
 					require.NoError(t, err)

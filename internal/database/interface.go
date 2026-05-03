@@ -138,6 +138,7 @@ type DB interface {
 		encryptedAccessToken encfield.EncryptedField,
 		accessTokenExpiresAt *time.Time,
 		scopes string,
+		requestedScopes string,
 	) (*OAuth2Token, error)
 	DeleteOAuth2Token(ctx context.Context, tokenId apid.ID) error
 	DeleteAllOAuth2TokensForConnection(ctx context.Context, connectionId apid.ID) error

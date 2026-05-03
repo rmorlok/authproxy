@@ -55,7 +55,8 @@ func (o *oAuth2Connection) createDbTokenFromResponse(ctx context.Context, resp *
 		encryptedRefreshToken = refreshFrom.EncryptedRefreshToken
 	}
 
-	scopes := strings.Join(util.Map(o.auth.Scopes, func(s config.Scope) string { return s.Id }), " ")
+	requestedScopes := strings.Join(util.Map(o.auth.Scopes, func(s config.Scope) string { return s.Id }), " ")
+	scopes := requestedScopes
 	if jsonResp.Scope != "" {
 		scopes = jsonResp.Scope
 	}
@@ -78,9 +79,15 @@ func (o *oAuth2Connection) createDbTokenFromResponse(ctx context.Context, resp *
 		encryptedAccessToken,
 		expiresAt,
 		scopes,
+		requestedScopes,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert oauth2 token: %w", err)
+	}
+
+	mismatch := detectScopeMismatch(o.auth.Scopes, scopes)
+	if err := o.applyScopeMismatch(ctx, mismatch); err != nil {
+		return nil, err
 	}
 
 	return token, nil

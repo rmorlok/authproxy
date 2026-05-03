@@ -23,6 +23,7 @@ import (
 
 	"log/slog"
 	"net/http"
+	"strings"
 	"time"
 )
 
@@ -1042,6 +1043,97 @@ func (r *ConnectionsRoutes) putAnnotation(gctx *gin.Context) { r.annotsAdapter.H
 // @Router			/connections/{id}/annotations/{annotation} [delete]
 func (r *ConnectionsRoutes) deleteAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleDelete(gctx) }
 
+// ConnectionScopesJson exposes the OAuth2 scopes a connection requested at auth time and the
+// scopes the provider actually granted. The two sets can diverge when the provider chooses to
+// honor only a subset of the request (RFC 6749 §3.3).
+type ConnectionScopesJson struct {
+	Requested []string `json:"requested"`
+	Granted   []string `json:"granted"`
+}
+
+// @Summary		Get OAuth2 scopes for a connection
+// @Description	Returns the requested and granted OAuth2 scopes for the connection's current token. Only valid for OAuth2 connections.
+// @Tags			connections
+// @Produce		json
+// @Param			id	path		string	true	"Connection ID"
+// @Success		200	{object}	ConnectionScopesJson
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		404	{object}	ErrorResponse
+// @Failure		422	{object}	ErrorResponse
+// @Failure		500	{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/scopes [get]
+func (r *ConnectionsRoutes) getScopes(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := apid.Parse(gctx.Param("id"))
+	if err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == apid.Nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
+		val.MarkErrorReturn()
+		return
+	}
+
+	c, err := r.core.GetConnection(ctx, id)
+	if err != nil {
+		if errors.Is(err, coreIface.ErrNotFound) {
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
+		} else {
+			apgin.WriteErr(gctx, nil, err)
+		}
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		apgin.WriteError(gctx, nil, httpErr)
+		return
+	}
+
+	connector := c.GetConnectorVersionEntity().GetDefinition()
+	if connector.Auth == nil {
+		apgin.WriteError(gctx, nil, httperr.New(http.StatusUnprocessableEntity, "scopes are only available for OAuth2 connections"))
+		val.MarkErrorReturn()
+		return
+	}
+	if _, ok := connector.Auth.Inner().(*cschema.AuthOAuth2); !ok {
+		apgin.WriteError(gctx, nil, httperr.New(http.StatusUnprocessableEntity, "scopes are only available for OAuth2 connections"))
+		val.MarkErrorReturn()
+		return
+	}
+
+	token, err := r.db.GetOAuth2Token(ctx, id)
+	if err != nil {
+		if errors.Is(err, database.ErrNotFound) {
+			apgin.WriteError(gctx, nil, httperr.NotFound("no oauth2 token exists for this connection"))
+		} else {
+			apgin.WriteErr(gctx, nil, err)
+		}
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, ConnectionScopesJson{
+		Requested: splitScopes(token.RequestedScopes),
+		Granted:   splitScopes(token.Scopes),
+	})
+}
+
+func splitScopes(s string) []string {
+	out := strings.Fields(s)
+	if out == nil {
+		return []string{}
+	}
+	return out
+}
+
 func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 	g.POST(
 		"/connections/_initiate",
@@ -1229,6 +1321,15 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 			ForIdField("id").
 			Build(),
 		r.deleteAnnotation,
+	)
+	g.GET(
+		"/connections/:id/scopes",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerb("get").
+			ForIdField("id").
+			Build(),
+		r.getScopes,
 	)
 }
 
