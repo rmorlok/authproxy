@@ -104,7 +104,7 @@ services:
   #   https://github.com/rmorlok/go-oauth2-server/blob/main/docs/test_mode_api.md
   oauth-server:
     build:
-      context: https://github.com/rmorlok/go-oauth2-server.git#97552ba20cfb7c367b95db0b500c239a99c3d155
+      context: https://github.com/rmorlok/go-oauth2-server.git#eb379d96ba1b0aa6cb5ba5826f75a13c8da66d50
     ports:
       - "8086:8080"
     # Bypass the upstream docker-entrypoint.sh: it waits for postgres+etcd

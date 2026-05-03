@@ -39,20 +39,18 @@ The file contains five flow tests (one per scope-shape case):
 
 | Test                                      | Connector declares                       | Token-endpoint script   | Connection state | Notable assertion                                  |
 | ----------------------------------------- | ---------------------------------------- | ----------------------- | ---------------- | -------------------------------------------------- |
-| `TestScopeMismatch_RequiredMissing`       | `read` (req), `email` (req)              | `scope=read`            | `auth_failed`    | `setup_error` calls out the missing required scope |
-| `TestScopeMismatch_OptionalMissing`       | `read` (req), `email` (opt)              | `scope=read`            | `ready`          | `/scopes` returns granted=`[read]`, requested=`[read, email]` |
-| `TestScopeMismatch_AllScopesGranted`      | `read` (req), `email` (opt)              | `scope=read email`      | `ready`          | granted set equals requested set                   |
+| `TestScopeMismatch_RequiredMissing`       | `read` (req), `write` (req)              | `scope=read`            | `auth_failed`    | `setup_error` calls out the missing required scope |
+| `TestScopeMismatch_OptionalMissing`       | `read` (req), `write` (opt)              | `scope=read`            | `ready`          | `/scopes` returns granted=`[read]`, requested=`[read, write]` |
+| `TestScopeMismatch_AllScopesGranted`      | `read` (req), `write` (opt)              | `scope=read write`      | `ready`          | granted set equals requested set                   |
 | `TestScopeMismatch_ExtraGranted`          | `read` (req)                             | `scope=read admin`      | `ready`          | `/scopes` granted=`[read, admin]`, requested=`[read]` |
 | `TestScopeMismatch_ProviderOmitsScope`    | `read` (req)                             | `scope=""` (RFC §5.1)   | `ready`          | granted falls back to requested                    |
 
-The scope names used in the connector declarations (`read`, `email`)
-are chosen because they're already in the test provider's seeded scopes
-table — the provider's login handler validates the requested scope
-against that table before showing the consent page, so unregistered
-scope names like `write` would short-circuit the flow at login. For the
-ExtraGranted case the unregistered `admin` is fine: the connector only
-declares `read`, so the proxy never sends `admin` to the authorize
-endpoint — it appears solely in the scripted token response.
+The connector declarations use scope names like `write` and `admin`
+that are not in the provider's default seeded scopes table. The
+`provider.CreateClient(Scope: …)` call in the test setup registers
+each requested scope with the provider's `oauth_scopes` table (added
+in go-oauth2-server #44), so the provider's login handler accepts the
+authorize request and renders the consent page.
 
 For the success cases, each test additionally hits
 `GET /api/v1/connections/{id}/scopes` over the real HTTP server and

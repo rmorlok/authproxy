@@ -187,24 +187,17 @@ func (s *scopeMismatchSetup) fetchConnectionScopes(t *testing.T, connectionID st
 
 func ptr(s string) *string { return &s }
 
-// TestScopeMismatch_RequiredMissing — the connector requires {read, email} but
+// TestScopeMismatch_RequiredMissing — the connector requires {read, write} but
 // the provider grants only {read}. The proxy must reject the token, record an
 // auth failure, and surface the missing required scope in setup_error. The
 // token row is still persisted so /scopes can show what was requested vs
 // granted (useful for debugging the failure).
 //
-// We use scope names that the test provider has pre-registered in its scopes
-// table (read, email) — see go-oauth2-server/testmode/seed.go. The provider's
-// login handler validates the requested scope against that table before
-// rendering the consent page, so unregistered scopes (e.g. "write") would
-// short-circuit the flow at login and never reach the divergence we want to
-// test.
-//
 // See scope_mismatch_test.md for the scenario specification.
 func TestScopeMismatch_RequiredMissing(t *testing.T) {
 	s := newScopeMismatchSetup(t, "scope-required-missing",
-		[]string{"read", "email"}, nil,
-		[]string{"read", "email"})
+		[]string{"read", "write"}, nil,
+		[]string{"read", "write"})
 
 	s.provider.Script(s.clientKey, helpers.EndpointToken, helpers.ScriptAction{
 		ScopeOverride: ptr("read"),
@@ -221,25 +214,24 @@ func TestScopeMismatch_RequiredMissing(t *testing.T) {
 	require.NotNilf(t, conn.SetupError, "auth-failed connection should have setup_error recorded")
 	assert.Containsf(t, *conn.SetupError, "required oauth2 scopes were not granted",
 		"setup_error should call out the missing required scopes; got %q", *conn.SetupError)
-	assert.Containsf(t, *conn.SetupError, "email",
+	assert.Containsf(t, *conn.SetupError, "write",
 		"setup_error should name the missing scope; got %q", *conn.SetupError)
 
 	token := s.env.GetOAuth2Token(t, connectionID)
 	require.NotNilf(t, token, "token row should be persisted even on required-missing so /scopes can show the divergence")
 	assert.Equal(t, "read", token.Scopes, "stored scopes should reflect what the provider returned")
-	assert.Equal(t, "read email", token.RequestedScopes,
+	assert.Equal(t, "read write", token.RequestedScopes,
 		"requested_scopes should preserve the original request from the connector")
 }
 
-// TestScopeMismatch_OptionalMissing — connector declares {read (req), email
+// TestScopeMismatch_OptionalMissing — connector declares {read (req), write
 // (opt)}, provider grants only {read}. Connection should land ready, and
 // callers can inspect the divergence through the /scopes endpoint to decide
-// which features to expose. See TestScopeMismatch_RequiredMissing for why we
-// use registered scope names like "email" rather than "write".
+// which features to expose.
 func TestScopeMismatch_OptionalMissing(t *testing.T) {
 	s := newScopeMismatchSetup(t, "scope-optional-missing",
-		[]string{"read"}, []string{"email"},
-		[]string{"read", "email"})
+		[]string{"read"}, []string{"write"},
+		[]string{"read", "write"})
 
 	s.provider.Script(s.clientKey, helpers.EndpointToken, helpers.ScriptAction{
 		ScopeOverride: ptr("read"),
@@ -254,25 +246,24 @@ func TestScopeMismatch_OptionalMissing(t *testing.T) {
 	token := s.env.GetOAuth2Token(t, connectionID)
 	require.NotNil(t, token, "token must be persisted on the success path")
 	assert.Equal(t, "read", token.Scopes)
-	assert.Equal(t, "read email", token.RequestedScopes)
+	assert.Equal(t, "read write", token.RequestedScopes)
 
 	status, body := s.fetchConnectionScopes(t, connectionID)
 	require.Equal(t, http.StatusOK, status)
-	assert.ElementsMatch(t, []string{"read", "email"}, body["requested"])
+	assert.ElementsMatch(t, []string{"read", "write"}, body["requested"])
 	assert.ElementsMatch(t, []string{"read"}, body["granted"])
 }
 
-// TestScopeMismatch_AllScopesGranted — connector declares {read (req), email
+// TestScopeMismatch_AllScopesGranted — connector declares {read (req), write
 // (opt)} and the provider grants both. Connection ready and the granted set
-// equals the requested set as exposed via the /scopes endpoint. See
-// TestScopeMismatch_RequiredMissing for why we use registered scope names.
+// equals the requested set as exposed via the /scopes endpoint.
 func TestScopeMismatch_AllScopesGranted(t *testing.T) {
 	s := newScopeMismatchSetup(t, "scope-all-granted",
-		[]string{"read"}, []string{"email"},
-		[]string{"read", "email"})
+		[]string{"read"}, []string{"write"},
+		[]string{"read", "write"})
 
 	s.provider.Script(s.clientKey, helpers.EndpointToken, helpers.ScriptAction{
-		ScopeOverride: ptr("read email"),
+		ScopeOverride: ptr("read write"),
 	})
 
 	connectionID := s.driveApprovalAndGetConnectionId(t)
@@ -282,13 +273,13 @@ func TestScopeMismatch_AllScopesGranted(t *testing.T) {
 
 	token := s.env.GetOAuth2Token(t, connectionID)
 	require.NotNil(t, token)
-	assert.Equal(t, "read email", token.Scopes)
-	assert.Equal(t, "read email", token.RequestedScopes)
+	assert.Equal(t, "read write", token.Scopes)
+	assert.Equal(t, "read write", token.RequestedScopes)
 
 	status, body := s.fetchConnectionScopes(t, connectionID)
 	require.Equal(t, http.StatusOK, status)
-	assert.ElementsMatch(t, []string{"read", "email"}, body["requested"])
-	assert.ElementsMatch(t, []string{"read", "email"}, body["granted"])
+	assert.ElementsMatch(t, []string{"read", "write"}, body["requested"])
+	assert.ElementsMatch(t, []string{"read", "write"}, body["granted"])
 }
 
 // TestScopeMismatch_ExtraGranted — connector declares {read} but the provider
