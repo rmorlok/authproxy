@@ -70,9 +70,8 @@ func (o *oAuth2Connection) RecordCancelSessionAfterAuth(ctx context.Context, sho
 	o.state.CancelSessionAfterAuth = shouldCancel
 	ttl := o.state.ExpiresAt.Sub(apctx.GetClock(ctx).Now())
 
-	result := o.r.Set(ctx, getStateRedisKey(o.state.Id), o.state, ttl)
-	if result.Err() != nil {
-		return fmt.Errorf("failed to set state in redis for session status for connection %s: %w", o.connection.GetId(), result.Err())
+	if err := writeStateToRedis(ctx, o.r, o.encrypt, o.state, ttl); err != nil {
+		return fmt.Errorf("failed to set state in redis for session status for connection %s: %w", o.connection.GetId(), err)
 	}
 
 	return nil
