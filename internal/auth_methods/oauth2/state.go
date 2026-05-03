@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/redis/go-redis/v9"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
@@ -58,12 +59,24 @@ func writeStateToRedis(ctx context.Context, r apredis.Client, e encrypt.E, s *st
 	return nil
 }
 
-// readStateFromRedis loads, decrypts, and unmarshals the state. A decrypt
-// failure (tampered ciphertext, wrong key, etc.) is reported as a generic
-// state error so callers don't leak the failure mode to clients.
+// readStateFromRedis loads, decrypts, and unmarshals the state.
+//
+// Errors are wrapped against package sentinels so callers can dispatch on
+// the failure shape without inspecting strings:
+//   - errStateNotFound: the state id has no record in Redis (genuinely
+//     unknown id, or a replay of an already-consumed state).
+//   - errStateTampered: decryption or post-decrypt JSON parsing failed,
+//     indicating the payload was modified outside this proxy.
+//
+// Any other error (Redis transport, envelope parse) is returned wrapped
+// without a sentinel and represents a system fault rather than a security
+// rejection.
 func readStateFromRedis(ctx context.Context, r apredis.Client, e encrypt.E, stateId apid.ID) (*state, error) {
 	raw, err := r.Get(ctx, getStateRedisKey(stateId)).Result()
 	if err != nil {
+		if errors.Is(err, redis.Nil) {
+			return nil, fmt.Errorf("%w: id %s", errStateNotFound, stateId.String())
+		}
 		return nil, fmt.Errorf("failed to get oauth state from redis for id %s: %w", stateId.String(), err)
 	}
 	ef, err := encfield.ParseInlineString(raw)
@@ -72,11 +85,11 @@ func readStateFromRedis(ctx context.Context, r apredis.Client, e encrypt.E, stat
 	}
 	plaintext, err := e.Decrypt(ctx, ef)
 	if err != nil {
-		return nil, fmt.Errorf("failed to decrypt oauth state for id %s: %w", stateId.String(), err)
+		return nil, fmt.Errorf("%w: failed to decrypt oauth state for id %s: %v", errStateTampered, stateId.String(), err)
 	}
 	var s state
 	if err := json.Unmarshal(plaintext, &s); err != nil {
-		return nil, fmt.Errorf("failed to unmarshal oauth state for id %s: %w", stateId.String(), err)
+		return nil, fmt.Errorf("%w: failed to unmarshal oauth state for id %s: %v", errStateTampered, stateId.String(), err)
 	}
 	return &s, nil
 }
@@ -128,42 +141,118 @@ func getOAuth2State(
 
 	s, err := readStateFromRedis(ctx, r, encrypt, stateId)
 	if err != nil {
+		switch {
+		case errors.Is(err, errStateNotFound):
+			emitCallbackRejection(ctx, logger, rejectionUnknownState, rejectionAttrs{
+				StateId: stateId,
+				ActorId: actor.GetId(),
+				Err:     err,
+			})
+		case errors.Is(err, errStateTampered):
+			emitCallbackRejection(ctx, logger, rejectionTamperedState, rejectionAttrs{
+				StateId: stateId,
+				ActorId: actor.GetId(),
+				Err:     err,
+			})
+		default:
+			emitCallbackRejection(ctx, logger, rejectionStateLoadError, rejectionAttrs{
+				StateId: stateId,
+				ActorId: actor.GetId(),
+				Err:     err,
+			})
+		}
 		return nil, err
 	}
 
 	if !s.IsValid() {
-		return nil, fmt.Errorf("state %s is invalid", stateId.String())
+		err := fmt.Errorf("state %s is invalid", stateId.String())
+		emitCallbackRejection(ctx, logger, rejectionStateInvalid, rejectionAttrs{
+			StateId:      stateId,
+			ActorId:      actor.GetId(),
+			ConnectionId: s.ConnectionId,
+			Namespace:    s.Namespace,
+			Err:          err,
+		})
+		return nil, err
 	}
 
 	if s.ExpiresAt.Before(apctx.GetClock(ctx).Now()) {
-		return nil, fmt.Errorf("state %s has expired", stateId.String())
+		err := fmt.Errorf("state %s has expired", stateId.String())
+		emitCallbackRejection(ctx, logger, rejectionExpiredState, rejectionAttrs{
+			StateId:      stateId,
+			ActorId:      actor.GetId(),
+			ConnectionId: s.ConnectionId,
+			Namespace:    s.Namespace,
+			Err:          err,
+		})
+		return nil, err
 	}
 
 	if s.ActorId != actor.GetId() {
-		return nil, fmt.Errorf("actor id %s does not match state actor id %s", actor.GetId(), s.ActorId)
+		err := fmt.Errorf("actor id %s does not match state actor id %s", actor.GetId(), s.ActorId)
+		emitCallbackRejection(ctx, logger, rejectionActorMismatch, rejectionAttrs{
+			StateId:      stateId,
+			ActorId:      actor.GetId(),
+			ConnectionId: s.ConnectionId,
+			Namespace:    s.Namespace,
+			Err:          err,
+		})
+		return nil, err
 	}
 
 	if s.Namespace != actor.GetNamespace() {
-		return nil, fmt.Errorf("actor namespace %q does not match state namespace %q", actor.GetNamespace(), s.Namespace)
+		err := fmt.Errorf("actor namespace %q does not match state namespace %q", actor.GetNamespace(), s.Namespace)
+		emitCallbackRejection(ctx, logger, rejectionNamespaceMismatchActor, rejectionAttrs{
+			StateId:      stateId,
+			ActorId:      actor.GetId(),
+			ConnectionId: s.ConnectionId,
+			Namespace:    s.Namespace,
+			Err:          err,
+		})
+		return nil, err
 	}
 
 	connection, err := core.GetConnection(ctx, s.ConnectionId)
 	if err != nil {
 		if errors.Is(err, coreIface.ErrNotFound) {
-			return nil, fmt.Errorf("connection %s not found for state %s", s.ConnectionId.String(), stateId.String())
+			notFoundErr := fmt.Errorf("connection %s not found for state %s", s.ConnectionId.String(), stateId.String())
+			emitCallbackRejection(ctx, logger, rejectionConnectionNotFound, rejectionAttrs{
+				StateId:      stateId,
+				ActorId:      actor.GetId(),
+				ConnectionId: s.ConnectionId,
+				Namespace:    s.Namespace,
+				Err:          notFoundErr,
+			})
+			return nil, notFoundErr
 		}
 
 		return nil, fmt.Errorf("failed to get connection %s for state %s: %w", s.ConnectionId.String(), stateId.String(), err)
 	}
 
 	if s.Namespace != connection.GetNamespace() {
-		return nil, fmt.Errorf("connection namespace %q does not match state namespace %q", connection.GetNamespace(), s.Namespace)
+		err := fmt.Errorf("connection namespace %q does not match state namespace %q", connection.GetNamespace(), s.Namespace)
+		emitCallbackRejection(ctx, logger, rejectionNamespaceMismatchConnection, rejectionAttrs{
+			StateId:      stateId,
+			ActorId:      actor.GetId(),
+			ConnectionId: s.ConnectionId,
+			Namespace:    s.Namespace,
+			Err:          err,
+		})
+		return nil, err
 	}
 
 	cv := connection.GetConnectorVersionEntity()
 	connector := cv.GetDefinition()
 	if connector.Auth.GetType() != sconfig.AuthTypeOAuth2 {
-		return nil, fmt.Errorf("connector %s is not an oauth2 connector", s.ConnectorId)
+		err := fmt.Errorf("connector %s is not an oauth2 connector", s.ConnectorId)
+		emitCallbackRejection(ctx, logger, rejectionConnectorTypeMismatch, rejectionAttrs{
+			StateId:      stateId,
+			ActorId:      actor.GetId(),
+			ConnectionId: s.ConnectionId,
+			Namespace:    s.Namespace,
+			Err:          err,
+		})
+		return nil, err
 	}
 
 	// TODO: add actor auth validation once connections get ownership

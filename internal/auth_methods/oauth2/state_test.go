@@ -248,3 +248,150 @@ func (w testWriter) Write(p []byte) (int, error) {
 	w.t.Log(string(p))
 	return len(p), nil
 }
+
+func TestGetOAuth2State_EmitsRejectionEvent_UnknownState(t *testing.T) {
+	ctx := context.Background()
+	cfg, r := apredis.MustApplyTestConfig(nil)
+	e := encrypt.NewFakeEncryptService(false)
+	logger, read := bufLogger(t)
+
+	// State is never written, so the Redis lookup misses.
+	stateId := apid.New(apid.PrefixOauth2State)
+	actor := stateTestActor{id: apid.New(apid.PrefixActor), namespace: "root.tenant-a"}
+
+	_, err := getOAuth2State(ctx, cfg, nil, r, &stateTestCore{}, nil, e, logger, actor, stateId)
+	require.Error(t, err)
+
+	events := onlyRejection(read())
+	require.Len(t, events, 1)
+	assert.Equal(t, string(rejectionUnknownState), events[0]["category"])
+	assert.Equal(t, stateId.String(), events[0]["state_id"])
+	assert.Equal(t, actor.id.String(), events[0]["actor_id"])
+}
+
+func TestGetOAuth2State_EmitsRejectionEvent_TamperedState(t *testing.T) {
+	ctx := context.Background()
+	cfg, r := apredis.MustApplyTestConfig(nil)
+	e := newStateTestEncrypt(t)
+	logger, read := bufLogger(t)
+
+	stateId := apid.New(apid.PrefixOauth2State)
+	actor := stateTestActor{id: apid.New(apid.PrefixActor), namespace: "root.tenant-a"}
+	s := &state{
+		Id:           stateId,
+		Namespace:    "root.tenant-a",
+		ActorId:      actor.id,
+		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
+		ConnectionId: apid.New(apid.PrefixConnection),
+		ExpiresAt:    time.Now().Add(time.Minute).UTC(),
+	}
+	require.NoError(t, writeStateToRedis(ctx, r, e, s, time.Minute))
+
+	// Flip a byte in the ciphertext so AEAD authentication fails on read.
+	raw, err := r.Get(ctx, getStateRedisKey(stateId)).Result()
+	require.NoError(t, err)
+	ef, err := encfield.ParseInlineString(raw)
+	require.NoError(t, err)
+	ciphertext, err := base64.StdEncoding.DecodeString(ef.Data)
+	require.NoError(t, err)
+	ciphertext[len(ciphertext)/2] ^= 0xff
+	tampered := encfield.EncryptedField{ID: ef.ID, Data: base64.StdEncoding.EncodeToString(ciphertext)}
+	require.NoError(t, r.Set(ctx, getStateRedisKey(stateId), tampered.ToInlineString(), time.Minute).Err())
+
+	_, err = getOAuth2State(ctx, cfg, nil, r, &stateTestCore{}, nil, e, logger, actor, stateId)
+	require.Error(t, err)
+
+	events := onlyRejection(read())
+	require.Len(t, events, 1)
+	assert.Equal(t, string(rejectionTamperedState), events[0]["category"])
+}
+
+func TestGetOAuth2State_EmitsRejectionEvent_ActorMismatch(t *testing.T) {
+	ctx := context.Background()
+	cfg, r := apredis.MustApplyTestConfig(nil)
+	e := encrypt.NewFakeEncryptService(false)
+	logger, read := bufLogger(t)
+
+	stateId := apid.New(apid.PrefixOauth2State)
+	stateActorId := apid.New(apid.PrefixActor)
+	s := &state{
+		Id:           stateId,
+		Namespace:    "root.tenant-a",
+		ActorId:      stateActorId,
+		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
+		ConnectionId: apid.New(apid.PrefixConnection),
+		ExpiresAt:    time.Now().Add(time.Minute).UTC(),
+	}
+	require.NoError(t, writeStateToRedis(ctx, r, e, s, time.Minute))
+
+	// Inbound actor differs from the actor recorded on the state.
+	actor := stateTestActor{id: apid.New(apid.PrefixActor), namespace: "root.tenant-a"}
+	core := &stateTestCore{conn: &mockCore.Connection{Namespace: "root.tenant-a"}}
+
+	_, err := getOAuth2State(ctx, cfg, nil, r, core, nil, e, logger, actor, stateId)
+	require.Error(t, err)
+
+	events := onlyRejection(read())
+	require.Len(t, events, 1)
+	assert.Equal(t, string(rejectionActorMismatch), events[0]["category"])
+	assert.Equal(t, stateId.String(), events[0]["state_id"])
+}
+
+func TestGetOAuth2State_EmitsRejectionEvent_NamespaceMismatchActor(t *testing.T) {
+	ctx := context.Background()
+	cfg, r := apredis.MustApplyTestConfig(nil)
+	e := encrypt.NewFakeEncryptService(false)
+	logger, read := bufLogger(t)
+
+	stateId := apid.New(apid.PrefixOauth2State)
+	actorId := apid.New(apid.PrefixActor)
+	s := &state{
+		Id:           stateId,
+		Namespace:    "root.tenant-a",
+		ActorId:      actorId,
+		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
+		ConnectionId: apid.New(apid.PrefixConnection),
+		ExpiresAt:    time.Now().Add(time.Minute).UTC(),
+	}
+	require.NoError(t, writeStateToRedis(ctx, r, e, s, time.Minute))
+
+	actor := stateTestActor{id: actorId, namespace: "root.tenant-b"}
+	core := &stateTestCore{conn: &mockCore.Connection{Namespace: "root.tenant-b"}}
+
+	_, err := getOAuth2State(ctx, cfg, nil, r, core, nil, e, logger, actor, stateId)
+	require.Error(t, err)
+
+	events := onlyRejection(read())
+	require.Len(t, events, 1)
+	assert.Equal(t, string(rejectionNamespaceMismatchActor), events[0]["category"])
+	assert.Equal(t, "root.tenant-a", events[0]["namespace"])
+}
+
+func TestGetOAuth2State_EmitsRejectionEvent_NamespaceMismatchConnection(t *testing.T) {
+	ctx := context.Background()
+	cfg, r := apredis.MustApplyTestConfig(nil)
+	e := encrypt.NewFakeEncryptService(false)
+	logger, read := bufLogger(t)
+
+	stateId := apid.New(apid.PrefixOauth2State)
+	actorId := apid.New(apid.PrefixActor)
+	s := &state{
+		Id:           stateId,
+		Namespace:    "root.tenant-a",
+		ActorId:      actorId,
+		ConnectorId:  apid.New(apid.PrefixConnectorVersion),
+		ConnectionId: apid.New(apid.PrefixConnection),
+		ExpiresAt:    time.Now().Add(time.Minute).UTC(),
+	}
+	require.NoError(t, writeStateToRedis(ctx, r, e, s, time.Minute))
+
+	actor := stateTestActor{id: actorId, namespace: "root.tenant-a"}
+	core := &stateTestCore{conn: &mockCore.Connection{Namespace: "root.tenant-b"}}
+
+	_, err := getOAuth2State(ctx, cfg, nil, r, core, nil, e, logger, actor, stateId)
+	require.Error(t, err)
+
+	events := onlyRejection(read())
+	require.Len(t, events, 1)
+	assert.Equal(t, string(rejectionNamespaceMismatchConnection), events[0]["category"])
+}
