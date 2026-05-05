@@ -127,10 +127,10 @@ type SetupOptions struct {
 	ServeMarketplaceUI bool
 
 	// LogCapture, when non-nil, replaces the configured logging block with
-	// a buffered JSON sink so the test can assert on emitted slog records
-	// (e.g., the "oauth callback rejected" events from #214). The swap
-	// happens before the dependency manager is built so every derived
-	// logger routes here. nil leaves the configured logger untouched.
+	// a buffered JSON sink so the test can assert on emitted slog records.
+	// The swap happens before the dependency manager is built so every
+	// derived logger routes here. nil leaves the configured logger
+	// untouched.
 	LogCapture *LogCapture
 }
 

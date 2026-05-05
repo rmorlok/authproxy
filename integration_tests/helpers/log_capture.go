@@ -15,8 +15,6 @@ import (
 // replacing the configured logging block with a JSON handler that writes
 // into an in-memory buffer the test can inspect after the fact.
 //
-// Tests use this to assert on observability events the production code
-// emits — e.g., the "oauth callback rejected" events from PR 1 (#214).
 // The capture sits at the root logger level, so any descendant logger
 // (per-service, per-component, per-connection) routes through it.
 type LogCapture struct {
@@ -53,14 +51,16 @@ func (c *LogCapture) Records(t *testing.T) []map[string]any {
 	return records
 }
 
-// RejectionEvents returns just the "oauth callback rejected" events. The
-// message string is the public contract from PR 1 — alerts and tests both
-// key off it.
-func (c *LogCapture) RejectionEvents(t *testing.T) []map[string]any {
+// RecordsWithMessage returns the captured records whose `msg` field
+// matches the given string exactly. Callers pass the message they expect
+// the production code under test to emit — typically a stable string
+// constant the production package treats as part of its observability
+// contract.
+func (c *LogCapture) RecordsWithMessage(t *testing.T, msg string) []map[string]any {
 	t.Helper()
 	out := []map[string]any{}
 	for _, r := range c.Records(t) {
-		if r["msg"] == "oauth callback rejected" {
+		if r["msg"] == msg {
 			out = append(out, r)
 		}
 	}

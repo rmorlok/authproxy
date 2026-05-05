@@ -20,6 +20,12 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// rejectionEventMessage mirrors the message string the production OAuth2
+// package emits for every rejected callback. Operators key alerts off
+// this exact string, so the tests pin it explicitly to catch silent
+// renames as part of the public observability contract.
+const rejectionEventMessage = "oauth callback rejected"
+
 // callbackStateSecurityRig is the per-test fixture for the four
 // direct-HTTP rejection cases. All four share the same OAuth2 connector
 // shape and provider client setup; only the malformed/tampered/replayed
@@ -135,7 +141,7 @@ func (r *callbackStateSecurityRig) requireConnectionUnchanged(t *testing.T, conn
 // event is the security alert, and double-emission would skew alerting.
 func (r *callbackStateSecurityRig) requireOneRejection(t *testing.T, category string) map[string]any {
 	t.Helper()
-	events := r.logCapture.RejectionEvents(t)
+	events := r.logCapture.RecordsWithMessage(t, rejectionEventMessage)
 	require.Lenf(t, events, 1, "expected exactly one rejection event; got %d (%v)", len(events), events)
 	assert.Equal(t, category, events[0]["category"], "rejection category mismatch")
 	return events[0]
@@ -258,7 +264,7 @@ func TestCallbackRejection_ReplayedState(t *testing.T) {
 	loc := rig.env.DeliverOAuth2Callback(t, callbackURL)
 	require.Truef(t, strings.HasPrefix(loc, rig.returnToURL),
 		"first callback should land on return_to_url; got %q", loc)
-	require.Empty(t, rig.logCapture.RejectionEvents(t),
+	require.Empty(t, rig.logCapture.RecordsWithMessage(t, rejectionEventMessage),
 		"first callback must not emit a rejection event")
 
 	// Replay: deliver the same callback URL a second time. The state was
