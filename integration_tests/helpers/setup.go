@@ -125,6 +125,13 @@ type SetupOptions struct {
 	// IncludePublic. The vite build runs once per `go test` process if
 	// `ui/marketplace/dist/index.html` is missing.
 	ServeMarketplaceUI bool
+
+	// LogCapture, when non-nil, replaces the configured logging block with
+	// a buffered JSON sink so the test can assert on emitted slog records.
+	// The swap happens before the dependency manager is built so every
+	// derived logger routes here. nil leaves the configured logger
+	// untouched.
+	LogCapture *LogCapture
 }
 
 // repoRoot returns the absolute path to the repository root.
@@ -213,6 +220,17 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 			cfgRoot.Connectors = &sconfig.Connectors{}
 		}
 		cfgRoot.Connectors.LoadFromList = append(cfgRoot.Connectors.LoadFromList, opts.Connectors...)
+	}
+
+	// Hook the log capture before the dependency manager builds its cached
+	// logger — once dm.GetLogger() runs, the logger is fixed and any later
+	// swap would only affect new builders.
+	if opts.LogCapture != nil {
+		cfgRoot := cfg.GetRoot()
+		if cfgRoot.Logging == nil {
+			cfgRoot.Logging = &sconfig.LoggingConfig{}
+		}
+		cfgRoot.Logging.InnerVal = opts.LogCapture.asLoggingImpl()
 	}
 
 	// ServeMarketplaceUI requires both the public service running and a real
@@ -555,6 +573,26 @@ func (env *IntegrationTestEnv) CreateConnection(t *testing.T, connectorID apid.I
 // in integration.yaml means the URL is "http://localhost:0/oauth2/callback").
 func (env *IntegrationTestEnv) PublicOAuthCallbackURL() string {
 	return env.Cfg.GetRoot().Public.GetBaseUrl() + "/oauth2/callback"
+}
+
+// ForgeOAuth2CallbackURL builds a `/oauth2/callback?...` URL with the
+// state and code values provided. Used by the callback-state-security
+// tests to construct callbacks the browser would never produce on its
+// own (missing state, unknown state, replayed state, etc.). state and
+// code may be empty.
+func (env *IntegrationTestEnv) ForgeOAuth2CallbackURL(state, code string) string {
+	q := url.Values{}
+	if state != "" {
+		q.Set("state", state)
+	}
+	if code != "" {
+		q.Set("code", code)
+	}
+	base := env.PublicOAuthCallbackURL()
+	if encoded := q.Encode(); encoded != "" {
+		return base + "?" + encoded
+	}
+	return base
 }
 
 // InitiateOAuth2Connection POSTs to /api/v1/connections/_initiate and returns
