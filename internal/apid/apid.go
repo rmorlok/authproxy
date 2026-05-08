@@ -32,6 +32,7 @@ const (
 	PrefixEncryptionKey        Prefix = "ek_"
 	PrefixEncryptionKeyVersion Prefix = "ekv_"
 	PrefixSession              Prefix = "sess_"
+	PrefixRateLimit            Prefix = "rl_"
 )
 
 // validPrefixes is the set of all known prefixes for validation.
@@ -48,6 +49,7 @@ var validPrefixes = map[Prefix]bool{
 	PrefixSession:              true,
 	PrefixEncryptionKey:        true,
 	PrefixEncryptionKeyVersion: true,
+	PrefixRateLimit:            true,
 }
 
 // ID is a prefixed identifier string. The zero value is Nil (empty string).

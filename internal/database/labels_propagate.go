@@ -53,6 +53,9 @@ func (s *service) RefreshNamespaceLabelsCarryForward(ctx context.Context, nsPath
 	if err := s.refreshConnectorVersionsInNamespace(ctx, nsPath); err != nil {
 		return err
 	}
+	if err := s.refreshRateLimitsInNamespace(ctx, nsPath); err != nil {
+		return err
+	}
 
 	childPaths, err := s.directChildNamespacePaths(ctx, nsPath)
 	if err != nil {
@@ -193,6 +196,19 @@ func (s *service) refreshEncryptionKeysInNamespace(ctx context.Context, nsPath s
 	}
 	for _, id := range ids {
 		if _, err := s.recomputeEncryptionKeyLabelsTx(ctx, id); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func (s *service) refreshRateLimitsInNamespace(ctx context.Context, nsPath string) error {
+	ids, err := s.scanIdsByNamespace(RateLimitsTable, nsPath)
+	if err != nil {
+		return err
+	}
+	for _, id := range ids {
+		if _, err := s.recomputeRateLimitLabelsTx(ctx, id); err != nil {
 			return err
 		}
 	}
@@ -375,6 +391,49 @@ func (s *service) recomputeEncryptionKeyLabelsTx(ctx context.Context, id apid.ID
 	return corrected, err
 }
 
+// recomputeRateLimitLabelsTx opens a short transaction and re-derives a
+// rate limit's full labels from its namespace and own user labels. Returns
+// true if drift was detected and corrected.
+func (s *service) recomputeRateLimitLabelsTx(ctx context.Context, id apid.ID) (bool, error) {
+	var corrected bool
+	err := s.transaction(func(tx *sql.Tx) error {
+		var rl RateLimit
+		err := s.sq.
+			Select(rl.cols()...).
+			From(RateLimitsTable).
+			Where(sq.Eq{"id": id, "deleted_at": nil}).
+			RunWith(tx).
+			QueryRow().
+			Scan(rl.fields()...)
+		if err != nil {
+			if errors.Is(err, sql.ErrNoRows) {
+				return nil
+			}
+			return err
+		}
+
+		userLabels, _ := SplitUserAndApxyLabels(rl.Labels)
+		nsLabels, err := s.fetchLabelsForCarryForward(ctx, tx, NamespacesTable, sq.Eq{
+			"path":       rl.Namespace,
+			"deleted_at": nil,
+		})
+		if err != nil {
+			return err
+		}
+
+		newLabels := ApplyParentCarryForward(
+			userLabels,
+			ParentCarryForward{Rt: NamespaceLabelToken, Labels: nsLabels},
+		)
+		newLabels = InjectSelfImplicitLabels(rl.Id, rl.Namespace, newLabels)
+
+		var werr error
+		corrected, werr = s.writeRecomputedLabels(ctx, tx, RateLimitsTable, sq.Eq{"id": id, "deleted_at": nil}, rl.Labels, newLabels)
+		return werr
+	})
+	return corrected, err
+}
+
 // recomputeConnectorVersionLabelsTx opens a short transaction and
 // re-derives a connector version's full labels from its namespace and own
 // user labels. Returns true if drift was detected and corrected.
@@ -536,6 +595,7 @@ func (s *service) ReconcileCarryForwardLabels(ctx context.Context, batchSize int
 		{name: "connections", walk: s.reconcileConnections},
 		{name: "actors", walk: s.reconcileActors},
 		{name: "encryption_keys", walk: s.reconcileEncryptionKeys},
+		{name: "rate_limits", walk: s.reconcileRateLimits},
 	}
 
 	for _, step := range steps {
@@ -653,6 +713,26 @@ func (s *service) reconcileEncryptionKeys(ctx context.Context, batchSize int32, 
 			if wasCorrected {
 				corrected++
 				s.logger.Info("reconciled drifted carry-forward labels", "type", "encryption_key", "id", ek.Id)
+			}
+			return nil
+		})
+	return corrected, err
+}
+
+func (s *service) reconcileRateLimits(ctx context.Context, batchSize int32, limiter *rate.Limiter) (int64, error) {
+	var corrected int64
+	err := pagination.EnumerateThrottled(
+		ctx,
+		s.ListRateLimitsBuilder().Limit(batchSize).Enumerate,
+		limiter,
+		func(rl RateLimit) error {
+			wasCorrected, err := s.recomputeRateLimitLabelsTx(ctx, rl.Id)
+			if err != nil {
+				return err
+			}
+			if wasCorrected {
+				corrected++
+				s.logger.Info("reconciled drifted carry-forward labels", "type", "rate_limit", "id", rl.Id)
 			}
 			return nil
 		})

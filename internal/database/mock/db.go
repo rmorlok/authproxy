@@ -15,6 +15,7 @@ import (
 	encfield "github.com/rmorlok/authproxy/internal/encfield"
 	auth "github.com/rmorlok/authproxy/internal/schema/auth"
 	connectors "github.com/rmorlok/authproxy/internal/schema/connectors"
+	rate_limit "github.com/rmorlok/authproxy/internal/schema/rate_limit"
 	pagination "github.com/rmorlok/authproxy/internal/util/pagination"
 	rate "golang.org/x/time/rate"
 )
@@ -397,6 +398,20 @@ func (mr *MockDBMockRecorder) CreateNamespace(ctx, ns interface{}) *gomock.Call 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateNamespace", reflect.TypeOf((*MockDB)(nil).CreateNamespace), ctx, ns)
 }
 
+// CreateRateLimit mocks base method.
+func (m *MockDB) CreateRateLimit(ctx context.Context, rl *database.RateLimit) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CreateRateLimit", ctx, rl)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// CreateRateLimit indicates an expected call of CreateRateLimit.
+func (mr *MockDBMockRecorder) CreateRateLimit(ctx, rl interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CreateRateLimit", reflect.TypeOf((*MockDB)(nil).CreateRateLimit), ctx, rl)
+}
+
 // DeleteActor mocks base method.
 func (m *MockDB) DeleteActor(ctx context.Context, id apid.ID) error {
 	m.ctrl.T.Helper()
@@ -655,6 +670,50 @@ func (m *MockDB) DeleteOAuth2Token(ctx context.Context, tokenId apid.ID) error {
 func (mr *MockDBMockRecorder) DeleteOAuth2Token(ctx, tokenId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteOAuth2Token", reflect.TypeOf((*MockDB)(nil).DeleteOAuth2Token), ctx, tokenId)
+}
+
+// DeleteRateLimit mocks base method.
+func (m *MockDB) DeleteRateLimit(ctx context.Context, id apid.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteRateLimit", ctx, id)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteRateLimit indicates an expected call of DeleteRateLimit.
+func (mr *MockDBMockRecorder) DeleteRateLimit(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRateLimit", reflect.TypeOf((*MockDB)(nil).DeleteRateLimit), ctx, id)
+}
+
+// DeleteRateLimitAnnotations mocks base method.
+func (m *MockDB) DeleteRateLimitAnnotations(ctx context.Context, id apid.ID, keys []string) (*database.RateLimit, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteRateLimitAnnotations", ctx, id, keys)
+	ret0, _ := ret[0].(*database.RateLimit)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteRateLimitAnnotations indicates an expected call of DeleteRateLimitAnnotations.
+func (mr *MockDBMockRecorder) DeleteRateLimitAnnotations(ctx, id, keys interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRateLimitAnnotations", reflect.TypeOf((*MockDB)(nil).DeleteRateLimitAnnotations), ctx, id, keys)
+}
+
+// DeleteRateLimitLabels mocks base method.
+func (m *MockDB) DeleteRateLimitLabels(ctx context.Context, id apid.ID, keys []string) (*database.RateLimit, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteRateLimitLabels", ctx, id, keys)
+	ret0, _ := ret[0].(*database.RateLimit)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteRateLimitLabels indicates an expected call of DeleteRateLimitLabels.
+func (mr *MockDBMockRecorder) DeleteRateLimitLabels(ctx, id, keys interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRateLimitLabels", reflect.TypeOf((*MockDB)(nil).DeleteRateLimitLabels), ctx, id, keys)
 }
 
 // EnsureNamespaceByPath mocks base method.
@@ -982,6 +1041,21 @@ func (mr *MockDBMockRecorder) GetOAuth2Token(ctx, connectionId interface{}) *gom
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOAuth2Token", reflect.TypeOf((*MockDB)(nil).GetOAuth2Token), ctx, connectionId)
 }
 
+// GetRateLimit mocks base method.
+func (m *MockDB) GetRateLimit(ctx context.Context, id apid.ID) (*database.RateLimit, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRateLimit", ctx, id)
+	ret0, _ := ret[0].(*database.RateLimit)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRateLimit indicates an expected call of GetRateLimit.
+func (mr *MockDBMockRecorder) GetRateLimit(ctx, id interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRateLimit", reflect.TypeOf((*MockDB)(nil).GetRateLimit), ctx, id)
+}
+
 // HasNonceBeenUsed mocks base method.
 func (m *MockDB) HasNonceBeenUsed(ctx context.Context, nonce apid.ID) (bool, error) {
 	m.ctrl.T.Helper()
@@ -1216,6 +1290,35 @@ func (mr *MockDBMockRecorder) ListNamespacesFromCursor(ctx, cursor interface{}) 
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListNamespacesFromCursor", reflect.TypeOf((*MockDB)(nil).ListNamespacesFromCursor), ctx, cursor)
 }
 
+// ListRateLimitsBuilder mocks base method.
+func (m *MockDB) ListRateLimitsBuilder() database.ListRateLimitsBuilder {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListRateLimitsBuilder")
+	ret0, _ := ret[0].(database.ListRateLimitsBuilder)
+	return ret0
+}
+
+// ListRateLimitsBuilder indicates an expected call of ListRateLimitsBuilder.
+func (mr *MockDBMockRecorder) ListRateLimitsBuilder() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRateLimitsBuilder", reflect.TypeOf((*MockDB)(nil).ListRateLimitsBuilder))
+}
+
+// ListRateLimitsFromCursor mocks base method.
+func (m *MockDB) ListRateLimitsFromCursor(ctx context.Context, cursor string) (database.ListRateLimitsExecutor, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListRateLimitsFromCursor", ctx, cursor)
+	ret0, _ := ret[0].(database.ListRateLimitsExecutor)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListRateLimitsFromCursor indicates an expected call of ListRateLimitsFromCursor.
+func (mr *MockDBMockRecorder) ListRateLimitsFromCursor(ctx, cursor interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListRateLimitsFromCursor", reflect.TypeOf((*MockDB)(nil).ListRateLimitsFromCursor), ctx, cursor)
+}
+
 // Migrate mocks base method.
 func (m *MockDB) Migrate(ctx context.Context) error {
 	m.ctrl.T.Helper()
@@ -1407,6 +1510,36 @@ func (m *MockDB) PutNamespaceLabels(ctx context.Context, path string, labels map
 func (mr *MockDBMockRecorder) PutNamespaceLabels(ctx, path, labels interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutNamespaceLabels", reflect.TypeOf((*MockDB)(nil).PutNamespaceLabels), ctx, path, labels)
+}
+
+// PutRateLimitAnnotations mocks base method.
+func (m *MockDB) PutRateLimitAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*database.RateLimit, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutRateLimitAnnotations", ctx, id, annotations)
+	ret0, _ := ret[0].(*database.RateLimit)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PutRateLimitAnnotations indicates an expected call of PutRateLimitAnnotations.
+func (mr *MockDBMockRecorder) PutRateLimitAnnotations(ctx, id, annotations interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutRateLimitAnnotations", reflect.TypeOf((*MockDB)(nil).PutRateLimitAnnotations), ctx, id, annotations)
+}
+
+// PutRateLimitLabels mocks base method.
+func (m *MockDB) PutRateLimitLabels(ctx context.Context, id apid.ID, labels map[string]string) (*database.RateLimit, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PutRateLimitLabels", ctx, id, labels)
+	ret0, _ := ret[0].(*database.RateLimit)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// PutRateLimitLabels indicates an expected call of PutRateLimitLabels.
+func (mr *MockDBMockRecorder) PutRateLimitLabels(ctx, id, labels interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PutRateLimitLabels", reflect.TypeOf((*MockDB)(nil).PutRateLimitLabels), ctx, id, labels)
 }
 
 // ReconcileCarryForwardLabels mocks base method.
@@ -1709,6 +1842,51 @@ func (m *MockDB) UpdateNamespaceLabels(ctx context.Context, path string, labels 
 func (mr *MockDBMockRecorder) UpdateNamespaceLabels(ctx, path, labels interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateNamespaceLabels", reflect.TypeOf((*MockDB)(nil).UpdateNamespaceLabels), ctx, path, labels)
+}
+
+// UpdateRateLimitAnnotations mocks base method.
+func (m *MockDB) UpdateRateLimitAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*database.RateLimit, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateRateLimitAnnotations", ctx, id, annotations)
+	ret0, _ := ret[0].(*database.RateLimit)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateRateLimitAnnotations indicates an expected call of UpdateRateLimitAnnotations.
+func (mr *MockDBMockRecorder) UpdateRateLimitAnnotations(ctx, id, annotations interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRateLimitAnnotations", reflect.TypeOf((*MockDB)(nil).UpdateRateLimitAnnotations), ctx, id, annotations)
+}
+
+// UpdateRateLimitDefinition mocks base method.
+func (m *MockDB) UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def rate_limit.RateLimit) (*database.RateLimit, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateRateLimitDefinition", ctx, id, def)
+	ret0, _ := ret[0].(*database.RateLimit)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateRateLimitDefinition indicates an expected call of UpdateRateLimitDefinition.
+func (mr *MockDBMockRecorder) UpdateRateLimitDefinition(ctx, id, def interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRateLimitDefinition", reflect.TypeOf((*MockDB)(nil).UpdateRateLimitDefinition), ctx, id, def)
+}
+
+// UpdateRateLimitLabels mocks base method.
+func (m *MockDB) UpdateRateLimitLabels(ctx context.Context, id apid.ID, labels map[string]string) (*database.RateLimit, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateRateLimitLabels", ctx, id, labels)
+	ret0, _ := ret[0].(*database.RateLimit)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// UpdateRateLimitLabels indicates an expected call of UpdateRateLimitLabels.
+func (mr *MockDBMockRecorder) UpdateRateLimitLabels(ctx, id, labels interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateRateLimitLabels", reflect.TypeOf((*MockDB)(nil).UpdateRateLimitLabels), ctx, id, labels)
 }
 
 // UpsertActor mocks base method.
