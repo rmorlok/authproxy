@@ -595,12 +595,23 @@ func (env *IntegrationTestEnv) ForgeOAuth2CallbackURL(state, code string) string
 	return base
 }
 
-// InitiateOAuth2Connection POSTs to /api/v1/connections/_initiate and returns
-// the new connection's ID and the redirect URL the user would be sent to. The
-// redirect URL points at the public service's /oauth2/redirect endpoint.
+// InitiateOAuth2Connection POSTs to /api/v1/connections/_initiate signed as
+// the default test actor and returns the new connection's ID and the redirect
+// URL. Tests that need to initiate as a specific actor (multi-actor scenarios)
+// should call InitiateOAuth2ConnectionAsActor directly.
 func (env *IntegrationTestEnv) InitiateOAuth2Connection(t *testing.T, connectorID apid.ID, returnToUrl string) (connectionID, redirectURL string) {
 	t.Helper()
-	require.NotNil(t, env.ApiGin, "InitiateOAuth2Connection requires in-process gin (StartHTTPServer must be false)")
+	return env.InitiateOAuth2ConnectionAsActor(t, connectorID, returnToUrl, "test-actor")
+}
+
+// InitiateOAuth2ConnectionAsActor POSTs to /api/v1/connections/_initiate signed
+// for the named actor (external_id) and returns the new connection's ID and
+// the redirect URL pointing at the public service's /oauth2/redirect endpoint.
+// Works in both in-process (ApiGin) and real HTTP (ServerURL) modes.
+func (env *IntegrationTestEnv) InitiateOAuth2ConnectionAsActor(t *testing.T, connectorID apid.ID, returnToUrl, actorExternalID string) (connectionID, redirectURL string) {
+	t.Helper()
+	require.Truef(t, env.ApiGin != nil || env.ServerURL != "",
+		"InitiateOAuth2ConnectionAsActor requires either in-process gin or a running HTTP server")
 
 	body, err := jsonMarshal(coreIface.InitiateConnectionRequest{
 		ConnectorId: connectorID,
@@ -608,18 +619,34 @@ func (env *IntegrationTestEnv) InitiateOAuth2Connection(t *testing.T, connectorI
 	})
 	require.NoError(t, err)
 
+	const path = "/api/v1/connections/_initiate"
 	req, err := env.ApiAuthUtil.NewSignedRequestForActorExternalId(
 		http.MethodPost,
-		"/api/v1/connections/_initiate",
+		path,
 		body,
 		sconfig.RootNamespace,
-		"test-actor",
+		actorExternalID,
 		aschema.AllPermissions(),
 	)
 	require.NoError(t, err)
 
 	w := httptest.NewRecorder()
-	env.ApiGin.ServeHTTP(w, req)
+	if env.ApiGin != nil {
+		env.ApiGin.ServeHTTP(w, req)
+	} else {
+		abs, err := url.Parse(env.ServerURL + path)
+		require.NoError(t, err)
+		req.URL = abs
+		req.Host = abs.Host
+		req.RequestURI = ""
+		resp, err := http.DefaultClient.Do(req)
+		require.NoError(t, err)
+		defer resp.Body.Close()
+		w.Code = resp.StatusCode
+		if _, err := w.Body.ReadFrom(resp.Body); err != nil {
+			require.NoError(t, err)
+		}
+	}
 	require.Equalf(t, http.StatusOK, w.Code, "initiate failed: %s", w.Body.String())
 
 	var resp coreIface.ConnectionSetupRedirect
