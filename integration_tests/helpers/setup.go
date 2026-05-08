@@ -2,6 +2,7 @@ package helpers
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -13,6 +14,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	auth2 "github.com/rmorlok/authproxy/internal/apauth/service"
@@ -596,26 +598,36 @@ func (env *IntegrationTestEnv) ForgeOAuth2CallbackURL(state, code string) string
 }
 
 // InitiateOAuth2Connection POSTs to /api/v1/connections/_initiate signed as
-// the default test actor and returns the new connection's ID and the redirect
-// URL. Tests that need to initiate as a specific actor (multi-actor scenarios)
-// should call InitiateOAuth2ConnectionAsActor directly.
+// the default test actor in the root namespace. Tests that need to initiate
+// as a specific actor (multi-actor scenarios) or in a child namespace
+// (multi-tenant scenarios) should call InitiateOAuth2ConnectionAsActor directly.
 func (env *IntegrationTestEnv) InitiateOAuth2Connection(t *testing.T, connectorID apid.ID, returnToUrl string) (connectionID, redirectURL string) {
 	t.Helper()
-	return env.InitiateOAuth2ConnectionAsActor(t, connectorID, returnToUrl, "test-actor")
+	return env.InitiateOAuth2ConnectionAsActor(t, connectorID, returnToUrl, "test-actor", sconfig.RootNamespace)
 }
 
 // InitiateOAuth2ConnectionAsActor POSTs to /api/v1/connections/_initiate signed
-// for the named actor (external_id) and returns the new connection's ID and
-// the redirect URL pointing at the public service's /oauth2/redirect endpoint.
-// Works in both in-process (ApiGin) and real HTTP (ServerURL) modes.
-func (env *IntegrationTestEnv) InitiateOAuth2ConnectionAsActor(t *testing.T, connectorID apid.ID, returnToUrl, actorExternalID string) (connectionID, redirectURL string) {
+// for the named actor (external_id) in the given namespace and returns the new
+// connection's ID and the redirect URL pointing at the public service's
+// /oauth2/redirect endpoint. Works in both in-process (ApiGin) and real HTTP
+// (ServerURL) modes.
+//
+// Caller is responsible for ensuring the namespace exists (via env.Core.CreateNamespace
+// or its ancestors) when it is not the root namespace.
+func (env *IntegrationTestEnv) InitiateOAuth2ConnectionAsActor(t *testing.T, connectorID apid.ID, returnToUrl, actorExternalID, namespace string) (connectionID, redirectURL string) {
 	t.Helper()
 	require.Truef(t, env.ApiGin != nil || env.ServerURL != "",
 		"InitiateOAuth2ConnectionAsActor requires either in-process gin or a running HTTP server")
 
+	// Land the connection in the actor's namespace by default. Without
+	// IntoNamespace, the API places the connection in the connector's
+	// namespace (root), which doesn't reflect how a real multi-tenant
+	// deployment isolates tenants — and breaks state-vs-connection
+	// namespace checks the security tests rely on.
 	body, err := jsonMarshal(coreIface.InitiateConnectionRequest{
-		ConnectorId: connectorID,
-		ReturnToUrl: returnToUrl,
+		ConnectorId:   connectorID,
+		ReturnToUrl:   returnToUrl,
+		IntoNamespace: namespace,
 	})
 	require.NoError(t, err)
 
@@ -624,7 +636,7 @@ func (env *IntegrationTestEnv) InitiateOAuth2ConnectionAsActor(t *testing.T, con
 		http.MethodPost,
 		path,
 		body,
-		sconfig.RootNamespace,
+		namespace,
 		actorExternalID,
 		aschema.AllPermissions(),
 	)
@@ -689,12 +701,22 @@ func (env *IntegrationTestEnv) FollowOAuth2Redirect(t *testing.T, redirectURL st
 }
 
 // DeliverOAuth2Callback issues an in-process GET to the public service's
-// `/oauth2/callback` endpoint with the code+state the OAuth provider would
-// have redirected the user to. Returns the final Location header — typically
-// the test's return_to_url, possibly augmented with setup=pending.
+// `/oauth2/callback` endpoint signed as the default test actor in the root
+// namespace. Tests that need to deliver under a specific actor or in a child
+// namespace should call DeliverOAuth2CallbackAsActor directly.
 func (env *IntegrationTestEnv) DeliverOAuth2Callback(t *testing.T, callbackURL string) string {
 	t.Helper()
-	require.NotNil(t, env.PublicGin, "DeliverOAuth2Callback requires SetupOptions.IncludePublic=true")
+	return env.DeliverOAuth2CallbackAsActor(t, callbackURL, "test-actor", sconfig.RootNamespace)
+}
+
+// DeliverOAuth2CallbackAsActor issues an in-process GET to the public service's
+// `/oauth2/callback` endpoint signed for the named actor (external_id) in the
+// given namespace, mirroring the JWT a real browser session for that actor
+// would carry. Returns the final Location header — typically the test's
+// return_to_url on success, or error_pages.internal_error on rejection.
+func (env *IntegrationTestEnv) DeliverOAuth2CallbackAsActor(t *testing.T, callbackURL, actorExternalID, namespace string) string {
+	t.Helper()
+	require.NotNil(t, env.PublicGin, "DeliverOAuth2CallbackAsActor requires SetupOptions.IncludePublic=true")
 
 	parsed, err := url.Parse(callbackURL)
 	require.NoError(t, err)
@@ -703,8 +725,8 @@ func (env *IntegrationTestEnv) DeliverOAuth2Callback(t *testing.T, callbackURL s
 		http.MethodGet,
 		parsed.RequestURI(),
 		nil,
-		sconfig.RootNamespace,
-		"test-actor",
+		namespace,
+		actorExternalID,
 		aschema.AllPermissions(),
 	)
 	require.NoError(t, err)
@@ -716,6 +738,46 @@ func (env *IntegrationTestEnv) DeliverOAuth2Callback(t *testing.T, callbackURL s
 	loc := w.Header().Get("Location")
 	require.NotEmpty(t, loc, "/oauth2/callback should set Location")
 	return loc
+}
+
+// OAuth2StateForTest mirrors the unexported `state` struct in
+// internal/auth_methods/oauth2 (see state.go:24-34) so tests can construct
+// synthetic state envelopes that exercise validation paths the natural
+// _initiate flow can't reach (e.g., crafted namespace/actor mismatches
+// against the state-vs-caller and state-vs-connection checks).
+//
+// JSON tags must stay in sync with the production struct; if they drift,
+// the production decode will fail with errStateTampered.
+type OAuth2StateForTest struct {
+	Id                     apid.ID   `json:"id"`
+	Namespace              string    `json:"namespace"`
+	ActorId                apid.ID   `json:"actor_id"`
+	ConnectorId            apid.ID   `json:"connector_id"`
+	ConnectorVersion       uint64    `json:"connector_version"`
+	ConnectionId           apid.ID   `json:"connection_id"`
+	ReturnToUrl            string    `json:"return_to"`
+	CancelSessionAfterAuth bool      `json:"cancel_session_after_auth"`
+	ExpiresAt              time.Time `json:"expires_at"`
+}
+
+// WriteOAuth2StateForTest encrypts and stores a synthetic OAuth2 state
+// envelope in Redis at the production key `oauth2:state:<state.Id>`,
+// using env.DM's encrypt service so the envelope round-trips through the
+// same AEAD as a state minted by the real `_initiate` flow.
+//
+// Used by tests that need the production callback handler to read a state
+// envelope with hand-crafted fields (namespace_mismatch_actor,
+// namespace_mismatch_connection, etc.) — values the natural flow would
+// never produce.
+func (env *IntegrationTestEnv) WriteOAuth2StateForTest(t *testing.T, s OAuth2StateForTest, ttl time.Duration) {
+	t.Helper()
+	plaintext, err := json.Marshal(s)
+	require.NoError(t, err)
+	ctx := context.Background()
+	ef, err := env.DM.GetEncryptService().EncryptGlobal(ctx, plaintext)
+	require.NoError(t, err)
+	key := fmt.Sprintf("oauth2:state:%s", s.Id.String())
+	require.NoError(t, env.DM.GetRedisClient().Set(ctx, key, ef.ToInlineString(), ttl).Err())
 }
 
 // GetOAuth2Token reads the most recent OAuth2 token row stored for the

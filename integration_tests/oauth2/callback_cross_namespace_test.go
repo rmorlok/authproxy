@@ -19,30 +19,39 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// TestCallbackRejection_ActorMismatch covers issue #167 case 5: an attacker
-// initiates an OAuth flow, completes the provider authorize step to mint a
-// code, and sends the resulting `/oauth2/callback?state=…&code=…` URL to a
-// different actor (the victim) — e.g., via a phishing link. When the victim's
-// browser follows the link, the public service identifies the victim from
-// their SESSION-ID cookie, but the state record carries the attacker's actor
-// id. State validation must reject with `actor_mismatch` and redirect to the
-// configured error page; no token must be exchanged or persisted.
+// TestCallbackRejection_CrossNamespace covers issue #167 case 6: a multi-tenant
+// AuthProxy deployment where two customer apps share the instance and use
+// child namespaces (`root.tenant-a`, `root.tenant-b`) to isolate their actors.
+// The same external_id can refer to two different users — one in each
+// namespace — because actor rows are scoped per-namespace.
 //
-// See callback_actor_mismatch_test.md for the scenario specification, threat
-// model rationale, and sequence diagram.
-func TestCallbackRejection_ActorMismatch(t *testing.T) {
+// Threat: an attacker (alice in tenant-a) initiates a connection, drives the
+// provider's authorize step to mint a code, and sends the resulting callback
+// URL to a victim with the same external_id in a different tenant (bob in
+// tenant-b). When bob's browser follows the link, the public service
+// identifies bob from his SESSION-ID cookie. Because actor IDs are
+// independently allocated per (namespace, external_id), bob's actor id
+// differs from alice's — so state validation rejects with `actor_mismatch`
+// before reaching the namespace-specific defense-in-depth checks.
+//
+// The two `namespace_mismatch_*` categories are tested separately in
+// callback_namespace_mismatch_test.go via direct state-envelope injection.
+func TestCallbackRejection_CrossNamespace(t *testing.T) {
 	provider := helpers.NewOAuth2TestProvider(t)
 
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
-	attackerExternalID := "alice-attacker-" + suffix
-	victimExternalID := "bob-victim-" + suffix
-	clientKey := "actor-mismatch-client-" + suffix
-	clientSecret := "actor-mismatch-secret-" + suffix
+	tenantA := "root.tenant-a-" + suffix
+	tenantB := "root.tenant-b-" + suffix
+	// Same external_id in both tenants — the multi-tenant collision the
+	// test exercises. Each tenant's actor row gets its own actor_id.
+	sharedExternalID := "user-123-" + suffix
+	clientKey := "cross-ns-client-" + suffix
+	clientSecret := "cross-ns-secret-" + suffix
 	providerUserPassword := "p4ssw0rd-" + suffix
 	providerUserEmail := "alice-" + suffix + "@example.com"
 
 	connectorID := apid.New(apid.PrefixConnectorVersion)
-	connector := helpers.NewOAuth2Connector(connectorID, "actor-mismatch-test", provider, helpers.OAuth2ConnectorOptions{
+	connector := helpers.NewOAuth2Connector(connectorID, "cross-ns-test", provider, helpers.OAuth2ConnectorOptions{
 		ClientID:     clientKey,
 		ClientSecret: clientSecret,
 		Scopes:       []string{"read"},
@@ -58,6 +67,12 @@ func TestCallbackRejection_ActorMismatch(t *testing.T) {
 		LogCapture:         logCapture,
 	})
 	defer env.Cleanup()
+
+	ctx := context.Background()
+	_, err := env.Core.CreateNamespace(ctx, tenantA, nil)
+	require.NoError(t, err)
+	_, err = env.Core.CreateNamespace(ctx, tenantB, nil)
+	require.NoError(t, err)
 
 	callbackURL := env.PublicOAuthCallbackURL()
 	registered := provider.CreateClient(helpers.CreateClientRequest{
@@ -76,20 +91,18 @@ func TestCallbackRejection_ActorMismatch(t *testing.T) {
 	})
 	require.NotEmpty(t, providerUser.ID)
 
-	// 1. Attacker initiates the connection. State stored in Redis with
-	//    ActorId = attacker. The connection row gets the attacker's actor.
+	// 1. Attacker initiates as alice in tenant-a. State stored with
+	//    Namespace=tenant-a, ActorId=<alice's tenant-a actor>.
 	returnTo := "https://example.com/return"
-	connID, redirectURL := env.InitiateOAuth2ConnectionAsActor(t, connectorID, returnTo, attackerExternalID, sconfig.RootNamespace)
+	connID, redirectURL := env.InitiateOAuth2ConnectionAsActor(t, connectorID, returnTo, sharedExternalID, tenantA)
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
 	stateID := parsed.Query().Get("state_id")
-	require.NotEmpty(t, stateID, "InitiateOAuth2ConnectionAsActor should embed state_id in redirect URL: %s", redirectURL)
+	require.NotEmpty(t, stateID, "InitiateOAuth2ConnectionAsActor should embed state_id: %s", redirectURL)
 
 	// 2. Mint a code via the test provider's /test/authorize. The provider
-	//    doesn't care which proxy actor owns the state — it's validating
-	//    against its own client/user records — so the attacker can drive
-	//    this leg programmatically. The output is the exact callback URL
-	//    the provider would have produced after a real consent.
+	//    only validates against its own client/user records, so the
+	//    attacker can drive this leg programmatically.
 	authResp := provider.Authorize(helpers.AuthorizeRequest{
 		ClientID:    clientKey,
 		UserID:      providerUser.ID,
@@ -104,68 +117,65 @@ func TestCallbackRejection_ActorMismatch(t *testing.T) {
 	code := providerCallback.Query().Get("code")
 	require.NotEmpty(t, code, "provider should issue a code on approve; got %s", authResp.RedirectURL)
 
-	// 3. Victim's marketplace session: open chromedp, navigate to
-	//    /connectors?auth_token=<victim>. The SPA bootstrap calls
-	//    /session/_initiate, which exchanges the JWT for a SESSION-ID
-	//    cookie scoped to the victim. We wait for the Connect button as
-	//    the bootstrap-complete signal — same marker standard_flow_test
-	//    uses.
-	victimAuthToken, err := env.PublicAuthUtil.GenerateBearerToken(
-		context.Background(), victimExternalID, sconfig.RootNamespace, aschema.AllPermissions(),
+	// 3. Victim bob's marketplace session in tenant-b. Same external_id
+	//    as alice but a different namespace, so the auth middleware
+	//    materializes a separate actor row with a different actor_id.
+	bobAuthToken, err := env.PublicAuthUtil.GenerateBearerToken(
+		ctx, sharedExternalID, tenantB, aschema.AllPermissions(),
 	)
 	require.NoError(t, err)
 
 	browserCtx, _ := helpers.NewBrowser(t)
 
-	connectorsURL := env.PublicURL + "/connectors?auth_token=" + url.QueryEscape(victimAuthToken)
+	connectorsURL := env.PublicURL + "/connectors?auth_token=" + url.QueryEscape(bobAuthToken)
 	require.NoError(t, chromedp.Run(browserCtx,
 		chromedp.Navigate(connectorsURL),
 		chromedp.WaitVisible(`//button[normalize-space()='Connect']`, chromedp.BySearch),
 	))
 
-	// 4. Victim's browser follows the forged callback link. The browser
-	//    carries the victim's SESSION-ID cookie, so the public service
-	//    identifies the victim as the calling actor; state validation
-	//    detects ActorId mismatch and redirects to the error page.
+	// 4. Bob's browser follows the forged callback link. The browser
+	//    carries bob's SESSION-ID cookie, so the public service
+	//    identifies bob (tenant-b actor); state validation finds
+	//    s.ActorId (alice in tenant-a) != caller.Id (bob in tenant-b)
+	//    and rejects with actor_mismatch — the namespace-specific checks
+	//    never run because actor identity is checked first.
 	forgedURL := env.PublicURL + "/oauth2/callback?state=" + url.QueryEscape(stateID) + "&code=" + url.QueryEscape(code)
 	errorPageURL := env.Cfg.GetRoot().ErrorPages.InternalError
 	require.NotEmpty(t, errorPageURL, "test config must set error_pages.internal_error")
 
 	require.NoError(t, chromedp.Run(browserCtx,
 		chromedp.Navigate(forgedURL),
-		// example.com renders <h1>Example Domain</h1> reliably; we use
-		// it as a load signal after the proxy's 302.
 		chromedp.WaitVisible(`h1`, chromedp.ByQuery),
 	))
 
 	var finalURL string
 	require.NoError(t, chromedp.Run(browserCtx, chromedp.Location(&finalURL)))
 	assert.Equalf(t, errorPageURL, finalURL,
-		"victim's browser should land on error_pages.internal_error after actor_mismatch rejection; got %q", finalURL)
+		"bob's browser should land on error_pages.internal_error after rejection; got %q", finalURL)
 
-	// 5. Exactly one rejection event with category=actor_mismatch, carrying
-	//    the state id. The actor_id field reflects the calling actor (the
-	//    victim) so SOC analysts see who was hit by the link.
+	// 5. Exactly one rejection event with category=actor_mismatch.
 	events := logCapture.RecordsWithMessage(t, rejectionEventMessage)
 	require.Lenf(t, events, 1, "expected exactly one rejection event; got %d (%v)", len(events), events)
-	assert.Equal(t, "actor_mismatch", events[0]["category"], "rejection category mismatch")
+	assert.Equal(t, "actor_mismatch", events[0]["category"],
+		"cross-namespace attack rejects on actor_mismatch first; namespace_mismatch_actor is defense-in-depth tested separately")
 	assert.Equal(t, stateID, events[0]["state_id"], "rejection event should record the state_id")
 
-	// 6. No token row was written.
-	require.Nil(t, env.GetOAuth2Token(t, connID), "no oauth2_token row should exist after actor_mismatch rejection")
+	// 6. No credentials attached to bob's tenant. alice's connection in
+	//    tenant-a still has no token; bob in tenant-b owns no connection
+	//    related to this flow.
+	require.Nil(t, env.GetOAuth2Token(t, connID), "no oauth2_token row should exist for the rejected callback")
 
-	// 7. Connection still in `created`, no setup_step transition.
 	conn := env.GetConnection(t, connID)
 	assert.Equal(t, database.ConnectionStateCreated, conn.State,
 		"connection state should remain `created` after a rejected callback")
 	assert.Nil(t, conn.SetupStep, "no setup_step should be recorded on a rejected callback")
 	assert.Nil(t, conn.SetupError, "no setup_error should be recorded on a rejected callback")
+	assert.Equal(t, tenantA, conn.Namespace, "connection still belongs to alice's tenant")
 
-	// 8. Provider observed zero /token calls — the token exchange path was
-	//    short-circuited by state validation.
+	// 7. Provider observed zero /token calls.
 	tokenReqs := provider.Requests(helpers.RequestsFilter{
 		Endpoint: helpers.EndpointToken,
 		ClientID: clientKey,
 	})
-	assert.Empty(t, tokenReqs, "provider must not have observed a /token call when actor_mismatch rejected")
+	assert.Empty(t, tokenReqs, "provider must not have observed a /token call when callback rejected")
 }
