@@ -9,6 +9,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// vc returns a fresh root validation context for direct Validate-method tests.
+func vc() *common.ValidationContext { return &common.ValidationContext{} }
+
 // validRateLimit returns a fully-populated, valid RateLimit for use as a
 // starting point in negative tests.
 func validRateLimit() *RateLimit {
@@ -21,7 +24,7 @@ func validRateLimit() *RateLimit {
 				Kind:  PathMatchKindPrefix,
 				Value: "/services/data/",
 			},
-			RequestTypes: []RequestType{RequestTypeProxy},
+			RequestTypes: []common.RequestType{common.RequestTypeProxy},
 		},
 		Bucket: Bucket{
 			Dimensions: []string{DimensionActor, "labels/team"},
@@ -70,12 +73,12 @@ func TestSelector_Validate_RequestTypes_DefaultWhenNil(t *testing.T) {
 	rl := validRateLimit()
 	rl.Selector.RequestTypes = nil
 	require.NoError(t, rl.Validate())
-	require.Equal(t, []RequestType{RequestTypeProxy, RequestTypeProbe}, rl.Selector.EffectiveRequestTypes())
+	require.Equal(t, []common.RequestType{common.RequestTypeProxy, common.RequestTypeProbe}, rl.Selector.EffectiveRequestTypes())
 }
 
 func TestSelector_Validate_RequestTypes_RejectExplicitEmpty(t *testing.T) {
 	rl := validRateLimit()
-	rl.Selector.RequestTypes = []RequestType{}
+	rl.Selector.RequestTypes = []common.RequestType{}
 	err := rl.Validate()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "request_types")
@@ -84,7 +87,7 @@ func TestSelector_Validate_RequestTypes_RejectExplicitEmpty(t *testing.T) {
 
 func TestSelector_Validate_RequestTypes_RejectUnknown(t *testing.T) {
 	rl := validRateLimit()
-	rl.Selector.RequestTypes = []RequestType{RequestTypeProxy, "bogus"}
+	rl.Selector.RequestTypes = []common.RequestType{common.RequestTypeProxy, "bogus"}
 	err := rl.Validate()
 	require.Error(t, err)
 	require.Contains(t, err.Error(), "bogus")
@@ -92,20 +95,20 @@ func TestSelector_Validate_RequestTypes_RejectUnknown(t *testing.T) {
 
 func TestSelector_Validate_RequestTypes_AcceptsAllKnown(t *testing.T) {
 	rl := validRateLimit()
-	rl.Selector.RequestTypes = []RequestType{
-		RequestTypeProxy,
-		RequestTypeProbe,
-		RequestTypeOAuth,
-		RequestTypeOAuth2TokenExchg,
-		RequestTypeOAuth2Refresh,
-		RequestTypeOAuth2Revocation,
+	rl.Selector.RequestTypes = []common.RequestType{
+		common.RequestTypeProxy,
+		common.RequestTypeProbe,
+		common.RequestTypeOAuth,
+		common.RequestTypeOAuth2TokenExchange,
+		common.RequestTypeOAuth2Refresh,
+		common.RequestTypeOAuth2Revocation,
 	}
 	require.NoError(t, rl.Validate())
 }
 
 func TestSelector_EffectiveRequestTypes_NilReceiver(t *testing.T) {
 	var s *Selector
-	require.Equal(t, []RequestType{RequestTypeProxy, RequestTypeProbe}, s.EffectiveRequestTypes())
+	require.Equal(t, []common.RequestType{common.RequestTypeProxy, common.RequestTypeProbe}, s.EffectiveRequestTypes())
 }
 
 func TestPathMatch_Validate(t *testing.T) {
@@ -268,6 +271,144 @@ func TestAlgorithm_Validate_TokenBucket(t *testing.T) {
 			}
 		})
 	}
+}
+
+// --- Direct tests for leaf Validate methods ---
+//
+// The earlier table tests exercise each algorithm variant via the parent
+// Algorithm.Validate, which is the call site that matters in production.
+// These tests pin the leaf types' contracts directly so a regression in
+// FixedWindow.Validate / SlidingWindow.Validate / TokenBucket.Validate is
+// caught even if the parent dispatch logic also breaks.
+
+func TestFixedWindow_Validate_Direct(t *testing.T) {
+	require.NoError(t, (*FixedWindow)(nil).Validate(vc()))
+
+	ok := &FixedWindow{Window: common.HumanDuration{Duration: time.Minute}, Limit: 5}
+	require.NoError(t, ok.Validate(vc()))
+
+	zeroWindow := &FixedWindow{Window: common.HumanDuration{Duration: 0}, Limit: 5}
+	err := zeroWindow.Validate(vc())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "window")
+
+	zeroLimit := &FixedWindow{Window: common.HumanDuration{Duration: time.Minute}, Limit: 0}
+	err = zeroLimit.Validate(vc())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "limit")
+
+	negativeWindow := &FixedWindow{Window: common.HumanDuration{Duration: -1 * time.Second}, Limit: 5}
+	err = negativeWindow.Validate(vc())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "window")
+}
+
+func TestSlidingWindow_Validate_Direct(t *testing.T) {
+	require.NoError(t, (*SlidingWindow)(nil).Validate(vc()))
+
+	for _, mode := range []SlidingWindowMode{SlidingWindowModeLog, SlidingWindowModeCounter} {
+		sw := &SlidingWindow{
+			Window: common.HumanDuration{Duration: time.Minute},
+			Limit:  10,
+			Mode:   mode,
+		}
+		require.NoError(t, sw.Validate(vc()), "mode %s should be valid", mode)
+	}
+
+	missingMode := &SlidingWindow{
+		Window: common.HumanDuration{Duration: time.Minute}, Limit: 10,
+	}
+	err := missingMode.Validate(vc())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "mode")
+
+	badMode := &SlidingWindow{
+		Window: common.HumanDuration{Duration: time.Minute}, Limit: 10, Mode: "exact",
+	}
+	err = badMode.Validate(vc())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "mode")
+
+	zeroWindow := &SlidingWindow{Mode: SlidingWindowModeLog, Limit: 10}
+	err = zeroWindow.Validate(vc())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "window")
+
+	zeroLimit := &SlidingWindow{
+		Window: common.HumanDuration{Duration: time.Minute}, Mode: SlidingWindowModeLog,
+	}
+	err = zeroLimit.Validate(vc())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "limit")
+}
+
+func TestTokenBucket_Validate_Direct(t *testing.T) {
+	require.NoError(t, (*TokenBucket)(nil).Validate(vc()))
+
+	ok := &TokenBucket{Capacity: 10, RefillRate: 1.5}
+	require.NoError(t, ok.Validate(vc()))
+
+	zeroCap := &TokenBucket{Capacity: 0, RefillRate: 1.0}
+	err := zeroCap.Validate(vc())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "capacity")
+
+	zeroRate := &TokenBucket{Capacity: 10, RefillRate: 0}
+	err = zeroRate.Validate(vc())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "refill_rate")
+
+	negativeCap := &TokenBucket{Capacity: -1, RefillRate: 1.0}
+	err = negativeCap.Validate(vc())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "capacity")
+
+	negativeRate := &TokenBucket{Capacity: 10, RefillRate: -0.5}
+	err = negativeRate.Validate(vc())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "refill_rate")
+}
+
+func TestSelector_Validate_Direct(t *testing.T) {
+	// Empty selector validates — every clause is optional.
+	require.NoError(t, (&Selector{}).Validate(vc()))
+
+	// Methods accept canonical HTTP verbs.
+	for _, m := range []string{"GET", "POST", "PUT", "PATCH", "DELETE", "HEAD", "OPTIONS"} {
+		s := &Selector{Methods: []string{m}}
+		require.NoError(t, s.Validate(vc()), "method %s should be valid", m)
+	}
+
+	// Lowercase is rejected so a typo in the rule can't silently match
+	// nothing.
+	bad := &Selector{Methods: []string{"get"}}
+	err := bad.Validate(vc())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "get")
+
+	// PathMatch errors propagate with a path prefix.
+	withBadPath := &Selector{
+		PathMatch: &PathMatch{Kind: PathMatchKindRegex, Value: "[unterminated"},
+	}
+	err = withBadPath.Validate(vc())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "path_match")
+	require.Contains(t, err.Error(), "regex")
+
+	// Explicit empty request_types is rejected; nil is fine.
+	empty := &Selector{RequestTypes: []common.RequestType{}}
+	err = empty.Validate(vc())
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "request_types")
+
+	// Nil request_types is valid (default is materialised by EffectiveRequestTypes).
+	require.NoError(t, (&Selector{}).Validate(vc()))
+
+	// Validation errors carry the field name passed in via vc.
+	vcWithRoot := (&common.ValidationContext{}).PushField("selector")
+	err = (&Selector{Methods: []string{"WAT"}}).Validate(vcWithRoot)
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "selector.methods")
 }
 
 func TestRateLimit_Validate_ErrorPathPrefix(t *testing.T) {

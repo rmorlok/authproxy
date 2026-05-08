@@ -8,43 +8,11 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
-// RequestType identifies the kind of proxy traffic a rule may govern. The
-// string values mirror httpf.RequestType so the runtime evaluation layer can
-// compare directly without an import cycle.
-type RequestType string
-
-const (
-	RequestTypeProxy             RequestType = "proxy"
-	RequestTypeProbe             RequestType = "probe"
-	RequestTypeOAuth2TokenExchg  RequestType = "oauth2_token_exchange"
-	RequestTypeOAuth2Refresh     RequestType = "oauth2_refresh"
-	RequestTypeOAuth2Revocation  RequestType = "oauth2_revocation"
-	// RequestTypeOAuth is retained as a coarse-grained value matching the
-	// existing httpf enum until that enum is split into the finer-grained
-	// values above.
-	RequestTypeOAuth RequestType = "oauth"
-)
-
-// IsValidRequestType reports whether t is a recognised request-type value.
-func IsValidRequestType(t RequestType) bool {
-	switch t {
-	case RequestTypeProxy,
-		RequestTypeProbe,
-		RequestTypeOAuth2TokenExchg,
-		RequestTypeOAuth2Refresh,
-		RequestTypeOAuth2Revocation,
-		RequestTypeOAuth:
-		return true
-	default:
-		return false
-	}
-}
-
 // DefaultRequestTypes is applied when a Selector leaves RequestTypes nil
 // (i.e., the field is omitted from the input). An explicit empty list is
 // rejected at validation rather than treated as "default".
-func DefaultRequestTypes() []RequestType {
-	return []RequestType{RequestTypeProxy, RequestTypeProbe}
+func DefaultRequestTypes() []common.RequestType {
+	return []common.RequestType{common.RequestTypeProxy, common.RequestTypeProbe}
 }
 
 // PathMatchKind selects how PathMatch.Value is interpreted.
@@ -112,11 +80,11 @@ type Selector struct {
 	// RequestTypes restricts the rule to specific request types. nil means
 	// "use DefaultRequestTypes()". An explicit empty slice is rejected at
 	// validation so an operator can't accidentally create an inert rule.
-	RequestTypes []RequestType `json:"request_types,omitempty" yaml:"request_types,omitempty"`
+	RequestTypes []common.RequestType `json:"request_types,omitempty" yaml:"request_types,omitempty"`
 }
 
 // EffectiveRequestTypes returns RequestTypes when set, otherwise the default.
-func (s *Selector) EffectiveRequestTypes() []RequestType {
+func (s *Selector) EffectiveRequestTypes() []common.RequestType {
 	if s == nil || s.RequestTypes == nil {
 		return DefaultRequestTypes()
 	}
@@ -157,7 +125,7 @@ func (s *Selector) Validate(vc *common.ValidationContext) error {
 		result = multierror.Append(result, vc.NewErrorForField("request_types", "must not be an empty list; omit the field to use the default"))
 	}
 	for i, t := range s.RequestTypes {
-		if !IsValidRequestType(t) {
+		if !common.IsValidRequestType(t) {
 			result = multierror.Append(result, vc.PushField("request_types").PushIndex(i).NewErrorf("unknown request type %q", string(t)))
 		}
 	}

@@ -2,17 +2,25 @@ package httpf
 
 import (
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
-type RequestType string
+// RequestType is re-exported from schema/common so callers within the
+// runtime layers can keep referring to httpf.RequestType while the canonical
+// definition (and its validation) lives alongside the rest of the schema
+// types.
+type RequestType = common.RequestType
 
 const (
-	RequestTypeGlobal RequestType = "global"
-	RequestTypeProxy  RequestType = "proxy"
-	RequestTypeOAuth  RequestType = "oauth"
-	RequestTypePublic RequestType = "public"
-	RequestTypeProbe  RequestType = "probe"
+	RequestTypeGlobal              = common.RequestTypeGlobal
+	RequestTypeProxy               = common.RequestTypeProxy
+	RequestTypeOAuth               = common.RequestTypeOAuth
+	RequestTypePublic              = common.RequestTypePublic
+	RequestTypeProbe               = common.RequestTypeProbe
+	RequestTypeOAuth2TokenExchange = common.RequestTypeOAuth2TokenExchange
+	RequestTypeOAuth2Refresh       = common.RequestTypeOAuth2Refresh
+	RequestTypeOAuth2Revocation    = common.RequestTypeOAuth2Revocation
 )
 
 type RequestInfo struct {

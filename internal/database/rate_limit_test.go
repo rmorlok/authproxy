@@ -22,7 +22,7 @@ func validDef() rlschema.RateLimit {
 				Kind:  rlschema.PathMatchKindPrefix,
 				Value: "/v1/",
 			},
-			RequestTypes: []rlschema.RequestType{rlschema.RequestTypeProxy},
+			RequestTypes: []common.RequestType{common.RequestTypeProxy},
 		},
 		Bucket: rlschema.Bucket{Dimensions: []string{rlschema.DimensionActor}},
 		Algorithm: rlschema.Algorithm{
@@ -322,7 +322,7 @@ func TestRateLimit_DefinitionRoundTripJSON(t *testing.T) {
 			name: "fixed_window",
 			def: rlschema.RateLimit{
 				Mode:     rlschema.ModeEnforce,
-				Selector: rlschema.Selector{Methods: []string{"GET"}, RequestTypes: []rlschema.RequestType{rlschema.RequestTypeProxy}},
+				Selector: rlschema.Selector{Methods: []string{"GET"}, RequestTypes: []common.RequestType{common.RequestTypeProxy}},
 				Bucket:   rlschema.Bucket{Dimensions: []string{rlschema.DimensionActor}},
 				Algorithm: rlschema.Algorithm{
 					FixedWindow: &rlschema.FixedWindow{
@@ -334,7 +334,7 @@ func TestRateLimit_DefinitionRoundTripJSON(t *testing.T) {
 		{
 			name: "sliding_window_log",
 			def: rlschema.RateLimit{
-				Selector: rlschema.Selector{Methods: []string{"POST"}, RequestTypes: []rlschema.RequestType{rlschema.RequestTypeProxy}},
+				Selector: rlschema.Selector{Methods: []string{"POST"}, RequestTypes: []common.RequestType{common.RequestTypeProxy}},
 				Bucket:   rlschema.Bucket{Dimensions: []string{rlschema.DimensionConnection}},
 				Algorithm: rlschema.Algorithm{
 					SlidingWindow: &rlschema.SlidingWindow{
