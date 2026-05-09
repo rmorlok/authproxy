@@ -16,6 +16,17 @@
       "type": "string",
       "description": "A cron expression, e.g., '0 0 1 * * *'."
     },
+    "RequestType": {
+      "type": "string",
+      "enum": [
+        "global",
+        "proxy",
+        "oauth",
+        "public",
+        "probe"
+      ],
+      "description": "Identifies the kind of traffic flowing through the proxy."
+    },
     "UUID": {
       "type": "string",
       "pattern": "^[0-9a-fA-F]{8}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{4}-?[0-9a-fA-F]{12}$",

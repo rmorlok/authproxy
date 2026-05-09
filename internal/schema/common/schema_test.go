@@ -162,6 +162,31 @@ func TestSchema(t *testing.T) {
 			},
 		},
 		{
+			Name: "RequestType",
+			Schema: `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/common/test.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["test"],
+  "properties": {
+	"test": {
+		"$ref": "./schema.json#/$defs/RequestType"
+    }
+  }
+}`,
+			Tests: []test{
+				{Name: "wrong type", Valid: false, Data: `{"test": 99}`},
+				{Name: "unknown value", Valid: false, Data: `{"test": "bogus"}`},
+				{Name: "global", Valid: true, Data: `{"test": "global"}`},
+				{Name: "proxy", Valid: true, Data: `{"test": "proxy"}`},
+				{Name: "oauth", Valid: true, Data: `{"test": "oauth"}`},
+				{Name: "public", Valid: true, Data: `{"test": "public"}`},
+				{Name: "probe", Valid: true, Data: `{"test": "probe"}`},
+			},
+		},
+		{
 			Name: "HumanDuration",
 			Schema: `
 {

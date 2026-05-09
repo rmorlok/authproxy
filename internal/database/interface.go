@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encfield"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	rlschema "github.com/rmorlok/authproxy/internal/schema/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"golang.org/x/time/rate"
 )
@@ -205,6 +206,23 @@ type DB interface {
 		ekId apid.ID,
 		callback func(ekvs []*EncryptionKeyVersion, lastPage bool) (keepGoing pagination.KeepGoing, err error),
 	) error
+
+	/*
+	 * Rate Limits
+	 */
+
+	GetRateLimit(ctx context.Context, id apid.ID) (*RateLimit, error)
+	CreateRateLimit(ctx context.Context, rl *RateLimit) error
+	UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def rlschema.RateLimit) (*RateLimit, error)
+	DeleteRateLimit(ctx context.Context, id apid.ID) error
+	UpdateRateLimitLabels(ctx context.Context, id apid.ID, labels map[string]string) (*RateLimit, error)
+	PutRateLimitLabels(ctx context.Context, id apid.ID, labels map[string]string) (*RateLimit, error)
+	DeleteRateLimitLabels(ctx context.Context, id apid.ID, keys []string) (*RateLimit, error)
+	UpdateRateLimitAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*RateLimit, error)
+	PutRateLimitAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (*RateLimit, error)
+	DeleteRateLimitAnnotations(ctx context.Context, id apid.ID, keys []string) (*RateLimit, error)
+	ListRateLimitsBuilder() ListRateLimitsBuilder
+	ListRateLimitsFromCursor(ctx context.Context, cursor string) (ListRateLimitsExecutor, error)
 
 	/*
 	 * Re-encryption
