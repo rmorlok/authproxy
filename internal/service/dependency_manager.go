@@ -44,6 +44,13 @@ type DependencyManager struct {
 	asynqInspector    *asynq.Inspector
 	c                 coreIface.C
 	pings             map[string]PingFunc
+
+	// Rate-limit cache + refresher are owned by the dependency manager so
+	// the lifecycle is tied to the proxy process. The cache is populated
+	// lazily via GetRateLimitCache(); StartRateLimitRefresher() boots the
+	// background goroutine and returns a stop function the caller defers.
+	rateLimitCache ratelimit.MutableCache
+	rateLimitOnce  sync.Once
 }
 
 func NewDependencyManager(serviceId string, cfg config.C) *DependencyManager {
@@ -317,6 +324,34 @@ func (dm *DependencyManager) GetCoreService() coreIface.C {
 	}
 
 	return dm.c
+}
+
+// GetRateLimitCache returns the lazily-initialised in-memory rate-limit cache
+// for this process. The cache starts empty; call StartRateLimitRefresher()
+// to populate and keep it fresh from the database.
+func (dm *DependencyManager) GetRateLimitCache() ratelimit.Cache {
+	dm.rateLimitOnce.Do(func() {
+		dm.rateLimitCache = ratelimit.NewCache()
+	})
+	return dm.rateLimitCache
+}
+
+// StartRateLimitRefresher boots the background goroutine that keeps the
+// in-memory rate-limit cache fresh from the database. The returned stop
+// function cancels the goroutine and waits for it to exit; api/admin-api
+// callers should defer it.
+//
+// Multiple calls within the same process are safe but only the first
+// actually starts a goroutine — subsequent calls return a no-op stop.
+func (dm *DependencyManager) StartRateLimitRefresher(ctx context.Context) (stop func()) {
+	// Make sure the cache singleton is initialised.
+	_ = dm.GetRateLimitCache()
+	return ratelimit.StartRefresher(
+		ctx,
+		dm.GetDatabase(),
+		dm.rateLimitCache,
+		dm.GetLogBuilder().WithComponent("ratelimit-refresher").Build(),
+	)
 }
 
 // TODO: this automigrate should not be specific to the connectors config

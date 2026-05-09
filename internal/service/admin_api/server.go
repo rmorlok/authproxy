@@ -216,6 +216,11 @@ func Serve(cfg config.C) {
 		panic(err)
 	}
 
+	// Boot the rate-limit cache refresher before serving traffic so the
+	// initial snapshot lands before the proxy starts evaluating rules.
+	stopRateLimitRefresher := dm.StartRateLimitRefresher(context.Background())
+	defer stopRateLimitRefresher()
+
 	var wg sync.WaitGroup
 	wg.Add(1)
 	go func() {
