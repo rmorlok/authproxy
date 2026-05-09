@@ -71,7 +71,7 @@ func TestCallbackRejection_NamespaceMismatchActor(t *testing.T) {
 	// Alice initiates a real connection in tenant-a so we have a valid
 	// connection row to point the synthetic state at, and so alice's
 	// actor row is materialized with an apid we can reference.
-	connID, _ := env.InitiateOAuth2ConnectionAsActor(t, connectorID, "https://example.com/return", aliceExternalID, tenantA)
+	connID, _ := env.InitiateOAuth2Connection(t, connectorID, "https://example.com/return", helpers.WithActor(aliceExternalID, tenantA))
 	alice, err := env.Db.GetActorByExternalId(ctx, tenantA, aliceExternalID)
 	require.NoError(t, err)
 	require.NotNil(t, alice)
@@ -98,9 +98,9 @@ func TestCallbackRejection_NamespaceMismatchActor(t *testing.T) {
 	// (alice signed her own JWT), but s.Namespace ("tenant-b") doesn't
 	// match the caller's namespace ("tenant-a") — fires
 	// `namespace_mismatch_actor` before the connection lookup runs.
-	loc := env.DeliverOAuth2CallbackAsActor(t,
+	loc := env.DeliverOAuth2Callback(t,
 		env.ForgeOAuth2CallbackURL(forgedStateID.String(), "fake-code"),
-		aliceExternalID, tenantA,
+		helpers.WithActor(aliceExternalID, tenantA),
 	)
 	errorPageURL := env.Cfg.GetRoot().ErrorPages.InternalError
 	require.NotEmpty(t, errorPageURL, "test config must set error_pages.internal_error")
@@ -181,14 +181,14 @@ func TestCallbackRejection_NamespaceMismatchConnection(t *testing.T) {
 
 	// Bob owns a connection in tenant-b. We'll point the synthetic state
 	// at this connection to make the connection-namespace check fail.
-	bobConnID, _ := env.InitiateOAuth2ConnectionAsActor(t, connectorID, "https://example.com/return", bobExternalID, tenantB)
+	bobConnID, _ := env.InitiateOAuth2Connection(t, connectorID, "https://example.com/return", helpers.WithActor(bobExternalID, tenantB))
 	bobConn := env.GetConnection(t, bobConnID)
 	require.Equal(t, tenantB, bobConn.Namespace, "bob's connection should live in tenant-b")
 
 	// Materialize alice's actor by initiating a throwaway connection in
 	// tenant-a (we don't reference this connection in the synthetic state;
 	// we only need alice's actor_id so the actor-id check passes).
-	_, _ = env.InitiateOAuth2ConnectionAsActor(t, connectorID, "https://example.com/return", aliceExternalID, tenantA)
+	_, _ = env.InitiateOAuth2Connection(t, connectorID, "https://example.com/return", helpers.WithActor(aliceExternalID, tenantA))
 	alice, err := env.Db.GetActorByExternalId(ctx, tenantA, aliceExternalID)
 	require.NoError(t, err)
 
@@ -208,9 +208,9 @@ func TestCallbackRejection_NamespaceMismatchConnection(t *testing.T) {
 		ExpiresAt:        time.Now().Add(5 * time.Minute),
 	}, 5*time.Minute)
 
-	loc := env.DeliverOAuth2CallbackAsActor(t,
+	loc := env.DeliverOAuth2Callback(t,
 		env.ForgeOAuth2CallbackURL(forgedStateID.String(), "fake-code"),
-		aliceExternalID, tenantA,
+		helpers.WithActor(aliceExternalID, tenantA),
 	)
 	errorPageURL := env.Cfg.GetRoot().ErrorPages.InternalError
 	require.NotEmpty(t, errorPageURL, "test config must set error_pages.internal_error")
