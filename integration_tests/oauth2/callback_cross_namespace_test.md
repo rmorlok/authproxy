@@ -108,14 +108,14 @@ assumption breaks.
 | Real initiate | Alice initiates in tenant-a so a real connection row exists. |
 | Lookup | Read alice's actor id via `env.Db.GetActorByExternalId(ctx, tenant-a, alice)`. |
 | Inject | `env.WriteOAuth2StateForTest` at a fresh `forgedStateID` with `ActorId=alice.Id`, `ConnectionId=conn.Id`, but `Namespace="root.tenant-b-<suffix>"` (lie). |
-| Deliver | `env.DeliverOAuth2CallbackAsActor(callback, alice, tenant-a)`. |
+| Deliver | `env.DeliverOAuth2Callback(callback, helpers.WithActor(alice, tenant-a))`. |
 | Reject | `s.ActorId == caller.Id` ✓, `s.Namespace ("tenant-b") != caller.Namespace ("tenant-a")` → `namespace_mismatch_actor`. |
 
 **Why direct HTTP:** the scenario hinges on programmatic state
 injection — there is no realistic browser-driven path to land a
 state with a colliding actor id in a different namespace. Direct
-delivery via `DeliverOAuth2CallbackAsActor` exercises the same
-production handler chain.
+delivery via `DeliverOAuth2Callback(..., WithActor(...))` exercises
+the same production handler chain.
 
 ## Test 3 — `TestCallbackRejection_NamespaceMismatchConnection` (synthetic state, direct HTTP)
 
@@ -129,7 +129,7 @@ different tenant.
 | Bob's connection | Bob initiates in tenant-b so a real connection row exists in tenant-b. |
 | Materialize alice | Alice initiates a throwaway connection in tenant-a so her actor row exists; we discard the connection id. |
 | Inject | Synthetic state: `Namespace=tenant-a`, `ActorId=alice.Id`, `ConnectionId=bob.Conn.Id` (in tenant-b). |
-| Deliver | `env.DeliverOAuth2CallbackAsActor(callback, alice, tenant-a)`. |
+| Deliver | `env.DeliverOAuth2Callback(callback, helpers.WithActor(alice, tenant-a))`. |
 | Reject | `s.ActorId == caller.Id` ✓, `s.Namespace == caller.Namespace` ✓, connection lookup returns bob's connection in tenant-b, `s.Namespace ("tenant-a") != connection.Namespace ("tenant-b")` → `namespace_mismatch_connection`. |
 
 **Why bob's connection isn't modified:** the rejection happens
@@ -143,10 +143,10 @@ data even when the forgery names the victim's connection id.
 | Lever                                                    | What it controls |
 | -------------------------------------------------------- | ---------------- |
 | `env.Core.CreateNamespace(ctx, "root.tenant-x-…", nil)`  | Pre-creates child namespaces for multi-tenant tests. |
-| `env.InitiateOAuth2ConnectionAsActor(t, …, namespace)`   | Initiates as a named actor in a named namespace; sets `IntoNamespace` so the connection lives in the actor's tenant. |
+| `env.InitiateOAuth2Connection(t, …, helpers.WithActor(ext, ns))` | Initiates as a named actor in a named namespace; sets `IntoNamespace` so the connection lives in the actor's tenant. |
 | `env.PublicAuthUtil.GenerateBearerToken(ctx, ext, ns, perms)` | Mints a JWT for any namespace; used to bootstrap the chromedp marketplace session. |
 | `env.WriteOAuth2StateForTest(t, OAuth2StateForTest{…}, ttl)` | Encrypts a synthetic state envelope via `env.DM.GetEncryptService().EncryptGlobal` and writes it to Redis at `oauth2:state:<id>`. The shape of `OAuth2StateForTest` mirrors the unexported production `state` struct. |
-| `env.DeliverOAuth2CallbackAsActor(t, url, ext, ns)`      | Delivers the callback signed as a specific actor in a specific namespace; mirrors the JWT a real browser session would carry. |
+| `env.DeliverOAuth2Callback(t, url, helpers.WithActor(ext, ns))` | Delivers the callback signed as a specific actor in a specific namespace; mirrors the JWT a real browser session would carry. |
 | `logCapture.RecordsWithMessage(t, rejectionEventMessage)` | Surfaces the structured rejection event for category assertions. |
 
 ## Sequence — Test 1 (chromedp)

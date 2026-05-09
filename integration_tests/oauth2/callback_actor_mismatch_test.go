@@ -79,7 +79,7 @@ func TestCallbackRejection_ActorMismatch(t *testing.T) {
 	// 1. Attacker initiates the connection. State stored in Redis with
 	//    ActorId = attacker. The connection row gets the attacker's actor.
 	returnTo := "https://example.com/return"
-	connID, redirectURL := env.InitiateOAuth2ConnectionAsActor(t, connectorID, returnTo, attackerExternalID, sconfig.RootNamespace)
+	connID, redirectURL := env.InitiateOAuth2Connection(t, connectorID, returnTo, helpers.WithActor(attackerExternalID, sconfig.RootNamespace))
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
 	stateID := parsed.Query().Get("state_id")

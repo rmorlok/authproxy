@@ -71,7 +71,7 @@ look like.
 | Lever                                                       | What it controls |
 | ----------------------------------------------------------- | ---------------- |
 | `helpers.SetupOptions{StartHTTPServer: true, IncludePublic: true, ServeMarketplaceUI: true, LogCapture: …}` | Real HTTP server + marketplace static assets so chromedp can bootstrap a session. |
-| `env.InitiateOAuth2ConnectionAsActor(t, connectorID, returnTo, "alice-attacker-…")` | Initiates the connection programmatically as the attacker — signs the request with a JWT carrying the attacker's external id. |
+| `env.InitiateOAuth2Connection(t, connectorID, returnTo, helpers.WithActor("alice-attacker-…", root))` | Initiates the connection programmatically as the attacker — signs the request with a JWT carrying the attacker's external id. |
 | `provider.Authorize(...)` (`/test/authorize`)               | Mints the OAuth code without a browser. The provider doesn't care which proxy actor owns the state — it validates against its own client/user records — so the attacker can drive this leg programmatically. |
 | `env.PublicAuthUtil.GenerateBearerToken(ctx, "bob-victim-…", root, allPerms)` | Mints the JWT the victim's browser will present to the marketplace. |
 | chromedp navigation to `/connectors?auth_token=<victim JWT>` | Triggers the marketplace SPA's `_initiate` call, which sets the victim's `SESSION-ID` cookie. We wait on the `Connect` button as the bootstrap-complete signal. |
