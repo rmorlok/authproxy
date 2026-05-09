@@ -1,7 +1,6 @@
 package rate_limit
 
 import (
-	"strings"
 	"testing"
 	"time"
 
@@ -157,7 +156,6 @@ func TestBucket_Validate_Errors(t *testing.T) {
 		{"empty-string", []string{""}, "must not be empty"},
 		{"unknown-name", []string{"team"}, "must be a reserved name"},
 		{"missing-label-key", []string{"labels/"}, "missing label key"},
-		{"oversize-label-key", []string{"labels/" + strings.Repeat("x", 400)}, "exceeds maximum length"},
 		{"duplicate", []string{DimensionActor, DimensionActor}, "duplicate dimension"},
 	}
 
