@@ -74,8 +74,6 @@ func (b *Bucket) Validate(vc *common.ValidationContext) error {
 		key := strings.TrimPrefix(d, LabelDimensionPrefix)
 		if key == "" {
 			result = multierror.Append(result, vc.PushField("dimensions").PushIndex(i).NewErrorf("missing label key after %q in %q", LabelDimensionPrefix, d))
-		} else if len(key) > 317 { // 253 prefix + "/" + 63 name (Kubernetes label-key limit)
-			result = multierror.Append(result, vc.PushField("dimensions").PushIndex(i).NewErrorf("label key in %q exceeds maximum length", d))
 		}
 	}
 
