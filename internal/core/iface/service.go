@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	rlschema "github.com/rmorlok/authproxy/internal/schema/rate_limit"
 	"github.com/rmorlok/authproxy/internal/tasks"
 )
 
@@ -196,6 +197,48 @@ type C interface {
 
 	// ListEncryptionKeysFromCursor continues listing encryption keys from a cursor to support pagination.
 	ListEncryptionKeysFromCursor(ctx context.Context, cursor string) (ListEncryptionKeysExecutor, error)
+
+	/*
+	 *
+	 * Rate Limits
+	 *
+	 */
+
+	// GetRateLimit returns a rate limit by ID.
+	GetRateLimit(ctx context.Context, id apid.ID) (RateLimit, error)
+
+	// CreateRateLimit creates a new rate-limit resource. Definition is validated before insert.
+	CreateRateLimit(ctx context.Context, namespace string, def rlschema.RateLimit, labels, annotations map[string]string) (RateLimit, error)
+
+	// UpdateRateLimitDefinition replaces a rate limit's definition payload.
+	UpdateRateLimitDefinition(ctx context.Context, id apid.ID, def rlschema.RateLimit) (RateLimit, error)
+
+	// DeleteRateLimit soft deletes a rate limit.
+	DeleteRateLimit(ctx context.Context, id apid.ID) error
+
+	// UpdateRateLimitLabels replaces all user labels on a rate limit.
+	UpdateRateLimitLabels(ctx context.Context, id apid.ID, labels map[string]string) (RateLimit, error)
+
+	// PutRateLimitLabels merges the supplied labels into the existing set.
+	PutRateLimitLabels(ctx context.Context, id apid.ID, labels map[string]string) (RateLimit, error)
+
+	// DeleteRateLimitLabels removes the specified user-label keys.
+	DeleteRateLimitLabels(ctx context.Context, id apid.ID, keys []string) (RateLimit, error)
+
+	// UpdateRateLimitAnnotations replaces all annotations on a rate limit.
+	UpdateRateLimitAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (RateLimit, error)
+
+	// PutRateLimitAnnotations merges the supplied annotations into the existing set.
+	PutRateLimitAnnotations(ctx context.Context, id apid.ID, annotations map[string]string) (RateLimit, error)
+
+	// DeleteRateLimitAnnotations removes the specified annotation keys.
+	DeleteRateLimitAnnotations(ctx context.Context, id apid.ID, keys []string) (RateLimit, error)
+
+	// ListRateLimitsBuilder returns a builder for listing rate limits.
+	ListRateLimitsBuilder() ListRateLimitsBuilder
+
+	// ListRateLimitsFromCursor continues listing rate limits from a cursor.
+	ListRateLimitsFromCursor(ctx context.Context, cursor string) (ListRateLimitsExecutor, error)
 
 	/*
 	 *

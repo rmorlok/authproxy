@@ -332,6 +332,36 @@ type SwaggerListEncryptionKeysResponse struct {
 	Cursor string `json:"cursor,omitempty"`
 }
 
+// SwaggerRateLimitJson is a simplified rate-limit model for swagger documentation.
+//
+//	@Description	Rate limit configuration
+type SwaggerRateLimitJson struct {
+	// Rate limit ID
+	Id apid.ID `swaggertype:"string" json:"id" example:"rl_test550e8400abcde"`
+	// Namespace path
+	Namespace string `json:"namespace" example:"acme"`
+	// JSON-serialised definition (mode, selector, bucket, algorithm)
+	Definition map[string]interface{} `json:"definition"`
+	// Labels assigned to the rate limit
+	Labels map[string]string `json:"labels,omitempty"`
+	// Annotations assigned to the rate limit
+	Annotations map[string]string `json:"annotations,omitempty"`
+	// Creation timestamp
+	CreatedAt time.Time `json:"created_at"`
+	// Last update timestamp
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
+// SwaggerListRateLimitsResponse is the response for list rate limits.
+//
+//	@Description	Paginated list of rate limits
+type SwaggerListRateLimitsResponse struct {
+	// List of rate limits
+	Items []SwaggerRateLimitJson `json:"items"`
+	// Pagination cursor for next page
+	Cursor string `json:"cursor,omitempty"`
+}
+
 // SwaggerListRequestsResponse is the response for list request logs
 //
 //	@Description	Paginated list of request log entries
