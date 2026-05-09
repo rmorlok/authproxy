@@ -2,6 +2,8 @@ basePath: /api/v1
 definitions:
   github_com_rmorlok_authproxy_internal_schema_config.KeyData:
     type: object
+  github_com_rmorlok_authproxy_internal_schema_rate_limit.RateLimit:
+    type: object
   routes.ActorJson:
     properties:
       annotations:
@@ -120,6 +122,8 @@ definitions:
         type: object
       path:
         type: string
+    type: object
+  routes.CreateRateLimitRequestJson:
     type: object
   routes.DataSourceOptionJson:
     description: Data source option for form select fields
@@ -561,6 +565,18 @@ definitions:
           $ref: '#/definitions/routes.SwaggerNamespaceJson'
         type: array
     type: object
+  routes.SwaggerListRateLimitsResponse:
+    description: Paginated list of rate limits
+    properties:
+      cursor:
+        description: Pagination cursor for next page
+        type: string
+      items:
+        description: List of rate limits
+        items:
+          $ref: '#/definitions/routes.SwaggerRateLimitJson'
+        type: array
+    type: object
   routes.SwaggerListRequestsResponse:
     description: Paginated list of request log entries
     properties:
@@ -610,6 +626,38 @@ definitions:
       value:
         description: Value to set
         example: production
+        type: string
+    type: object
+  routes.SwaggerRateLimitJson:
+    description: Rate limit configuration
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        description: Annotations assigned to the rate limit
+        type: object
+      created_at:
+        description: Creation timestamp
+        type: string
+      definition:
+        additionalProperties: true
+        description: JSON-serialised definition (mode, selector, bucket, algorithm)
+        type: object
+      id:
+        description: Rate limit ID
+        example: rl_test550e8400abcde
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        description: Labels assigned to the rate limit
+        type: object
+      namespace:
+        description: Namespace path
+        example: acme
+        type: string
+      updated_at:
+        description: Last update timestamp
         type: string
     type: object
   routes.SwaggerRequestLogEntry:
@@ -752,6 +800,19 @@ definitions:
         additionalProperties:
           type: string
         type: object
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
+  routes.UpdateRateLimitRequestJson:
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      definition:
+        $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_rate_limit.RateLimit'
       labels:
         additionalProperties:
           type: string
@@ -4718,6 +4779,548 @@ paths:
       summary: Set a label for a namespace
       tags:
       - namespaces
+  /rate-limits:
+    get:
+      consumes:
+      - application/json
+      description: List rate limits with optional filtering and pagination
+      parameters:
+      - description: Pagination cursor
+        in: query
+        name: cursor
+        type: string
+      - description: Maximum number of results to return
+        in: query
+        name: limit
+        type: integer
+      - description: Filter by namespace
+        in: query
+        name: namespace
+        type: string
+      - description: Filter by label selector
+        in: query
+        name: label_selector
+        type: string
+      - description: Order by field (e.g., 'created_at:desc')
+        in: query
+        name: order_by
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerListRateLimitsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List rate limits
+      tags:
+      - rate_limits
+    post:
+      consumes:
+      - application/json
+      description: Create a new rate limit resource
+      parameters:
+      - description: Rate limit creation request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.CreateRateLimitRequestJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerRateLimitJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Create rate limit
+      tags:
+      - rate_limits
+  /rate-limits/{id}:
+    delete:
+      consumes:
+      - application/json
+      description: Soft delete a rate limit
+      parameters:
+      - description: Rate limit ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete rate limit
+      tags:
+      - rate_limits
+    get:
+      consumes:
+      - application/json
+      description: Get a specific rate limit by ID
+      parameters:
+      - description: Rate limit ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerRateLimitJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get rate limit
+      tags:
+      - rate_limits
+    patch:
+      consumes:
+      - application/json
+      description: Update a rate limit's definition, labels, or annotations
+      parameters:
+      - description: Rate limit ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Update request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.UpdateRateLimitRequestJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerRateLimitJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Update rate limit
+      tags:
+      - rate_limits
+  /rate-limits/{id}/annotations:
+    get:
+      description: Get all annotations associated with a specific rate limit
+      parameters:
+      - description: Rate limit ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all annotations for a rate limit
+      tags:
+      - rate_limits
+  /rate-limits/{id}/annotations/{annotation}:
+    delete:
+      description: Delete a specific annotation by key from a rate limit
+      parameters:
+      - description: Rate limit ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete an annotation from a rate limit
+      tags:
+      - rate_limits
+    get:
+      description: Get a specific annotation value by key for a rate limit
+      parameters:
+      - description: Rate limit ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a specific annotation for a rate limit
+      tags:
+      - rate_limits
+    put:
+      consumes:
+      - application/json
+      description: Set or update a specific annotation value by key for a rate limit
+      parameters:
+      - description: Rate limit ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Annotation key
+        in: path
+        name: annotation
+        required: true
+        type: string
+      - description: Annotation value
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.SwaggerPutKeyValueRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set an annotation for a rate limit
+      tags:
+      - rate_limits
+  /rate-limits/{id}/labels:
+    get:
+      description: Get all labels associated with a specific rate limit
+      parameters:
+      - description: Rate limit ID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get all labels for a rate limit
+      tags:
+      - rate_limits
+  /rate-limits/{id}/labels/{label}:
+    delete:
+      description: Delete a specific label by key from a rate limit
+      parameters:
+      - description: Rate limit ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      responses:
+        "204":
+          description: No Content
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Delete a label from a rate limit
+      tags:
+      - rate_limits
+    get:
+      description: Get a specific label value by key for a rate limit
+      parameters:
+      - description: Rate limit ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get a specific label for a rate limit
+      tags:
+      - rate_limits
+    put:
+      consumes:
+      - application/json
+      description: Set or update a specific label value by key for a rate limit
+      parameters:
+      - description: Rate limit ID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Label key
+        in: path
+        name: label
+        required: true
+        type: string
+      - description: Label value
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.SwaggerPutKeyValueRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerKeyValueJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Set a label for a rate limit
+      tags:
+      - rate_limits
   /request-log:
     get:
       consumes:

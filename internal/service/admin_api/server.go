@@ -151,6 +151,11 @@ func GetGinServer(
 		authService,
 		dm.GetCoreService(),
 	)
+	routesRateLimits := common_routes.NewRateLimitsRoutes(
+		dm.GetConfig(),
+		authService,
+		dm.GetCoreService(),
+	)
 	routesTaskMonitoring := common_routes.NewTaskMonitoringRoutes(
 		dm.GetConfig(),
 		authService,
@@ -164,6 +169,7 @@ func GetGinServer(
 	routesConnections.Register(api)
 	routesNamespaces.Register(api)
 	routesEncryptionKeys.Register(api)
+	routesRateLimits.Register(api)
 	routesRequestLog.Register(api)
 	routesActors.Register(api)
 	routesTaskMonitoring.Register(api)
