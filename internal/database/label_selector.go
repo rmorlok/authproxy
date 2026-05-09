@@ -132,6 +132,43 @@ func (s LabelSelector) String() string {
 	return strings.Join(parts, ",")
 }
 
+// Matches reports whether the supplied label map satisfies every requirement
+// in the selector. An empty / nil selector matches any input — same convention
+// the SQL-side uses (no requirements means no filter).
+//
+// This is the in-memory counterpart to ApplyToSqlBuilderWithProvider used by
+// the rate-limit evaluator (and any future runtime path that needs to match
+// label selectors against per-request snapshots).
+func (s LabelSelector) Matches(labels map[string]string) bool {
+	for _, r := range s {
+		v, present := labels[r.Key]
+		switch r.Operator {
+		case LabelOperatorEqual:
+			if !present || v != r.Value {
+				return false
+			}
+		case LabelOperatorNotEqual:
+			// Kubernetes-style: matches when the key is absent OR present with
+			// a different value. Mirrors the SQL predicate above.
+			if present && v == r.Value {
+				return false
+			}
+		case LabelOperatorExists:
+			if !present {
+				return false
+			}
+		case LabelOperatorNotExists:
+			if present {
+				return false
+			}
+		default:
+			// Unknown operator — fail closed.
+			return false
+		}
+	}
+	return true
+}
+
 func (s LabelSelector) ApplyToSqlBuilderWithProvider(q sq.SelectBuilder, labelsColumn string, provider config.DatabaseProvider) sq.SelectBuilder {
 	labelsExpr := labelsColumn
 	sqlitePathExpr := fmt.Sprintf("'$.\"' || ? || '\"'")
