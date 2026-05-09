@@ -1,0 +1,43 @@
+# $schema: ../schema.json
+#
+# Mirrors valid.yaml's required structure but uses an unsupported
+# telemetry.exporter.protocol value, which must be rejected by the schema.
+
+api:
+  port: 8081
+
+admin_api:
+  port: 8082
+
+public:
+  port: 8081
+
+worker:
+  health_check_port: 8083
+
+host_application:
+  initiate_session_url: http://127.0.0.1:8888/login-redirect
+
+system_auth:
+  jwt_signing_key:
+    public_key:
+      path: ./dev_config/keys/system.pub
+    private_key:
+      path: ./dev_config/keys/system
+
+database:
+  provider: postgres
+  host: localhost
+  port: 5432
+  user: postgres
+  password: postgres
+  database: authproxy
+  sslmode: disable
+
+connectors:
+  load_from_list: []
+
+telemetry:
+  enabled: true
+  exporter:
+    protocol: not-a-real-protocol

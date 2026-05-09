@@ -205,6 +205,10 @@ func Serve(cfg config.C) {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
+	// Initialise telemetry early; flush last so other shutdowns can still emit.
+	dm.GetTelemetry()
+	defer dm.ShutdownTelemetry()
+
 	defer dm.GetRedisClient().Close()
 
 	dm.AutoMigrateAll()

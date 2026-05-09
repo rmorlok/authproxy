@@ -226,3 +226,38 @@ connectors:
         - id: users:read
           reason: |
             Allows us to map work to who is responsible
+telemetry:
+  enabled: true
+  exporter:
+    protocol: grpc
+    endpoint:
+      env_var: OTEL_EXPORTER_OTLP_ENDPOINT
+      default: http://localhost:4317
+    insecure: true
+    headers:
+      authorization:
+        env_var: OTEL_HEADER_AUTH
+        default: Bearer dev-token
+  resource:
+    service_name_prefix: authproxy
+    attributes:
+      deployment.environment: dev
+  sampling:
+    ratio: 1.0
+  signals:
+    traces: true
+    metrics: true
+    logs: true
+  http:
+    excluded_paths:
+      - /ping
+      - /healthz
+  proxy:
+    span_attribute_labels:
+      - type
+      - env
+    metric_dimension_labels:
+      - type
+    metric_dimension_value_cap: 50
+  propagation:
+    inject_outbound_default: false

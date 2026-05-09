@@ -13,6 +13,7 @@ import (
 	authSync "github.com/rmorlok/authproxy/internal/apauth/tasks"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"
+	"github.com/rmorlok/authproxy/internal/aptelemetry"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
@@ -44,6 +45,9 @@ type DependencyManager struct {
 	asynqInspector    *asynq.Inspector
 	c                 coreIface.C
 	pings             map[string]PingFunc
+	telemetry         *aptelemetry.Providers
+	telemetryOnce     sync.Once
+	telemetryErr      error
 }
 
 func NewDependencyManager(serviceId string, cfg config.C) *DependencyManager {
@@ -301,6 +305,50 @@ func (dm *DependencyManager) GetAsyncInspector() *asynq.Inspector {
 	}
 
 	return dm.asynqInspector
+}
+
+// GetTelemetry returns the OTel providers for this service. When telemetry is
+// disabled or unconfigured, the returned Providers are no-op implementations.
+//
+// The first call lazily initialises the SDK; subsequent calls return the same
+// Providers. Initialisation failure is panicked, matching the pattern used by
+// other dependencies on this manager. Use ShutdownTelemetry to flush and tear
+// down before exit.
+func (dm *DependencyManager) GetTelemetry() *aptelemetry.Providers {
+	dm.telemetryOnce.Do(func() {
+		providers, err := aptelemetry.New(
+			context.Background(),
+			dm.serviceId,
+			"",
+			dm.GetConfigRoot().Telemetry,
+		)
+		if err != nil {
+			dm.telemetryErr = err
+			return
+		}
+		dm.telemetry = providers
+	})
+
+	if dm.telemetryErr != nil {
+		panic(fmt.Errorf("failed to initialise telemetry: %w", dm.telemetryErr))
+	}
+
+	return dm.telemetry
+}
+
+// ShutdownTelemetry flushes and tears down OTel providers if they were
+// initialised. Safe to call multiple times. Bounded by aptelemetry.ShutdownTimeout.
+func (dm *DependencyManager) ShutdownTelemetry() {
+	if dm.telemetry == nil {
+		return
+	}
+
+	ctx, cancel := context.WithTimeout(context.Background(), aptelemetry.ShutdownTimeout)
+	defer cancel()
+
+	if err := dm.telemetry.Shutdown(ctx); err != nil {
+		dm.GetLogger().Warn("telemetry shutdown reported an error", "error", err)
+	}
 }
 
 func (dm *DependencyManager) GetCoreService() coreIface.C {

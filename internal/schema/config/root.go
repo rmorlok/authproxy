@@ -25,6 +25,7 @@ type Root struct {
 	HttpLogging     *HttpLogging    `json:"http_logging,omitempty" yaml:"http_logging,omitempty"`
 	Connections     *Connections     `json:"connections,omitempty" yaml:"connections,omitempty"`
 	Tasks           *Tasks          `json:"tasks,omitempty" yaml:"tasks,omitempty"`
+	Telemetry       *Telemetry      `json:"telemetry,omitempty" yaml:"telemetry,omitempty"`
 	DevSettings     *DevSettings    `json:"dev_settings,omitempty" yaml:"dev_settings,omitempty"`
 }
 
@@ -47,6 +48,10 @@ func (r *Root) Validate() error {
 	}
 
 	if err := r.HostApplication.Validate(vc.PushField("host_application")); err != nil {
+		result = multierror.Append(result, err)
+	}
+
+	if err := r.Telemetry.Validate(vc.PushField("telemetry")); err != nil {
 		result = multierror.Append(result, err)
 	}
 
