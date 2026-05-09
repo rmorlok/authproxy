@@ -184,9 +184,6 @@ func TestSchema(t *testing.T) {
 				{Name: "oauth", Valid: true, Data: `{"test": "oauth"}`},
 				{Name: "public", Valid: true, Data: `{"test": "public"}`},
 				{Name: "probe", Valid: true, Data: `{"test": "probe"}`},
-				{Name: "oauth2_token_exchange", Valid: true, Data: `{"test": "oauth2_token_exchange"}`},
-				{Name: "oauth2_refresh", Valid: true, Data: `{"test": "oauth2_refresh"}`},
-				{Name: "oauth2_revocation", Valid: true, Data: `{"test": "oauth2_revocation"}`},
 			},
 		},
 		{

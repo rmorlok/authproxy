@@ -23,10 +23,7 @@
         "proxy",
         "oauth",
         "public",
-        "probe",
-        "oauth2_token_exchange",
-        "oauth2_refresh",
-        "oauth2_revocation"
+        "probe"
       ],
       "description": "Identifies the kind of traffic flowing through the proxy."
     },
