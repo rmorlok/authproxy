@@ -99,9 +99,6 @@ func TestSelector_Validate_RequestTypes_AcceptsAllKnown(t *testing.T) {
 		common.RequestTypeProxy,
 		common.RequestTypeProbe,
 		common.RequestTypeOAuth,
-		common.RequestTypeOAuth2TokenExchange,
-		common.RequestTypeOAuth2Refresh,
-		common.RequestTypeOAuth2Revocation,
 	}
 	require.NoError(t, rl.Validate())
 }
@@ -113,10 +110,10 @@ func TestSelector_EffectiveRequestTypes_NilReceiver(t *testing.T) {
 
 func TestPathMatch_Validate(t *testing.T) {
 	cases := []struct {
-		name     string
-		pm       PathMatch
-		wantErr  bool
-		errPart  string
+		name    string
+		pm      PathMatch
+		wantErr bool
+		errPart string
 	}{
 		{"prefix-ok", PathMatch{Kind: PathMatchKindPrefix, Value: "/x"}, false, ""},
 		{"glob-ok", PathMatch{Kind: PathMatchKindGlob, Value: "/x/*"}, false, ""},

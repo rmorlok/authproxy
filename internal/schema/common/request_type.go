@@ -27,16 +27,6 @@ const (
 
 	// RequestTypeProbe is a connector-defined health probe.
 	RequestTypeProbe RequestType = "probe"
-
-	// RequestTypeOAuth2TokenExchange is an OAuth2 authorization-code → token
-	// exchange call.
-	RequestTypeOAuth2TokenExchange RequestType = "oauth2_token_exchange"
-
-	// RequestTypeOAuth2Refresh is an OAuth2 refresh-token call.
-	RequestTypeOAuth2Refresh RequestType = "oauth2_refresh"
-
-	// RequestTypeOAuth2Revocation is an OAuth2 token-revocation call.
-	RequestTypeOAuth2Revocation RequestType = "oauth2_revocation"
 )
 
 // AllRequestTypes returns every recognised RequestType. Callers that need to
@@ -49,9 +39,6 @@ func AllRequestTypes() []RequestType {
 		RequestTypeOAuth,
 		RequestTypePublic,
 		RequestTypeProbe,
-		RequestTypeOAuth2TokenExchange,
-		RequestTypeOAuth2Refresh,
-		RequestTypeOAuth2Revocation,
 	}
 }
 
@@ -62,10 +49,7 @@ func IsValidRequestType[T string | RequestType](t T) bool {
 		RequestTypeProxy,
 		RequestTypeOAuth,
 		RequestTypePublic,
-		RequestTypeProbe,
-		RequestTypeOAuth2TokenExchange,
-		RequestTypeOAuth2Refresh,
-		RequestTypeOAuth2Revocation:
+		RequestTypeProbe:
 		return true
 	default:
 		return false

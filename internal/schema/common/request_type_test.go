@@ -17,9 +17,6 @@ func TestRequestType_IsValid(t *testing.T) {
 		{"oauth", RequestTypeOAuth, true},
 		{"public", RequestTypePublic, true},
 		{"probe", RequestTypeProbe, true},
-		{"oauth2_token_exchange", RequestTypeOAuth2TokenExchange, true},
-		{"oauth2_refresh", RequestTypeOAuth2Refresh, true},
-		{"oauth2_revocation", RequestTypeOAuth2Revocation, true},
 		{"empty", "", false},
 		{"unknown", "bogus", false},
 		{"case-mismatch", "Proxy", false},
@@ -36,7 +33,7 @@ func TestRequestType_IsValid(t *testing.T) {
 
 func TestRequestType_Validate(t *testing.T) {
 	require.NoError(t, RequestType("proxy").Validate())
-	require.NoError(t, RequestTypeOAuth2Refresh.Validate())
+	require.NoError(t, RequestTypeOAuth.Validate())
 
 	err := RequestType("nope").Validate()
 	require.Error(t, err)
@@ -45,7 +42,7 @@ func TestRequestType_Validate(t *testing.T) {
 
 func TestAllRequestTypes(t *testing.T) {
 	all := AllRequestTypes()
-	require.Len(t, all, 8)
+	require.Len(t, all, 5)
 	for _, rt := range all {
 		require.True(t, IsValidRequestType(rt), "expected %q to be valid", rt)
 	}

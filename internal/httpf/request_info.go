@@ -13,14 +13,11 @@ import (
 type RequestType = common.RequestType
 
 const (
-	RequestTypeGlobal              = common.RequestTypeGlobal
-	RequestTypeProxy               = common.RequestTypeProxy
-	RequestTypeOAuth               = common.RequestTypeOAuth
-	RequestTypePublic              = common.RequestTypePublic
-	RequestTypeProbe               = common.RequestTypeProbe
-	RequestTypeOAuth2TokenExchange = common.RequestTypeOAuth2TokenExchange
-	RequestTypeOAuth2Refresh       = common.RequestTypeOAuth2Refresh
-	RequestTypeOAuth2Revocation    = common.RequestTypeOAuth2Revocation
+	RequestTypeGlobal = common.RequestTypeGlobal
+	RequestTypeProxy  = common.RequestTypeProxy
+	RequestTypeOAuth  = common.RequestTypeOAuth
+	RequestTypePublic = common.RequestTypePublic
+	RequestTypeProbe  = common.RequestTypeProbe
 )
 
 type RequestInfo struct {
