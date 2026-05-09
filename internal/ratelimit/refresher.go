@@ -26,13 +26,6 @@ const minRefreshInterval = 5 * time.Second
 // process startup the api/admin-api server should call Sync() once to
 // populate the cache before serving traffic, then Run() in a goroutine for
 // the lifetime of the process.
-//
-// The DB query is performed without a Redis mutex: the cache is per-process
-// and each proxy node refreshes independently of the others. Coordinating
-// across processes via Redis (sentinel/mutex) would only help if the cache
-// were shared (e.g., a Redis-backed snapshot read by all proxies) — that
-// design is intentionally deferred until the proxy fleet is large enough to
-// stress the database from synchronized refreshes.
 type Refresher struct {
 	db       database.DB
 	cache    MutableCache
@@ -177,14 +170,20 @@ func (r *Refresher) notifySync(err error) {
 	}
 }
 
-// Background entry-point used by api/admin-api server bootstrap. Returns a
+// Background entry-point used by server bootstrap. Returns a
 // stop function that cancels the goroutine and waits for it to exit.
 //
 // Typical use:
 //
 //	stop := ratelimit.StartRefresher(ctx, db, cache, logger)
 //	defer stop()
-func StartRefresher(parentCtx context.Context, db database.DB, cache MutableCache, logger *slog.Logger, opts ...RefresherOption) (stop func()) {
+func StartRefresher(
+	parentCtx context.Context,
+	db database.DB,
+	cache MutableCache,
+	logger *slog.Logger,
+	opts ...RefresherOption,
+) (stop func()) {
 	r := NewRefresher(db, cache, logger, opts...)
 	ctx, cancel := context.WithCancel(parentCtx)
 	var wg sync.WaitGroup
@@ -198,4 +197,3 @@ func StartRefresher(parentCtx context.Context, db database.DB, cache MutableCach
 		wg.Wait()
 	}
 }
-
