@@ -152,16 +152,13 @@ sequenceDiagram
     PUB->>R: GET state envelope, validate
     PUB->>P: POST /token (attempt 1)
     P-->>PUB: 503
-    PUB->>PUB: log "transient failure; retrying" (attempt=1)
-    Note over PUB: sleep 200ms
+    Note over PUB: log transient failure, retry (attempt=1)<br/>sleep 200ms
     PUB->>P: POST /token (attempt 2)
     P-->>PUB: 503
-    PUB->>PUB: log "transient failure; retrying" (attempt=2)
-    Note over PUB: sleep 400ms
+    Note over PUB: log transient failure, retry (attempt=2)<br/>sleep 400ms
     PUB->>P: POST /token (attempt 3)
     P-->>PUB: 503
-    PUB->>PUB: classifyTokenEndpointStatus → provider_5xx
-    PUB->>PUB: emitTokenExchangeFailure (one event, attempts=3)
-    PUB->>DB: HandleAuthFailed → setup_step=auth_failed,<br/>setup_error="received status code 503: …"
+    Note over PUB: classifyTokenEndpointStatus → provider_5xx<br/>emitTokenExchangeFailure (one event, attempts=3)
+    PUB->>DB: HandleAuthFailed → setup_step=auth_failed,<br/>setup_error="received status code 503"
     PUB-->>T: 302 → return_to_url?setup=pending&connection_id=…
 ```
