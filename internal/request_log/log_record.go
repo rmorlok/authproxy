@@ -41,6 +41,26 @@ type LogRecord struct {
 	RequestCancelled    bool                `json:"request_cancelled,omitempty"`
 	FullRequestRecorded bool                `json:"full_request_recorded,omitempty"`
 	Labels              database.Labels     `json:"labels,omitempty"`
+
+	// ResponseSource identifies who produced the response. Defaults to
+	// ResponseSourceUpstream so historical entries — and any non-429
+	// response — keep the obvious meaning. See attribution.go.
+	ResponseSource ResponseSource `json:"response_source,omitempty"`
+
+	// RateLimitId, RateLimitMode, RateLimitBucket are populated when a
+	// proxy-side RateLimit resource matched the request, regardless of
+	// whether it was the firing rule or just a logged observation. The
+	// connector-level reactive limiter does not populate these (it has
+	// no rule id).
+	RateLimitId     apid.ID           `json:"rate_limit_id,omitempty"`
+	RateLimitMode   string            `json:"rate_limit_mode,omitempty"`
+	RateLimitBucket map[string]string `json:"rate_limit_bucket,omitempty"`
+
+	// RateLimitMatched is the full set of rate-limit rules that matched
+	// this request — the firing rule plus any observe-mode matches. Lets
+	// operators see *every* rule that contributed to the decision, not
+	// just the one that ultimately rejected the request.
+	RateLimitMatched []RateLimitMatch `json:"rate_limit_matched,omitempty"`
 }
 
 func (e *LogRecord) GetId() apid.ID {

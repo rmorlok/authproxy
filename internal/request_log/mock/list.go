@@ -34,6 +34,8 @@ type MockListRequestBuilderExecutor struct {
 	Path                     *string     `json:"path,omitempty"`
 	PathRegex                *string     `json:"path_regex,omitempty"`
 	LabelSelector            *string     `json:"label_selector,omitempty"`
+	ResponseSource           *string     `json:"response_source,omitempty"`
+	RateLimitId              *apid.ID    `json:"rate_limit_id,omitempty"`
 }
 
 func (l *MockListRequestBuilderExecutor) WithNamespaceMatcher(matcher string) request_log.ListRequestBuilder {
@@ -121,6 +123,16 @@ func (l *MockListRequestBuilderExecutor) WithParsedTimestampRange(r string) (req
 func (l *MockListRequestBuilderExecutor) WithLabelSelector(selector string) (request_log.ListRequestBuilder, error) {
 	l.LabelSelector = util.ToPtr(selector)
 	return l, nil
+}
+
+func (l *MockListRequestBuilderExecutor) WithResponseSource(s request_log.ResponseSource) request_log.ListRequestBuilder {
+	l.ResponseSource = util.ToPtr(string(s))
+	return l
+}
+
+func (l *MockListRequestBuilderExecutor) WithRateLimitId(id apid.ID) request_log.ListRequestBuilder {
+	l.RateLimitId = util.ToPtr(id)
+	return l
 }
 
 func (l *MockListRequestBuilderExecutor) Limit(limit int32) request_log.ListRequestBuilder {

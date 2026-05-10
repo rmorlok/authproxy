@@ -59,7 +59,9 @@ func (s *clickhouseRecordStore) StoreRecords(ctx context.Context, records []*Log
 			"request_http_version, request_size_bytes, request_mime_type, "+
 			"response_http_version, response_size_bytes, response_mime_type, "+
 			"internal_timeout, request_cancelled, full_request_recorded, "+
-			"labels) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			"labels, response_source, rate_limit_id, rate_limit_mode, "+
+			"rate_limit_bucket, rate_limit_matched) "+
+			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		entryRecordsTable,
 	))
 	if err != nil {
@@ -74,6 +76,20 @@ func (s *clickhouseRecordStore) StoreRecords(ctx context.Context, records []*Log
 		if labelsVal == nil {
 			labelsVal = "{}"
 		}
+		source := r.ResponseSource
+		if source == "" {
+			source = ResponseSourceUpstream
+		}
+		bucketJSON, err := marshalRateLimitBucket(r.RateLimitBucket)
+		if err != nil {
+			s.logger.Error("failed to marshal rate-limit bucket", "error", err, "entry_id", r.RequestId.String())
+			continue
+		}
+		matchedJSON, err := marshalRateLimitMatched(r.RateLimitMatched)
+		if err != nil {
+			s.logger.Error("failed to marshal rate-limit matched", "error", err, "entry_id", r.RequestId.String())
+			continue
+		}
 		_, err = stmt.ExecContext(ctx,
 			r.RequestId.String(), r.Namespace, string(r.Type), r.CorrelationId,
 			r.Timestamp.UnixMilli(), r.MillisecondDuration.Duration().Milliseconds(),
@@ -84,6 +100,8 @@ func (s *clickhouseRecordStore) StoreRecords(ctx context.Context, records []*Log
 			r.ResponseHttpVersion, r.ResponseSizeBytes, r.ResponseMimeType,
 			r.InternalTimeout, r.RequestCancelled, r.FullRequestRecorded,
 			labelsVal,
+			string(source), r.RateLimitId.String(), r.RateLimitMode,
+			bucketJSON, matchedJSON,
 		)
 		if err != nil {
 			s.logger.Error("failed to insert record into clickhouse", "error", err, "entry_id", r.RequestId.String())
@@ -129,7 +147,12 @@ func (s *clickhouseRecordStore) Migrate(ctx context.Context) error {
 		internal_timeout Bool,
 		request_cancelled Bool,
 		full_request_recorded Bool,
-		labels String DEFAULT '{}'
+		labels String DEFAULT '{}',
+		response_source String DEFAULT 'upstream',
+		rate_limit_id String DEFAULT '',
+		rate_limit_mode String DEFAULT '',
+		rate_limit_bucket String DEFAULT '{}',
+		rate_limit_matched String DEFAULT '[]'
 	) ENGINE = MergeTree()
 	ORDER BY (namespace, timestamp_ms, request_id)`, entryRecordsTable)
 
@@ -375,6 +398,16 @@ func (l *clickhouseListRequestsBuilder) WithLabelSelector(selector string) (List
 		return nil, err
 	}
 	return l, nil
+}
+
+func (l *clickhouseListRequestsBuilder) WithResponseSource(s ResponseSource) ListRequestBuilder {
+	l.sqlListRequestsBuilder.WithResponseSource(s)
+	return l
+}
+
+func (l *clickhouseListRequestsBuilder) WithRateLimitId(id apid.ID) ListRequestBuilder {
+	l.sqlListRequestsBuilder.WithRateLimitId(id)
+	return l
 }
 
 var _ ListRequestExecutor = (*clickhouseListRequestsBuilder)(nil)
