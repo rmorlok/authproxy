@@ -4,10 +4,37 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/url"
+	"time"
 
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	gentleman "gopkg.in/h2non/gentleman.v2"
+)
+
+// Token-exchange retry policy. The token endpoint must be reachable for
+// the OAuth flow to complete; rather than fail the whole flow on a
+// momentary upstream blip, we make a small bounded number of attempts
+// before giving up. Permanent failures (4xx) are not retried — retrying
+// would re-submit the same authorization code, which a sane provider
+// rejects as invalid_grant on the second try.
+//
+// The policy is intentionally hardcoded. If different connectors need
+// different budgets, this becomes a connector-level config knob — but
+// only when there's evidence that they do.
+const (
+	// tokenExchangeMaxAttempts is the total number of token-endpoint POST
+	// attempts (including the first). 3 = 1 try + 2 retries — enough to
+	// ride through a single bad pod or a quick rolling restart, not so
+	// many that a hard outage stretches the user's wait beyond a couple
+	// of seconds.
+	tokenExchangeMaxAttempts = 3
+	// tokenExchangeBackoffStep is the linear backoff between attempts:
+	// 200ms before retry 1, 400ms before retry 2. Short enough that a
+	// user staring at the marketplace post-consent does not notice;
+	// long enough that a node-local failover has time to settle.
+	tokenExchangeBackoffStep = 200 * time.Millisecond
 )
 
 func (o *oAuth2Connection) getPublicCallbackUrl() (string, error) {
@@ -121,16 +148,6 @@ func (o *oAuth2Connection) exchangeCodeAndAdvance(ctx context.Context, query url
 		return "", err
 	}
 
-	req := c.Request().
-		Method("POST").
-		URL(tokenEndpoint).
-		Type("application/x-www-form-urlencoded").
-		AddHeader("accept", "application/json")
-
-	for k, v := range o.auth.Token.QueryOverrides {
-		req = req.SetQuery(k, v)
-	}
-
 	values := url.Values{
 		"client_id":     {clientId},
 		"client_secret": {clientSecret},
@@ -143,13 +160,12 @@ func (o *oAuth2Connection) exchangeCodeAndAdvance(ctx context.Context, query url
 		values.Set(k, v)
 	}
 
-	resp, err := req.
-		BodyString(values.Encode()).
-		Send()
-
+	resp, attempts, err := o.postTokenExchangeWithRetry(ctx, c, tokenEndpoint, values)
 	if err != nil {
 		err = fmt.Errorf("failed to post to exchange authorization code for access token: %w", err)
-		emitTokenExchangeFailure(ctx, o.logger, tokenExchangeNetworkError, o.tokenExchangeAttrsFromConn(err))
+		attrs := o.tokenExchangeAttrsFromConn(err)
+		attrs.Attempts = attempts
+		emitTokenExchangeFailure(ctx, o.logger, tokenExchangeNetworkError, attrs)
 		return "", err
 	}
 
@@ -159,6 +175,7 @@ func (o *oAuth2Connection) exchangeCodeAndAdvance(ctx context.Context, query url
 		attrs := o.tokenExchangeAttrsFromConn(err)
 		attrs.ProviderStatusCode = resp.StatusCode
 		attrs.ProviderError = providerErr
+		attrs.Attempts = attempts
 		emitTokenExchangeFailure(ctx, o.logger, category, attrs)
 		return "", err
 	}
@@ -181,6 +198,76 @@ func (o *oAuth2Connection) exchangeCodeAndAdvance(ctx context.Context, query url
 		return o.appendSetupPendingToReturnUrl(o.state.ReturnToUrl), nil
 	}
 	return o.state.ReturnToUrl, nil
+}
+
+// postTokenExchangeWithRetry POSTs the token-exchange form to the provider's
+// token endpoint, retrying transient failures (transport errors and 5xx
+// responses) up to tokenExchangeMaxAttempts times. Returns the final
+// response (or last network error), along with the number of attempts
+// actually made — callers attach that to the failure event so the
+// "exhausted" case is observably distinct from a single non-retryable
+// 4xx.
+//
+// Permanent failures (4xx) are returned immediately without retry; the
+// provider has classified the request as malformed or unauthorized,
+// and resubmitting the same authorization code would only burn the
+// code and produce an `invalid_grant` on the second call.
+//
+// Each retry rebuilds the gentleman.Request from scratch — gentleman
+// requests are single-use (they panic with "Request was already
+// dispatched" on a second Send).
+func (o *oAuth2Connection) postTokenExchangeWithRetry(
+	ctx context.Context,
+	client *gentleman.Client,
+	tokenEndpoint string,
+	values url.Values,
+) (*gentleman.Response, int, error) {
+	var lastResp *gentleman.Response
+	var lastErr error
+
+	for attempt := 1; attempt <= tokenExchangeMaxAttempts; attempt++ {
+		if attempt > 1 {
+			backoff := tokenExchangeBackoffStep * time.Duration(attempt-1)
+			select {
+			case <-ctx.Done():
+				return nil, attempt - 1, ctx.Err()
+			case <-time.After(backoff):
+			}
+		}
+
+		req := client.Request().
+			Method("POST").
+			URL(tokenEndpoint).
+			Type("application/x-www-form-urlencoded").
+			AddHeader("accept", "application/json")
+
+		for k, v := range o.auth.Token.QueryOverrides {
+			req = req.SetQuery(k, v)
+		}
+
+		resp, err := req.BodyString(values.Encode()).Send()
+
+		if err == nil && resp.StatusCode < 500 {
+			return resp, attempt, nil
+		}
+
+		lastResp, lastErr = resp, err
+
+		if attempt < tokenExchangeMaxAttempts {
+			args := []any{
+				slog.Int("attempt", attempt),
+				slog.Int("max_attempts", tokenExchangeMaxAttempts),
+			}
+			if err != nil {
+				args = append(args, slog.String("error", err.Error()))
+			} else {
+				args = append(args, slog.Int("provider_status_code", resp.StatusCode))
+			}
+			o.logger.WarnContext(ctx, "oauth token exchange transient failure; retrying", args...)
+		}
+	}
+
+	return lastResp, tokenExchangeMaxAttempts, lastErr
 }
 
 // appendSetupPendingToReturnUrl augments the return URL with query params that signal the UI
