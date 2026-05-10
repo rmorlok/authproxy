@@ -35,7 +35,8 @@ func Serve(cfg config.C) {
 	defer dm.ShutdownTelemetry()
 
 	workerConfig := cfg.GetRoot().Worker
-	router := apgin.ForService(&workerConfig, logger, cfg.IsDebugMode())
+	router := apgin.ForService(&workerConfig, logger, cfg.IsDebugMode(),
+		apgin.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry, dm.GetServiceId()))
 
 	router.GET("/ping", func(c *gin.Context) {
 		c.PureJSON(http.StatusOK, gin.H{

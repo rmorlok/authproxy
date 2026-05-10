@@ -56,7 +56,8 @@ func GetGinServer(
 		logger,
 	)
 
-	server := apgin.ForService(service, logger, dm.GetConfig().IsDebugMode())
+	server := apgin.ForService(service, logger, dm.GetConfig().IsDebugMode(),
+		apgin.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry, dm.GetServiceId()))
 
 	corsConfig := GetCorsConfig(dm.GetConfig())
 	if corsConfig != nil {
@@ -79,7 +80,8 @@ func GetGinServer(
 
 	var healthChecker *gin.Engine
 	if service.Port() != service.HealthCheckPort() {
-		healthChecker = apgin.ForService(service, logger, dm.GetConfig().IsDebugMode())
+		healthChecker = apgin.ForService(service, logger, dm.GetConfig().IsDebugMode(),
+		apgin.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry, dm.GetServiceId()))
 	} else {
 		healthChecker = server
 	}
