@@ -402,6 +402,102 @@
       "additionalProperties": false,
       "type": "object"
     },
+    "Telemetry": {
+      "type": "object",
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "exporter": { "$ref": "#/$defs/TelemetryExporter" },
+        "resource": { "$ref": "#/$defs/TelemetryResource" },
+        "sampling": { "$ref": "#/$defs/TelemetrySampling" },
+        "signals": { "$ref": "#/$defs/TelemetrySignals" },
+        "http": { "$ref": "#/$defs/TelemetryHTTP" },
+        "proxy": { "$ref": "#/$defs/TelemetryProxy" },
+        "propagation": { "$ref": "#/$defs/TelemetryPropagation" }
+      },
+      "additionalProperties": false
+    },
+    "TelemetryExporter": {
+      "type": "object",
+      "properties": {
+        "protocol": {
+          "type": "string",
+          "enum": ["grpc", "http/protobuf"]
+        },
+        "endpoint": { "$ref": "../common/schema.json#/$defs/StringValue" },
+        "headers": {
+          "type": "object",
+          "additionalProperties": { "$ref": "../common/schema.json#/$defs/StringValue" }
+        },
+        "insecure": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "TelemetryResource": {
+      "type": "object",
+      "properties": {
+        "service_name_prefix": { "type": "string" },
+        "attributes": {
+          "type": "object",
+          "additionalProperties": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "TelemetrySampling": {
+      "type": "object",
+      "properties": {
+        "ratio": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "TelemetrySignals": {
+      "type": "object",
+      "properties": {
+        "traces": { "type": "boolean" },
+        "metrics": { "type": "boolean" },
+        "logs": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
+    "TelemetryHTTP": {
+      "type": "object",
+      "properties": {
+        "excluded_paths": {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      },
+      "additionalProperties": false
+    },
+    "TelemetryProxy": {
+      "type": "object",
+      "properties": {
+        "span_attribute_labels": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "metric_dimension_labels": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "metric_dimension_value_cap": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "additionalProperties": false
+    },
+    "TelemetryPropagation": {
+      "type": "object",
+      "properties": {
+        "inject_outbound_default": { "type": "boolean" }
+      },
+      "additionalProperties": false
+    },
     "RedisReal": {
       "type": "object",
       "properties": {
@@ -843,6 +939,9 @@
     },
     "tasks": {
       "$ref": "#/$defs/Tasks"
+    },
+    "telemetry": {
+      "$ref": "#/$defs/Telemetry"
     },
     "dev_settings": {
       "$ref": "#/$defs/DevSettings"

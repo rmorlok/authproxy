@@ -30,6 +30,10 @@ func Serve(cfg config.C) {
 		gin.SetMode(gin.ReleaseMode)
 	}
 
+	// Initialise telemetry early; flush last so other shutdowns can still emit.
+	dm.GetTelemetry()
+	defer dm.ShutdownTelemetry()
+
 	workerConfig := cfg.GetRoot().Worker
 	router := apgin.ForService(&workerConfig, logger, cfg.IsDebugMode())
 
