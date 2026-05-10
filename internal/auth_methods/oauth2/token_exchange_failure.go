@@ -79,7 +79,12 @@ type tokenExchangeAttrs struct {
 	Namespace          string
 	ProviderStatusCode int
 	ProviderError      string
-	Err                error
+	// Attempts is how many token-endpoint POSTs were made before the
+	// failure was surfaced (1 means the first attempt failed and was
+	// not retried). Emitted when > 0 so 5xx exhaustion is visibly
+	// distinct from a single non-retryable failure.
+	Attempts int
+	Err      error
 }
 
 // tokenExchangeFailureMessage is the single message string for every
@@ -115,6 +120,9 @@ func emitTokenExchangeFailure(ctx context.Context, logger *slog.Logger, category
 	}
 	if attrs.ProviderError != "" {
 		args = append(args, slog.String("provider_error", attrs.ProviderError))
+	}
+	if attrs.Attempts > 0 {
+		args = append(args, slog.Int("attempts", attrs.Attempts))
 	}
 	if attrs.Err != nil {
 		args = append(args, slog.String("error", attrs.Err.Error()))
