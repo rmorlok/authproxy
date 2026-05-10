@@ -1,0 +1,14 @@
+# $schema: ./schema.json
+
+labels:
+  type: legacy-basic
+display_name: Legacy Basic Auth Service
+logo:
+  public_url: https://example.com/legacy.png
+description: |
+  Service that authenticates via HTTP Basic Auth using an account id and an API key.
+auth:
+  type: api-key
+  placement:
+    type: basic
+    username_field: account_id

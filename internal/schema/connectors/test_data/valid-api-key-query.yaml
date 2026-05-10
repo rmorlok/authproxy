@@ -1,0 +1,14 @@
+# $schema: ./schema.json
+
+labels:
+  type: openweathermap-query
+display_name: OpenWeatherMap (query key)
+logo:
+  public_url: https://example.com/owm.png
+description: |
+  Weather data with the API key passed as a query parameter.
+auth:
+  type: api-key
+  placement:
+    type: query
+    param_name: appid
