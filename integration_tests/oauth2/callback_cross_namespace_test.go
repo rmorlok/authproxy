@@ -94,7 +94,7 @@ func TestCallbackRejection_CrossNamespace(t *testing.T) {
 	// 1. Attacker initiates as alice in tenant-a. State stored with
 	//    Namespace=tenant-a, ActorId=<alice's tenant-a actor>.
 	returnTo := "https://example.com/return"
-	connID, redirectURL := env.InitiateOAuth2ConnectionAsActor(t, connectorID, returnTo, sharedExternalID, tenantA)
+	connID, redirectURL := env.InitiateOAuth2Connection(t, connectorID, returnTo, helpers.WithActor(sharedExternalID, tenantA))
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
 	stateID := parsed.Query().Get("state_id")

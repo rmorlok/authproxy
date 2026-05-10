@@ -173,3 +173,127 @@ func TestBuildLabelSelectorFromMap_Roundtrip(t *testing.T) {
 		assert.Equal(t, labels[req.Key], req.Value)
 	}
 }
+
+// TestLabelSelector_Matches covers the in-memory evaluator added for the
+// rate-limit runtime. Each case exercises one operator + a few of the
+// edge interactions that the SQL emitter covers via predicates.
+func TestLabelSelector_Matches(t *testing.T) {
+	cases := []struct {
+		name     string
+		selector LabelSelector
+		labels   map[string]string
+		want     bool
+	}{
+		{"empty selector matches anything", nil, map[string]string{"x": "y"}, true},
+		{"empty selector matches nil labels", nil, nil, true},
+		{
+			"= matches",
+			LabelSelector{{Key: "env", Operator: LabelOperatorEqual, Value: "prod"}},
+			map[string]string{"env": "prod"},
+			true,
+		},
+		{
+			"= rejects different value",
+			LabelSelector{{Key: "env", Operator: LabelOperatorEqual, Value: "prod"}},
+			map[string]string{"env": "staging"},
+			false,
+		},
+		{
+			"= rejects missing key",
+			LabelSelector{{Key: "env", Operator: LabelOperatorEqual, Value: "prod"}},
+			map[string]string{},
+			false,
+		},
+		{
+			"!= matches different value",
+			LabelSelector{{Key: "env", Operator: LabelOperatorNotEqual, Value: "prod"}},
+			map[string]string{"env": "staging"},
+			true,
+		},
+		{
+			"!= matches missing key",
+			LabelSelector{{Key: "env", Operator: LabelOperatorNotEqual, Value: "prod"}},
+			map[string]string{},
+			true,
+		},
+		{
+			"!= rejects same value",
+			LabelSelector{{Key: "env", Operator: LabelOperatorNotEqual, Value: "prod"}},
+			map[string]string{"env": "prod"},
+			false,
+		},
+		{
+			"exists matches present key",
+			LabelSelector{{Key: "team", Operator: LabelOperatorExists}},
+			map[string]string{"team": "platform"},
+			true,
+		},
+		{
+			"exists matches present key with empty value",
+			LabelSelector{{Key: "team", Operator: LabelOperatorExists}},
+			map[string]string{"team": ""},
+			true,
+		},
+		{
+			"exists rejects missing key",
+			LabelSelector{{Key: "team", Operator: LabelOperatorExists}},
+			map[string]string{},
+			false,
+		},
+		{
+			"!exists rejects present key",
+			LabelSelector{{Key: "debug", Operator: LabelOperatorNotExists}},
+			map[string]string{"debug": "true"},
+			false,
+		},
+		{
+			"!exists matches missing key",
+			LabelSelector{{Key: "debug", Operator: LabelOperatorNotExists}},
+			map[string]string{},
+			true,
+		},
+		{
+			"all clauses ANDed: all satisfied",
+			LabelSelector{
+				{Key: "env", Operator: LabelOperatorEqual, Value: "prod"},
+				{Key: "team", Operator: LabelOperatorExists},
+				{Key: "debug", Operator: LabelOperatorNotExists},
+			},
+			map[string]string{"env": "prod", "team": "platform"},
+			true,
+		},
+		{
+			"all clauses ANDed: one fails",
+			LabelSelector{
+				{Key: "env", Operator: LabelOperatorEqual, Value: "prod"},
+				{Key: "team", Operator: LabelOperatorExists},
+			},
+			map[string]string{"env": "prod"}, // team missing
+			false,
+		},
+		{
+			"unknown operator fails closed",
+			LabelSelector{{Key: "x", Operator: LabelOperator("bogus"), Value: "y"}},
+			map[string]string{"x": "y"},
+			false,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			assert.Equal(t, tc.want, tc.selector.Matches(tc.labels))
+		})
+	}
+}
+
+// TestLabelSelector_Matches_RoundtripWithParser ensures Parse + Matches
+// give the same answer as authoring the LabelSelector by hand. Mirrors the
+// existing SQL roundtrip test.
+func TestLabelSelector_Matches_RoundtripWithParser(t *testing.T) {
+	parsed, err := ParseLabelSelector("env=prod,team,!debug")
+	assert.NoError(t, err)
+
+	assert.True(t, parsed.Matches(map[string]string{"env": "prod", "team": "platform"}))
+	assert.False(t, parsed.Matches(map[string]string{"env": "prod"}))
+	assert.False(t, parsed.Matches(map[string]string{"env": "prod", "team": "p", "debug": "1"}))
+}
