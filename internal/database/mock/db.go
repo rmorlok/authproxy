@@ -456,6 +456,20 @@ func (mr *MockDBMockRecorder) DeleteActorLabels(ctx, id, keys interface{}) *gomo
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteActorLabels", reflect.TypeOf((*MockDB)(nil).DeleteActorLabels), ctx, id, keys)
 }
 
+// DeleteAllApiKeyCredentialsForConnection mocks base method.
+func (m *MockDB) DeleteAllApiKeyCredentialsForConnection(ctx context.Context, connectionId apid.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteAllApiKeyCredentialsForConnection", ctx, connectionId)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// DeleteAllApiKeyCredentialsForConnection indicates an expected call of DeleteAllApiKeyCredentialsForConnection.
+func (mr *MockDBMockRecorder) DeleteAllApiKeyCredentialsForConnection(ctx, connectionId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteAllApiKeyCredentialsForConnection", reflect.TypeOf((*MockDB)(nil).DeleteAllApiKeyCredentialsForConnection), ctx, connectionId)
+}
+
 // DeleteAllOAuth2TokensForConnection mocks base method.
 func (m *MockDB) DeleteAllOAuth2TokensForConnection(ctx context.Context, connectionId apid.ID) error {
 	m.ctrl.T.Helper()
@@ -801,6 +815,21 @@ func (mr *MockDBMockRecorder) EnumerateOAuth2TokensExpiringWithin(ctx, duration,
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "EnumerateOAuth2TokensExpiringWithin", reflect.TypeOf((*MockDB)(nil).EnumerateOAuth2TokensExpiringWithin), ctx, duration, callback)
 }
 
+// GetActiveApiKeyCredential mocks base method.
+func (m *MockDB) GetActiveApiKeyCredential(ctx context.Context, connectionId apid.ID) (*database.ApiKeyCredential, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetActiveApiKeyCredential", ctx, connectionId)
+	ret0, _ := ret[0].(*database.ApiKeyCredential)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetActiveApiKeyCredential indicates an expected call of GetActiveApiKeyCredential.
+func (mr *MockDBMockRecorder) GetActiveApiKeyCredential(ctx, connectionId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetActiveApiKeyCredential", reflect.TypeOf((*MockDB)(nil).GetActiveApiKeyCredential), ctx, connectionId)
+}
+
 // GetActor mocks base method.
 func (m *MockDB) GetActor(ctx context.Context, id apid.ID) (*database.Actor, error) {
 	m.ctrl.T.Helper()
@@ -1069,6 +1098,21 @@ func (m *MockDB) HasNonceBeenUsed(ctx context.Context, nonce apid.ID) (bool, err
 func (mr *MockDBMockRecorder) HasNonceBeenUsed(ctx, nonce interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "HasNonceBeenUsed", reflect.TypeOf((*MockDB)(nil).HasNonceBeenUsed), ctx, nonce)
+}
+
+// InsertApiKeyCredential mocks base method.
+func (m *MockDB) InsertApiKeyCredential(ctx context.Context, connectionId apid.ID, encryptedCredentials encfield.EncryptedField, placement *connectors.ApiKeyPlacement, createdByActorId *apid.ID) (*database.ApiKeyCredential, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "InsertApiKeyCredential", ctx, connectionId, encryptedCredentials, placement, createdByActorId)
+	ret0, _ := ret[0].(*database.ApiKeyCredential)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// InsertApiKeyCredential indicates an expected call of InsertApiKeyCredential.
+func (mr *MockDBMockRecorder) InsertApiKeyCredential(ctx, connectionId, encryptedCredentials, placement, createdByActorId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertApiKeyCredential", reflect.TypeOf((*MockDB)(nil).InsertApiKeyCredential), ctx, connectionId, encryptedCredentials, placement, createdByActorId)
 }
 
 // InsertOAuth2Token mocks base method.
@@ -1599,6 +1643,20 @@ func (mr *MockDBMockRecorder) SetConnectionEncryptedConfiguration(ctx, id, encry
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectionEncryptedConfiguration", reflect.TypeOf((*MockDB)(nil).SetConnectionEncryptedConfiguration), ctx, id, encryptedConfig)
 }
 
+// SetConnectionHealthState mocks base method.
+func (m *MockDB) SetConnectionHealthState(ctx context.Context, id apid.ID, state database.ConnectionHealthState) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetConnectionHealthState", ctx, id, state)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetConnectionHealthState indicates an expected call of SetConnectionHealthState.
+func (mr *MockDBMockRecorder) SetConnectionHealthState(ctx, id, state interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectionHealthState", reflect.TypeOf((*MockDB)(nil).SetConnectionHealthState), ctx, id, state)
+}
+
 // SetConnectionSetupError mocks base method.
 func (m *MockDB) SetConnectionSetupError(ctx context.Context, id apid.ID, setupError *string) error {
 	m.ctrl.T.Helper()
@@ -1639,20 +1697,6 @@ func (m *MockDB) SetConnectionState(ctx context.Context, id apid.ID, state datab
 func (mr *MockDBMockRecorder) SetConnectionState(ctx, id, state interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectionState", reflect.TypeOf((*MockDB)(nil).SetConnectionState), ctx, id, state)
-}
-
-// SetConnectionHealthState mocks base method.
-func (m *MockDB) SetConnectionHealthState(ctx context.Context, id apid.ID, state database.ConnectionHealthState) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SetConnectionHealthState", ctx, id, state)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// SetConnectionHealthState indicates an expected call of SetConnectionHealthState.
-func (mr *MockDBMockRecorder) SetConnectionHealthState(ctx, id, state interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectionHealthState", reflect.TypeOf((*MockDB)(nil).SetConnectionHealthState), ctx, id, state)
 }
 
 // SetConnectorVersionState mocks base method.
@@ -1751,6 +1795,20 @@ func (m *MockDB) UpdateActorAnnotations(ctx context.Context, id apid.ID, annotat
 func (mr *MockDBMockRecorder) UpdateActorAnnotations(ctx, id, annotations interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateActorAnnotations", reflect.TypeOf((*MockDB)(nil).UpdateActorAnnotations), ctx, id, annotations)
+}
+
+// UpdateApiKeyCredentialLastValidated mocks base method.
+func (m *MockDB) UpdateApiKeyCredentialLastValidated(ctx context.Context, credentialId apid.ID, at time.Time) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "UpdateApiKeyCredentialLastValidated", ctx, credentialId, at)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// UpdateApiKeyCredentialLastValidated indicates an expected call of UpdateApiKeyCredentialLastValidated.
+func (mr *MockDBMockRecorder) UpdateApiKeyCredentialLastValidated(ctx, credentialId, at interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "UpdateApiKeyCredentialLastValidated", reflect.TypeOf((*MockDB)(nil).UpdateApiKeyCredentialLastValidated), ctx, credentialId, at)
 }
 
 // UpdateConnectionAnnotations mocks base method.

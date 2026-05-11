@@ -156,6 +156,20 @@ type DB interface {
 	) error
 
 	/*
+	 * API Key credentials
+	 */
+	GetActiveApiKeyCredential(ctx context.Context, connectionId apid.ID) (*ApiKeyCredential, error)
+	InsertApiKeyCredential(
+		ctx context.Context,
+		connectionId apid.ID,
+		encryptedCredentials encfield.EncryptedField,
+		placement *cschema.ApiKeyPlacement,
+		createdByActorId *apid.ID,
+	) (*ApiKeyCredential, error)
+	UpdateApiKeyCredentialLastValidated(ctx context.Context, credentialId apid.ID, at time.Time) error
+	DeleteAllApiKeyCredentialsForConnection(ctx context.Context, connectionId apid.ID) error
+
+	/*
 	 * Encryption Keys
 	 */
 
