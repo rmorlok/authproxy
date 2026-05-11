@@ -142,6 +142,7 @@ type DB interface {
 		accessTokenExpiresAt *time.Time,
 		scopes string,
 		requestedScopes string,
+		createdByActorId *apid.ID,
 	) (*OAuth2Token, error)
 	DeleteOAuth2Token(ctx context.Context, tokenId apid.ID) error
 	DeleteAllOAuth2TokensForConnection(ctx context.Context, connectionId apid.ID) error

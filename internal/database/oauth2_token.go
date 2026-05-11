@@ -41,6 +41,7 @@ type OAuth2Token struct {
 	AccessTokenExpiresAt  *time.Time
 	Scopes                string
 	RequestedScopes       string
+	CreatedByActorId      *apid.ID // Actor who initiated this token (carried forward on refresh)
 	CreatedAt             time.Time
 	EncryptedAt           *time.Time
 	DeletedAt             *time.Time
@@ -56,6 +57,7 @@ func (t *OAuth2Token) cols() []string {
 		"access_token_expires_at",
 		"scopes",
 		"requested_scopes",
+		"created_by_actor_id",
 		"created_at",
 		"encrypted_at",
 		"deleted_at",
@@ -72,6 +74,7 @@ func (t *OAuth2Token) fields() []any {
 		&t.AccessTokenExpiresAt,
 		&t.Scopes,
 		&t.RequestedScopes,
+		&t.CreatedByActorId,
 		&t.CreatedAt,
 		&t.EncryptedAt,
 		&t.DeletedAt,
@@ -88,6 +91,7 @@ func (t *OAuth2Token) values() []any {
 		t.AccessTokenExpiresAt,
 		t.Scopes,
 		t.RequestedScopes,
+		t.CreatedByActorId,
 		t.CreatedAt,
 		t.EncryptedAt,
 		t.DeletedAt,
@@ -124,6 +128,12 @@ func (t *OAuth2Token) Validate() error {
 	if t.RefreshedFromId != nil {
 		if err := t.RefreshedFromId.ValidatePrefix(apid.PrefixOAuth2Token); err != nil {
 			result = multierror.Append(result, fmt.Errorf("invalid oauth2 token refreshed from id: %w", err))
+		}
+	}
+
+	if t.CreatedByActorId != nil {
+		if err := t.CreatedByActorId.ValidatePrefix(apid.PrefixActor); err != nil {
+			result = multierror.Append(result, fmt.Errorf("invalid oauth2 token created_by_actor_id: %w", err))
 		}
 	}
 
@@ -229,6 +239,7 @@ func (s *service) InsertOAuth2Token(
 	accessTokenExpiresAt *time.Time,
 	scopes string,
 	requestedScopes string,
+	createdByActorId *apid.ID,
 ) (*OAuth2Token, error) {
 	logger := aplog.NewBuilder(s.logger).
 		WithCtx(ctx).
@@ -270,6 +281,7 @@ func (s *service) InsertOAuth2Token(
 			AccessTokenExpiresAt:  accessTokenExpiresAt,
 			Scopes:                scopes,
 			RequestedScopes:       requestedScopes,
+			CreatedByActorId:      createdByActorId,
 			CreatedAt:             now,
 		}
 
