@@ -247,13 +247,33 @@ func (dm *DependencyManager) GetRateLimitFactory() *ratelimit.Factory {
 	return ratelimit.NewFactory(store, dm.GetLogger())
 }
 
+// GetRateLimitEnforcerFactory returns the middleware factory that
+// evaluates proxy-side RateLimit resources against in-flight requests
+// (#223). Reads from the same in-memory cache that the Refresher (#219)
+// populates. Construction is cheap; the heavy lifting happens per-request
+// inside the round-tripper.
+func (dm *DependencyManager) GetRateLimitEnforcerFactory() *ratelimit.EnforcerFactory {
+	return ratelimit.NewEnforcerFactory(
+		dm.GetRateLimitCache(),
+		dm.GetRedisClient(),
+		dm.GetLogBuilder().WithComponent("ratelimit-enforcer").Build(),
+	)
+}
+
 func (dm *DependencyManager) GetHttpf() httpf.F {
 	if dm.httpf == nil {
+		// Ordering matters: in httpf.CreateFactory the requestLog
+		// factory is moved to outermost in the call chain so synthetic
+		// 429s from either rate limiter still produce log entries. The
+		// enforcer runs before the connector-level reactive limiter
+		// so a proxy-side rejection short-circuits before any upstream
+		// 429 backoff is applied.
 		dm.httpf = httpf.CreateFactory(
 			dm.GetConfig(),
 			dm.GetRedisClient(),
 			dm.GetLogStorageService(),
 			dm.GetLogger(),
+			dm.GetRateLimitEnforcerFactory(),
 			dm.GetRateLimitFactory(),
 		)
 	}

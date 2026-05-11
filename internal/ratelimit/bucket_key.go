@@ -29,6 +29,23 @@ func (k BucketKey) IsGlobal() bool {
 	return len(k.Components) == 0
 }
 
+// AsMap renders the bucket key as a map suitable for storage on a request
+// log entry (LogRecord.RateLimitBucket). Order is lost — the map is for
+// human consumption, not for downstream bucket-key equality. Component
+// names are preserved verbatim, so duplicate dimension names would
+// collide; the schema rejects duplicates at validation time so this is
+// not a real concern.
+func (k BucketKey) AsMap() map[string]string {
+	if k.IsGlobal() {
+		return nil
+	}
+	out := make(map[string]string, len(k.Components))
+	for _, c := range k.Components {
+		out[c.Name] = c.Value
+	}
+	return out
+}
+
 // String renders a stable, canonical string suitable for use as a Redis
 // sub-key. The format escapes the field separator ('|') and the
 // name-value separator ('=') in values to avoid collisions, e.g.
