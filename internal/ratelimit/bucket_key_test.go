@@ -46,6 +46,35 @@ func TestBucketKey_String_OrderMatters(t *testing.T) {
 	require.NotEqual(t, k1.String(), k2.String())
 }
 
+func TestBucketKey_AsMap_Global(t *testing.T) {
+	// IsGlobal() keys have no components — AsMap should return nil so
+	// downstream JSON serialisation produces `null` (or omits the field
+	// entirely when annotated `omitempty`) rather than `{}`.
+	require.Nil(t, BucketKey{}.AsMap())
+}
+
+func TestBucketKey_AsMap_PopulatedRoundTrip(t *testing.T) {
+	k := BucketKey{Components: []BucketKeyComponent{
+		{Name: "actor", Value: "act_a"},
+		{Name: "labels/team", Value: "alpha"},
+	}}
+	got := k.AsMap()
+	require.Equal(t, map[string]string{
+		"actor":       "act_a",
+		"labels/team": "alpha",
+	}, got)
+}
+
+func TestBucketKey_AsMap_EmptyValuesPreserved(t *testing.T) {
+	// Missing dimensions resolve to "" — those should still appear in the
+	// map so log-side filtering can distinguish "actor=" (unauthenticated
+	// traffic) from a populated value.
+	k := BucketKey{Components: []BucketKeyComponent{
+		{Name: "actor", Value: ""},
+	}}
+	require.Equal(t, map[string]string{"actor": ""}, k.AsMap())
+}
+
 func TestBucketKey_String_Escapes(t *testing.T) {
 	// Values containing the field/separator characters must be escaped so
 	// they don't produce ambiguous parses or collisions.

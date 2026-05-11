@@ -247,14 +247,41 @@ func (dm *DependencyManager) GetRateLimitFactory() *ratelimit.Factory {
 	return ratelimit.NewFactory(store, dm.GetLogger())
 }
 
+// GetRateLimitEnforcerFactory returns the middleware factory that
+// evaluates proxy-side RateLimit resources against in-flight requests
+// (#223). Reads from the same in-memory cache that the Refresher (#219)
+// populates. Construction is cheap; the heavy lifting happens per-request
+// inside the round-tripper.
+func (dm *DependencyManager) GetRateLimitEnforcerFactory() *ratelimit.EnforcerFactory {
+	return ratelimit.NewEnforcerFactory(
+		dm.GetRateLimitCache(),
+		dm.GetRedisClient(),
+		dm.GetLogBuilder().WithComponent("ratelimit-enforcer").Build(),
+	)
+}
+
 func (dm *DependencyManager) GetHttpf() httpf.F {
 	if dm.httpf == nil {
-		// Build the additional-middlewares list. Telemetry is appended last
-		// so it wraps everything else, making the client span cover any
-		// retries / rate-limit waits emitted by the inner middlewares.
-		// NewTelemetryFactory returns (nil, nil) when telemetry is disabled,
-		// in which case the chain is identical to its pre-telemetry shape.
-		middlewares := []httpf.RoundTripperFactory{dm.GetRateLimitFactory()}
+		// Ordering matters: each entry wraps the previous, so the *last*
+		// entry in this slice becomes the outermost in execution order.
+		// CreateFactory itself appends the requestLog factory last so it
+		// surrounds everything and synthetic 429s still produce log
+		// entries. Within this slice:
+		//   - reactive 429 limiter is innermost so it can short-circuit
+		//     a request that's already in cool-down before any other
+		//     middleware does work
+		//   - the proxy-side rate-limit enforcer (#223) runs immediately
+		//     outside the reactive limiter so a rule rejection
+		//     short-circuits the reactive check too — but its work is
+		//     still covered by the telemetry span that wraps it
+		//   - telemetry wraps both rate-limit middlewares so the client
+		//     span covers any retries / rate-limit waits they emit
+		// NewTelemetryFactory returns (nil, nil) when telemetry is
+		// disabled, in which case telemetry simply drops out of the chain.
+		middlewares := []httpf.RoundTripperFactory{
+			dm.GetRateLimitFactory(),
+			dm.GetRateLimitEnforcerFactory(),
+		}
 		telemetryRT, err := httpf.NewTelemetryFactory(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry)
 		if err != nil {
 			panic(fmt.Errorf("failed to construct httpf telemetry middleware: %w", err))
