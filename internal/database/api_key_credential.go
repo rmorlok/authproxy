@@ -22,7 +22,7 @@ func init() {
 	RegisterEncryptedField(EncryptedFieldRegistration{
 		Table:            ApiKeyCredentialsTable,
 		PrimaryKeyCols:   []string{"id"},
-		EncryptedCols:    []string{"encrypted_api_key", "encrypted_username"},
+		EncryptedCols:    []string{"encrypted_credentials"},
 		JoinTable:        ConnectionsTable,
 		JoinLocalCol:     "connection_id",
 		JoinRemoteCol:    "id",
@@ -33,29 +33,32 @@ func init() {
 const ApiKeyCredentialsTable = "api_key_credentials"
 
 // ApiKeyCredential is one row in the api_key_credentials table — the encrypted
-// API key (and optional username, for basic auth) submitted by a user for a
-// connection. Rotation produces a new row and soft-deletes the prior, so the
-// history of credentials is preserved. At most one row per connection has
+// credential blob (api key and, for basic placement, username) submitted by a
+// user for a connection. The encrypted_credentials column stores a single
+// opaque encrypted blob; the substructure inside (e.g. {"api_key": "...",
+// "username": "..."}) is decided by the encrypt/decrypt layer that owns the
+// plaintext shape — the database is agnostic to it.
+//
+// Rotation produces a new row and soft-deletes the prior, so the history of
+// credentials is preserved. At most one row per connection has
 // deleted_at IS NULL at any given moment.
 type ApiKeyCredential struct {
-	Id                 apid.ID
-	ConnectionId       apid.ID                  // FK to Connection; not enforced by DB
-	EncryptedApiKey    encfield.EncryptedField  // The secret value
-	EncryptedUsername  *encfield.EncryptedField // Populated only for the basic placement
-	PlacementSnapshot  *cschema.ApiKeyPlacement // Placement config at submission time
-	CreatedByActorId   *apid.ID                 // Actor who submitted (or rotated to) this credential
-	LastValidatedAt    *time.Time               // Most recent successful probe against this credential
-	CreatedAt          time.Time
-	EncryptedAt        *time.Time
-	DeletedAt          *time.Time
+	Id                   apid.ID
+	ConnectionId         apid.ID                  // FK to Connection; not enforced by DB
+	EncryptedCredentials encfield.EncryptedField  // Opaque encrypted blob (api key + optional username)
+	PlacementSnapshot    *cschema.ApiKeyPlacement // Placement config at submission time
+	CreatedByActorId     *apid.ID                 // Actor who submitted (or rotated to) this credential
+	LastValidatedAt      *time.Time               // Most recent successful probe against this credential
+	CreatedAt            time.Time
+	EncryptedAt          *time.Time
+	DeletedAt            *time.Time
 }
 
 func (c *ApiKeyCredential) cols() []string {
 	return []string{
 		"id",
 		"connection_id",
-		"encrypted_api_key",
-		"encrypted_username",
+		"encrypted_credentials",
 		"placement_snapshot",
 		"created_by_actor_id",
 		"last_validated_at",
@@ -69,8 +72,7 @@ func (c *ApiKeyCredential) fields() []any {
 	return []any{
 		&c.Id,
 		&c.ConnectionId,
-		&c.EncryptedApiKey,
-		&c.EncryptedUsername,
+		&c.EncryptedCredentials,
 		(*apiKeyPlacementDB)(c.placementPtr()),
 		&c.CreatedByActorId,
 		&c.LastValidatedAt,
@@ -88,8 +90,7 @@ func (c *ApiKeyCredential) values() []any {
 	return []any{
 		c.Id,
 		c.ConnectionId,
-		c.EncryptedApiKey,
-		c.EncryptedUsername,
+		c.EncryptedCredentials,
 		placementVal,
 		c.CreatedByActorId,
 		c.LastValidatedAt,
@@ -191,18 +192,19 @@ func (s *service) GetActiveApiKeyCredential(
 	return &result, nil
 }
 
-// InsertApiKeyCredential stores a new credential for the connection, soft-
+// InsertApiKeyCredential stores a new credential blob for the connection, soft-
 // deleting any previously-active row in the same transaction so that exactly
 // one credential is active per connection at all times.
 //
-// encryptedUsername may be nil for placements other than basic. placement may
-// be nil (callers may submit a credential before a placement snapshot is
-// produced), though typically every insert carries one.
+// encryptedCredentials is the opaque encrypted blob produced by the auth
+// layer; its plaintext substructure (e.g. api key + username for the basic
+// placement) is decided by that layer and is not interpreted here. placement
+// may be nil, though typically every insert carries a snapshot of the
+// placement config in use at submission time.
 func (s *service) InsertApiKeyCredential(
 	ctx context.Context,
 	connectionId apid.ID,
-	encryptedApiKey encfield.EncryptedField,
-	encryptedUsername *encfield.EncryptedField,
+	encryptedCredentials encfield.EncryptedField,
 	placement *cschema.ApiKeyPlacement,
 	createdByActorId *apid.ID,
 ) (*ApiKeyCredential, error) {
@@ -239,13 +241,12 @@ func (s *service) InsertApiKeyCredential(
 		}
 
 		newCred = &ApiKeyCredential{
-			Id:                apctx.GetIdGenerator(ctx).New(apid.PrefixApiKeyCredential),
-			ConnectionId:      connectionId,
-			EncryptedApiKey:   encryptedApiKey,
-			EncryptedUsername: encryptedUsername,
-			PlacementSnapshot: placementCopy,
-			CreatedByActorId:  createdByActorId,
-			CreatedAt:         now,
+			Id:                   apctx.GetIdGenerator(ctx).New(apid.PrefixApiKeyCredential),
+			ConnectionId:         connectionId,
+			EncryptedCredentials: encryptedCredentials,
+			PlacementSnapshot:    placementCopy,
+			CreatedByActorId:     createdByActorId,
+			CreatedAt:            now,
 		}
 
 		if err := newCred.Validate(); err != nil {

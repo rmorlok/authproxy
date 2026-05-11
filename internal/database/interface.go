@@ -162,8 +162,7 @@ type DB interface {
 	InsertApiKeyCredential(
 		ctx context.Context,
 		connectionId apid.ID,
-		encryptedApiKey encfield.EncryptedField,
-		encryptedUsername *encfield.EncryptedField,
+		encryptedCredentials encfield.EncryptedField,
 		placement *cschema.ApiKeyPlacement,
 		createdByActorId *apid.ID,
 	) (*ApiKeyCredential, error)

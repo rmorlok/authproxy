@@ -1101,18 +1101,18 @@ func (mr *MockDBMockRecorder) HasNonceBeenUsed(ctx, nonce interface{}) *gomock.C
 }
 
 // InsertApiKeyCredential mocks base method.
-func (m *MockDB) InsertApiKeyCredential(ctx context.Context, connectionId apid.ID, encryptedApiKey encfield.EncryptedField, encryptedUsername *encfield.EncryptedField, placement *connectors.ApiKeyPlacement, createdByActorId *apid.ID) (*database.ApiKeyCredential, error) {
+func (m *MockDB) InsertApiKeyCredential(ctx context.Context, connectionId apid.ID, encryptedCredentials encfield.EncryptedField, placement *connectors.ApiKeyPlacement, createdByActorId *apid.ID) (*database.ApiKeyCredential, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "InsertApiKeyCredential", ctx, connectionId, encryptedApiKey, encryptedUsername, placement, createdByActorId)
+	ret := m.ctrl.Call(m, "InsertApiKeyCredential", ctx, connectionId, encryptedCredentials, placement, createdByActorId)
 	ret0, _ := ret[0].(*database.ApiKeyCredential)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // InsertApiKeyCredential indicates an expected call of InsertApiKeyCredential.
-func (mr *MockDBMockRecorder) InsertApiKeyCredential(ctx, connectionId, encryptedApiKey, encryptedUsername, placement, createdByActorId interface{}) *gomock.Call {
+func (mr *MockDBMockRecorder) InsertApiKeyCredential(ctx, connectionId, encryptedCredentials, placement, createdByActorId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertApiKeyCredential", reflect.TypeOf((*MockDB)(nil).InsertApiKeyCredential), ctx, connectionId, encryptedApiKey, encryptedUsername, placement, createdByActorId)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertApiKeyCredential", reflect.TypeOf((*MockDB)(nil).InsertApiKeyCredential), ctx, connectionId, encryptedCredentials, placement, createdByActorId)
 }
 
 // InsertOAuth2Token mocks base method.

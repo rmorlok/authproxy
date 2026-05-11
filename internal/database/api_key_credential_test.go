@@ -64,12 +64,12 @@ func TestApiKeyCredentials_RoundTrip(t *testing.T) {
 		HeaderName: "X-API-Key",
 		Prefix:     "Token ",
 	}
+	blob := encfield.EncryptedField{ID: "ekv_test", Data: "encryptedCredentialsBlob"}
 
 	cred, err := db.InsertApiKeyCredential(
 		ctx,
 		connectionId,
-		encfield.EncryptedField{ID: "ekv_test", Data: "encryptedApiKey"},
-		nil,
+		blob,
 		placement,
 		&actorId,
 	)
@@ -77,8 +77,7 @@ func TestApiKeyCredentials_RoundTrip(t *testing.T) {
 	require.NotNil(t, cred)
 	require.True(t, cred.Id.HasPrefix(apid.PrefixApiKeyCredential))
 	require.Equal(t, connectionId, cred.ConnectionId)
-	require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedApiKey"}, cred.EncryptedApiKey)
-	require.Nil(t, cred.EncryptedUsername)
+	require.Equal(t, blob, cred.EncryptedCredentials)
 	require.Equal(t, placement, cred.PlacementSnapshot)
 	require.NotSame(t, placement, cred.PlacementSnapshot, "placement should be cloned on insert")
 	require.Equal(t, &actorId, cred.CreatedByActorId)
@@ -87,6 +86,7 @@ func TestApiKeyCredentials_RoundTrip(t *testing.T) {
 	got, err := db.GetActiveApiKeyCredential(ctx, connectionId)
 	require.NoError(t, err)
 	require.Equal(t, cred.Id, got.Id)
+	require.Equal(t, blob, got.EncryptedCredentials)
 	require.Equal(t, placement, got.PlacementSnapshot)
 
 	require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM api_key_credentials"))
@@ -114,8 +114,7 @@ func TestApiKeyCredentials_InsertSoftDeletesPrior(t *testing.T) {
 	first, err := db.InsertApiKeyCredential(
 		ctx,
 		connectionId,
-		encfield.EncryptedField{ID: "ekv_test", Data: "firstKey"},
-		nil,
+		encfield.EncryptedField{ID: "ekv_test", Data: "firstBlob"},
 		placement,
 		nil,
 	)
@@ -124,8 +123,7 @@ func TestApiKeyCredentials_InsertSoftDeletesPrior(t *testing.T) {
 	second, err := db.InsertApiKeyCredential(
 		ctx,
 		connectionId,
-		encfield.EncryptedField{ID: "ekv_test", Data: "secondKey"},
-		nil,
+		encfield.EncryptedField{ID: "ekv_test", Data: "secondBlob"},
 		placement,
 		nil,
 	)
@@ -139,7 +137,7 @@ func TestApiKeyCredentials_InsertSoftDeletesPrior(t *testing.T) {
 	got, err := db.GetActiveApiKeyCredential(ctx, connectionId)
 	require.NoError(t, err)
 	require.Equal(t, second.Id, got.Id)
-	require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "secondKey"}, got.EncryptedApiKey)
+	require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "secondBlob"}, got.EncryptedCredentials)
 }
 
 func TestApiKeyCredentials_InsertIsolatedAcrossConnections(t *testing.T) {
@@ -153,15 +151,15 @@ func TestApiKeyCredentials_InsertIsolatedAcrossConnections(t *testing.T) {
 
 	credA, err := db.InsertApiKeyCredential(
 		ctx, connectionA,
-		encfield.EncryptedField{ID: "ekv_test", Data: "keyA"},
-		nil, placement, nil,
+		encfield.EncryptedField{ID: "ekv_test", Data: "blobA"},
+		placement, nil,
 	)
 	require.NoError(t, err)
 
 	credB, err := db.InsertApiKeyCredential(
 		ctx, connectionB,
-		encfield.EncryptedField{ID: "ekv_test", Data: "keyB"},
-		nil, placement, nil,
+		encfield.EncryptedField{ID: "ekv_test", Data: "blobB"},
+		placement, nil,
 	)
 	require.NoError(t, err)
 
@@ -175,37 +173,6 @@ func TestApiKeyCredentials_InsertIsolatedAcrossConnections(t *testing.T) {
 	require.Equal(t, credB.Id, gotB.Id)
 }
 
-func TestApiKeyCredentials_BasicPlacementWithUsername(t *testing.T) {
-	_, db := MustApplyBlankTestDbConfig(t, nil)
-	ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(time.Now())).Build()
-
-	connectionId := apid.New(apid.PrefixConnection)
-	placement := &cschema.ApiKeyPlacement{
-		Type:          cschema.ApiKeyPlacementBasic,
-		UsernameField: "account_id",
-	}
-	username := encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccountId"}
-
-	cred, err := db.InsertApiKeyCredential(
-		ctx,
-		connectionId,
-		encfield.EncryptedField{ID: "ekv_test", Data: "encryptedKey"},
-		&username,
-		placement,
-		nil,
-	)
-	require.NoError(t, err)
-	require.NotNil(t, cred.EncryptedUsername)
-	require.Equal(t, username, *cred.EncryptedUsername)
-
-	got, err := db.GetActiveApiKeyCredential(ctx, connectionId)
-	require.NoError(t, err)
-	require.NotNil(t, got.EncryptedUsername)
-	require.Equal(t, username, *got.EncryptedUsername)
-	require.Equal(t, cschema.ApiKeyPlacementBasic, got.PlacementSnapshot.Type)
-	require.Equal(t, "account_id", got.PlacementSnapshot.UsernameField)
-}
-
 func TestApiKeyCredentials_UpdateLastValidated(t *testing.T) {
 	_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 	now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
@@ -214,8 +181,7 @@ func TestApiKeyCredentials_UpdateLastValidated(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
 	cred, err := db.InsertApiKeyCredential(
 		ctx, connectionId,
-		encfield.EncryptedField{ID: "ekv_test", Data: "k"},
-		nil,
+		encfield.EncryptedField{ID: "ekv_test", Data: "blob"},
 		&cschema.ApiKeyPlacement{Type: cschema.ApiKeyPlacementBearer},
 		nil,
 	)
@@ -250,13 +216,13 @@ func TestApiKeyCredentials_DeleteAllForConnection(t *testing.T) {
 	// Two consecutive inserts on one connection (the second soft-deletes the first),
 	// plus a credential on a sibling connection that must be untouched.
 	_, err := db.InsertApiKeyCredential(ctx, connectionId,
-		encfield.EncryptedField{ID: "ekv_test", Data: "k1"}, nil, placement, nil)
+		encfield.EncryptedField{ID: "ekv_test", Data: "k1"}, placement, nil)
 	require.NoError(t, err)
 	_, err = db.InsertApiKeyCredential(ctx, connectionId,
-		encfield.EncryptedField{ID: "ekv_test", Data: "k2"}, nil, placement, nil)
+		encfield.EncryptedField{ID: "ekv_test", Data: "k2"}, placement, nil)
 	require.NoError(t, err)
 	siblingCred, err := db.InsertApiKeyCredential(ctx, otherId,
-		encfield.EncryptedField{ID: "ekv_test", Data: "sibling"}, nil, placement, nil)
+		encfield.EncryptedField{ID: "ekv_test", Data: "sibling"}, placement, nil)
 	require.NoError(t, err)
 
 	require.NoError(t, db.DeleteAllApiKeyCredentialsForConnection(ctx, connectionId))
@@ -283,8 +249,9 @@ func TestApiKeyCredentials_EncryptedFieldRegistration(t *testing.T) {
 			break
 		}
 	}
-	require.NotNil(t, found, "api_key_credentials must register its encrypted columns with the re-encryption registry")
-	require.ElementsMatch(t, []string{"encrypted_api_key", "encrypted_username"}, found.EncryptedCols)
+	require.NotNil(t, found, "api_key_credentials must register its encrypted column with the re-encryption registry")
+	require.ElementsMatch(t, []string{"encrypted_credentials"}, found.EncryptedCols,
+		"a single encrypted_credentials column simplifies re-encryption jobs")
 	require.Equal(t, ConnectionsTable, found.JoinTable, "namespace should resolve via JOIN to connections")
 	require.Equal(t, "connection_id", found.JoinLocalCol)
 	require.Equal(t, "id", found.JoinRemoteCol)
@@ -310,7 +277,7 @@ func TestApiKeyCredentials_PlacementSnapshotRoundtripsEachVariant(t *testing.T) 
 			connectionId := apid.New(apid.PrefixConnection)
 			p := tc.p
 			_, err := db.InsertApiKeyCredential(ctx, connectionId,
-				encfield.EncryptedField{ID: "ekv_test", Data: "k"}, nil, &p, nil)
+				encfield.EncryptedField{ID: "ekv_test", Data: "blob"}, &p, nil)
 			require.NoError(t, err)
 
 			got, err := db.GetActiveApiKeyCredential(ctx, connectionId)
@@ -319,4 +286,3 @@ func TestApiKeyCredentials_PlacementSnapshotRoundtripsEachVariant(t *testing.T) 
 		})
 	}
 }
-

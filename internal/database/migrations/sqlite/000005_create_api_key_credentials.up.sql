@@ -2,8 +2,7 @@ create table api_key_credentials
 (
     id                    text primary key,
     connection_id         text not null,
-    encrypted_api_key     text,
-    encrypted_username    text,
+    encrypted_credentials text,
     placement_snapshot    text,
     created_by_actor_id   text,
     last_validated_at     datetime,
