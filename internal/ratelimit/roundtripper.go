@@ -15,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/request_log"
 	"github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
@@ -80,6 +81,14 @@ func (rt *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			slog.String("connection_id", rt.connectionId.String()),
 			slog.Duration("retry_after", remaining),
 		)
+		// Stamp the request log so this synthetic 429 is distinguishable
+		// from a real upstream 429 — closing the gap noted on #222. The
+		// proxy bootstrap installs an Attribution on every proxy request;
+		// when it isn't there (e.g. tests that don't wire attribution),
+		// this is a no-op.
+		if attr := request_log.AttributionFromContext(ctx); attr != nil {
+			attr.Source = request_log.ResponseSourceConnectorRateLimiter
+		}
 		return rt.syntheticTooManyRequests(remaining), nil
 	}
 

@@ -12,8 +12,10 @@ import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import {
     ListResponse, RequestEntryRecord,
-    RequestType, ListRequestsParams, listRequests
+    RequestType, ResponseSource, ListRequestsParams, listRequests
 } from '@authproxy/api';
+import { Link as RouterLink } from 'react-router-dom';
+import Link from '@mui/material/Link';
 import dayjs from 'dayjs';
 import Chip from '@mui/material/Chip';
 import TextField from '@mui/material/TextField';
@@ -45,6 +47,50 @@ export const columns: (GridColDef<RequestEntryRecord> & {hideInitial?: boolean})
         sortable: true,
         align: 'center',
         renderCell: (params) => (<HttpStatusChip value={params.value} />),
+    },
+    {
+        // Visible by default — tells operators at a glance whether a 429
+        // came from the 3rd party or from one of authproxy's own rate
+        // limiters.
+        field: 'response_source',
+        headerName: 'Source',
+        description: 'who produced the response (upstream / connector rate limiter / rate limit resource)',
+        sortable: true,
+        renderCell: (params) => {
+            const v = (params.value as ResponseSource) || ResponseSource.UPSTREAM;
+            const label = v === ResponseSource.UPSTREAM ? 'upstream'
+                : v === ResponseSource.CONNECTOR_RATE_LIMITER ? 'connector RL'
+                : v === ResponseSource.RATE_LIMIT ? 'rate limit'
+                : v;
+            const color = v === ResponseSource.UPSTREAM ? 'default' : 'warning';
+            return <Chip label={label} size="small" color={color as any} variant="outlined" />;
+        },
+    },
+    {
+        // Hidden by default — only meaningful for the small fraction of
+        // requests where a rate-limit resource fired. When present, link
+        // to the rate-limiter detail page so operators can jump straight
+        // to the rule that produced the 429.
+        field: 'rate_limit_id',
+        headerName: 'Rate Limit',
+        description: 'ID of the rate-limit resource that fired (if any)',
+        sortable: true,
+        hideInitial: true,
+        minWidth: 220,
+        renderCell: (params) => {
+            const id = params.value as string;
+            if (!id) return null;
+            return (
+                <Link
+                    component={RouterLink}
+                    to={`/rate-limits/${id}`}
+                    onClick={(e) => e.stopPropagation()}
+                    underline="hover"
+                >
+                    {id}
+                </Link>
+            );
+        },
     },
     {
         field: 'type',

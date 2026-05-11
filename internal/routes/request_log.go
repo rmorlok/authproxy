@@ -43,6 +43,8 @@ type ListRequestsQuery struct {
 	Path                     *string  `form:"path"`
 	PathRegex                *string  `form:"path_regex"`
 	LabelSelector            *string  `form:"label_selector"`
+	ResponseSource           *string  `form:"response_source"`
+	RateLimitId              *apid.ID `form:"rate_limit_id" swaggertype:"string"`
 }
 
 func (q *ListRequestsQuery) ApplyToBuilder(
@@ -122,6 +124,18 @@ func (q *ListRequestsQuery) ApplyToBuilder(
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	if q.ResponseSource != nil {
+		src := request_log.ResponseSource(*q.ResponseSource)
+		if !request_log.IsValidResponseSource(src) {
+			return nil, httperr.BadRequestf("invalid response_source %q", *q.ResponseSource)
+		}
+		b = b.WithResponseSource(src)
+	}
+
+	if q.RateLimitId != nil {
+		b = b.WithRateLimitId(*q.RateLimitId)
 	}
 
 	return b, nil

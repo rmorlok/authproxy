@@ -81,6 +81,8 @@ type ListRequestBuilder interface {
 	WithTimestampRange(start, end time.Time) ListRequestBuilder
 	WithParsedTimestampRange(r string) (ListRequestBuilder, error)
 	WithLabelSelector(selector string) (ListRequestBuilder, error)
+	WithResponseSource(s ResponseSource) ListRequestBuilder
+	WithRateLimitId(id apid.ID) ListRequestBuilder
 }
 
 // ListFilters holds the filter, pagination, and ordering data for list requests.
@@ -104,6 +106,8 @@ type ListFilters struct {
 	PathRegex                *string           `json:"path_regex,omitempty"`
 	NamespaceMatchers        []string          `json:"namespace_matchers,omitempty"`
 	LabelSelector            *string           `json:"label_selector,omitempty"`
+	ResponseSource           *string           `json:"response_source,omitempty"`
+	RateLimitId              *apid.ID          `json:"rate_limit_id,omitempty"`
 	Errors                   *multierror.Error `json:"-"`
 }
 
@@ -205,4 +209,12 @@ func (l *ListFilters) SetTimestampRange(start, end time.Time) {
 
 func (l *ListFilters) SetLabelSelector(selector string) {
 	l.LabelSelector = util.ToPtr(selector)
+}
+
+func (l *ListFilters) SetResponseSource(s ResponseSource) {
+	l.ResponseSource = util.ToPtr(string(s))
+}
+
+func (l *ListFilters) SetRateLimitId(id apid.ID) {
+	l.RateLimitId = util.ToPtr(id)
 }

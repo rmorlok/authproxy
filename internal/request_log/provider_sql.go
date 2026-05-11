@@ -93,12 +93,29 @@ func (s *sqlRecordStore) StoreRecords(ctx context.Context, records []*LogRecord)
 			"request_cancelled",
 			"full_request_recorded",
 			"labels",
+			"response_source",
+			"rate_limit_id",
+			"rate_limit_mode",
+			"rate_limit_bucket",
+			"rate_limit_matched",
 		)
 
 	for _, record := range records {
 		labelsVal, _ := record.Labels.Value()
 		if labelsVal == nil {
 			labelsVal = "{}"
+		}
+		source := record.ResponseSource
+		if source == "" {
+			source = ResponseSourceUpstream
+		}
+		bucketJSON, err := marshalRateLimitBucket(record.RateLimitBucket)
+		if err != nil {
+			return fmt.Errorf("failed to marshal rate-limit bucket: %w", err)
+		}
+		matchedJSON, err := marshalRateLimitMatched(record.RateLimitMatched)
+		if err != nil {
+			return fmt.Errorf("failed to marshal rate-limit matched: %w", err)
 		}
 		builder = builder.Values(
 			record.RequestId.String(),
@@ -126,6 +143,11 @@ func (s *sqlRecordStore) StoreRecords(ctx context.Context, records []*LogRecord)
 			record.RequestCancelled,
 			record.FullRequestRecorded,
 			labelsVal,
+			string(source),
+			record.RateLimitId.String(),
+			record.RateLimitMode,
+			bucketJSON,
+			matchedJSON,
 		)
 	}
 
@@ -215,12 +237,16 @@ var entryRecordColumns = []string{
 	"response_http_version", "response_size_bytes", "response_mime_type",
 	"internal_timeout", "request_cancelled", "full_request_recorded",
 	"labels",
+	"response_source", "rate_limit_id", "rate_limit_mode",
+	"rate_limit_bucket", "rate_limit_matched",
 }
 
 func scanLogRecord(row interface{ Scan(dest ...any) error }) (*LogRecord, error) {
 	er := &LogRecord{}
 	var requestId, connectionId, connectorId string
 	var timestampMs, durationMs int64
+	var responseSource, rateLimitId, rateLimitMode string
+	var rateLimitBucket, rateLimitMatched []byte
 
 	err := row.Scan(
 		&requestId, &er.Namespace, &er.Type, &er.CorrelationId, &timestampMs,
@@ -231,6 +257,8 @@ func scanLogRecord(row interface{ Scan(dest ...any) error }) (*LogRecord, error)
 		&er.ResponseHttpVersion, &er.ResponseSizeBytes, &er.ResponseMimeType,
 		&er.InternalTimeout, &er.RequestCancelled, &er.FullRequestRecorded,
 		&er.Labels,
+		&responseSource, &rateLimitId, &rateLimitMode,
+		&rateLimitBucket, &rateLimitMatched,
 	)
 	if err != nil {
 		return nil, err
@@ -241,6 +269,19 @@ func scanLogRecord(row interface{ Scan(dest ...any) error }) (*LogRecord, error)
 	er.ConnectorId = apid.ID(connectorId)
 	er.Timestamp = time.Unix(0, timestampMs*int64(time.Millisecond)).In(time.UTC)
 	er.MillisecondDuration = MillisecondDuration(time.Duration(durationMs) * time.Millisecond)
+
+	if responseSource == "" {
+		responseSource = string(ResponseSourceUpstream)
+	}
+	er.ResponseSource = ResponseSource(responseSource)
+	er.RateLimitId = apid.ID(rateLimitId)
+	er.RateLimitMode = rateLimitMode
+	if bucket, err := unmarshalRateLimitBucket(rateLimitBucket); err == nil {
+		er.RateLimitBucket = bucket
+	}
+	if matched, err := unmarshalRateLimitMatched(rateLimitMatched); err == nil {
+		er.RateLimitMatched = matched
+	}
 
 	return er, nil
 }
@@ -433,6 +474,16 @@ func (l *sqlListRequestsBuilder) WithLabelSelector(selector string) (ListRequest
 	return l, nil
 }
 
+func (l *sqlListRequestsBuilder) WithResponseSource(s ResponseSource) ListRequestBuilder {
+	l.ListFilters.SetResponseSource(s)
+	return l
+}
+
+func (l *sqlListRequestsBuilder) WithRateLimitId(id apid.ID) ListRequestBuilder {
+	l.ListFilters.SetRateLimitId(id)
+	return l
+}
+
 func (l *sqlListRequestsBuilder) buildQuery() sq.SelectBuilder {
 	builder := sq.Select(entryRecordColumns...).
 		From(entryRecordsTable).
@@ -516,6 +567,14 @@ func (l *sqlListRequestsBuilder) buildQuery() sq.SelectBuilder {
 		if err == nil && len(selector) > 0 {
 			builder = selector.ApplyToSqlBuilderWithProvider(builder, "labels", l.provider)
 		}
+	}
+
+	if l.ResponseSource != nil {
+		builder = builder.Where(sq.Eq{"response_source": *l.ResponseSource})
+	}
+
+	if l.RateLimitId != nil {
+		builder = builder.Where(sq.Eq{"rate_limit_id": l.RateLimitId.String()})
 	}
 
 	// Order by

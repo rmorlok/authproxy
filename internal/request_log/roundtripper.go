@@ -25,6 +25,14 @@ type RoundTripper struct {
 // RoundTrip implements the http.RoundTripper interface
 func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	ctx := req.Context()
+	// Install an Attribution on the request context so inner middlewares
+	// (e.g. the connector-level reactive 429 limiter) can stamp who
+	// produced the response. We share the pointer with this round-tripper
+	// so we read the same struct on the way back out — see attribution.go.
+	if AttributionFromContext(ctx) == nil {
+		ctx = ContextWithAttribution(ctx, &Attribution{})
+		req = req.WithContext(ctx)
+	}
 	// Create a context that won't be cancelled when the request completes, for use in async
 	// goroutines that store logs after the round trip returns. This preserves context values
 	// (correlation ID, clock, etc.) but prevents "context canceled" errors.
@@ -123,6 +131,7 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 			record := full_log.ToRecord()
 			SetLogRecordFieldsFromRequestInfo(record, t.requestInfo)
+			ApplyAttributionToLogRecord(record, ctx)
 
 			err = t.store.StoreRecord(asyncCtx, record)
 			if err != nil {
@@ -216,6 +225,7 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 		record := full_log.ToRecord()
 		SetLogRecordFieldsFromRequestInfo(record, t.requestInfo)
+		ApplyAttributionToLogRecord(record, ctx)
 
 		if err := t.store.StoreRecord(asyncCtx, record); err != nil {
 			t.logger.Error("error storing HTTP log record", "error", err, "entry_id", full_log.Id.String(), "correlation_id", full_log.CorrelationID)
