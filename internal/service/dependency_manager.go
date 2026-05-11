@@ -262,19 +262,40 @@ func (dm *DependencyManager) GetRateLimitEnforcerFactory() *ratelimit.EnforcerFa
 
 func (dm *DependencyManager) GetHttpf() httpf.F {
 	if dm.httpf == nil {
-		// Ordering matters: in httpf.CreateFactory the requestLog
-		// factory is moved to outermost in the call chain so synthetic
-		// 429s from either rate limiter still produce log entries. The
-		// enforcer runs before the connector-level reactive limiter
-		// so a proxy-side rejection short-circuits before any upstream
-		// 429 backoff is applied.
+		// Ordering matters: each entry wraps the previous, so the *last*
+		// entry in this slice becomes the outermost in execution order.
+		// CreateFactory itself appends the requestLog factory last so it
+		// surrounds everything and synthetic 429s still produce log
+		// entries. Within this slice:
+		//   - reactive 429 limiter is innermost so it can short-circuit
+		//     a request that's already in cool-down before any other
+		//     middleware does work
+		//   - the proxy-side rate-limit enforcer (#223) runs immediately
+		//     outside the reactive limiter so a rule rejection
+		//     short-circuits the reactive check too — but its work is
+		//     still covered by the telemetry span that wraps it
+		//   - telemetry wraps both rate-limit middlewares so the client
+		//     span covers any retries / rate-limit waits they emit
+		// NewTelemetryFactory returns (nil, nil) when telemetry is
+		// disabled, in which case telemetry simply drops out of the chain.
+		middlewares := []httpf.RoundTripperFactory{
+			dm.GetRateLimitFactory(),
+			dm.GetRateLimitEnforcerFactory(),
+		}
+		telemetryRT, err := httpf.NewTelemetryFactory(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry)
+		if err != nil {
+			panic(fmt.Errorf("failed to construct httpf telemetry middleware: %w", err))
+		}
+		if telemetryRT != nil {
+			middlewares = append(middlewares, telemetryRT)
+		}
+
 		dm.httpf = httpf.CreateFactory(
 			dm.GetConfig(),
 			dm.GetRedisClient(),
 			dm.GetLogStorageService(),
 			dm.GetLogger(),
-			dm.GetRateLimitEnforcerFactory(),
-			dm.GetRateLimitFactory(),
+			middlewares...,
 		)
 	}
 
