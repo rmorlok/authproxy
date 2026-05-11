@@ -15,6 +15,15 @@
         }
       }
     },
+    "ConnectorTelemetry": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "propagate_trace_context": {
+          "type": "boolean"
+        }
+      }
+    },
     "ApiKeyPlacement": {
       "type": "object",
       "additionalProperties": false,
@@ -265,6 +274,9 @@
     },
     "setup_flow": {
       "$ref": "#/$defs/SetupFlow"
+    },
+    "telemetry": {
+      "$ref": "#/$defs/ConnectorTelemetry"
     }
   },
   "required": ["labels", "display_name", "logo", "auth"],

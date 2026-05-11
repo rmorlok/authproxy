@@ -31,4 +31,11 @@ type RequestInfo struct {
 	// RateLimiting is the rate limiting configuration for the connector, if available.
 	// Nil means use default behavior (enabled with standard Retry-After parsing).
 	RateLimiting *connectors.RateLimiting
+
+	// PropagateTraceContext is the per-connection / per-connector override
+	// for W3C trace context injection on outbound calls. nil means "use the
+	// global default from telemetry.propagation.inject_outbound_default".
+	// Populated by ForConnection from a connection whose connector defines
+	// telemetry.propagate_trace_context.
+	PropagateTraceContext *bool
 }

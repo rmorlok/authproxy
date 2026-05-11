@@ -10,6 +10,7 @@ import (
 	"go.opentelemetry.io/otel/attribute"
 	"go.opentelemetry.io/otel/codes"
 	"go.opentelemetry.io/otel/metric"
+	"go.opentelemetry.io/otel/propagation"
 	semconv "go.opentelemetry.io/otel/semconv/v1.26.0"
 	"go.opentelemetry.io/otel/trace"
 
@@ -49,9 +50,11 @@ func NewTelemetryFactory(providers *aptelemetry.Providers, cfg *sconfig.Telemetr
 	}
 
 	f := &telemetryFactory{
-		tracesEnabled:  tracesEnabled,
-		metricsEnabled: metricsEnabled,
-		projector:      newLabelProjector(cfg.GetProxy()),
+		tracesEnabled:         tracesEnabled,
+		metricsEnabled:        metricsEnabled,
+		projector:             newLabelProjector(cfg.GetProxy()),
+		propagator:            providers.Propagator,
+		injectOutboundDefault: cfg.InjectOutboundDefault(),
 	}
 
 	if tracesEnabled {
@@ -99,6 +102,26 @@ type telemetryFactory struct {
 	requestBodySize  metric.Int64Histogram
 	responseBodySize metric.Int64Histogram
 	projector        *labelProjector
+
+	// propagator is the W3C TraceContext + Baggage composite from the
+	// providers. Always present (even with no-op providers) but only used
+	// when the resolved propagation decision is true.
+	propagator propagation.TextMapPropagator
+	// injectOutboundDefault is the global default for outbound W3C trace
+	// context injection. Per-connection / per-connector overrides on
+	// RequestInfo.PropagateTraceContext take precedence over this default.
+	injectOutboundDefault bool
+}
+
+// shouldPropagate resolves the outbound-injection decision for a given
+// RequestInfo. The per-request override (sourced from the connector's
+// telemetry.propagate_trace_context) wins when present; otherwise the global
+// telemetry.propagation.inject_outbound_default applies.
+func (f *telemetryFactory) shouldPropagate(ri RequestInfo) bool {
+	if ri.PropagateTraceContext != nil {
+		return *ri.PropagateTraceContext
+	}
+	return f.injectOutboundDefault
 }
 
 // NewRoundTripper wraps transport in a roundtripper that emits a span and
@@ -134,6 +157,15 @@ func (rt *telemetryRoundTripper) RoundTrip(req *http.Request) (*http.Response, e
 			trace.WithAttributes(spanAttrs...),
 		)
 		req = req.WithContext(ctx)
+	}
+
+	// Inject W3C trace context onto outbound headers when the resolved
+	// decision is true. Decision priority: per-request override > global
+	// default. Injection is unconditionally a no-op when the active span is
+	// invalid (no provider, sampling drop, etc.), so this is safe to call
+	// even with no-op providers.
+	if rt.factory.propagator != nil && rt.factory.shouldPropagate(rt.requestInfo) {
+		rt.factory.propagator.Inject(ctx, propagation.HeaderCarrier(req.Header))
 	}
 
 	start := time.Now()

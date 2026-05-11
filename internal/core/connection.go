@@ -191,6 +191,18 @@ func (c *connection) GetRateLimitConfig() *connectors.RateLimiting {
 	return def.RateLimiting
 }
 
+// PropagateTraceContext returns the per-connector override for outbound W3C
+// trace context injection. nil means "use the global default" from the
+// telemetry config block.
+func (c *connection) PropagateTraceContext() *bool {
+	def := c.cv.GetDefinition()
+	if def == nil || def.Telemetry == nil {
+		return nil
+	}
+	return def.Telemetry.PropagateTraceContext
+}
+
 var _ iface.Connection = (*connection)(nil)
 var _ aplog.HasLogger = (*connection)(nil)
 var _ httpf.RateLimitConfigProvider = (*connection)(nil)
+var _ httpf.TracePropagationProvider = (*connection)(nil)

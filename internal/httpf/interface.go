@@ -22,6 +22,13 @@ type RateLimitConfigProvider interface {
 	GetRateLimitConfig() *connectors.RateLimiting
 }
 
+// TracePropagationProvider is an optional interface implemented by connections
+// whose connector definition specifies a per-connector override for outbound
+// W3C trace context injection. Return nil to inherit the global default.
+type TracePropagationProvider interface {
+	PropagateTraceContext() *bool
+}
+
 type Connection interface {
 	GetId() apid.ID
 	GetNamespace() string

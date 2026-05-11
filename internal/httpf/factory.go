@@ -108,6 +108,10 @@ func (f *clientFactory) ForConnection(c Connection) F {
 		ri.RateLimiting = rlp.GetRateLimitConfig()
 	}
 
+	if tpp, ok := c.(TracePropagationProvider); ok {
+		ri.PropagateTraceContext = tpp.PropagateTraceContext()
+	}
+
 	return fp.ForRequestInfo(ri)
 }
 
