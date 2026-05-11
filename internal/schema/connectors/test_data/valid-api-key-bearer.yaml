@@ -1,0 +1,13 @@
+# $schema: ./schema.json
+
+labels:
+  type: sendgrid
+display_name: SendGrid
+logo:
+  public_url: https://example.com/sendgrid.png
+description: |
+  Send transactional email through SendGrid.
+auth:
+  type: api-key
+  placement:
+    type: bearer

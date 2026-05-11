@@ -1,0 +1,13 @@
+# $schema: ./schema.json
+
+labels:
+  type: invalid-header-no-name
+display_name: Invalid (header placement missing header_name)
+logo:
+  public_url: https://example.com/x.png
+description: |
+  header placement requires header_name; this file omits it.
+auth:
+  type: api-key
+  placement:
+    type: header

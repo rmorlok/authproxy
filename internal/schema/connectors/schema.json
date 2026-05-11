@@ -3,13 +3,53 @@
   "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/connectors/schema.json",
   "$defs": {
     "AuthApiKey": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
       "properties": {
         "type": {
           "const": "api-key"
+        },
+        "placement": {
+          "$ref": "#/$defs/ApiKeyPlacement"
+        }
+      }
+    },
+    "ApiKeyPlacement": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": {
+          "enum": ["bearer", "header", "query", "basic"]
+        },
+        "header_name": {
+          "type": "string"
+        },
+        "prefix": {
+          "type": "string"
+        },
+        "param_name": {
+          "type": "string"
+        },
+        "username_field": {
+          "type": "string"
         }
       },
-      "additionalProperties": false,
-      "type": "object"
+      "allOf": [
+        {
+          "if": { "properties": { "type": { "const": "header" } } },
+          "then": { "required": ["header_name"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "query" } } },
+          "then": { "required": ["param_name"] }
+        },
+        {
+          "if": { "properties": { "type": { "const": "basic" } } },
+          "then": { "required": ["username_field"] }
+        }
+      ]
     },
     "AuthNoAuth": {
       "properties": {
