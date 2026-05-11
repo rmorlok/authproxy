@@ -2,6 +2,7 @@ package database
 
 import (
 	"database/sql"
+	"database/sql/driver"
 
 	"github.com/XSAM/otelsql"
 	"go.opentelemetry.io/otel/attribute"
@@ -59,36 +60,76 @@ func (o *telemetryOpts) telemetryEnabled() bool {
 // telemetry is enabled and falling through to plain sql.Open otherwise.
 // driverName is the underlying driver registered with database/sql (e.g.
 // "pgx", "sqlite3"); dbSystem is the OTel semconv db.system attribute value
-// (e.g. semconv.DBSystemPostgreSQL.Value.AsString()).
+// (e.g. "postgresql").
 func openInstrumentedDB(driverName, dsn, dbSystem string, opts *telemetryOpts) (*sql.DB, error) {
 	if !opts.telemetryEnabled() {
 		return sql.Open(driverName, dsn)
 	}
 
-	otelOpts := []otelsql.Option{
-		otelsql.WithTracerProvider(opts.providers.TracerProvider),
-		otelsql.WithMeterProvider(opts.providers.MeterProvider),
-		otelsql.WithAttributes(attribute.String(string(semconv.DBSystemKey), dbSystem)),
-	}
-
+	otelOpts := otelOptionsFor(opts, dbSystem)
 	db, err := otelsql.Open(driverName, dsn, otelOpts...)
 	if err != nil {
 		return nil, err
 	}
-
-	if opts.cfg.MetricsEnabled() {
-		// Register go.sql.DB connection pool gauges (open / in-use / idle
-		// connections, wait counts, etc.). Ignore the returned values: a
-		// failure to register pool stats should not fail the whole
-		// connection — instrumentation is best-effort.
-		_, _ = otelsql.RegisterDBStatsMetrics(db, otelOpts...)
-	}
-
+	maybeRegisterPoolStats(opts, db, otelOpts)
 	return db, nil
 }
 
-// dbSystemPostgres is the otel semconv db.system value for Postgres.
-const dbSystemPostgres = "postgresql"
+// OpenInstrumentedSQL is the exported counterpart of openInstrumentedDB.
+// Other packages that own their own sql.DB constructors (e.g. request_log,
+// which opens separate Postgres / SQLite connections for HTTP request
+// logging) call this to inherit the same telemetry treatment as the main
+// database without duplicating the plumbing.
+//
+// dbSystem is the semconv db.system value (DBSystemPostgreSQL, DBSystemSQLite,
+// DBSystemClickHouse). opts are forwarded as-is — pass WithTelemetry to
+// instrument; pass nothing for a plain sql.Open fast path.
+func OpenInstrumentedSQL(driverName, dsn, dbSystem string, opts ...Option) (*sql.DB, error) {
+	return openInstrumentedDB(driverName, dsn, dbSystem, resolveOpts(opts))
+}
 
-// dbSystemSQLite is the otel semconv db.system value for SQLite.
-const dbSystemSQLite = "sqlite"
+// OpenInstrumentedConnector wraps a driver.Connector — used by drivers that
+// expose a Connector rather than a registered driver name. The ClickHouse
+// std driver is the in-tree example (clickhouse.Connector(opts) returns a
+// driver.Connector that can be wrapped here). When telemetry is disabled,
+// returns a plain sql.OpenDB(connector) with no overhead.
+func OpenInstrumentedConnector(connector driver.Connector, dbSystem string, opts ...Option) *sql.DB {
+	resolved := resolveOpts(opts)
+	if !resolved.telemetryEnabled() {
+		return sql.OpenDB(connector)
+	}
+
+	otelOpts := otelOptionsFor(resolved, dbSystem)
+	db := otelsql.OpenDB(connector, otelOpts...)
+	maybeRegisterPoolStats(resolved, db, otelOpts)
+	return db
+}
+
+// otelOptionsFor builds the otelsql option slice common to both the
+// driver-name and connector paths.
+func otelOptionsFor(opts *telemetryOpts, dbSystem string) []otelsql.Option {
+	return []otelsql.Option{
+		otelsql.WithTracerProvider(opts.providers.TracerProvider),
+		otelsql.WithMeterProvider(opts.providers.MeterProvider),
+		otelsql.WithAttributes(attribute.String(string(semconv.DBSystemKey), dbSystem)),
+	}
+}
+
+// maybeRegisterPoolStats registers the standard go-sql DB connection pool
+// gauges (open / in-use / idle, wait counts) when metrics are enabled.
+// Failures are non-fatal — instrumentation is best effort.
+func maybeRegisterPoolStats(opts *telemetryOpts, db *sql.DB, otelOpts []otelsql.Option) {
+	if !opts.cfg.MetricsEnabled() {
+		return
+	}
+	_, _ = otelsql.RegisterDBStatsMetrics(db, otelOpts...)
+}
+
+// DBSystemPostgreSQL / DBSystemSQLite / DBSystemClickHouse are the
+// otel semconv db.system values used when constructing instrumented
+// connections. Pass these to OpenInstrumentedSQL / OpenInstrumentedConnector.
+const (
+	DBSystemPostgreSQL = "postgresql"
+	DBSystemSQLite     = "sqlite"
+	DBSystemClickHouse = "clickhouse"
+)

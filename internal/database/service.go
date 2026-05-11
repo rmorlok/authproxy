@@ -54,7 +54,7 @@ func NewSqliteConnection(dbConfig *config.DatabaseSqlite, l *slog.Logger, opts .
 		defer file.Close()
 	}
 
-	db, err := openInstrumentedDB("sqlite3", dbConfig.GetDsn(), dbSystemSQLite, resolveOpts(opts))
+	db, err := openInstrumentedDB("sqlite3", dbConfig.GetDsn(), DBSystemSQLite, resolveOpts(opts))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open sqlite database '%s': %w", dbConfig.GetDsn(), err)
 	}
@@ -74,7 +74,7 @@ func NewSqliteConnection(dbConfig *config.DatabaseSqlite, l *slog.Logger, opts .
 
 // NewPostgresConnection creates a new database connection to a Postgres database.
 func NewPostgresConnection(dbConfig *config.DatabasePostgres, l *slog.Logger, opts ...Option) (DB, error) {
-	db, err := openInstrumentedDB("pgx", dbConfig.GetDsn(), dbSystemPostgres, resolveOpts(opts))
+	db, err := openInstrumentedDB("pgx", dbConfig.GetDsn(), DBSystemPostgreSQL, resolveOpts(opts))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open postgres database '%s': %w", dbConfig.GetDsn(), err)
 	}
