@@ -56,3 +56,5 @@ connectors:
       This integration pushes candidates to greenhouse
     auth:
       type: api-key
+      placement:
+        type: bearer

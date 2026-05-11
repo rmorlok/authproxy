@@ -185,6 +185,8 @@ connectors:
       This integration pushes candidates to greenhouse
     auth:
       type: api-key
+      placement:
+        type: bearer
   - labels:
       type: google-calendar
       env: prod
@@ -392,6 +394,8 @@ connectors:
 #      This integration pushes candidates to greenhouse
 #    auth:
 #      type: api-key
+#      placement:
+#        type: bearer
 #  - labels:
 #      type: google-calendar
 #      env: dev
@@ -474,6 +478,8 @@ connectors:
 #      This integration pushes candidates to greenhouse
 #    auth:
 #      type: api-key
+#      placement:
+#        type: bearer
 #  - labels:
 #      type: google-calendar
 #      env: stage

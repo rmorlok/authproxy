@@ -5,7 +5,7 @@
     "AuthApiKey": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type"],
+      "required": ["type", "placement"],
       "properties": {
         "type": {
           "const": "api-key"

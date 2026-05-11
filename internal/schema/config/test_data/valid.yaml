@@ -123,6 +123,8 @@ connectors:
       This integration pushes candidates to greenhouse
     auth:
       type: api-key
+      placement:
+        type: bearer
   - labels:
       type: google-calendar
     display_name: Google Calendar

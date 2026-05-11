@@ -4,7 +4,7 @@ import (
 	"context"
 	"encoding/json"
 
-	"github.com/rmorlok/authproxy/internal/apauth/core"
+	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
@@ -51,6 +51,20 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 		return nil, httperr.BadRequest(err.Error())
 	}
 
+	// For api-key connectors, the credential fields submitted in this step (api_key
+	// and, for the basic placement, the configured username field) belong in the
+	// api_key_credentials table — NOT in the connection's EncryptedConfiguration
+	// blob. Extract them, encrypt into a single opaque blob, persist, and strip
+	// from the merged config before saving so plaintext credentials never reach
+	// the general per-connection config.
+	if def := c.cv.GetDefinition(); def.Auth != nil {
+		if ak, ok := def.Auth.Inner().(*config.AuthApiKey); ok && ak.Placement != nil {
+			if err := c.persistApiKeyCredentialsFromConfig(ctx, mergedConfig, ak.Placement); err != nil {
+				return nil, err
+			}
+		}
+	}
+
 	if err := c.SetConfiguration(ctx, mergedConfig); err != nil {
 		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to save configuration: %w", err))
 	}
@@ -79,6 +93,17 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 	}
 
 	if nextStep.Equals(cschema.SetupStepAuth) {
+		// For api-key the credential was persisted in the preconnect submit above,
+		// so there is no separate auth phase: skip straight to verify / configure /
+		// ready via the unified post-auth handler.
+		if connector.Auth != nil {
+			if _, ok := connector.Auth.Inner().(*config.AuthApiKey); ok {
+				if _, err := c.HandleCredentialsEstablished(ctx); err != nil {
+					return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to advance api-key connection after credentials submission: %w", err))
+				}
+				return c.GetCurrentSetupStepResponse(ctx)
+			}
+		}
 		// Transition to auth phase — initiate OAuth flow
 		return c.initiateAuthStep(ctx, req.ReturnToUrl, connector)
 	}
@@ -86,6 +111,87 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 	// Next step is a form step
 	return c.buildFormResponse(ctx, nextStep, connector.SetupFlow)
 }
+
+// persistApiKeyCredentialsFromConfig extracts the credential fields declared by
+// placement from mergedConfig, encrypts the resulting plaintext as a single
+// JSON blob, persists it into api_key_credentials, and removes the credential
+// fields from mergedConfig in place. No-op when none of the credential fields
+// are present in this step's submission (multi-step preconnect flows may collect
+// credentials only in a single step).
+func (c *connection) persistApiKeyCredentialsFromConfig(
+	ctx context.Context,
+	mergedConfig map[string]any,
+	placement *cschema.ApiKeyPlacement,
+) error {
+	fieldNames := placement.CredentialFieldNames()
+	if len(fieldNames) == 0 {
+		return nil
+	}
+
+	plaintext, anyPresent := extractApiKeyPlaintext(mergedConfig, placement)
+	if !anyPresent {
+		return nil
+	}
+	if plaintext.ApiKey == "" {
+		return httperr.BadRequest("api_key is required")
+	}
+	if placement.Type == cschema.ApiKeyPlacementBasic && plaintext.Username == "" {
+		return httperr.BadRequestf("%q is required for basic placement", placement.UsernameField)
+	}
+
+	blobJSON, err := json.Marshal(plaintext)
+	if err != nil {
+		return httperr.InternalServerError(httperr.WithInternalErrorf("failed to marshal api-key plaintext: %w", err))
+	}
+	encrypted, err := c.s.encrypt.EncryptStringForNamespace(ctx, c.Namespace, string(blobJSON))
+	if err != nil {
+		return httperr.InternalServerError(httperr.WithInternalErrorf("failed to encrypt api-key credentials: %w", err))
+	}
+
+	actor := apauthcore.GetAuthFromContext(ctx).MustGetActor()
+	actorId := actor.GetId()
+	if _, err := c.s.db.InsertApiKeyCredential(ctx, c.Id, encrypted, placement, &actorId); err != nil {
+		return httperr.InternalServerError(httperr.WithInternalErrorf("failed to persist api-key credentials: %w", err))
+	}
+
+	// Strip credential fields from merged config so plaintext does not enter
+	// EncryptedConfiguration.
+	for _, name := range fieldNames {
+		delete(mergedConfig, name)
+	}
+	return nil
+}
+
+// extractApiKeyPlaintext pulls the credential field values from mergedConfig
+// into an ApiKeyCredentialPlaintext. Returns (plaintext, true) if any credential
+// field was present, (zero, false) otherwise. Validates that each present value
+// is a non-empty string and surfaces a typed error for anything else.
+func extractApiKeyPlaintext(
+	mergedConfig map[string]any,
+	placement *cschema.ApiKeyPlacement,
+) (database.ApiKeyCredentialPlaintext, bool) {
+	var out database.ApiKeyCredentialPlaintext
+	present := false
+
+	if v, ok := mergedConfig["api_key"]; ok {
+		present = true
+		if s, ok := v.(string); ok {
+			out.ApiKey = s
+		}
+	}
+
+	if placement.Type == cschema.ApiKeyPlacementBasic && placement.UsernameField != "" {
+		if v, ok := mergedConfig[placement.UsernameField]; ok {
+			present = true
+			if s, ok := v.(string); ok {
+				out.Username = s
+			}
+		}
+	}
+
+	return out, present
+}
+
 
 // initiateAuthStep starts the OAuth flow after preconnect steps are complete.
 func (c *connection) initiateAuthStep(ctx context.Context, returnToUrl string, connector *cschema.Connector) (iface.ConnectionSetupResponse, error) {
@@ -105,7 +211,7 @@ func (c *connection) initiateAuthStep(ctx context.Context, returnToUrl string, c
 		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to set setup step to auth: %w", err))
 	}
 
-	ra := core.GetAuthFromContext(ctx)
+	ra := apauthcore.GetAuthFromContext(ctx)
 	o2 := c.s.getOAuth2Factory().NewOAuth2(c)
 	url, err := o2.SetStateAndGeneratePublicUrl(ctx, ra.MustGetActor(), returnToUrl)
 	if err != nil {

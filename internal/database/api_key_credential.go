@@ -32,6 +32,16 @@ func init() {
 
 const ApiKeyCredentialsTable = "api_key_credentials"
 
+// ApiKeyCredentialPlaintext is the canonical plaintext shape stored, encrypted,
+// inside ApiKeyCredential.EncryptedCredentials. Defined here so callers that
+// encrypt (the connection-initiate submit handler) and callers that decrypt
+// (the api-key proxy) share one contract. The database itself never inspects
+// the plaintext — it only stores the encrypted blob.
+type ApiKeyCredentialPlaintext struct {
+	ApiKey   string `json:"api_key"`
+	Username string `json:"username,omitempty"`
+}
+
 // ApiKeyCredential is one row in the api_key_credentials table — the encrypted
 // credential blob (api key and, for basic placement, username) submitted by a
 // user for a connection. The encrypted_credentials column stores a single

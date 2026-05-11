@@ -48,6 +48,28 @@ func (p *ApiKeyPlacement) Clone() *ApiKeyPlacement {
 	return &clone
 }
 
+// CredentialFieldNames returns the field names that carry secret values in the
+// connection-initiate form for this placement. These fields are extracted from
+// submitted form data, encrypted, and stored in api_key_credentials — they do
+// NOT merge into the connection's EncryptedConfiguration.
+//
+// For bearer / header / query placements this is just "api_key". For basic, it
+// is "api_key" plus the connector-declared UsernameField.
+func (p *ApiKeyPlacement) CredentialFieldNames() []string {
+	if p == nil {
+		return nil
+	}
+	switch p.Type {
+	case ApiKeyPlacementBasic:
+		if p.UsernameField == "" {
+			return []string{"api_key"}
+		}
+		return []string{"api_key", p.UsernameField}
+	default:
+		return []string{"api_key"}
+	}
+}
+
 // AuthApiKey describes an API-key-authenticated connector.
 type AuthApiKey struct {
 	Type      AuthType         `json:"type" yaml:"type"`

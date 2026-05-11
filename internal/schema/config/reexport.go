@@ -46,6 +46,7 @@ type (
 	Auth                    = connectors.Auth
 	AuthType                = connectors.AuthType
 	AuthApiKey              = connectors.AuthApiKey
+	ApiKeyPlacement         = connectors.ApiKeyPlacement
 	AuthOAuth2              = connectors.AuthOAuth2
 	AuthNoAuth              = connectors.AuthNoAuth
 	AuthOauth2Authorization = connectors.AuthOauth2Authorization
@@ -59,4 +60,9 @@ type (
 const (
 	AuthTypeOAuth2 = connectors.AuthTypeOAuth2
 	AuthTypeAPIKey = connectors.AuthTypeAPIKey
+
+	ApiKeyPlacementBearer = connectors.ApiKeyPlacementBearer
+	ApiKeyPlacementHeader = connectors.ApiKeyPlacementHeader
+	ApiKeyPlacementQuery  = connectors.ApiKeyPlacementQuery
+	ApiKeyPlacementBasic  = connectors.ApiKeyPlacementBasic
 )
