@@ -188,7 +188,11 @@ func (dm *DependencyManager) GetRedisClient() apredis.Client {
 func (dm *DependencyManager) GetDatabase() database.DB {
 	if dm.db == nil {
 		var err error
-		dm.db, err = database.NewConnectionForRoot(dm.GetConfigRoot(), dm.GetLogger())
+		dm.db, err = database.NewConnectionForRoot(
+			dm.GetConfigRoot(),
+			dm.GetLogger(),
+			database.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry),
+		)
 		if err != nil {
 			panic(err)
 		}
