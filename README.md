@@ -10,6 +10,47 @@ Embeddable connector marketplace UI:
 Pre-built admin UI for managing connectors and connections:
 ![admin-ui.jpg](docs/images/admin-walkthrough.gif)
 
+## Table of contents
+
+- [Key Concepts](#key-concepts)
+  - [Authenticating Proxy](#authenticating-proxy)
+  - [Connectors and Connections](#connectors-and-connections)
+  - [Connector Versioning](#connector-versioning)
+  - [Namespaces and Access Control](#namespaces-and-access-control)
+  - [JWT Authentication and Scoped Tokens](#jwt-authentication-and-scoped-tokens)
+  - [Dev Env Authentication](#dev-env-authentication)
+  - [Application-Level Encryption](#application-level-encryption)
+  - [Embeddable Marketplace](#embeddable-marketplace)
+  - [Request Logging and Auditability](#request-logging-and-auditability)
+  - [Labels and Annotations](#labels-and-annotations)
+  - [Rate Limits](#rate-limits)
+- [Architecture](#architecture)
+- [Running Locally](#running-locally)
+  - [Quick Start with Docker Compose](#quick-start-with-docker-compose)
+  - [Manual Setup](#manual-setup)
+  - [TLS Certificates](#tls-certificates)
+  - [Testing](#testing)
+  - [Pre-push Preflight](#pre-push-preflight)
+- [UI](#ui)
+  - [Marketplace UI](#marketplace-ui)
+  - [Admin UI](#admin-ui)
+- [Client Config](#client-config)
+- [Related Projects](#related-projects)
+- [License](#license)
+- [Documentation](#documentation)
+
+## Feature documentation
+
+In-depth guides live under [`docs/`](docs/README.md):
+
+- [Rate limits](docs/rate-limits.md) — defining rate-limit resources, the connector-level reactive 429 handler, and the request-log attribution fields.
+- [Labels and annotations](docs/labels.md) — the label system, system labels under `apxy/`, carry-forward through namespaces and connectors, label selectors.
+- [Background tasks](docs/background_tasks.md) — running the worker, monitoring queues.
+- [Blob storage](docs/blob_storage.md) — viewing data stored in MinIO / S3.
+- [Redis insight](docs/redis_insight.md) — viewing data stored in Redis.
+
+See the [docs index](docs/README.md) for the full list.
+
 ## Key Concepts
 
 ### Authenticating Proxy
@@ -214,6 +255,17 @@ Use cases include:
 - **Workflow tracking**: Mark connections with pipeline or workflow identifiers
 
 Labels support Kubernetes-style selector syntax for querying, making it easy to find resources matching complex criteria.
+
+See [docs/labels.md](docs/labels.md) for the full reference — system labels under `apxy/`, carry-forward semantics through the namespace → connector → connection hierarchy, the per-request label snapshot, and selector syntax.
+
+### Rate Limits
+
+Two complementary rate-limiting systems are built in:
+
+1. **Connector-level reactive 429 handling.** When a 3rd party returns 429, AuthProxy parses the `Retry-After` header (or applies exponential backoff) and short-circuits subsequent requests on that connection until the cool-down expires. Built into every connector; configurable via the connector definition.
+2. **Rate-limit resources.** Declarative, namespace-scoped rules you define via API or Terraform. They run **before** the upstream call and enforce caps you configure — for example, "no more than 60 writes per minute per actor against Salesforce." Supports fixed-window / sliding-window / token-bucket algorithms, label-selector and path-based matching, per-actor / per-team / per-label bucketing, and `enforce` vs. `observe` mode for safe rollout.
+
+Both can fire on the same request and both stamp the request log so you can tell them apart. See [docs/rate-limits.md](docs/rate-limits.md) for the full reference.
 
 ## Architecture
 
@@ -502,8 +554,16 @@ See [RELATED.md](RELATED.md) for a list of related products in the API integrati
 
 AuthProxy is open source. See [LICENSE](LICENSE) for details.
 
-## Additional Documentation
+## Documentation
 
-* [Managing background tasks](docs/background_tasks.md)
-* [Viewing data stored in Blob Storage such as request logs](docs/blob_storage.md)
-* [Viewing data stored in Redis](docs/redis_insight.md)
+The full set of long-form guides lives under [`docs/`](docs/README.md):
+
+| Topic | Doc |
+|---|---|
+| Define rate-limit resources, connector reactive 429 handling, log attribution | [docs/rate-limits.md](docs/rate-limits.md) |
+| Label system, system labels, carry-forward, selectors | [docs/labels.md](docs/labels.md) |
+| Managing background tasks | [docs/background_tasks.md](docs/background_tasks.md) |
+| Viewing data stored in Blob Storage (request logs, etc.) | [docs/blob_storage.md](docs/blob_storage.md) |
+| Viewing data stored in Redis | [docs/redis_insight.md](docs/redis_insight.md) |
+| Terraform provider — resource reference | [terraform/provider/docs/resources/](terraform/provider/docs/resources/) |
+| Terraform provider — runnable examples | [terraform/provider/examples/resources/](terraform/provider/examples/resources/) |
