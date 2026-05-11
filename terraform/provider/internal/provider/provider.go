@@ -111,6 +111,7 @@ func (p *AuthProxyProvider) Resources(_ context.Context) []func() resource.Resou
 		resources.NewEncryptionKeyResource,
 		resources.NewActorResource,
 		resources.NewConnectorResource,
+		resources.NewRateLimitResource,
 	}
 }
 
