@@ -249,12 +249,26 @@ func (dm *DependencyManager) GetRateLimitFactory() *ratelimit.Factory {
 
 func (dm *DependencyManager) GetHttpf() httpf.F {
 	if dm.httpf == nil {
+		// Build the additional-middlewares list. Telemetry is appended last
+		// so it wraps everything else, making the client span cover any
+		// retries / rate-limit waits emitted by the inner middlewares.
+		// NewTelemetryFactory returns (nil, nil) when telemetry is disabled,
+		// in which case the chain is identical to its pre-telemetry shape.
+		middlewares := []httpf.RoundTripperFactory{dm.GetRateLimitFactory()}
+		telemetryRT, err := httpf.NewTelemetryFactory(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry)
+		if err != nil {
+			panic(fmt.Errorf("failed to construct httpf telemetry middleware: %w", err))
+		}
+		if telemetryRT != nil {
+			middlewares = append(middlewares, telemetryRT)
+		}
+
 		dm.httpf = httpf.CreateFactory(
 			dm.GetConfig(),
 			dm.GetRedisClient(),
 			dm.GetLogStorageService(),
 			dm.GetLogger(),
-			dm.GetRateLimitFactory(),
+			middlewares...,
 		)
 	}
 
