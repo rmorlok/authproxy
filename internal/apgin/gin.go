@@ -14,12 +14,37 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/internal/apctx"
+	"github.com/rmorlok/authproxy/internal/aptelemetry"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
+// ServiceOption configures a Gin engine produced by ForService. Pass options
+// constructed via WithTelemetry, etc.
+type ServiceOption func(*serviceOptions)
+
+type serviceOptions struct {
+	telemetry        *aptelemetry.Providers
+	telemetryConfig  *config.Telemetry
+	telemetryService string
+}
+
+// WithTelemetry registers HTTP server instrumentation on the engine using the
+// supplied OTel providers and telemetry config. When the providers are nil or
+// in no-op mode (telemetry disabled), the option is inert and the engine
+// remains identical to one built without it. The serviceID is reported as an
+// attribute on every span and metric point.
+func WithTelemetry(providers *aptelemetry.Providers, cfg *config.Telemetry, serviceID string) ServiceOption {
+	return func(o *serviceOptions) {
+		o.telemetry = providers
+		o.telemetryConfig = cfg
+		o.telemetryService = serviceID
+	}
+}
+
 // ForService creates a Gin engine configured for a production service with
-// debug mode, logging, recovery, and error logging middleware.
-func ForService(service config.Service, logger *slog.Logger, debugMode bool) *gin.Engine {
+// debug mode, logging, recovery, and error logging middleware. Pass
+// WithTelemetry to add OTel instrumentation (server spans + HTTP metrics).
+func ForService(service config.Service, logger *slog.Logger, debugMode bool, opts ...ServiceOption) *gin.Engine {
 	logFormatter := func(param gin.LogFormatterParams) string {
 		var statusColor, methodColor, resetColor string
 		if param.IsOutputColor() {
@@ -43,7 +68,48 @@ func ForService(service config.Service, logger *slog.Logger, debugMode bool) *gi
 	}
 
 	engine := gin.New()
-	engine.Use(DebugModeMiddleware(debugMode), gin.LoggerWithFormatter(logFormatter), gin.Recovery(), ErrorLoggingMiddleware(logger))
+
+	// Build the middleware chain. Telemetry middleware (when enabled) goes
+	// outermost so the server span wraps logging, recovery, and handlers —
+	// and so panics are observable as exception events on the span before
+	// gin.Recovery converts them into 500 responses.
+	chain := []gin.HandlerFunc{}
+
+	o := serviceOptions{}
+	for _, opt := range opts {
+		opt(&o)
+	}
+	telemetryEnabled := false
+	if mw, err := newTelemetryMiddleware(o.telemetryService, o.telemetry, o.telemetryConfig); err != nil {
+		// Construction errors at startup are programmer errors (bad meter
+		// names, etc.) — log loudly so they surface immediately rather than
+		// silently dropping instrumentation.
+		if logger != nil {
+			logger.Error("apgin: failed to construct telemetry middleware", "error", err)
+		} else {
+			log.Printf("apgin: failed to construct telemetry middleware: %v", err)
+		}
+	} else if mw != nil {
+		chain = append(chain, mw)
+		telemetryEnabled = true
+	}
+
+	// When telemetry is active, swap gin.Recovery() for one that records the
+	// panic as an exception event on the active span before writing 500.
+	// Same response behaviour either way.
+	recovery := gin.Recovery()
+	if telemetryEnabled {
+		recovery = telemetryRecovery()
+	}
+
+	chain = append(chain,
+		DebugModeMiddleware(debugMode),
+		gin.LoggerWithFormatter(logFormatter),
+		recovery,
+		ErrorLoggingMiddleware(logger),
+	)
+
+	engine.Use(chain...)
 
 	return engine
 }
