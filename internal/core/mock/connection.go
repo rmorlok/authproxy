@@ -18,6 +18,7 @@ type Connection struct {
 	Id               apid.ID
 	Namespace        string
 	State            database.ConnectionState
+	HealthState      database.ConnectionHealthState
 	ConnectorId      apid.ID
 	ConnectorVersion uint64
 	CreatedAt        time.Time
@@ -72,6 +73,18 @@ func (m *Connection) GetConnectorVersionEntity() iface.ConnectorVersion {
 
 func (m *Connection) SetState(ctx context.Context, state database.ConnectionState) error {
 	m.State = state
+	return nil
+}
+
+func (m *Connection) GetHealthState() database.ConnectionHealthState {
+	if m.HealthState == "" {
+		return database.ConnectionHealthStateHealthy
+	}
+	return m.HealthState
+}
+
+func (m *Connection) MarkHealthState(ctx context.Context, state database.ConnectionHealthState, reason string) error {
+	m.HealthState = state
 	return nil
 }
 

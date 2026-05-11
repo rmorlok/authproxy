@@ -1641,6 +1641,20 @@ func (mr *MockDBMockRecorder) SetConnectionState(ctx, id, state interface{}) *go
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectionState", reflect.TypeOf((*MockDB)(nil).SetConnectionState), ctx, id, state)
 }
 
+// SetConnectionHealthState mocks base method.
+func (m *MockDB) SetConnectionHealthState(ctx context.Context, id apid.ID, state database.ConnectionHealthState) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "SetConnectionHealthState", ctx, id, state)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// SetConnectionHealthState indicates an expected call of SetConnectionHealthState.
+func (mr *MockDBMockRecorder) SetConnectionHealthState(ctx, id, state interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetConnectionHealthState", reflect.TypeOf((*MockDB)(nil).SetConnectionHealthState), ctx, id, state)
+}
+
 // SetConnectorVersionState mocks base method.
 func (m *MockDB) SetConnectorVersionState(ctx context.Context, id apid.ID, version uint64, state database.ConnectorVersionState) error {
 	m.ctrl.T.Helper()

@@ -116,6 +116,7 @@ type DB interface {
 	CreateConnection(ctx context.Context, c *Connection) error
 	DeleteConnection(ctx context.Context, id apid.ID) error
 	SetConnectionState(ctx context.Context, id apid.ID, state ConnectionState) error
+	SetConnectionHealthState(ctx context.Context, id apid.ID, state ConnectionHealthState) error
 	SetConnectionSetupStep(ctx context.Context, id apid.ID, setupStep *cschema.SetupStep) error
 	SetConnectionSetupError(ctx context.Context, id apid.ID, setupError *string) error
 	SetConnectionEncryptedConfiguration(ctx context.Context, id apid.ID, encryptedConfig *encfield.EncryptedField) error

@@ -20,6 +20,7 @@ type Connection interface {
 	GetId() apid.ID
 	GetNamespace() string
 	GetState() database.ConnectionState
+	GetHealthState() database.ConnectionHealthState
 	GetConnectorId() apid.ID
 	GetConnectorVersion() uint64
 	GetCreatedAt() time.Time
@@ -41,6 +42,13 @@ type Connection interface {
 	 */
 
 	SetState(ctx context.Context, state database.ConnectionState) error
+	// MarkHealthState updates the connection's operational health signal.
+	// reason is a short stable token (e.g. "refresh_invalid_grant",
+	// "refresh_succeeded") attached to the structured transition event;
+	// the field is for operators, not user-visible strings. Calls are
+	// idempotent — flipping to the current state is a no-op and emits no
+	// event.
+	MarkHealthState(ctx context.Context, state database.ConnectionHealthState, reason string) error
 	SetSetupStep(ctx context.Context, setupStep *cschema.SetupStep) error
 	SetSetupError(ctx context.Context, setupError *string) error
 	GetConfiguration(ctx context.Context) (map[string]any, error)

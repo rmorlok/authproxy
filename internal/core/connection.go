@@ -57,6 +57,13 @@ func (c *connection) GetState() database.ConnectionState {
 	return c.State
 }
 
+func (c *connection) GetHealthState() database.ConnectionHealthState {
+	if c.HealthState == "" {
+		return database.ConnectionHealthStateHealthy
+	}
+	return c.HealthState
+}
+
 func (c *connection) GetConnectorId() apid.ID {
 	return c.ConnectorId
 }

@@ -49,12 +49,36 @@ func IsValidConnectionState[T string | ConnectionState](state T) bool {
 	}
 }
 
+// ConnectionHealthState is the operational health signal for a connection,
+// distinct from its lifecycle state. A connection can be Ready and unhealthy
+// simultaneously — for example, an OAuth2 connection whose refresh token has
+// been revoked stays in ConnectionStateReady but flips to unhealthy until the
+// user re-authenticates. Probe-driven and refresh-driven signals both write
+// to this field; UI surfaces it to drive the unified reauth action.
+type ConnectionHealthState string
+
+const (
+	ConnectionHealthStateHealthy   ConnectionHealthState = "healthy"
+	ConnectionHealthStateUnhealthy ConnectionHealthState = "unhealthy"
+)
+
+func IsValidConnectionHealthState[T string | ConnectionHealthState](state T) bool {
+	switch ConnectionHealthState(state) {
+	case ConnectionHealthStateHealthy,
+		ConnectionHealthStateUnhealthy:
+		return true
+	default:
+		return false
+	}
+}
+
 const ConnectionsTable = "connections"
 
 type Connection struct {
 	Id                      apid.ID
 	Namespace               string
 	State                   ConnectionState
+	HealthState             ConnectionHealthState
 	ConnectorId             apid.ID
 	ConnectorVersion        uint64
 	Labels                  Labels
@@ -73,6 +97,7 @@ func (c *Connection) cols() []string {
 		"id",
 		"namespace",
 		"state",
+		"health_state",
 		"connector_id",
 		"connector_version",
 		"labels",
@@ -92,6 +117,7 @@ func (c *Connection) fields() []any {
 		&c.Id,
 		&c.Namespace,
 		&c.State,
+		&c.HealthState,
 		&c.ConnectorId,
 		&c.ConnectorVersion,
 		&c.Labels,
@@ -111,6 +137,7 @@ func (c *Connection) values() []any {
 		c.Id,
 		c.Namespace,
 		c.State,
+		c.healthStateForInsert(),
 		c.ConnectorId,
 		c.ConnectorVersion,
 		c.Labels,
@@ -123,6 +150,17 @@ func (c *Connection) values() []any {
 		c.UpdatedAt,
 		c.DeletedAt,
 	}
+}
+
+// healthStateForInsert defaults the column to healthy when callers construct
+// a Connection without explicitly setting HealthState. The DB column has a
+// default but squirrel sends an empty string on Insert which would otherwise
+// fail validation on reads.
+func (c *Connection) healthStateForInsert() ConnectionHealthState {
+	if c.HealthState == "" {
+		return ConnectionHealthStateHealthy
+	}
+	return c.HealthState
 }
 
 func (c *Connection) GetId() apid.ID {
@@ -166,6 +204,10 @@ func (c *Connection) Validate() error {
 
 	if !IsValidConnectionState(c.State) {
 		result = multierror.Append(result, errors.New("invalid connection state"))
+	}
+
+	if c.HealthState != "" && !IsValidConnectionHealthState(c.HealthState) {
+		result = multierror.Append(result, errors.New("invalid connection health state"))
 	}
 
 	if c.ConnectorId == apid.Nil {
@@ -339,6 +381,43 @@ func (s *service) SetConnectionState(ctx context.Context, id apid.ID, state Conn
 
 	if affected > 1 {
 		return fmt.Errorf("multiple connections had state updated: %w", ErrViolation)
+	}
+
+	return nil
+}
+
+func (s *service) SetConnectionHealthState(ctx context.Context, id apid.ID, state ConnectionHealthState) error {
+	if id == apid.Nil {
+		return errors.New("connection id is required")
+	}
+
+	if !IsValidConnectionHealthState(state) {
+		return errors.New("invalid connection health state")
+	}
+
+	now := apctx.GetClock(ctx).Now()
+	dbResult, err := s.sq.
+		Update(ConnectionsTable).
+		Set("updated_at", now).
+		Set("health_state", state).
+		Where(sq.Eq{"id": id, "deleted_at": nil}).
+		RunWith(s.db).
+		Exec()
+	if err != nil {
+		return fmt.Errorf("failed to update connection health state: %w", err)
+	}
+
+	affected, err := dbResult.RowsAffected()
+	if err != nil {
+		return fmt.Errorf("failed to update connection health state: %w", err)
+	}
+
+	if affected == 0 {
+		return ErrNotFound
+	}
+
+	if affected > 1 {
+		return fmt.Errorf("multiple connections had health state updated: %w", ErrViolation)
 	}
 
 	return nil
