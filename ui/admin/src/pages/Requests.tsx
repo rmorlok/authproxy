@@ -57,12 +57,12 @@ export const columns: (GridColDef<RequestEntryRecord> & {hideInitial?: boolean})
         description: 'who produced the response (upstream / connector rate limiter / rate limit resource)',
         sortable: true,
         renderCell: (params) => {
-            const v = (params.value as string) || 'upstream';
-            const label = v === 'upstream' ? 'upstream'
-                : v === 'connector_rate_limiter' ? 'connector RL'
-                : v === 'rate_limit' ? 'rate limit'
+            const v = (params.value as ResponseSource) || ResponseSource.UPSTREAM;
+            const label = v === ResponseSource.UPSTREAM ? 'upstream'
+                : v === ResponseSource.CONNECTOR_RATE_LIMITER ? 'connector RL'
+                : v === ResponseSource.RATE_LIMIT ? 'rate limit'
                 : v;
-            const color = v === 'upstream' ? 'default' : 'warning';
+            const color = v === ResponseSource.UPSTREAM ? 'default' : 'warning';
             return <Chip label={label} size="small" color={color as any} variant="outlined" />;
         },
     },
