@@ -167,6 +167,7 @@ func (r *proxyRefreshRig) forceTokenExpired(t *testing.T, connectionID string, c
 		&pastExpiry,
 		existing.Scopes,
 		existing.RequestedScopes,
+		existing.CreatedByActorId,
 	)
 	require.NoError(t, err, "force-expire: insert replacement token row")
 
