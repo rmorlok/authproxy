@@ -6,6 +6,7 @@ require (
 	cloud.google.com/go/secretmanager v1.16.0
 	github.com/ClickHouse/clickhouse-go/v2 v2.43.0
 	github.com/Masterminds/squirrel v1.5.4
+	github.com/XSAM/otelsql v0.41.0
 	github.com/alicebob/miniredis/v2 v2.35.0
 	github.com/aws/aws-sdk-go-v2 v1.41.2
 	github.com/aws/aws-sdk-go-v2/config v1.32.9

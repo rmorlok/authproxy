@@ -12,6 +12,7 @@ import (
 	"github.com/ClickHouse/clickhouse-go/v2"
 	sq "github.com/Masterminds/squirrel"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -23,18 +24,18 @@ type clickhouseRecordStore struct {
 	logger *slog.Logger
 }
 
-func NewClickhouseRecordStore(cfg *config.Database, logger *slog.Logger) RecordStore {
+func NewClickhouseRecordStore(cfg *config.Database, logger *slog.Logger, dbOpts ...database.Option) RecordStore {
 	chCfg, ok := cfg.InnerVal.(*config.DatabaseClickhouse)
 	if !ok {
 		panic(fmt.Sprintf("expected *config.DatabaseClickhouse, got %T", cfg))
 	}
 
-	opts, err := chCfg.ToClickhouseOptions()
+	chOpts, err := chCfg.ToClickhouseOptions()
 	if err != nil {
 		panic(fmt.Errorf("failed to convert clickhouse config to options: %w", err))
 	}
 
-	db := clickhouse.OpenDB(opts)
+	db := database.OpenInstrumentedConnector(clickhouse.Connector(chOpts), database.DBSystemClickHouse, dbOpts...)
 	s := &clickhouseRecordStore{
 		db:     db,
 		cfg:    chCfg,
@@ -180,7 +181,7 @@ type clickhouseRecordRetriever struct {
 	logger          *slog.Logger
 }
 
-func NewClickhouseRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorEncryptor, logger *slog.Logger) RecordRetriever {
+func NewClickhouseRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorEncryptor, logger *slog.Logger, dbOpts ...database.Option) RecordRetriever {
 	chCfg, ok := cfg.InnerVal.(*config.DatabaseClickhouse)
 	if !ok {
 		panic(fmt.Sprintf("expected *config.HttpLoggingDatabaseClickhouse, got %T", cfg))
@@ -191,7 +192,7 @@ func NewClickhouseRecordRetriever(cfg *config.Database, cursorEncryptor paginati
 		panic(fmt.Errorf("failed to convert clickhouse config to options: %w", err))
 	}
 
-	db := clickhouse.OpenDB(options)
+	db := database.OpenInstrumentedConnector(clickhouse.Connector(options), database.DBSystemClickHouse, dbOpts...)
 	return &clickhouseRecordRetriever{
 		db:              db,
 		cfg:             chCfg,

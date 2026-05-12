@@ -7,6 +7,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apblob"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -100,16 +101,19 @@ func (ss *StorageService) Migrate(ctx context.Context) error {
 }
 
 // NewStorageService that will store the log records and the full request/response.
+// dbOpts are forwarded to the underlying DB constructors — pass
+// database.WithTelemetry(...) to instrument the request-log database tier.
 func NewStorageService(
 	ctx context.Context,
 	cfg *config.HttpLogging,
 	cursorEncryptor pagination.CursorEncryptor,
 	encryptor Encryptor,
 	logger *slog.Logger,
+	dbOpts ...database.Option,
 ) (*StorageService, error) {
 	logger = logger.With("service", "request_log")
-	store := NewRecordStore(cfg.Database, logger)
-	retriever := NewRecordRetriever(cfg.Database, cursorEncryptor, logger)
+	store := NewRecordStore(cfg.Database, logger, dbOpts...)
+	retriever := NewRecordRetriever(cfg.Database, cursorEncryptor, logger, dbOpts...)
 	blobStore, err := apblob.NewFromConfig(ctx, cfg.BlobStorage)
 	if err != nil {
 		return nil, err

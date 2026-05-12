@@ -40,8 +40,8 @@ type sqlRecordStore struct {
 	placeholderFormat sq.PlaceholderFormat
 }
 
-func NewSqlRecordStore(cfg *config.Database, logger *slog.Logger) RecordStore {
-	db, err := sql.Open(cfg.GetDriver(), cfg.GetDsn())
+func NewSqlRecordStore(cfg *config.Database, logger *slog.Logger, opts ...database.Option) RecordStore {
+	db, err := database.OpenInstrumentedSQL(cfg.GetDriver(), cfg.GetDsn(), dbSystemFor(cfg.GetProvider()), opts...)
 	if err != nil {
 		panic(fmt.Errorf("failed to open http logging database: %w", err))
 	}
@@ -213,8 +213,8 @@ type sqlRecordRetriever struct {
 	placeholderFormat sq.PlaceholderFormat
 }
 
-func NewSqlRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorEncryptor, logger *slog.Logger) RecordRetriever {
-	db, err := sql.Open(cfg.GetDriver(), cfg.GetDsn())
+func NewSqlRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorEncryptor, logger *slog.Logger, opts ...database.Option) RecordRetriever {
+	db, err := database.OpenInstrumentedSQL(cfg.GetDriver(), cfg.GetDsn(), dbSystemFor(cfg.GetProvider()), opts...)
 	if err != nil {
 		panic(fmt.Errorf("failed to open http logging database for retrieval: %w", err))
 	}

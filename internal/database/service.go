@@ -18,20 +18,22 @@ import (
 )
 
 // NewConnectionForRoot creates a new database connection from the specified configuration. The type of the database
-// returned will be determined by the configuration. Same as NewConnection.
-func NewConnectionForRoot(root *config.Root, logger *slog.Logger) (DB, error) {
+// returned will be determined by the configuration. Optional Options enable
+// telemetry instrumentation; without them the returned sql.DB is a plain,
+// uninstrumented driver connection identical to the historic behaviour.
+func NewConnectionForRoot(root *config.Root, logger *slog.Logger, opts ...Option) (DB, error) {
 	switch v := root.Database.InnerVal.(type) {
 	case *config.DatabaseSqlite:
-		return NewSqliteConnection(v, logger)
+		return NewSqliteConnection(v, logger, opts...)
 	case *config.DatabasePostgres:
-		return NewPostgresConnection(v, logger)
+		return NewPostgresConnection(v, logger, opts...)
 	default:
 		return nil, errors.New("database type not supported")
 	}
 }
 
 // NewSqliteConnection creates a new database connection to a SQLite database.
-func NewSqliteConnection(dbConfig *config.DatabaseSqlite, l *slog.Logger) (DB, error) {
+func NewSqliteConnection(dbConfig *config.DatabaseSqlite, l *slog.Logger, opts ...Option) (DB, error) {
 	path := dbConfig.Path
 	_, err := os.Stat(path)
 	if err != nil {
@@ -52,7 +54,7 @@ func NewSqliteConnection(dbConfig *config.DatabaseSqlite, l *slog.Logger) (DB, e
 		defer file.Close()
 	}
 
-	db, err := sql.Open("sqlite3", dbConfig.GetDsn())
+	db, err := openInstrumentedDB("sqlite3", dbConfig.GetDsn(), DBSystemSQLite, resolveOpts(opts))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open sqlite database '%s': %w", dbConfig.GetDsn(), err)
 	}
@@ -71,8 +73,8 @@ func NewSqliteConnection(dbConfig *config.DatabaseSqlite, l *slog.Logger) (DB, e
 }
 
 // NewPostgresConnection creates a new database connection to a Postgres database.
-func NewPostgresConnection(dbConfig *config.DatabasePostgres, l *slog.Logger) (DB, error) {
-	db, err := sql.Open("pgx", dbConfig.GetDsn())
+func NewPostgresConnection(dbConfig *config.DatabasePostgres, l *slog.Logger, opts ...Option) (DB, error) {
+	db, err := openInstrumentedDB("pgx", dbConfig.GetDsn(), DBSystemPostgreSQL, resolveOpts(opts))
 	if err != nil {
 		return nil, fmt.Errorf("failed to open postgres database '%s': %w", dbConfig.GetDsn(), err)
 	}
