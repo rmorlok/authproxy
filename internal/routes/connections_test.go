@@ -2058,6 +2058,7 @@ func TestConnections(t *testing.T) {
 				nil,
 				"read write",
 				"read write admin",
+				nil,
 			)
 			require.NoError(t, err)
 

@@ -101,6 +101,24 @@ func TestOAuth2Token_Validate(t *testing.T) {
 		}
 		require.NoError(t, tok.Validate())
 	})
+	t.Run("wrong prefix on created by actor id", func(t *testing.T) {
+		wrongId := apid.New(apid.PrefixConnection)
+		tok := &OAuth2Token{
+			Id:               apid.New(apid.PrefixOAuth2Token),
+			ConnectionId:     apid.New(apid.PrefixConnection),
+			CreatedByActorId: &wrongId,
+		}
+		require.Error(t, tok.Validate())
+	})
+	t.Run("valid with created by actor id", func(t *testing.T) {
+		actorId := apid.New(apid.PrefixActor)
+		tok := &OAuth2Token{
+			Id:               apid.New(apid.PrefixOAuth2Token),
+			ConnectionId:     apid.New(apid.PrefixConnection),
+			CreatedByActorId: &actorId,
+		}
+		require.NoError(t, tok.Validate())
+	})
 }
 
 func TestOAuth2Tokens(t *testing.T) {
@@ -120,6 +138,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			nil,
 			"scope1 scope2",
 			"scope1 scope2",
+			nil,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, tok)
@@ -154,6 +173,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			nil,
 			"scope1 scope2",
 			"scope1 scope2",
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -177,6 +197,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			nil,
 			"scope1 scope2",
 			"scope1 scope2",
+			nil,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, tok1)
@@ -195,6 +216,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			nil,
 			"scope1 scope2",
 			"scope1 scope2",
+			nil,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, tok2)
@@ -228,6 +250,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			nil,
 			"scope1 scope2",
 			"scope1 scope2",
+			nil,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, tok1)
@@ -246,6 +269,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			nil,
 			"scope1 scope2",
 			"scope1 scope2",
+			nil,
 		)
 		require.NoError(t, err)
 		require.NotNil(t, tok2)
@@ -263,6 +287,34 @@ func TestOAuth2Tokens(t *testing.T) {
 		require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken2"}, tok2.EncryptedRefreshToken)
 		require.Equal(t, encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken2"}, tok2.EncryptedAccessToken)
 	})
+	t.Run("persists created by actor id", func(t *testing.T) {
+		_, db := MustApplyBlankTestDbConfig(t, nil)
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		connectionId := apid.New(apid.PrefixConnection)
+		actorId := apid.New(apid.PrefixActor)
+
+		tok, err := db.InsertOAuth2Token(
+			ctx,
+			connectionId,
+			nil,
+			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedRefreshToken"},
+			encfield.EncryptedField{ID: "ekv_test", Data: "encryptedAccessToken"},
+			nil,
+			"scope1",
+			"scope1",
+			&actorId,
+		)
+		require.NoError(t, err)
+		require.NotNil(t, tok.CreatedByActorId)
+		require.Equal(t, actorId, *tok.CreatedByActorId)
+
+		fetched, err := db.GetOAuth2Token(ctx, connectionId)
+		require.NoError(t, err)
+		require.NotNil(t, fetched.CreatedByActorId)
+		require.Equal(t, actorId, *fetched.CreatedByActorId)
+	})
 	t.Run("delete token", func(t *testing.T) {
 		_, db, rawDb := MustApplyBlankTestDbConfigRaw(t, nil)
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
@@ -279,6 +331,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			nil,
 			"scope1 scope2",
 			"scope1 scope2",
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -292,6 +345,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			nil,
 			"scope1",
 			"scope1",
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -330,6 +384,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			nil,
 			"scope1 scope2",
 			"scope1 scope2",
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -342,6 +397,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			nil,
 			"scope1 scope2",
 			"scope1 scope2",
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -355,6 +411,7 @@ func TestOAuth2Tokens(t *testing.T) {
 			nil,
 			"scope1",
 			"scope1",
+			nil,
 		)
 		require.NoError(t, err)
 
@@ -600,6 +657,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 						token.AccessTokenExpiresAt,
 						"scope1 scope2",
 						"scope1 scope2",
+						nil,
 					)
 					require.NoError(t, err)
 				}

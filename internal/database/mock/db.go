@@ -1116,18 +1116,18 @@ func (mr *MockDBMockRecorder) InsertApiKeyCredential(ctx, connectionId, encrypte
 }
 
 // InsertOAuth2Token mocks base method.
-func (m *MockDB) InsertOAuth2Token(ctx context.Context, connectionId apid.ID, refreshedFrom *apid.ID, encryptedRefreshToken, encryptedAccessToken encfield.EncryptedField, accessTokenExpiresAt *time.Time, scopes, requestedScopes string) (*database.OAuth2Token, error) {
+func (m *MockDB) InsertOAuth2Token(ctx context.Context, connectionId apid.ID, refreshedFrom *apid.ID, encryptedRefreshToken, encryptedAccessToken encfield.EncryptedField, accessTokenExpiresAt *time.Time, scopes, requestedScopes string, createdByActorId *apid.ID) (*database.OAuth2Token, error) {
 	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "InsertOAuth2Token", ctx, connectionId, refreshedFrom, encryptedRefreshToken, encryptedAccessToken, accessTokenExpiresAt, scopes, requestedScopes)
+	ret := m.ctrl.Call(m, "InsertOAuth2Token", ctx, connectionId, refreshedFrom, encryptedRefreshToken, encryptedAccessToken, accessTokenExpiresAt, scopes, requestedScopes, createdByActorId)
 	ret0, _ := ret[0].(*database.OAuth2Token)
 	ret1, _ := ret[1].(error)
 	return ret0, ret1
 }
 
 // InsertOAuth2Token indicates an expected call of InsertOAuth2Token.
-func (mr *MockDBMockRecorder) InsertOAuth2Token(ctx, connectionId, refreshedFrom, encryptedRefreshToken, encryptedAccessToken, accessTokenExpiresAt, scopes, requestedScopes interface{}) *gomock.Call {
+func (mr *MockDBMockRecorder) InsertOAuth2Token(ctx, connectionId, refreshedFrom, encryptedRefreshToken, encryptedAccessToken, accessTokenExpiresAt, scopes, requestedScopes, createdByActorId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertOAuth2Token", reflect.TypeOf((*MockDB)(nil).InsertOAuth2Token), ctx, connectionId, refreshedFrom, encryptedRefreshToken, encryptedAccessToken, accessTokenExpiresAt, scopes, requestedScopes)
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertOAuth2Token", reflect.TypeOf((*MockDB)(nil).InsertOAuth2Token), ctx, connectionId, refreshedFrom, encryptedRefreshToken, encryptedAccessToken, accessTokenExpiresAt, scopes, requestedScopes, createdByActorId)
 }
 
 // ListActorsBuilder mocks base method.

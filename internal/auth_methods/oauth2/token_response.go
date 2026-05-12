@@ -73,6 +73,17 @@ func (o *oAuth2Connection) createDbTokenFromResponse(
 		refreshFromId = &refreshFrom.Id
 	}
 
+	// On the authorization-code path the state has the initiating actor.
+	// On refresh the state is gone, so carry forward the actor recorded on
+	// the prior token row.
+	var createdByActorId *apid.ID
+	if refreshFrom != nil {
+		createdByActorId = refreshFrom.CreatedByActorId
+	} else if o.state != nil && o.state.ActorId != apid.Nil {
+		actorId := o.state.ActorId
+		createdByActorId = &actorId
+	}
+
 	token, err := o.db.InsertOAuth2Token(
 		ctx,
 		o.connection.GetId(),
@@ -82,6 +93,7 @@ func (o *oAuth2Connection) createDbTokenFromResponse(
 		expiresAt,
 		scopes,
 		requestedScopes,
+		createdByActorId,
 	)
 	if err != nil {
 		return nil, fmt.Errorf("failed to insert oauth2 token: %w", err)
