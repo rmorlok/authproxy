@@ -1,4 +1,4 @@
-# README.md
+# AGENTS.md
 
 This file provides guidance to coding agents when working with code in this repository.
 
@@ -6,228 +6,128 @@ This file provides guidance to coding agents when working with code in this repo
 
 AuthProxy is an open-source, embeddable integration platform-as-a-service (iPaaS). It manages the connection lifecycle to 3rd party systems, allowing applications to call those systems through an authenticating proxy.
 
-## Development Commands
+## Workflow
 
-### Preflight (Required Before Commit)
-
-Always run the preflight checks before committing:
+### Preflight (required before commit)
 
 ```bash
 ./scripts/preflight.sh
 ```
 
-If it fails, fix the issues (e.g., regenerate Swagger docs, update integration test module deps) before committing.
+This regenerates Swagger docs and checks the integration-tests module is consistent. Fix any failures before committing.
 
-### Backend (Go)
+### Working with pull requests
 
-**Start Dependencies (Docker Compose — recommended):**
+- **Apply the issue's labels to the PR.** When opening a PR that closes a labelled issue, copy those labels onto the PR (e.g. `gh pr create --label "project:api-key"`). Keeps project-tracking views consistent and surfaces the PR in the same dashboards as the issue.
+- **Respond to PR review comments after addressing them.** When you push a change that resolves a review comment, reply on the original comment thread describing what changed (link to the commit if useful). Don't leave the reviewer guessing whether their feedback landed.
+
+## Running locally
+
+### Backend dependencies
+
 ```bash
-# Start all data stores (PostgreSQL, Redis, MinIO, ClickHouse)
+# Data stores only (Postgres, Redis, MinIO, ClickHouse)
 docker compose up -d
 
-# Or start full stack including AuthProxy server
+# Full stack including the AuthProxy server
 docker compose --profile server up -d
-```
 
-**Reset Data Environment:**
-```bash
-# Tear down all containers, volumes, and networks to start fresh
+# Tear down everything (containers + volumes)
 ./scripts/teardown-docker.sh
 ```
 
-**Start Dependencies (Manual — alternative):**
-```bash
-# Create network
-docker network create authproxy
+### Run the server
 
-# Start Redis
-docker run --name redis-server -p 6379:6379 --network authproxy -d redis:latest
-
-# Start MinIO (required for request log storage)
-# Note: port 9002 is used for the S3 API to avoid conflicts with other services (e.g. ClickHouse uses 9000)
-docker run --name minio -p 9002:9000 -p 9001:9001 \
-  -e MINIO_ROOT_USER=minioadmin \
-  -e MINIO_ROOT_PASSWORD=minioadmin \
-  --network authproxy \
-  -d minio/minio server /data --console-address ":9001"
-
-# Create the bucket (run once)
-docker run --rm --network authproxy \
-  -e MC_HOST_minio=http://minioadmin:minioadmin@minio:9000 \
-  minio/mc mb minio/authproxy-request-logs
-```
-
-**Run Server:**
 ```bash
 go run ./cmd/server serve --config=./dev_config/default.yaml all
 ```
 
-Available services: `admin-api`, `api`, `public`, `worker`, or `all`
+The final arg is the service to run: `admin-api`, `api`, `public`, `worker`, or `all`.
 
-**Run Client Proxy:**
+### Run the client proxy
+
 ```bash
 go run ./cmd/cli raw-proxy --enableLoginRedirect=true --proxyTo=api
 ```
 
-**Testing:**
-```bash
-# Run all tests
-go test ./...
+### Other useful commands
 
-# Run tests in a specific package
-go test ./internal/database
-
-# Run a single test
-go test ./internal/database -run TestActorCreate
-
-# Run tests with verbose output
-go test -v ./...
-```
-
-**Other Commands:**
 ```bash
 # Print all routes
 go run ./cmd/server routes --config=./dev_config/default.yaml
 ```
 
-### Frontend (TypeScript/React)
+### Frontend
 
-**Setup:**
+Node + yarn pinned via Volta (versions in `package.json`).
+
 ```bash
-volta install node
-volta install yarn
+volta install node && volta install yarn
 yarn install
-```
-
-**Run Marketplace UI:**
-```bash
 yarn workspace @authproxy/marketplace dev
-```
-
-**Run Admin UI:**
-```bash
 yarn workspace @authproxy/admin dev
 ```
 
-### Monitoring Tools
+### Monitoring tools
 
-**Redis Insight (View Redis Data):**
 ```bash
+# RedisInsight — also available via docker-compose's "tools" profile (port 5540)
 docker run -d --name redisinsight -p 5540:5540 -v redisinsight:/data --network authproxy redis/redisinsight:latest
-# Connect to: redis://default@redis-server:6379
-```
 
-**Asynqmon (Background Tasks):**
-```bash
+# Asynqmon (background-task dashboard)
 docker run --rm -d --name asynqmon --network authproxy -p 8090:8080 hibiken/asynqmon --redis-addr=redis-server:6379
-# Open: http://localhost:8090
-```
 
-**Asynq CLI:**
-```bash
-go install github.com/hibiken/asynq/tools/asynq@latest
-asynq dash
+# Asynq CLI
+go install github.com/hibiken/asynq/tools/asynq@latest && asynq dash
 ```
 
 ## Architecture
 
-### Service Architecture
+### Service ports (defaults from `dev_config/default.yaml`)
 
-AuthProxy runs as multiple independent services that can be started together or separately:
+| Service | Port | Role |
+|---|---|---|
+| `public` | 8080 | OAuth callbacks, marketplace |
+| `api` | 8081 | Core API for application integration |
+| `admin-api` | 8082 | Administrative API + UI |
+| `worker` | 8083 (health) | Background-task processor (Asynq) |
 
-- **admin-api** (port 8082): Administrative API with UI for managing connectors and connections
-- **api** (port 8081): Core API for application integration
-- **public** (port 8080): Public-facing endpoints for OAuth callbacks and marketplace
-- **worker** (port 8083 health check): Background task processor using Asynq
+All services are coordinated through the `cmd/server` entrypoint using the service-based architecture in `internal/service/`.
 
-All services are coordinated through the `cmd/server` entrypoint which uses a service-based architecture defined in `internal/service/`.
+### Layering
 
-### Core Business Logic (`internal/core`)
+- `internal/core` is the business-logic layer — fully hydrated models on top of the database and Redis.
+- **Other packages should depend on `internal/core/iface` (interfaces) rather than `internal/core` directly.** This is the main layering rule that's easy to violate accidentally.
+- Auth methods live under `internal/auth_methods/{oauth2,no_auth,…}` and import `internal/core/iface`, never `internal/core` directly (avoid cycles).
 
-The core package is the central business logic layer. It wraps the database and Redis to provide fully hydrated models with methods for system interaction. Core handles:
-- Connectors (3rd party service definitions)
-- Connections (authenticated instances to external services)
-- Actors (users/entities that own connections)
-- Automatic logging, event queuing, and background task scheduling
+### Database
 
-**Important:** Other packages should depend on `internal/core/iface` (interfaces) rather than `internal/core` directly to maintain proper layering.
+- Two providers supported: **SQLite** (default for dev) and **PostgreSQL**. Schemas must stay in sync.
+- Per-package guide with deeper conventions: [`internal/database/AGENTS.md`](internal/database/AGENTS.md). Read it before touching migrations, models, or the DB interface.
 
-### Database Layer (`internal/database`)
+### Auth
 
-The database package provides direct SQL access using:
-- SQLite (default, configured via YAML)
-- Database migrations in `internal/database/migrations/sqlite/`
-- Squirrel for query building
-- Models: Actor, Connection, Connector, ConnectorVersion, Namespace, OAuth2Token
+`internal/apauth/` is where authentication lives — `apauth/core` (request auth + actor types), `apauth/service` (validators, redirects), `apauth/jwt` (signing/verification), `apauth/tasks` (background work). Session JWTs are signed with keys configured under `system_auth.jwt_signing_key`.
 
-### Authentication & Sessions (`internal/auth`)
+### Background tasks
 
-Handles session management across services:
-- Reads and validates JWTs from requests
-- Verifies tokens against database state
-- Injects session information into request context
-- Uses public/private key pairs for JWT signing (configured in `system_auth.jwt_signing_key`)
+Asynq, fronted by `internal/apasynq` (testable interface) with API-exposed wrappers in `internal/tasks`. Tasks are registered through `service.RegisterTasks` and periodic tasks come from `service.GetCronTasks`.
 
-### JWT Package (`internal/jwt`)
+### Configuration
 
-Manages JWT operations:
-- Actor-based token signing and verification
-- System-level authentication tokens
-- Integrates with the key configuration system
+YAML-based, loaded from `internal/schema/config`. Dev configs in `dev_config/`. Connector definitions support three auth types: **OAuth2**, **API Key** (placements: `bearer`, `header`, `query`, `basic`), and **NoAuth**. Connectors can declare **probes** to validate connection health.
 
-### Background Tasks (`internal/tasks`, `internal/apasynq`)
+### Other packages worth knowing
 
-- `internal/tasks`: API-exposed task wrappers bound to specific auth contexts for secure customer monitoring
-- `internal/apasynq`: Extracted interface for Asynq with centralized mocking capabilities
-- Uses Redis and Asynq for task queuing
+- `internal/apctx` — request context with correlation ids, an injectable clock, and value-applier helpers. Use `apctx.GetClock(ctx)` instead of `time.Now()` in any code under test.
+- `internal/encrypt` + `internal/encfield` — AES-GCM encryption for `EncryptedField` columns. The re-encryption registry (`internal/database/reencrypt_registry.go`) drives key-rotation jobs over registered encrypted columns.
+- `internal/request_log` — structured HTTP request/response logging with sensitive-data redaction.
+- `internal/httpf` — HTTP client factory with mock support and OpenTelemetry instrumentation.
 
-### Configuration (`internal/config`)
-
-YAML-based configuration system with:
-- Service configs (ports, TLS, CORS)
-- System authentication (keys, admin users)
-- Connector definitions (OAuth2, API Key, NoAuth)
-- Database and Redis settings
-- Logging configuration
-
-Configuration files are in `dev_config/` for development.
-
-### Routing (`internal/routes`)
-
-Shared routes across services. Individual services have their own service-specific routes in `internal/service/<service>/routes`. This allows the same functionality with different security contexts (session vs. no session).
-
-### Request Logging (`internal/request_log`)
-
-Comprehensive HTTP request/response logging with:
-- Configurable body size limits
-- Content type filtering
-- Sensitive data redaction
-- Duration tracking in milliseconds
-
-### Context Package (`internal/apctx`)
-
-Provides enhanced context management:
-- Correlation IDs for request tracing
-- Clock interface for testable time operations
-- UUID generation
-- Value applier pattern for context enrichment
-- Builder pattern for context construction
-
-### Encryption (`internal/encrypt`)
-
-Handles secure encryption operations for storing sensitive data like OAuth tokens.
-
-### Utilities
-
-- `internal/util`: Common utilities (JSON, regex, coercion, must, pointers, pagination)
-- `internal/sqlh`: SQL helper functions for counting and scanning
-- `internal/test_utils`: Testing utilities (paths, SQL helpers, logging, test data)
-- `internal/httpf`: HTTP helper functions with mock support
-- `internal/apredis`: Redis interface with mutex support and mocking
-
-## Client Configuration
+## Client configuration
 
 The CLI tool (`cmd/cli`) looks for config at `~/.authproxy.yaml`:
+
 ```yaml
 admin_username: bobdole
 admin_private_key_path: /path/to/private/key
@@ -235,48 +135,9 @@ server:
   api: http://localhost:8081
 ```
 
-## Key Concepts
+## Key concepts
 
-### Connectors
-Connector definitions in YAML specify how to authenticate with external services. Supported auth types:
-- OAuth2 (authorization code, token exchange, refresh, revocation)
-- API Key (header, query param, or body)
-- No Auth
-
-Connectors can include "probes" to validate connections.
-
-### Connections
-Runtime instances of authenticated connections to external services, owned by Actors. Connections store encrypted credentials and OAuth tokens in the database.
-
-### Actors
-Actors represent users or entities that own connections. They have email, external_id, admin/super_admin flags, and permissions stored as JSON.
-
-### Namespaces
-Logical grouping for connectors and connections, allowing multi-tenancy.
-
-## Investigating CI/CD Failures
-
-When a GitHub Actions workflow is failing, use the `gh` CLI to investigate:
-
-```bash
-# List recent runs for a specific workflow
-gh run list --workflow=<workflow-file>.yml --limit=5
-
-# View failed step logs for a specific run
-gh run view <run-id> --log-failed
-
-# View full logs for a run
-gh run view <run-id> --log
-
-# List all workflows
-gh workflow list
-```
-
-When investigating, check the failed step output carefully for the root cause. Common issues include version mismatches, missing dependencies, or configuration errors.
-
-## Testing Notes
-
-- Use `internal/test_utils` for common test helpers
-- Database tests use in-memory SQLite via `test_db.go`
-- Mock implementations available for: Redis, Asynq, HTTP client, logging
-- Tests use standard Go testing with testify for assertions
+- **Connector** — YAML definition of how to authenticate to a 3rd-party service (auth type + setup flow + probes).
+- **Connection** — runtime instance of a Connector, owned by an Actor, with encrypted credentials.
+- **Actor** — user or service principal that owns connections; carries permissions.
+- **Namespace** — hierarchical grouping for multi-tenancy (`root/...`).
