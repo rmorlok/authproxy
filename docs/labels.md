@@ -58,7 +58,6 @@ Every namespace-scoped resource carries `labels` and `annotations` columns:
 | `connection` | Inherits labels from its connector version, plus the namespace. |
 | `encryption_key` | Inherits from its namespace. |
 | `rate_limit` | Inherits from its namespace. See [Rate limits](rate-limits.md). |
-| `oauth2_token` | Inherits from its connection. |
 | `request_log` entry | The frozen label snapshot of the request that produced it. |
 
 Request log entries store the per-request label snapshot (the values that were active when the request ran), not a live reference — so a label change on the connection does not retroactively change old log entries.
@@ -100,7 +99,6 @@ The `<rt>` token comes from the resource's apid prefix (strip the trailing `_`):
 | Connector version | `cxr` |
 | Encryption key | `ek` |
 | Rate limit | `rl` |
-| OAuth2 token | `tok` |
 
 For example, a connection with id `cxn_abc123` in namespace `root.acme` always carries:
 
@@ -125,7 +123,6 @@ namespace
    ├── encryption_key                   (labels carry forward through "ns/")
    ├── connector (version)              (labels carry forward through "cxr/")
    │      └── connection                (labels carry forward through "cxn/")
-   │             └── oauth2_token       (labels carry forward through "tok/")
    ├── rate_limit                       (labels carry forward through "ns/")
    └── (child namespace)                (labels carry forward through "ns/")
 ```
@@ -160,14 +157,18 @@ apxy/cxn/-/ns:          root.acme        # implicit identifier
 
 ### Propagation on parent change
 
-Carry-forward is **materialised on create**. If the parent's labels change later, the values on existing children are stale until the propagation job runs.
+Carry-forward is **materialised on create** — and **eventually consistent** afterwards. If the parent's labels change later, the values on existing children are stale until the propagation job catches up; depending on fleet size, fan-out depth, and how rate-limited the reconciler is, that delay can be anywhere from a few seconds to several hours.
 
 There are two propagation paths:
 
-1. **Targeted refresh.** Admin API mutators (e.g., updating a namespace's labels) enqueue a background task that re-derives every descendant's `apxy/` mirror — running each row's update in its own short transaction so concurrent reads aren't blocked.
-2. **Daily consistency checker.** A scheduled job walks every resource type, compares the on-disk labels to what the carry-forward rule would compute, and corrects any drift. Belt-and-braces for the targeted refresh.
+1. **Targeted refresh.** Admin API mutators (e.g., updating a namespace's labels) enqueue a background task that re-derives every descendant's `apxy/` mirror — running each row's update in its own short transaction so concurrent reads aren't blocked. Typical latency: seconds to a few minutes, longer for deep fan-outs.
+2. **Daily consistency checker.** A scheduled job walks every resource type, compares the on-disk labels to what the carry-forward rule would compute, and corrects any drift. Belt-and-braces for the targeted refresh; the worst-case bound is "next daily run plus the time the walk itself takes" — minutes to hours.
 
-Operational implication: a label change on a deep namespace can fan out to many descendants. The propagation job batches updates and runs out of band; do not rely on a label change being visible to in-flight proxy requests within the next few seconds.
+**Operational implications:**
+
+- Treat carry-forward labels as eventually-consistent reads. Application logic that needs to observe a fresh parent-label change should not rely on a child's mirrored `apxy/<parent>/...` having caught up yet.
+- A label change on a deep namespace can fan out to many descendants. The propagation job batches updates and runs out of band; do not rely on a label change being visible to in-flight proxy requests within the next few seconds.
+- Per-request label snapshots on **new** requests after the update reflect the parent change as soon as each individual descendant row is rewritten — so propagation progresses visibly through the fleet rather than landing atomically.
 
 ## Per-request label snapshot
 

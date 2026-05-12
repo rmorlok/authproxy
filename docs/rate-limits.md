@@ -9,7 +9,7 @@ Both can fire on the same request and both stamp the request log so you can tell
 
 ## Table of contents
 
-- [Customer guide](#customer-guide)
+- [User guide](#user-guide)
   - [When to use which system](#when-to-use-which-system)
   - [Defining a rate limit](#defining-a-rate-limit)
     - [Via the API](#via-the-api)
@@ -34,7 +34,7 @@ Both can fire on the same request and both stamp the request log so you can tell
 
 ---
 
-# Customer guide
+# User guide
 
 ## When to use which system
 
@@ -92,7 +92,7 @@ Labels and annotations also have sub-resource endpoints — see [Labels — API 
 
 ### Via Terraform
 
-The `authproxy_rate_limit` resource exposes every field as typed HCL — no `jsonencode` blobs:
+The `authproxy_rate_limit` resource exposes every field as typed HCL:
 
 ```hcl
 resource "authproxy_rate_limit" "salesforce_writes" {
