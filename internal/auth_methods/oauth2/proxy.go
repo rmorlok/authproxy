@@ -4,8 +4,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"net/url"
+	"time"
 
 	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/core/iface"
@@ -13,6 +15,23 @@ import (
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	gentleman "gopkg.in/h2non/gentleman.v2"
+)
+
+// Refresh-token retry policy. Mirrors the token-exchange policy in
+// callback.go: a small bounded number of attempts with linear backoff,
+// retrying transport errors and 5xx responses only. 4xx responses
+// (invalid_grant, invalid_client, etc.) are permanent — resubmitting the
+// same refresh token won't change the provider's decision and may, with
+// some providers, count toward a per-refresh-token attempt budget.
+const (
+	// tokenRefreshMaxAttempts is the total number of refresh-endpoint POST
+	// attempts (including the first). 3 = 1 try + 2 retries.
+	tokenRefreshMaxAttempts = 3
+	// tokenRefreshBackoffStep is the linear backoff between attempts:
+	// 200ms before retry 1, 400ms before retry 2. Same shape as
+	// tokenExchangeBackoffStep — short enough not to stall a proxied
+	// request perceptibly, long enough to ride out a node-local hiccup.
+	tokenRefreshBackoffStep = 200 * time.Millisecond
 )
 
 // errNoRefreshToken is returned by refreshAccessToken when the persisted
@@ -32,14 +51,14 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 	m := o.tokenMutex()
 	err := m.Lock(ctx)
 	if err != nil {
-		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", err)
+		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, err)
 	}
 	defer m.Unlock(ctx)
 
 	// Get the latest token to make sure we still need to refresh
 	token, err = o.db.GetOAuth2Token(ctx, o.connection.GetId())
 	if err != nil {
-		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", err)
+		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, err)
 	}
 
 	if mode == refreshModeOnlyExpired && !token.IsAccessTokenExpired(ctx) {
@@ -50,25 +69,23 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 		// Permanent — there is no way to obtain a new access token without
 		// user interaction. Flip the connection unhealthy so the unified
 		// reauth UX surfaces the prompt.
-		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshNoRefreshToken, 0, "", errNoRefreshToken)
+		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshNoRefreshToken, 0, "", 0, errNoRefreshToken)
 	}
 
 	clientId, err := o.auth.ClientId.GetValue(ctx)
 	if err != nil {
-		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", err)
+		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, err)
 	}
 
 	clientSecret, err := o.auth.ClientSecret.GetValue(ctx)
 	if err != nil {
-		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", err)
+		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, err)
 	}
 
 	refreshToken, err := o.encrypt.DecryptString(ctx, token.EncryptedRefreshToken)
 	if err != nil {
-		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", err)
+		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, err)
 	}
-
-	// Prepare a refresh token request
 
 	client := o.httpf.
 		ForRequestType(httpf.RequestTypeOAuth).
@@ -76,43 +93,33 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 		New()
 	tokenEndpoint, err := o.renderMustache(ctx, o.auth.Token.Endpoint)
 	if err != nil {
-		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "",
+		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0,
 			fmt.Errorf("failed to render token endpoint template: %w", err))
 	}
 
-	refreshReq := client.
-		UseContext(ctx).
-		Request().
-		Method("POST").
-		URL(tokenEndpoint).
-		SetHeader("Content-Type", "application/x-www-form-urlencoded").
-		AddHeader("accept", "application/json").
-		BodyString(
-			url.Values{
-				"grant_type":    {"refresh_token"},
-				"refresh_token": {refreshToken},
-				"client_id":     {clientId},
-				"client_secret": {clientSecret},
-			}.Encode(),
-		)
+	values := url.Values{
+		"grant_type":    {"refresh_token"},
+		"refresh_token": {refreshToken},
+		"client_id":     {clientId},
+		"client_secret": {clientSecret},
+	}
 
-	// Submit the refresh request
-	refreshResp, err := refreshReq.Send()
+	refreshResp, attempts, err := o.postRefreshWithRetry(ctx, client, tokenEndpoint, values)
 	if err != nil {
 		// Transport-layer failure — provider never produced a status code.
 		// Transient by classification; does not flip unhealthy.
-		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshNetworkError, 0, "", err)
+		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshNetworkError, 0, "", attempts, err)
 	}
 
 	if refreshResp.StatusCode != 200 {
 		category, providerErr := classifyTokenRefreshStatus(refreshResp.StatusCode, refreshResp.Bytes())
 		err := fmt.Errorf("refresh token request failed with status %d", refreshResp.StatusCode)
-		return nil, o.classifyAndRecordRefreshFailure(ctx, category, refreshResp.StatusCode, providerErr, err)
+		return nil, o.classifyAndRecordRefreshFailure(ctx, category, refreshResp.StatusCode, providerErr, attempts, err)
 	}
 
 	newToken, err := o.createDbTokenFromResponse(ctx, refreshResp, token)
 	if err != nil {
-		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshMalformedResponse, refreshResp.StatusCode, "",
+		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshMalformedResponse, refreshResp.StatusCode, "", attempts,
 			fmt.Errorf("failed to refresh token: %w", err))
 	}
 
@@ -139,16 +146,24 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 // Centralizing the emit + mark dance here ensures every refresh failure
 // path produces the same observable shape, and that the "permanent →
 // unhealthy" mapping lives in one place.
+//
+// attempts is the number of refresh-endpoint POSTs actually made (0 for
+// failures that occur before any HTTP call — internal_error,
+// no_refresh_token). When > 0 it's emitted on the failure event so the
+// "retry exhausted" case is visibly distinct from a single non-retryable
+// failure.
 func (o *oAuth2Connection) classifyAndRecordRefreshFailure(
 	ctx context.Context,
 	category tokenRefreshCategory,
 	providerStatusCode int,
 	providerErr string,
+	attempts int,
 	err error,
 ) error {
 	attrs := o.tokenRefreshAttrsFromConn(err)
 	attrs.ProviderStatusCode = providerStatusCode
 	attrs.ProviderError = providerErr
+	attrs.Attempts = attempts
 	emitTokenRefreshFailure(ctx, o.logger, category, attrs)
 
 	if category.IsPermanent() && o.connection != nil {
@@ -257,6 +272,74 @@ func (o *oAuth2Connection) sendProxyRequest(
 
 func (o *oAuth2Connection) ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest, w http.ResponseWriter) error {
 	return nil
+}
+
+// postRefreshWithRetry POSTs a refresh-token grant to the provider's token
+// endpoint with a small bounded retry budget for transient failures
+// (transport errors and 5xx responses). Returns the final response (or
+// last network error) along with the number of attempts actually made;
+// callers attach that to the failure event so "exhausted budget" is
+// visibly distinct from a single non-retryable failure.
+//
+// 4xx responses are never retried — the provider has classified the
+// refresh token itself as invalid/expired/revoked, and resubmitting it
+// will not change the outcome. With some providers (notably ones that
+// enforce refresh-token rotation), a retried 4xx counts against the
+// token's lifetime, so retrying is observably worse than not.
+//
+// gentleman requests are single-use (Send panics on the second call), so
+// each iteration rebuilds the request from scratch.
+func (o *oAuth2Connection) postRefreshWithRetry(
+	ctx context.Context,
+	client *gentleman.Client,
+	tokenEndpoint string,
+	values url.Values,
+) (*gentleman.Response, int, error) {
+	var lastResp *gentleman.Response
+	var lastErr error
+
+	for attempt := 1; attempt <= tokenRefreshMaxAttempts; attempt++ {
+		if attempt > 1 {
+			backoff := tokenRefreshBackoffStep * time.Duration(attempt-1)
+			select {
+			case <-ctx.Done():
+				return nil, attempt - 1, ctx.Err()
+			case <-time.After(backoff):
+			}
+		}
+
+		req := client.
+			UseContext(ctx).
+			Request().
+			Method("POST").
+			URL(tokenEndpoint).
+			SetHeader("Content-Type", "application/x-www-form-urlencoded").
+			AddHeader("accept", "application/json").
+			BodyString(values.Encode())
+
+		resp, err := req.Send()
+
+		if err == nil && resp.StatusCode < 500 {
+			return resp, attempt, nil
+		}
+
+		lastResp, lastErr = resp, err
+
+		if attempt < tokenRefreshMaxAttempts {
+			args := []any{
+				slog.Int("attempt", attempt),
+				slog.Int("max_attempts", tokenRefreshMaxAttempts),
+			}
+			if err != nil {
+				args = append(args, slog.String("error", err.Error()))
+			} else {
+				args = append(args, slog.Int("provider_status_code", resp.StatusCode))
+			}
+			o.logger.WarnContext(ctx, "oauth token refresh transient failure; retrying", args...)
+		}
+	}
+
+	return lastResp, tokenRefreshMaxAttempts, lastErr
 }
 
 var _ iface.Proxy = (*oAuth2Connection)(nil)
