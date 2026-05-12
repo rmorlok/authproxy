@@ -19,6 +19,7 @@ This regenerates Swagger docs and checks the integration-tests module is consist
 ### Working with pull requests
 
 - **Apply the issue's labels to the PR.** When opening a PR that closes a labelled issue, copy those labels onto the PR (e.g. `gh pr create --label "project:api-key"`). Keeps project-tracking views consistent and surfaces the PR in the same dashboards as the issue.
+- **Tag the PR with the local clone it came from.** Several clones of this repo coexist on the same machine (`~/src/authproxy1`, `~/src/authproxy2`, …) and it's useful to know which one produced a given PR. Take the current directory's basename — if it matches `authproxy<N>` (single-digit suffix `0-9`) — and apply a `clone:authproxy<N>` label. Create the label first if it doesn't exist (`gh label create clone:authproxy<N> --color BFD4F2`). If the basename doesn't match the `authproxy<N>` pattern (e.g. a fork, a feature-named worktree), skip this label.
 - **Respond to PR review comments after addressing them.** When you push a change that resolves a review comment, reply on the original comment thread describing what changed (link to the commit if useful). Don't leave the reviewer guessing whether their feedback landed.
 
 ## Running locally
