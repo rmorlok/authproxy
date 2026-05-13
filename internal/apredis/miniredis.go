@@ -19,7 +19,10 @@ var miniredisErr error
 //
 // Parameters:
 // - redisConfig: the configuration for the miniredis instance
-func NewMiniredis(redisConfig *config.RedisMiniredis) (Client, error) {
+// - opts: optional functional options (e.g. WithTelemetry) for instrumenting
+//   the client with OTel tracing and / or metrics
+func NewMiniredis(redisConfig *config.RedisMiniredis, opts ...Option) (Client, error) {
+	resolved := resolveOpts(opts)
 	if miniredisServer == nil {
 		miniredisMutex.Lock()
 		defer miniredisMutex.Unlock()
@@ -38,6 +41,12 @@ func NewMiniredis(redisConfig *config.RedisMiniredis) (Client, error) {
 				Addr:     miniredisServer.Addr(),
 				Protocol: 2, // Needed because RESP3 is unstable for Redis Search
 			})
+
+			if err := instrumentClient(miniredisClient, resolved); err != nil {
+				miniredisServer.Close()
+				miniredisErr = err
+				return nil, miniredisErr
+			}
 
 			// Test the connection to ensure it's working
 			_, err = miniredisClient.Ping(context.Background()).Result()

@@ -176,7 +176,11 @@ func (dm *DependencyManager) GetLogger() *slog.Logger {
 func (dm *DependencyManager) GetRedisClient() apredis.Client {
 	if dm.r == nil {
 		var err error
-		dm.r, err = apredis.NewForRoot(context.Background(), dm.GetConfig().GetRoot())
+		dm.r, err = apredis.NewForRoot(
+			context.Background(),
+			dm.GetConfig().GetRoot(),
+			apredis.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry),
+		)
 		if err != nil {
 			panic(err)
 		}
