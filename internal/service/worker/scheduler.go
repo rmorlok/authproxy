@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
+	"github.com/rmorlok/authproxy/internal/apasynq"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"
 )
@@ -32,9 +33,10 @@ type scheduler struct {
 	rsMtx           apredis.Mutex
 	logger          *slog.Logger
 	syncInterval    time.Duration
+	telemetry       *apasynq.Telemetry
 }
 
-func newScheduler(r apredis.Client, hc func(isScheduler bool, err error), l *slog.Logger, syncInterval time.Duration) *scheduler {
+func newScheduler(r apredis.Client, hc func(isScheduler bool, err error), l *slog.Logger, syncInterval time.Duration, tel *apasynq.Telemetry) *scheduler {
 	return &scheduler{
 		r:               r,
 		healthCheckFunc: hc,
@@ -45,6 +47,7 @@ func newScheduler(r apredis.Client, hc func(isScheduler bool, err error), l *slo
 			apredis.MutexOptionDetailedLockMetadata(),
 		),
 		syncInterval: syncInterval,
+		telemetry:    tel,
 	}
 }
 
@@ -54,14 +57,20 @@ func (s *scheduler) addRegistrar(cr CronRegistrar) *scheduler {
 }
 
 func (s *scheduler) GetConfigs() ([]*asynq.PeriodicTaskConfig, error) {
-	configs := make([]*asynq.PeriodicTaskConfig, 0)
+	// asynq.PeriodicTaskManager calls GetConfigs every SyncInterval to
+	// refresh its task registry. Wrapping the call in a span surfaces the
+	// scheduler's heartbeat in traces; when telemetry is disabled the
+	// wrapper invokes fn directly with no overhead.
+	return s.telemetry.WithSchedulerSyncSpan(context.Background(), func() ([]*asynq.PeriodicTaskConfig, error) {
+		configs := make([]*asynq.PeriodicTaskConfig, 0)
 
-	// This should be updated to handler errors as many of these will come from database records...
-	for _, r := range s.registrars {
-		configs = append(configs, r.GetCronTasks()...)
-	}
+		// This should be updated to handler errors as many of these will come from database records...
+		for _, r := range s.registrars {
+			configs = append(configs, r.GetCronTasks()...)
+		}
 
-	return configs, nil
+		return configs, nil
+	})
 }
 
 func (s *scheduler) start(ctx context.Context) error {
