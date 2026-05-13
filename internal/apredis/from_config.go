@@ -8,13 +8,15 @@ import (
 )
 
 // NewForRoot creates a new redis client from the specified configuration. The type of the client
-// returned will be determined by the configuration.
-func NewForRoot(ctx context.Context, root *config.Root) (Client, error) {
+// returned will be determined by the configuration. Optional Options enable
+// telemetry instrumentation; without them the returned client is a plain,
+// uninstrumented redis.Client identical to the historic behaviour.
+func NewForRoot(ctx context.Context, root *config.Root, opts ...Option) (Client, error) {
 	switch v := root.Redis.InnerVal.(type) {
 	case *config.RedisMiniredis:
-		return NewMiniredis(v)
+		return NewMiniredis(v, opts...)
 	case *config.RedisReal:
-		return NewRedis(ctx, v)
+		return NewRedis(ctx, v, opts...)
 	default:
 		return nil, errors.New("redis type not supported")
 	}

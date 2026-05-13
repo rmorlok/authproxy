@@ -17,8 +17,10 @@ var redisErr error
 //
 // Parameters:
 // - redisConfig: the configuration for the Redis instance
-// - secretKey: the AES key used to secure cursors
-func NewRedis(ctx context.Context, redisConfig *config.RedisReal) (Client, error) {
+// - opts: optional functional options (e.g. WithTelemetry) for instrumenting
+//   the client with OTel tracing and / or metrics
+func NewRedis(ctx context.Context, redisConfig *config.RedisReal, opts ...Option) (Client, error) {
+	resolved := resolveOpts(opts)
 	if redisClient == nil {
 		redisOnce.Do(func() {
 			var err error
@@ -31,6 +33,11 @@ func NewRedis(ctx context.Context, redisConfig *config.RedisReal) (Client, error
 
 			// Configure the Redis client with the provided configuration
 			redisClient = redis.NewClient(cfg)
+
+			if err := instrumentClient(redisClient, resolved); err != nil {
+				redisErr = err
+				return
+			}
 
 			// Test the connection to ensure it's working
 			_, err = redisClient.Ping(context.Background()).Result()
