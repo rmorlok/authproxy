@@ -118,8 +118,8 @@ func (c *Connector) Clone() *Connector {
 }
 
 // Normalize applies defaults that depend on the connector's configuration but
-// are not user-authored — e.g. synthesizing a credential-collection
-// preconnect step for AuthApiKey when none was supplied. Idempotent.
+// are not user-authored — e.g. synthesizing a credential-collection step for
+// AuthApiKey when none was supplied. Idempotent.
 //
 // Called by Validate before per-field checks so that downstream validation and
 // hashing run against the normalized form.
@@ -129,16 +129,19 @@ func (c *Connector) Normalize() {
 	}
 
 	if ak, ok := c.Auth.Inner().(*AuthApiKey); ok {
-		// Auto-synthesize a preconnect step when the connector did not declare
+		// Auto-synthesize a credentials step when the connector did not declare
 		// its own — the author hasn't told us how to collect the credential, so
-		// we generate a form matching the placement.
+		// we generate a form matching the placement. The credentials phase is
+		// owned by the auth method (api-key, here) so the submit handler can
+		// route by phase and never confuse credential fields with preconnect
+		// fields, even if names collide.
 		if c.SetupFlow == nil {
 			c.SetupFlow = &SetupFlow{}
 		}
-		if !c.SetupFlow.HasPreconnect() {
-			step := SynthesizeApiKeyPreconnectStep(ak.Placement)
+		if !c.SetupFlow.HasCredentials() {
+			step := SynthesizeApiKeyCredentialsStep(ak.Placement)
 			if step != nil {
-				c.SetupFlow.Preconnect = &SetupFlowPhase{Steps: []SetupFlowStep{*step}}
+				c.SetupFlow.Credentials = &SetupFlowPhase{Steps: []SetupFlowStep{*step}}
 			}
 		}
 	}

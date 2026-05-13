@@ -147,6 +147,9 @@
         "preconnect": {
           "$ref": "#/$defs/SetupFlowPhase"
         },
+        "credentials": {
+          "$ref": "#/$defs/SetupFlowPhase"
+        },
         "configure": {
           "$ref": "#/$defs/SetupFlowPhase"
         }

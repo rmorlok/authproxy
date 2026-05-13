@@ -6,19 +6,19 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
-// SynthesizedApiKeyPreconnectStepId is the id assigned to the auto-generated
-// preconnect step for api-key connectors that did not declare their own
-// setup_flow.preconnect.
-const SynthesizedApiKeyPreconnectStepId = "_authproxy_api_key_credentials"
+// SynthesizedApiKeyCredentialsStepId is the id assigned to the auto-generated
+// credentials step for api-key connectors that did not declare their own
+// setup_flow.credentials.
+const SynthesizedApiKeyCredentialsStepId = "_authproxy_api_key_credentials"
 
-// SynthesizeApiKeyPreconnectStep builds a credential-collection SetupFlowStep
-// for an api-key placement. The returned step has a JSON Schema requiring
-// "api_key" (plus the placement's UsernameField for basic auth) and a
-// JSONForms UI Schema rendering each field — api_key is rendered with a
-// password input so the value is masked.
+// SynthesizeApiKeyCredentialsStep builds a credential-collection SetupFlowStep
+// for an api-key placement, lives in setup_flow.credentials. The returned step
+// has a JSON Schema requiring "api_key" (plus the placement's UsernameField
+// for basic auth) and a JSONForms UI Schema rendering each field — api_key is
+// rendered with a password input so the value is masked.
 //
 // Returns nil if placement is nil.
-func SynthesizeApiKeyPreconnectStep(placement *ApiKeyPlacement) *SetupFlowStep {
+func SynthesizeApiKeyCredentialsStep(placement *ApiKeyPlacement) *SetupFlowStep {
 	if placement == nil {
 		return nil
 	}
@@ -89,7 +89,7 @@ func SynthesizeApiKeyPreconnectStep(placement *ApiKeyPlacement) *SetupFlowStep {
 	}
 
 	return &SetupFlowStep{
-		Id:          SynthesizedApiKeyPreconnectStepId,
+		Id:          SynthesizedApiKeyCredentialsStepId,
 		Title:       "Enter your API key",
 		Description: "Provide the API key used to authenticate with this service.",
 		JsonSchema:  common.RawJSON(jsBytes),

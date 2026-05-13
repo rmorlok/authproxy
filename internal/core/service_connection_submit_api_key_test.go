@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"encoding/json"
-	"strings"
 	"testing"
 
 	"github.com/golang/mock/gomock"
@@ -16,14 +15,14 @@ import (
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
-	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 // newTestApiKeyConnection builds a test connection backed by an AuthApiKey
 // connector with the given placement. The connector is Normalize()d first so
-// the synthesized preconnect step is present, mirroring runtime behavior.
+// the synthesized credentials step is present, mirroring runtime behavior.
 func newTestApiKeyConnection(
 	t *testing.T,
 	ctrl *gomock.Controller,
@@ -71,20 +70,7 @@ func contextWithActor(t *testing.T) (context.Context, apid.ID) {
 	return ra.ContextWith(context.Background()), actorId
 }
 
-// captureEncConfig captures the value passed to SetConnectionEncryptedConfiguration.
-type captureEncConfig struct{ field *encfield.EncryptedField }
-
-func (c *captureEncConfig) Matches(x any) bool {
-	v, ok := x.(*encfield.EncryptedField)
-	if !ok {
-		return false
-	}
-	c.field = v
-	return true
-}
-func (c *captureEncConfig) String() string { return "captured *encfield.EncryptedField" }
-
-// captureEncCredential captures the value passed to InsertApiKeyCredential.
+// captureEncCredential captures the encrypted blob passed to InsertApiKeyCredential.
 type captureEncCredential struct{ field encfield.EncryptedField }
 
 func (c *captureEncCredential) Matches(x any) bool {
@@ -105,22 +91,25 @@ func TestApiKeySubmit_BearerPersistsCredentialAndAdvancesToReady(t *testing.T) {
 		Type: cschema.ApiKeyPlacementBearer,
 	}, nil)
 
-	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
 	conn.SetupStep = &step
 
-	configCap := &captureEncConfig{}
 	credCap := &captureEncCredential{}
 	ctx, actorId := contextWithActor(t)
 
+	// Critical: SetConnectionEncryptedConfiguration is NOT expected. The
+	// credentials phase routes plaintext to the auth method, never into the
+	// general per-connection config blob. Omitting an EXPECT here means the
+	// mock controller will fail the test if the call ever happens — which is
+	// exactly the invariant we're guarding.
 	db.EXPECT().
 		InsertApiKeyCredential(gomock.Any(), conn.Id, credCap, gomock.AssignableToTypeOf(&cschema.ApiKeyPlacement{}), &actorId).
 		Return(&database.ApiKeyCredential{Id: apid.New(apid.PrefixApiKeyCredential)}, nil)
-	db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, configCap).Return(nil)
 	db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
 	db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateReady).Return(nil)
 
 	resp, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{
-		StepId: cschema.SynthesizedApiKeyPreconnectStepId,
+		StepId: cschema.SynthesizedApiKeyCredentialsStepId,
 		Data:   json.RawMessage(`{"api_key":"sk-abc-123"}`),
 	})
 	require.NoError(t, err)
@@ -131,14 +120,6 @@ func TestApiKeySubmit_BearerPersistsCredentialAndAdvancesToReady(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(credCap.field.Data), &plaintext))
 	require.Equal(t, "sk-abc-123", plaintext.ApiKey)
 	require.Empty(t, plaintext.Username)
-
-	// EncryptedConfiguration must not contain the api_key plaintext.
-	require.NotNil(t, configCap.field)
-	require.False(t, strings.Contains(configCap.field.Data, "sk-abc-123"),
-		"api_key plaintext leaked into EncryptedConfiguration")
-	var cfg map[string]any
-	require.NoError(t, json.Unmarshal([]byte(configCap.field.Data), &cfg))
-	require.NotContains(t, cfg, "api_key", "api_key field must be stripped from connection config")
 }
 
 func TestApiKeySubmit_BasicPersistsBothCredentialFields(t *testing.T) {
@@ -150,22 +131,20 @@ func TestApiKeySubmit_BasicPersistsBothCredentialFields(t *testing.T) {
 		UsernameField: "account_id",
 	}, nil)
 
-	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
 	conn.SetupStep = &step
 
-	configCap := &captureEncConfig{}
 	credCap := &captureEncCredential{}
 	ctx, actorId := contextWithActor(t)
 
 	db.EXPECT().
 		InsertApiKeyCredential(gomock.Any(), conn.Id, credCap, gomock.AssignableToTypeOf(&cschema.ApiKeyPlacement{}), &actorId).
 		Return(&database.ApiKeyCredential{Id: apid.New(apid.PrefixApiKeyCredential)}, nil)
-	db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, configCap).Return(nil)
 	db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
 	db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateReady).Return(nil)
 
 	resp, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{
-		StepId: cschema.SynthesizedApiKeyPreconnectStepId,
+		StepId: cschema.SynthesizedApiKeyCredentialsStepId,
 		Data:   json.RawMessage(`{"api_key":"key-xyz","account_id":"acct-001"}`),
 	})
 	require.NoError(t, err)
@@ -175,14 +154,6 @@ func TestApiKeySubmit_BasicPersistsBothCredentialFields(t *testing.T) {
 	require.NoError(t, json.Unmarshal([]byte(credCap.field.Data), &plaintext))
 	require.Equal(t, "key-xyz", plaintext.ApiKey)
 	require.Equal(t, "acct-001", plaintext.Username)
-
-	// Neither credential field nor value should appear in the merged config.
-	var cfg map[string]any
-	require.NoError(t, json.Unmarshal([]byte(configCap.field.Data), &cfg))
-	require.NotContains(t, cfg, "api_key")
-	require.NotContains(t, cfg, "account_id")
-	assert.False(t, strings.Contains(configCap.field.Data, "key-xyz"))
-	assert.False(t, strings.Contains(configCap.field.Data, "acct-001"))
 }
 
 func TestApiKeySubmit_TransitionsToVerifyWhenProbesPresent(t *testing.T) {
@@ -195,19 +166,18 @@ func TestApiKeySubmit_TransitionsToVerifyWhenProbesPresent(t *testing.T) {
 			{Id: "ping", Http: &cschema.ProbeHttp{Method: "GET", URL: "https://example.com/ping"}},
 		},
 	)
-	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
 	conn.SetupStep = &step
 
 	ctx, actorId := contextWithActor(t)
 	db.EXPECT().
 		InsertApiKeyCredential(gomock.Any(), conn.Id, gomock.Any(), gomock.Any(), &actorId).
 		Return(&database.ApiKeyCredential{Id: apid.New(apid.PrefixApiKeyCredential)}, nil)
-	db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, gomock.Any()).Return(nil)
 	db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &cschema.SetupStepVerify).Return(nil)
 	ac.EXPECT().EnqueueContext(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
 
 	resp, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{
-		StepId: cschema.SynthesizedApiKeyPreconnectStepId,
+		StepId: cschema.SynthesizedApiKeyCredentialsStepId,
 		Data:   json.RawMessage(`{"api_key":"sk-abc"}`),
 	})
 	require.NoError(t, err)
@@ -223,25 +193,107 @@ func TestApiKeySubmit_NoReplay_PriorCredentialNeverDecryptedIntoForm(t *testing.
 	conn, db, _ := newTestApiKeyConnection(t, ctrl, &cschema.ApiKeyPlacement{
 		Type: cschema.ApiKeyPlacementBearer,
 	}, nil)
-	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
 	conn.SetupStep = &step
 
 	ctx, actorId := contextWithActor(t)
 	db.EXPECT().
 		InsertApiKeyCredential(gomock.Any(), conn.Id, gomock.Any(), gomock.Any(), &actorId).
 		Return(&database.ApiKeyCredential{Id: apid.New(apid.PrefixApiKeyCredential)}, nil)
-	db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, gomock.Any()).Return(nil)
 	db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
 	db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateReady).Return(nil)
 
 	// CRITICAL: GetActiveApiKeyCredential must NOT be called during submit.
-	// gomock's default expectation is zero calls, so omitting an EXPECT here
-	// suffices — if submit reads the prior credential, ctrl.Finish() will fail.
+	// gomock fails ctrl.Finish() if submit reads the prior credential.
 
 	resp, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{
-		StepId: cschema.SynthesizedApiKeyPreconnectStepId,
+		StepId: cschema.SynthesizedApiKeyCredentialsStepId,
 		Data:   json.RawMessage(`{"api_key":"new-key"}`),
 	})
 	require.NoError(t, err)
 	require.NotNil(t, resp)
+}
+
+// TestApiKeySubmit_PreconnectFieldNamedApiKeyIsNotTreatedAsCredential is the
+// regression test for the naming-conflict bug. A connector author can declare
+// a preconnect step that happens to include a field literally named "api_key"
+// — that field belongs to the connection config, NOT to the credential. The
+// new phase-dispatched submit handler routes by phase, so a preconnect submit
+// never goes near the credential persistence path.
+func TestApiKeySubmit_PreconnectFieldNamedApiKeyIsNotTreatedAsCredential(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	// Author declares a preconnect step with a field called "api_key" — a
+	// pathological case to stress the dispatcher. The synthesized credentials
+	// step still exists alongside (Normalize doesn't suppress credentials when
+	// preconnect is present).
+	preconnect := cschema.SetupFlowStep{
+		Id: "tenant",
+		JsonSchema: common.RawJSON(`{
+			"type": "object",
+			"required": ["api_key"],
+			"properties": {"api_key": {"type": "string"}},
+			"additionalProperties": false
+		}`),
+	}
+	e := encrypt.NewFakeEncryptService(false)
+	s, db, _, _, _, _ := FullMockService(t, ctrl)
+	s.encrypt = e
+
+	connector := cschema.Connector{
+		Auth: &cschema.Auth{InnerVal: &cschema.AuthApiKey{
+			Type:      cschema.AuthTypeAPIKey,
+			Placement: &cschema.ApiKeyPlacement{Type: cschema.ApiKeyPlacementBearer},
+		}},
+		SetupFlow: &cschema.SetupFlow{
+			Preconnect: &cschema.SetupFlowPhase{Steps: []cschema.SetupFlowStep{preconnect}},
+		},
+	}
+	connector.Normalize()
+	cv := NewTestConnectorVersion(connector)
+	conn := &connection{
+		Connection: database.Connection{
+			Id:               "cxn_test2222222222aa",
+			Namespace:        "root",
+			State:            database.ConnectionStateCreated,
+			ConnectorId:      cv.GetId(),
+			ConnectorVersion: cv.GetVersion(),
+		},
+		s:      s,
+		cv:     cv,
+		logger: aplog.NewNoopLogger(),
+	}
+
+	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+	conn.SetupStep = &step
+
+	// Critical invariants:
+	//   - InsertApiKeyCredential must NOT be called for a preconnect submit
+	//     (omitting EXPECT enforces this).
+	//   - The author's "api_key" preconnect field IS expected to land in the
+	//     connection config — SetConnectionEncryptedConfiguration must be called
+	//     and the value must be present.
+	db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, gomock.Any()).
+		DoAndReturn(func(_ context.Context, _ apid.ID, ef *encfield.EncryptedField) error {
+			var cfg map[string]any
+			require.NoError(t, json.Unmarshal([]byte(ef.Data), &cfg))
+			require.Equal(t, "tenant-supplied-value", cfg["api_key"],
+				"preconnect's own api_key field must reach EncryptedConfiguration unchanged")
+			return nil
+		})
+	// After preconnect completes the next step is the synthesized credentials step,
+	// so SubmitForm returns that form (not complete).
+	credsStep := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
+	db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &credsStep).Return(nil)
+
+	ctx, _ := contextWithActor(t)
+	resp, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{
+		StepId: "tenant",
+		Data:   json.RawMessage(`{"api_key":"tenant-supplied-value"}`),
+	})
+	require.NoError(t, err)
+	form, ok := resp.(*iface.ConnectionSetupForm)
+	require.True(t, ok, "expected next step to be the credentials form, got %T", resp)
+	require.Equal(t, cschema.SynthesizedApiKeyCredentialsStepId, form.StepId)
 }

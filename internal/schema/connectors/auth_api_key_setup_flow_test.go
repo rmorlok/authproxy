@@ -8,10 +8,10 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestSynthesizeApiKeyPreconnectStep_Bearer(t *testing.T) {
-	step := SynthesizeApiKeyPreconnectStep(&ApiKeyPlacement{Type: ApiKeyPlacementBearer})
+func TestSynthesizeApiKeyCredentialsStep_Bearer(t *testing.T) {
+	step := SynthesizeApiKeyCredentialsStep(&ApiKeyPlacement{Type: ApiKeyPlacementBearer})
 	require.NotNil(t, step)
-	require.Equal(t, SynthesizedApiKeyPreconnectStepId, step.Id)
+	require.Equal(t, SynthesizedApiKeyCredentialsStepId, step.Id)
 
 	var schema map[string]any
 	require.NoError(t, json.Unmarshal(step.JsonSchema, &schema))
@@ -25,10 +25,10 @@ func TestSynthesizeApiKeyPreconnectStep_Bearer(t *testing.T) {
 	require.False(t, schema["additionalProperties"].(bool))
 }
 
-func TestSynthesizeApiKeyPreconnectStep_Header(t *testing.T) {
+func TestSynthesizeApiKeyCredentialsStep_Header(t *testing.T) {
 	// header placement renders the same form as bearer at this layer — the
 	// header_name + prefix only affect the proxy, not the user-input form.
-	step := SynthesizeApiKeyPreconnectStep(&ApiKeyPlacement{
+	step := SynthesizeApiKeyCredentialsStep(&ApiKeyPlacement{
 		Type:       ApiKeyPlacementHeader,
 		HeaderName: "X-API-Key",
 	})
@@ -41,8 +41,8 @@ func TestSynthesizeApiKeyPreconnectStep_Header(t *testing.T) {
 	require.NotContains(t, props, "X-API-Key")
 }
 
-func TestSynthesizeApiKeyPreconnectStep_Query(t *testing.T) {
-	step := SynthesizeApiKeyPreconnectStep(&ApiKeyPlacement{
+func TestSynthesizeApiKeyCredentialsStep_Query(t *testing.T) {
+	step := SynthesizeApiKeyCredentialsStep(&ApiKeyPlacement{
 		Type:      ApiKeyPlacementQuery,
 		ParamName: "api_key",
 	})
@@ -54,8 +54,8 @@ func TestSynthesizeApiKeyPreconnectStep_Query(t *testing.T) {
 	require.Contains(t, props, "api_key")
 }
 
-func TestSynthesizeApiKeyPreconnectStep_Basic(t *testing.T) {
-	step := SynthesizeApiKeyPreconnectStep(&ApiKeyPlacement{
+func TestSynthesizeApiKeyCredentialsStep_Basic(t *testing.T) {
+	step := SynthesizeApiKeyCredentialsStep(&ApiKeyPlacement{
 		Type:          ApiKeyPlacementBasic,
 		UsernameField: "account_id",
 	})
@@ -71,8 +71,8 @@ func TestSynthesizeApiKeyPreconnectStep_Basic(t *testing.T) {
 	require.ElementsMatch(t, []string{"api_key", "account_id"}, required)
 }
 
-func TestSynthesizeApiKeyPreconnectStep_Nil(t *testing.T) {
-	require.Nil(t, SynthesizeApiKeyPreconnectStep(nil))
+func TestSynthesizeApiKeyCredentialsStep_Nil(t *testing.T) {
+	require.Nil(t, SynthesizeApiKeyCredentialsStep(nil))
 }
 
 func TestApiKeyPlacement_CredentialFieldNames(t *testing.T) {
@@ -89,7 +89,7 @@ func TestApiKeyPlacement_CredentialFieldNames(t *testing.T) {
 	require.Nil(t, p.CredentialFieldNames())
 }
 
-func TestConnectorNormalize_SynthesizesApiKeyPreconnectWhenMissing(t *testing.T) {
+func TestConnectorNormalize_SynthesizesApiKeyCredentialsWhenMissing(t *testing.T) {
 	c := &Connector{
 		Auth: &Auth{InnerVal: &AuthApiKey{
 			Type:      AuthTypeAPIKey,
@@ -99,12 +99,12 @@ func TestConnectorNormalize_SynthesizesApiKeyPreconnectWhenMissing(t *testing.T)
 	c.Normalize()
 
 	require.NotNil(t, c.SetupFlow)
-	require.True(t, c.SetupFlow.HasPreconnect())
-	require.Len(t, c.SetupFlow.Preconnect.Steps, 1)
-	require.Equal(t, SynthesizedApiKeyPreconnectStepId, c.SetupFlow.Preconnect.Steps[0].Id)
+	require.True(t, c.SetupFlow.HasCredentials())
+	require.Len(t, c.SetupFlow.Credentials.Steps, 1)
+	require.Equal(t, SynthesizedApiKeyCredentialsStepId, c.SetupFlow.Credentials.Steps[0].Id)
 }
 
-func TestConnectorNormalize_LeavesExplicitPreconnectAlone(t *testing.T) {
+func TestConnectorNormalize_LeavesExplicitCredentialsAlone(t *testing.T) {
 	explicit := SetupFlowStep{
 		Id:         "custom-step",
 		Title:      "Custom",
@@ -116,13 +116,40 @@ func TestConnectorNormalize_LeavesExplicitPreconnectAlone(t *testing.T) {
 			Placement: &ApiKeyPlacement{Type: ApiKeyPlacementBearer},
 		}},
 		SetupFlow: &SetupFlow{
-			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{explicit}},
+			Credentials: &SetupFlowPhase{Steps: []SetupFlowStep{explicit}},
 		},
 	}
 	c.Normalize()
 
+	require.Len(t, c.SetupFlow.Credentials.Steps, 1)
+	require.Equal(t, "custom-step", c.SetupFlow.Credentials.Steps[0].Id)
+}
+
+func TestConnectorNormalize_LeavesPreconnectAlone(t *testing.T) {
+	// A connector author's preconnect step (collecting non-credential prerequisites
+	// like a tenant) must not be touched by Normalize — credentials phase is
+	// independent of preconnect.
+	preconnect := SetupFlowStep{
+		Id:         "tenant",
+		JsonSchema: common.RawJSON(`{"type":"object","properties":{"tenant":{"type":"string"}},"required":["tenant"],"additionalProperties":false}`),
+	}
+	c := &Connector{
+		Auth: &Auth{InnerVal: &AuthApiKey{
+			Type:      AuthTypeAPIKey,
+			Placement: &ApiKeyPlacement{Type: ApiKeyPlacementBearer},
+		}},
+		SetupFlow: &SetupFlow{
+			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{preconnect}},
+		},
+	}
+	c.Normalize()
+
+	// Preconnect is unchanged...
 	require.Len(t, c.SetupFlow.Preconnect.Steps, 1)
-	require.Equal(t, "custom-step", c.SetupFlow.Preconnect.Steps[0].Id)
+	require.Equal(t, "tenant", c.SetupFlow.Preconnect.Steps[0].Id)
+	// ...AND a credentials step is synthesized alongside it.
+	require.True(t, c.SetupFlow.HasCredentials())
+	require.Equal(t, SynthesizedApiKeyCredentialsStepId, c.SetupFlow.Credentials.Steps[0].Id)
 }
 
 func TestConnectorNormalize_Idempotent(t *testing.T) {
@@ -133,10 +160,10 @@ func TestConnectorNormalize_Idempotent(t *testing.T) {
 		}},
 	}
 	c.Normalize()
-	first := c.SetupFlow.Preconnect.Steps[0].Id
+	first := c.SetupFlow.Credentials.Steps[0].Id
 	c.Normalize()
-	require.Len(t, c.SetupFlow.Preconnect.Steps, 1)
-	require.Equal(t, first, c.SetupFlow.Preconnect.Steps[0].Id)
+	require.Len(t, c.SetupFlow.Credentials.Steps, 1)
+	require.Equal(t, first, c.SetupFlow.Credentials.Steps[0].Id)
 }
 
 func TestConnectorNormalize_NoOpForOAuth2(t *testing.T) {
@@ -144,8 +171,9 @@ func TestConnectorNormalize_NoOpForOAuth2(t *testing.T) {
 		Auth: &Auth{InnerVal: &AuthOAuth2{Type: AuthTypeOAuth2}},
 	}
 	c.Normalize()
-	// OAuth2 connectors should not have a preconnect synthesized.
-	require.False(t, c.SetupFlow != nil && c.SetupFlow.HasPreconnect())
+	// OAuth2 connectors should not have a credentials phase synthesized — they
+	// use the auth phase (redirect) instead.
+	require.False(t, c.SetupFlow != nil && c.SetupFlow.HasCredentials())
 }
 
 func toStringSlice(v any) []string {

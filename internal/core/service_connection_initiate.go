@@ -84,10 +84,35 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 
 	connector := cv.GetDefinition()
 
-	// If the connector has preconnect steps, return the first form instead of proceeding to auth
+	// If the connector has preconnect steps, return the first form before
+	// touching the auth phase or the credentials phase.
 	if connector.SetupFlow.HasPreconnect() {
 		firstStep := connector.SetupFlow.Preconnect.Steps[0]
 		first := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		if err := connection.SetSetupStep(ctx, &first); err != nil {
+			val.MarkErrorReturn()
+			return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
+		}
+
+		return &iface.ConnectionSetupForm{
+			Id:              connection.GetId(),
+			Type:            iface.ConnectionSetupResponseTypeForm,
+			StepId:          firstStep.Id,
+			StepTitle:       firstStep.Title,
+			StepDescription: firstStep.Description,
+			CurrentStep:     0,
+			TotalSteps:      connector.SetupFlow.TotalSteps(),
+			JsonSchema:      json.RawMessage(firstStep.JsonSchema),
+			UiSchema:        json.RawMessage(firstStep.UiSchema),
+		}, nil
+	}
+
+	// Otherwise, if the auth method declared a credentials phase (api-key after
+	// Normalize), return its first form. The submit handler routes credential
+	// data to the auth method instead of merging it into the connection config.
+	if connector.SetupFlow.HasCredentials() {
+		firstStep := connector.SetupFlow.Credentials.Steps[0]
+		first := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
 		if err := connection.SetSetupStep(ctx, &first); err != nil {
 			val.MarkErrorReturn()
 			return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
