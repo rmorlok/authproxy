@@ -9,6 +9,7 @@ export * from './connectors';
 export * from './connections';
 export * from './encryptionKeys';
 export * from './namespaces';
+export * from './rateLimits';
 export * from './requests';
 export * from './session';
 export * from './tasks';

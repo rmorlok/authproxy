@@ -13,6 +13,7 @@ import HttpRoundedIcon from '@mui/icons-material/Http';
 import PeopleRoundedIcon from '@mui/icons-material/PeopleRounded';
 import AssignmentRoundedIcon from '@mui/icons-material/AssignmentRounded';
 import KeyRoundedIcon from '@mui/icons-material/KeyRounded';
+import SpeedRoundedIcon from '@mui/icons-material/SpeedRounded';
 import SettingsRoundedIcon from '@mui/icons-material/SettingsRounded';
 import AccountTreeRoundedIcon from '@mui/icons-material/AccountTreeRounded';
 import InfoRoundedIcon from '@mui/icons-material/InfoRounded';
@@ -26,6 +27,7 @@ const mainListItems = [
   { text: 'Requests', icon: <HttpRoundedIcon />, link: '/requests' },
   { text: 'Tasks', icon: <AssignmentRoundedIcon />, link: '/tasks' },
   { text: 'Encryption Keys', icon: <KeyRoundedIcon />, link: '/encryption-keys' },
+  { text: 'Rate Limits', icon: <SpeedRoundedIcon />, link: '/rate-limits' },
   { text: 'Actors', icon: <PeopleRoundedIcon />, link: '/actors' },
 ];
 

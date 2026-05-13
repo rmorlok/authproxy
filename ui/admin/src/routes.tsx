@@ -13,6 +13,8 @@ import ActorsPage from "./pages/Actors";
 import ActorDetailPage from "./pages/ActorDetail";
 import EncryptionKeysPage from "./pages/EncryptionKeys";
 import EncryptionKeyDetail from "./pages/EncryptionKeyDetail";
+import RateLimitsPage from "./pages/RateLimits";
+import RateLimitDetail from "./pages/RateLimitDetail";
 import TasksPage from "./pages/Tasks";
 import TaskQueueDetailPage from "./pages/TaskQueueDetail";
 import NamespaceDetailPage from "./pages/NamespaceDetail";
@@ -122,6 +124,25 @@ export const router = createBrowserRouter([
                     {
                         attr: 'id',
                         path: (params: Params<string>) => `/encryption-keys/${params.id}`,
+                    },
+                ],
+            },
+            {
+                path: 'rate-limits',
+                element: (<ListParent><RateLimitsPage /></ListParent>),
+                handle: { title: 'Rate Limits' },
+            },
+            {
+                path: 'rate-limits/:id',
+                element: <RateLimitDetail />,
+                handle: [
+                    {
+                        title: 'Rate Limits',
+                        path: (_params: Params<string>) => `/rate-limits`,
+                    },
+                    {
+                        attr: 'id',
+                        path: (params: Params<string>) => `/rate-limits/${params.id}`,
                     },
                 ],
             },
