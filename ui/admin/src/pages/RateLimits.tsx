@@ -16,7 +16,6 @@ import Dialog from '@mui/material/Dialog';
 import DialogTitle from '@mui/material/DialogTitle';
 import DialogContent from '@mui/material/DialogContent';
 import DialogActions from '@mui/material/DialogActions';
-import TextField from '@mui/material/TextField';
 import Tooltip from '@mui/material/Tooltip';
 import Alert from '@mui/material/Alert';
 import {
@@ -24,6 +23,8 @@ import {
     ListResponse, ListRateLimitsParams, namespaceAndChildren,
     createRateLimit, updateRateLimit, CreateRateLimitRequest,
 } from '@authproxy/api';
+import RateLimitDefinitionEditor from '../components/RateLimitDefinitionEditor';
+import { EMPTY_DEFINITION } from '../components/RateLimitDefinitionForm';
 import dayjs from 'dayjs';
 import {useQueryState, parseAsInteger, parseAsStringLiteral, parseAsString} from 'nuqs'
 import {useNavigate} from "react-router-dom";
@@ -72,26 +73,6 @@ function bucketSummary(def: RateLimitDefinition): string {
     return def.bucket.dimensions.join(', ');
 }
 
-// Template definition pre-filled into the Create dialog's JSON editor.
-// Token bucket is the most commonly desired shape (burst + sustained
-// rate), so we use that as the default starting point.
-const createTemplate = {
-    mode: 'enforce',
-    selector: {
-        methods: ['POST', 'PATCH', 'PUT'],
-        request_types: ['proxy'],
-    },
-    bucket: {
-        dimensions: ['actor'],
-    },
-    algorithm: {
-        token_bucket: {
-            capacity: 60,
-            refill_rate: 1.0,
-        },
-    },
-};
-
 export default function RateLimits() {
     const defaultPageSize = 20;
     const modeOptions = useMemo(() => [
@@ -123,7 +104,7 @@ export default function RateLimits() {
     const [createOpen, setCreateOpen] = useState(false);
     const [createLoading, setCreateLoading] = useState(false);
     const [createError, setCreateError] = useState<string | null>(null);
-    const [createJson, setCreateJson] = useState<string>(JSON.stringify(createTemplate, null, 2));
+    const [createDef, setCreateDef] = useState<RateLimitDefinition>(EMPTY_DEFINITION);
 
     const responsesCacheRef = useRef<ListResponse<RateLimit>[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
@@ -271,21 +252,13 @@ export default function RateLimits() {
         setCreateLoading(true);
         setCreateError(null);
         try {
-            let parsed: RateLimitDefinition;
-            try {
-                parsed = JSON.parse(createJson);
-            } catch (parseErr: any) {
-                setCreateError(`Invalid JSON: ${parseErr.message}`);
-                setCreateLoading(false);
-                return;
-            }
             const request: CreateRateLimitRequest = {
                 namespace: ns,
-                definition: parsed,
+                definition: createDef,
             };
             await createRateLimit(request);
             setCreateOpen(false);
-            setCreateJson(JSON.stringify(createTemplate, null, 2));
+            setCreateDef(EMPTY_DEFINITION);
             resetPagination();
             fetchPage(1);
         } catch (err: any) {
@@ -440,28 +413,10 @@ export default function RateLimits() {
             <Dialog open={createOpen} onClose={() => !createLoading && setCreateOpen(false)} fullWidth maxWidth="md">
                 <DialogTitle>Create Rate Limit</DialogTitle>
                 <DialogContent>
-                    <Typography variant="body2" color="text.secondary" sx={{ mb: 1 }}>
-                        Define the rule as JSON. The structured form is on the rate-limit detail page after creation.
-                    </Typography>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
                         Will be created in namespace <Chip size="small" label={ns || 'root'} />.
                     </Typography>
-                    <TextField
-                        label="Definition (JSON)"
-                        fullWidth
-                        multiline
-                        minRows={16}
-                        value={createJson}
-                        onChange={(e) => setCreateJson(e.target.value)}
-                        slotProps={{
-                            input: {
-                                sx: {
-                                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                                    fontSize: '0.85rem',
-                                },
-                            },
-                        }}
-                    />
+                    <RateLimitDefinitionEditor value={createDef} onChange={setCreateDef} />
                     {createError && <Alert severity="error" sx={{ mt: 2 }}>{createError}</Alert>}
                 </DialogContent>
                 <DialogActions>

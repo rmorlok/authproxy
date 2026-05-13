@@ -16,7 +16,6 @@ import DialogActions from '@mui/material/DialogActions';
 import Button from '@mui/material/Button';
 import Switch from '@mui/material/Switch';
 import FormControlLabel from '@mui/material/FormControlLabel';
-import TextField from '@mui/material/TextField';
 import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import Tooltip from '@mui/material/Tooltip';
@@ -26,6 +25,8 @@ import {
 } from '@authproxy/api';
 import { useNavigate } from 'react-router-dom';
 import AnnotationsEditor from './AnnotationsEditor';
+import RateLimitDefinitionEditor from './RateLimitDefinitionEditor';
+import { EMPTY_DEFINITION } from './RateLimitDefinitionForm';
 
 function ModeChip({ mode }: { mode: RateLimitMode }) {
     const color = mode === RateLimitMode.ENFORCE ? 'warning' : 'info';
@@ -69,7 +70,7 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
     // Action menu / dialog state.
     const [menuAnchorEl, setMenuAnchorEl] = useState<null | HTMLElement>(null);
     const [editDefOpen, setEditDefOpen] = useState(false);
-    const [editJson, setEditJson] = useState<string>('');
+    const [editDef, setEditDef] = useState<RateLimitDefinition>(EMPTY_DEFINITION);
     const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
     const [actionLoading, setActionLoading] = useState(false);
     const [actionError, setActionError] = useState<string | null>(null);
@@ -145,7 +146,7 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
 
     const onClickEditDefinition = () => {
         setActionError(null);
-        setEditJson(JSON.stringify(rl.definition, null, 2));
+        setEditDef(rl.definition);
         closeMenu();
         setEditDefOpen(true);
     };
@@ -154,15 +155,7 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
         setActionError(null);
         setActionLoading(true);
         try {
-            let parsed: RateLimitDefinition;
-            try {
-                parsed = JSON.parse(editJson);
-            } catch (parseErr: any) {
-                setActionError(`Invalid JSON: ${parseErr.message}`);
-                setActionLoading(false);
-                return;
-            }
-            await rateLimits.update(rl.id, { definition: parsed });
+            await rateLimits.update(rl.id, { definition: editDef });
             setEditDefOpen(false);
             fetchRl();
         } catch (err: any) {
@@ -357,24 +350,9 @@ export default function RateLimitDetail({ rateLimitId }: { rateLimitId: string }
                 <DialogTitle>Edit definition</DialogTitle>
                 <DialogContent>
                     <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
-                        Edit the rule as JSON. The mode toggle in the header is the quick path for the most-common change.
+                        The mode toggle in the header is the quick path for the most-common change. Use this dialog for selector / bucket / algorithm edits.
                     </Typography>
-                    <TextField
-                        label="Definition (JSON)"
-                        fullWidth
-                        multiline
-                        minRows={16}
-                        value={editJson}
-                        onChange={(e) => setEditJson(e.target.value)}
-                        slotProps={{
-                            input: {
-                                sx: {
-                                    fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace',
-                                    fontSize: '0.85rem',
-                                },
-                            },
-                        }}
-                    />
+                    <RateLimitDefinitionEditor value={editDef} onChange={setEditDef} />
                 </DialogContent>
                 <DialogActions>
                     <Button onClick={() => setEditDefOpen(false)} disabled={actionLoading}>Cancel</Button>
