@@ -124,14 +124,14 @@ sequenceDiagram
     T->>P: POST /test/scripts (clientKey, EndpointRefresh, {Status:503, FailCount:N})
 
     T->>API: POST /api/v1/connections/<id>/_proxy
-    API->>DB: GetOAuth2Token → access_token expired
+    API->>DB: GetOAuth2Token, access_token expired
 
-    loop attempt 1 → tokenRefreshMaxAttempts
+    loop attempt 1 to tokenRefreshMaxAttempts
         API->>P: POST /token (grant_type=refresh_token)
         alt scripted 503 (queue not drained)
             P-->>API: 503 temporarily_unavailable
-            API->>API: log "oauth token refresh transient failure; retrying"
-            API->>API: sleep tokenRefreshBackoffStep × (attempt-1)
+            API->>API: log oauth token refresh transient failure, retrying
+            API->>API: sleep tokenRefreshBackoffStep * (attempt-1)
         else queue drained, default behavior
             P-->>API: 200 + access_token (real grant)
         end
