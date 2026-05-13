@@ -11,6 +11,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
+	"github.com/rmorlok/authproxy/internal/apasynq"
 	authSync "github.com/rmorlok/authproxy/internal/apauth/tasks"
 	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/aplog"
@@ -89,6 +90,14 @@ func Serve(cfg config.C) {
 
 	ctx := context.Background()
 
+	// Build the asynq telemetry surface (middleware + scheduler-sync
+	// wrapper + queue-depth gauge). Safe to call when telemetry is
+	// disabled — every entry point is a no-op in that case.
+	asynqTel, err := apasynq.NewTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry, dm.GetAsyncInspector())
+	if err != nil {
+		log.Fatalf("failed to construct asynq telemetry: %v", err)
+	}
+
 	srv := asynq.NewServerFromRedisClient(
 		dm.GetRedisClient(),
 		asynq.Config{
@@ -105,7 +114,19 @@ func Serve(cfg config.C) {
 		},
 	)
 
+	// Register the queue-depth observable gauge for every queue the
+	// asynq server is configured to consume. The returned stop function
+	// unregisters the callback on shutdown.
+	stopQueueGauge, err := asynqTel.StartQueueDepthGauge([]string{"default"})
+	if err != nil {
+		log.Fatalf("failed to start queue depth gauge: %v", err)
+	}
+	defer stopQueueGauge()
+
 	mux := asynq.NewServeMux()
+	// Telemetry middleware wraps every handler with a span + duration
+	// histogram observation. Identity wrapper when telemetry is disabled.
+	mux.Use(asynqTel.Middleware())
 
 	oauth2TaskHandler := oauth2.NewTaskHandler(
 		cfg,
@@ -163,6 +184,7 @@ func Serve(cfg config.C) {
 		asyncSchedulerHealthChecker,
 		dm.GetLogBuilder().WithComponent("scheduler").Build(),
 		workerConfig.GetCronSyncInterval(),
+		asynqTel,
 	).
 		addRegistrar(oauth2TaskHandler).
 		addRegistrar(dm.GetCoreService()).
