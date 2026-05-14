@@ -137,6 +137,7 @@ func Serve(cfg config.C) {
 		dm.GetHttpf(),
 		dm.GetEncryptService(),
 		logger,
+		oauth2.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry),
 	)
 	oauth2TaskHandler.RegisterTasks(mux)
 	dm.GetCoreService().RegisterTasks(mux)

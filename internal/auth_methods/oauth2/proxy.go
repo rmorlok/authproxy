@@ -10,6 +10,7 @@ import (
 	"time"
 
 	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
@@ -48,6 +49,27 @@ const (
 )
 
 func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *database.OAuth2Token, mode refreshMode) (*database.OAuth2Token, error) {
+	var result *database.OAuth2Token
+	err := o.tel.withSpan(ctx, "refresh", o.connectorIDForTelemetry(), func(ctx context.Context) error {
+		var err error
+		result, err = o.refreshAccessTokenInner(ctx, token, mode)
+		return err
+	})
+	return result, err
+}
+
+// connectorIDForTelemetry returns the connector id used as the
+// authproxy.connector_id dimension on lifecycle counters and spans. Safe to
+// call when the connection / connector version isn't populated (returns the
+// zero apid.ID, which connectorAttr treats as "absent").
+func (o *oAuth2Connection) connectorIDForTelemetry() apid.ID {
+	if o.connection == nil {
+		return apid.Nil
+	}
+	return o.connection.GetConnectorId()
+}
+
+func (o *oAuth2Connection) refreshAccessTokenInner(ctx context.Context, token *database.OAuth2Token, mode refreshMode) (*database.OAuth2Token, error) {
 	m := o.tokenMutex()
 	err := m.Lock(ctx)
 	if err != nil {
@@ -134,6 +156,7 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 		)
 	}
 	emitTokenRefreshSucceeded(ctx, o.logger, o.tokenRefreshAttrsFromConn(nil))
+	o.tel.recordRefreshSuccess(ctx, o.connectorIDForTelemetry())
 
 	return newToken, nil
 }
@@ -165,6 +188,7 @@ func (o *oAuth2Connection) classifyAndRecordRefreshFailure(
 	attrs.ProviderError = providerErr
 	attrs.Attempts = attempts
 	emitTokenRefreshFailure(ctx, o.logger, category, attrs)
+	o.tel.recordRefreshFailure(ctx, string(category), o.connectorIDForTelemetry())
 
 	if category.IsPermanent() && o.connection != nil {
 		if markErr := o.connection.MarkHealthState(ctx, database.ConnectionHealthStateUnhealthy, "refresh_"+string(category)); markErr != nil {
