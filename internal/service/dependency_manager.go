@@ -420,6 +420,7 @@ func (dm *DependencyManager) GetCoreService() coreIface.C {
 			dm.GetAsyncClient(),
 			dm.GetLogger(),
 			core.WithRateLimitCache(dm.GetRateLimitCache()),
+			core.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry),
 		)
 	}
 

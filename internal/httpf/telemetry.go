@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"net/http"
 	"strconv"
-	"sync"
 	"time"
 
 	"go.opentelemetry.io/otel/attribute"
@@ -18,14 +17,14 @@ import (
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
 
+// LabelValueOther mirrors aptelemetry.LabelValueOther for callers that
+// only import this package. Kept as a constant alias so existing
+// references continue to compile.
+const LabelValueOther = aptelemetry.LabelValueOther
+
 // telemetryInstrumentationName is the instrumentation scope reported on the
 // emitted spans and metrics. Useful for filtering by source in dashboards.
 const telemetryInstrumentationName = "github.com/rmorlok/authproxy/internal/httpf"
-
-// LabelValueOther is the placeholder substituted for label values that exceed
-// the configured metric_dimension_value_cap. Bounds the cardinality of metric
-// streams under runaway label-value churn.
-const LabelValueOther = "other"
 
 // NewTelemetryFactory returns a RoundTripperFactory that emits an OTel client
 // span per outbound request plus the proxy duration / bytes-in / bytes-out
@@ -52,7 +51,7 @@ func NewTelemetryFactory(providers *aptelemetry.Providers, cfg *sconfig.Telemetr
 	f := &telemetryFactory{
 		tracesEnabled:         tracesEnabled,
 		metricsEnabled:        metricsEnabled,
-		projector:             newLabelProjector(cfg.GetProxy()),
+		projector:             aptelemetry.NewLabelProjectorFromProxyConfig(cfg.GetProxy()),
 		propagator:            providers.Propagator,
 		injectOutboundDefault: cfg.InjectOutboundDefault(),
 	}
@@ -101,7 +100,7 @@ type telemetryFactory struct {
 	duration         metric.Float64Histogram
 	requestBodySize  metric.Int64Histogram
 	responseBodySize metric.Int64Histogram
-	projector        *labelProjector
+	projector        *aptelemetry.LabelProjector
 
 	// propagator is the W3C TraceContext + Baggage composite from the
 	// providers. Always present (even with no-op providers) but only used
@@ -214,7 +213,7 @@ func (rt *telemetryRoundTripper) spanStartAttributes(req *http.Request) []attrib
 		}
 	}
 	attrs = append(attrs, rt.identityAttributes()...)
-	attrs = append(attrs, rt.factory.projector.spanAttrs(rt.requestInfo.Labels)...)
+	attrs = append(attrs, rt.factory.projector.SpanAttrs(rt.requestInfo.Labels)...)
 	return attrs
 }
 
@@ -271,111 +270,7 @@ func (rt *telemetryRoundTripper) metricAttributes(req *http.Request, status int)
 	if !rt.requestInfo.ConnectorId.IsNil() {
 		attrs = append(attrs, attribute.String("authproxy.connector_id", rt.requestInfo.ConnectorId.String()))
 	}
-	attrs = append(attrs, rt.factory.projector.metricDims(rt.requestInfo.Labels)...)
+	attrs = append(attrs, rt.factory.projector.MetricDims(rt.requestInfo.Labels)...)
 	return attrs
 }
 
-// labelProjector encapsulates the two independent allowlists and optional
-// value-cap state. It reads directly from RequestInfo.Labels (the already-
-// computed effective set produced by httpf.F.ForConnection / ForLabels). It
-// does no merging of its own: that work happens upstream.
-type labelProjector struct {
-	spanKeys   []string
-	metricKeys []string
-	valueCap   int
-
-	// valueSeen tracks the bounded set of values observed per metric
-	// dimension key for cap enforcement. Once a key's set reaches valueCap,
-	// further distinct values collapse to LabelValueOther. The cap is per
-	// process; in a multi-replica deployment the cap applies independently
-	// on each replica, which is the conservative behaviour we want.
-	valueSeenMu sync.RWMutex
-	valueSeen   map[string]map[string]struct{}
-}
-
-func newLabelProjector(cfg *sconfig.TelemetryProxy) *labelProjector {
-	p := &labelProjector{}
-	if cfg == nil {
-		return p
-	}
-	p.spanKeys = append(p.spanKeys, cfg.SpanAttributeLabels...)
-	p.metricKeys = append(p.metricKeys, cfg.MetricDimensionLabels...)
-	if cfg.MetricDimensionValueCap != nil && *cfg.MetricDimensionValueCap > 0 {
-		p.valueCap = *cfg.MetricDimensionValueCap
-		p.valueSeen = make(map[string]map[string]struct{}, len(p.metricKeys))
-	}
-	return p
-}
-
-// spanAttrs projects allowlisted labels onto span attributes. Keys not
-// present in labels produce no attribute. The label key is reported verbatim
-// (no namespacing) — applications choose label keys that won't collide with
-// reserved OTel attributes.
-func (p *labelProjector) spanAttrs(labels map[string]string) []attribute.KeyValue {
-	if p == nil || len(p.spanKeys) == 0 || len(labels) == 0 {
-		return nil
-	}
-	out := make([]attribute.KeyValue, 0, len(p.spanKeys))
-	for _, k := range p.spanKeys {
-		v, ok := labels[k]
-		if !ok {
-			continue
-		}
-		out = append(out, attribute.String(k, v))
-	}
-	return out
-}
-
-// metricDims projects allowlisted labels onto metric dimensions, applying the
-// configured value cap. Keys not present in labels produce no dimension.
-func (p *labelProjector) metricDims(labels map[string]string) []attribute.KeyValue {
-	if p == nil || len(p.metricKeys) == 0 || len(labels) == 0 {
-		return nil
-	}
-	out := make([]attribute.KeyValue, 0, len(p.metricKeys))
-	for _, k := range p.metricKeys {
-		v, ok := labels[k]
-		if !ok {
-			continue
-		}
-		out = append(out, attribute.String(k, p.cappedValue(k, v)))
-	}
-	return out
-}
-
-// cappedValue returns v unchanged when the configured value cap allows it,
-// or LabelValueOther when v would push a key's distinct-value count over the
-// cap. When no cap is configured, v is always returned verbatim.
-func (p *labelProjector) cappedValue(key, value string) string {
-	if p.valueCap <= 0 {
-		return value
-	}
-
-	// Hot path: value already accepted for this key.
-	p.valueSeenMu.RLock()
-	if seen, ok := p.valueSeen[key]; ok {
-		if _, present := seen[value]; present {
-			p.valueSeenMu.RUnlock()
-			return value
-		}
-	}
-	p.valueSeenMu.RUnlock()
-
-	// Slow path: take a write lock and admit the value if there's room.
-	p.valueSeenMu.Lock()
-	defer p.valueSeenMu.Unlock()
-
-	seen := p.valueSeen[key]
-	if seen == nil {
-		seen = make(map[string]struct{}, p.valueCap)
-		p.valueSeen[key] = seen
-	}
-	if _, present := seen[value]; present {
-		return value
-	}
-	if len(seen) >= p.valueCap {
-		return LabelValueOther
-	}
-	seen[value] = struct{}{}
-	return value
-}

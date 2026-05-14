@@ -39,6 +39,7 @@ func NewTaskHandler(
 	httpf httpf.F,
 	encrypt encrypt.E,
 	logger *slog.Logger,
+	factoryOpts ...FactoryOption,
 ) TaskRegistrar {
 	return &taskHandler{
 		cfg:     cfg,
@@ -49,7 +50,7 @@ func NewTaskHandler(
 		httpf:   httpf,
 		encrypt: encrypt,
 		logger:  logger,
-		factory: NewFactory(cfg, db, redis, c, httpf, encrypt, logger),
+		factory: NewFactory(cfg, db, redis, c, httpf, encrypt, logger, factoryOpts...),
 	}
 }
 

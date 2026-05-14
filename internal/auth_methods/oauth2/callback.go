@@ -83,11 +83,30 @@ func (o *oAuth2Connection) CallbackFrom3rdParty(ctx context.Context, query url.V
 // "oauth token exchange failed" event with a stable category before returning, so SOC
 // dashboards and alerts can key off `category` rather than parsing error strings.
 func (o *oAuth2Connection) exchangeCodeAndAdvance(ctx context.Context, query url.Values) (string, error) {
+	var returnURL string
+	err := o.tel.withSpan(ctx, "token_exchange", o.connectorIDForTelemetry(), func(ctx context.Context) error {
+		var err error
+		returnURL, err = o.exchangeCodeAndAdvanceInner(ctx, query)
+		return err
+	})
+	return returnURL, err
+}
+
+// emitAndRecordExchangeFailure centralizes the structured-event emit + OTel
+// failure-counter bump for token-exchange failures. Mirrors the refresh-side
+// classifyAndRecordRefreshFailure: every callsite uses the same shape so the
+// "category" string lands consistently on logs, metrics, and span errors.
+func (o *oAuth2Connection) emitAndRecordExchangeFailure(ctx context.Context, category tokenExchangeCategory, attrs tokenExchangeAttrs) {
+	emitTokenExchangeFailure(ctx, o.logger, category, attrs)
+	o.tel.recordTokenExchangeFailure(ctx, string(category), o.connectionLabelsForTelemetry())
+}
+
+func (o *oAuth2Connection) exchangeCodeAndAdvanceInner(ctx context.Context, query url.Values) (string, error) {
 	// Delete the state from Redis now that the callback is consuming it.
 	// This is the terminal step of the OAuth flow, so the state is no longer needed.
 	if err := deleteStateFromRedis(ctx, o.r, o.state.Id); err != nil {
 		err = fmt.Errorf("failed to clean up oauth state: %w", err)
-		emitTokenExchangeFailure(ctx, o.logger, tokenExchangeStateCleanupError, o.tokenExchangeAttrsFromConn(err))
+		o.emitAndRecordExchangeFailure(ctx, tokenExchangeStateCleanupError, o.tokenExchangeAttrsFromConn(err))
 		return "", err
 	}
 
@@ -103,21 +122,21 @@ func (o *oAuth2Connection) exchangeCodeAndAdvance(ctx context.Context, query url
 		err := fmt.Errorf("authorization denied by provider: %s", msg)
 		attrs := o.tokenExchangeAttrsFromConn(err)
 		attrs.ProviderError = errCode
-		emitTokenExchangeFailure(ctx, o.logger, tokenExchangeProviderDenied, attrs)
+		o.emitAndRecordExchangeFailure(ctx, tokenExchangeProviderDenied, attrs)
 		return "", err
 	}
 
 	code := query.Get("code")
 	if code == "" {
 		err := errors.New("no code in query")
-		emitTokenExchangeFailure(ctx, o.logger, tokenExchangeMissingCode, o.tokenExchangeAttrsFromConn(err))
+		o.emitAndRecordExchangeFailure(ctx, tokenExchangeMissingCode, o.tokenExchangeAttrsFromConn(err))
 		return "", err
 	}
 
 	callbackUrl, err := o.getPublicCallbackUrl()
 	if err != nil {
 		err = fmt.Errorf("failed to get public callback url: %w", err)
-		emitTokenExchangeFailure(ctx, o.logger, tokenExchangeInternalError, o.tokenExchangeAttrsFromConn(err))
+		o.emitAndRecordExchangeFailure(ctx, tokenExchangeInternalError, o.tokenExchangeAttrsFromConn(err))
 		return "", err
 	}
 
@@ -130,21 +149,21 @@ func (o *oAuth2Connection) exchangeCodeAndAdvance(ctx context.Context, query url
 	clientId, err := o.auth.ClientId.GetValue(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to get client id for connector: %w", err)
-		emitTokenExchangeFailure(ctx, o.logger, tokenExchangeInternalError, o.tokenExchangeAttrsFromConn(err))
+		o.emitAndRecordExchangeFailure(ctx, tokenExchangeInternalError, o.tokenExchangeAttrsFromConn(err))
 		return "", err
 	}
 
 	clientSecret, err := o.auth.ClientSecret.GetValue(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to get client secret for connector: %w", err)
-		emitTokenExchangeFailure(ctx, o.logger, tokenExchangeInternalError, o.tokenExchangeAttrsFromConn(err))
+		o.emitAndRecordExchangeFailure(ctx, tokenExchangeInternalError, o.tokenExchangeAttrsFromConn(err))
 		return "", err
 	}
 
 	tokenEndpoint, err := o.renderMustache(ctx, o.auth.Token.Endpoint)
 	if err != nil {
 		err = fmt.Errorf("failed to render token endpoint template: %w", err)
-		emitTokenExchangeFailure(ctx, o.logger, tokenExchangeInternalError, o.tokenExchangeAttrsFromConn(err))
+		o.emitAndRecordExchangeFailure(ctx, tokenExchangeInternalError, o.tokenExchangeAttrsFromConn(err))
 		return "", err
 	}
 
@@ -165,7 +184,7 @@ func (o *oAuth2Connection) exchangeCodeAndAdvance(ctx context.Context, query url
 		err = fmt.Errorf("failed to post to exchange authorization code for access token: %w", err)
 		attrs := o.tokenExchangeAttrsFromConn(err)
 		attrs.Attempts = attempts
-		emitTokenExchangeFailure(ctx, o.logger, tokenExchangeNetworkError, attrs)
+		o.emitAndRecordExchangeFailure(ctx, tokenExchangeNetworkError, attrs)
 		return "", err
 	}
 
@@ -176,23 +195,25 @@ func (o *oAuth2Connection) exchangeCodeAndAdvance(ctx context.Context, query url
 		attrs.ProviderStatusCode = resp.StatusCode
 		attrs.ProviderError = providerErr
 		attrs.Attempts = attempts
-		emitTokenExchangeFailure(ctx, o.logger, category, attrs)
+		o.emitAndRecordExchangeFailure(ctx, category, attrs)
 		return "", err
 	}
 
 	_, err = o.createDbTokenFromResponse(ctx, resp, nil)
 	if err != nil {
 		err = fmt.Errorf("failed to create db token from response: %w", err)
-		emitTokenExchangeFailure(ctx, o.logger, tokenExchangeMalformedResponse, o.tokenExchangeAttrsFromConn(err))
+		o.emitAndRecordExchangeFailure(ctx, tokenExchangeMalformedResponse, o.tokenExchangeAttrsFromConn(err))
 		return "", err
 	}
 
 	outcome, err := o.connection.HandleCredentialsEstablished(ctx)
 	if err != nil {
 		err = fmt.Errorf("failed to handle post-auth state transition: %w", err)
-		emitTokenExchangeFailure(ctx, o.logger, tokenExchangeInternalError, o.tokenExchangeAttrsFromConn(err))
+		o.emitAndRecordExchangeFailure(ctx, tokenExchangeInternalError, o.tokenExchangeAttrsFromConn(err))
 		return "", err
 	}
+
+	o.tel.recordTokenExchangeSuccess(ctx, o.connectionLabelsForTelemetry())
 
 	if outcome.SetupPending {
 		return o.appendSetupPendingToReturnUrl(o.state.ReturnToUrl), nil
