@@ -51,6 +51,13 @@ type Limiter interface {
 	// (Allowed=false, RetryAfter set). See Decision for the failure-mode
 	// contract.
 	Decide(ctx context.Context, bucketKey BucketKey) (Decision, error)
+
+	// Peek returns what Decide would return given the current counter
+	// state, without writing. Used by the dry-run admin endpoint so
+	// operators can validate "would this request be limited?" without
+	// polluting the runtime counters. Same fail-open semantics as Decide:
+	// on Redis error returns Allowed=true / FailedOpen=true.
+	Peek(ctx context.Context, bucketKey BucketKey) (Decision, error)
 }
 
 // NewLimiter builds a Limiter for a RateLimit row. The algorithm variant

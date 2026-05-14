@@ -96,6 +96,61 @@ if remaining < 0 then remaining = 0 end
 return {1, remaining}
 `)
 
+// slidingWindowLogPeekScript mirrors slidingWindowLogScript but writes
+// nothing. ZCOUNT (read-only) counts entries inside the trailing
+// window; ZRANGEBYSCORE LIMIT 0 1 reads the oldest for retry-after.
+var slidingWindowLogPeekScript = redis.NewScript(`
+local key = KEYS[1]
+local limit = tonumber(ARGV[1])
+local now_ms = tonumber(ARGV[2])
+local window_ms = tonumber(ARGV[3])
+
+-- Count just the entries Decide would not evict.
+local count = redis.call('ZCOUNT', key, '(' .. tostring(now_ms - window_ms), '+inf')
+
+if count >= limit then
+    local oldest = redis.call('ZRANGEBYSCORE', key,
+        '(' .. tostring(now_ms - window_ms), '+inf',
+        'WITHSCORES', 'LIMIT', 0, 1)
+    local retry_ms = window_ms
+    if #oldest == 2 then
+        retry_ms = (tonumber(oldest[2]) + window_ms) - now_ms
+        if retry_ms < 1 then retry_ms = 1 end
+    end
+    return {0, retry_ms}
+end
+
+return {1, limit - count - 1}
+`)
+
+// slidingWindowCounterPeekScript mirrors slidingWindowCounterScript but
+// writes nothing. Same weighted-window math, no INCR.
+var slidingWindowCounterPeekScript = redis.NewScript(`
+local key_curr = KEYS[1]
+local key_prev = KEYS[2]
+local limit = tonumber(ARGV[1])
+local window_ms = tonumber(ARGV[2])
+local elapsed_ms = tonumber(ARGV[3])
+
+local prev_count = tonumber(redis.call('GET', key_prev) or '0')
+local curr_count = tonumber(redis.call('GET', key_curr) or '0')
+
+local prev_weight = (window_ms - elapsed_ms) / window_ms
+if prev_weight < 0 then prev_weight = 0 end
+
+local approx = curr_count + math.floor(prev_count * prev_weight)
+
+if approx >= limit then
+    local retry_ms = window_ms - elapsed_ms
+    if retry_ms < 1 then retry_ms = 1 end
+    return {0, retry_ms}
+end
+
+local remaining = limit - approx - 1
+if remaining < 0 then remaining = 0 end
+return {1, remaining}
+`)
+
 type slidingWindowLimiter struct {
 	ruleID  apid.ID
 	limit   int
@@ -189,6 +244,73 @@ func (l *slidingWindowLimiter) decideCounter(ctx context.Context, bucketKey Buck
 		// allows -1 for "not computable cheaply"; we do have a number
 		// here so we report it, but consumers should treat it as a
 		// rough estimate not a precise budget.
+		return Decision{Allowed: true, Remaining: value}, nil
+	}
+	return Decision{
+		Allowed:    false,
+		RetryAfter: time.Duration(value) * time.Millisecond,
+	}, nil
+}
+
+func (l *slidingWindowLimiter) Peek(ctx context.Context, bucketKey BucketKey) (Decision, error) {
+	now := apctx.GetClock(ctx).Now()
+
+	switch l.mode {
+	case rlschema.SlidingWindowModeLog:
+		return l.peekLog(ctx, bucketKey, now)
+	case rlschema.SlidingWindowModeCounter:
+		return l.peekCounter(ctx, bucketKey, now)
+	}
+	return failOpen(l.logger, l.ruleID, fmt.Errorf("unknown sliding window mode %q", l.mode))
+}
+
+func (l *slidingWindowLimiter) peekLog(ctx context.Context, bucketKey BucketKey, now time.Time) (Decision, error) {
+	key := fmt.Sprintf("%s:swl", limiterKeyPrefix(l.ruleID, bucketKey))
+	windowMs := l.window.Milliseconds()
+
+	res, err := slidingWindowLogPeekScript.Run(ctx, l.redis,
+		[]string{key},
+		l.limit, now.UnixMilli(), windowMs,
+	).Result()
+	if err != nil {
+		return failOpen(l.logger, l.ruleID, err)
+	}
+
+	allowed, value, err := parseDecisionResult(res)
+	if err != nil {
+		return failOpen(l.logger, l.ruleID, err)
+	}
+	if allowed {
+		return Decision{Allowed: true, Remaining: value}, nil
+	}
+	return Decision{
+		Allowed:    false,
+		RetryAfter: time.Duration(value) * time.Millisecond,
+	}, nil
+}
+
+func (l *slidingWindowLimiter) peekCounter(ctx context.Context, bucketKey BucketKey, now time.Time) (Decision, error) {
+	windowMs := l.window.Milliseconds()
+	windowID := now.UnixMilli() / windowMs
+	elapsedMs := now.UnixMilli() % windowMs
+
+	prefix := limiterKeyPrefix(l.ruleID, bucketKey)
+	keyCurr := fmt.Sprintf("%s:swc:%d", prefix, windowID)
+	keyPrev := fmt.Sprintf("%s:swc:%d", prefix, windowID-1)
+
+	res, err := slidingWindowCounterPeekScript.Run(ctx, l.redis,
+		[]string{keyCurr, keyPrev},
+		l.limit, windowMs, elapsedMs,
+	).Result()
+	if err != nil {
+		return failOpen(l.logger, l.ruleID, err)
+	}
+
+	allowed, value, err := parseDecisionResult(res)
+	if err != nil {
+		return failOpen(l.logger, l.ruleID, err)
+	}
+	if allowed {
 		return Decision{Allowed: true, Remaining: value}, nil
 	}
 	return Decision{
