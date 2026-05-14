@@ -6226,6 +6226,75 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "/rate-limits/_dry_run": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Evaluate which rate-limit rules would apply to a synthesized request, and whether each would limit it. Counters are NOT incremented — the endpoint uses Limiter.Peek to inspect counter state without writing. Useful for validating selectors / buckets / algorithms without sending real traffic.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "rate_limits"
+                ],
+                "summary": "Dry-run a rate-limit evaluation",
+                "parameters": [
+                    {
+                        "description": "Dry-run input",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/routes.SwaggerDryRunRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/routes.SwaggerDryRunResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/rate-limits/{id}": {
             "get": {
                 "security": [
@@ -7910,6 +7979,111 @@ const docTemplateadmin_api = `{
                 "task_id": {
                     "description": "Task ID for tracking the disconnect operation",
                     "type": "string"
+                }
+            }
+        },
+        "routes.SwaggerDryRunContext": {
+            "description": "Identity the request runs under",
+            "type": "object",
+            "properties": {
+                "actor_id": {
+                    "type": "string"
+                },
+                "connection_id": {
+                    "type": "string"
+                },
+                "namespace": {
+                    "type": "string"
+                }
+            }
+        },
+        "routes.SwaggerDryRunMatch": {
+            "type": "object",
+            "properties": {
+                "algorithm_summary": {
+                    "type": "string",
+                    "example": "token bucket 60 @ 1/s"
+                },
+                "bucket_key": {
+                    "type": "string",
+                    "example": "actor=act_abc|labels/team=acme"
+                },
+                "effective_mode": {
+                    "type": "string",
+                    "example": "enforce"
+                },
+                "namespace": {
+                    "type": "string"
+                },
+                "peek_failed": {
+                    "type": "boolean"
+                },
+                "rate_limit_id": {
+                    "type": "string",
+                    "example": "rl_test550e8400"
+                },
+                "remaining": {
+                    "type": "integer"
+                },
+                "retry_after_ms": {
+                    "type": "integer"
+                },
+                "would_allow": {
+                    "type": "boolean"
+                }
+            }
+        },
+        "routes.SwaggerDryRunNotMatched": {
+            "type": "object",
+            "properties": {
+                "namespace": {
+                    "type": "string"
+                },
+                "rate_limit_id": {
+                    "type": "string"
+                },
+                "reason": {
+                    "type": "string"
+                }
+            }
+        },
+        "routes.SwaggerDryRunRequest": {
+            "description": "Dry-run input: a proxy-shaped request + request type + the identity it runs under",
+            "type": "object",
+            "properties": {
+                "context": {
+                    "$ref": "#/definitions/routes.SwaggerDryRunContext"
+                },
+                "request": {
+                    "$ref": "#/definitions/routes.ProxyRequest"
+                },
+                "request_type": {
+                    "type": "string",
+                    "example": "proxy"
+                }
+            }
+        },
+        "routes.SwaggerDryRunResponse": {
+            "description": "Per-rule match + peek-driven would-allow result",
+            "type": "object",
+            "properties": {
+                "matched": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/routes.SwaggerDryRunMatch"
+                    }
+                },
+                "not_matched": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/routes.SwaggerDryRunNotMatched"
+                    }
+                },
+                "request_label_snapshot": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
                 }
             }
         },

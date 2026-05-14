@@ -12,3 +12,8 @@ var ErrConnectionNotFound = fmt.Errorf("connection not found: %w", ErrNotFound)
 var ErrProtected = database.ErrProtected
 var ErrDraftAlreadyExists = errors.New("a draft version already exists")
 var ErrNotDraft = errors.New("version is not a draft")
+
+// ErrInvalidArgument signals that the caller supplied input the core
+// service can't operate on (missing required field, malformed value,
+// etc.). Higher layers wrap it into the appropriate HTTP 400.
+var ErrInvalidArgument = errors.New("invalid argument")

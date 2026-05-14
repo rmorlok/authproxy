@@ -78,6 +78,92 @@ type RateLimitsRoutes struct {
 	annotsAdapter key_value.Adapter[apid.ID]
 }
 
+// DryRunRequestJson is the wire shape for POST /rate-limits/_dry_run.
+// Reuses iface.ProxyRequest for the request half — same shape as the
+// real /connections/{id}/_proxy endpoint, so a future "send this for
+// real" button can hand the same payload to that endpoint without
+// reshaping. RequestType + Context live alongside since the proxy
+// path takes request_type as a sibling param, not on the request.
+type DryRunRequestJson struct {
+	Request     coreIface.ProxyRequest `json:"request"`
+	RequestType string                 `json:"request_type"`
+	Context     DryRunContextJson      `json:"context"`
+}
+
+type DryRunContextJson struct {
+	ConnectionId *apid.ID `json:"connection_id,omitempty"`
+	ActorId      *apid.ID `json:"actor_id,omitempty"`
+	Namespace    *string  `json:"namespace,omitempty"`
+}
+
+type DryRunResponseJson struct {
+	RequestLabelSnapshot map[string]string      `json:"request_label_snapshot"`
+	Matched              []DryRunMatchJson      `json:"matched"`
+	NotMatched           []DryRunNotMatchedJson `json:"not_matched"`
+}
+
+type DryRunMatchJson struct {
+	RateLimitId      apid.ID `json:"rate_limit_id"`
+	Namespace        string  `json:"namespace"`
+	EffectiveMode    string  `json:"effective_mode"`
+	BucketKey        string  `json:"bucket_key"`
+	AlgorithmSummary string  `json:"algorithm_summary"`
+	WouldAllow       bool    `json:"would_allow"`
+	Remaining        int     `json:"remaining"`
+	RetryAfterMs     int64   `json:"retry_after_ms"`
+	PeekFailed       bool    `json:"peek_failed"`
+}
+
+type DryRunNotMatchedJson struct {
+	RateLimitId apid.ID `json:"rate_limit_id"`
+	Namespace   string  `json:"namespace"`
+	Reason      string  `json:"reason"`
+}
+
+// toCore translates the wire request to the structured input the core
+// service consumes. Nothing here does business logic — it's just shape.
+func (r DryRunRequestJson) toCore() coreIface.DryRunRateLimitRequest {
+	return coreIface.DryRunRateLimitRequest{
+		Request:     r.Request,
+		RequestType: r.RequestType,
+		Context: coreIface.DryRunRequestContext{
+			ConnectionId: r.Context.ConnectionId,
+			ActorId:      r.Context.ActorId,
+			Namespace:    r.Context.Namespace,
+		},
+	}
+}
+
+func dryRunResponseFromCore(res coreIface.DryRunRateLimitResult) DryRunResponseJson {
+	matched := make([]DryRunMatchJson, len(res.Matched))
+	for i, m := range res.Matched {
+		matched[i] = DryRunMatchJson{
+			RateLimitId:      m.RateLimitId,
+			Namespace:        m.Namespace,
+			EffectiveMode:    m.EffectiveMode,
+			BucketKey:        m.BucketKey,
+			AlgorithmSummary: m.AlgorithmSummary,
+			WouldAllow:       m.WouldAllow,
+			Remaining:        m.Remaining,
+			RetryAfterMs:     m.RetryAfterMs,
+			PeekFailed:       m.PeekFailed,
+		}
+	}
+	notMatched := make([]DryRunNotMatchedJson, len(res.NotMatched))
+	for i, nm := range res.NotMatched {
+		notMatched[i] = DryRunNotMatchedJson{
+			RateLimitId: nm.RateLimitId,
+			Namespace:   nm.Namespace,
+			Reason:      nm.Reason,
+		}
+	}
+	return DryRunResponseJson{
+		RequestLabelSnapshot: res.RequestLabelSnapshot,
+		Matched:              matched,
+		NotMatched:           notMatched,
+	}
+}
+
 // @Summary		Get rate limit
 // @Description	Get a specific rate limit by ID
 // @Tags			rate_limits
@@ -444,6 +530,57 @@ func (r *RateLimitsRoutes) delete(gctx *gin.Context) {
 	gctx.Status(http.StatusNoContent)
 }
 
+// @Summary		Dry-run a rate-limit evaluation
+// @Description	Evaluate which rate-limit rules would apply to a synthesized request, and whether each would limit it. Counters are NOT incremented — the endpoint uses Limiter.Peek to inspect counter state without writing. Useful for validating selectors / buckets / algorithms without sending real traffic.
+// @Tags			rate_limits
+// @Accept			json
+// @Produce		json
+// @Param			request	body		SwaggerDryRunRequest	true	"Dry-run input"
+// @Success		200		{object}	SwaggerDryRunResponse
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/rate-limits/_dry_run [post]
+func (r *RateLimitsRoutes) dryRun(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	var req DryRunRequestJson
+	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+		val.MarkErrorReturn()
+		return
+	}
+
+	result, err := r.core.DryRunRateLimit(ctx, req.toCore())
+	if err != nil {
+		switch {
+		case errors.Is(err, core.ErrInvalidArgument):
+			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err, httperr.WithPublicErr(err)))
+		case errors.Is(err, core.ErrNotFound):
+			apgin.WriteError(gctx, nil, httperr.NotFound(err.Error(), httperr.WithInternalErr(err)))
+		default:
+			apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		}
+		val.MarkErrorReturn()
+		return
+	}
+
+	// Namespace permission check happens *after* hydration so a
+	// connection-driven dry-run is validated against the connection's
+	// namespace, not whatever the caller guessed.
+	if err := val.ValidateNamespace(result.Namespace); err != nil {
+		apgin.WriteError(gctx, nil, httperr.Forbidden(err.Error(), httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, dryRunResponseFromCore(result))
+}
+
 // Label and annotation handlers delegate to the shared key_value adapter.
 
 // @Summary		Get all labels for a rate limit
@@ -592,6 +729,15 @@ func (r *RateLimitsRoutes) Register(g gin.IRouter) {
 			ForVerb("create").
 			Build(),
 		r.create,
+	)
+	g.POST(
+		"/rate-limits/_dry_run",
+		r.authService.NewRequiredBuilder().
+			ForResource("rate_limits").
+			ForIdExtractor(idExtractor).
+			ForVerb("get").
+			Build(),
+		r.dryRun,
 	)
 	g.GET(
 		"/rate-limits/:id",

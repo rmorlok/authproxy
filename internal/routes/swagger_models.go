@@ -362,6 +362,54 @@ type SwaggerListRateLimitsResponse struct {
 	Cursor string `json:"cursor,omitempty"`
 }
 
+// SwaggerDryRunRequest is the input for the rate-limit dry-run endpoint.
+// Reuses ProxyRequest so the request body is identical to the shape the
+// real /connections/{id}/_proxy endpoint accepts.
+//
+//	@Description	Dry-run input: a proxy-shaped request + request type + the identity it runs under
+type SwaggerDryRunRequest struct {
+	Request     ProxyRequest         `json:"request"`
+	RequestType string               `json:"request_type" example:"proxy"`
+	Context     SwaggerDryRunContext `json:"context"`
+}
+
+// SwaggerDryRunContext is the actor + connection + namespace identity.
+// Labels live on Request now (matching ProxyRequest).
+//
+//	@Description	Identity the request runs under
+type SwaggerDryRunContext struct {
+	ConnectionId string `json:"connection_id,omitempty"`
+	ActorId      string `json:"actor_id,omitempty"`
+	Namespace    string `json:"namespace,omitempty"`
+}
+
+// SwaggerDryRunResponse is what the endpoint returns.
+//
+//	@Description	Per-rule match + peek-driven would-allow result
+type SwaggerDryRunResponse struct {
+	RequestLabelSnapshot map[string]string         `json:"request_label_snapshot"`
+	Matched              []SwaggerDryRunMatch      `json:"matched"`
+	NotMatched           []SwaggerDryRunNotMatched `json:"not_matched"`
+}
+
+type SwaggerDryRunMatch struct {
+	RateLimitId      string `json:"rate_limit_id" swaggertype:"string" example:"rl_test550e8400"`
+	Namespace        string `json:"namespace"`
+	EffectiveMode    string `json:"effective_mode" example:"enforce"`
+	BucketKey        string `json:"bucket_key" example:"actor=act_abc|labels/team=acme"`
+	AlgorithmSummary string `json:"algorithm_summary" example:"token bucket 60 @ 1/s"`
+	WouldAllow       bool   `json:"would_allow"`
+	Remaining        int    `json:"remaining"`
+	RetryAfterMs     int64  `json:"retry_after_ms"`
+	PeekFailed       bool   `json:"peek_failed"`
+}
+
+type SwaggerDryRunNotMatched struct {
+	RateLimitId string `json:"rate_limit_id" swaggertype:"string"`
+	Namespace   string `json:"namespace"`
+	Reason      string `json:"reason"`
+}
+
 // SwaggerListRequestsResponse is the response for list request logs
 //
 //	@Description	Paginated list of request log entries

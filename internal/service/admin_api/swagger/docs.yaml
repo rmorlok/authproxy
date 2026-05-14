@@ -444,6 +444,78 @@ definitions:
         description: Task ID for tracking the disconnect operation
         type: string
     type: object
+  routes.SwaggerDryRunContext:
+    description: Identity the request runs under
+    properties:
+      actor_id:
+        type: string
+      connection_id:
+        type: string
+      namespace:
+        type: string
+    type: object
+  routes.SwaggerDryRunMatch:
+    properties:
+      algorithm_summary:
+        example: token bucket 60 @ 1/s
+        type: string
+      bucket_key:
+        example: actor=act_abc|labels/team=acme
+        type: string
+      effective_mode:
+        example: enforce
+        type: string
+      namespace:
+        type: string
+      peek_failed:
+        type: boolean
+      rate_limit_id:
+        example: rl_test550e8400
+        type: string
+      remaining:
+        type: integer
+      retry_after_ms:
+        type: integer
+      would_allow:
+        type: boolean
+    type: object
+  routes.SwaggerDryRunNotMatched:
+    properties:
+      namespace:
+        type: string
+      rate_limit_id:
+        type: string
+      reason:
+        type: string
+    type: object
+  routes.SwaggerDryRunRequest:
+    description: 'Dry-run input: a proxy-shaped request + request type + the identity
+      it runs under'
+    properties:
+      context:
+        $ref: '#/definitions/routes.SwaggerDryRunContext'
+      request:
+        $ref: '#/definitions/routes.ProxyRequest'
+      request_type:
+        example: proxy
+        type: string
+    type: object
+  routes.SwaggerDryRunResponse:
+    description: Per-rule match + peek-driven would-allow result
+    properties:
+      matched:
+        items:
+          $ref: '#/definitions/routes.SwaggerDryRunMatch'
+        type: array
+      not_matched:
+        items:
+          $ref: '#/definitions/routes.SwaggerDryRunNotMatched'
+        type: array
+      request_label_snapshot:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
   routes.SwaggerEncryptionKeyJson:
     description: Encryption key configuration
     properties:
@@ -4862,6 +4934,53 @@ paths:
       security:
       - BearerAuth: []
       summary: Create rate limit
+      tags:
+      - rate_limits
+  /rate-limits/_dry_run:
+    post:
+      consumes:
+      - application/json
+      description: Evaluate which rate-limit rules would apply to a synthesized request,
+        and whether each would limit it. Counters are NOT incremented — the endpoint
+        uses Limiter.Peek to inspect counter state without writing. Useful for validating
+        selectors / buckets / algorithms without sending real traffic.
+      parameters:
+      - description: Dry-run input
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.SwaggerDryRunRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerDryRunResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Dry-run a rate-limit evaluation
       tags:
       - rate_limits
   /rate-limits/{id}:
