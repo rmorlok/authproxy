@@ -117,9 +117,19 @@ func (t *telemetry) metricsActive() bool {
 	return t != nil && t.metricsEnabled
 }
 
-// connectorAttr returns the connector_id attribute or an empty slice when
-// the id is unset. Connector id is bounded-cardinality (one per connector
-// version row), so it's a safe metric dimension.
+// connectorAttr returns the connector_id attribute for use as a SPAN
+// attribute. Span attributes can carry high-cardinality identifiers (spans
+// aren't a time series — they're stored per-trace), so a per-connector id
+// is fine on spans. Operators correlate per-connector activity through
+// traces (Tempo) and the structured request log, which already indexes
+// connection_id.
+//
+// Deliberately NOT used as a metric dimension. AuthProxy deployments can
+// have hundreds to thousands of connectors, and putting connector_id on
+// metric attributes would explode the active-series count across
+// {result, reason, revocation_kind} × connector_id. The lifecycle counters
+// stay aggregate (rate of failures by reason); per-connector breakdowns
+// belong in traces.
 func connectorAttr(connectorID apid.ID) []attribute.KeyValue {
 	if connectorID.IsNil() {
 		return nil
@@ -160,34 +170,35 @@ func (t *telemetry) withSpan(
 }
 
 // recordRefreshSuccess increments the refresh-attempts counter with
-// result=success.
-func (t *telemetry) recordRefreshSuccess(ctx context.Context, connectorID apid.ID) {
+// result=success. Metric dimensions are deliberately bounded — see
+// connectorAttr for why connector_id stays out of metric attributes.
+// connectorID is accepted for API symmetry with the failure path and the
+// span methods; it is intentionally unused here.
+func (t *telemetry) recordRefreshSuccess(ctx context.Context, _ apid.ID) {
 	if !t.metricsActive() {
 		return
 	}
-	attrs := append(connectorAttr(connectorID), attribute.String("authproxy.oauth2.result", resultSuccess))
-	t.refreshAttempts.Add(ctx, 1, metric.WithAttributes(attrs...))
+	t.refreshAttempts.Add(ctx, 1, metric.WithAttributes(attribute.String("authproxy.oauth2.result", resultSuccess)))
 }
 
 // recordRefreshFailure increments the refresh-attempts counter with
 // result=failure and the refresh-failures counter with reason=<category>.
-// Both counters carry connector_id so dashboards can break failures down
-// by connector.
-func (t *telemetry) recordRefreshFailure(ctx context.Context, reason string, connectorID apid.ID) {
+// Both counters stay aggregate across connectors — per-connector
+// breakdowns belong in traces, where the connector_id span attribute is
+// set unconditionally.
+func (t *telemetry) recordRefreshFailure(ctx context.Context, reason string, _ apid.ID) {
 	if !t.metricsActive() {
 		return
 	}
 
-	attemptAttrs := append(connectorAttr(connectorID), attribute.String("authproxy.oauth2.result", resultFailure))
-	t.refreshAttempts.Add(ctx, 1, metric.WithAttributes(attemptAttrs...))
-
-	failureAttrs := append(connectorAttr(connectorID), attribute.String("authproxy.oauth2.reason", reason))
-	t.refreshFailures.Add(ctx, 1, metric.WithAttributes(failureAttrs...))
+	t.refreshAttempts.Add(ctx, 1, metric.WithAttributes(attribute.String("authproxy.oauth2.result", resultFailure)))
+	t.refreshFailures.Add(ctx, 1, metric.WithAttributes(attribute.String("authproxy.oauth2.reason", reason)))
 }
 
 // recordRevocation increments the revocations counter with kind +
-// success / failure outcome.
-func (t *telemetry) recordRevocation(ctx context.Context, kind string, ok bool, connectorID apid.ID) {
+// success / failure outcome. connector_id intentionally omitted from
+// metric attributes — see connectorAttr.
+func (t *telemetry) recordRevocation(ctx context.Context, kind string, ok bool, _ apid.ID) {
 	if !t.metricsActive() {
 		return
 	}
@@ -195,32 +206,28 @@ func (t *telemetry) recordRevocation(ctx context.Context, kind string, ok bool, 
 	if !ok {
 		result = resultFailure
 	}
-	attrs := append(connectorAttr(connectorID),
+	t.revocations.Add(ctx, 1, metric.WithAttributes(
 		attribute.String("authproxy.oauth2.revocation_kind", kind),
 		attribute.String("authproxy.oauth2.result", result),
-	)
-	t.revocations.Add(ctx, 1, metric.WithAttributes(attrs...))
+	))
 }
 
 // recordTokenExchangeSuccess / recordTokenExchangeFailure mirror the refresh
 // pair — attempts with result, failures with reason. The "attempts" counter
 // lets dashboards graph success rate without separately tracking successes.
-func (t *telemetry) recordTokenExchangeSuccess(ctx context.Context, connectorID apid.ID) {
+// connector_id intentionally omitted — see connectorAttr.
+func (t *telemetry) recordTokenExchangeSuccess(ctx context.Context, _ apid.ID) {
 	if !t.metricsActive() {
 		return
 	}
-	attrs := append(connectorAttr(connectorID), attribute.String("authproxy.oauth2.result", resultSuccess))
-	t.tokenExchangeAttempts.Add(ctx, 1, metric.WithAttributes(attrs...))
+	t.tokenExchangeAttempts.Add(ctx, 1, metric.WithAttributes(attribute.String("authproxy.oauth2.result", resultSuccess)))
 }
 
-func (t *telemetry) recordTokenExchangeFailure(ctx context.Context, reason string, connectorID apid.ID) {
+func (t *telemetry) recordTokenExchangeFailure(ctx context.Context, reason string, _ apid.ID) {
 	if !t.metricsActive() {
 		return
 	}
 
-	attemptAttrs := append(connectorAttr(connectorID), attribute.String("authproxy.oauth2.result", resultFailure))
-	t.tokenExchangeAttempts.Add(ctx, 1, metric.WithAttributes(attemptAttrs...))
-
-	failureAttrs := append(connectorAttr(connectorID), attribute.String("authproxy.oauth2.reason", reason))
-	t.tokenExchangeFailures.Add(ctx, 1, metric.WithAttributes(failureAttrs...))
+	t.tokenExchangeAttempts.Add(ctx, 1, metric.WithAttributes(attribute.String("authproxy.oauth2.result", resultFailure)))
+	t.tokenExchangeFailures.Add(ctx, 1, metric.WithAttributes(attribute.String("authproxy.oauth2.reason", reason)))
 }

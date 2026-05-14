@@ -190,6 +190,43 @@ func TestTelemetry_NilReceiverIsSafe(t *testing.T) {
 	require.Error(t, err, "withSpan must still invoke fn on nil receiver")
 }
 
+// TestTelemetry_MetricsExcludeConnectorIDAttribute pins the cardinality
+// contract: AuthProxy deployments can have hundreds to thousands of
+// connectors, so connector_id MUST NOT appear as a metric dimension. Every
+// emitted metric data point's attribute set is checked to confirm
+// authproxy.connector_id is absent. Span attributes still carry connector_id
+// — that's covered by the design of withSpan (spans aren't a time series).
+func TestTelemetry_MetricsExcludeConnectorIDAttribute(t *testing.T) {
+	fx := newOauth2TelemetryFixture(t)
+	tel, err := newTelemetry(fx.providers, &sconfig.Telemetry{Enabled: enabledPtr(true)})
+	require.NoError(t, err)
+
+	connectorID := apid.New(apid.PrefixConnectorVersion)
+
+	tel.recordRefreshSuccess(context.Background(), connectorID)
+	tel.recordRefreshFailure(context.Background(), string(tokenRefreshInvalidGrant), connectorID)
+	tel.recordRevocation(context.Background(), revocationKindRefresh, true, connectorID)
+	tel.recordRevocation(context.Background(), revocationKindAccess, false, connectorID)
+	tel.recordTokenExchangeSuccess(context.Background(), connectorID)
+	tel.recordTokenExchangeFailure(context.Background(), string(tokenExchangeInvalidGrant), connectorID)
+
+	rm := fx.readMetrics(t)
+	require.NotEmpty(t, rm.ScopeMetrics)
+
+	for _, sm := range rm.ScopeMetrics {
+		for _, m := range sm.Metrics {
+			sum, ok := m.Data.(metricdata.Sum[int64])
+			require.True(t, ok, "expected Sum[int64] for counter %q, got %T", m.Name, m.Data)
+			for _, dp := range sum.DataPoints {
+				_, present := dp.Attributes.Value("authproxy.connector_id")
+				require.False(t, present,
+					"metric %q must not carry authproxy.connector_id as a dimension (would explode cardinality at scale); got attrs: %v",
+					m.Name, dp.Attributes.ToSlice())
+			}
+		}
+	}
+}
+
 // --- helpers ----------------------------------------------------------------
 
 func requireMetricEmitted(t *testing.T, rm metricdata.ResourceMetrics, name string) {
