@@ -1,0 +1,11 @@
+# $schema: ./schema.json
+
+labels:
+  type: invalid-no-placement
+display_name: Invalid (missing placement)
+logo:
+  public_url: https://example.com/x.png
+description: |
+  api-key auth without a placement block must be rejected.
+auth:
+  type: api-key

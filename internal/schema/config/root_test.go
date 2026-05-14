@@ -51,6 +51,8 @@ connectors:
         This integration pushes candidates to greenhouse
       auth:
         type: api-key
+        placement:
+          type: bearer
 `
 	expected := &Root{
 		Connectors: connectors.FromList([]Connector{
@@ -97,6 +99,9 @@ connectors:
 				Auth: &Auth{
 					InnerVal: &AuthApiKey{
 						Type: AuthTypeAPIKey,
+						Placement: &ApiKeyPlacement{
+							Type: ApiKeyPlacementBearer,
+						},
 					},
 				},
 			},

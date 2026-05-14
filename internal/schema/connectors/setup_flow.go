@@ -19,12 +19,19 @@ import (
 // SetupFlow defines the multi-step setup flow for a connector. Customers define this in their
 // connector YAML to configure what forms are presented to users during connection setup.
 type SetupFlow struct {
-	// Preconnect defines form steps shown before the OAuth/auth flow begins.
-	// Values collected here are available for mustache templating in auth configuration
+	// Preconnect defines form steps shown before any credential acquisition. Values
+	// collected here are available for mustache templating in auth configuration
 	// (e.g. tenant subdomain in OAuth endpoints).
 	Preconnect *SetupFlowPhase `json:"preconnect,omitempty" yaml:"preconnect,omitempty"`
 
-	// Configure defines form steps shown after the auth flow completes.
+	// Credentials defines form steps owned by the auth method for collecting
+	// credential material. Populated by AuthApiKey (synthesized or explicit);
+	// OAuth2 doesn't use this phase — it has its own redirect-based auth step.
+	// Form data submitted here is dispatched to the auth method and never merges
+	// into the connection's general config blob.
+	Credentials *SetupFlowPhase `json:"credentials,omitempty" yaml:"credentials,omitempty"`
+
+	// Configure defines form steps shown after credentials are established.
 	// These steps can use data sources that make proxied API calls using the
 	// connection's credentials to populate dynamic form options.
 	Configure *SetupFlowPhase `json:"configure,omitempty" yaml:"configure,omitempty"`
@@ -46,6 +53,12 @@ func (sf *SetupFlow) Validate(vc *common.ValidationContext) error {
 		}
 	}
 
+	if sf.Credentials != nil {
+		if err := sf.Credentials.Validate(vc.PushField("credentials"), seenIds, false); err != nil {
+			result = multierror.Append(result, err)
+		}
+	}
+
 	if sf.Configure != nil {
 		if err := sf.Configure.Validate(vc.PushField("configure"), seenIds, true); err != nil {
 			result = multierror.Append(result, err)
@@ -60,12 +73,18 @@ func (sf *SetupFlow) HasPreconnect() bool {
 	return sf != nil && sf.Preconnect != nil && len(sf.Preconnect.Steps) > 0
 }
 
+// HasCredentials returns true if the setup flow has credential-collection steps.
+// Auth methods (currently AuthApiKey) own these steps; OAuth2 returns false.
+func (sf *SetupFlow) HasCredentials() bool {
+	return sf != nil && sf.Credentials != nil && len(sf.Credentials.Steps) > 0
+}
+
 // HasConfigure returns true if the setup flow has configure steps.
 func (sf *SetupFlow) HasConfigure() bool {
 	return sf != nil && sf.Configure != nil && len(sf.Configure.Steps) > 0
 }
 
-// TotalSteps returns the total number of form steps across both phases.
+// TotalSteps returns the total number of form steps across all phases.
 func (sf *SetupFlow) TotalSteps() int {
 	if sf == nil {
 		return 0
@@ -73,6 +92,9 @@ func (sf *SetupFlow) TotalSteps() int {
 	total := 0
 	if sf.Preconnect != nil {
 		total += len(sf.Preconnect.Steps)
+	}
+	if sf.Credentials != nil {
+		total += len(sf.Credentials.Steps)
 	}
 	if sf.Configure != nil {
 		total += len(sf.Configure.Steps)
@@ -87,6 +109,7 @@ type SetupStepPhase string
 
 const (
 	SetupPhasePreconnect   SetupStepPhase = "preconnect"
+	SetupPhaseCredentials  SetupStepPhase = "credentials"
 	SetupPhaseAuth         SetupStepPhase = "auth"
 	SetupPhaseVerify       SetupStepPhase = "verify"
 	SetupPhaseConfigure    SetupStepPhase = "configure"
@@ -98,9 +121,9 @@ const (
 func (p SetupStepPhase) String() string { return string(p) }
 
 // IsIndexed reports whether the phase carries a 0-based step index in its canonical form
-// (preconnect, configure). Singleton pseudo-steps return false.
+// (preconnect, credentials, configure). Singleton pseudo-steps return false.
 func (p SetupStepPhase) IsIndexed() bool {
-	return p == SetupPhasePreconnect || p == SetupPhaseConfigure
+	return p == SetupPhasePreconnect || p == SetupPhaseCredentials || p == SetupPhaseConfigure
 }
 
 // IsTerminalFailure reports whether the phase represents a terminal failure pseudo-step
@@ -112,7 +135,7 @@ func (p SetupStepPhase) IsTerminalFailure() bool {
 // IsValid reports whether p is one of the recognized phases.
 func (p SetupStepPhase) IsValid() bool {
 	switch p {
-	case SetupPhasePreconnect, SetupPhaseAuth, SetupPhaseVerify, SetupPhaseConfigure,
+	case SetupPhasePreconnect, SetupPhaseCredentials, SetupPhaseAuth, SetupPhaseVerify, SetupPhaseConfigure,
 		SetupPhaseVerifyFailed, SetupPhaseAuthFailed:
 		return true
 	}
@@ -346,6 +369,15 @@ func (sf *SetupFlow) GetStepBySetupStep(step SetupStep) (*SetupFlowStep, int, er
 			return nil, 0, fmt.Errorf("preconnect step index %d out of range", step.index)
 		}
 		return &sf.Preconnect.Steps[step.index], step.index, nil
+	case SetupPhaseCredentials:
+		if sf.Credentials == nil || step.index >= len(sf.Credentials.Steps) {
+			return nil, 0, fmt.Errorf("credentials step index %d out of range", step.index)
+		}
+		globalIndex := step.index
+		if sf.Preconnect != nil {
+			globalIndex += len(sf.Preconnect.Steps)
+		}
+		return &sf.Credentials.Steps[step.index], globalIndex, nil
 	case SetupPhaseConfigure:
 		if sf.Configure == nil || step.index >= len(sf.Configure.Steps) {
 			return nil, 0, fmt.Errorf("configure step index %d out of range", step.index)
@@ -353,6 +385,9 @@ func (sf *SetupFlow) GetStepBySetupStep(step SetupStep) (*SetupFlowStep, int, er
 		globalIndex := step.index
 		if sf.Preconnect != nil {
 			globalIndex += len(sf.Preconnect.Steps)
+		}
+		if sf.Credentials != nil {
+			globalIndex += len(sf.Credentials.Steps)
 		}
 		return &sf.Configure.Steps[step.index], globalIndex, nil
 	default:
@@ -369,23 +404,49 @@ func (sf *SetupFlow) FirstSetupStep() SetupStep {
 	if sf.HasPreconnect() {
 		return SetupStep{phase: SetupPhasePreconnect}
 	}
+	if sf.HasCredentials() {
+		return SetupStep{phase: SetupPhaseCredentials}
+	}
 	if sf.HasConfigure() {
 		return SetupStep{phase: SetupPhaseConfigure}
 	}
 	return SetupStep{}
 }
 
-// NextSetupStep returns the step that follows current. The auth phase is implicit between
-// preconnect and configure phases; when the connector has probes, a verify phase runs between
-// auth and configure. Returns the zero SetupStep (IsZero) when current is the final step.
+// NextSetupStep returns the step that follows current.
+//
+// The credentials phase is owned by an auth method (currently AuthApiKey): when
+// the setup flow has a credentials phase, preconnect transitions there before
+// any auth phase. When it doesn't, preconnect transitions directly to the
+// OAuth2-style auth phase (which OAuth2 connectors use to redirect+wait).
+//
+// When the connector has probes, a verify phase runs between credential
+// establishment and configure. Returns the zero SetupStep (IsZero) when current
+// is the final step.
 func (sf *SetupFlow) NextSetupStep(current SetupStep, hasProbes bool) (SetupStep, error) {
 	switch current.phase {
 	case SetupPhasePreconnect:
 		if sf.Preconnect != nil && current.index+1 < len(sf.Preconnect.Steps) {
 			return SetupStep{phase: SetupPhasePreconnect, index: current.index + 1}, nil
 		}
-		// Preconnect done — next is auth
+		if sf.HasCredentials() {
+			return SetupStep{phase: SetupPhaseCredentials}, nil
+		}
+		// No credentials phase — fall through to the auth phase (OAuth2's redirect step).
 		return SetupStepAuth, nil
+	case SetupPhaseCredentials:
+		if sf.Credentials != nil && current.index+1 < len(sf.Credentials.Steps) {
+			return SetupStep{phase: SetupPhaseCredentials, index: current.index + 1}, nil
+		}
+		// Credentials done — credentials phase replaces the auth phase for its
+		// auth method, so we go straight to verify / configure / ready.
+		if hasProbes {
+			return SetupStepVerify, nil
+		}
+		if sf.HasConfigure() {
+			return SetupStep{phase: SetupPhaseConfigure}, nil
+		}
+		return SetupStep{}, nil // Complete
 	case SetupPhaseAuth:
 		if hasProbes {
 			return SetupStepVerify, nil

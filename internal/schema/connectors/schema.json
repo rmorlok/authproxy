@@ -5,7 +5,7 @@
     "AuthApiKey": {
       "type": "object",
       "additionalProperties": false,
-      "required": ["type"],
+      "required": ["type", "placement"],
       "properties": {
         "type": {
           "const": "api-key"
@@ -145,6 +145,9 @@
       "type": "object",
       "properties": {
         "preconnect": {
+          "$ref": "#/$defs/SetupFlowPhase"
+        },
+        "credentials": {
           "$ref": "#/$defs/SetupFlowPhase"
         },
         "configure": {

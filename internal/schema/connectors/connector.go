@@ -117,7 +117,39 @@ func (c *Connector) Clone() *Connector {
 	return &clone
 }
 
+// Normalize applies defaults that depend on the connector's configuration but
+// are not user-authored — e.g. synthesizing a credential-collection step for
+// AuthApiKey when none was supplied. Idempotent.
+//
+// Called by Validate before per-field checks so that downstream validation and
+// hashing run against the normalized form.
+func (c *Connector) Normalize() {
+	if c == nil || c.Auth == nil {
+		return
+	}
+
+	if ak, ok := c.Auth.Inner().(*AuthApiKey); ok {
+		// Auto-synthesize a credentials step when the connector did not declare
+		// its own — the author hasn't told us how to collect the credential, so
+		// we generate a form matching the placement. The credentials phase is
+		// owned by the auth method (api-key, here) so the submit handler can
+		// route by phase and never confuse credential fields with preconnect
+		// fields, even if names collide.
+		if c.SetupFlow == nil {
+			c.SetupFlow = &SetupFlow{}
+		}
+		if !c.SetupFlow.HasCredentials() {
+			step := SynthesizeApiKeyCredentialsStep(ak.Placement)
+			if step != nil {
+				c.SetupFlow.Credentials = &SetupFlowPhase{Steps: []SetupFlowStep{*step}}
+			}
+		}
+	}
+}
+
 func (c *Connector) Validate(vc *common.ValidationContext) error {
+	c.Normalize()
+
 	result := &multierror.Error{}
 
 	if c.State != "" {
@@ -135,6 +167,14 @@ func (c *Connector) Validate(vc *common.ValidationContext) error {
 	if c.RateLimiting != nil {
 		if err := c.RateLimiting.Validate(vc.PushField("rate_limiting")); err != nil {
 			result = multierror.Append(result, err)
+		}
+	}
+
+	if c.Auth != nil {
+		if av, ok := c.Auth.Inner().(AuthValidator); ok {
+			if err := av.Validate(vc.PushField("auth")); err != nil {
+				result = multierror.Append(result, err)
+			}
 		}
 	}
 
