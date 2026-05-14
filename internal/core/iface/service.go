@@ -240,6 +240,13 @@ type C interface {
 	// ListRateLimitsFromCursor continues listing rate limits from a cursor.
 	ListRateLimitsFromCursor(ctx context.Context, cursor string) (ListRateLimitsExecutor, error)
 
+	// DryRunRateLimit answers "would this request be rate-limited?"
+	// against the same in-memory rule cache the enforcer uses. Counters
+	// are not incremented — Limiter.Peek inspects state without writing.
+	// Returns the per-rule match + would-allow outcome plus the
+	// post-hydration namespace and label snapshot.
+	DryRunRateLimit(ctx context.Context, req DryRunRateLimitRequest) (DryRunRateLimitResult, error)
+
 	/*
 	 *
 	 * Tasks

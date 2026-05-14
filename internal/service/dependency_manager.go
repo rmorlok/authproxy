@@ -419,6 +419,7 @@ func (dm *DependencyManager) GetCoreService() coreIface.C {
 			dm.GetHttpf(),
 			dm.GetAsyncClient(),
 			dm.GetLogger(),
+			core.WithRateLimitCache(dm.GetRateLimitCache()),
 		)
 	}
 

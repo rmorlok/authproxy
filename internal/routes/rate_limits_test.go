@@ -18,7 +18,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"
-	apredismock "github.com/rmorlok/authproxy/internal/apredis/mock"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
@@ -55,12 +54,16 @@ func TestRateLimits(t *testing.T) {
 		cfg, e := encrypt.NewTestEncryptService(cfg, db)
 		ctrl := gomock.NewController(t)
 		ac := asynqmock.NewMockClient(ctrl)
-		rs := apredismock.NewMockClient(ctrl)
 
-		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
-		require.NoError(t, c.Migrate(context.Background()))
 		rlCache := ratelimit.NewCache()
-		rlr := NewRateLimitsRoutes(cfg, auth, c, db, rlCache, rds, aplog.NewNoopLogger())
+		// The dry-run subtree needs a real redis (for Limiter.Peek) and
+		// the cache, so we hand the core service the real apredis
+		// client instead of the per-test mock. The core's other paths
+		// don't talk to Redis in these tests.
+		c := core.NewCoreService(cfg, db, e, rds, h, ac, test_utils.NewTestLogger(),
+			core.WithRateLimitCache(rlCache))
+		require.NoError(t, c.Migrate(context.Background()))
+		rlr := NewRateLimitsRoutes(cfg, auth, c)
 		r := apgin.ForTest(nil)
 		rlr.Register(r)
 

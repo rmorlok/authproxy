@@ -157,10 +157,6 @@ func GetGinServer(
 		dm.GetConfig(),
 		authService,
 		dm.GetCoreService(),
-		dm.GetDatabase(),
-		dm.GetRateLimitCache(),
-		dm.GetRedisClient(),
-		logger,
 	)
 	routesTaskMonitoring := common_routes.NewTaskMonitoringRoutes(
 		dm.GetConfig(),
