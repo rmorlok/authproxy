@@ -7,6 +7,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apasynq"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/aptelemetry"
+	"github.com/rmorlok/authproxy/internal/auth_methods/api_key"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core/iface"
@@ -37,6 +38,9 @@ type service struct {
 
 	o2FactoryOnce sync.Once
 	o2Factory     oauth2.Factory
+
+	apiKeyFactoryOnce sync.Once
+	apiKeyFactory     api_key.Factory
 }
 
 // Option configures optional dependencies on the core service. The
