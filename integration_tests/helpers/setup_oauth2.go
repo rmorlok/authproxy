@@ -350,3 +350,19 @@ func (env *IntegrationTestEnv) GetOAuth2Token(t *testing.T, connectionID string)
 	require.NoError(t, err)
 	return tok
 }
+
+// DecryptOAuth2RefreshToken decrypts the persisted refresh_token for the
+// connection's current token row and returns the plaintext. Tests that need
+// to assert on the *value* of the refresh token (e.g. rotation tests) must
+// decrypt because EncryptedField bytes change on every encryption (AES-GCM
+// uses a fresh nonce), so equality of encrypted bytes is not a reliable
+// signal that the plaintext changed.
+func (env *IntegrationTestEnv) DecryptOAuth2RefreshToken(t *testing.T, tok *database.OAuth2Token) string {
+	t.Helper()
+	require.NotNil(t, tok, "DecryptOAuth2RefreshToken: token must not be nil")
+	require.False(t, tok.EncryptedRefreshToken.IsZero(),
+		"DecryptOAuth2RefreshToken: token has no encrypted refresh_token")
+	plaintext, err := env.DM.GetEncryptService().DecryptString(context.Background(), tok.EncryptedRefreshToken)
+	require.NoError(t, err, "decrypt refresh_token")
+	return plaintext
+}
