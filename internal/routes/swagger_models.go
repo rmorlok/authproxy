@@ -362,6 +362,61 @@ type SwaggerListRateLimitsResponse struct {
 	Cursor string `json:"cursor,omitempty"`
 }
 
+// SwaggerDryRunRequest is the input for the rate-limit dry-run endpoint.
+//
+//	@Description	Dry-run input: a synthesized request + the identity it runs under
+type SwaggerDryRunRequest struct {
+	Request SwaggerDryRunRequestPayload `json:"request"`
+	Context SwaggerDryRunContext        `json:"context"`
+}
+
+// SwaggerDryRunRequestPayload mirrors httpf-level request fields.
+//
+//	@Description	The request shape to simulate
+type SwaggerDryRunRequestPayload struct {
+	Method      string            `json:"method" example:"POST"`
+	Path        string            `json:"path" example:"/v1/things"`
+	RequestType string            `json:"request_type" example:"proxy"`
+	Headers     map[string]string `json:"headers,omitempty"`
+}
+
+// SwaggerDryRunContext is the actor + connection + namespace + label context.
+//
+//	@Description	Identity / context the request runs under
+type SwaggerDryRunContext struct {
+	ConnectionId string            `json:"connection_id,omitempty"`
+	ActorId      string            `json:"actor_id,omitempty"`
+	Namespace    string            `json:"namespace,omitempty"`
+	Labels       map[string]string `json:"labels,omitempty"`
+}
+
+// SwaggerDryRunResponse is what the endpoint returns.
+//
+//	@Description	Per-rule match + peek-driven would-allow result
+type SwaggerDryRunResponse struct {
+	RequestLabelSnapshot map[string]string         `json:"request_label_snapshot"`
+	Matched              []SwaggerDryRunMatch      `json:"matched"`
+	NotMatched           []SwaggerDryRunNotMatched `json:"not_matched"`
+}
+
+type SwaggerDryRunMatch struct {
+	RateLimitId      string `json:"rate_limit_id" swaggertype:"string" example:"rl_test550e8400"`
+	Namespace        string `json:"namespace"`
+	EffectiveMode    string `json:"effective_mode" example:"enforce"`
+	BucketKey        string `json:"bucket_key" example:"actor=act_abc|labels/team=acme"`
+	AlgorithmSummary string `json:"algorithm_summary" example:"token bucket 60 @ 1/s"`
+	WouldAllow       bool   `json:"would_allow"`
+	Remaining        int    `json:"remaining"`
+	RetryAfterMs     int64  `json:"retry_after_ms"`
+	PeekFailed       bool   `json:"peek_failed"`
+}
+
+type SwaggerDryRunNotMatched struct {
+	RateLimitId string `json:"rate_limit_id" swaggertype:"string"`
+	Namespace   string `json:"namespace"`
+	Reason      string `json:"reason"`
+}
+
 // SwaggerListRequestsResponse is the response for list request logs
 //
 //	@Description	Paginated list of request log entries

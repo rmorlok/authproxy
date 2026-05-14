@@ -22,25 +22,39 @@ import (
 //     validation (e.g. an uncompilable regex). Callers should log + skip
 //     such rules — they shouldn't be able to reach the runtime.
 func Match(rule rlschema.RateLimit, ctx *RequestContext) (matched bool, key BucketKey, err error) {
+	matched, key, _, err = MatchExplain(rule, ctx)
+	return
+}
+
+// MatchExplain is like Match but, on a miss, returns a short reason string
+// describing which selector clause refused. Powers the dry-run admin
+// endpoint so operators can see why a rule didn't fire.
+//
+// Reason strings stay narrow and human-readable; callers display them
+// verbatim. The same clause priority used by Match is preserved: the
+// first clause that fails wins (request_type → method → label_selector
+// → path_match).
+func MatchExplain(rule rlschema.RateLimit, ctx *RequestContext) (matched bool, key BucketKey, reason string, err error) {
 	if ctx == nil {
-		return false, BucketKey{}, nil
+		return false, BucketKey{}, "request context not provided", nil
 	}
 
-	if !matchRequestType(rule.Selector.EffectiveRequestTypes(), ctx.Type) {
-		return false, BucketKey{}, nil
+	allowedTypes := rule.Selector.EffectiveRequestTypes()
+	if !matchRequestType(allowedTypes, ctx.Type) {
+		return false, BucketKey{}, fmt.Sprintf("request_type %q is not in the rule's allowed list", string(ctx.Type)), nil
 	}
 
 	if !matchMethods(rule.Selector.Methods, ctx.Method) {
-		return false, BucketKey{}, nil
+		return false, BucketKey{}, fmt.Sprintf("method %q does not match the rule's method list", ctx.Method), nil
 	}
 
 	if rule.Selector.LabelSelector != "" {
 		ok, lerr := matchLabelSelector(rule.Selector.LabelSelector, ctx.Labels)
 		if lerr != nil {
-			return false, BucketKey{}, fmt.Errorf("label selector: %w", lerr)
+			return false, BucketKey{}, "", fmt.Errorf("label selector: %w", lerr)
 		}
 		if !ok {
-			return false, BucketKey{}, nil
+			return false, BucketKey{}, fmt.Sprintf("request labels do not satisfy %q", rule.Selector.LabelSelector), nil
 		}
 	}
 
@@ -51,14 +65,17 @@ func Match(rule rlschema.RateLimit, ctx *RequestContext) (matched bool, key Buck
 		}
 		ok, perr := matchPath(rule.Selector.PathMatch, p, ctx.UpstreamURL != nil)
 		if perr != nil {
-			return false, BucketKey{}, fmt.Errorf("path match: %w", perr)
+			return false, BucketKey{}, "", fmt.Errorf("path match: %w", perr)
 		}
 		if !ok {
-			return false, BucketKey{}, nil
+			if !(ctx.UpstreamURL != nil) {
+				return false, BucketKey{}, fmt.Sprintf("rule requires a %s path match but the request carried no URL", rule.Selector.PathMatch.Kind), nil
+			}
+			return false, BucketKey{}, fmt.Sprintf("path %q does not %s-match %q", p, rule.Selector.PathMatch.Kind, rule.Selector.PathMatch.Value), nil
 		}
 	}
 
-	return true, ResolveBucketKey(rule, ctx), nil
+	return true, ResolveBucketKey(rule, ctx), "", nil
 }
 
 // matchRequestType returns true if ctxType is in the rule's allowed list.

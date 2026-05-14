@@ -145,6 +145,10 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		dm.GetConfig(),
 		authService,
 		dm.GetCoreService(),
+		dm.GetDatabase(),
+		dm.GetRateLimitCache(),
+		dm.GetRedisClient(),
+		logger,
 	)
 
 	api := server.Group("/api/v1")
