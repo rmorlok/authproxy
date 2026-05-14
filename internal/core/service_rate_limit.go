@@ -223,13 +223,16 @@ var _ iface.ListRateLimitsBuilder = (*listRateLimitsWrapper)(nil)
 // filtered out.
 func (s *service) DryRunRateLimit(ctx context.Context, req iface.DryRunRateLimitRequest) (iface.DryRunRateLimitResult, error) {
 	if req.Request.Method == "" {
-		return iface.DryRunRateLimitResult{}, ErrInvalidArgument
+		return iface.DryRunRateLimitResult{}, fmt.Errorf("%w: request.method is required", ErrInvalidArgument)
 	}
-	if req.Request.RequestType == "" {
-		return iface.DryRunRateLimitResult{}, ErrInvalidArgument
+	if req.Request.URL == "" {
+		return iface.DryRunRateLimitResult{}, fmt.Errorf("%w: request.url is required", ErrInvalidArgument)
 	}
-	if !common.IsValidRequestType(req.Request.RequestType) {
-		return iface.DryRunRateLimitResult{}, fmt.Errorf("%w: invalid request_type %q", ErrInvalidArgument, req.Request.RequestType)
+	if req.RequestType == "" {
+		return iface.DryRunRateLimitResult{}, fmt.Errorf("%w: request_type is required", ErrInvalidArgument)
+	}
+	if !common.IsValidRequestType(req.RequestType) {
+		return iface.DryRunRateLimitResult{}, fmt.Errorf("%w: invalid request_type %q", ErrInvalidArgument, req.RequestType)
 	}
 	if req.Context.ConnectionId == nil && req.Context.Namespace == nil {
 		return iface.DryRunRateLimitResult{}, fmt.Errorf("%w: connection_id or namespace is required", ErrInvalidArgument)
@@ -310,20 +313,19 @@ func (s *service) DryRunRateLimit(ctx context.Context, req iface.DryRunRateLimit
 
 // hydrateDryRunContext fills a RequestContext from the dry-run input.
 // When a connection is supplied, the connection's namespace / connector
-// / labels are used (mirroring httpf.ForConnection). Manual labels on
-// the request context always merge on top.
+// / labels are used (mirroring httpf.ForConnection). Labels on the
+// ProxyRequest itself always merge on top, matching the real proxy
+// path's "request labels override connection labels" rule.
 func (s *service) hydrateDryRunContext(ctx context.Context, req iface.DryRunRateLimitRequest) (*ratelimit.RequestContext, error) {
-	rc := &ratelimit.RequestContext{
-		Type:   common.RequestType(req.Request.RequestType),
-		Method: strings.ToUpper(req.Request.Method),
+	u, err := url.Parse(req.Request.URL)
+	if err != nil {
+		return nil, fmt.Errorf("%w: invalid url: %s", ErrInvalidArgument, err.Error())
 	}
 
-	if req.Request.Path != "" {
-		u, err := url.Parse(req.Request.Path)
-		if err != nil {
-			return nil, fmt.Errorf("%w: invalid path: %s", ErrInvalidArgument, err.Error())
-		}
-		rc.UpstreamURL = u
+	rc := &ratelimit.RequestContext{
+		Type:        common.RequestType(req.RequestType),
+		Method:      strings.ToUpper(req.Request.Method),
+		UpstreamURL: u,
 	}
 
 	if req.Context.ConnectionId != nil && !req.Context.ConnectionId.IsNil() {
@@ -351,11 +353,11 @@ func (s *service) hydrateDryRunContext(ctx context.Context, req iface.DryRunRate
 		rc.ActorID = *req.Context.ActorId
 	}
 
-	if len(req.Context.Labels) > 0 {
+	if len(req.Request.Labels) > 0 {
 		if rc.Labels == nil {
-			rc.Labels = make(map[string]string, len(req.Context.Labels))
+			rc.Labels = make(map[string]string, len(req.Request.Labels))
 		}
-		for k, v := range req.Context.Labels {
+		for k, v := range req.Request.Labels {
 			rc.Labels[k] = v
 		}
 	}

@@ -36,32 +36,32 @@ type ListRateLimitsBuilder interface {
 	ForLabelSelector(selector string) ListRateLimitsBuilder
 }
 
-// DryRunRateLimitRequest is the input to C.DryRunRateLimit. Mirrors the
-// fields a real proxy request would carry (so the matcher sees the same
-// shape) plus the identity / context that drives label resolution.
+// DryRunRateLimitRequest is the input to C.DryRunRateLimit. Reuses
+// ProxyRequest so the dry-run accepts the same shape a real proxy call
+// does — URL / Method / Headers / Labels / Body. RequestType stays as a
+// sibling field because the real proxy path also takes it separately
+// from the request payload (Proxy.ProxyRequest(ctx, reqType, req)).
 type DryRunRateLimitRequest struct {
-	// Request describes the HTTP call to simulate.
-	Request DryRunRequestPayload
+	// Request is the proxy-shaped request to simulate. Labels on the
+	// request take precedence over labels carried forward from a
+	// supplied connection.
+	Request ProxyRequest
+
+	// RequestType selects the kind of traffic to simulate (proxy,
+	// probe, etc.). Must be one of common.RequestType.
+	RequestType string
 
 	// Context is the identity the request runs under. When ConnectionId
 	// is set, the implementation hydrates Namespace + Connector +
 	// Labels from the connection (the way httpf.ForConnection does at
-	// runtime). Manual Labels always merge on top.
+	// runtime).
 	Context DryRunRequestContext
-}
-
-type DryRunRequestPayload struct {
-	Method      string
-	Path        string
-	RequestType string
-	Headers     map[string]string
 }
 
 type DryRunRequestContext struct {
 	ConnectionId *apid.ID
 	ActorId      *apid.ID
 	Namespace    *string
-	Labels       map[string]string
 }
 
 // DryRunRateLimitResult is the structured output of C.DryRunRateLimit.

@@ -445,16 +445,12 @@ definitions:
         type: string
     type: object
   routes.SwaggerDryRunContext:
-    description: Identity / context the request runs under
+    description: Identity the request runs under
     properties:
       actor_id:
         type: string
       connection_id:
         type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
       namespace:
         type: string
     type: object
@@ -493,26 +489,13 @@ definitions:
         type: string
     type: object
   routes.SwaggerDryRunRequest:
-    description: 'Dry-run input: a synthesized request + the identity it runs under'
+    description: 'Dry-run input: a proxy-shaped request + request type + the identity
+      it runs under'
     properties:
       context:
         $ref: '#/definitions/routes.SwaggerDryRunContext'
       request:
-        $ref: '#/definitions/routes.SwaggerDryRunRequestPayload'
-    type: object
-  routes.SwaggerDryRunRequestPayload:
-    description: The request shape to simulate
-    properties:
-      headers:
-        additionalProperties:
-          type: string
-        type: object
-      method:
-        example: POST
-        type: string
-      path:
-        example: /v1/things
-        type: string
+        $ref: '#/definitions/routes.ProxyRequest'
       request_type:
         example: proxy
         type: string

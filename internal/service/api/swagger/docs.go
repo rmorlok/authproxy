@@ -7983,7 +7983,7 @@ const docTemplateApi = `{
             }
         },
         "routes.SwaggerDryRunContext": {
-            "description": "Identity / context the request runs under",
+            "description": "Identity the request runs under",
             "type": "object",
             "properties": {
                 "actor_id": {
@@ -7991,12 +7991,6 @@ const docTemplateApi = `{
                 },
                 "connection_id": {
                     "type": "string"
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
                 },
                 "namespace": {
                     "type": "string"
@@ -8054,34 +8048,14 @@ const docTemplateApi = `{
             }
         },
         "routes.SwaggerDryRunRequest": {
-            "description": "Dry-run input: a synthesized request + the identity it runs under",
+            "description": "Dry-run input: a proxy-shaped request + request type + the identity it runs under",
             "type": "object",
             "properties": {
                 "context": {
                     "$ref": "#/definitions/routes.SwaggerDryRunContext"
                 },
                 "request": {
-                    "$ref": "#/definitions/routes.SwaggerDryRunRequestPayload"
-                }
-            }
-        },
-        "routes.SwaggerDryRunRequestPayload": {
-            "description": "The request shape to simulate",
-            "type": "object",
-            "properties": {
-                "headers": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "method": {
-                    "type": "string",
-                    "example": "POST"
-                },
-                "path": {
-                    "type": "string",
-                    "example": "/v1/things"
+                    "$ref": "#/definitions/routes.ProxyRequest"
                 },
                 "request_type": {
                     "type": "string",

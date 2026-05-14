@@ -690,34 +690,52 @@ func TestRateLimits(t *testing.T) {
 	}
 
 	t.Run("dry run", func(t *testing.T) {
+		// Default request body — fields supply just enough for the
+		// dry-run to be valid (URL, method, request_type). Tests
+		// override individual fields rather than reshape the body
+		// each time.
+		baseBody := func() map[string]interface{} {
+			return map[string]interface{}{
+				"request": map[string]interface{}{
+					"method": "POST",
+					"url":    "https://api.example.com/v1/things",
+				},
+				"request_type": "proxy",
+				"context": map[string]interface{}{
+					"namespace": "root",
+					"actor_id":  "act_test",
+				},
+			}
+		}
+
 		t.Run("rejects when method missing", func(t *testing.T) {
 			tu, done := setup(t)
 			defer done()
 
-			ns := "root"
-			code, body := postDryRun(t, tu, map[string]interface{}{
-				"request": map[string]interface{}{
-					"request_type": "proxy",
-				},
-				"context": map[string]interface{}{
-					"namespace": ns,
-					"actor_id":  "act_test",
-				},
-			}, aschema.AllPermissions())
-			require.Equal(t, http.StatusBadRequest, code, string(body))
+			body := baseBody()
+			delete(body["request"].(map[string]interface{}), "method")
+			code, raw := postDryRun(t, tu, body, aschema.AllPermissions())
+			require.Equal(t, http.StatusBadRequest, code, string(raw))
+		})
+
+		t.Run("rejects when url missing", func(t *testing.T) {
+			tu, done := setup(t)
+			defer done()
+
+			body := baseBody()
+			delete(body["request"].(map[string]interface{}), "url")
+			code, raw := postDryRun(t, tu, body, aschema.AllPermissions())
+			require.Equal(t, http.StatusBadRequest, code, string(raw))
 		})
 
 		t.Run("rejects when neither connection_id nor namespace given", func(t *testing.T) {
 			tu, done := setup(t)
 			defer done()
-			code, body := postDryRun(t, tu, map[string]interface{}{
-				"request": map[string]interface{}{
-					"method":       "POST",
-					"request_type": "proxy",
-				},
-				"context": map[string]interface{}{},
-			}, aschema.AllPermissions())
-			require.Equal(t, http.StatusBadRequest, code, string(body))
+
+			body := baseBody()
+			body["context"] = map[string]interface{}{}
+			code, raw := postDryRun(t, tu, body, aschema.AllPermissions())
+			require.Equal(t, http.StatusBadRequest, code, string(raw))
 		})
 
 		t.Run("matched rule reports peek result without consuming counter", func(t *testing.T) {
@@ -728,17 +746,7 @@ func TestRateLimits(t *testing.T) {
 			require.Len(t, rules, 1)
 			ruleId := rules[0].Id
 
-			body := map[string]interface{}{
-				"request": map[string]interface{}{
-					"method":       "POST",
-					"path":         "/v1/things",
-					"request_type": "proxy",
-				},
-				"context": map[string]interface{}{
-					"namespace": "root",
-					"actor_id":  "act_test",
-				},
-			}
+			body := baseBody()
 
 			// First call: would_allow=true on a fresh bucket; remaining=1.
 			code, raw := postDryRun(t, tu, body, aschema.AllPermissions())
@@ -786,16 +794,7 @@ func TestRateLimits(t *testing.T) {
 			)
 			require.Len(t, rules, 2)
 
-			code, raw := postDryRun(t, tu, map[string]interface{}{
-				"request": map[string]interface{}{
-					"method":       "POST",
-					"request_type": "proxy",
-				},
-				"context": map[string]interface{}{
-					"namespace": "root",
-					"actor_id":  "act_test",
-				},
-			}, aschema.AllPermissions())
+			code, raw := postDryRun(t, tu, baseBody(), aschema.AllPermissions())
 			require.Equal(t, http.StatusOK, code, string(raw))
 			var resp DryRunResponseJson
 			require.NoError(t, json.Unmarshal(raw, &resp))
@@ -826,17 +825,9 @@ func TestRateLimits(t *testing.T) {
 				Algorithm: rlschema.Algorithm{TokenBucket: &rlschema.TokenBucket{Capacity: 1, RefillRate: 1}},
 			})
 
-			code, raw := postDryRun(t, tu, map[string]interface{}{
-				"request": map[string]interface{}{
-					"method":       "POST",
-					"path":         "/wrong/path",
-					"request_type": "proxy",
-				},
-				"context": map[string]interface{}{
-					"namespace": "root",
-					"actor_id":  "act_test",
-				},
-			}, aschema.AllPermissions())
+			body := baseBody()
+			body["request"].(map[string]interface{})["url"] = "https://api.example.com/wrong/path"
+			code, raw := postDryRun(t, tu, body, aschema.AllPermissions())
 			require.Equal(t, http.StatusOK, code, string(raw))
 
 			var resp DryRunResponseJson
@@ -847,7 +838,7 @@ func TestRateLimits(t *testing.T) {
 			require.Contains(t, resp.NotMatched[0].Reason, "/services/data/")
 		})
 
-		t.Run("label override on context flows into snapshot and label selector match", func(t *testing.T) {
+		t.Run("labels on request flow into snapshot and label selector match", func(t *testing.T) {
 			tu, done := setup(t)
 			defer done()
 
@@ -861,17 +852,9 @@ func TestRateLimits(t *testing.T) {
 				Algorithm: rlschema.Algorithm{TokenBucket: &rlschema.TokenBucket{Capacity: 5, RefillRate: 1}},
 			})
 
-			code, raw := postDryRun(t, tu, map[string]interface{}{
-				"request": map[string]interface{}{
-					"method":       "POST",
-					"request_type": "proxy",
-				},
-				"context": map[string]interface{}{
-					"namespace": "root",
-					"actor_id":  "act_test",
-					"labels":    map[string]string{"team": "acme"},
-				},
-			}, aschema.AllPermissions())
+			body := baseBody()
+			body["request"].(map[string]interface{})["labels"] = map[string]string{"team": "acme"}
+			code, raw := postDryRun(t, tu, body, aschema.AllPermissions())
 			require.Equal(t, http.StatusOK, code, string(raw))
 
 			var resp DryRunResponseJson
@@ -888,16 +871,7 @@ func TestRateLimits(t *testing.T) {
 			def.Mode = rlschema.ModeObserve
 			rules := installRules(t, tu, "root", def)
 
-			code, raw := postDryRun(t, tu, map[string]interface{}{
-				"request": map[string]interface{}{
-					"method":       "POST",
-					"request_type": "proxy",
-				},
-				"context": map[string]interface{}{
-					"namespace": "root",
-					"actor_id":  "act_test",
-				},
-			}, aschema.AllPermissions())
+			code, raw := postDryRun(t, tu, baseBody(), aschema.AllPermissions())
 			require.Equal(t, http.StatusOK, code, string(raw))
 
 			var resp DryRunResponseJson
@@ -912,16 +886,7 @@ func TestRateLimits(t *testing.T) {
 			defer done()
 			_ = installRules(t, tu, "root", tokenBucketRule())
 
-			code, _ := postDryRun(t, tu, map[string]interface{}{
-				"request": map[string]interface{}{
-					"method":       "POST",
-					"request_type": "proxy",
-				},
-				"context": map[string]interface{}{
-					"namespace": "root",
-					"actor_id":  "act_test",
-				},
-			}, aschema.PermissionsSingle("root.other", "rate_limits", "get"))
+			code, _ := postDryRun(t, tu, baseBody(), aschema.PermissionsSingle("root.other", "rate_limits", "get"))
 			require.Equal(t, http.StatusForbidden, code)
 		})
 
@@ -936,16 +901,7 @@ func TestRateLimits(t *testing.T) {
 			require.NoError(t, err)
 			_ = installRules(t, tu, "root.sibling", tokenBucketRule())
 
-			code, raw := postDryRun(t, tu, map[string]interface{}{
-				"request": map[string]interface{}{
-					"method":       "POST",
-					"request_type": "proxy",
-				},
-				"context": map[string]interface{}{
-					"namespace": "root",
-					"actor_id":  "act_test",
-				},
-			}, aschema.AllPermissions())
+			code, raw := postDryRun(t, tu, baseBody(), aschema.AllPermissions())
 			require.Equal(t, http.StatusOK, code, string(raw))
 
 			var resp DryRunResponseJson
@@ -963,16 +919,7 @@ func TestRateLimits(t *testing.T) {
 			rules := installRules(t, tu, "root", tokenBucketRule())
 			require.Len(t, rules, 1)
 
-			req := map[string]interface{}{
-				"request": map[string]interface{}{
-					"method":       "POST",
-					"request_type": "proxy",
-				},
-				"context": map[string]interface{}{
-					"namespace": "root",
-					"actor_id":  "act_test",
-				},
-			}
+			req := baseBody()
 
 			// 5 dry-runs in a row should each report the same fresh
 			// bucket (capacity=2, remaining=1). If Peek were

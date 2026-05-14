@@ -79,25 +79,21 @@ type RateLimitsRoutes struct {
 }
 
 // DryRunRequestJson is the wire shape for POST /rate-limits/_dry_run.
-// Mirrors coreIface.DryRunRateLimitRequest with JSON tags + nullable
-// pointer fields so empty values aren't silently sent as zero values.
+// Reuses iface.ProxyRequest for the request half — same shape as the
+// real /connections/{id}/_proxy endpoint, so a future "send this for
+// real" button can hand the same payload to that endpoint without
+// reshaping. RequestType + Context live alongside since the proxy
+// path takes request_type as a sibling param, not on the request.
 type DryRunRequestJson struct {
-	Request DryRunRequestPayloadJson `json:"request"`
-	Context DryRunContextJson        `json:"context"`
-}
-
-type DryRunRequestPayloadJson struct {
-	Method      string            `json:"method"`
-	Path        string            `json:"path"`
-	RequestType string            `json:"request_type"`
-	Headers     map[string]string `json:"headers,omitempty"`
+	Request     coreIface.ProxyRequest `json:"request"`
+	RequestType string                 `json:"request_type"`
+	Context     DryRunContextJson      `json:"context"`
 }
 
 type DryRunContextJson struct {
-	ConnectionId *apid.ID          `json:"connection_id,omitempty"`
-	ActorId      *apid.ID          `json:"actor_id,omitempty"`
-	Namespace    *string           `json:"namespace,omitempty"`
-	Labels       map[string]string `json:"labels,omitempty"`
+	ConnectionId *apid.ID `json:"connection_id,omitempty"`
+	ActorId      *apid.ID `json:"actor_id,omitempty"`
+	Namespace    *string  `json:"namespace,omitempty"`
 }
 
 type DryRunResponseJson struct {
@@ -128,17 +124,12 @@ type DryRunNotMatchedJson struct {
 // service consumes. Nothing here does business logic — it's just shape.
 func (r DryRunRequestJson) toCore() coreIface.DryRunRateLimitRequest {
 	return coreIface.DryRunRateLimitRequest{
-		Request: coreIface.DryRunRequestPayload{
-			Method:      r.Request.Method,
-			Path:        r.Request.Path,
-			RequestType: r.Request.RequestType,
-			Headers:     r.Request.Headers,
-		},
+		Request:     r.Request,
+		RequestType: r.RequestType,
 		Context: coreIface.DryRunRequestContext{
 			ConnectionId: r.Context.ConnectionId,
 			ActorId:      r.Context.ActorId,
 			Namespace:    r.Context.Namespace,
-			Labels:       r.Context.Labels,
 		},
 	}
 }

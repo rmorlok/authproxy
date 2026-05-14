@@ -85,39 +85,58 @@ func freshTokenBucket() rlschema.RateLimit {
 	}
 }
 
+// validBaseReq returns a dry-run input with the minimum fields needed
+// to pass validation. Per-test edits override what they care about.
+func validBaseReq() iface.DryRunRateLimitRequest {
+	return iface.DryRunRateLimitRequest{
+		Request: iface.ProxyRequest{
+			Method: "POST",
+			URL:    "https://api.example.com/v1/things",
+		},
+		RequestType: "proxy",
+		Context: iface.DryRunRequestContext{
+			Namespace: ptrStr("root"),
+			ActorId:   ptrId("act_test"),
+		},
+	}
+}
+
 func TestDryRunRateLimit_ValidationErrors(t *testing.T) {
 	svc, _, done := newDryRunService(t)
 	defer done()
 
 	t.Run("missing method", func(t *testing.T) {
-		_, err := svc.DryRunRateLimit(context.Background(), iface.DryRunRateLimitRequest{
-			Request: iface.DryRunRequestPayload{RequestType: "proxy"},
-			Context: iface.DryRunRequestContext{Namespace: ptrStr("root")},
-		})
+		req := validBaseReq()
+		req.Request.Method = ""
+		_, err := svc.DryRunRateLimit(context.Background(), req)
+		require.ErrorIs(t, err, ErrInvalidArgument)
+	})
+
+	t.Run("missing url", func(t *testing.T) {
+		req := validBaseReq()
+		req.Request.URL = ""
+		_, err := svc.DryRunRateLimit(context.Background(), req)
 		require.ErrorIs(t, err, ErrInvalidArgument)
 	})
 
 	t.Run("missing request type", func(t *testing.T) {
-		_, err := svc.DryRunRateLimit(context.Background(), iface.DryRunRateLimitRequest{
-			Request: iface.DryRunRequestPayload{Method: "POST"},
-			Context: iface.DryRunRequestContext{Namespace: ptrStr("root")},
-		})
+		req := validBaseReq()
+		req.RequestType = ""
+		_, err := svc.DryRunRateLimit(context.Background(), req)
 		require.ErrorIs(t, err, ErrInvalidArgument)
 	})
 
 	t.Run("invalid request type", func(t *testing.T) {
-		_, err := svc.DryRunRateLimit(context.Background(), iface.DryRunRateLimitRequest{
-			Request: iface.DryRunRequestPayload{Method: "POST", RequestType: "bogus"},
-			Context: iface.DryRunRequestContext{Namespace: ptrStr("root")},
-		})
+		req := validBaseReq()
+		req.RequestType = "bogus"
+		_, err := svc.DryRunRateLimit(context.Background(), req)
 		require.ErrorIs(t, err, ErrInvalidArgument)
 	})
 
 	t.Run("no connection or namespace", func(t *testing.T) {
-		_, err := svc.DryRunRateLimit(context.Background(), iface.DryRunRateLimitRequest{
-			Request: iface.DryRunRequestPayload{Method: "POST", RequestType: "proxy"},
-			Context: iface.DryRunRequestContext{},
-		})
+		req := validBaseReq()
+		req.Context = iface.DryRunRequestContext{}
+		_, err := svc.DryRunRateLimit(context.Background(), req)
 		require.ErrorIs(t, err, ErrInvalidArgument)
 	})
 }
@@ -128,13 +147,7 @@ func TestDryRunRateLimit_PeekDoesNotMutate(t *testing.T) {
 
 	rule := installRule(t, svc, rlCache, "root", freshTokenBucket())
 
-	req := iface.DryRunRateLimitRequest{
-		Request: iface.DryRunRequestPayload{Method: "POST", RequestType: "proxy"},
-		Context: iface.DryRunRequestContext{
-			Namespace: ptrStr("root"),
-			ActorId:   ptrId("act_test"),
-		},
-	}
+	req := validBaseReq()
 
 	// 5 dry-runs in a row should each see capacity-1 remaining.
 	for i := 0; i < 5; i++ {
@@ -160,13 +173,9 @@ func TestDryRunRateLimit_NamespaceCascade(t *testing.T) {
 	require.NoError(t, err)
 	otherRule := installRule(t, svc, rlCache, "root.other", freshTokenBucket())
 
-	res, err := svc.DryRunRateLimit(context.Background(), iface.DryRunRateLimitRequest{
-		Request: iface.DryRunRequestPayload{Method: "POST", RequestType: "proxy"},
-		Context: iface.DryRunRequestContext{
-			Namespace: ptrStr("root.child"),
-			ActorId:   ptrId("act_test"),
-		},
-	})
+	req := validBaseReq()
+	req.Context.Namespace = ptrStr("root.child")
+	res, err := svc.DryRunRateLimit(context.Background(), req)
 	require.NoError(t, err)
 
 	require.Equal(t, "root.child", res.Namespace)
@@ -176,7 +185,7 @@ func TestDryRunRateLimit_NamespaceCascade(t *testing.T) {
 	_ = otherRule
 }
 
-func TestDryRunRateLimit_ManualLabelsOverride(t *testing.T) {
+func TestDryRunRateLimit_RequestLabelsOverride(t *testing.T) {
 	svc, rlCache, done := newDryRunService(t)
 	defer done()
 
@@ -192,14 +201,9 @@ func TestDryRunRateLimit_ManualLabelsOverride(t *testing.T) {
 		},
 	})
 
-	res, err := svc.DryRunRateLimit(context.Background(), iface.DryRunRateLimitRequest{
-		Request: iface.DryRunRequestPayload{Method: "POST", RequestType: "proxy"},
-		Context: iface.DryRunRequestContext{
-			Namespace: ptrStr("root"),
-			ActorId:   ptrId("act_test"),
-			Labels:    map[string]string{"team": "acme"},
-		},
-	})
+	req := validBaseReq()
+	req.Request.Labels = map[string]string{"team": "acme"}
+	res, err := svc.DryRunRateLimit(context.Background(), req)
 	require.NoError(t, err)
 	require.Len(t, res.Matched, 1)
 	require.Equal(t, "acme", res.RequestLabelSnapshot["team"])
@@ -218,13 +222,7 @@ func TestDryRunRateLimit_MissReasonReported(t *testing.T) {
 		Algorithm: rlschema.Algorithm{TokenBucket: &rlschema.TokenBucket{Capacity: 1, RefillRate: 1.0}},
 	})
 
-	res, err := svc.DryRunRateLimit(context.Background(), iface.DryRunRateLimitRequest{
-		Request: iface.DryRunRequestPayload{Method: "POST", RequestType: "proxy"},
-		Context: iface.DryRunRequestContext{
-			Namespace: ptrStr("root"),
-			ActorId:   ptrId("act_test"),
-		},
-	})
+	res, err := svc.DryRunRateLimit(context.Background(), validBaseReq())
 	require.NoError(t, err)
 	require.Empty(t, res.Matched)
 	require.Len(t, res.NotMatched, 1)
@@ -248,10 +246,7 @@ func TestDryRunRateLimit_NoCache(t *testing.T) {
 	svc := NewCoreService(cfg, db, e, r, hmock.NewMockF(ctrl), mock.NewMockClient(ctrl), logger)
 	require.NoError(t, svc.Migrate(context.Background()))
 
-	res, err := svc.DryRunRateLimit(context.Background(), iface.DryRunRateLimitRequest{
-		Request: iface.DryRunRequestPayload{Method: "POST", RequestType: "proxy"},
-		Context: iface.DryRunRequestContext{Namespace: ptrStr("root"), ActorId: ptrId("act_test")},
-	})
+	res, err := svc.DryRunRateLimit(context.Background(), validBaseReq())
 	require.NoError(t, err)
 	require.Empty(t, res.Matched)
 	require.Empty(t, res.NotMatched)

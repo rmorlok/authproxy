@@ -363,31 +363,24 @@ type SwaggerListRateLimitsResponse struct {
 }
 
 // SwaggerDryRunRequest is the input for the rate-limit dry-run endpoint.
+// Reuses ProxyRequest so the request body is identical to the shape the
+// real /connections/{id}/_proxy endpoint accepts.
 //
-//	@Description	Dry-run input: a synthesized request + the identity it runs under
+//	@Description	Dry-run input: a proxy-shaped request + request type + the identity it runs under
 type SwaggerDryRunRequest struct {
-	Request SwaggerDryRunRequestPayload `json:"request"`
-	Context SwaggerDryRunContext        `json:"context"`
+	Request     ProxyRequest         `json:"request"`
+	RequestType string               `json:"request_type" example:"proxy"`
+	Context     SwaggerDryRunContext `json:"context"`
 }
 
-// SwaggerDryRunRequestPayload mirrors httpf-level request fields.
+// SwaggerDryRunContext is the actor + connection + namespace identity.
+// Labels live on Request now (matching ProxyRequest).
 //
-//	@Description	The request shape to simulate
-type SwaggerDryRunRequestPayload struct {
-	Method      string            `json:"method" example:"POST"`
-	Path        string            `json:"path" example:"/v1/things"`
-	RequestType string            `json:"request_type" example:"proxy"`
-	Headers     map[string]string `json:"headers,omitempty"`
-}
-
-// SwaggerDryRunContext is the actor + connection + namespace + label context.
-//
-//	@Description	Identity / context the request runs under
+//	@Description	Identity the request runs under
 type SwaggerDryRunContext struct {
-	ConnectionId string            `json:"connection_id,omitempty"`
-	ActorId      string            `json:"actor_id,omitempty"`
-	Namespace    string            `json:"namespace,omitempty"`
-	Labels       map[string]string `json:"labels,omitempty"`
+	ConnectionId string `json:"connection_id,omitempty"`
+	ActorId      string `json:"actor_id,omitempty"`
+	Namespace    string `json:"namespace,omitempty"`
 }
 
 // SwaggerDryRunResponse is what the endpoint returns.
