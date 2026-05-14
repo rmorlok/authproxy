@@ -33,11 +33,11 @@ func (o *oAuth2Connection) revokeTokensInner(ctx context.Context) error {
 		return err
 	}
 
-	connectorID := o.connectorIDForTelemetry()
+	connLabels := o.connectionLabelsForTelemetry()
 
 	if o.auth.Revocation.SupportRevokingRefreshToken() {
 		err := o.revokeRefreshToken(ctx, token)
-		o.tel.recordRevocation(ctx, revocationKindRefresh, err == nil, connectorID)
+		o.tel.recordRevocation(ctx, revocationKindRefresh, err == nil, connLabels)
 		if err != nil {
 			return err
 		}
@@ -45,7 +45,7 @@ func (o *oAuth2Connection) revokeTokensInner(ctx context.Context) error {
 
 	if o.auth.Revocation.SupportRevokingAccessToken() {
 		err := o.revokeAccessToken(ctx, token)
-		o.tel.recordRevocation(ctx, revocationKindAccess, err == nil, connectorID)
+		o.tel.recordRevocation(ctx, revocationKindAccess, err == nil, connLabels)
 		if err != nil {
 			return err
 		}

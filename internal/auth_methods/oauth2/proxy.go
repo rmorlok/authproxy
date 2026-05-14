@@ -59,14 +59,27 @@ func (o *oAuth2Connection) refreshAccessToken(ctx context.Context, token *databa
 }
 
 // connectorIDForTelemetry returns the connector id used as the
-// authproxy.connector_id dimension on lifecycle counters and spans. Safe to
-// call when the connection / connector version isn't populated (returns the
-// zero apid.ID, which connectorAttr treats as "absent").
+// authproxy.connector_id SPAN attribute on lifecycle spans. Safe to call
+// when the connection / connector version isn't populated (returns the
+// zero apid.ID, which connectorAttr treats as "absent"). Not used as a
+// metric dimension — see connectorAttr.
 func (o *oAuth2Connection) connectorIDForTelemetry() apid.ID {
 	if o.connection == nil {
 		return apid.Nil
 	}
 	return o.connection.GetConnectorId()
+}
+
+// connectionLabelsForTelemetry returns the connection-level labels used as
+// the input to the metric-dimension projector. The projector applies the
+// configured allowlist + value cap, so the raw set can include
+// high-cardinality keys without leaking them onto metrics. Safe to call
+// when the connection isn't populated.
+func (o *oAuth2Connection) connectionLabelsForTelemetry() map[string]string {
+	if o.connection == nil {
+		return nil
+	}
+	return o.connection.GetLabels()
 }
 
 func (o *oAuth2Connection) refreshAccessTokenInner(ctx context.Context, token *database.OAuth2Token, mode refreshMode) (*database.OAuth2Token, error) {
@@ -156,7 +169,7 @@ func (o *oAuth2Connection) refreshAccessTokenInner(ctx context.Context, token *d
 		)
 	}
 	emitTokenRefreshSucceeded(ctx, o.logger, o.tokenRefreshAttrsFromConn(nil))
-	o.tel.recordRefreshSuccess(ctx, o.connectorIDForTelemetry())
+	o.tel.recordRefreshSuccess(ctx, o.connectionLabelsForTelemetry())
 
 	return newToken, nil
 }
@@ -188,7 +201,7 @@ func (o *oAuth2Connection) classifyAndRecordRefreshFailure(
 	attrs.ProviderError = providerErr
 	attrs.Attempts = attempts
 	emitTokenRefreshFailure(ctx, o.logger, category, attrs)
-	o.tel.recordRefreshFailure(ctx, string(category), o.connectorIDForTelemetry())
+	o.tel.recordRefreshFailure(ctx, string(category), o.connectionLabelsForTelemetry())
 
 	if category.IsPermanent() && o.connection != nil {
 		if markErr := o.connection.MarkHealthState(ctx, database.ConnectionHealthStateUnhealthy, "refresh_"+string(category)); markErr != nil {

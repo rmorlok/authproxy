@@ -41,11 +41,19 @@ type telemetry struct {
 	metricsEnabled bool
 	tracer         trace.Tracer
 
-	refreshAttempts        metric.Int64Counter
-	refreshFailures        metric.Int64Counter
-	revocations            metric.Int64Counter
-	tokenExchangeAttempts  metric.Int64Counter
-	tokenExchangeFailures  metric.Int64Counter
+	refreshAttempts       metric.Int64Counter
+	refreshFailures       metric.Int64Counter
+	revocations           metric.Int64Counter
+	tokenExchangeAttempts metric.Int64Counter
+	tokenExchangeFailures metric.Int64Counter
+
+	// projector applies the project-wide telemetry.proxy.{span_attribute_labels,
+	// metric_dimension_labels, metric_dimension_value_cap} allowlist + cap to
+	// labels from the connection (o.connection.GetLabels()). Operators
+	// opt in to per-connector metric breakdowns by adding bounded-
+	// cardinality keys (e.g. "type", "env") to metric_dimension_labels —
+	// see #225 / #232 for the rationale.
+	projector *aptelemetry.LabelProjector
 }
 
 // newTelemetry constructs a telemetry surface from the providers + config.
@@ -63,6 +71,8 @@ func newTelemetry(providers *aptelemetry.Providers, cfg *sconfig.Telemetry) (*te
 	if !t.tracesEnabled && !t.metricsEnabled {
 		return t, nil
 	}
+
+	t.projector = aptelemetry.NewLabelProjectorFromProxyConfig(cfg.GetProxy())
 
 	if t.tracesEnabled {
 		t.tracer = providers.TracerProvider.Tracer(telemetryInstrumentationName)
@@ -169,36 +179,52 @@ func (t *telemetry) withSpan(
 	return err
 }
 
+// projectedLabels returns the allowlisted metric-dimension labels for the
+// supplied connection-label set. Operators opt in to per-connector metric
+// breakdowns by adding bounded-cardinality keys (e.g. "type", "env") to
+// telemetry.proxy.metric_dimension_labels — see connectorAttr for why
+// connector_id specifically is never projected onto metrics.
+func (t *telemetry) projectedLabels(connectionLabels map[string]string) []attribute.KeyValue {
+	if t == nil || t.projector == nil {
+		return nil
+	}
+	return t.projector.MetricDims(connectionLabels)
+}
+
 // recordRefreshSuccess increments the refresh-attempts counter with
-// result=success. Metric dimensions are deliberately bounded — see
-// connectorAttr for why connector_id stays out of metric attributes.
-// connectorID is accepted for API symmetry with the failure path and the
-// span methods; it is intentionally unused here.
-func (t *telemetry) recordRefreshSuccess(ctx context.Context, _ apid.ID) {
+// result=success. connectionLabels are projected through the configured
+// allowlist (telemetry.proxy.metric_dimension_labels) — unlisted keys are
+// dropped, and the metric_dimension_value_cap collapses overflow values to
+// "other" per the shared cardinality contract from #232.
+func (t *telemetry) recordRefreshSuccess(ctx context.Context, connectionLabels map[string]string) {
 	if !t.metricsActive() {
 		return
 	}
-	t.refreshAttempts.Add(ctx, 1, metric.WithAttributes(attribute.String("authproxy.oauth2.result", resultSuccess)))
+	attrs := append([]attribute.KeyValue{attribute.String("authproxy.oauth2.result", resultSuccess)}, t.projectedLabels(connectionLabels)...)
+	t.refreshAttempts.Add(ctx, 1, metric.WithAttributes(attrs...))
 }
 
 // recordRefreshFailure increments the refresh-attempts counter with
 // result=failure and the refresh-failures counter with reason=<category>.
-// Both counters stay aggregate across connectors — per-connector
-// breakdowns belong in traces, where the connector_id span attribute is
-// set unconditionally.
-func (t *telemetry) recordRefreshFailure(ctx context.Context, reason string, _ apid.ID) {
+// Both counters receive the same projected-label set so dashboards can
+// break down failures by any allowlisted connection label.
+func (t *telemetry) recordRefreshFailure(ctx context.Context, reason string, connectionLabels map[string]string) {
 	if !t.metricsActive() {
 		return
 	}
 
-	t.refreshAttempts.Add(ctx, 1, metric.WithAttributes(attribute.String("authproxy.oauth2.result", resultFailure)))
-	t.refreshFailures.Add(ctx, 1, metric.WithAttributes(attribute.String("authproxy.oauth2.reason", reason)))
+	projected := t.projectedLabels(connectionLabels)
+
+	attemptAttrs := append([]attribute.KeyValue{attribute.String("authproxy.oauth2.result", resultFailure)}, projected...)
+	t.refreshAttempts.Add(ctx, 1, metric.WithAttributes(attemptAttrs...))
+
+	failureAttrs := append([]attribute.KeyValue{attribute.String("authproxy.oauth2.reason", reason)}, projected...)
+	t.refreshFailures.Add(ctx, 1, metric.WithAttributes(failureAttrs...))
 }
 
 // recordRevocation increments the revocations counter with kind +
-// success / failure outcome. connector_id intentionally omitted from
-// metric attributes — see connectorAttr.
-func (t *telemetry) recordRevocation(ctx context.Context, kind string, ok bool, _ apid.ID) {
+// success / failure outcome and the projected connection-label set.
+func (t *telemetry) recordRevocation(ctx context.Context, kind string, ok bool, connectionLabels map[string]string) {
 	if !t.metricsActive() {
 		return
 	}
@@ -206,28 +232,34 @@ func (t *telemetry) recordRevocation(ctx context.Context, kind string, ok bool, 
 	if !ok {
 		result = resultFailure
 	}
-	t.revocations.Add(ctx, 1, metric.WithAttributes(
+	attrs := append([]attribute.KeyValue{
 		attribute.String("authproxy.oauth2.revocation_kind", kind),
 		attribute.String("authproxy.oauth2.result", result),
-	))
+	}, t.projectedLabels(connectionLabels)...)
+	t.revocations.Add(ctx, 1, metric.WithAttributes(attrs...))
 }
 
 // recordTokenExchangeSuccess / recordTokenExchangeFailure mirror the refresh
-// pair — attempts with result, failures with reason. The "attempts" counter
-// lets dashboards graph success rate without separately tracking successes.
-// connector_id intentionally omitted — see connectorAttr.
-func (t *telemetry) recordTokenExchangeSuccess(ctx context.Context, _ apid.ID) {
+// pair — attempts with result, failures with reason — plus the projected
+// connection-label set on both.
+func (t *telemetry) recordTokenExchangeSuccess(ctx context.Context, connectionLabels map[string]string) {
 	if !t.metricsActive() {
 		return
 	}
-	t.tokenExchangeAttempts.Add(ctx, 1, metric.WithAttributes(attribute.String("authproxy.oauth2.result", resultSuccess)))
+	attrs := append([]attribute.KeyValue{attribute.String("authproxy.oauth2.result", resultSuccess)}, t.projectedLabels(connectionLabels)...)
+	t.tokenExchangeAttempts.Add(ctx, 1, metric.WithAttributes(attrs...))
 }
 
-func (t *telemetry) recordTokenExchangeFailure(ctx context.Context, reason string, _ apid.ID) {
+func (t *telemetry) recordTokenExchangeFailure(ctx context.Context, reason string, connectionLabels map[string]string) {
 	if !t.metricsActive() {
 		return
 	}
 
-	t.tokenExchangeAttempts.Add(ctx, 1, metric.WithAttributes(attribute.String("authproxy.oauth2.result", resultFailure)))
-	t.tokenExchangeFailures.Add(ctx, 1, metric.WithAttributes(attribute.String("authproxy.oauth2.reason", reason)))
+	projected := t.projectedLabels(connectionLabels)
+
+	attemptAttrs := append([]attribute.KeyValue{attribute.String("authproxy.oauth2.result", resultFailure)}, projected...)
+	t.tokenExchangeAttempts.Add(ctx, 1, metric.WithAttributes(attemptAttrs...))
+
+	failureAttrs := append([]attribute.KeyValue{attribute.String("authproxy.oauth2.reason", reason)}, projected...)
+	t.tokenExchangeFailures.Add(ctx, 1, metric.WithAttributes(failureAttrs...))
 }

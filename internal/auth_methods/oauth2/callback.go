@@ -98,7 +98,7 @@ func (o *oAuth2Connection) exchangeCodeAndAdvance(ctx context.Context, query url
 // "category" string lands consistently on logs, metrics, and span errors.
 func (o *oAuth2Connection) emitAndRecordExchangeFailure(ctx context.Context, category tokenExchangeCategory, attrs tokenExchangeAttrs) {
 	emitTokenExchangeFailure(ctx, o.logger, category, attrs)
-	o.tel.recordTokenExchangeFailure(ctx, string(category), o.connectorIDForTelemetry())
+	o.tel.recordTokenExchangeFailure(ctx, string(category), o.connectionLabelsForTelemetry())
 }
 
 func (o *oAuth2Connection) exchangeCodeAndAdvanceInner(ctx context.Context, query url.Values) (string, error) {
@@ -213,7 +213,7 @@ func (o *oAuth2Connection) exchangeCodeAndAdvanceInner(ctx context.Context, quer
 		return "", err
 	}
 
-	o.tel.recordTokenExchangeSuccess(ctx, o.connectorIDForTelemetry())
+	o.tel.recordTokenExchangeSuccess(ctx, o.connectionLabelsForTelemetry())
 
 	if outcome.SetupPending {
 		return o.appendSetupPendingToReturnUrl(o.state.ReturnToUrl), nil
