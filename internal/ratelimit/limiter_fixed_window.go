@@ -47,6 +47,33 @@ end
 return {1, limit - count}
 `)
 
+// fixedWindowPeekScript mirrors fixedWindowScript but writes nothing.
+// Reports what Decide would return for the current window state.
+//
+// Returns the same {allowed, value} shape as Decide.
+var fixedWindowPeekScript = redis.NewScript(`
+local key = KEYS[1]
+local limit = tonumber(ARGV[1])
+local window_ms = tonumber(ARGV[2])
+
+local count = tonumber(redis.call('GET', key) or '0')
+
+-- Decide does INCR-then-compare; we project that by checking whether
+-- the hypothetical incremented count would exceed the limit.
+if count + 1 > limit then
+    local pttl = redis.call('PTTL', key)
+    if pttl < 0 then
+        -- Either no key (-2) or no TTL (-1). Decide would establish a
+        -- new TTL via PEXPIRE; report the full window so callers don't
+        -- see a negative number.
+        pttl = window_ms
+    end
+    return {0, pttl}
+end
+
+return {1, limit - count - 1}
+`)
+
 type fixedWindowLimiter struct {
 	ruleID   apid.ID
 	limit    int
@@ -90,6 +117,32 @@ func (l *fixedWindowLimiter) Decide(ctx context.Context, bucketKey BucketKey) (D
 	return Decision{
 		Allowed:    false,
 		RetryAfter: time.Duration(retryOrRemainingMs) * time.Millisecond,
+	}, nil
+}
+
+func (l *fixedWindowLimiter) Peek(ctx context.Context, bucketKey BucketKey) (Decision, error) {
+	now := apctx.GetClock(ctx).Now()
+	windowMs := l.window.Milliseconds()
+
+	windowID := now.UnixMilli() / windowMs
+	key := fmt.Sprintf("%s:fw:%d", limiterKeyPrefix(l.ruleID, bucketKey), windowID)
+
+	res, err := fixedWindowPeekScript.Run(ctx, l.redis, []string{key}, l.limit, windowMs).Result()
+	if err != nil {
+		return failOpen(l.logger, l.ruleID, err)
+	}
+
+	allowed, value, err := parseDecisionResult(res)
+	if err != nil {
+		return failOpen(l.logger, l.ruleID, err)
+	}
+
+	if allowed {
+		return Decision{Allowed: true, Remaining: value}, nil
+	}
+	return Decision{
+		Allowed:    false,
+		RetryAfter: time.Duration(value) * time.Millisecond,
 	}, nil
 }
 
