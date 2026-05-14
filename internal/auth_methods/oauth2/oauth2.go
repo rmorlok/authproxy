@@ -27,6 +27,10 @@ type oAuth2Connection struct {
 
 	connection coreIface.Connection
 	state      *state
+
+	// tel is the OAuth2 lifecycle telemetry surface. May be nil — every
+	// telemetry method is nil-safe so call sites don't need to guard.
+	tel *telemetry
 }
 
 var _ OAuth2Connection = (*oAuth2Connection)(nil)

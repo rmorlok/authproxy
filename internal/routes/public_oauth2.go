@@ -185,6 +185,7 @@ func NewPublicOauth2Routes(
 	httpf httpf.F,
 	encrypt encrypt.E,
 	logger *slog.Logger,
+	factoryOpts ...oauth2.FactoryOption,
 ) *PublicOauth2Routes {
 	return &PublicOauth2Routes{
 		cfg:                         cfg,
@@ -194,7 +195,7 @@ func NewPublicOauth2Routes(
 		r:                           r,
 		httpf:                       httpf,
 		encrypt:                     encrypt,
-		oauthf:                      oauth2.NewFactory(cfg, db, r, c, httpf, encrypt, logger),
+		oauthf:                      oauth2.NewFactory(cfg, db, r, c, httpf, encrypt, logger, factoryOpts...),
 		logger:                      logger,
 	}
 }

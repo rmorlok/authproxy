@@ -14,6 +14,7 @@ import (
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/aplog"
+	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/config"
 	common_routes "github.com/rmorlok/authproxy/internal/routes"
 	"github.com/rmorlok/authproxy/internal/service"
@@ -119,6 +120,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		dm.GetHttpf(),
 		dm.GetEncryptService(),
 		logger,
+		oauth2.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry),
 	)
 	routesOauth2.Register(server)
 
