@@ -65,7 +65,6 @@ type DryRunRequestContext struct {
 }
 
 // DryRunRateLimitResult is the structured output of C.DryRunRateLimit.
-// No JSON tags here — wire-format shaping is the route layer's job.
 type DryRunRateLimitResult struct {
 	// Namespace is the namespace the dry-run was actually evaluated
 	// against (post-hydration). Returned so callers can show the
