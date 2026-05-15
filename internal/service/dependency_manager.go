@@ -50,6 +50,9 @@ type DependencyManager struct {
 	telemetryOnce sync.Once
 	telemetryErr  error
 
+	rootLogger     *slog.Logger
+	rootLoggerOnce sync.Once
+
 	// Rate-limit cache + refresher are owned by the dependency manager so
 	// the lifecycle is tied to the proxy process. The cache is populated
 	// lazily via GetRateLimitCache(); StartRateLimitRefresher() boots the
@@ -153,14 +156,32 @@ func (dm *DependencyManager) GetServiceId() string {
 
 func (dm *DependencyManager) GetLogBuilder() aplog.Builder {
 	if dm.logBuilder == nil {
-		dm.logBuilder = aplog.NewBuilder(dm.cfg.GetRootLogger())
+		dm.logBuilder = aplog.NewBuilder(dm.GetRootLogger())
 	}
 
 	return dm.logBuilder
 }
 
+// GetRootLogger returns the application-wide root slog.Logger, wrapped with
+// the telemetry-aware handler from internal/aplog so every emitted record
+// gains trace_id / span_id when in a traced context (and is fanned to the
+// OTel logs pipeline when telemetry.signals.logs is on). Cached on first
+// call — every other DM lookup that needs a logger derives from this one,
+// so the wrap happens exactly once per process.
+//
+// Force-initialises telemetry providers before wrapping so the OTel logs
+// bridge picks up the live LoggerProvider regardless of call order in the
+// service's Serve func.
 func (dm *DependencyManager) GetRootLogger() *slog.Logger {
-	return dm.GetConfigRoot().GetRootLogger()
+	dm.rootLoggerOnce.Do(func() {
+		providers := dm.GetTelemetry()
+		dm.rootLogger = aplog.WrapWithTelemetry(
+			dm.GetConfigRoot().GetRootLogger(),
+			providers,
+			dm.GetConfigRoot().Telemetry,
+		)
+	})
+	return dm.rootLogger
 }
 
 func (dm *DependencyManager) GetLogger() *slog.Logger {
