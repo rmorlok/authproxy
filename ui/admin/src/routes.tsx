@@ -15,6 +15,7 @@ import EncryptionKeysPage from "./pages/EncryptionKeys";
 import EncryptionKeyDetail from "./pages/EncryptionKeyDetail";
 import RateLimitsPage from "./pages/RateLimits";
 import RateLimitDetail from "./pages/RateLimitDetail";
+import RateLimitDryRunPage from "./pages/RateLimitDryRun";
 import TasksPage from "./pages/Tasks";
 import TaskQueueDetailPage from "./pages/TaskQueueDetail";
 import NamespaceDetailPage from "./pages/NamespaceDetail";
@@ -131,6 +132,17 @@ export const router = createBrowserRouter([
                 path: 'rate-limits',
                 element: (<ListParent><RateLimitsPage /></ListParent>),
                 handle: { title: 'Rate Limits' },
+            },
+            {
+                path: 'rate-limits/_dry_run',
+                element: <RateLimitDryRunPage />,
+                handle: [
+                    {
+                        title: 'Rate Limits',
+                        path: (_params: Params<string>) => `/rate-limits`,
+                    },
+                    { title: 'Dry run' },
+                ],
             },
             {
                 path: 'rate-limits/:id',

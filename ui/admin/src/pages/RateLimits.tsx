@@ -363,9 +363,14 @@ export default function RateLimits() {
         <Box sx={{width: '100%', maxWidth: {sm: '100%', md: '1700px'}}}>
             <Stack direction="row" justifyContent="space-between" alignItems="center" sx={{ mb: 2 }}>
                 <Typography component="h2" variant="h6">Rate Limits</Typography>
-                <Button variant="contained" size="small" onClick={() => setCreateOpen(true)}>
-                    Create Rate Limit
-                </Button>
+                <Stack direction="row" spacing={1}>
+                    <Button variant="outlined" size="small" onClick={() => navigate('/rate-limits/_dry_run')}>
+                        Dry run
+                    </Button>
+                    <Button variant="contained" size="small" onClick={() => setCreateOpen(true)}>
+                        Create Rate Limit
+                    </Button>
+                </Stack>
             </Stack>
             <Stack direction="row" spacing={2} alignItems="center" sx={{ mb: 2 }}>
                 <FormControl size="small" sx={{ minWidth: 180 }}>

@@ -1,5 +1,6 @@
 import { client } from './client';
 import { ListResponse } from './common';
+import { ProxyRequest } from './proxy';
 
 // Rate-limit models. Mirror the server's routes.RateLimitJson shape and
 // the internal rate_limit schema package — kept here verbatim so SDK
@@ -148,6 +149,64 @@ export const deleteRateLimit = (id: string) => {
     return client.delete(`/api/v1/rate-limits/${id}`);
 };
 
+// --- Dry run ---
+
+/**
+ * DryRunRateLimitRequest mirrors the server's input. Reuses ProxyRequest
+ * for the request half, matching the shape /connections/{id}/_proxy
+ * already accepts.
+ */
+export interface DryRunRateLimitRequest {
+    request: ProxyRequest;
+    request_type: string;
+    context: {
+        connection_id?: string;
+        actor_id?: string;
+        namespace?: string;
+    };
+}
+
+export interface DryRunRateLimitMatch {
+    rate_limit_id: string;
+    namespace: string;
+    effective_mode: string;
+    bucket_key: string;
+    algorithm_summary: string;
+    would_allow: boolean;
+    remaining: number;
+    retry_after_ms: number;
+    /**
+     * True when the runtime fail-opened on a Redis error during Peek.
+     * The UI should surface this as "couldn't read counter; runtime
+     * would fail-open" so operators know the would_allow isn't
+     * trustworthy.
+     */
+    peek_failed: boolean;
+}
+
+export interface DryRunRateLimitNotMatched {
+    rate_limit_id: string;
+    namespace: string;
+    reason: string;
+}
+
+export interface DryRunRateLimitResponse {
+    request_label_snapshot: Record<string, string>;
+    matched: DryRunRateLimitMatch[];
+    not_matched: DryRunRateLimitNotMatched[];
+}
+
+/**
+ * Evaluate which rate limits would apply to a synthesized request, and
+ * whether each would limit it. Counters are NOT incremented — the
+ * server's Limiter.Peek reads counter state without writing. Useful for
+ * validating selectors / buckets / algorithms without sending real
+ * traffic.
+ */
+export const dryRunRateLimit = (req: DryRunRateLimitRequest) => {
+    return client.post<DryRunRateLimitResponse>('/api/v1/rate-limits/_dry_run', req);
+};
+
 // --- Label & annotation sub-resources, identical shape to encryption keys. ---
 
 export interface RateLimitLabel {
@@ -190,6 +249,7 @@ export const rateLimits = {
     get: getRateLimit,
     update: updateRateLimit,
     delete: deleteRateLimit,
+    dryRun: dryRunRateLimit,
     getLabels: getRateLimitLabels,
     getLabel: getRateLimitLabel,
     putLabel: putRateLimitLabel,
