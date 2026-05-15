@@ -19,7 +19,7 @@ echo "Tearing down AuthProxy Docker environment..."
 # Stop and remove all containers and volumes managed by docker-compose
 # Include all profiles to ensure everything is cleaned up
 echo "Stopping docker compose services and removing volumes..."
-docker compose --profile server --profile tools down -v 2>/dev/null || true
+docker compose --profile server --profile tools --profile observability down -v 2>/dev/null || true
 
 # Also clean up any manually-started containers from the manual setup instructions
 MANUAL_CONTAINERS="redis-server postgres-server clickhouse-server minio redisinsight asynqmon"

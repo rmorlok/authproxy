@@ -43,6 +43,19 @@ func New(ctx context.Context, serviceID string, version string, cfg *sconfig.Tel
 		return NoopProviders(), nil
 	}
 
+	// Endpoint-gated soft-disable: when the operator marks telemetry
+	// enabled but the exporter.endpoint resolves to empty (env-var with
+	// blank default, no explicit value), fall through to no-op providers.
+	// This is the gating mechanism dev_config/default.yaml uses to ship a
+	// "telemetry block present, but inert unless AUTHPROXY_OTEL_ENDPOINT
+	// is set" UX — flip on the env var to point at a real OTLP collector,
+	// otherwise the SDK never tries to dial anywhere.
+	if endpoint, ok, err := exporterEndpoint(ctx, cfg.GetExporter()); err != nil {
+		return nil, fmt.Errorf("aptelemetry: resolve exporter endpoint: %w", err)
+	} else if !ok || endpoint == "" {
+		return NoopProviders(), nil
+	}
+
 	res, err := buildResource(ctx, serviceID, version, cfg.GetResource())
 	if err != nil {
 		return nil, fmt.Errorf("aptelemetry: build resource: %w", err)

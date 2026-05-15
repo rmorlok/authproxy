@@ -86,6 +86,32 @@ services:
     profiles:
       - tools
 
+  # Local observability stack — Grafana + Tempo + Loki + Prometheus +
+  # bundled OTel Collector in a single image. AuthProxy exports OTLP/gRPC
+  # to :4317 when telemetry.exporter.endpoint resolves (see
+  # AUTHPROXY_OTEL_ENDPOINT in dev_config/default.yaml).
+  #
+  # Bring it up with:    docker compose --profile observability up -d
+  # Grafana UI:          http://localhost:3000 (no login required)
+  # OTLP gRPC ingest:    localhost:4317
+  # OTLP HTTP ingest:    localhost:4318
+  otel-lgtm:
+    image: grafana/otel-lgtm:0.8.6
+    ports:
+      - "3000:3000" # Grafana UI
+      - "4317:4317" # OTLP gRPC
+      - "4318:4318" # OTLP HTTP
+    volumes:
+      - otel_lgtm_data:/data
+      # Pre-provisioned dashboards are loaded from this directory on
+      # boot — see dev_config/observability/grafana/dashboards/.
+      - ./dev_config/observability/grafana/dashboards:/otel-lgtm/grafana/conf/provisioning/dashboards:ro
+      - ./dev_config/observability/grafana/dashboards-json:/var/lib/grafana/dashboards:ro
+    networks:
+      - authproxy
+    profiles:
+      - observability
+
   server:
     build: .
     ports:
@@ -111,6 +137,7 @@ volumes:
   minio_data:
   clickhouse_data:
   redisinsight_data:
+  otel_lgtm_data:
 
 networks:
   authproxy:

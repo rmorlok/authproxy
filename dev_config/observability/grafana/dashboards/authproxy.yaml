@@ -1,0 +1,15 @@
+# Grafana dashboard-provider config consumed by grafana/otel-lgtm on boot.
+# Points at /var/lib/grafana/dashboards (mounted from
+# dev_config/observability/grafana/dashboards-json/) so every JSON file in
+# that directory shows up under the "AuthProxy" folder in the Grafana UI.
+apiVersion: 1
+providers:
+  - name: authproxy
+    orgId: 1
+    folder: AuthProxy
+    type: file
+    disableDeletion: true
+    editable: true
+    options:
+      path: /var/lib/grafana/dashboards
+      foldersFromFilesStructure: false
