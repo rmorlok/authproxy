@@ -93,6 +93,14 @@
         },
         "http": {
           "$ref": "#/$defs/ProbeHttp"
+        },
+        "failure_threshold": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "recovery_threshold": {
+          "type": "integer",
+          "minimum": 1
         }
       },
       "dependencies": {
