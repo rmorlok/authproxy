@@ -6,12 +6,11 @@ package mock
 
 import (
 	context "context"
-	http "net/http"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
 	iface "github.com/rmorlok/authproxy/internal/core/iface"
-	"github.com/rmorlok/authproxy/internal/httpf"
+	httpf "github.com/rmorlok/authproxy/internal/httpf"
 )
 
 // MockNoAuthConnection is a mock of NoAuthConnection interface.
@@ -50,18 +49,4 @@ func (m *MockNoAuthConnection) ProxyRequest(ctx context.Context, reqType httpf.R
 func (mr *MockNoAuthConnectionMockRecorder) ProxyRequest(ctx, reqType, req interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProxyRequest", reflect.TypeOf((*MockNoAuthConnection)(nil).ProxyRequest), ctx, reqType, req)
-}
-
-// ProxyRequestRaw mocks base method.
-func (m *MockNoAuthConnection) ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest, w http.ResponseWriter) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProxyRequestRaw", ctx, reqType, req, w)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ProxyRequestRaw indicates an expected call of ProxyRequestRaw.
-func (mr *MockNoAuthConnectionMockRecorder) ProxyRequestRaw(ctx, reqType, req, w interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProxyRequestRaw", reflect.TypeOf((*MockNoAuthConnection)(nil).ProxyRequestRaw), ctx, reqType, req, w)
 }

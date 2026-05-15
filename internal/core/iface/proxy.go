@@ -122,5 +122,4 @@ func ProxyResponseFromGentlemen(resp *gentleman.Response) (*ProxyResponse, error
 
 type Proxy interface {
 	ProxyRequest(ctx context.Context, reqType httpf.RequestType, req *ProxyRequest) (*ProxyResponse, error)
-	ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *ProxyRequest, w http.ResponseWriter) error
 }

@@ -2,7 +2,6 @@ package iface
 
 import (
 	"context"
-	"net/http"
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -61,12 +60,6 @@ type Connection interface {
 		reqType httpf.RequestType,
 		req *ProxyRequest,
 	) (*ProxyResponse, error)
-	ProxyRequestRaw(
-		ctx context.Context,
-		reqType httpf.RequestType,
-		req *ProxyRequest,
-		w http.ResponseWriter,
-	) error
 	SubmitForm(ctx context.Context, req SubmitConnectionRequest) (ConnectionSetupResponse, error)
 	GetCurrentSetupStepResponse(ctx context.Context) (ConnectionSetupResponse, error)
 	GetDataSource(ctx context.Context, sourceId string) ([]apjs.DataSourceOption, error)

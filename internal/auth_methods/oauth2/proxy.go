@@ -307,10 +307,6 @@ func (o *oAuth2Connection) sendProxyRequest(
 	return r.Do()
 }
 
-func (o *oAuth2Connection) ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest, w http.ResponseWriter) error {
-	return nil
-}
-
 // postRefreshWithRetry POSTs a refresh-token grant to the provider's token
 // endpoint with a small bounded retry budget for transient failures
 // (transport errors and 5xx responses). Returns the final response (or

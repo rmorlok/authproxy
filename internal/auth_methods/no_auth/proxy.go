@@ -2,7 +2,6 @@ package no_auth
 
 import (
 	"context"
-	"net/http"
 
 	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/core/iface"
@@ -27,10 +26,6 @@ func (n *noAuthConnection) ProxyRequest(ctx context.Context, reqType httpf.Reque
 	}
 
 	return iface.ProxyResponseFromGentlemen(resp)
-}
-
-func (n *noAuthConnection) ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest, w http.ResponseWriter) error {
-	return nil
 }
 
 var _ iface.Proxy = (*noAuthConnection)(nil)

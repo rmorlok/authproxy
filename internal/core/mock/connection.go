@@ -3,7 +3,6 @@ package mock
 import (
 	"context"
 	"fmt"
-	"net/http"
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -106,15 +105,6 @@ func (m *Connection) ProxyRequest(
 	req *iface.ProxyRequest,
 ) (*iface.ProxyResponse, error) {
 	return nil, nil
-}
-
-func (m *Connection) ProxyRequestRaw(
-	ctx context.Context,
-	reqType httpf.RequestType,
-	req *iface.ProxyRequest,
-	w http.ResponseWriter,
-) error {
-	return nil
 }
 
 func (m *Connection) GetSetupStep() *cschema.SetupStep {

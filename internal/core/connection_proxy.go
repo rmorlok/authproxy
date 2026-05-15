@@ -3,7 +3,6 @@ package core
 import (
 	"context"
 	"errors"
-	"net/http"
 
 	"github.com/rmorlok/authproxy/internal/auth_methods/no_auth"
 	"github.com/rmorlok/authproxy/internal/core/iface"
@@ -63,16 +62,3 @@ func (c *connection) ProxyRequest(
 	return p.ProxyRequest(ctx, reqType, req)
 }
 
-func (c *connection) ProxyRequestRaw(
-	ctx context.Context,
-	reqType httpf.RequestType,
-	req *iface.ProxyRequest,
-	w http.ResponseWriter,
-) error {
-	p, err := c.getProxyImpl()
-	if err != nil {
-		return err
-	}
-
-	return p.ProxyRequestRaw(ctx, reqType, req, w)
-}

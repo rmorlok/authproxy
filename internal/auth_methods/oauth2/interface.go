@@ -2,7 +2,6 @@ package oauth2
 
 import (
 	"context"
-	"net/http"
 	"net/url"
 
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -36,7 +35,6 @@ type OAuth2Connection interface {
 	) (string, error)
 	CallbackFrom3rdParty(ctx context.Context, query url.Values) (string, error)
 	ProxyRequest(ctx context.Context, reqType httpf.RequestType, req *coreIface.ProxyRequest) (*coreIface.ProxyResponse, error)
-	ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *coreIface.ProxyRequest, w http.ResponseWriter) error
 	SupportsRevokeTokens() bool
 	RevokeTokens(ctx context.Context) error
 }
