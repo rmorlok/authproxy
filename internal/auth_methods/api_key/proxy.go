@@ -11,7 +11,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
 // ProxyRequest authenticates an outbound proxied request with the connection's
@@ -59,36 +58,17 @@ func (a *apiKeyConnection) ProxyRequestRaw(ctx context.Context, reqType httpf.Re
 
 // resolveAuth fetches the active credential row, decrypts the plaintext, and
 // computes the authentication application for the placement that was in effect
-// when the credential was submitted. The placement_snapshot stored on the
-// credential row is used in preference to the live connector definition so an
-// in-flight YAML change can't break previously-submitted credentials.
+// when the credential was submitted. Every credential row carries a placement
+// snapshot — InsertApiKeyCredential always captures one — so a missing snapshot
+// indicates corruption and surfaces an error rather than guessing.
 func (a *apiKeyConnection) resolveAuth(ctx context.Context) (authApplication, error) {
 	cred, err := a.db.GetActiveApiKeyCredential(ctx, a.connection.GetId())
 	if err != nil {
 		return authApplication{}, fmt.Errorf("failed to load api-key credential: %w", err)
 	}
 
-	placement := cred.PlacementSnapshot
-	if placement == nil {
-		// Fall back to the connector definition's placement when the credential
-		// row didn't snapshot one (rows inserted before snapshot wiring shipped).
-		// In current code Connector.Normalize materializes placement and
-		// InsertApiKeyCredential captures it, so this fallback should rarely
-		// trigger — but it keeps the proxy resilient if the credential row
-		// predates snapshot capture.
-		cv := a.connection.GetConnectorVersionEntity()
-		if cv == nil {
-			return authApplication{}, errors.New("connector version missing for api-key proxy request")
-		}
-		def := cv.GetDefinition()
-		if def == nil || def.Auth == nil {
-			return authApplication{}, errors.New("connector definition missing for api-key proxy request")
-		}
-		ak, ok := def.Auth.Inner().(*cschema.AuthApiKey)
-		if !ok {
-			return authApplication{}, fmt.Errorf("expected AuthApiKey, got %T", def.Auth.Inner())
-		}
-		placement = ak.Placement
+	if cred.PlacementSnapshot == nil {
+		return authApplication{}, errors.New("api-key credential is missing its placement snapshot")
 	}
 
 	decrypted, err := a.encrypt.DecryptString(ctx, cred.EncryptedCredentials)
@@ -100,5 +80,5 @@ func (a *apiKeyConnection) resolveAuth(ctx context.Context) (authApplication, er
 		return authApplication{}, fmt.Errorf("failed to unmarshal api-key plaintext: %w", err)
 	}
 
-	return computeAuthApplication(placement, plaintext)
+	return computeAuthApplication(cred.PlacementSnapshot, plaintext)
 }

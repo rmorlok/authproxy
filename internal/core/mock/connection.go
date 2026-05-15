@@ -29,11 +29,6 @@ type Connection struct {
 	SetupStep        *cschema.SetupStep
 	SetupError       *string
 	Configuration    map[string]any
-
-	// ConnectorVersionEntity is the mocked ConnectorVersion returned from
-	// GetConnectorVersionEntity. Optional — defaults to nil (matching the
-	// historical mock behaviour).
-	ConnectorVersionEntity iface.ConnectorVersion
 }
 
 func (m *Connection) GetId() apid.ID {
@@ -73,7 +68,7 @@ func (m *Connection) GetLabels() map[string]string {
 }
 
 func (m *Connection) GetConnectorVersionEntity() iface.ConnectorVersion {
-	return m.ConnectorVersionEntity
+	return nil
 }
 
 func (m *Connection) SetState(ctx context.Context, state database.ConnectionState) error {

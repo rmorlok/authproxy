@@ -60,40 +60,28 @@ func TestResolveAuth_UsesPlacementSnapshotWhenPresent(t *testing.T) {
 	assert.Equal(t, "sk-snapshot", app.HeaderValue)
 }
 
-func TestResolveAuth_FallsBackToLiveDefinitionWhenSnapshotMissing(t *testing.T) {
+func TestResolveAuth_FailsWhenPlacementSnapshotMissing(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
 	connectionId := apid.New(apid.PrefixConnection)
+	conn, db := newTestApiKeyConn(t, ctrl, &mockCore.Connection{Id: connectionId})
 
-	// Live connector definition uses bearer placement. Credential row has no
-	// snapshot (e.g. row inserted before snapshot capture shipped).
-	liveDef := &cschema.Connector{
-		Auth: &cschema.Auth{InnerVal: &cschema.AuthApiKey{
-			Type:      cschema.AuthTypeAPIKey,
-			Placement: &cschema.ApiKeyPlacement{Type: cschema.ApiKeyPlacementBearer},
-		}},
-	}
-	conn, db := newTestApiKeyConn(t, ctrl, &mockCore.Connection{
-		Id: connectionId,
-		ConnectorVersionEntity: &mockCore.ConnectorVersion{
-			Definition: liveDef,
-		},
-	})
-
+	// Every credential row inserted by the connection-initiate path carries a
+	// placement snapshot. A row without one indicates corruption, so the proxy
+	// errors rather than guessing.
 	db.EXPECT().GetActiveApiKeyCredential(gomock.Any(), connectionId).Return(
 		&database.ApiKeyCredential{
 			Id:                   apid.New(apid.PrefixApiKeyCredential),
 			ConnectionId:         connectionId,
 			EncryptedCredentials: encfield.EncryptedField{ID: "ekv_fake", Data: `{"api_key":"sk-live"}`},
-			// PlacementSnapshot: nil (testing the fallback)
+			// PlacementSnapshot: nil
 		}, nil,
 	)
 
-	app, err := conn.resolveAuth(context.Background())
-	require.NoError(t, err)
-	assert.Equal(t, "Authorization", app.HeaderName)
-	assert.Equal(t, "Bearer sk-live", app.HeaderValue)
+	_, err := conn.resolveAuth(context.Background())
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "placement snapshot")
 }
 
 func TestResolveAuth_PropagatesDBError(t *testing.T) {
