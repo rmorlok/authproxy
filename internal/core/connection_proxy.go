@@ -31,6 +31,13 @@ func (c *connection) getProxyImpl() (iface.Proxy, error) {
 			return
 		}
 
+		if _, ok := auth.Inner().(*config.AuthApiKey); ok {
+			akf := c.s.getApiKeyFactory()
+			c.proxyImpl = akf.NewApiKey(c)
+			c.proxyImplErr = nil
+			return
+		}
+
 		if auth, ok := auth.Inner().(*config.AuthNoAuth); ok {
 			c.proxyImpl = no_auth.NewNoAuth(c.s.logger, c.s.httpf, auth, c)
 			c.proxyImplErr = nil
