@@ -19,6 +19,7 @@ import (
 	common_routes "github.com/rmorlok/authproxy/internal/routes"
 	"github.com/rmorlok/authproxy/internal/service"
 	"github.com/rmorlok/authproxy/internal/util"
+	marketplaceembed "github.com/rmorlok/authproxy/ui/marketplace/embed"
 )
 
 func GetCorsConfig(cfg config.C) *cors.Config {
@@ -75,8 +76,16 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 	}
 
 	if service.StaticVal != nil {
-		// Static content
-		server.Use(static.Serve(service.StaticVal.MountAtPath, static.LocalFile(service.StaticVal.ServeFromPath, true)))
+		// Static content: prefer the compiled-in marketplace UI; fall back to
+		// an on-disk directory when ServeFromPath is set (local iteration,
+		// custom builds).
+		var sfs static.ServeFileSystem
+		if service.StaticVal.IsEmbedded() {
+			sfs = apgin.NewEmbedServeFileSystem(marketplaceembed.FS())
+		} else {
+			sfs = static.LocalFile(service.StaticVal.ServeFromPath, true)
+		}
+		server.Use(static.Serve(service.StaticVal.MountAtPath, sfs))
 	}
 
 	healthChecker.GET("/ping", func(c *gin.Context) {
@@ -192,8 +201,19 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		// so deep links like /connectors or /connections must serve the
 		// SPA's index.html (the SPA reads the URL itself). Without this,
 		// the static middleware would fall through to a 404 for those paths.
-		indexPath := filepath.Join(service.StaticVal.ServeFromPath, "index.html")
 		mountPrefix := strings.TrimSuffix(service.StaticVal.MountAtPath, "/")
+		var serveIndex func(c *gin.Context)
+		if service.StaticVal.IsEmbedded() {
+			embedHTTPFS := http.FS(marketplaceembed.FS())
+			serveIndex = func(c *gin.Context) {
+				c.FileFromFS("index.html", embedHTTPFS)
+			}
+		} else {
+			indexPath := filepath.Join(service.StaticVal.ServeFromPath, "index.html")
+			serveIndex = func(c *gin.Context) {
+				c.File(indexPath)
+			}
+		}
 		server.NoRoute(func(c *gin.Context) {
 			if c.Request.Method != http.MethodGet {
 				return
@@ -206,7 +226,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 			if mountPrefix != "" && !strings.HasPrefix(p, mountPrefix) {
 				return
 			}
-			c.File(indexPath)
+			serveIndex(c)
 		})
 	}
 

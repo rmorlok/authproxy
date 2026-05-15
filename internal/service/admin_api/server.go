@@ -3,11 +3,13 @@ package admin_api
 import (
 	"context"
 	"net/http"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/gin-contrib/cors"
+	"github.com/gin-gonic/contrib/static"
 	"github.com/gin-gonic/gin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apgin"
@@ -18,6 +20,7 @@ import (
 	admin_api_swagger "github.com/rmorlok/authproxy/internal/service/admin_api/swagger"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
+	adminembed "github.com/rmorlok/authproxy/ui/admin/embed"
 )
 
 func GetCorsConfig(cfg config.C) *cors.Config {
@@ -62,6 +65,19 @@ func GetGinServer(
 	corsConfig := GetCorsConfig(dm.GetConfig())
 	if corsConfig != nil {
 		server.Use(apgin.NewCorsMiddleware(*corsConfig, logger))
+	}
+
+	if service.StaticVal != nil {
+		// Static content: prefer the compiled-in admin UI; fall back to an
+		// on-disk directory when ServeFromPath is set (local iteration,
+		// custom builds).
+		var sfs static.ServeFileSystem
+		if service.StaticVal.IsEmbedded() {
+			sfs = apgin.NewEmbedServeFileSystem(adminembed.FS())
+		} else {
+			sfs = static.LocalFile(service.StaticVal.ServeFromPath, true)
+		}
+		server.Use(static.Serve(service.StaticVal.MountAtPath, sfs))
 	}
 
 	// Swagger documentation endpoint
@@ -193,6 +209,38 @@ func GetGinServer(
 	if service.SupportsUi() {
 		routesError := common_routes.NewErrorRoutes(dm.GetConfig())
 		routesError.Register(server)
+	}
+
+	if service.StaticVal != nil {
+		// SPA fallback: deep links like /connectors must serve the admin SPA's
+		// index.html so React Router can resolve them client-side.
+		mountPrefix := strings.TrimSuffix(service.StaticVal.MountAtPath, "/")
+		var serveIndex func(c *gin.Context)
+		if service.StaticVal.IsEmbedded() {
+			embedHTTPFS := http.FS(adminembed.FS())
+			serveIndex = func(c *gin.Context) {
+				c.FileFromFS("index.html", embedHTTPFS)
+			}
+		} else {
+			indexPath := filepath.Join(service.StaticVal.ServeFromPath, "index.html")
+			serveIndex = func(c *gin.Context) {
+				c.File(indexPath)
+			}
+		}
+		server.NoRoute(func(c *gin.Context) {
+			if c.Request.Method != http.MethodGet {
+				return
+			}
+			p := c.Request.URL.Path
+			// Don't shadow API or swagger — they should keep returning their own 404s.
+			if strings.HasPrefix(p, "/api/") || strings.HasPrefix(p, "/swagger") {
+				return
+			}
+			if mountPrefix != "" && !strings.HasPrefix(p, mountPrefix) {
+				return
+			}
+			serveIndex(c)
+		})
 	}
 
 	return service.GetServerAndHealthChecker(server, healthChecker)
