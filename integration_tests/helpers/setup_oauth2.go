@@ -366,3 +366,18 @@ func (env *IntegrationTestEnv) DecryptOAuth2RefreshToken(t *testing.T, tok *data
 	require.NoError(t, err, "decrypt refresh_token")
 	return plaintext
 }
+
+// DecryptOAuth2AccessToken decrypts the persisted access_token for the
+// connection's current token row and returns the plaintext. Used by tests
+// that drive provider-side revocation by token value (e.g. scenario 11) —
+// the test provider's /test/revoke endpoint takes the raw token string, so
+// the test must decrypt the stored row to retrieve it.
+func (env *IntegrationTestEnv) DecryptOAuth2AccessToken(t *testing.T, tok *database.OAuth2Token) string {
+	t.Helper()
+	require.NotNil(t, tok, "DecryptOAuth2AccessToken: token must not be nil")
+	require.False(t, tok.EncryptedAccessToken.IsZero(),
+		"DecryptOAuth2AccessToken: token has no encrypted access_token")
+	plaintext, err := env.DM.GetEncryptService().DecryptString(context.Background(), tok.EncryptedAccessToken)
+	require.NoError(t, err, "decrypt access_token")
+	return plaintext
+}
