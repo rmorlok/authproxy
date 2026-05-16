@@ -63,7 +63,7 @@ func (s *service) runProbeForConnection(ctx context.Context, t *asynq.Task) erro
 		Build()
 
 	logger.Debug("getting connection")
-	conn, err := s.GetConnection(ctx, p.ConnectionId)
+	conn, err := s.getConnection(ctx, p.ConnectionId)
 	if err != nil {
 		if errors.Is(database.ErrNotFound, err) {
 			logger.Error("connection not found", "error", err)
@@ -89,10 +89,8 @@ func (s *service) runProbeForConnection(ctx context.Context, t *asynq.Task) erro
 	// transition the connection's health_state. Health bookkeeping is
 	// best-effort: a failure here is logged but does not invalidate the
 	// underlying probe outcome.
-	if cc, ok := conn.(*connection); ok {
-		if healthErr := cc.recordPeriodicProbeOutcome(ctx, probe, invokeErr == nil); healthErr != nil {
-			logger.Error("failed to record probe outcome for health state", "error", healthErr)
-		}
+	if healthErr := conn.recordPeriodicProbeOutcome(ctx, probe, invokeErr == nil); healthErr != nil {
+		logger.Error("failed to record probe outcome for health state", "error", healthErr)
 	}
 
 	if invokeErr != nil {
