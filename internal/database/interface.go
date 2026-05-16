@@ -171,6 +171,16 @@ type DB interface {
 	DeleteAllApiKeyCredentialsForConnection(ctx context.Context, connectionId apid.ID) error
 
 	/*
+	 * Connection probe health (per-(connection, probe) counters for the
+	 * probe-driven health-check signal)
+	 */
+	RecordProbeSuccess(ctx context.Context, connectionId apid.ID, probeId string) (*ConnectionProbeHealth, error)
+	RecordProbeFailure(ctx context.Context, connectionId apid.ID, probeId string) (*ConnectionProbeHealth, error)
+	GetConnectionProbeHealth(ctx context.Context, connectionId apid.ID, probeId string) (*ConnectionProbeHealth, error)
+	ListConnectionProbeHealth(ctx context.Context, connectionId apid.ID) (map[string]*ConnectionProbeHealth, error)
+	ResetConnectionProbeHealth(ctx context.Context, connectionId apid.ID) error
+
+	/*
 	 * Encryption Keys
 	 */
 

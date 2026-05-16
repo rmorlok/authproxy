@@ -875,6 +875,21 @@ func (mr *MockDBMockRecorder) GetConnection(ctx, id interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnection", reflect.TypeOf((*MockDB)(nil).GetConnection), ctx, id)
 }
 
+// GetConnectionProbeHealth mocks base method.
+func (m *MockDB) GetConnectionProbeHealth(ctx context.Context, connectionId apid.ID, probeId string) (*database.ConnectionProbeHealth, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetConnectionProbeHealth", ctx, connectionId, probeId)
+	ret0, _ := ret[0].(*database.ConnectionProbeHealth)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetConnectionProbeHealth indicates an expected call of GetConnectionProbeHealth.
+func (mr *MockDBMockRecorder) GetConnectionProbeHealth(ctx, connectionId, probeId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetConnectionProbeHealth", reflect.TypeOf((*MockDB)(nil).GetConnectionProbeHealth), ctx, connectionId, probeId)
+}
+
 // GetConnectorVersion mocks base method.
 func (m *MockDB) GetConnectorVersion(ctx context.Context, id apid.ID, version uint64) (*database.ConnectorVersion, error) {
 	m.ctrl.T.Helper()
@@ -1157,6 +1172,21 @@ func (m *MockDB) ListActorsFromCursor(ctx context.Context, cursor string) (datab
 func (mr *MockDBMockRecorder) ListActorsFromCursor(ctx, cursor interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListActorsFromCursor", reflect.TypeOf((*MockDB)(nil).ListActorsFromCursor), ctx, cursor)
+}
+
+// ListConnectionProbeHealth mocks base method.
+func (m *MockDB) ListConnectionProbeHealth(ctx context.Context, connectionId apid.ID) (map[string]*database.ConnectionProbeHealth, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ListConnectionProbeHealth", ctx, connectionId)
+	ret0, _ := ret[0].(map[string]*database.ConnectionProbeHealth)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// ListConnectionProbeHealth indicates an expected call of ListConnectionProbeHealth.
+func (mr *MockDBMockRecorder) ListConnectionProbeHealth(ctx, connectionId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ListConnectionProbeHealth", reflect.TypeOf((*MockDB)(nil).ListConnectionProbeHealth), ctx, connectionId)
 }
 
 // ListConnectionsBuilder mocks base method.
@@ -1601,6 +1631,36 @@ func (mr *MockDBMockRecorder) ReconcileCarryForwardLabels(ctx, batchSize, limite
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ReconcileCarryForwardLabels", reflect.TypeOf((*MockDB)(nil).ReconcileCarryForwardLabels), ctx, batchSize, limiter)
 }
 
+// RecordProbeFailure mocks base method.
+func (m *MockDB) RecordProbeFailure(ctx context.Context, connectionId apid.ID, probeId string) (*database.ConnectionProbeHealth, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RecordProbeFailure", ctx, connectionId, probeId)
+	ret0, _ := ret[0].(*database.ConnectionProbeHealth)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RecordProbeFailure indicates an expected call of RecordProbeFailure.
+func (mr *MockDBMockRecorder) RecordProbeFailure(ctx, connectionId, probeId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordProbeFailure", reflect.TypeOf((*MockDB)(nil).RecordProbeFailure), ctx, connectionId, probeId)
+}
+
+// RecordProbeSuccess mocks base method.
+func (m *MockDB) RecordProbeSuccess(ctx context.Context, connectionId apid.ID, probeId string) (*database.ConnectionProbeHealth, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "RecordProbeSuccess", ctx, connectionId, probeId)
+	ret0, _ := ret[0].(*database.ConnectionProbeHealth)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// RecordProbeSuccess indicates an expected call of RecordProbeSuccess.
+func (mr *MockDBMockRecorder) RecordProbeSuccess(ctx, connectionId, probeId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordProbeSuccess", reflect.TypeOf((*MockDB)(nil).RecordProbeSuccess), ctx, connectionId, probeId)
+}
+
 // RefreshConnectionsForConnectorVersion mocks base method.
 func (m *MockDB) RefreshConnectionsForConnectorVersion(ctx context.Context, id apid.ID, version uint64) error {
 	m.ctrl.T.Helper()
@@ -1627,6 +1687,20 @@ func (m *MockDB) RefreshNamespaceLabelsCarryForward(ctx context.Context, nsPath 
 func (mr *MockDBMockRecorder) RefreshNamespaceLabelsCarryForward(ctx, nsPath interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RefreshNamespaceLabelsCarryForward", reflect.TypeOf((*MockDB)(nil).RefreshNamespaceLabelsCarryForward), ctx, nsPath)
+}
+
+// ResetConnectionProbeHealth mocks base method.
+func (m *MockDB) ResetConnectionProbeHealth(ctx context.Context, connectionId apid.ID) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ResetConnectionProbeHealth", ctx, connectionId)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ResetConnectionProbeHealth indicates an expected call of ResetConnectionProbeHealth.
+func (mr *MockDBMockRecorder) ResetConnectionProbeHealth(ctx, connectionId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ResetConnectionProbeHealth", reflect.TypeOf((*MockDB)(nil).ResetConnectionProbeHealth), ctx, connectionId)
 }
 
 // SetConnectionEncryptedConfiguration mocks base method.

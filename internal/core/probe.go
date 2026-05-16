@@ -36,6 +36,14 @@ func (p *probeBase) Logger() *slog.Logger {
 	return p.logger
 }
 
+func (p *probeBase) EffectiveFailureThreshold() int {
+	return p.cfg.EffectiveFailureThreshold()
+}
+
+func (p *probeBase) EffectiveRecoveryThreshold() int {
+	return p.cfg.EffectiveRecoveryThreshold()
+}
+
 func (p *probeBase) GetScheduleString() string {
 	if !p.IsPeriodic() {
 		return ""
