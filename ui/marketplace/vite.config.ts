@@ -38,8 +38,11 @@ export default defineConfig(({ mode }) => {
     build: {
       // Output into embed/dist so the Go //go:embed directive in embed/embed.go
       // can pick the build up at compile time without copying files around.
+      // emptyOutDir is intentionally false: the committed .gitkeep is what
+      // keeps go:embed happy on a fresh checkout, and Vite's default cleanup
+      // would delete it.
       outDir: 'embed/dist',
-      emptyOutDir: true,
+      emptyOutDir: false,
     },
     resolve: {
       alias: [

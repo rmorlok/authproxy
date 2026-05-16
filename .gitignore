@@ -35,11 +35,11 @@ tmp
 node_modules
 
 # Built UI artifacts — embedded at compile time via //go:embed.
-# Keep .gitkeep and the placeholder index.html so a fresh checkout still
-# compiles before running `vite build`.
+# Only .gitkeep is tracked so a fresh checkout still compiles before
+# `vite build` runs; Vite is configured with emptyOutDir:false so the
+# committed .gitkeep survives across builds.
 ui/*/embed/dist/*
 !ui/*/embed/dist/.gitkeep
-!ui/*/embed/dist/index.html
 
 dev_config/keys/tls
 

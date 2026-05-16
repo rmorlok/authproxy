@@ -59,7 +59,11 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
-          platforms: linux/amd64,linux/arm64
+          # arm64 builds run under QEMU emulation on GH-hosted amd64 runners,
+          # which is ~5x slower than native — fine for the merge/tag path
+          # where we ship the multi-arch manifest, but it pushes PR builds
+          # past the job timeout. PRs build amd64 only for verification.
+          platforms: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           push: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
