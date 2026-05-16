@@ -16,14 +16,35 @@ import (
 	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
-// Scenario 18 from issue #177: the proxy's HTTP client has no configured
-// timeout (httpf.factory uses http.DefaultTransport as-is). The closest
-// observable failure mode is a connection that terminates mid-flight —
-// from the proxy's perspective a server-side timeout, a forced TCP reset,
-// and a process crash all surface identically as a transport error on the
-// pending POST/GET. The test provider's ScriptAction{DropConnection:true}
-// reproduces this by hijacking the response writer and closing the
-// underlying connection.
+// Scenario 18 from issue #177: provider-side timeouts. The proxy has
+// no time-budgeted HTTP timeout configured — `httpf.factory` wraps
+// `http.DefaultTransport` without setting `Timeout` on the underlying
+// client, and the inbound gin server is constructed without
+// `ReadTimeout` / `WriteTimeout`, so no per-request deadline ever
+// lands on the ctx the handler runs under. Cancellation can still
+// arrive via context propagation if the *calling client* closes its
+// connection: the refresh, proxy, and revocation legs thread `ctx`
+// through `gentleman.UseContext(ctx)` so the in-flight upstream
+// request aborts in that case. The token-exchange leg
+// (`postTokenExchangeWithRetry`) does not call `UseContext` on the
+// request itself, but the retry-loop's backoff `select` does check
+// `ctx.Done()` between attempts.
+//
+// What this means for "what happens when the provider hangs":
+//   - if the calling client stays connected, there is no source of
+//     timeout — the request waits indefinitely on whichever leg is
+//     blocked;
+//   - if the calling client disconnects, refresh/proxy/revocation
+//     abort the upstream request via ctx; token exchange aborts only
+//     between attempts.
+//
+// The closest faithful reproduction of a "provider stopped responding"
+// failure that the proxy can actually observe is a connection that
+// terminates mid-flight. From the proxy's perspective a server-side
+// timeout, a TCP reset, and a process crash all surface identically
+// as a transport error on the pending POST/GET. The test provider's
+// `ScriptAction{DropConnection: true}` reproduces this by hijacking
+// the response writer and closing the underlying connection.
 //
 // The proxy classifies any transport-layer failure on the token-exchange
 // or refresh leg as `network_error` (transient). The token endpoint and
