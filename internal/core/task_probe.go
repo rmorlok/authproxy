@@ -89,7 +89,7 @@ func (s *service) runProbeForConnection(ctx context.Context, t *asynq.Task) erro
 	// transition the connection's health_state. Health bookkeeping is
 	// best-effort: a failure here is logged but does not invalidate the
 	// underlying probe outcome.
-	if healthErr := conn.recordPeriodicProbeOutcome(ctx, probe, invokeErr == nil); healthErr != nil {
+	if healthErr := conn.recordPeriodicProbeOutcome(ctx, probe, invokeErr == nil, invokeErr); healthErr != nil {
 		logger.Error("failed to record probe outcome for health state", "error", healthErr)
 	}
 

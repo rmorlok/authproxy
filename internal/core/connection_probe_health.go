@@ -18,104 +18,122 @@ import (
 const healthReasonPrefix = "probe:"
 
 // recordPeriodicProbeOutcome is the probe-driven half of the health-state
-// signal. It records the per-(connection, probe) counter, then decides whether
-// the outcome crossed a threshold:
+// signal. It appends an outcome event for the (connection, probe), then walks
+// the recent event log to decide whether thresholds were crossed:
 //
-//   - On failure: if the just-incremented failure count reaches the probe's
-//     failure threshold, flip the connection unhealthy. MarkHealthState is
-//     idempotent so subsequent failures are no-ops on the state machine.
+//   - On failure: if the most-recent rows show a consecutive-failure streak
+//     >= the probe's failure_threshold, flip the connection unhealthy.
+//     MarkHealthState is idempotent so further failures are no-ops on the
+//     state machine.
 //
-//   - On success: if the connection is currently unhealthy, check whether
-//     recovery is satisfied. Recovery requires the current probe's success
-//     streak to reach its recovery threshold AND no other probe to be at or
-//     over its failure threshold. When satisfied, flip healthy and reset all
-//     counters for the connection so a future failure starts a fresh streak.
+//   - On success: if currently unhealthy, check whether recovery is satisfied.
+//     Recovery requires (1) this probe's consecutive-success streak >= its
+//     recovery_threshold AND (2) no other probe currently has a consecutive-
+//     failure streak >= its own failure_threshold. When satisfied, flip
+//     healthy.
 //
 // Also stamps last_validated_at on the active api-key credential when the
-// outcome is a success against an api-key connector — gives operators a
-// per-connection "credential last checked OK" timestamp without scraping logs.
+// outcome is a success against an api-key connector.
 //
-// Errors are logged at call sites but do not cause the probe task to retry —
-// the probe outcome is already authoritative; a counter-write failure should
-// not invalidate the invocation.
-func (c *connection) recordPeriodicProbeOutcome(ctx context.Context, probe iface.Probe, success bool) error {
-	var row *database.ConnectionProbeHealth
-	var err error
-	if success {
-		row, err = c.s.db.RecordProbeSuccess(ctx, c.Id, probe.GetId())
-	} else {
-		row, err = c.s.db.RecordProbeFailure(ctx, c.Id, probe.GetId())
+// Errors are returned for the caller (task_probe.go) to log. The probe
+// invocation outcome itself is already authoritative; a bookkeeping failure
+// should not trigger an Asynq retry.
+func (c *connection) recordPeriodicProbeOutcome(ctx context.Context, probe iface.Probe, success bool, invokeErr error) error {
+	outcome := database.ProbeOutcomeStatusSuccess
+	errorMessage := ""
+	if !success {
+		outcome = database.ProbeOutcomeStatusFailure
+		if invokeErr != nil {
+			errorMessage = invokeErr.Error()
+		}
 	}
-	if err != nil {
-		return fmt.Errorf("record probe outcome: %w", err)
+
+	if _, err := c.s.db.InsertProbeOutcome(ctx, c.Id, probe.GetId(), outcome, errorMessage); err != nil {
+		return fmt.Errorf("insert probe outcome: %w", err)
 	}
 
 	if success {
 		if err := c.maybeUpdateApiKeyLastValidated(ctx); err != nil {
-			// Non-fatal: log and continue with the health-state decision.
 			c.logger.LogAttrs(ctx, slog.LevelWarn, "failed to update api-key last_validated_at",
 				slog.String("probe_id", probe.GetId()),
 				slog.String("error", err.Error()),
 			)
 		}
-		return c.maybeRecoverHealth(ctx, probe, row)
+		return c.maybeRecoverHealth(ctx, probe)
 	}
 
-	if row.ConsecutiveFailures >= probe.EffectiveFailureThreshold() {
-		reason := healthReasonPrefix + probe.GetId()
-		return c.MarkHealthState(ctx, database.ConnectionHealthStateUnhealthy, reason)
+	streak, err := c.consecutiveOutcomeStreak(ctx, probe.GetId(), database.ProbeOutcomeStatusFailure, probe.EffectiveFailureThreshold())
+	if err != nil {
+		return err
+	}
+	if streak >= probe.EffectiveFailureThreshold() {
+		return c.MarkHealthState(ctx, database.ConnectionHealthStateUnhealthy, healthReasonPrefix+probe.GetId())
 	}
 	return nil
 }
 
 // maybeRecoverHealth handles the success-side of the probe-driven transition.
-// Called only on success; assumes the connection's current probe counters have
-// already been updated (this probe's success streak incremented, failure streak
-// reset to zero).
-func (c *connection) maybeRecoverHealth(ctx context.Context, probe iface.Probe, row *database.ConnectionProbeHealth) error {
+// Called only on success; assumes the success outcome has already been
+// appended to the event log.
+func (c *connection) maybeRecoverHealth(ctx context.Context, probe iface.Probe) error {
 	if c.GetHealthState() == database.ConnectionHealthStateHealthy {
 		return nil
 	}
 
-	if row.ConsecutiveSuccesses < probe.EffectiveRecoveryThreshold() {
+	successStreak, err := c.consecutiveOutcomeStreak(ctx, probe.GetId(), database.ProbeOutcomeStatusSuccess, probe.EffectiveRecoveryThreshold())
+	if err != nil {
+		return err
+	}
+	if successStreak < probe.EffectiveRecoveryThreshold() {
 		return nil
 	}
 
-	// Any other probe still at or over its failure threshold blocks recovery —
-	// recovery means ALL probes are within bounds, not just the one that just
-	// passed.
-	all, err := c.s.db.ListConnectionProbeHealth(ctx, c.Id)
-	if err != nil {
-		return fmt.Errorf("list probe health: %w", err)
-	}
+	// Recovery requires every OTHER probe to be within its failure threshold.
+	// A recovery on probe A doesn't restore health while probe B is still
+	// over-failing.
 	def := c.cv.GetDefinition()
 	if def != nil {
 		for _, p := range def.Probes {
 			if p.Id == probe.GetId() {
 				continue
 			}
-			cnt, ok := all[p.Id]
-			if !ok {
-				continue
+			otherFailureThreshold := p.EffectiveFailureThreshold()
+			otherStreak, err := c.consecutiveOutcomeStreak(ctx, p.Id, database.ProbeOutcomeStatusFailure, otherFailureThreshold)
+			if err != nil {
+				return err
 			}
-			if cnt.ConsecutiveFailures >= p.EffectiveFailureThreshold() {
+			if otherStreak >= otherFailureThreshold {
 				return nil // another probe is still failing
 			}
 		}
 	}
 
-	reason := healthReasonPrefix + probe.GetId()
-	if err := c.MarkHealthState(ctx, database.ConnectionHealthStateHealthy, reason); err != nil {
-		return err
+	return c.MarkHealthState(ctx, database.ConnectionHealthStateHealthy, healthReasonPrefix+probe.GetId())
+}
+
+// consecutiveOutcomeStreak returns the number of most-recent outcomes for the
+// (connection, probe) that match the given outcome, capped at limit.
+//
+// The "cap at limit" matters: we only need to know whether the streak crosses
+// a threshold, so reading more than `limit` rows is wasted work. The caller
+// passes the relevant threshold as limit; if the returned streak equals
+// limit, "≥ threshold" is satisfied.
+func (c *connection) consecutiveOutcomeStreak(ctx context.Context, probeId, matchOutcome string, limit int) (int, error) {
+	if limit <= 0 {
+		return 0, nil
 	}
-	// Reset every probe's counters so future failures start a fresh streak.
-	// Without this, a probe that was at (threshold - 1) failures stays primed
-	// and would flip unhealthy on its next failure rather than requiring the
-	// full threshold count.
-	if err := c.s.db.ResetConnectionProbeHealth(ctx, c.Id); err != nil {
-		return fmt.Errorf("reset probe counters: %w", err)
+	rows, err := c.s.db.GetRecentProbeOutcomes(ctx, c.Id, probeId, limit)
+	if err != nil {
+		return 0, fmt.Errorf("get recent probe outcomes: %w", err)
 	}
-	return nil
+	n := 0
+	for _, r := range rows {
+		if r.Outcome != matchOutcome {
+			break
+		}
+		n++
+	}
+	return n, nil
 }
 
 // maybeUpdateApiKeyLastValidated stamps the active api-key credential's
@@ -133,8 +151,6 @@ func (c *connection) maybeUpdateApiKeyLastValidated(ctx context.Context) error {
 	cred, err := c.s.db.GetActiveApiKeyCredential(ctx, c.Id)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
-			// No active credential — probe succeeded without one (raw http
-			// probe against a public endpoint, say). Nothing to stamp.
 			return nil
 		}
 		return err

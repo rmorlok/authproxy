@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"context"
+	"errors"
 	"log/slog"
 	"testing"
 	"time"
@@ -19,8 +20,8 @@ import (
 	clock "k8s.io/utils/clock/testing"
 )
 
-// stubProbe is a minimal iface.Probe used only as a token for the threshold
-// accessors and id — the test layer calls neither Invoke nor IsPeriodic.
+// stubProbe is a minimal iface.Probe used only as a threshold + id carrier
+// for the runtime tests. Invoke is never called from the helper under test.
 type stubProbe struct {
 	id             string
 	failureThresh  int
@@ -34,10 +35,29 @@ func (p *stubProbe) GetScheduleString() string                  { return "*/5 * 
 func (p *stubProbe) EffectiveFailureThreshold() int             { return p.failureThresh }
 func (p *stubProbe) EffectiveRecoveryThreshold() int            { return p.recoveryThresh }
 
+// outcomes builds a most-recent-first slice of probe outcomes for use as the
+// GetRecentProbeOutcomes mock return. Each rune is one event: 's' = success,
+// 'f' = failure. "ffs" = newest-to-oldest: failure, failure, success.
+func outcomes(s string) []*database.ConnectionProbeOutcome {
+	out := make([]*database.ConnectionProbeOutcome, 0, len(s))
+	for _, r := range s {
+		var oc string
+		switch r {
+		case 's':
+			oc = database.ProbeOutcomeStatusSuccess
+		case 'f':
+			oc = database.ProbeOutcomeStatusFailure
+		default:
+			panic("outcomes: invalid rune; use 's' or 'f'")
+		}
+		out = append(out, &database.ConnectionProbeOutcome{Outcome: oc})
+	}
+	return out
+}
+
 // newProbeHealthTestConn builds a test connection whose connector definition
-// carries the supplied probes. probes are used by the recovery-time threshold
-// lookups against other probes for the "any probe over threshold blocks
-// recovery" rule.
+// carries the supplied probes — the runtime reads those for recovery-time
+// threshold lookups against other probes.
 func newProbeHealthTestConn(
 	t *testing.T,
 	ctrl *gomock.Controller,
@@ -74,11 +94,14 @@ func TestRecordPeriodicProbeOutcome_SingleFailureDoesNotFlip(t *testing.T) {
 
 	probe := &stubProbe{id: "ping", failureThresh: 3, recoveryThresh: 1}
 	db.EXPECT().
-		RecordProbeFailure(gomock.Any(), conn.Id, "ping").
-		Return(&database.ConnectionProbeHealth{ConsecutiveFailures: 1}, nil)
-	// SetConnectionHealthState is NOT expected — single failure is sub-threshold.
+		InsertProbeOutcome(gomock.Any(), conn.Id, "ping", database.ProbeOutcomeStatusFailure, "boom").
+		Return(&database.ConnectionProbeOutcome{}, nil)
+	db.EXPECT().
+		GetRecentProbeOutcomes(gomock.Any(), conn.Id, "ping", 3).
+		Return(outcomes("f"), nil)
+	// NO SetConnectionHealthState — streak is sub-threshold.
 
-	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, false))
+	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, false, errors.New("boom")))
 	for _, rec := range decodeJSONLines(t, buf) {
 		assert.NotEqual(t, connectionHealthStateChangedMessage, rec["msg"],
 			"no transition should fire on first failure")
@@ -91,20 +114,21 @@ func TestRecordPeriodicProbeOutcome_NthFailureFlipsUnhealthy(t *testing.T) {
 	conn, db, buf := newProbeHealthTestConn(t, ctrl, nil, database.ConnectionHealthStateHealthy)
 
 	probe := &stubProbe{id: "ping", failureThresh: 3, recoveryThresh: 1}
-	// Counter increment returns the post-update count = exactly the threshold.
 	db.EXPECT().
-		RecordProbeFailure(gomock.Any(), conn.Id, "ping").
-		Return(&database.ConnectionProbeHealth{ConsecutiveFailures: 3}, nil)
+		InsertProbeOutcome(gomock.Any(), conn.Id, "ping", database.ProbeOutcomeStatusFailure, "").
+		Return(&database.ConnectionProbeOutcome{}, nil)
+	db.EXPECT().
+		GetRecentProbeOutcomes(gomock.Any(), conn.Id, "ping", 3).
+		Return(outcomes("fff"), nil)
 	db.EXPECT().
 		SetConnectionHealthState(gomock.Any(), conn.Id, database.ConnectionHealthStateUnhealthy).
 		Return(nil)
 
-	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, false))
+	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, false, nil))
 	assert.Equal(t, database.ConnectionHealthStateUnhealthy, conn.HealthState)
 
-	recs := decodeJSONLines(t, buf)
 	var found bool
-	for _, rec := range recs {
+	for _, rec := range decodeJSONLines(t, buf) {
 		if rec["msg"] == connectionHealthStateChangedMessage {
 			assert.Equal(t, "healthy", rec["previous_health_state"])
 			assert.Equal(t, "unhealthy", rec["health_state"])
@@ -115,23 +139,44 @@ func TestRecordPeriodicProbeOutcome_NthFailureFlipsUnhealthy(t *testing.T) {
 	require.True(t, found, "expected a health_state changed event")
 }
 
-func TestRecordPeriodicProbeOutcome_AlreadyUnhealthyFailureDoesNotEmitDuplicate(t *testing.T) {
+func TestRecordPeriodicProbeOutcome_FailureStreakBrokenByInterveningSuccess(t *testing.T) {
+	// The just-inserted failure is preceded by a success in the recent log —
+	// the consecutive streak is 1, not 2.
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	conn, db, _ := newProbeHealthTestConn(t, ctrl, nil, database.ConnectionHealthStateHealthy)
+
+	probe := &stubProbe{id: "ping", failureThresh: 3, recoveryThresh: 1}
+	db.EXPECT().
+		InsertProbeOutcome(gomock.Any(), conn.Id, "ping", database.ProbeOutcomeStatusFailure, "").
+		Return(&database.ConnectionProbeOutcome{}, nil)
+	// Newest first: f, s, f. Counting consecutive failures from the head
+	// stops at the success → streak = 1.
+	db.EXPECT().
+		GetRecentProbeOutcomes(gomock.Any(), conn.Id, "ping", 3).
+		Return(outcomes("fsf"), nil)
+	// NO flip.
+
+	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, false, nil))
+}
+
+func TestRecordPeriodicProbeOutcome_AlreadyUnhealthyFailureNoDuplicate(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 	conn, db, buf := newProbeHealthTestConn(t, ctrl, nil, database.ConnectionHealthStateUnhealthy)
 
 	probe := &stubProbe{id: "ping", failureThresh: 3, recoveryThresh: 1}
 	db.EXPECT().
-		RecordProbeFailure(gomock.Any(), conn.Id, "ping").
-		Return(&database.ConnectionProbeHealth{ConsecutiveFailures: 5}, nil)
-	// MarkHealthState IS called (to unhealthy) but it's idempotent — no DB
-	// write and no event. Omitting EXPECT for SetConnectionHealthState
-	// verifies the DB layer is not touched.
+		InsertProbeOutcome(gomock.Any(), conn.Id, "ping", database.ProbeOutcomeStatusFailure, "").
+		Return(&database.ConnectionProbeOutcome{}, nil)
+	db.EXPECT().
+		GetRecentProbeOutcomes(gomock.Any(), conn.Id, "ping", 3).
+		Return(outcomes("fff"), nil)
+	// MarkHealthState IS called but is idempotent — no DB write, no event.
 
-	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, false))
+	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, false, nil))
 	for _, rec := range decodeJSONLines(t, buf) {
-		assert.NotEqual(t, connectionHealthStateChangedMessage, rec["msg"],
-			"flip-to-current-state must be a no-op")
+		assert.NotEqual(t, connectionHealthStateChangedMessage, rec["msg"])
 	}
 }
 
@@ -142,19 +187,16 @@ func TestRecordPeriodicProbeOutcome_SuccessWhileHealthyIsNoop(t *testing.T) {
 
 	probe := &stubProbe{id: "ping", failureThresh: 3, recoveryThresh: 1}
 	db.EXPECT().
-		RecordProbeSuccess(gomock.Any(), conn.Id, "ping").
-		Return(&database.ConnectionProbeHealth{ConsecutiveSuccesses: 1}, nil)
-	// NO ListConnectionProbeHealth (recovery path skipped — already healthy).
-	// NO SetConnectionHealthState (still healthy).
-	// NO ResetConnectionProbeHealth.
+		InsertProbeOutcome(gomock.Any(), conn.Id, "ping", database.ProbeOutcomeStatusSuccess, "").
+		Return(&database.ConnectionProbeOutcome{}, nil)
+	// Recovery path skipped — already healthy.
 
-	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, true))
+	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, true, nil))
 }
 
 func TestRecordPeriodicProbeOutcome_RecoveryThresholdFlipsHealthy(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	// One probe configured, recovery_threshold = 2.
 	probes := []cschema.Probe{
 		{Id: "ping", FailureThreshold: intPtr(3), RecoveryThreshold: intPtr(2)},
 	}
@@ -162,26 +204,21 @@ func TestRecordPeriodicProbeOutcome_RecoveryThresholdFlipsHealthy(t *testing.T) 
 
 	probe := &stubProbe{id: "ping", failureThresh: 3, recoveryThresh: 2}
 	db.EXPECT().
-		RecordProbeSuccess(gomock.Any(), conn.Id, "ping").
-		Return(&database.ConnectionProbeHealth{ConsecutiveSuccesses: 2}, nil)
+		InsertProbeOutcome(gomock.Any(), conn.Id, "ping", database.ProbeOutcomeStatusSuccess, "").
+		Return(&database.ConnectionProbeOutcome{}, nil)
 	db.EXPECT().
-		ListConnectionProbeHealth(gomock.Any(), conn.Id).
-		Return(map[string]*database.ConnectionProbeHealth{
-			"ping": {ConsecutiveSuccesses: 2, ConsecutiveFailures: 0},
-		}, nil)
+		GetRecentProbeOutcomes(gomock.Any(), conn.Id, "ping", 2).
+		Return(outcomes("ss"), nil)
+	// Sole probe — cross-probe loop has nothing else to inspect.
 	db.EXPECT().
 		SetConnectionHealthState(gomock.Any(), conn.Id, database.ConnectionHealthStateHealthy).
 		Return(nil)
-	db.EXPECT().
-		ResetConnectionProbeHealth(gomock.Any(), conn.Id).
-		Return(nil)
 
-	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, true))
+	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, true, nil))
 	assert.Equal(t, database.ConnectionHealthStateHealthy, conn.HealthState)
 
-	recs := decodeJSONLines(t, buf)
 	var found bool
-	for _, rec := range recs {
+	for _, rec := range decodeJSONLines(t, buf) {
 		if rec["msg"] == connectionHealthStateChangedMessage {
 			assert.Equal(t, "unhealthy", rec["previous_health_state"])
 			assert.Equal(t, "healthy", rec["health_state"])
@@ -202,18 +239,20 @@ func TestRecordPeriodicProbeOutcome_SuccessBelowRecoveryThresholdDoesNotFlip(t *
 
 	probe := &stubProbe{id: "ping", failureThresh: 3, recoveryThresh: 2}
 	db.EXPECT().
-		RecordProbeSuccess(gomock.Any(), conn.Id, "ping").
-		Return(&database.ConnectionProbeHealth{ConsecutiveSuccesses: 1}, nil)
-	// NOT enough successes yet — no list/reset/flip expected.
+		InsertProbeOutcome(gomock.Any(), conn.Id, "ping", database.ProbeOutcomeStatusSuccess, "").
+		Return(&database.ConnectionProbeOutcome{}, nil)
+	// 1 success then 1 failure — streak = 1, below threshold 2.
+	db.EXPECT().
+		GetRecentProbeOutcomes(gomock.Any(), conn.Id, "ping", 2).
+		Return(outcomes("sf"), nil)
 
-	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, true))
+	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, true, nil))
 	assert.Equal(t, database.ConnectionHealthStateUnhealthy, conn.HealthState)
 }
 
 func TestRecordPeriodicProbeOutcome_AnotherProbeOverThresholdBlocksRecovery(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
-	// Two probes — ping recovers but pong is still failing.
 	probes := []cschema.Probe{
 		{Id: "ping", FailureThreshold: intPtr(3), RecoveryThreshold: intPtr(1)},
 		{Id: "pong", FailureThreshold: intPtr(3), RecoveryThreshold: intPtr(1)},
@@ -222,25 +261,52 @@ func TestRecordPeriodicProbeOutcome_AnotherProbeOverThresholdBlocksRecovery(t *t
 
 	probe := &stubProbe{id: "ping", failureThresh: 3, recoveryThresh: 1}
 	db.EXPECT().
-		RecordProbeSuccess(gomock.Any(), conn.Id, "ping").
-		Return(&database.ConnectionProbeHealth{ConsecutiveSuccesses: 1}, nil)
+		InsertProbeOutcome(gomock.Any(), conn.Id, "ping", database.ProbeOutcomeStatusSuccess, "").
+		Return(&database.ConnectionProbeOutcome{}, nil)
 	db.EXPECT().
-		ListConnectionProbeHealth(gomock.Any(), conn.Id).
-		Return(map[string]*database.ConnectionProbeHealth{
-			"ping": {ConsecutiveSuccesses: 1, ConsecutiveFailures: 0},
-			"pong": {ConsecutiveFailures: 4, ConsecutiveSuccesses: 0}, // still over threshold
-		}, nil)
-	// NO flip-to-healthy, NO reset.
+		GetRecentProbeOutcomes(gomock.Any(), conn.Id, "ping", 1).
+		Return(outcomes("s"), nil)
+	// Cross-probe check: pong's recent outcomes show 3 consecutive failures.
+	db.EXPECT().
+		GetRecentProbeOutcomes(gomock.Any(), conn.Id, "pong", 3).
+		Return(outcomes("fff"), nil)
 
-	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, true))
-	assert.Equal(t, database.ConnectionHealthStateUnhealthy, conn.HealthState)
+	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, true, nil))
+	assert.Equal(t, database.ConnectionHealthStateUnhealthy, conn.HealthState,
+		"recovery blocked while another probe is still failing")
 	for _, rec := range decodeJSONLines(t, buf) {
-		assert.NotEqual(t, connectionHealthStateChangedMessage, rec["msg"],
-			"recovery blocked while another probe is still failing")
+		assert.NotEqual(t, connectionHealthStateChangedMessage, rec["msg"])
 	}
 }
 
-func TestRecordPeriodicProbeOutcome_ApiKeyConnectionStampsLastValidatedAt(t *testing.T) {
+func TestRecordPeriodicProbeOutcome_AnotherProbeRecoveredAllowsRecovery(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+	probes := []cschema.Probe{
+		{Id: "ping", FailureThreshold: intPtr(3), RecoveryThreshold: intPtr(1)},
+		{Id: "pong", FailureThreshold: intPtr(3), RecoveryThreshold: intPtr(1)},
+	}
+	conn, db, _ := newProbeHealthTestConn(t, ctrl, probes, database.ConnectionHealthStateUnhealthy)
+
+	probe := &stubProbe{id: "ping", failureThresh: 3, recoveryThresh: 1}
+	db.EXPECT().
+		InsertProbeOutcome(gomock.Any(), conn.Id, "ping", database.ProbeOutcomeStatusSuccess, "").
+		Return(&database.ConnectionProbeOutcome{}, nil)
+	db.EXPECT().
+		GetRecentProbeOutcomes(gomock.Any(), conn.Id, "ping", 1).
+		Return(outcomes("s"), nil)
+	db.EXPECT().
+		GetRecentProbeOutcomes(gomock.Any(), conn.Id, "pong", 3).
+		Return(outcomes("sff"), nil) // success at head breaks pong's failure streak
+	db.EXPECT().
+		SetConnectionHealthState(gomock.Any(), conn.Id, database.ConnectionHealthStateHealthy).
+		Return(nil)
+
+	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, true, nil))
+	assert.Equal(t, database.ConnectionHealthStateHealthy, conn.HealthState)
+}
+
+func TestRecordPeriodicProbeOutcome_ApiKeyStampsLastValidatedAt(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -252,7 +318,6 @@ func TestRecordPeriodicProbeOutcome_ApiKeyConnectionStampsLastValidatedAt(t *tes
 		}},
 	})
 	connId := apid.New(apid.PrefixConnection)
-
 	now := time.Date(2024, time.March, 15, 10, 0, 0, 0, time.UTC)
 	ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
@@ -273,8 +338,8 @@ func TestRecordPeriodicProbeOutcome_ApiKeyConnectionStampsLastValidatedAt(t *tes
 	probe := &stubProbe{id: "ping", failureThresh: 3, recoveryThresh: 1}
 	credId := apid.New(apid.PrefixApiKeyCredential)
 	db.EXPECT().
-		RecordProbeSuccess(gomock.Any(), connId, "ping").
-		Return(&database.ConnectionProbeHealth{ConsecutiveSuccesses: 1}, nil)
+		InsertProbeOutcome(gomock.Any(), connId, "ping", database.ProbeOutcomeStatusSuccess, "").
+		Return(&database.ConnectionProbeOutcome{}, nil)
 	db.EXPECT().
 		GetActiveApiKeyCredential(gomock.Any(), connId).
 		Return(&database.ApiKeyCredential{
@@ -286,10 +351,10 @@ func TestRecordPeriodicProbeOutcome_ApiKeyConnectionStampsLastValidatedAt(t *tes
 		UpdateApiKeyCredentialLastValidated(gomock.Any(), credId, now).
 		Return(nil)
 
-	require.NoError(t, conn.recordPeriodicProbeOutcome(ctx, probe, true))
+	require.NoError(t, conn.recordPeriodicProbeOutcome(ctx, probe, true, nil))
 }
 
-func TestRecordPeriodicProbeOutcome_OAuth2ConnectionSkipsLastValidatedAt(t *testing.T) {
+func TestRecordPeriodicProbeOutcome_OAuth2SkipsLastValidatedAt(t *testing.T) {
 	ctrl := gomock.NewController(t)
 	defer ctrl.Finish()
 
@@ -315,12 +380,11 @@ func TestRecordPeriodicProbeOutcome_OAuth2ConnectionSkipsLastValidatedAt(t *test
 
 	probe := &stubProbe{id: "ping", failureThresh: 3, recoveryThresh: 1}
 	db.EXPECT().
-		RecordProbeSuccess(gomock.Any(), connId, "ping").
-		Return(&database.ConnectionProbeHealth{ConsecutiveSuccesses: 1}, nil)
-	// NO GetActiveApiKeyCredential expected.
-	// NO UpdateApiKeyCredentialLastValidated expected.
+		InsertProbeOutcome(gomock.Any(), connId, "ping", database.ProbeOutcomeStatusSuccess, "").
+		Return(&database.ConnectionProbeOutcome{}, nil)
+	// NO GetActiveApiKeyCredential / UpdateApiKeyCredentialLastValidated.
 
-	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, true))
+	require.NoError(t, conn.recordPeriodicProbeOutcome(context.Background(), probe, true, nil))
 }
 
 func intPtr(i int) *int { return &i }
