@@ -21,13 +21,28 @@ export default defineConfig(({ mode }) => {
 
   const port = Number(process.env.AUTHPROXY_MARKETPLACE_UI_PORT) || 5173;
 
+  // VITE_BASE_URL controls the public base path the SPA is mounted at, e.g. "/marketplace/".
+  // Defaults to "/" so the embedded build serves at the service root; downstream
+  // deployments (umbrella demo chart, customer chart at a subpath) can override.
+  const base = process.env.VITE_BASE_URL || '/';
+
   return {
+    base,
     plugins: [react()],
     // strictPort makes a port collision fail loudly instead of silently
     // shifting onto another install's slot — see the multi-clone setup above.
     server: {
       port,
       strictPort: true,
+    },
+    build: {
+      // Output into embed/dist so the Go //go:embed directive in embed/embed.go
+      // can pick the build up at compile time without copying files around.
+      // emptyOutDir is intentionally false: the committed .gitkeep is what
+      // keeps go:embed happy on a fresh checkout, and Vite's default cleanup
+      // would delete it.
+      outDir: 'embed/dist',
+      emptyOutDir: false,
     },
     resolve: {
       alias: [

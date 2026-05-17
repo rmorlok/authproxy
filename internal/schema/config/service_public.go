@@ -11,9 +11,20 @@ import (
 
 // ServicePublicStaticContentConfig is a configuration to have the public service serve static content in addition
 // to its other functions. This can be used to serve the marketplace SPA directly.
+//
+// When ServeFromPath is empty, the service serves the UI from its compiled-in
+// embedded filesystem (built by `vite build` and bundled via //go:embed). Set
+// ServeFromPath to override with an on-disk build for local iteration or
+// custom branding.
 type ServicePublicStaticContentConfig struct {
 	MountAtPath   string `json:"mount_at" yaml:"mount_at"`
 	ServeFromPath string `json:"serve_from" yaml:"serve_from"`
+}
+
+// IsEmbedded reports whether the static handler should serve from the service's
+// compiled-in UI assets rather than an on-disk directory.
+func (c *ServicePublicStaticContentConfig) IsEmbedded() bool {
+	return c != nil && c.ServeFromPath == ""
 }
 
 type CookieConfig struct {

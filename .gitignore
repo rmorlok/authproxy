@@ -34,6 +34,13 @@ tmp
 .yarn
 node_modules
 
+# Built UI artifacts — embedded at compile time via //go:embed.
+# Only .gitkeep is tracked so a fresh checkout still compiles before
+# `vite build` runs; Vite is configured with emptyOutDir:false so the
+# committed .gitkeep survives across builds.
+ui/*/embed/dist/*
+!ui/*/embed/dist/.gitkeep
+
 dev_config/keys/tls
 
 .claude/scheduled_tasks.lock

@@ -4,8 +4,14 @@
 .claude
 .env
 node_modules
+**/node_modules
 tmp
-ui/
-sdks/
 *.test
 *.out
+
+# UI build outputs are produced inside the container's node stage; the
+# committed placeholders in ui/*/embed/dist/ still ship via the build context
+# so the go:embed directive has something to point at on first build.
+**/.vite
+ui/*/dist
+sdks/*/dist

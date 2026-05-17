@@ -11,8 +11,10 @@ import (
 )
 
 // marketplaceDistRel is the path of the marketplace UI's vite build output,
-// relative to the repository root.
-const marketplaceDistRel = "ui/marketplace/dist"
+// relative to the repository root. Vite writes here so the //go:embed in
+// ui/marketplace/embed picks the build up for the production binary; the
+// integration tests reuse the same dir as an on-disk static serve path.
+const marketplaceDistRel = "ui/marketplace/embed/dist"
 
 // marketplaceBuildOnce ensures we only run the build once per `go test`
 // process even if multiple tests call EnsureMarketplaceBuilt.
@@ -21,7 +23,7 @@ var (
 	marketplaceBuildErr  error
 )
 
-// EnsureMarketplaceBuilt makes sure ui/marketplace/dist/index.html exists,
+// EnsureMarketplaceBuilt makes sure ui/marketplace/embed/dist/index.html exists,
 // running `yarn workspace @authproxy/marketplace build` once per test process
 // if the dist is missing. Tests that drive the marketplace UI through a real
 // browser depend on this; the public service's static config points at the
