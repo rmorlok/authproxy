@@ -287,6 +287,98 @@
         }
       ],
       "type": "timeseries"
+    },
+    {
+      "collapsed": false,
+      "gridPos": { "h": 1, "w": 24, "x": 0, "y": 24 },
+      "id": 5,
+      "panels": [],
+      "title": "Inbound HTTP (every AuthProxy service)",
+      "type": "row"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [] },
+          "unit": "reqps"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 0, "y": 25 },
+      "id": 6,
+      "options": {
+        "legend": { "calcs": [], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi", "sort": "desc" }
+      },
+      "title": "Inbound request rate by service + status",
+      "description": "Per-second rate of HTTP requests reaching each AuthProxy service (api / admin-api / public / worker health). Populated by the Gin middleware from #231 on every inbound request, so this panel shows live data the moment any traffic hits AuthProxy.",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "sum by (authproxy_service, http_response_status_code) (rate(http_server_request_duration_seconds_count[1m]))",
+          "legendFormat": "{{authproxy_service}} {{http_response_status_code}}",
+          "refId": "A"
+        }
+      ],
+      "type": "timeseries"
+    },
+    {
+      "datasource": { "type": "prometheus", "uid": "prometheus" },
+      "fieldConfig": {
+        "defaults": {
+          "color": { "mode": "palette-classic" },
+          "custom": {
+            "drawStyle": "line",
+            "fillOpacity": 10,
+            "lineInterpolation": "linear",
+            "lineWidth": 1,
+            "showPoints": "never",
+            "spanNulls": false
+          },
+          "mappings": [],
+          "thresholds": { "mode": "absolute", "steps": [] },
+          "unit": "s"
+        }
+      },
+      "gridPos": { "h": 8, "w": 12, "x": 12, "y": 25 },
+      "id": 7,
+      "options": {
+        "legend": { "calcs": ["mean", "max"], "displayMode": "table", "placement": "bottom", "showLegend": true },
+        "tooltip": { "mode": "multi" }
+      },
+      "title": "Inbound request duration percentiles by service",
+      "description": "p50 / p95 / p99 latency of inbound HTTP requests, broken out by AuthProxy service. Source: http.server.request.duration histogram.",
+      "targets": [
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.50, sum by (le, authproxy_service) (rate(http_server_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{authproxy_service}} p50",
+          "refId": "A"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.95, sum by (le, authproxy_service) (rate(http_server_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{authproxy_service}} p95",
+          "refId": "B"
+        },
+        {
+          "datasource": { "type": "prometheus", "uid": "prometheus" },
+          "expr": "histogram_quantile(0.99, sum by (le, authproxy_service) (rate(http_server_request_duration_seconds_bucket[5m])))",
+          "legendFormat": "{{authproxy_service}} p99",
+          "refId": "C"
+        }
+      ],
+      "type": "timeseries"
     }
   ],
   "refresh": "10s",
@@ -302,8 +394,8 @@
   },
   "timepicker": {},
   "timezone": "",
-  "title": "AuthProxy — Proxy RED",
+  "title": "AuthProxy — Proxy RED + Inbound HTTP",
   "uid": "authproxy-proxy-red",
-  "version": 1,
+  "version": 2,
   "weekStart": ""
 }
