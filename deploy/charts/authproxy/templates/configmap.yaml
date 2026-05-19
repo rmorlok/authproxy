@@ -64,7 +64,13 @@ Secrets, not in this ConfigMap.
         "private_key" (dict "path" (printf "%s/%s" .Values.jwt.mountPath .Values.jwt.privateKeyFile))) -}}
 {{-   if .Values.encryptionKeys.existingSecret -}}
 {{-     $_ := set $sysAuth "global_aes_key" (dict "path" (printf "%s/%s" .Values.encryptionKeys.mountPath .Values.encryptionKeys.globalAesKeyFile)) -}}
-{{-     $_ := set $sysAuth "actors" (dict "keys_path" (printf "%s/%s" .Values.encryptionKeys.mountPath .Values.encryptionKeys.actorsKeysDir)) -}}
+{{-   end -}}
+{{-   if .Values.actors.existingSecret -}}
+{{-     $actors := dict "keys_path" .Values.actors.mountPath -}}
+{{-     if .Values.actors.permissions -}}
+{{-       $_ := set $actors "permissions" .Values.actors.permissions -}}
+{{-     end -}}
+{{-     $_ := set $sysAuth "actors" $actors -}}
 {{-   end -}}
 {{-   $_ := set $cfg "system_auth" $sysAuth -}}
 {{- end -}}

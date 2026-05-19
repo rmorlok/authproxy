@@ -1,0 +1,37 @@
+# chart-testing values for the helm-chart-ci workflow.
+#
+# Minimum-deps profile per A5 (#287):
+#   - SQLite database (no external DB)
+#   - real Redis as a tiny in-cluster Deployment (applied by the workflow
+#     before `ct install`, addressable at `redis:6379` in the test namespace)
+#   - JWT + encryption key Secrets are generated and applied by the workflow
+#     (the chart deliberately never creates them)
+#
+# image.tag pins to `main` so the CI exercises whatever is currently
+# published from rmorlok/authproxy@main, not whatever Chart.appVersion
+# happens to be at the time of the chart change.
+
+image:
+  tag: main
+  pullPolicy: IfNotPresent
+
+database:
+  provider: sqlite
+  path: /tmp/authproxy.db
+
+redis:
+  address: redis:6379
+
+jwt:
+  existingSecret: authproxy-jwt
+
+encryptionKeys:
+  existingSecret: authproxy-encryption
+
+actors:
+  existingSecret: authproxy-actors
+
+# Faster probes so the helm test pod's rollout wait doesn't stall.
+healthcheck:
+  initialDelaySeconds: 5
+  periodSeconds: 3

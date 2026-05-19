@@ -179,8 +179,27 @@
       "properties": {
         "existingSecret":   { "type": "string" },
         "mountPath":        { "type": "string" },
-        "globalAesKeyFile": { "type": "string" },
-        "actorsKeysDir":    { "type": "string" }
+        "globalAesKeyFile": { "type": "string" }
+      }
+    },
+
+    "actors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "existingSecret": { "type": "string" },
+        "mountPath":      { "type": "string" },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "namespace": { "type": "string" },
+              "resources": { "type": "array", "items": { "type": "string" } },
+              "verbs":     { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
       }
     },
 
