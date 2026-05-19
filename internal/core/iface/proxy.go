@@ -120,7 +120,26 @@ func ProxyResponseFromGentlemen(resp *gentleman.Response) (*ProxyResponse, error
 	return proxyResp, nil
 }
 
+// RawProxyRequest carries the inputs to the streaming raw-proxy path.
+// Separate from ProxyRequest because raw bodies are streamed (io.Reader on
+// the outbound request) rather than buffered into BodyRaw/BodyJson, and
+// the inbound URL + headers come pre-shaped by the route handler.
+type RawProxyRequest struct {
+	// Outbound is the request the orchestrator will send to the upstream.
+	// The route handler is responsible for resolving the URL (from
+	// X-AuthProxy-Upstream-URL), filtering hop-by-hop headers, and
+	// attaching the inbound body as outbound.Body. The orchestrator
+	// applies the connector's credentials via the Authenticator and
+	// sends it through httpf's *http.Client (rate-limit + OTel still
+	// apply, but gentleman's body buffering does not).
+	Outbound *http.Request
+	// Labels are forwarded to httpf's ForLabels chain (rate-limit,
+	// request log, OTel) — same shape as ProxyRequest.Labels for the
+	// wrapped path.
+	Labels map[string]string
+}
+
 type Proxy interface {
 	ProxyRequest(ctx context.Context, reqType httpf.RequestType, req *ProxyRequest) (*ProxyResponse, error)
-	ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *ProxyRequest, w http.ResponseWriter) error
+	ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *RawProxyRequest, w http.ResponseWriter) error
 }

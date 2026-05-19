@@ -27,6 +27,9 @@ type clientFactory struct {
 
 	factoryParent     *gentleman.Client
 	factoryParentOnce sync.Once
+
+	wrappedTransport     http.RoundTripper
+	wrappedTransportOnce sync.Once
 }
 
 func CreateFactory(
@@ -206,7 +209,24 @@ func (f *clientFactory) New() *gentleman.Client {
 	// and we can cache with middlewares applied.
 	f.factoryParentOnce.Do(func() {
 		f.factoryParent = gentleman.New()
+		f.factoryParent.Use(transport.Set(f.buildWrappedTransport()))
+	})
 
+	return gentleman.New().UseParent(f.factoryParent)
+}
+
+// NewHTTPClient returns a stock *http.Client whose Transport is the same
+// wrapped RoundTripper used by New(). For the streaming raw-proxy path,
+// where we need direct net/http semantics (no gentleman body buffering).
+func (f *clientFactory) NewHTTPClient() *http.Client {
+	return &http.Client{Transport: f.buildWrappedTransport()}
+}
+
+// buildWrappedTransport applies the registered middlewares around the
+// default transport. Cached per factory instance so the wrap (which can
+// allocate per-request-info state inside the middleware) happens once.
+func (f *clientFactory) buildWrappedTransport() http.RoundTripper {
+	f.wrappedTransportOnce.Do(func() {
 		parent := http.DefaultTransport
 		for _, m := range f.middlewares {
 			result := m.NewRoundTripper(f.requestInfo, parent)
@@ -214,11 +234,7 @@ func (f *clientFactory) New() *gentleman.Client {
 				parent = result
 			}
 		}
-
-		f.factoryParent.Use(
-			transport.Set(parent),
-		)
+		f.wrappedTransport = parent
 	})
-
-	return gentleman.New().UseParent(f.factoryParent)
+	return f.wrappedTransport
 }

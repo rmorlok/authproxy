@@ -2,15 +2,16 @@
 // resolve credentials via the auth method's Authenticator, send the request
 // through the httpf client (which carries rate-limit / telemetry /
 // request-log middleware), and on a 401 from the upstream attempt the
-// retry-once-after-recover dance. Owns ProxyRequest and (in #330)
-// ProxyRequestRaw so the per-auth-method packages only have to describe
-// "how to apply this credential to a request" — not how to drive a proxy
-// call.
+// retry-once-after-recover dance. Owns both the wrapped (structured)
+// ProxyRequest and the streaming ProxyRequestRaw paths so the
+// per-auth-method packages only have to describe "how to apply this
+// credential to a request" — not how to drive a proxy call.
 package proxy
 
 import (
 	"context"
 	"errors"
+	"io"
 	"net/http"
 
 	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
@@ -66,11 +67,248 @@ func (p *proxy) ProxyRequest(ctx context.Context, reqType httpf.RequestType, req
 	return iface.ProxyResponseFromGentlemen(resp)
 }
 
-// ProxyRequestRaw is the streaming proxy path. Implemented in #330; for
-// now this preserves the prior stub behavior so callers that touch the
-// path during the refactor see no change.
-func (p *proxy) ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest, w http.ResponseWriter) error {
+// ProxyRequestRaw is the streaming raw-proxy path: the caller's inbound
+// HTTP body flows directly into the outbound request, the upstream
+// response streams back into w with flushing after each successful read,
+// and trailers are passed through.
+//
+// On a 401 we may attempt a single retry, but only if the inbound body
+// has not yet been consumed (Resolve succeeded but the body reader is
+// still at position zero). For streaming inbound bodies — the common
+// case here — once any bytes have been sent the 401 is surfaced to the
+// caller. Real SSE / LLM / S3 callers typically send POST bodies from
+// buffered or seekable sources, so a more sophisticated rewind path can
+// be added later if the streaming-body 401-retry case actually bites.
+func (p *proxy) ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *iface.RawProxyRequest, w http.ResponseWriter) error {
+	if req == nil || req.Outbound == nil {
+		return errors.New("raw proxy request requires an outbound *http.Request")
+	}
+
+	client := p.httpf.
+		ForRequestType(reqType).
+		ForConnection(p.conn).
+		ForActor(apauthcore.ActorFromContext(ctx)).
+		ForLabels(req.Labels).
+		NewHTTPClient()
+
+	// Snapshot of the inbound body so we can issue a single retry if the
+	// upstream rejects with 401 *before* any inbound bytes were forwarded.
+	// Once forwarding starts the body's read position is unrecoverable;
+	// see the function comment for the rationale.
+	outbound := req.Outbound.WithContext(ctx)
+	originalBody := outbound.Body
+
+	resp, err := p.sendRaw(ctx, client, outbound)
+	if err != nil {
+		return err
+	}
+
+	if resp.StatusCode == http.StatusUnauthorized && canRetryRawAfter401(originalBody) {
+		recoverErr := p.auth.RecoverFrom401(ctx)
+		if recoverErr == nil {
+			drainAndClose(resp.Body)
+			retried, retryErr := p.sendRaw(ctx, client, req.Outbound.WithContext(ctx))
+			if retryErr == nil {
+				resp = retried
+			}
+		} else if !errors.Is(recoverErr, auth_methods.ErrCannotRecover) {
+			_ = recoverErr
+		}
+	}
+
+	return streamResponse(w, resp)
+}
+
+// canRetryRawAfter401 reports whether the inbound body is in a state
+// where a retry could replay it. With no body (GET/HEAD/DELETE) retry is
+// safe. With a body that's already been consumed we cannot rewind, so we
+// surface the 401. http.NoBody is the sentinel net/http uses for the
+// "no body" case after the request is built; nil also occurs in
+// constructed requests.
+func canRetryRawAfter401(body io.ReadCloser) bool {
+	if body == nil {
+		return true
+	}
+	if body == http.NoBody {
+		return true
+	}
+	// Conservative default: assume the body has been (or is being)
+	// consumed and the retry would not see the same bytes. Real callers
+	// that need streaming-body 401-retry will need a rewindable body
+	// abstraction — a future PR.
+	return false
+}
+
+// sendRaw applies the credentials to the outbound request and sends it
+// via the supplied client. Split out so the retry-after-401 path can
+// build a new request with a fresh body and reuse the same client.
+func (p *proxy) sendRaw(ctx context.Context, client *http.Client, outbound *http.Request) (*http.Response, error) {
+	app, err := p.auth.Resolve(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	// Caller-supplied headers are already on outbound. Credential headers
+	// take precedence (Set, not Add) — same order/precedence as the
+	// wrapped path.
+	for h, v := range app.Headers {
+		outbound.Header.Set(h, v)
+	}
+	if len(app.QueryParams) > 0 {
+		q := outbound.URL.Query()
+		for k, v := range app.QueryParams {
+			q.Set(k, v)
+		}
+		outbound.URL.RawQuery = q.Encode()
+	}
+
+	return client.Do(outbound)
+}
+
+// streamResponse copies the upstream response back to the caller with
+// flushing after each read so SSE / chunked-transfer streams reach the
+// client incrementally instead of being buffered into a single
+// response-completion write. Trailers (declared via the Trailer header
+// per RFC 7230 §4.4) are forwarded after the body completes.
+func streamResponse(w http.ResponseWriter, resp *http.Response) error {
+	defer drainAndClose(resp.Body)
+
+	copyHeaderExceptHopByHop(w.Header(), resp.Header)
+	// Announce trailers up front so http.ResponseWriter accepts them
+	// after the body is written.
+	if len(resp.Trailer) > 0 {
+		trailerNames := make([]string, 0, len(resp.Trailer))
+		for k := range resp.Trailer {
+			trailerNames = append(trailerNames, k)
+		}
+		w.Header()["Trailer"] = trailerNames
+	}
+	w.WriteHeader(resp.StatusCode)
+
+	flusher, _ := w.(http.Flusher)
+	if _, err := flushingCopy(w, resp.Body, flusher); err != nil {
+		return err
+	}
+
+	if len(resp.Trailer) > 0 {
+		for k, vv := range resp.Trailer {
+			for _, v := range vv {
+				w.Header().Add(http.TrailerPrefix+k, v)
+			}
+		}
+	}
+	if flusher != nil {
+		flusher.Flush()
+	}
 	return nil
+}
+
+// flushingCopy is io.Copy with a Flush call after each non-empty read.
+// Defaults to a 32KiB buffer (same as io.copyBuffer) — the chunk size
+// is the SSE event size or the upstream's preferred TCP write size, not
+// our concern; we just push whatever lands on the upstream socket
+// downstream without waiting for EOF.
+func flushingCopy(dst io.Writer, src io.Reader, flusher http.Flusher) (int64, error) {
+	buf := make([]byte, 32*1024)
+	var written int64
+	for {
+		nr, er := src.Read(buf)
+		if nr > 0 {
+			nw, ew := dst.Write(buf[:nr])
+			if nw > 0 {
+				written += int64(nw)
+				if flusher != nil {
+					flusher.Flush()
+				}
+			}
+			if ew != nil {
+				return written, ew
+			}
+			if nr != nw {
+				return written, io.ErrShortWrite
+			}
+		}
+		if er != nil {
+			if er == io.EOF {
+				return written, nil
+			}
+			return written, er
+		}
+	}
+}
+
+// copyHeaderExceptHopByHop copies upstream response headers onto the
+// downstream ResponseWriter, omitting hop-by-hop headers per RFC 7230
+// §6.1. Hop-by-hop headers (and anything listed in the Connection
+// header) are scoped to a single connection and must not be forwarded.
+func copyHeaderExceptHopByHop(dst, src http.Header) {
+	// Headers listed in the Connection header are also hop-by-hop for
+	// this hop only.
+	hopByConnection := map[string]struct{}{}
+	for _, v := range src.Values("Connection") {
+		for _, name := range splitCommaTrim(v) {
+			hopByConnection[http.CanonicalHeaderKey(name)] = struct{}{}
+		}
+	}
+	for k, vv := range src {
+		if isHopByHopHeader(k) {
+			continue
+		}
+		if _, ok := hopByConnection[http.CanonicalHeaderKey(k)]; ok {
+			continue
+		}
+		dst[k] = append([]string(nil), vv...)
+	}
+}
+
+// hopByHopHeaders enumerated in RFC 7230 §6.1.
+var hopByHopHeaders = map[string]struct{}{
+	"Connection":          {},
+	"Keep-Alive":          {},
+	"Proxy-Authenticate":  {},
+	"Proxy-Authorization": {},
+	"Te":                  {},
+	"Trailers":            {},
+	"Transfer-Encoding":   {},
+	"Upgrade":             {},
+}
+
+func isHopByHopHeader(name string) bool {
+	_, ok := hopByHopHeaders[http.CanonicalHeaderKey(name)]
+	return ok
+}
+
+func splitCommaTrim(s string) []string {
+	if s == "" {
+		return nil
+	}
+	var out []string
+	start := 0
+	for i := 0; i <= len(s); i++ {
+		if i == len(s) || s[i] == ',' {
+			seg := s[start:i]
+			// Trim ASCII spaces and tabs.
+			for len(seg) > 0 && (seg[0] == ' ' || seg[0] == '\t') {
+				seg = seg[1:]
+			}
+			for len(seg) > 0 && (seg[len(seg)-1] == ' ' || seg[len(seg)-1] == '\t') {
+				seg = seg[:len(seg)-1]
+			}
+			if seg != "" {
+				out = append(out, seg)
+			}
+			start = i + 1
+		}
+	}
+	return out
+}
+
+func drainAndClose(rc io.ReadCloser) {
+	if rc == nil {
+		return
+	}
+	_, _ = io.Copy(io.Discard, rc)
+	_ = rc.Close()
 }
 
 // send builds a fresh gentleman request with the resolved credential
