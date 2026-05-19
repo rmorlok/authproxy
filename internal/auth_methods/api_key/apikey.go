@@ -17,5 +17,3 @@ type apiKeyConnection struct {
 	connection coreIface.Connection
 }
 
-var _ coreIface.Proxy = (*apiKeyConnection)(nil)
-var _ ApiKeyConnection = (*apiKeyConnection)(nil)

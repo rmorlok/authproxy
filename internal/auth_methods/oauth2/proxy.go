@@ -5,13 +5,10 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
-	"net/http"
 	"net/url"
 	"time"
 
-	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
@@ -240,77 +237,6 @@ func (o *oAuth2Connection) getValidToken(ctx context.Context) (*database.OAuth2T
 	return token, nil
 }
 
-func (o *oAuth2Connection) ProxyRequest(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest) (*iface.ProxyResponse, error) {
-	token, err := o.getValidToken(ctx)
-	if err != nil {
-		return nil, err
-	}
-
-	accessToken, err := o.encrypt.DecryptString(ctx, token.EncryptedAccessToken)
-	if err != nil {
-		return nil, err
-	}
-
-	resp, err := o.sendProxyRequest(ctx, reqType, req, accessToken)
-	if err != nil {
-		return nil, err
-	}
-
-	// Retry-once-after-refresh: a 401 from the upstream means the access
-	// token is unauthorized at the provider even though our local
-	// expiry-clock said it was still valid. Force a refresh and replay the
-	// request exactly once with the new token.
-	//
-	// If the refresh itself fails (transient or permanent), we return the
-	// original 401 unchanged — the customer's app sees the same auth
-	// failure it would have without this retry path, and the refresh
-	// failure was already classified and (if permanent) flipped the
-	// connection unhealthy by refreshAccessToken.
-	if resp.StatusCode == http.StatusUnauthorized {
-		newToken, refreshErr := o.refreshAccessToken(ctx, token, refreshModeAlways)
-		if refreshErr == nil {
-			newAccessToken, decryptErr := o.encrypt.DecryptString(ctx, newToken.EncryptedAccessToken)
-			if decryptErr == nil {
-				retried, retryErr := o.sendProxyRequest(ctx, reqType, req, newAccessToken)
-				if retryErr == nil {
-					resp = retried
-				}
-			}
-		}
-	}
-
-	return iface.ProxyResponseFromGentlemen(resp)
-}
-
-// sendProxyRequest builds a fresh gentleman request with the supplied
-// access token applied as the bearer header and sends it. Split out because
-// gentleman requests are single-use (Send panics on the second call), so
-// the retry-once-after-refresh path needs to construct a new request rather
-// than mutate the existing one.
-func (o *oAuth2Connection) sendProxyRequest(
-	ctx context.Context,
-	reqType httpf.RequestType,
-	req *iface.ProxyRequest,
-	accessToken string,
-) (*gentleman.Response, error) {
-	r := o.httpf.
-		ForRequestType(reqType).
-		ForConnection(o.connection).
-		ForActor(apauthcore.ActorFromContext(ctx)).
-		ForLabels(req.Labels).
-		New().
-		UseContext(ctx).
-		Request().
-		SetHeader("Authorization", "Bearer "+accessToken)
-
-	req.Apply(r)
-	return r.Do()
-}
-
-func (o *oAuth2Connection) ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest, w http.ResponseWriter) error {
-	return nil
-}
-
 // postRefreshWithRetry POSTs a refresh-token grant to the provider's token
 // endpoint with a small bounded retry budget for transient failures
 // (transport errors and 5xx responses). Returns the final response (or
@@ -378,5 +304,3 @@ func (o *oAuth2Connection) postRefreshWithRetry(
 
 	return lastResp, tokenRefreshMaxAttempts, lastErr
 }
-
-var _ iface.Proxy = (*oAuth2Connection)(nil)

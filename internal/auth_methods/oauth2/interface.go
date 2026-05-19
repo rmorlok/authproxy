@@ -2,12 +2,11 @@ package oauth2
 
 import (
 	"context"
-	"net/http"
 	"net/url"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/auth_methods"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
-	"github.com/rmorlok/authproxy/internal/httpf"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
@@ -22,6 +21,7 @@ type IActorData interface {
 //go:generate mockgen -source=./interface.go -destination=./mock/oauth2.go -package=mock
 type Factory interface {
 	NewOAuth2(connection coreIface.Connection) OAuth2Connection
+	NewAuthenticator(connection coreIface.Connection) auth_methods.Authenticator
 	GetOAuth2State(ctx context.Context, actor IActorData, stateId apid.ID) (OAuth2Connection, error)
 }
 
@@ -35,8 +35,6 @@ type OAuth2Connection interface {
 		returnToUrl string,
 	) (string, error)
 	CallbackFrom3rdParty(ctx context.Context, query url.Values) (string, error)
-	ProxyRequest(ctx context.Context, reqType httpf.RequestType, req *coreIface.ProxyRequest) (*coreIface.ProxyResponse, error)
-	ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *coreIface.ProxyRequest, w http.ResponseWriter) error
 	SupportsRevokeTokens() bool
 	RevokeTokens(ctx context.Context) error
 }
