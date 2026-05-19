@@ -1,8 +1,14 @@
 # Default values for the authproxy chart.
 #
-# A3 scope: a minimal but valid surface that lets the chart render valid
-# Kubernetes manifests. A4 (#292) expands this with typed fields for
-# database, redis, s3, jwt, encryption keys, services-on/off, etc.
+# Section guide:
+#   image / serviceAccount / replicaCount / resources / ...  — standard pod knobs
+#   services.<id>.enabled                                     — toggle individual services
+#   ports                                                     — container port assignments
+#   ingress                                                   — single Ingress, port-name backends
+#   database / redis / s3                                     — typed connectivity blocks
+#   jwt / encryptionKeys                                      — Secret volumes for crypto material
+#   config                                                    — escape hatch merged into the rendered AuthProxy YAML
+#   healthcheck                                               — liveness / readiness shared knobs
 
 # -- Container image to deploy.
 image:
@@ -23,15 +29,16 @@ serviceAccount:
   # -- Create a ServiceAccount for the pods.
   create: true
   # -- Annotations to apply to the ServiceAccount. Set
-  # `eks.amazonaws.com/role-arn` here to wire IRSA for S3 + other AWS APIs.
+  # `eks.amazonaws.com/role-arn` here to wire IRSA for S3 (and skip
+  # `s3.existingSecret`).
   annotations: {}
   # -- ServiceAccount name. Generated from the release name if empty.
   name: ""
 
-# -- Replica count for the AuthProxy pod. The chart deploys all four
-# services (api, admin-api, public, worker) as a single Deployment running
-# `serve all`; for independent scaling per service, run the chart multiple
-# times with different `runServices` (A4) or wait for the per-service mode.
+# -- Replica count for the AuthProxy pod. The chart deploys a single
+# Deployment running the union of enabled services in one process; for
+# independent scaling per service, install the chart multiple times with
+# different `services` blocks (see chart README for examples).
 replicaCount: 1
 
 # -- Annotations applied to each pod.
@@ -53,16 +60,29 @@ tolerations: []
 # -- Affinity rules.
 affinity: {}
 
+# -- Toggle individual services. Disabled services are dropped from the
+# `serve` argument list and from the Service's port list. Disabling
+# `public` also disables the liveness/readiness probe (no HTTP listener).
+services:
+  api:
+    enabled: true
+  adminApi:
+    enabled: true
+  public:
+    enabled: true
+  worker:
+    enabled: true
+
+# -- Container port assignments. Match the AuthProxy config port fields.
+ports:
+  public: 8080
+  api: 8081
+  adminApi: 8082
+  workerHealth: 8083
+
 service:
   # -- Service type.
   type: ClusterIP
-  # -- Per-service container port mapping. Names match the AuthProxy service
-  # IDs; ingress.hosts[].paths[].service references them by key.
-  ports:
-    public: 8080
-    api: 8081
-    adminApi: 8082
-    workerHealth: 8083
 
 ingress:
   # -- Enable an Ingress resource.
@@ -72,7 +92,7 @@ ingress:
   # -- Annotations applied to the Ingress.
   annotations: {}
   # -- Host + path rules. Each path references a `service` key from
-  # `service.ports` above.
+  # `ports` above (in camelCase).
   hosts:
     - host: authproxy.local
       paths:
@@ -82,44 +102,83 @@ ingress:
   # -- TLS configuration entries.
   tls: []
 
-# -- Inline AuthProxy YAML config. Rendered into a ConfigMap and mounted at
-# /etc/authproxy/config.yaml in the container. A4 (#292) ships typed
-# top-level keys (`database`, `redis`, `s3`, etc.) that compose into this
-# map; for now the chart only ships the minimum config needed to render.
-config:
-  public:
-    port: 8080
-  api:
-    port: 8081
-  admin_api:
-    port: 8082
-  worker:
-    health_check_port: 8083
+# -- Database connectivity. AuthProxy supports postgres + sqlite; postgres
+# is the production-typical choice and is the default here.
+database:
+  # -- Provider: `postgres` or `sqlite`.
+  provider: postgres
+  # -- Postgres host (required for postgres provider).
+  host: ""
+  # -- Postgres port.
+  port: 5432
+  # -- Database name.
+  database: authproxy
+  # -- Postgres user.
+  user: authproxy
+  # -- Postgres SSL mode (`disable`, `require`, `verify-ca`, `verify-full`).
+  sslmode: require
+  # -- Run schema migrations at startup.
+  autoMigrate: true
+  # -- Secret holding the database password. Must contain a key named
+  # `AUTHPROXY_DB_PASSWORD` (the env var the rendered config references).
+  # The chart wires it via `envFrom`; the password never appears in the
+  # rendered ConfigMap.
+  existingSecret: ""
+  # -- SQLite-only: filesystem path. Ignored when provider=postgres.
+  path: /var/lib/authproxy/authproxy.db
 
-# -- References to externally managed Secrets. The chart wires `envFrom`
-# entries so the container picks up credentials at startup; the chart never
-# creates the Secrets themselves. A4 will rename these to typed sections
-# (`database.existingSecret`, `redis.existingSecret`, etc.).
-secrets:
-  # -- Database connection credentials (POSTGRES_* env vars expected).
-  database:
-    existingSecret: ""
-  # -- Redis connection credentials.
-  redis:
-    existingSecret: ""
-  # -- S3 credentials (only needed when not using IRSA).
-  s3:
-    existingSecret: ""
-  # -- JWT signing key pair and admin actor keys (mounted as files).
-  jwt:
-    existingSecret: ""
-    mountPath: /etc/authproxy/keys/jwt
-  # -- Encryption keys (mounted as files).
-  encryption:
-    existingSecret: ""
-    mountPath: /etc/authproxy/keys/encryption
+# -- Redis connectivity. Required for sessions, async tasks, rate-limit
+# cache, and OAuth round-trip state.
+redis:
+  # -- host:port (required).
+  address: ""
+  # -- Optional Redis username (Redis 6 ACLs).
+  username: ""
+  # -- Logical DB index.
+  db: 0
+  # -- Secret holding the redis password. Must contain a key named
+  # `AUTHPROXY_REDIS_PASSWORD` (the env var the rendered config references).
+  existingSecret: ""
 
-# -- HTTP path on the public service used for liveness / readiness probes.
+# -- S3-compatible blob storage for request-log payloads. Disabled by
+# default; AuthProxy falls back to local/no blob storage when omitted.
+s3:
+  enabled: false
+  bucket: ""
+  region: ""
+  # -- Optional S3 endpoint (e.g. MinIO). Leave empty to use AWS defaults.
+  endpoint: ""
+  # -- Optional key prefix for stored objects.
+  prefix: ""
+  # -- Force path-style addressing (MinIO + most S3-compatible services).
+  forcePathStyle: false
+  # -- Secret holding AWS_ACCESS_KEY_ID and AWS_SECRET_ACCESS_KEY env vars.
+  # Leave empty when using IRSA (set `serviceAccount.annotations` instead).
+  existingSecret: ""
+
+# -- JWT signing key pair, mounted into the container as files (paths are
+# substituted into the rendered config). The chart only references the
+# Secret; customers create it.
+jwt:
+  existingSecret: ""
+  mountPath: /etc/authproxy/keys/jwt
+  publicKeyFile: system.pub
+  privateKeyFile: system
+
+# -- Encryption keys (global AES key + actor signing keys), mounted as a
+# Secret volume.
+encryptionKeys:
+  existingSecret: ""
+  mountPath: /etc/authproxy/keys/encryption
+  globalAesKeyFile: global_aes.key
+  actorsKeysDir: actors
+
+# -- Free-form config overlay merged on top of the rendered AuthProxy YAML.
+# Use this for fields the chart hasn't promoted to typed values yet.
+config: {}
+
+# -- Liveness / readiness probe configuration. Targets the public service;
+# only emitted when `services.public.enabled` is true.
 healthcheck:
   path: /healthz
   initialDelaySeconds: 10

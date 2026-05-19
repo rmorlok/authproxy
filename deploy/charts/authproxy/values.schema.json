@@ -1,0 +1,213 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "AuthProxy Helm chart values",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "image": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": { "type": "string", "minLength": 1 },
+        "tag":        { "type": "string" },
+        "pullPolicy": { "type": "string", "enum": ["Always", "IfNotPresent", "Never"] }
+      },
+      "required": ["repository"]
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": { "name": { "type": "string" } },
+        "required": ["name"]
+      }
+    },
+    "nameOverride":     { "type": "string" },
+    "fullnameOverride": { "type": "string" },
+
+    "serviceAccount": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "create":      { "type": "boolean" },
+        "name":        { "type": "string" },
+        "annotations": { "type": "object", "additionalProperties": { "type": "string" } }
+      }
+    },
+
+    "replicaCount":     { "type": "integer", "minimum": 1 },
+    "podAnnotations":   { "type": "object", "additionalProperties": { "type": "string" } },
+    "podLabels":        { "type": "object", "additionalProperties": { "type": "string" } },
+    "podSecurityContext": { "type": "object" },
+    "securityContext":  { "type": "object" },
+    "resources":        { "type": "object" },
+    "nodeSelector":     { "type": "object", "additionalProperties": { "type": "string" } },
+    "tolerations":      { "type": "array" },
+    "affinity":         { "type": "object" },
+
+    "services": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "api":      { "$ref": "#/definitions/serviceToggle" },
+        "adminApi": { "$ref": "#/definitions/serviceToggle" },
+        "public":   { "$ref": "#/definitions/serviceToggle" },
+        "worker":   { "$ref": "#/definitions/serviceToggle" }
+      }
+    },
+
+    "ports": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "public":       { "$ref": "#/definitions/portNumber" },
+        "api":          { "$ref": "#/definitions/portNumber" },
+        "adminApi":     { "$ref": "#/definitions/portNumber" },
+        "workerHealth": { "$ref": "#/definitions/portNumber" }
+      }
+    },
+
+    "service": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "type": { "type": "string", "enum": ["ClusterIP", "NodePort", "LoadBalancer"] }
+      }
+    },
+
+    "ingress": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":     { "type": "boolean" },
+        "className":   { "type": "string" },
+        "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
+        "hosts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "host": { "type": "string", "minLength": 1 },
+              "paths": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "additionalProperties": false,
+                  "properties": {
+                    "path":     { "type": "string", "minLength": 1 },
+                    "pathType": { "type": "string", "enum": ["Exact", "Prefix", "ImplementationSpecific"] },
+                    "service":  { "type": "string", "enum": ["public", "api", "adminApi", "workerHealth"] }
+                  },
+                  "required": ["path", "service"]
+                }
+              }
+            },
+            "required": ["host", "paths"]
+          }
+        },
+        "tls": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "hosts":      { "type": "array", "items": { "type": "string" } },
+              "secretName": { "type": "string" }
+            }
+          }
+        }
+      }
+    },
+
+    "database": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider":       { "type": "string", "enum": ["postgres", "sqlite"] },
+        "host":           { "type": "string" },
+        "port":           { "$ref": "#/definitions/portNumber" },
+        "database":       { "type": "string" },
+        "user":           { "type": "string" },
+        "sslmode":        { "type": "string", "enum": ["disable", "allow", "prefer", "require", "verify-ca", "verify-full"] },
+        "autoMigrate":    { "type": "boolean" },
+        "existingSecret": { "type": "string" },
+        "path":           { "type": "string" }
+      },
+      "required": ["provider"]
+    },
+
+    "redis": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "address":        { "type": "string" },
+        "username":       { "type": "string" },
+        "db":             { "type": "integer", "minimum": 0 },
+        "existingSecret": { "type": "string" }
+      }
+    },
+
+    "s3": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":        { "type": "boolean" },
+        "bucket":         { "type": "string" },
+        "region":         { "type": "string" },
+        "endpoint":       { "type": "string" },
+        "prefix":         { "type": "string" },
+        "forcePathStyle": { "type": "boolean" },
+        "existingSecret": { "type": "string" }
+      }
+    },
+
+    "jwt": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "existingSecret": { "type": "string" },
+        "mountPath":      { "type": "string" },
+        "publicKeyFile":  { "type": "string" },
+        "privateKeyFile": { "type": "string" }
+      }
+    },
+
+    "encryptionKeys": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "existingSecret":   { "type": "string" },
+        "mountPath":        { "type": "string" },
+        "globalAesKeyFile": { "type": "string" },
+        "actorsKeysDir":    { "type": "string" }
+      }
+    },
+
+    "config": { "type": "object" },
+
+    "healthcheck": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "path":                { "type": "string", "pattern": "^/" },
+        "initialDelaySeconds": { "type": "integer", "minimum": 0 },
+        "periodSeconds":       { "type": "integer", "minimum": 1 }
+      }
+    }
+  },
+  "definitions": {
+    "serviceToggle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" }
+      }
+    },
+    "portNumber": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 65535
+    }
+  }
+}
