@@ -1,11 +1,14 @@
 {{ include "authproxy.fullname" . }} has been installed.
 
-Image:        {{ include "authproxy.image" . }}
-Replicas:     {{ .Values.replicaCount }}
+Image:       {{ include "authproxy.image" . }}
+Replicas:    {{ .Values.replicaCount }}
+Services:    {{ include "authproxy.enabledServices" . }}
+
+{{- $ports := (include "authproxy.enabledPorts" . | fromYaml).ports }}
 
 Service ports (ClusterIP {{ include "authproxy.fullname" . }}):
-{{- range $name, $port := .Values.service.ports }}
-  {{ $name | kebabcase | printf "%-14s" }} {{ $port }}
+{{- range $ports }}
+  {{ .name | printf "%-14s" }} {{ .port }}
 {{- end }}
 
 {{- if .Values.ingress.enabled }}
@@ -22,21 +25,20 @@ Ingress is enabled. Reachable hosts:
 Ingress is disabled. To reach the service from outside the cluster,
 either enable `ingress.enabled` in your values or port-forward, e.g.:
 
-  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "authproxy.fullname" . }} 8080:{{ .Values.service.ports.public }}
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "authproxy.fullname" . }} {{ .Values.ports.public }}:{{ .Values.ports.public }}
 {{- end }}
 
 {{- $missing := list }}
-{{- if not .Values.secrets.database.existingSecret }}{{- $missing = append $missing "secrets.database.existingSecret" }}{{- end }}
-{{- if not .Values.secrets.redis.existingSecret }}{{- $missing = append $missing "secrets.redis.existingSecret" }}{{- end }}
-{{- if not .Values.secrets.jwt.existingSecret }}{{- $missing = append $missing "secrets.jwt.existingSecret" }}{{- end }}
-{{- if not .Values.secrets.encryption.existingSecret }}{{- $missing = append $missing "secrets.encryption.existingSecret" }}{{- end }}
+{{- if not .Values.database.existingSecret }}{{- $missing = append $missing "database.existingSecret" }}{{- end }}
+{{- if not .Values.redis.existingSecret }}{{- $missing = append $missing "redis.existingSecret" }}{{- end }}
+{{- if not .Values.jwt.existingSecret }}{{- $missing = append $missing "jwt.existingSecret" }}{{- end }}
+{{- if not .Values.encryptionKeys.existingSecret }}{{- $missing = append $missing "encryptionKeys.existingSecret" }}{{- end }}
+{{- if and .Values.s3.enabled (not .Values.s3.existingSecret) (not .Values.serviceAccount.annotations) }}{{- $missing = append $missing "s3.existingSecret (or serviceAccount.annotations for IRSA)" }}{{- end }}
 {{- if $missing }}
 
 NOTE: the following secret references are unset and the pod will fail to
-start until you provide them (chart deliberately never creates Secrets):
+start until you provide them (the chart deliberately never creates Secrets):
 {{- range $missing }}
   - {{ . }}
 {{- end }}
 {{- end }}
-
-For chart options, run `helm show values authproxy/{{ .Chart.Name }}`.

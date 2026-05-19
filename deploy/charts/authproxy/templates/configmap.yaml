@@ -1,3 +1,76 @@
+{{/*
+Render the AuthProxy config YAML from typed values, layered with the free-
+form `config` overlay. Sensitive fields reference env vars via the
+AuthProxy StringValue { env_var: NAME } pattern so passwords stay in
+Secrets, not in this ConfigMap.
+*/}}
+{{- $cfg := dict -}}
+
+{{/* --- service ports --- */}}
+{{- if .Values.services.public.enabled -}}
+{{- $_ := set $cfg "public" (dict "port" .Values.ports.public) -}}
+{{- end -}}
+{{- if .Values.services.api.enabled -}}
+{{- $_ := set $cfg "api" (dict "port" .Values.ports.api) -}}
+{{- end -}}
+{{- if .Values.services.adminApi.enabled -}}
+{{- $_ := set $cfg "admin_api" (dict "port" .Values.ports.adminApi) -}}
+{{- end -}}
+{{- if .Values.services.worker.enabled -}}
+{{- $_ := set $cfg "worker" (dict "health_check_port" .Values.ports.workerHealth) -}}
+{{- end -}}
+
+{{/* --- database --- */}}
+{{- $db := dict "provider" .Values.database.provider "auto_migrate" .Values.database.autoMigrate -}}
+{{- if eq .Values.database.provider "postgres" -}}
+{{-   $_ := set $db "host" .Values.database.host -}}
+{{-   $_ := set $db "port" .Values.database.port -}}
+{{-   $_ := set $db "user" .Values.database.user -}}
+{{-   $_ := set $db "database" .Values.database.database -}}
+{{-   $_ := set $db "sslmode" .Values.database.sslmode -}}
+{{-   if .Values.database.existingSecret -}}
+{{-     $_ := set $db "password" (dict "env_var" "AUTHPROXY_DB_PASSWORD") -}}
+{{-   end -}}
+{{- else if eq .Values.database.provider "sqlite" -}}
+{{-   $_ := set $db "path" .Values.database.path -}}
+{{- end -}}
+{{- $_ := set $cfg "database" $db -}}
+
+{{/* --- redis --- */}}
+{{- $redis := dict "provider" "redis" "address" .Values.redis.address "db" .Values.redis.db -}}
+{{- if .Values.redis.username -}}
+{{-   $_ := set $redis "username" .Values.redis.username -}}
+{{- end -}}
+{{- if .Values.redis.existingSecret -}}
+{{-   $_ := set $redis "password" (dict "env_var" "AUTHPROXY_REDIS_PASSWORD") -}}
+{{- end -}}
+{{- $_ := set $cfg "redis" $redis -}}
+
+{{/* --- s3 (request-log blob storage) --- */}}
+{{- if .Values.s3.enabled -}}
+{{-   $s3 := dict "provider" "s3" "bucket" .Values.s3.bucket "force_path_style" .Values.s3.forcePathStyle -}}
+{{-   if .Values.s3.region -}}{{- $_ := set $s3 "region" .Values.s3.region -}}{{- end -}}
+{{-   if .Values.s3.endpoint -}}{{- $_ := set $s3 "endpoint" .Values.s3.endpoint -}}{{- end -}}
+{{-   if .Values.s3.prefix -}}{{- $_ := set $s3 "prefix" .Values.s3.prefix -}}{{- end -}}
+{{-   $creds := dict "type" "implicit" -}}
+{{-   $_ := set $s3 "credentials" $creds -}}
+{{-   $_ := set $cfg "blob_storage" $s3 -}}
+{{- end -}}
+
+{{/* --- crypto material file paths --- */}}
+{{- if .Values.jwt.existingSecret -}}
+{{-   $sysAuth := dict "jwt_signing_key" (dict
+        "public_key" (dict "path" (printf "%s/%s" .Values.jwt.mountPath .Values.jwt.publicKeyFile))
+        "private_key" (dict "path" (printf "%s/%s" .Values.jwt.mountPath .Values.jwt.privateKeyFile))) -}}
+{{-   if .Values.encryptionKeys.existingSecret -}}
+{{-     $_ := set $sysAuth "global_aes_key" (dict "path" (printf "%s/%s" .Values.encryptionKeys.mountPath .Values.encryptionKeys.globalAesKeyFile)) -}}
+{{-     $_ := set $sysAuth "actors" (dict "keys_path" (printf "%s/%s" .Values.encryptionKeys.mountPath .Values.encryptionKeys.actorsKeysDir)) -}}
+{{-   end -}}
+{{-   $_ := set $cfg "system_auth" $sysAuth -}}
+{{- end -}}
+
+{{/* --- overlay: merge user-provided `config` over the rendered defaults --- */}}
+{{- $cfg = mergeOverwrite $cfg .Values.config -}}
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -6,4 +79,4 @@ metadata:
     {{- include "authproxy.labels" . | nindent 4 }}
 data:
   config.yaml: |
-    {{- toYaml .Values.config | nindent 4 }}
+    {{- toYaml $cfg | nindent 4 }}

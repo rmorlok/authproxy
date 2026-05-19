@@ -1,3 +1,5 @@
+{{- $ports := (include "authproxy.enabledPorts" . | fromYaml).ports -}}
+{{- if $ports -}}
 apiVersion: v1
 kind: Service
 metadata:
@@ -9,9 +11,10 @@ spec:
   selector:
     {{- include "authproxy.selectorLabels" . | nindent 4 }}
   ports:
-    {{- range $name, $port := .Values.service.ports }}
-    - name: {{ $name | kebabcase }}
-      port: {{ $port }}
-      targetPort: {{ $name | kebabcase }}
+    {{- range $ports }}
+    - name: {{ .name }}
+      port: {{ .port }}
+      targetPort: {{ .name }}
       protocol: TCP
     {{- end }}
+{{- end }}

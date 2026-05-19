@@ -1,3 +1,8 @@
+{{- $services := include "authproxy.enabledServices" . -}}
+{{- if not $services -}}
+{{- fail "At least one service must be enabled. Set services.<id>.enabled=true for one of: api, adminApi, public, worker." -}}
+{{- end -}}
+{{- $ports := (include "authproxy.enabledPorts" . | fromYaml).ports -}}
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -43,28 +48,31 @@ spec:
           args:
             - serve
             - --config=/etc/authproxy/config.yaml
-            - all
+            - {{ $services | quote }}
+          {{- if $ports }}
           ports:
-            {{- range $name, $port := .Values.service.ports }}
-            - name: {{ $name | kebabcase }}
-              containerPort: {{ $port }}
+            {{- range $ports }}
+            - name: {{ .name }}
+              containerPort: {{ .port }}
               protocol: TCP
             {{- end }}
-          {{- if or .Values.secrets.database.existingSecret .Values.secrets.redis.existingSecret .Values.secrets.s3.existingSecret }}
+          {{- end }}
+          {{- if or .Values.database.existingSecret .Values.redis.existingSecret .Values.s3.existingSecret }}
           envFrom:
-            {{- with .Values.secrets.database.existingSecret }}
+            {{- with .Values.database.existingSecret }}
             - secretRef:
                 name: {{ . }}
             {{- end }}
-            {{- with .Values.secrets.redis.existingSecret }}
+            {{- with .Values.redis.existingSecret }}
             - secretRef:
                 name: {{ . }}
             {{- end }}
-            {{- with .Values.secrets.s3.existingSecret }}
+            {{- with .Values.s3.existingSecret }}
             - secretRef:
                 name: {{ . }}
             {{- end }}
           {{- end }}
+          {{- if .Values.services.public.enabled }}
           livenessProbe:
             httpGet:
               path: {{ .Values.healthcheck.path }}
@@ -77,6 +85,7 @@ spec:
               port: public
             initialDelaySeconds: {{ .Values.healthcheck.initialDelaySeconds }}
             periodSeconds: {{ .Values.healthcheck.periodSeconds }}
+          {{- end }}
           {{- with .Values.resources }}
           resources:
             {{- toYaml . | nindent 12 }}
@@ -86,26 +95,26 @@ spec:
               mountPath: /etc/authproxy/config.yaml
               subPath: config.yaml
               readOnly: true
-            {{- with .Values.secrets.jwt.existingSecret }}
+            {{- with .Values.jwt.existingSecret }}
             - name: jwt-keys
-              mountPath: {{ $.Values.secrets.jwt.mountPath }}
+              mountPath: {{ $.Values.jwt.mountPath }}
               readOnly: true
             {{- end }}
-            {{- with .Values.secrets.encryption.existingSecret }}
+            {{- with .Values.encryptionKeys.existingSecret }}
             - name: encryption-keys
-              mountPath: {{ $.Values.secrets.encryption.mountPath }}
+              mountPath: {{ $.Values.encryptionKeys.mountPath }}
               readOnly: true
             {{- end }}
       volumes:
         - name: config
           configMap:
             name: {{ include "authproxy.fullname" . }}-config
-        {{- with .Values.secrets.jwt.existingSecret }}
+        {{- with .Values.jwt.existingSecret }}
         - name: jwt-keys
           secret:
             secretName: {{ . }}
         {{- end }}
-        {{- with .Values.secrets.encryption.existingSecret }}
+        {{- with .Values.encryptionKeys.existingSecret }}
         - name: encryption-keys
           secret:
             secretName: {{ . }}
