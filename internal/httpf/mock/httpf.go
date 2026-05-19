@@ -5,6 +5,7 @@
 package mock
 
 import (
+	http "net/http"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
@@ -151,6 +152,43 @@ func (m *MockRateLimitConfigProvider) GetRateLimitConfig() *connectors.RateLimit
 func (mr *MockRateLimitConfigProviderMockRecorder) GetRateLimitConfig() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRateLimitConfig", reflect.TypeOf((*MockRateLimitConfigProvider)(nil).GetRateLimitConfig))
+}
+
+// MockTracePropagationProvider is a mock of TracePropagationProvider interface.
+type MockTracePropagationProvider struct {
+	ctrl     *gomock.Controller
+	recorder *MockTracePropagationProviderMockRecorder
+}
+
+// MockTracePropagationProviderMockRecorder is the mock recorder for MockTracePropagationProvider.
+type MockTracePropagationProviderMockRecorder struct {
+	mock *MockTracePropagationProvider
+}
+
+// NewMockTracePropagationProvider creates a new mock instance.
+func NewMockTracePropagationProvider(ctrl *gomock.Controller) *MockTracePropagationProvider {
+	mock := &MockTracePropagationProvider{ctrl: ctrl}
+	mock.recorder = &MockTracePropagationProviderMockRecorder{mock}
+	return mock
+}
+
+// EXPECT returns an object that allows the caller to indicate expected use.
+func (m *MockTracePropagationProvider) EXPECT() *MockTracePropagationProviderMockRecorder {
+	return m.recorder
+}
+
+// PropagateTraceContext mocks base method.
+func (m *MockTracePropagationProvider) PropagateTraceContext() *bool {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "PropagateTraceContext")
+	ret0, _ := ret[0].(*bool)
+	return ret0
+}
+
+// PropagateTraceContext indicates an expected call of PropagateTraceContext.
+func (mr *MockTracePropagationProviderMockRecorder) PropagateTraceContext() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "PropagateTraceContext", reflect.TypeOf((*MockTracePropagationProvider)(nil).PropagateTraceContext))
 }
 
 // MockConnection is a mock of Connection interface.
@@ -430,4 +468,18 @@ func (m *MockF) New() *gentleman.Client {
 func (mr *MockFMockRecorder) New() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "New", reflect.TypeOf((*MockF)(nil).New))
+}
+
+// NewHTTPClient mocks base method.
+func (m *MockF) NewHTTPClient() *http.Client {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewHTTPClient")
+	ret0, _ := ret[0].(*http.Client)
+	return ret0
+}
+
+// NewHTTPClient indicates an expected call of NewHTTPClient.
+func (mr *MockFMockRecorder) NewHTTPClient() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewHTTPClient", reflect.TypeOf((*MockF)(nil).NewHTTPClient))
 }

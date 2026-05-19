@@ -64,7 +64,7 @@ type Connection interface {
 	ProxyRequestRaw(
 		ctx context.Context,
 		reqType httpf.RequestType,
-		req *ProxyRequest,
+		req *RawProxyRequest,
 		w http.ResponseWriter,
 	) error
 	SubmitForm(ctx context.Context, req SubmitConnectionRequest) (ConnectionSetupResponse, error)

@@ -111,7 +111,7 @@ func (m *Connection) ProxyRequest(
 func (m *Connection) ProxyRequestRaw(
 	ctx context.Context,
 	reqType httpf.RequestType,
-	req *iface.ProxyRequest,
+	req *iface.RawProxyRequest,
 	w http.ResponseWriter,
 ) error {
 	return nil

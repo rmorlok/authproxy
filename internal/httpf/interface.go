@@ -1,6 +1,8 @@
 package httpf
 
 import (
+	"net/http"
+
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/connectors"
 	"gopkg.in/h2non/gentleman.v2"
@@ -52,6 +54,12 @@ type Actor interface {
 //go:generate mockgen -source=./interface.go -destination=./mock/httpf.go -package=mock
 type F interface {
 	New() *gentleman.Client
+	// NewHTTPClient returns a stock *http.Client whose Transport is the
+	// same wrapped RoundTripper chain (request-log, rate-limit enforcer,
+	// OTel, …) used by New(). Use this for the streaming raw-proxy path
+	// — gentleman's Send() buffers the response body, which defeats SSE
+	// and other long-lived streams.
+	NewHTTPClient() *http.Client
 	ForRequestInfo(ri RequestInfo) F
 	ForRequestType(rt RequestType) F
 	ForConnectorVersion(cv ConnectorVersion) F

@@ -102,15 +102,14 @@ func (r *ConnectionsProxyRoutes) proxy(gctx *gin.Context) {
 }
 
 func (r *ConnectionsProxyRoutes) Register(g gin.IRouter) {
-	g.POST(
-		"/connections/:id/_proxy",
-		r.auth.NewRequiredBuilder().
-			ForResource("connections").
-			ForVerb("proxy").
-			ForIdField("id").
-			Build(),
-		r.proxy,
-	)
+	proxyAuth := r.auth.NewRequiredBuilder().
+		ForResource("connections").
+		ForVerb("proxy").
+		ForIdField("id").
+		Build()
+
+	g.POST("/connections/:id/_proxy", proxyAuth, r.proxy)
+	g.Any("/connections/:id/_proxy_raw", proxyAuth, r.proxyRaw)
 }
 
 func NewConnectionsProxyRoutes(

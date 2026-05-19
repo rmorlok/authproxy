@@ -68,7 +68,7 @@ func (c *connection) ProxyRequest(
 func (c *connection) ProxyRequestRaw(
 	ctx context.Context,
 	reqType httpf.RequestType,
-	req *iface.ProxyRequest,
+	req *iface.RawProxyRequest,
 	w http.ResponseWriter,
 ) error {
 	p, err := c.getProxyImpl()
