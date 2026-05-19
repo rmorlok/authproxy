@@ -98,6 +98,8 @@ func (s *sqlRecordStore) StoreRecords(ctx context.Context, records []*LogRecord)
 			"rate_limit_mode",
 			"rate_limit_bucket",
 			"rate_limit_matched",
+			"request_body_skipped",
+			"response_body_skipped",
 		)
 
 	for _, record := range records {
@@ -148,6 +150,8 @@ func (s *sqlRecordStore) StoreRecords(ctx context.Context, records []*LogRecord)
 			record.RateLimitMode,
 			bucketJSON,
 			matchedJSON,
+			string(record.RequestBodySkipped),
+			string(record.ResponseBodySkipped),
 		)
 	}
 
@@ -239,6 +243,7 @@ var entryRecordColumns = []string{
 	"labels",
 	"response_source", "rate_limit_id", "rate_limit_mode",
 	"rate_limit_bucket", "rate_limit_matched",
+	"request_body_skipped", "response_body_skipped",
 }
 
 func scanLogRecord(row interface{ Scan(dest ...any) error }) (*LogRecord, error) {
@@ -247,6 +252,7 @@ func scanLogRecord(row interface{ Scan(dest ...any) error }) (*LogRecord, error)
 	var timestampMs, durationMs int64
 	var responseSource, rateLimitId, rateLimitMode string
 	var rateLimitBucket, rateLimitMatched []byte
+	var requestBodySkipped, responseBodySkipped string
 
 	err := row.Scan(
 		&requestId, &er.Namespace, &er.Type, &er.CorrelationId, &timestampMs,
@@ -259,10 +265,13 @@ func scanLogRecord(row interface{ Scan(dest ...any) error }) (*LogRecord, error)
 		&er.Labels,
 		&responseSource, &rateLimitId, &rateLimitMode,
 		&rateLimitBucket, &rateLimitMatched,
+		&requestBodySkipped, &responseBodySkipped,
 	)
 	if err != nil {
 		return nil, err
 	}
+	er.RequestBodySkipped = BodySkippedReason(requestBodySkipped)
+	er.ResponseBodySkipped = BodySkippedReason(responseBodySkipped)
 
 	er.RequestId = apid.ID(requestId)
 	er.ConnectionId = apid.ID(connectionId)

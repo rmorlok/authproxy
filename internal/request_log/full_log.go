@@ -12,6 +12,24 @@ import (
 // full request. To represent the redacted version of the request, an LogRecord is used,
 // which is a subset of the EntryRequest and organized for searching.
 
+// BodySkippedReason explains why a request/response body was not captured
+// into the full log. Empty string means the body was captured (or there
+// was no body to capture).
+type BodySkippedReason string
+
+const (
+	// BodySkippedStreaming indicates the body had no advance size
+	// (Content-Length unset / chunked). The full log has no way to know
+	// how big the body will be, so capture is skipped rather than risk
+	// OOMing the proxy or growing the blob unboundedly.
+	BodySkippedStreaming BodySkippedReason = "streaming"
+	// BodySkippedTooLarge indicates Content-Length was set but exceeded
+	// the configured max_request_size / max_response_size. Capture is
+	// skipped — operators that want the body anyway can raise the cap
+	// in config.
+	BodySkippedTooLarge BodySkippedReason = "too_large"
+)
+
 type FullLogRequest struct {
 	URL           string              `json:"u"`
 	HttpVersion   string              `json:"v"`
@@ -19,6 +37,10 @@ type FullLogRequest struct {
 	Headers       map[string][]string `json:"h"`
 	ContentLength int64               `json:"cl,omitempty"`
 	Body          []byte              `json:"b,omitempty"`
+	// BodySkipped is non-empty when the body bytes were not captured —
+	// see BodySkippedReason. Mutually exclusive with Body (a captured
+	// body has BodySkipped == "").
+	BodySkipped BodySkippedReason `json:"bs,omitempty"`
 }
 
 func (e *FullLogRequest) setRecordFields(er *LogRecord) {
@@ -35,6 +57,7 @@ func (e *FullLogRequest) setRecordFields(er *LogRecord) {
 	er.Method = e.Method
 	er.RequestHttpVersion = e.HttpVersion
 	er.RequestSizeBytes = e.ContentLength
+	er.RequestBodySkipped = e.BodySkipped
 
 	if e.Headers != nil && e.Headers["Content-Type"] != nil && len(e.Headers["Content-Type"]) > 0 {
 		er.RequestMimeType = e.Headers["Content-Type"][0]
@@ -48,6 +71,9 @@ type FullLogResponse struct {
 	Body          []byte              `json:"b,omitempty"`
 	ContentLength int64               `json:"cl,omitempty"`
 	Err           string              `json:"err,omitempty"`
+	// BodySkipped is non-empty when the response body was not captured
+	// (chunked SSE, oversize). Same shape as FullLogRequest.BodySkipped.
+	BodySkipped BodySkippedReason `json:"bs,omitempty"`
 }
 
 func (e *FullLogResponse) setRecordFields(er *LogRecord) {
@@ -64,6 +90,7 @@ func (e *FullLogResponse) setRecordFields(er *LogRecord) {
 	er.ResponseSizeBytes = e.ContentLength
 	er.ResponseStatusCode = e.StatusCode
 	er.ResponseError = e.Err
+	er.ResponseBodySkipped = e.BodySkipped
 }
 
 type FullLog struct {
@@ -139,6 +166,7 @@ func NewFullLogFromRecord(er *LogRecord) *FullLog {
 		Method:        er.Method,
 		ContentLength: er.RequestSizeBytes,
 		Headers:       make(map[string][]string),
+		BodySkipped:   er.RequestBodySkipped,
 	}
 	if er.RequestMimeType != "" {
 		entry.Request.Headers["Content-Type"] = []string{er.RequestMimeType}
@@ -151,6 +179,7 @@ func NewFullLogFromRecord(er *LogRecord) *FullLog {
 		ContentLength: er.ResponseSizeBytes,
 		Err:           er.ResponseError,
 		Headers:       make(map[string][]string),
+		BodySkipped:   er.ResponseBodySkipped,
 	}
 	if er.ResponseMimeType != "" {
 		entry.Response.Headers["Content-Type"] = []string{er.ResponseMimeType}

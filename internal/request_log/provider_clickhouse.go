@@ -61,8 +61,9 @@ func (s *clickhouseRecordStore) StoreRecords(ctx context.Context, records []*Log
 			"response_http_version, response_size_bytes, response_mime_type, "+
 			"internal_timeout, request_cancelled, full_request_recorded, "+
 			"labels, response_source, rate_limit_id, rate_limit_mode, "+
-			"rate_limit_bucket, rate_limit_matched) "+
-			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+			"rate_limit_bucket, rate_limit_matched, "+
+			"request_body_skipped, response_body_skipped) "+
+			"VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
 		entryRecordsTable,
 	))
 	if err != nil {
@@ -103,6 +104,7 @@ func (s *clickhouseRecordStore) StoreRecords(ctx context.Context, records []*Log
 			labelsVal,
 			string(source), r.RateLimitId.String(), r.RateLimitMode,
 			bucketJSON, matchedJSON,
+			string(r.RequestBodySkipped), string(r.ResponseBodySkipped),
 		)
 		if err != nil {
 			s.logger.Error("failed to insert record into clickhouse", "error", err, "entry_id", r.RequestId.String())
@@ -153,7 +155,9 @@ func (s *clickhouseRecordStore) Migrate(ctx context.Context) error {
 		rate_limit_id String DEFAULT '',
 		rate_limit_mode String DEFAULT '',
 		rate_limit_bucket String DEFAULT '{}',
-		rate_limit_matched String DEFAULT '[]'
+		rate_limit_matched String DEFAULT '[]',
+		request_body_skipped String DEFAULT '',
+		response_body_skipped String DEFAULT ''
 	) ENGINE = MergeTree()
 	ORDER BY (namespace, timestamp_ms, request_id)`, entryRecordsTable)
 

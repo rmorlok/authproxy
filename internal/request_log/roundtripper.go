@@ -42,6 +42,8 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	var requestBodyBuf *bytes.Buffer
 	var requestBodyTrackingReader trackingReader
 	var responseBodyTrackingReader trackingReader
+	var requestBodySkipped BodySkippedReason
+	var responseBodySkipped BodySkippedReason
 
 	// Generate a unique ID for this request
 	id := apctx.GetIdGenerator(ctx).New(apid.PrefixRequestLog)
@@ -52,23 +54,33 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 
 	if req.Body != nil {
 		if cc.recordFullRequest && cc.maxFullRequestSize > 0 {
-			// Create a buffer to store the request body
-			requestBodyBuf = &bytes.Buffer{}
-
-			// Create a TeeReader that copies to our buffer but passes through all data
-			bodyReader := io.TeeReader(
-				io.LimitReader(req.Body, int64(cc.maxFullRequestSize)),
-				requestBodyBuf,
-			)
-
-			// Split the reader so the data is read from the tee reader, but the close happens on the body
-			split := newSplitReadCloser(bodyReader, req.Body)
-
-			// Standardize the tracking of response size regardless of if we are tracking the body
-			requestBodyTrackingReader = split
-
-			// Replace the request body with our reader while preserving the original closer
-			req.Body = split
+			// Size-bounded capture: decide tee-vs-skip up front based on
+			// the advance-known Content-Length. Streaming bodies (chunked,
+			// no Content-Length) and bodies larger than the configured cap
+			// are forwarded *un-tee'd* so the upstream sees the full
+			// stream and the proxy does not accumulate an unbounded body
+			// in memory. The "skipped" reason lands on the log record so
+			// operators can see why a body wasn't captured.
+			switch {
+			case req.ContentLength < 0:
+				requestBodySkipped = BodySkippedStreaming
+				tracking := newTrackingReadCloser(req.Body)
+				requestBodyTrackingReader = tracking
+				req.Body = tracking
+			case uint64(req.ContentLength) > cc.maxFullRequestSize:
+				requestBodySkipped = BodySkippedTooLarge
+				tracking := newTrackingReadCloser(req.Body)
+				requestBodyTrackingReader = tracking
+				req.Body = tracking
+			default:
+				// ContentLength is set and within the cap. Tee straight
+				// through — no LimitReader, since we know the body fits.
+				requestBodyBuf = &bytes.Buffer{}
+				bodyReader := io.TeeReader(req.Body, requestBodyBuf)
+				split := newSplitReadCloser(bodyReader, req.Body)
+				requestBodyTrackingReader = split
+				req.Body = split
+			}
 		} else {
 			// Track the body size
 			tracking := newTrackingReadCloser(req.Body)
@@ -104,6 +116,7 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 			Method:        req.Method,
 			Headers:       req.Header,
 			ContentLength: reqContentLength,
+			BodySkipped:   requestBodySkipped,
 		},
 		MillisecondDuration: MillisecondDuration(clock.Since(startTime)),
 	}
@@ -157,23 +170,40 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 	full_log.Response.ContentLength = resp.ContentLength // This will be overwritten if we are recording the full response
 
 	if cc.recordFullRequest && cc.maxFullResponseSize > 0 && resp.Body != nil {
-		var responseBodyWriter *io.PipeWriter
+		// Same size-bounded decision as the request side, against the
+		// upstream's Content-Length and max_full_response_size. SSE /
+		// chunked streams skip the tee — the whole point of the raw
+		// path is "don't buffer the upstream response."
+		switch {
+		case resp.ContentLength < 0:
+			responseBodySkipped = BodySkippedStreaming
+			bodyReader := newTrackingReadCloser(resp.Body)
+			responseBodyTrackingReader = bodyReader
+			resp.Body = bodyReader
+		case uint64(resp.ContentLength) > cc.maxFullResponseSize:
+			responseBodySkipped = BodySkippedTooLarge
+			bodyReader := newTrackingReadCloser(resp.Body)
+			responseBodyTrackingReader = bodyReader
+			resp.Body = bodyReader
+		default:
+			var responseBodyWriter *io.PipeWriter
 
-		// Create a new reader that allows us to read the response without consuming it
-		responseBodyReader, responseBodyWriter = io.Pipe()
-		originalBody := resp.Body
+			// Create a new reader that allows us to read the response without consuming it
+			responseBodyReader, responseBodyWriter = io.Pipe()
+			originalBody := resp.Body
 
-		// Create a TeeReader to copy the response to our writer while still passing it through
-		teeReader := io.TeeReader(io.LimitReader(originalBody, int64(cc.maxFullResponseSize)), responseBodyWriter)
+			// Content-Length is known and within the cap — tee without
+			// a LimitReader so the upstream body passes through whole.
+			teeReader := io.TeeReader(originalBody, responseBodyWriter)
 
-		bodyReader := newSplitReadCloser(teeReader, originalBody, responseBodyWriter)
+			bodyReader := newSplitReadCloser(teeReader, originalBody, responseBodyWriter)
 
-		// Track the response being read for size as well
-		responseBodyTrackingReader = bodyReader
+			// Track the response being read for size as well
+			responseBodyTrackingReader = bodyReader
 
-		// Replace the response body with our tee reader
-		resp.Body = bodyReader
-
+			// Replace the response body with our tee reader
+			resp.Body = bodyReader
+		}
 	} else {
 		bodyReader := newTrackingReadCloser(resp.Body)
 
@@ -183,6 +213,7 @@ func (t *RoundTripper) RoundTrip(req *http.Request) (*http.Response, error) {
 		// Replace the response body with our tee reader
 		resp.Body = bodyReader
 	}
+	full_log.Response.BodySkipped = responseBodySkipped
 
 	// Store the full_log in Redis asynchronously
 	go func() {
