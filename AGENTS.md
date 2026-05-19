@@ -125,6 +125,23 @@ YAML-based, loaded from `internal/schema/config`. Dev configs in `dev_config/`. 
 - `internal/encrypt` + `internal/encfield` — AES-GCM encryption for `EncryptedField` columns. The re-encryption registry (`internal/database/reencrypt_registry.go`) drives key-rotation jobs over registered encrypted columns.
 - `internal/request_log` — structured HTTP request/response logging with sensitive-data redaction.
 - `internal/httpf` — HTTP client factory with mock support and OpenTelemetry instrumentation.
+- `internal/aptelemetry` — bootstrap and shared helpers for OpenTelemetry (`New`, `NoopProviders`, `LabelProjector`). All services route through this package; no other code should construct OTel providers directly.
+
+### Telemetry conventions
+
+Full reference: [`docs/telemetry.md`](docs/telemetry.md). Day-to-day rules when adding instrumentation:
+
+- **Config lives in one place.** The `telemetry:` block in `internal/schema/config` is the only knob — there is no per-package toggle. It is **off by default**, endpoint-gated (an empty `exporter.endpoint` falls through to no-op providers), and signals can be toggled independently under `telemetry.signals`.
+- **Use the existing instrumented wrappers** rather than wiring providers yourself:
+  - HTTP server: the Gin middleware is registered globally in each service — no per-route work.
+  - Outbound HTTP: `internal/httpf` clients are already instrumented (otelhttp roundtripper + span attributes); call sites get tracing for free.
+  - Database: open SQL handles via `database.OpenInstrumentedSQL` / `database.OpenInstrumentedConnector` (used by both `internal/database` and `internal/request_log`).
+  - Redis: hook installation is shared in `internal/apredis`.
+  - Asynq: middleware is registered by `service.RegisterTasks`; periodic tasks come through `PeriodicTaskManager`.
+  - Logs ↔ traces: `internal/aplog` uses the `otelslog` bridge — emit normal `slog` records and trace/span IDs are attached automatically.
+- **Labels are projected, never re-merged.** Spans and metrics read the already-resolved label set from `RequestInfo.Labels` (the namespace → connector → connection → request snapshot). Use `aptelemetry.LabelProjector` with the configured allowlists rather than reading raw label maps. Two independent allowlists govern span attributes vs. metric dimensions; metric allowlists should stay tight to control cardinality.
+- **Health / readiness endpoints are excluded by default** so dashboards aren't drowned in liveness probes. If you add a new high-volume system endpoint, decide whether to exclude it explicitly.
+- **Tests use in-memory exporters.** Pull spans/metrics with `tracetest` + a `ManualReader`; never dial a real collector from unit tests.
 
 ## Client configuration
 

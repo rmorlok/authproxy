@@ -9,6 +9,7 @@ This directory holds long-form documentation that supplements the [main repo REA
 
 ## Operational guides
 
+- **[Telemetry](telemetry.md)** — OpenTelemetry traces / metrics / logs across all services, OTLP exporter configuration, label projection, the metrics catalog, and the local Grafana + Tempo + Loki + Prometheus dev stack under `docker compose --profile observability`.
 - **[Background tasks](background_tasks.md)** — running the worker, monitoring queues with Asynqmon.
 - **[Blob storage](blob_storage.md)** — viewing data stored in MinIO / S3 (full request bodies, etc.).
 - **[Redis insight](redis_insight.md)** — viewing data stored in Redis (rate-limit counters, session state, etc.).

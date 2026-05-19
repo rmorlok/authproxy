@@ -34,6 +34,7 @@ Pre-built admin UI for managing connectors and connections:
 - [UI](#ui)
   - [Marketplace UI](#marketplace-ui)
   - [Admin UI](#admin-ui)
+- [Telemetry](#telemetry)
 - [Client Config](#client-config)
 - [Related Projects](#related-projects)
 - [License](#license)
@@ -45,6 +46,7 @@ In-depth guides live under [`docs/`](docs/README.md):
 
 - [Rate limits](docs/rate-limits.md) — defining rate-limit resources, the connector-level reactive 429 handler, and the request-log attribution fields.
 - [Labels and annotations](docs/labels.md) — the label system, system labels under `apxy/`, carry-forward through namespaces and connectors, label selectors.
+- [Telemetry](docs/telemetry.md) — OpenTelemetry traces, metrics, and logs; OTLP configuration, label projection, signal coverage, and the local Grafana dev stack.
 - [Background tasks](docs/background_tasks.md) — running the worker, monitoring queues.
 - [Blob storage](docs/blob_storage.md) — viewing data stored in MinIO / S3.
 - [Redis insight](docs/redis_insight.md) — viewing data stored in Redis.
@@ -544,6 +546,19 @@ Run the admin UI:
 yarn workspace @authproxy/admin dev
 ```
 
+## Telemetry
+
+AuthProxy emits OpenTelemetry **traces**, **metrics**, and **logs** from every service (`api`, `admin-api`, `public`, `worker`). All three signals are configured through a single `telemetry:` block and shipped via OTLP to a Collector you supply. Telemetry is **off by default** — existing deployments are unaffected until you opt in.
+
+A local Grafana + Tempo + Loki + Prometheus stack is wired into `docker compose` under the `observability` profile, so you can see traces and metrics flowing end-to-end without any external dependencies:
+
+```bash
+docker compose --profile observability up -d
+export AUTHPROXY_OTEL_ENDPOINT=http://localhost:4317
+```
+
+See [docs/telemetry.md](docs/telemetry.md) for the full reference — signal coverage, metrics catalog, configuration, label projection, sampling, and the local dev walkthrough with screenshots.
+
 ## Client Config
 
 The client cli looks for a config file at `~/.authproxy.yaml`:
@@ -571,6 +586,7 @@ The full set of long-form guides lives under [`docs/`](docs/README.md):
 |---|---|
 | Define rate-limit resources, connector reactive 429 handling, log attribution | [docs/rate-limits.md](docs/rate-limits.md) |
 | Label system, system labels, carry-forward, selectors | [docs/labels.md](docs/labels.md) |
+| OpenTelemetry traces / metrics / logs, OTLP config, label projection, dev Grafana stack | [docs/telemetry.md](docs/telemetry.md) |
 | Managing background tasks | [docs/background_tasks.md](docs/background_tasks.md) |
 | Viewing data stored in Blob Storage (request logs, etc.) | [docs/blob_storage.md](docs/blob_storage.md) |
 | Viewing data stored in Redis | [docs/redis_insight.md](docs/redis_insight.md) |
