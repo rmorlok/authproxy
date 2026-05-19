@@ -318,10 +318,19 @@ docker compose --profile tools up -d
 
 This adds RedisInsight on port 5540. Connect to `redis://default@redis:6379`.
 
+**Start the local observability stack (Grafana + Tempo + Loki + Prometheus + OTel Collector):**
+
+```bash
+docker compose --profile observability up -d
+export AUTHPROXY_OTEL_ENDPOINT=http://localhost:4317
+```
+
+Grafana is at <http://localhost:3000> (no login). The `telemetry:` block in `dev_config/default.yaml` is endpoint-gated — unsetting `AUTHPROXY_OTEL_ENDPOINT` returns to a no-op telemetry path. See [`dev_config/observability/README.md`](./dev_config/observability/README.md) for details and example PromQL / TraceQL.
+
 **Stop everything:**
 
 ```bash
-docker compose --profile server --profile tools down
+docker compose --profile server --profile tools --profile observability down
 ```
 
 Add `-v` to also remove data volumes.

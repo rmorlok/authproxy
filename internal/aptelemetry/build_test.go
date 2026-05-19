@@ -109,6 +109,32 @@ func TestNew_SignalsToggleIndependently(t *testing.T) {
 	requireShutdownWithinTimeout(t, p, 3*time.Second)
 }
 
+// TestNew_EnabledButEmptyEndpointFallsThroughToNoop pins the soft-disable
+// gate used by dev_config/default.yaml: telemetry.enabled may be true and
+// the block fully populated, but with the exporter.endpoint env-var
+// resolving to an empty string (default ""), New returns no-op providers
+// rather than dialling localhost:4317. This is what gives the
+// "observability profile not running -> no SDK warnings" UX dev expects.
+func TestNew_EnabledButEmptyEndpointFallsThroughToNoop(t *testing.T) {
+	on := true
+	cfg := &sconfig.Telemetry{
+		Enabled: &on,
+		Exporter: &sconfig.TelemetryExporter{
+			// directStringValue("") gives a present-but-empty endpoint
+			// — same shape as an env-var with an empty default that
+			// the operator hasn't overridden.
+			Endpoint: directStringValue(""),
+		},
+	}
+
+	p, err := New(context.Background(), "api", "", cfg)
+	require.NoError(t, err)
+	require.False(t, p.Enabled, "empty endpoint must fall through to no-op providers")
+	requireNoopTracerProvider(t, p.TracerProvider)
+	requireNoopMeterProvider(t, p.MeterProvider)
+	requireNoopLoggerProvider(t, p.LoggerProvider)
+}
+
 func TestNoopProviders(t *testing.T) {
 	p := NoopProviders()
 	require.False(t, p.Enabled)

@@ -124,6 +124,54 @@ redis:
 oauth:
   round_trip_ttl: 60m
 
+# OpenTelemetry settings. The whole block is endpoint-gated: when
+# AUTHPROXY_OTEL_ENDPOINT is unset, exporter.endpoint resolves to empty
+# and the SDK falls through to no-op providers. To activate the dev
+# observability sample (grafana/otel-lgtm) run:
+#
+#   docker compose --profile observability up -d
+#   export AUTHPROXY_OTEL_ENDPOINT=http://localhost:4317
+#
+# then start the AuthProxy services. Telemetry flows into the bundled
+# Grafana at http://localhost:3000 (no login). See docs/telemetry.md for
+# the full reference.
+telemetry:
+  enabled: true
+  exporter:
+    protocol: grpc
+    endpoint:
+      env_var: AUTHPROXY_OTEL_ENDPOINT
+      default: ""
+    insecure: true
+  resource:
+    service_name_prefix: authproxy
+    attributes:
+      deployment.environment: dev
+  sampling:
+    ratio: 1.0
+  signals:
+    traces: true
+    metrics: true
+    logs: true
+  http:
+    excluded_paths:
+      - /ping
+      - /healthz
+  proxy:
+    # Project an allowlisted subset of connection labels onto proxy
+    # metrics + spans. `type` matches the connectors.identifying_labels
+    # entry above so the Grafana "Proxy RED" dashboard's per-`type`
+    # panel populates automatically.
+    span_attribute_labels:
+      - type
+      - env
+    metric_dimension_labels:
+      - type
+      - env
+    metric_dimension_value_cap: 50
+  propagation:
+    inject_outbound_default: false
+
 connectors:
   auto_migrate: true
   auto_migration_lock_duration: 30s
