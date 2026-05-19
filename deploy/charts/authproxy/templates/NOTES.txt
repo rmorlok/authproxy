@@ -1,0 +1,42 @@
+{{ include "authproxy.fullname" . }} has been installed.
+
+Image:        {{ include "authproxy.image" . }}
+Replicas:     {{ .Values.replicaCount }}
+
+Service ports (ClusterIP {{ include "authproxy.fullname" . }}):
+{{- range $name, $port := .Values.service.ports }}
+  {{ $name | kebabcase | printf "%-14s" }} {{ $port }}
+{{- end }}
+
+{{- if .Values.ingress.enabled }}
+
+Ingress is enabled. Reachable hosts:
+{{- range .Values.ingress.hosts }}
+  - {{ .host }}
+{{- range .paths }}
+      {{ .path }} → {{ .service | kebabcase }}
+{{- end }}
+{{- end }}
+{{- else }}
+
+Ingress is disabled. To reach the service from outside the cluster,
+either enable `ingress.enabled` in your values or port-forward, e.g.:
+
+  kubectl -n {{ .Release.Namespace }} port-forward svc/{{ include "authproxy.fullname" . }} 8080:{{ .Values.service.ports.public }}
+{{- end }}
+
+{{- $missing := list }}
+{{- if not .Values.secrets.database.existingSecret }}{{- $missing = append $missing "secrets.database.existingSecret" }}{{- end }}
+{{- if not .Values.secrets.redis.existingSecret }}{{- $missing = append $missing "secrets.redis.existingSecret" }}{{- end }}
+{{- if not .Values.secrets.jwt.existingSecret }}{{- $missing = append $missing "secrets.jwt.existingSecret" }}{{- end }}
+{{- if not .Values.secrets.encryption.existingSecret }}{{- $missing = append $missing "secrets.encryption.existingSecret" }}{{- end }}
+{{- if $missing }}
+
+NOTE: the following secret references are unset and the pod will fail to
+start until you provide them (chart deliberately never creates Secrets):
+{{- range $missing }}
+  - {{ . }}
+{{- end }}
+{{- end }}
+
+For chart options, run `helm show values authproxy/{{ .Chart.Name }}`.

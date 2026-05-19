@@ -1,0 +1,18 @@
+# Patterns to ignore when packaging the chart.
+# Mirrors the default `helm create` ignore list.
+.DS_Store
+.git/
+.gitignore
+.bzr/
+.hg/
+.hgignore
+.svn/
+*.swp
+*.bak
+*.tmp
+*.orig
+*~
+.project
+.idea/
+*.tmproj
+.vscode/
