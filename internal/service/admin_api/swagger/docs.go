@@ -1743,6 +1743,70 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "/connections/{id}/_reauth": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Re-run the credential-collection portion of setup against an existing Ready connection. Used for user-driven credential rotation and as the recovery path when a connection is unhealthy. For api-key, returns a fresh credentials form (no prior values pre-filled); on submit the existing credential row is soft-deleted and a new one inserted in the same transaction. For OAuth2, restarts at preconnect:0 if defined, otherwise re-initiates the OAuth redirect. The connection's lifecycle state stays Ready throughout.",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "connections"
+                ],
+                "summary": "Re-authenticate a connection",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Connection UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    },
+                    {
+                        "description": "Reauth request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/routes.ReauthConnectionRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ConnectionSetupForm"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/connections/{id}/_reconfigure": {
             "post": {
                 "security": [
@@ -7711,6 +7775,14 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "routes.ReauthConnectionRequest": {
+            "type": "object",
+            "properties": {
+                "return_to_url": {
+                    "type": "string"
+                }
+            }
+        },
         "routes.RetryConnectionRequest": {
             "type": "object",
             "properties": {
@@ -7750,6 +7822,11 @@ const docTemplateadmin_api = `{
                 "created_at": {
                     "description": "Creation timestamp",
                     "type": "string"
+                },
+                "health_state": {
+                    "description": "Operational health signal (healthy, unhealthy). Distinct from State: a Ready connection\nwhose credentials have stopped working flips to unhealthy without changing State.",
+                    "type": "string",
+                    "example": "healthy"
                 },
                 "id": {
                     "description": "Connection UUID",

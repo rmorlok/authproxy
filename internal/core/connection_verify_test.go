@@ -47,6 +47,22 @@ func TestOnVerifyPassed(t *testing.T) {
 		assert.Nil(t, conn.GetSetupStep())
 		assert.Equal(t, database.ConnectionStateReady, conn.GetState())
 	})
+
+	t.Run("flips health back to healthy when previously unhealthy", func(t *testing.T) {
+		ctrl := gomock.NewController(t)
+		defer ctrl.Finish()
+
+		conn, db := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
+		conn.HealthState = database.ConnectionHealthStateUnhealthy
+
+		db.EXPECT().SetConnectionHealthState(gomock.Any(), conn.Id, database.ConnectionHealthStateHealthy).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
+		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateReady).Return(nil)
+
+		err := conn.onVerifyPassed(context.Background())
+		require.NoError(t, err)
+		assert.Equal(t, database.ConnectionHealthStateHealthy, conn.GetHealthState())
+	})
 }
 
 func TestOnVerifyFailed(t *testing.T) {

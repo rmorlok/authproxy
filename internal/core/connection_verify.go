@@ -11,6 +11,11 @@ import (
 // onVerifyPassed advances the connection to the next setup step after all probes have run
 // successfully. If there are no remaining steps the connection is marked ready; otherwise
 // the next step (typically configure:0) is recorded.
+//
+// Verify success is also the canonical "credentials are working" signal, so health_state is
+// pinned to healthy here. MarkHealthState is idempotent: on initial setup this is a no-op
+// (the connection was created healthy), and on reauth-driven verify it flips the connection
+// back to healthy after a successful credential rotation.
 func (c *connection) onVerifyPassed(ctx context.Context) error {
 	connector := c.cv.GetDefinition()
 
@@ -21,6 +26,10 @@ func (c *connection) onVerifyPassed(ctx context.Context) error {
 		if err != nil {
 			return fmt.Errorf("failed to determine next step after verify: %w", err)
 		}
+	}
+
+	if err := c.MarkHealthState(ctx, database.ConnectionHealthStateHealthy, "verify_passed"); err != nil {
+		return fmt.Errorf("failed to mark connection healthy after verify: %w", err)
 	}
 
 	if nextStep.IsZero() {

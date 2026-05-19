@@ -249,16 +249,17 @@ func (r *ConnectionsRoutes) getDataSource(gctx *gin.Context) {
 }
 
 type ConnectionJson struct {
-	Id          apid.ID                  `json:"id" swaggertype:"string"`
-	Namespace   string                   `json:"namespace"`
-	Labels      map[string]string        `json:"labels,omitempty"`
-	Annotations map[string]string        `json:"annotations,omitempty"`
-	State       database.ConnectionState `json:"state"`
-	SetupStep   *cschema.SetupStep       `json:"setup_step,omitempty" swaggertype:"string"`
-	SetupError  *string                  `json:"setup_error,omitempty"`
-	Connector   ConnectorJson            `json:"connector"`
-	CreatedAt   time.Time                `json:"created_at"`
-	UpdatedAt   time.Time                `json:"updated_at"`
+	Id          apid.ID                        `json:"id" swaggertype:"string"`
+	Namespace   string                         `json:"namespace"`
+	Labels      map[string]string              `json:"labels,omitempty"`
+	Annotations map[string]string              `json:"annotations,omitempty"`
+	State       database.ConnectionState       `json:"state"`
+	HealthState database.ConnectionHealthState `json:"health_state"`
+	SetupStep   *cschema.SetupStep             `json:"setup_step,omitempty" swaggertype:"string"`
+	SetupError  *string                        `json:"setup_error,omitempty"`
+	Connector   ConnectorJson                  `json:"connector"`
+	CreatedAt   time.Time                      `json:"created_at"`
+	UpdatedAt   time.Time                      `json:"updated_at"`
 }
 
 func ConnectionToJson(conn coreIface.Connection) ConnectionJson {
@@ -270,6 +271,7 @@ func ConnectionToJson(conn coreIface.Connection) ConnectionJson {
 		Labels:      conn.GetLabels(),
 		Annotations: conn.GetAnnotations(),
 		State:       conn.GetState(),
+		HealthState: conn.GetHealthState(),
 		SetupStep:   conn.GetSetupStep(),
 		SetupError:  conn.GetSetupError(),
 		Connector:   connector,
@@ -734,6 +736,70 @@ func (r *ConnectionsRoutes) retry(gctx *gin.Context) {
 	_ = gctx.ShouldBindBodyWithJSON(&req)
 
 	resp, err := r.core.RetryConnectionSetup(ctx, id, req.ReturnToUrl)
+	if err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, resp)
+}
+
+type ReauthConnectionRequest struct {
+	ReturnToUrl string `json:"return_to_url,omitempty"`
+}
+
+// @Summary		Re-authenticate a connection
+// @Description	Re-run the credential-collection portion of setup against an existing Ready connection. Used for user-driven credential rotation and as the recovery path when a connection is unhealthy. For api-key, returns a fresh credentials form (no prior values pre-filled); on submit the existing credential row is soft-deleted and a new one inserted in the same transaction. For OAuth2, restarts at preconnect:0 if defined, otherwise re-initiates the OAuth redirect. The connection's lifecycle state stays Ready throughout.
+// @Tags			connections
+// @Accept			json
+// @Produce		json
+// @Param			id		path	string					true	"Connection UUID"
+// @Param			request	body	ReauthConnectionRequest	true	"Reauth request"
+// @Success		200	{object}	ConnectionSetupForm
+// @Failure		400	{object}	ErrorResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		404	{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connections/{id}/_reauth [post]
+func (r *ConnectionsRoutes) reauth(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	id, err := apid.Parse(gctx.Param("id"))
+	if err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format", httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+
+	if id == apid.Nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
+		val.MarkErrorReturn()
+		return
+	}
+
+	c, err := r.core.GetConnection(ctx, id)
+	if err != nil {
+		if errors.Is(err, coreIface.ErrNotFound) {
+			apgin.WriteError(gctx, nil, httperr.NotFound("connection not found"))
+		} else {
+			apgin.WriteErr(gctx, nil, err)
+		}
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
+		apgin.WriteError(gctx, nil, httpErr)
+		return
+	}
+
+	var req ReauthConnectionRequest
+	// Body is optional — return_to_url is only needed for OAuth2 connectors with no preconnect steps.
+	_ = gctx.ShouldBindBodyWithJSON(&req)
+
+	resp, err := r.core.ReauthConnection(ctx, id, req.ReturnToUrl)
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
@@ -1222,6 +1288,15 @@ func (r *ConnectionsRoutes) Register(g gin.IRouter) {
 			ForIdField("id").
 			Build(),
 		r.retry,
+	)
+	g.POST(
+		"/connections/:id/_reauth",
+		r.auth.NewRequiredBuilder().
+			ForResource("connections").
+			ForVerbs("create", "update").
+			ForIdField("id").
+			Build(),
+		r.reauth,
 	)
 	g.PUT(
 		"/connections/:id/_force_state",

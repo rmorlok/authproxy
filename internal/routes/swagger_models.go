@@ -130,6 +130,9 @@ type SwaggerConnectionJson struct {
 	Annotations map[string]string `json:"annotations,omitempty"`
 	// Connection state (pending, connected, disconnecting, disconnected, error)
 	State string `json:"state" example:"connected"`
+	// Operational health signal (healthy, unhealthy). Distinct from State: a Ready connection
+	// whose credentials have stopped working flips to unhealthy without changing State.
+	HealthState string `json:"health_state" example:"healthy"`
 	// Current setup step if connection setup is in progress
 	SetupStep *string `json:"setup_step,omitempty" example:"preconnect:0"`
 	// Connector information

@@ -189,6 +189,14 @@ export const retryConnectionAsync = createAsyncThunk(
     }
 );
 
+export const reauthConnectionAsync = createAsyncThunk(
+    'connections/reauthConnection',
+    async ({connectionId, returnToUrl}: { connectionId: string, returnToUrl?: string }) => {
+        const response = await connections.reauth(connectionId, returnToUrl);
+        return response.data;
+    }
+);
+
 export const disconnectConnectionAsync = createAsyncThunk(
     'connections/disconnectConnection',
     async (connectionId: string, _): Promise<DisconnectResponseJson> => {
@@ -317,6 +325,21 @@ export const connectionsSlice = createSlice({
             .addCase(retryConnectionAsync.rejected, (state, action) => {
                 state.retryingConnection = false;
                 state.initiationError = action.error.message || 'Failed to retry connection';
+            })
+
+            // Reauth connection — reuses the initiation pending/error flags so the existing
+            // setup-flow rendering picks up the returned form/redirect without new UI state.
+            .addCase(reauthConnectionAsync.pending, (state) => {
+                state.initiatingConnection = true;
+                state.initiationError = null;
+            })
+            .addCase(reauthConnectionAsync.fulfilled, (state, action) => {
+                state.initiatingConnection = false;
+                applySetupResponse(state, action.payload);
+            })
+            .addCase(reauthConnectionAsync.rejected, (state, action) => {
+                state.initiatingConnection = false;
+                state.initiationError = action.error.message || 'Failed to re-authenticate connection';
             })
 
             // Disconnect connection

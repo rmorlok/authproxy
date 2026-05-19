@@ -16,14 +16,17 @@ import {
   DialogContentText,
   DialogTitle,
 } from '@mui/material';
-import {tasks, Connection, ConnectionState, canBeDisconnected, PollForTaskResult, DisconnectResponseJson} from '@authproxy/api';
+import {tasks, Connection, ConnectionState, ConnectionHealthState, canBeDisconnected, isRedirectResponse, PollForTaskResult, DisconnectResponseJson} from '@authproxy/api';
 import { useDispatch } from 'react-redux';
 import {
   disconnectConnectionAsync,
   reconfigureConnectionAsync,
+  reauthConnectionAsync,
   AppDispatch, addToast, fetchConnectionsAsync,
 } from '../store';
 import SettingsIcon from '@mui/icons-material/Settings';
+import RefreshIcon from '@mui/icons-material/Refresh';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 interface ConnectionCardProps {
@@ -77,6 +80,29 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
   const handleReconfigureClick = () => {
     dispatch(reconfigureConnectionAsync(connection.id));
   };
+
+  // Handle re-authenticate button click. Reauth returns a setup-flow response
+  // (form or redirect) — the store's setup-flow handling renders the form
+  // dialog; OAuth2 redirects are followed in-page.
+  const handleReauthClick = () => {
+    dispatch(reauthConnectionAsync({
+      connectionId: connection.id,
+      returnToUrl: window.location.href,
+    })).then((action) => {
+      if (action.meta.requestStatus === 'fulfilled') {
+        const response = action.payload as any;
+        if (isRedirectResponse(response)) {
+          window.location.href = response.redirect_url;
+        }
+      }
+    });
+  };
+
+  // Reauth is meaningful only on Ready connections (any state earlier is still
+  // in initial setup; later states are tearing down). Visibility itself is the
+  // signal — when health is unhealthy the button is emphasized.
+  const canReauth = connection.state === ConnectionState.READY;
+  const isUnhealthy = connection.health_state === ConnectionHealthState.UNHEALTHY;
 
   // Handle disconnect button click
   const handleDisconnectClick = () => {
@@ -146,9 +172,10 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
         title={connector ? connector.display_name : 'Unknown Connector'}
         action={(<Chip
             label={connection.state}
-            color={statusColor}
+            color={isUnhealthy ? 'warning' : statusColor}
             size="small"
-            variant="outlined"
+            variant={isUnhealthy ? 'filled' : 'outlined'}
+            icon={isUnhealthy ? <WarningAmberIcon /> : undefined}
         />)}
         subheader={`Connected on ${createdDate}`}
       />
@@ -190,6 +217,17 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
 
       {canBeDisconnected(connection) && (
         <CardActions>
+          {canReauth && (
+            <Button
+              size="small"
+              startIcon={<RefreshIcon />}
+              onClick={handleReauthClick}
+              color={isUnhealthy ? 'warning' : 'primary'}
+              variant={isUnhealthy ? 'contained' : 'text'}
+            >
+              Re-authenticate
+            </Button>
+          )}
           {connection.state === ConnectionState.READY && connector?.has_configure && (
             <Button
               size="small"

@@ -9,7 +9,7 @@ import authReducer from '../store/sessionSlice';
 import connectorsReducer from '../store/connectorsSlice';
 import connectionsReducer from '../store/connectionsSlice';
 import toastsReducer from '../store/toastsSlice';
-import {Connection, ConnectionState, Connector, ConnectorVersionState} from '@authproxy/api';
+import {Connection, ConnectionState, ConnectionHealthState, Connector, ConnectorVersionState} from '@authproxy/api';
 import {describe, expect, test} from 'vitest';
 
 function createStore(preloadedState?: any) {
@@ -45,6 +45,7 @@ const makeConnection = (overrides: Partial<Connection> = {}): Connection => ({
     namespace: 'root',
     connector: connector,
     state: ConnectionState.READY,
+    health_state: ConnectionHealthState.HEALTHY,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',
     ...overrides,

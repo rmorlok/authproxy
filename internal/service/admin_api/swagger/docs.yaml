@@ -244,6 +244,11 @@ definitions:
         example: 200
         type: integer
     type: object
+  routes.ReauthConnectionRequest:
+    properties:
+      return_to_url:
+        type: string
+    type: object
   routes.RetryConnectionRequest:
     properties:
       return_to_url:
@@ -269,6 +274,12 @@ definitions:
         description: Connector information
       created_at:
         description: Creation timestamp
+        type: string
+      health_state:
+        description: |-
+          Operational health signal (healthy, unhealthy). Distinct from State: a Ready connection
+          whose credentials have stopped working flips to unhealthy without changing State.
+        example: healthy
         type: string
       id:
         description: Connection UUID
@@ -2017,6 +2028,53 @@ paths:
       summary: Proxy request through connection
       tags:
       - proxy
+  /connections/{id}/_reauth:
+    post:
+      consumes:
+      - application/json
+      description: Re-run the credential-collection portion of setup against an existing
+        Ready connection. Used for user-driven credential rotation and as the recovery
+        path when a connection is unhealthy. For api-key, returns a fresh credentials
+        form (no prior values pre-filled); on submit the existing credential row is
+        soft-deleted and a new one inserted in the same transaction. For OAuth2, restarts
+        at preconnect:0 if defined, otherwise re-initiates the OAuth redirect. The
+        connection's lifecycle state stays Ready throughout.
+      parameters:
+      - description: Connection UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Reauth request
+        in: body
+        name: request
+        required: true
+        schema:
+          $ref: '#/definitions/routes.ReauthConnectionRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.ConnectionSetupForm'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Re-authenticate a connection
+      tags:
+      - connections
   /connections/{id}/_reconfigure:
     post:
       description: Restart the configure phase for a completed connection, allowing

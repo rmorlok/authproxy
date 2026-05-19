@@ -11,6 +11,15 @@ export enum ConnectionState {
     DISCONNECTED = 'disconnected',
 }
 
+// Operational health signal for a connection. Distinct from ConnectionState:
+// a Ready connection whose credentials have stopped working flips to UNHEALTHY
+// without leaving the Ready lifecycle state. UIs surface this to drive the
+// unified re-authentication action.
+export enum ConnectionHealthState {
+    HEALTHY = 'healthy',
+    UNHEALTHY = 'unhealthy',
+}
+
 export interface UpdateConnectionRequest {
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
@@ -39,6 +48,7 @@ export interface Connection {
     namespace: string;
     connector: Connector;
     state: ConnectionState;
+    health_state: ConnectionHealthState;
     setup_step?: string;
     setup_error?: string;
     labels?: Record<string, string>;
@@ -130,6 +140,10 @@ export interface SubmitConnectionRequest {
 }
 
 export interface RetryConnectionRequest {
+    return_to_url?: string;
+}
+
+export interface ReauthConnectionRequest {
     return_to_url?: string;
 }
 
@@ -340,6 +354,21 @@ export const retryConnection = (id: string, returnToUrl?: string) => {
     );
 };
 
+/**
+ * Re-authenticate a Ready connection. Used both for user-driven credential rotation and as the
+ * recovery action when a connection has flipped to unhealthy. For api-key connectors, returns the
+ * credentials form (no prior values pre-filled); on submit the existing credential is rotated
+ * atomically. For OAuth2 connectors, restarts at preconnect:0 if defined, otherwise re-initiates
+ * the OAuth redirect (return_to_url is required in that case).
+ */
+export const reauthConnection = (id: string, returnToUrl?: string) => {
+    const request: ReauthConnectionRequest = { return_to_url: returnToUrl };
+    return client.post<ConnectionSetupResponse>(
+        `/api/v1/connections/${id}/_reauth`,
+        request
+    );
+};
+
 export const connections = {
     list: listConnections,
     get: getConnection,
@@ -354,6 +383,7 @@ export const connections = {
     reconfigure: reconfigureConnection,
     cancelSetup: cancelSetupConnection,
     retry: retryConnection,
+    reauth: reauthConnection,
     getLabels: getConnectionLabels,
     getLabel: getConnectionLabel,
     putLabel: putConnectionLabel,
