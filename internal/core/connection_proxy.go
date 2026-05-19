@@ -5,16 +5,21 @@ import (
 	"errors"
 	"net/http"
 
+	"github.com/rmorlok/authproxy/internal/auth_methods"
 	"github.com/rmorlok/authproxy/internal/auth_methods/no_auth"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/proxy"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
 var ErrProxyNotImplemented = errors.New("auth type for connection does not implement proxy")
 
-// getProxyImpl gets the object that implements proxy for this connection's connector version. This will depend on the
-// definition's auth type to delegate to an appropriate implementation.
+// getProxyImpl resolves the connection's auth type to an Authenticator and
+// constructs the internal/proxy orchestrator that runs proxied requests
+// through it. The per-auth-method packages describe credential application
+// (Authenticator); orchestration — build, send, retry-on-401 — lives in
+// internal/proxy.
 func (c *connection) getProxyImpl() (iface.Proxy, error) {
 	c.proxyImplOnce.Do(func() {
 		def, err := c.cv.getDefinition()
@@ -23,31 +28,28 @@ func (c *connection) getProxyImpl() (iface.Proxy, error) {
 			return
 		}
 
-		auth := def.Auth
-		if _, ok := auth.Inner().(*config.AuthOAuth2); ok {
-			o2f := c.s.getOAuth2Factory()
-			c.proxyImpl = o2f.NewOAuth2(c)
-			c.proxyImplErr = nil
+		auth, err := c.resolveAuthenticator(def.Auth.Inner())
+		if err != nil {
+			c.proxyImplErr = err
 			return
 		}
 
-		if _, ok := auth.Inner().(*config.AuthApiKey); ok {
-			akf := c.s.getApiKeyFactory()
-			c.proxyImpl = akf.NewApiKey(c)
-			c.proxyImplErr = nil
-			return
-		}
-
-		if auth, ok := auth.Inner().(*config.AuthNoAuth); ok {
-			c.proxyImpl = no_auth.NewNoAuth(c.s.logger, c.s.httpf, auth, c)
-			c.proxyImplErr = nil
-			return
-		}
-
-		c.proxyImplErr = ErrProxyNotImplemented
+		c.proxyImpl = proxy.New(c.s.httpf, c, auth)
 	})
 
 	return c.proxyImpl, c.proxyImplErr
+}
+
+func (c *connection) resolveAuthenticator(authConfig any) (auth_methods.Authenticator, error) {
+	switch authConfig.(type) {
+	case *config.AuthOAuth2:
+		return c.s.getOAuth2Factory().NewAuthenticator(c), nil
+	case *config.AuthApiKey:
+		return c.s.getApiKeyFactory().NewAuthenticator(c), nil
+	case *config.AuthNoAuth:
+		return no_auth.NewAuthenticator(), nil
+	}
+	return nil, ErrProxyNotImplemented
 }
 
 func (c *connection) ProxyRequest(

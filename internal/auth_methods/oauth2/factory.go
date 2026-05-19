@@ -7,6 +7,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/aptelemetry"
+	"github.com/rmorlok/authproxy/internal/auth_methods"
 	"github.com/rmorlok/authproxy/internal/config"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -77,6 +78,17 @@ func NewFactory(cfg config.C, db database.DB, r apredis.Client, c coreIface.C, h
 }
 
 func (f *factory) NewOAuth2(connection coreIface.Connection) OAuth2Connection {
+	return f.newConnection(connection)
+}
+
+// NewAuthenticator returns the same oAuth2Connection instance typed as an
+// auth_methods.Authenticator — the per-connection state is identical, only
+// the surfaced interface differs.
+func (f *factory) NewAuthenticator(connection coreIface.Connection) auth_methods.Authenticator {
+	return f.newConnection(connection)
+}
+
+func (f *factory) newConnection(connection coreIface.Connection) *oAuth2Connection {
 	conn := newOAuth2(
 		f.cfg,
 		f.db,

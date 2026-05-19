@@ -6,15 +6,14 @@ package mock
 
 import (
 	context "context"
-	http "net/http"
 	url "net/url"
 	reflect "reflect"
 
 	gomock "github.com/golang/mock/gomock"
 	apid "github.com/rmorlok/authproxy/internal/apid"
+	auth_methods "github.com/rmorlok/authproxy/internal/auth_methods"
 	oauth2 "github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	iface "github.com/rmorlok/authproxy/internal/core/iface"
-	"github.com/rmorlok/authproxy/internal/httpf"
 	auth "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
@@ -149,6 +148,20 @@ func (mr *MockFactoryMockRecorder) GetOAuth2State(ctx, actor, stateId interface{
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOAuth2State", reflect.TypeOf((*MockFactory)(nil).GetOAuth2State), ctx, actor, stateId)
 }
 
+// NewAuthenticator mocks base method.
+func (m *MockFactory) NewAuthenticator(connection iface.Connection) auth_methods.Authenticator {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "NewAuthenticator", connection)
+	ret0, _ := ret[0].(auth_methods.Authenticator)
+	return ret0
+}
+
+// NewAuthenticator indicates an expected call of NewAuthenticator.
+func (mr *MockFactoryMockRecorder) NewAuthenticator(connection interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewAuthenticator", reflect.TypeOf((*MockFactory)(nil).NewAuthenticator), connection)
+}
+
 // NewOAuth2 mocks base method.
 func (m *MockFactory) NewOAuth2(connection iface.Connection) oauth2.OAuth2Connection {
 	m.ctrl.T.Helper()
@@ -228,35 +241,6 @@ func (m *MockOAuth2Connection) GenerateAuthUrl(ctx context.Context, actor oauth2
 func (mr *MockOAuth2ConnectionMockRecorder) GenerateAuthUrl(ctx, actor interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GenerateAuthUrl", reflect.TypeOf((*MockOAuth2Connection)(nil).GenerateAuthUrl), ctx, actor)
-}
-
-// ProxyRequest mocks base method.
-func (m *MockOAuth2Connection) ProxyRequest(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest) (*iface.ProxyResponse, error) {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProxyRequest", ctx, reqType, req)
-	ret0, _ := ret[0].(*iface.ProxyResponse)
-	ret1, _ := ret[1].(error)
-	return ret0, ret1
-}
-
-// ProxyRequest indicates an expected call of ProxyRequest.
-func (mr *MockOAuth2ConnectionMockRecorder) ProxyRequest(ctx, reqType, req interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProxyRequest", reflect.TypeOf((*MockOAuth2Connection)(nil).ProxyRequest), ctx, reqType, req)
-}
-
-// ProxyRequestRaw mocks base method.
-func (m *MockOAuth2Connection) ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, req *iface.ProxyRequest, w http.ResponseWriter) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "ProxyRequestRaw", ctx, reqType, req, w)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// ProxyRequestRaw indicates an expected call of ProxyRequestRaw.
-func (mr *MockOAuth2ConnectionMockRecorder) ProxyRequestRaw(ctx, reqType, req, w interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ProxyRequestRaw", reflect.TypeOf((*MockOAuth2Connection)(nil).ProxyRequestRaw), ctx, reqType, req, w)
 }
 
 // RecordCancelSessionAfterAuth mocks base method.
