@@ -102,6 +102,16 @@ func (o *oAuth2Connection) GenerateAuthUrl(ctx context.Context, actor IActorData
 	query.Set("scope", strings.Join(scopes, " "))
 	query.Set("state", o.state.Id.String())
 
+	if o.auth.Authorization.PKCE != nil {
+		method := o.auth.Authorization.PKCE.GetMethodOrDefault()
+		challenge, err := pkceChallengeFor(method, o.state.PKCECodeVerifier)
+		if err != nil {
+			return "", fmt.Errorf("failed to compute pkce challenge for connector %s: %w", cv.GetId(), err)
+		}
+		query.Set("code_challenge", challenge)
+		query.Set("code_challenge_method", string(method))
+	}
+
 	for k, v := range o.auth.Authorization.QueryOverrides {
 		rendered, err := o.renderMustache(ctx, v)
 		if err != nil {

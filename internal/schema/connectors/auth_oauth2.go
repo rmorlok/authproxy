@@ -81,7 +81,36 @@ func (a *AuthOAuth2) Clone() AuthImpl {
 	}
 	clone.Scopes = scopes
 
+	clone.Authorization.PKCE = a.Authorization.PKCE.Clone()
+
 	return &clone
 }
 
+// Validate enforces OAuth2-specific schema invariants. Today this just
+// checks the optional PKCE block — the rest of the type's fields are
+// validated structurally elsewhere.
+func (a *AuthOAuth2) Validate(vc *common.ValidationContext) error {
+	if a == nil {
+		return nil
+	}
+
+	result := &multierror.Error{}
+
+	if a.Authorization.PKCE != nil {
+		pkceVC := vc.PushField("authorization").PushField("pkce")
+		switch a.Authorization.PKCE.Method {
+		case "", PKCEMethodS256, PKCEMethodPlain:
+			// "" defaults to S256 at runtime — accept here.
+		default:
+			result = multierror.Append(result, pkceVC.NewErrorfForField("method",
+				"%q is not a valid PKCE method; must be %q or %q",
+				a.Authorization.PKCE.Method, PKCEMethodS256, PKCEMethodPlain,
+			))
+		}
+	}
+
+	return result.ErrorOrNil()
+}
+
 var _ AuthImpl = (*AuthOAuth2)(nil)
+var _ AuthValidator = (*AuthOAuth2)(nil)
