@@ -328,6 +328,21 @@ func (mr *MockDBMockRecorder) ClearCurrentFlagForNamespace(ctx, namespacePath in
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ClearCurrentFlagForNamespace", reflect.TypeOf((*MockDB)(nil).ClearCurrentFlagForNamespace), ctx, namespacePath)
 }
 
+// CountProbeOutcomes mocks base method.
+func (m *MockDB) CountProbeOutcomes(ctx context.Context, connectionId apid.ID, probeId string) (int, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "CountProbeOutcomes", ctx, connectionId, probeId)
+	ret0, _ := ret[0].(int)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// CountProbeOutcomes indicates an expected call of CountProbeOutcomes.
+func (mr *MockDBMockRecorder) CountProbeOutcomes(ctx, connectionId, probeId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CountProbeOutcomes", reflect.TypeOf((*MockDB)(nil).CountProbeOutcomes), ctx, connectionId, probeId)
+}
+
 // CreateActor mocks base method.
 func (m *MockDB) CreateActor(ctx context.Context, actor *database.Actor) error {
 	m.ctrl.T.Helper()
@@ -686,6 +701,21 @@ func (mr *MockDBMockRecorder) DeleteOAuth2Token(ctx, tokenId interface{}) *gomoc
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteOAuth2Token", reflect.TypeOf((*MockDB)(nil).DeleteOAuth2Token), ctx, tokenId)
 }
 
+// DeleteOldProbeOutcomes mocks base method.
+func (m *MockDB) DeleteOldProbeOutcomes(ctx context.Context, connectionId apid.ID, probeId string, keepMinimum int, olderThan time.Time) (int64, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DeleteOldProbeOutcomes", ctx, connectionId, probeId, keepMinimum, olderThan)
+	ret0, _ := ret[0].(int64)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DeleteOldProbeOutcomes indicates an expected call of DeleteOldProbeOutcomes.
+func (mr *MockDBMockRecorder) DeleteOldProbeOutcomes(ctx, connectionId, probeId, keepMinimum, olderThan interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteOldProbeOutcomes", reflect.TypeOf((*MockDB)(nil).DeleteOldProbeOutcomes), ctx, connectionId, probeId, keepMinimum, olderThan)
+}
+
 // DeleteRateLimit mocks base method.
 func (m *MockDB) DeleteRateLimit(ctx context.Context, id apid.ID) error {
 	m.ctrl.T.Helper()
@@ -728,6 +758,21 @@ func (m *MockDB) DeleteRateLimitLabels(ctx context.Context, id apid.ID, keys []s
 func (mr *MockDBMockRecorder) DeleteRateLimitLabels(ctx, id, keys interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DeleteRateLimitLabels", reflect.TypeOf((*MockDB)(nil).DeleteRateLimitLabels), ctx, id, keys)
+}
+
+// DistinctProbeIdsForConnection mocks base method.
+func (m *MockDB) DistinctProbeIdsForConnection(ctx context.Context, connectionId apid.ID) ([]string, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "DistinctProbeIdsForConnection", ctx, connectionId)
+	ret0, _ := ret[0].([]string)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// DistinctProbeIdsForConnection indicates an expected call of DistinctProbeIdsForConnection.
+func (mr *MockDBMockRecorder) DistinctProbeIdsForConnection(ctx, connectionId interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "DistinctProbeIdsForConnection", reflect.TypeOf((*MockDB)(nil).DistinctProbeIdsForConnection), ctx, connectionId)
 }
 
 // EnsureNamespaceByPath mocks base method.
@@ -1085,6 +1130,21 @@ func (mr *MockDBMockRecorder) GetRateLimit(ctx, id interface{}) *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRateLimit", reflect.TypeOf((*MockDB)(nil).GetRateLimit), ctx, id)
 }
 
+// GetRecentProbeOutcomes mocks base method.
+func (m *MockDB) GetRecentProbeOutcomes(ctx context.Context, connectionId apid.ID, probeId string, limit int) ([]*database.ConnectionProbeOutcome, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetRecentProbeOutcomes", ctx, connectionId, probeId, limit)
+	ret0, _ := ret[0].([]*database.ConnectionProbeOutcome)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// GetRecentProbeOutcomes indicates an expected call of GetRecentProbeOutcomes.
+func (mr *MockDBMockRecorder) GetRecentProbeOutcomes(ctx, connectionId, probeId, limit interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetRecentProbeOutcomes", reflect.TypeOf((*MockDB)(nil).GetRecentProbeOutcomes), ctx, connectionId, probeId, limit)
+}
+
 // HasNonceBeenUsed mocks base method.
 func (m *MockDB) HasNonceBeenUsed(ctx context.Context, nonce apid.ID) (bool, error) {
 	m.ctrl.T.Helper()
@@ -1128,6 +1188,21 @@ func (m *MockDB) InsertOAuth2Token(ctx context.Context, connectionId apid.ID, re
 func (mr *MockDBMockRecorder) InsertOAuth2Token(ctx, connectionId, refreshedFrom, encryptedRefreshToken, encryptedAccessToken, accessTokenExpiresAt, scopes, requestedScopes, createdByActorId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertOAuth2Token", reflect.TypeOf((*MockDB)(nil).InsertOAuth2Token), ctx, connectionId, refreshedFrom, encryptedRefreshToken, encryptedAccessToken, accessTokenExpiresAt, scopes, requestedScopes, createdByActorId)
+}
+
+// InsertProbeOutcome mocks base method.
+func (m *MockDB) InsertProbeOutcome(ctx context.Context, connectionId apid.ID, probeId, outcome, errorMessage string) (*database.ConnectionProbeOutcome, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "InsertProbeOutcome", ctx, connectionId, probeId, outcome, errorMessage)
+	ret0, _ := ret[0].(*database.ConnectionProbeOutcome)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// InsertProbeOutcome indicates an expected call of InsertProbeOutcome.
+func (mr *MockDBMockRecorder) InsertProbeOutcome(ctx, connectionId, probeId, outcome, errorMessage interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "InsertProbeOutcome", reflect.TypeOf((*MockDB)(nil).InsertProbeOutcome), ctx, connectionId, probeId, outcome, errorMessage)
 }
 
 // ListActorsBuilder mocks base method.

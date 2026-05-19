@@ -15,6 +15,7 @@ func (s *service) RegisterTasks(mux *asynq.ServeMux) {
 	mux.HandleFunc(taskTypeDisconnectConnection, s.disconnectConnection)
 	mux.HandleFunc(taskTypeProbe, s.runProbeForConnection)
 	mux.HandleFunc(taskTypeVerifyConnection, s.verifyConnection)
+	mux.HandleFunc(taskTypeProbeOutcomeCleanup, s.runProbeOutcomeCleanup)
 }
 
 func (s *service) GetCronTasks() []*asynq.PeriodicTaskConfig {
@@ -68,6 +69,19 @@ func (s *service) GetCronTasks() []*asynq.PeriodicTaskConfig {
 
 	if err != nil {
 		s.logger.Error("failed to enumerate connections for periodic tasks", "error", err)
+	}
+
+	// Daily probe-outcome cleanup. One singleton task per service — the
+	// handler walks all connections internally and prunes per-(connection,
+	// probe). Cadence == retention so the table holds at most one extra day
+	// of rows in steady state.
+	if cleanupTask, err := newProbeOutcomeCleanupTask(DefaultProbeOutcomeRetention); err != nil {
+		s.logger.Error("failed to create probe outcome cleanup task", "error", err)
+	} else {
+		periodTasks = append(periodTasks, &asynq.PeriodicTaskConfig{
+			Task:     cleanupTask,
+			Cronspec: "@every 24h",
+		})
 	}
 
 	return periodTasks

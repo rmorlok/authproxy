@@ -171,6 +171,19 @@ type DB interface {
 	DeleteAllApiKeyCredentialsForConnection(ctx context.Context, connectionId apid.ID) error
 
 	/*
+	 * Connection probe outcomes — append-only event log that drives the
+	 * probe-driven health-check signal. The runtime walks the most-recent
+	 * rows for each (connection_id, probe_id) to compute consecutive-success
+	 * or -failure counts. A daily cleanup task caps growth (see
+	 * internal/core/task_probe_outcome_cleanup.go).
+	 */
+	InsertProbeOutcome(ctx context.Context, connectionId apid.ID, probeId string, outcome string, errorMessage string) (*ConnectionProbeOutcome, error)
+	GetRecentProbeOutcomes(ctx context.Context, connectionId apid.ID, probeId string, limit int) ([]*ConnectionProbeOutcome, error)
+	DeleteOldProbeOutcomes(ctx context.Context, connectionId apid.ID, probeId string, keepMinimum int, olderThan time.Time) (int64, error)
+	DistinctProbeIdsForConnection(ctx context.Context, connectionId apid.ID) ([]string, error)
+	CountProbeOutcomes(ctx context.Context, connectionId apid.ID, probeId string) (int, error)
+
+	/*
 	 * Encryption Keys
 	 */
 
