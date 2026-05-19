@@ -203,6 +203,24 @@
       }
     },
 
+    "hostApplication": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "initiateSessionUrl": { "type": "string" }
+      }
+    },
+
+    "connectors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "autoMigrate":       { "type": "boolean" },
+        "loadFromList":      { "type": "array" },
+        "identifyingLabels": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
     "config": { "type": "object" },
 
     "healthcheck": {

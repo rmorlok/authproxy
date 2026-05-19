@@ -191,6 +191,29 @@ actors:
       resources: ["*"]
       verbs: ["*"]
 
+# -- Host application integration. AuthProxy redirects unauthenticated
+# users (e.g. anyone landing on the marketplace UI) to this URL with a
+# `return_to` query param so the host app can establish a session and
+# bounce back. Required by the AuthProxy server's config validator —
+# leave the placeholder set, but point at a real host login URL for any
+# deployment that actually fronts a UI.
+hostApplication:
+  initiateSessionUrl: ""
+
+# -- Connector registry. AuthProxy refuses to start without the connectors
+# block — supply at least an empty `loadFromList` even when you intend to
+# manage connectors through the admin API at runtime.
+connectors:
+  # -- Run connector schema migrations at startup.
+  autoMigrate: true
+  # -- Inline connector definitions loaded at boot. See the AuthProxy
+  # connector schema docs for the format. Leave empty to manage connectors
+  # exclusively through the admin API.
+  loadFromList: []
+  # -- Labels used to identify connectors across reloads (matching the
+  # AuthProxy `connectors.identifying_labels` field).
+  identifyingLabels: []
+
 # -- Free-form config overlay merged on top of the rendered AuthProxy YAML.
 # Use this for fields the chart hasn't promoted to typed values yet.
 config: {}

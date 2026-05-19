@@ -31,6 +31,15 @@ encryptionKeys:
 actors:
   existingSecret: authproxy-actors
 
+# AuthProxy's config validator requires these even when nothing actually
+# uses them in the smoke test — placeholder URL + empty connector list.
+hostApplication:
+  initiateSessionUrl: http://placeholder.invalid/login
+
+connectors:
+  autoMigrate: true
+  loadFromList: []
+
 # Faster probes so the helm test pod's rollout wait doesn't stall.
 healthcheck:
   initialDelaySeconds: 5
