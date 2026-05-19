@@ -1,0 +1,126 @@
+# Default values for the authproxy chart.
+#
+# A3 scope: a minimal but valid surface that lets the chart render valid
+# Kubernetes manifests. A4 (#292) expands this with typed fields for
+# database, redis, s3, jwt, encryption keys, services-on/off, etc.
+
+# -- Container image to deploy.
+image:
+  repository: ghcr.io/rmorlok/authproxy
+  # -- Image tag. Empty string falls back to Chart.appVersion.
+  tag: ""
+  pullPolicy: IfNotPresent
+
+# -- Image pull secrets for private registries.
+imagePullSecrets: []
+
+# -- Override chart name in resource names.
+nameOverride: ""
+# -- Override the fully qualified release name in resource names.
+fullnameOverride: ""
+
+serviceAccount:
+  # -- Create a ServiceAccount for the pods.
+  create: true
+  # -- Annotations to apply to the ServiceAccount. Set
+  # `eks.amazonaws.com/role-arn` here to wire IRSA for S3 + other AWS APIs.
+  annotations: {}
+  # -- ServiceAccount name. Generated from the release name if empty.
+  name: ""
+
+# -- Replica count for the AuthProxy pod. The chart deploys all four
+# services (api, admin-api, public, worker) as a single Deployment running
+# `serve all`; for independent scaling per service, run the chart multiple
+# times with different `runServices` (A4) or wait for the per-service mode.
+replicaCount: 1
+
+# -- Annotations applied to each pod.
+podAnnotations: {}
+# -- Extra labels applied to each pod.
+podLabels: {}
+
+# -- Security context applied at the pod level.
+podSecurityContext: {}
+# -- Security context applied at the container level.
+securityContext: {}
+
+# -- Pod resource requests and limits.
+resources: {}
+# -- Node selector.
+nodeSelector: {}
+# -- Tolerations.
+tolerations: []
+# -- Affinity rules.
+affinity: {}
+
+service:
+  # -- Service type.
+  type: ClusterIP
+  # -- Per-service container port mapping. Names match the AuthProxy service
+  # IDs; ingress.hosts[].paths[].service references them by key.
+  ports:
+    public: 8080
+    api: 8081
+    adminApi: 8082
+    workerHealth: 8083
+
+ingress:
+  # -- Enable an Ingress resource.
+  enabled: false
+  # -- IngressClass name (e.g. `nginx`).
+  className: ""
+  # -- Annotations applied to the Ingress.
+  annotations: {}
+  # -- Host + path rules. Each path references a `service` key from
+  # `service.ports` above.
+  hosts:
+    - host: authproxy.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: public
+  # -- TLS configuration entries.
+  tls: []
+
+# -- Inline AuthProxy YAML config. Rendered into a ConfigMap and mounted at
+# /etc/authproxy/config.yaml in the container. A4 (#292) ships typed
+# top-level keys (`database`, `redis`, `s3`, etc.) that compose into this
+# map; for now the chart only ships the minimum config needed to render.
+config:
+  public:
+    port: 8080
+  api:
+    port: 8081
+  admin_api:
+    port: 8082
+  worker:
+    health_check_port: 8083
+
+# -- References to externally managed Secrets. The chart wires `envFrom`
+# entries so the container picks up credentials at startup; the chart never
+# creates the Secrets themselves. A4 will rename these to typed sections
+# (`database.existingSecret`, `redis.existingSecret`, etc.).
+secrets:
+  # -- Database connection credentials (POSTGRES_* env vars expected).
+  database:
+    existingSecret: ""
+  # -- Redis connection credentials.
+  redis:
+    existingSecret: ""
+  # -- S3 credentials (only needed when not using IRSA).
+  s3:
+    existingSecret: ""
+  # -- JWT signing key pair and admin actor keys (mounted as files).
+  jwt:
+    existingSecret: ""
+    mountPath: /etc/authproxy/keys/jwt
+  # -- Encryption keys (mounted as files).
+  encryption:
+    existingSecret: ""
+    mountPath: /etc/authproxy/keys/encryption
+
+# -- HTTP path on the public service used for liveness / readiness probes.
+healthcheck:
+  path: /healthz
+  initialDelaySeconds: 10
+  periodSeconds: 10

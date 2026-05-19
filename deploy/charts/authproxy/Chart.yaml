@@ -1,0 +1,31 @@
+apiVersion: v2
+name: authproxy
+description: Embeddable integration platform-as-a-service. Manages the connection lifecycle to third-party systems and proxies authenticated requests.
+type: application
+
+# Chart version follows its own semver, independent of the application image
+# version below. Bumped on every chart change.
+version: 0.1.0
+
+# Application version this chart was last validated against. Pinned to a
+# specific image tag here; downstream values can override `image.tag`.
+appVersion: "main"
+
+home: https://github.com/rmorlok/authproxy
+sources:
+  - https://github.com/rmorlok/authproxy
+maintainers:
+  - name: Ryan Morlok
+    url: https://github.com/rmorlok
+
+keywords:
+  - authproxy
+  - oauth
+  - oauth2
+  - ipaas
+  - integration
+  - proxy
+
+annotations:
+  # category hint surfaced by some chart UIs (Artifact Hub, Rancher, etc.)
+  category: Integration
