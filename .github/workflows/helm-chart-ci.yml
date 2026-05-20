@@ -91,10 +91,16 @@ jobs:
           node_image: kindest/node:v1.30.4
           wait: 120s
 
+      - name: Create test namespace
+        if: steps.changed.outputs.found == 'true'
+        run: kubectl create namespace authproxy-ct
+
       - name: Deploy in-cluster Redis sidecar
         if: steps.changed.outputs.found == 'true'
         run: |
-          kubectl apply -f - <<'EOF'
+          # Deployed into the same namespace as `ct install` so the chart's
+          # `redis:6379` short-name resolves via in-namespace DNS.
+          kubectl apply -n authproxy-ct -f - <<'EOF'
           apiVersion: apps/v1
           kind: Deployment
           metadata:
@@ -126,7 +132,7 @@ jobs:
                 targetPort: redis
                 name: redis
           EOF
-          kubectl rollout status deployment/redis --timeout=60s
+          kubectl -n authproxy-ct rollout status deployment/redis --timeout=60s
 
       - name: Generate crypto material + apply as K8s Secrets
         if: steps.changed.outputs.found == 'true'
@@ -146,9 +152,7 @@ jobs:
           openssl genrsa -out "$workdir/ci" 2048 2>/dev/null
           openssl rsa -in "$workdir/ci" -pubout -out "$workdir/ci.pub" 2>/dev/null
 
-          # ct creates per-install namespaces with random suffixes; using a
-          # stable namespace via --namespace keeps the Secret-prep step simple.
-          kubectl create namespace authproxy-ct
+          # Namespace was created in a prior step (so Redis could land in it).
           kubectl -n authproxy-ct create secret generic authproxy-jwt \
             --from-file=system="$workdir/system" \
             --from-file=system.pub="$workdir/system.pub"
