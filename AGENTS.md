@@ -49,7 +49,14 @@ The final arg is the service to run: `admin-api`, `api`, `public`, `worker`, or 
 ### Run the client proxy
 
 ```bash
-go run ./cmd/cli raw-proxy --enableLoginRedirect=true --proxyTo=api
+# JWT-signing reverse proxy to the AuthProxy server itself (dev tool).
+go run ./cmd/cli signing-proxy --enableLoginRedirect=true --proxyTo=api
+
+# Connection-scoped reverse proxy through /_proxy_raw (streaming).
+go run ./cmd/cli proxy --connection cxn_xxx --upstream-base https://api.openai.com
+
+# One-shot curl through a connection.
+go run ./cmd/cli curl --connection cxn_xxx https://api.openai.com/v1/models
 ```
 
 ### Other useful commands

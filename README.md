@@ -486,7 +486,7 @@ go run ./cmd/server serve --config=./dev_config/default.yaml all
 Run the client to proxy authenticated calls to the backend:
 
 ```bash
-go run ./cmd/cli raw-proxy --enableLoginRedirect=true --proxyTo=api
+go run ./cmd/cli signing-proxy --enableLoginRedirect=true --proxyTo=api
 ```
 
 ### Testing
