@@ -1,8 +1,10 @@
 package helpers
 
 import (
+	"bytes"
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"net"
 	"net/http"
@@ -448,6 +450,89 @@ func (env *IntegrationTestEnv) DoProxyRequest(t *testing.T, connectionID, target
 	}
 
 	// HTTP mode: rewrite the path-only URL onto env.ServerURL and send.
+	abs, err := url.Parse(env.ServerURL + path)
+	require.NoError(t, err)
+	req.URL = abs
+	req.Host = abs.Host
+	req.RequestURI = ""
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+	w.Code = resp.StatusCode
+	for k, vs := range resp.Header {
+		for _, v := range vs {
+			w.Header().Add(k, v)
+		}
+	}
+	if _, err := w.Body.ReadFrom(resp.Body); err != nil {
+		require.NoError(t, err)
+	}
+	return w
+}
+
+// DoProxyRawRequest performs a streaming /_proxy_raw request through the
+// integration test environment. The upstream URL is carried in the
+// X-AuthProxy-Upstream-URL header per the raw-proxy contract; body and
+// extraHeaders are forwarded as-is to the upstream. forceChunked, when
+// true, sends the body with Content-Length omitted so net/http negotiates
+// chunked transfer-encoding — used to exercise the streaming/skipped
+// path in the request log.
+func (env *IntegrationTestEnv) DoProxyRawRequest(
+	t *testing.T,
+	connectionID, targetURL, method string,
+	body []byte,
+	forceChunked bool,
+	extraHeaders http.Header,
+) *httptest.ResponseRecorder {
+	t.Helper()
+	require.Truef(t, env.ApiGin != nil || env.ServerURL != "", "DoProxyRawRequest requires either in-process gin or a running HTTP server")
+
+	path := "/api/v1/connections/" + connectionID + "/_proxy_raw"
+
+	var bodyReader io.Reader
+	if body != nil {
+		if forceChunked {
+			// Wrapping bytes.NewReader in struct{ io.Reader } strips the
+			// Len() method so http.NewRequest can't infer ContentLength,
+			// forcing chunked transfer-encoding on the wire.
+			bodyReader = struct{ io.Reader }{bytes.NewReader(body)}
+		} else {
+			bodyReader = bytes.NewReader(body)
+		}
+	}
+
+	req, err := env.ApiAuthUtil.NewSignedRequestForActorExternalId(
+		method,
+		path,
+		bodyReader,
+		sconfig.RootNamespace,
+		"test-actor",
+		aschema.AllPermissions(),
+	)
+	require.NoError(t, err)
+	if forceChunked {
+		// net/http's server side reports ContentLength=-1 for chunked
+		// transfer-encoding. For in-process tests the request struct
+		// is shared rather than re-parsed off the wire, so set the
+		// signal explicitly — the route handler propagates it to the
+		// outbound request and the roundtripper keys its skip
+		// decision off ContentLength<0.
+		req.ContentLength = -1
+		req.TransferEncoding = []string{"chunked"}
+	}
+	req.Header.Set("X-AuthProxy-Upstream-URL", targetURL)
+	for k, vv := range extraHeaders {
+		for _, v := range vv {
+			req.Header.Add(k, v)
+		}
+	}
+
+	w := httptest.NewRecorder()
+	if env.ApiGin != nil {
+		env.ApiGin.ServeHTTP(w, req)
+		return w
+	}
+
 	abs, err := url.Parse(env.ServerURL + path)
 	require.NoError(t, err)
 	req.URL = abs

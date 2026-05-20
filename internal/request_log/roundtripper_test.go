@@ -164,7 +164,12 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 			},
 		},
 		{
-			name:                "successful request, full logging enabled, request and response truncated",
+			// Behavior change in #331: oversized bodies are no longer
+			// truncated. The proxy forwards the full body upstream and
+			// records BodySkipped=too_large; the captured Body remains
+			// nil. Truncating would have OOM'd the proxy or corrupted
+			// the upstream body for the raw-streaming path.
+			name:                "successful request, oversized request and response skipped (too_large)",
 			recordFullRequest:   true,
 			maxFullRequestSize:  4,
 			maxFullResponseSize: 5,
@@ -208,7 +213,7 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 						"Some":         []string{"header"},
 					},
 					ContentLength: int64(len([]byte(`{"some": "json"}`))),
-					Body:          []byte(`{"so`),
+					BodySkipped:   BodySkippedTooLarge,
 				},
 				Response: FullLogResponse{
 					HttpVersion: "HTTP/2",
@@ -218,7 +223,7 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 						"Other":        []string{"header"},
 					},
 					ContentLength: int64(len([]byte(`{"other": "json"}`))),
-					Body:          []byte(`{"oth`),
+					BodySkipped:   BodySkippedTooLarge,
 				},
 			},
 		},
@@ -278,6 +283,125 @@ func TestRoundTripper_RoundTrip(t *testing.T) {
 					},
 					ContentLength: int64(len([]byte(`{"other": "json"}`))),
 					Body:          nil,
+				},
+			},
+		},
+		{
+			// Streaming-direction skip: ContentLength=-1 means chunked
+			// transfer-encoding (or otherwise unknown size). The proxy
+			// can't make a size-bounded decision, so the body is
+			// forwarded untouched and BodySkipped=streaming is stamped.
+			name:                "streaming request body, no Content-Length, skipped (streaming)",
+			recordFullRequest:   true,
+			maxFullRequestSize:  1024,
+			maxFullResponseSize: 1024,
+			request: &http.Request{
+				Method:     "POST",
+				URL:        util.Must(url.Parse("http://example.com/upload")),
+				Proto:      "HTTP/1.1",
+				ProtoMajor: 1,
+				ProtoMinor: 1,
+				Header: http.Header{
+					"Content-Type": []string{"application/octet-stream"},
+				},
+				Body:          io.NopCloser(bytes.NewBufferString(`stream-body`)),
+				ContentLength: -1,
+			},
+			response: &http.Response{
+				Status:     "200 OK",
+				StatusCode: http.StatusOK,
+				Proto:      "HTTP/2",
+				ProtoMajor: 2,
+				ProtoMinor: 0,
+				Header: http.Header{
+					"Content-Type": []string{"application/json"},
+				},
+				Body:          io.NopCloser(bytes.NewBufferString(`{"ok":true}`)),
+				ContentLength: int64(len(`{"ok":true}`)),
+			},
+			expectedFullLog: &FullLog{
+				Id:            apid.New(apid.PrefixRequestLog),
+				CorrelationID: "some-value",
+				Timestamp:     time.Now(),
+				Full:          true,
+				Request: FullLogRequest{
+					URL:         "http://example.com/upload",
+					HttpVersion: "HTTP/1.1",
+					Method:      "POST",
+					Headers: http.Header{
+						"Content-Type": []string{"application/octet-stream"},
+					},
+					ContentLength: int64(len("stream-body")), // inferred from bytes-read since ContentLength was -1
+					BodySkipped:   BodySkippedStreaming,
+				},
+				Response: FullLogResponse{
+					HttpVersion: "HTTP/2",
+					StatusCode:  http.StatusOK,
+					Headers: http.Header{
+						"Content-Type": []string{"application/json"},
+					},
+					ContentLength: int64(len(`{"ok":true}`)),
+					Body:          []byte(`{"ok":true}`),
+				},
+			},
+		},
+		{
+			// Chunked / SSE response: ContentLength=-1. Same skip
+			// behavior on the response side as on the request side.
+			name:                "streaming response body, no Content-Length, skipped (streaming)",
+			recordFullRequest:   true,
+			maxFullRequestSize:  1024,
+			maxFullResponseSize: 1024,
+			request: &http.Request{
+				Method:     "GET",
+				URL:        util.Must(url.Parse("http://example.com/sse")),
+				Proto:      "HTTP/1.1",
+				ProtoMajor: 1,
+				ProtoMinor: 1,
+				Header: http.Header{
+					"Accept": []string{"text/event-stream"},
+				},
+				Body:          http.NoBody,
+				ContentLength: 0,
+			},
+			response: &http.Response{
+				Status:     "200 OK",
+				StatusCode: http.StatusOK,
+				Proto:      "HTTP/1.1",
+				ProtoMajor: 1,
+				ProtoMinor: 1,
+				Header: http.Header{
+					"Content-Type": []string{"text/event-stream"},
+				},
+				Body:          io.NopCloser(bytes.NewBufferString("event: x\ndata: 1\n\n")),
+				ContentLength: -1,
+			},
+			expectedFullLog: &FullLog{
+				Id:            apid.New(apid.PrefixRequestLog),
+				CorrelationID: "some-value",
+				Timestamp:     time.Now(),
+				Full:          true,
+				Request: FullLogRequest{
+					URL:         "http://example.com/sse",
+					HttpVersion: "HTTP/1.1",
+					Method:      "GET",
+					Headers: http.Header{
+						"Accept": []string{"text/event-stream"},
+					},
+					// ContentLength=0 with non-nil http.NoBody falls
+					// into the default tee branch; the tee captures
+					// zero bytes and the buffer round-trips as [] not
+					// nil.
+					Body: []byte{},
+				},
+				Response: FullLogResponse{
+					HttpVersion: "HTTP/1.1",
+					StatusCode:  http.StatusOK,
+					Headers: http.Header{
+						"Content-Type": []string{"text/event-stream"},
+					},
+					ContentLength: int64(len("event: x\ndata: 1\n\n")),
+					BodySkipped:   BodySkippedStreaming,
 				},
 			},
 		},

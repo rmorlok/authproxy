@@ -32,11 +32,18 @@ type LogRecord struct {
 	RequestHttpVersion  string              `json:"request_http_version,omitempty"`
 	RequestSizeBytes    int64               `json:"request_size_bytes,omitempty"`
 	RequestMimeType     string              `json:"request_mime_type,omitempty"`
+	// RequestBodySkipped explains why the request body was not captured
+	// into the full log (chunked / unknown size, or larger than the
+	// configured cap). Empty when captured. See BodySkippedReason.
+	RequestBodySkipped  BodySkippedReason   `json:"request_body_skipped,omitempty"`
 	ResponseStatusCode  int                 `json:"response_status_code,omitempty"`
 	ResponseError       string              `json:"response_error,omitempty"`
 	ResponseHttpVersion string              `json:"response_http_version,omitempty"`
 	ResponseSizeBytes   int64               `json:"response_size_bytes,omitempty"`
 	ResponseMimeType    string              `json:"response_mime_type,omitempty"`
+	// ResponseBodySkipped mirrors RequestBodySkipped for the response
+	// side — chunked SSE / LLM token streams are the common case.
+	ResponseBodySkipped BodySkippedReason   `json:"response_body_skipped,omitempty"`
 	InternalTimeout     bool                `json:"internal_timeout,omitempty"`
 	RequestCancelled    bool                `json:"request_cancelled,omitempty"`
 	FullRequestRecorded bool                `json:"full_request_recorded,omitempty"`
