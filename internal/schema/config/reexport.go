@@ -50,9 +50,11 @@ type (
 	AuthOAuth2              = connectors.AuthOAuth2
 	AuthNoAuth              = connectors.AuthNoAuth
 	AuthOauth2Authorization = connectors.AuthOauth2Authorization
+	AuthOauth2PKCE          = connectors.AuthOauth2PKCE
 	AuthOauth2Token         = connectors.AuthOauth2Token
 	Connector               = connectors.Connector
 	Connectors              = connectors.Connectors
+	PKCEMethod              = connectors.PKCEMethod
 	Scope                   = connectors.Scope
 )
 
@@ -65,4 +67,7 @@ const (
 	ApiKeyPlacementHeader = connectors.ApiKeyPlacementHeader
 	ApiKeyPlacementQuery  = connectors.ApiKeyPlacementQuery
 	ApiKeyPlacementBasic  = connectors.ApiKeyPlacementBasic
+
+	PKCEMethodS256  = connectors.PKCEMethodS256
+	PKCEMethodPlain = connectors.PKCEMethodPlain
 )

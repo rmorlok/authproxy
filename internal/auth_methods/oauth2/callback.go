@@ -175,6 +175,13 @@ func (o *oAuth2Connection) exchangeCodeAndAdvanceInner(ctx context.Context, quer
 		"redirect_uri":  {callbackUrl},
 	}
 
+	// RFC 7636 §4.5 — the verifier is only sent on the initial code-for-token
+	// exchange. Refresh-token grants must not carry it (§6), which is why
+	// task_refresh_oauth_token.go does not have a mirror of this block.
+	if o.state.PKCECodeVerifier != "" {
+		values.Set("code_verifier", o.state.PKCECodeVerifier)
+	}
+
 	for k, v := range o.auth.Token.FormOverrides {
 		values.Set(k, v)
 	}
