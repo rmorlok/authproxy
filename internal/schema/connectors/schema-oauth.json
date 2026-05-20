@@ -27,9 +27,21 @@
         },
         "template": {
           "type": "string"
+        },
+        "pkce": {
+          "$ref": "#/$defs/PKCE"
         }
       },
       "required": ["endpoint"],
+      "additionalProperties": false,
+      "type": "object"
+    },
+    "PKCE": {
+      "properties": {
+        "method": {
+          "enum": ["S256", "plain"]
+        }
+      },
       "additionalProperties": false,
       "type": "object"
     },
