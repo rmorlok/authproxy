@@ -14,6 +14,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/encfield"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
@@ -81,6 +82,10 @@ type OAuth2ConnectorOptions struct {
 	// RevocationEndpoint overrides provider.RevocationEndpoint() (only used
 	// when IncludeRevocation is true).
 	RevocationEndpoint string
+	// PKCE, when non-nil, enables RFC 7636 PKCE on the authorize/token-exchange
+	// pair for this connector. Mirror the production schema block — nil means
+	// PKCE is disabled (the default, current behavior).
+	PKCE *connectors.AuthOauth2PKCE
 }
 
 // NewOAuth2Connector builds an authproxy connector wired to the given
@@ -112,6 +117,7 @@ func NewOAuth2Connector(connectorID apid.ID, displayName string, provider *OAuth
 		Scopes:       scopes,
 		Authorization: connectors.AuthOauth2Authorization{
 			Endpoint: authEndpoint,
+			PKCE:     opts.PKCE,
 		},
 		Token: connectors.AuthOauth2Token{
 			Endpoint: tokenEndpoint,
@@ -306,15 +312,17 @@ func (env *IntegrationTestEnv) DeliverOAuth2Callback(t *testing.T, callbackURL s
 // JSON tags must stay in sync with the production struct; if they drift,
 // the production decode will fail with errStateTampered.
 type OAuth2StateForTest struct {
-	Id                     apid.ID   `json:"id"`
-	Namespace              string    `json:"namespace"`
-	ActorId                apid.ID   `json:"actor_id"`
-	ConnectorId            apid.ID   `json:"connector_id"`
-	ConnectorVersion       uint64    `json:"connector_version"`
-	ConnectionId           apid.ID   `json:"connection_id"`
-	ReturnToUrl            string    `json:"return_to"`
-	CancelSessionAfterAuth bool      `json:"cancel_session_after_auth"`
-	ExpiresAt              time.Time `json:"expires_at"`
+	Id                     apid.ID               `json:"id"`
+	Namespace              string                `json:"namespace"`
+	ActorId                apid.ID               `json:"actor_id"`
+	ConnectorId            apid.ID               `json:"connector_id"`
+	ConnectorVersion       uint64                `json:"connector_version"`
+	ConnectionId           apid.ID               `json:"connection_id"`
+	ReturnToUrl            string                `json:"return_to"`
+	CancelSessionAfterAuth bool                  `json:"cancel_session_after_auth"`
+	ExpiresAt              time.Time             `json:"expires_at"`
+	PKCECodeVerifier       string                `json:"pkce_code_verifier,omitempty"`
+	PKCEMethod             connectors.PKCEMethod `json:"pkce_method,omitempty"`
 }
 
 // WriteOAuth2StateForTest encrypts and stores a synthetic OAuth2 state
@@ -335,6 +343,28 @@ func (env *IntegrationTestEnv) WriteOAuth2StateForTest(t *testing.T, s OAuth2Sta
 	require.NoError(t, err)
 	key := fmt.Sprintf("oauth2:state:%s", s.Id.String())
 	require.NoError(t, env.DM.GetRedisClient().Set(ctx, key, ef.ToInlineString(), ttl).Err())
+}
+
+// ReadOAuth2StateForTest decrypts and decodes the OAuth2 state record at
+// `oauth2:state:<stateId>` so tests can read fields like PKCECodeVerifier
+// that the natural _initiate flow populates. Used by the PKCE tests to
+// snapshot the persisted verifier before mutating it.
+//
+// The JSON tags on OAuth2StateForTest must stay in sync with the production
+// struct (`internal/auth_methods/oauth2/state.go`) so the decode round-trips.
+func (env *IntegrationTestEnv) ReadOAuth2StateForTest(t *testing.T, stateId apid.ID) OAuth2StateForTest {
+	t.Helper()
+	ctx := context.Background()
+	key := fmt.Sprintf("oauth2:state:%s", stateId.String())
+	raw, err := env.DM.GetRedisClient().Get(ctx, key).Result()
+	require.NoErrorf(t, err, "state %s should exist in redis", stateId)
+	ef, err := encfield.ParseInlineString(raw)
+	require.NoError(t, err)
+	plaintext, err := env.DM.GetEncryptService().Decrypt(ctx, ef)
+	require.NoError(t, err)
+	var s OAuth2StateForTest
+	require.NoError(t, json.Unmarshal(plaintext, &s))
+	return s
 }
 
 // GetOAuth2Token reads the most recent OAuth2 token row stored for the
