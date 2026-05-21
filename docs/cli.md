@@ -103,8 +103,6 @@ ap signing-proxy --proxyTo=admin-api --enableLoginRedirect=true
 
 `--proxyTo` accepts a service id (`api`, `admin-api`, `public`) or an absolute URL. `--enableLoginRedirect` adds a `/login-redirect` handler that simulates the host application's session-initiation flow — wire `host_application.initiate_session_url` (or `admin_api.ui.initiate_session_url`) at the printed URL.
 
-`ap raw-proxy` is a hidden deprecated alias for this command — it still works for one release and prints a one-line warning to stderr.
-
 ### `ap proxy` — connection-scoped streaming proxy
 
 Routes inbound requests through `POST /api/v1/connections/{id}/_proxy_raw` so the connection's credentials are applied and bodies stream end-to-end (chunked uploads, SSE responses).

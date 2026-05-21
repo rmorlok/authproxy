@@ -200,19 +200,3 @@ func cmdSigningProxy() *cobra.Command {
 
 	return cmd
 }
-
-// cmdRawProxyAlias keeps `ap raw-proxy` working for one release after
-// the rename to `ap signing-proxy`. Hidden from help; emits a one-line
-// deprecation notice on stderr before delegating to the same code.
-func cmdRawProxyAlias() *cobra.Command {
-	c := cmdSigningProxy()
-	c.Use = "raw-proxy"
-	c.Short = "Deprecated alias for `signing-proxy`"
-	c.Hidden = true
-	inner := c.RunE
-	c.RunE = func(cmd *cobra.Command, args []string) error {
-		fmt.Fprintln(os.Stderr, "warning: `ap raw-proxy` is deprecated and will be removed; use `ap signing-proxy` instead")
-		return inner(cmd, args)
-	}
-	return c
-}

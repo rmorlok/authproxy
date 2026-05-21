@@ -99,22 +99,6 @@ func TestProxyCmd_NoPositional_RunsListenerMode(t *testing.T) {
 	assert.Empty(t, ran, "no positional args means listener mode")
 }
 
-// cmdRawProxyAlias must reuse cmdSigningProxy's flag surface so the old
-// command keeps working byte-for-byte. The deprecation warning lives in
-// RunE — verified by inspection rather than test since it goes to
-// stderr.
-func TestRawProxyAlias_KeepsSamePrimaryFlags(t *testing.T) {
-	signing := cmdSigningProxy()
-	alias := cmdRawProxyAlias()
-
-	assert.Equal(t, "raw-proxy", alias.Use)
-	assert.True(t, alias.Hidden, "alias must be hidden from help")
-	for _, name := range []string{"proxyTo", "enableLoginRedirect", "port", "ip", "proto"} {
-		assert.NotNil(t, signing.Flag(name), "signing-proxy must have flag %s", name)
-		assert.NotNil(t, alias.Flag(name), "raw-proxy alias must have flag %s", name)
-	}
-}
-
 // TestRawProxyHandler_DerivesUpstreamFromBase covers the common path —
 // caller hits /v1/foo, --upstream-base is https://upstream/, handler
 // sets X-AuthProxy-Upstream-URL to https://upstream/v1/foo and signs
