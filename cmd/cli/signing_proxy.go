@@ -92,7 +92,7 @@ func writeJsonErrorResponse(w http.ResponseWriter, statusCode int, message strin
 	w.Write(response)
 }
 
-func cmdRawProxy() *cobra.Command {
+func cmdSigningProxy() *cobra.Command {
 	var (
 		resolver            *config.Resolver
 		proxyTo             string
@@ -105,8 +105,8 @@ func cmdRawProxy() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "raw-proxy",
-		Short: "Proxy HTTP calls to the server with signed JWT",
+		Use:   "signing-proxy",
+		Short: "Proxy HTTP calls to the server with a signed admin JWT",
 		RunE: func(cmd *cobra.Command, args []string) error {
 			signer, err := resolver.ResolveSigner()
 			if err != nil {
@@ -137,7 +137,7 @@ func cmdRawProxy() *cobra.Command {
 				return fmt.Errorf("invalid proxyTo value: %w", err)
 			}
 
-			log.Printf("Setting up raw-proxy to the host: %s", proxyTo)
+			log.Printf("Setting up signing-proxy to the host: %s", proxyTo)
 			log.Printf("Serving proxy on %s:%d", ip, port)
 
 			proxyHandler := httpProxyForHost(*proxyToUrl, signer)
