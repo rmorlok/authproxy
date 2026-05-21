@@ -1,7 +1,7 @@
 import * as React from 'react';
 import {Meta, StoryObj} from '@storybook/react';
 import ConnectionCard, {ConnectionCardSkeleton} from '../components/ConnectionCard';
-import {Connection, ConnectionState, ConnectorVersionState} from '@authproxy/api';
+import {Connection, ConnectionState, ConnectionHealthState, ConnectorVersionState} from '@authproxy/api';
 import {Provider} from 'react-redux';
 import {configureStore} from '@reduxjs/toolkit';
 import connectorsReducer from '../store/connectorsSlice';
@@ -72,6 +72,7 @@ const mockConnection: Connection = {
       logo: "https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg"
   },
   state: ConnectionState.READY,
+  health_state: ConnectionHealthState.HEALTHY,
   created_at: '2023-04-01T12:00:00Z',
   updated_at: '2023-04-01T12:00:00Z',
 };
@@ -79,6 +80,15 @@ const mockConnection: Connection = {
 export const Connected: Story = {
   args: {
     connection: mockConnection,
+  },
+};
+
+export const Unhealthy: Story = {
+  args: {
+    connection: {
+      ...mockConnection,
+      health_state: ConnectionHealthState.UNHEALTHY,
+    },
   },
 };
 

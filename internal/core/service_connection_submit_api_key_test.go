@@ -50,6 +50,7 @@ func newTestApiKeyConnection(
 			Id:               "cxn_test1111111111aa",
 			Namespace:        "root",
 			State:            database.ConnectionStateCreated,
+			HealthState:      database.ConnectionHealthStateHealthy,
 			ConnectorId:      cv.GetId(),
 			ConnectorVersion: cv.GetVersion(),
 		},

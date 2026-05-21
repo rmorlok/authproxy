@@ -22,7 +22,8 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import dayjs from 'dayjs';
 import Tooltip from '@mui/material/Tooltip';
-import {Connection, connections, ConnectionState, canBeDisconnected} from '@authproxy/api';
+import {Connection, connections, ConnectionState, ConnectionHealthState, canBeDisconnected} from '@authproxy/api';
+import WarningAmberIcon from '@mui/icons-material/WarningAmber';
 import { Link } from "react-router-dom";
 import AnnotationsEditor from "./AnnotationsEditor";
 
@@ -35,6 +36,23 @@ function StateChip({state}: { state: ConnectionState }) {
     [ConnectionState.DISCONNECTED]: 'default',
   };
   return <Chip label={state} color={colors[state]} size="small"/>;
+}
+
+// HealthChip surfaces the operational health signal alongside the lifecycle state. A Ready
+// connection can be unhealthy when credentials have stopped working — the chip makes that
+// visible to operators so they can follow up with the connection owner about reauth.
+function HealthChip({health}: { health?: ConnectionHealthState }) {
+  if (!health || health === ConnectionHealthState.HEALTHY) {
+    return null;
+  }
+  return (
+    <Chip
+      icon={<WarningAmberIcon />}
+      label="Unhealthy"
+      color="warning"
+      size="small"
+    />
+  );
 }
 
 export default function ConnectionDetail({connectionId}: { connectionId: string }) {
@@ -155,6 +173,7 @@ export default function ConnectionDetail({connectionId}: { connectionId: string 
       <Stack direction="row" justifyContent="space-between" alignItems="center">
         <Typography variant="h5">Connection</Typography>
         <Stack direction="row" spacing={1} alignItems="center">
+          <HealthChip health={conn.health_state}/>
           <StateChip state={conn.state}/>
           <IconButton aria-label="actions" onClick={openMenu} size="small">
             <MoreVertIcon/>

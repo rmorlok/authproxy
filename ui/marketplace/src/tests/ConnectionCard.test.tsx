@@ -4,7 +4,7 @@ import '@testing-library/jest-dom';
 import {Provider} from 'react-redux';
 import {combineReducers, configureStore} from '@reduxjs/toolkit';
 import ConnectionCard, {ConnectionCardSkeleton} from '../components/ConnectionCard';
-import {Connection, ConnectionState, Connector, ConnectorVersionState} from '@authproxy/api';
+import {Connection, ConnectionState, ConnectionHealthState, Connector, ConnectorVersionState} from '@authproxy/api';
 import authReducer from '../store/sessionSlice';
 import connectorsReducer from '../store/connectorsSlice';
 import connectionsReducer from '../store/connectionsSlice';
@@ -62,6 +62,7 @@ describe('ConnectionCard', () => {
         namespace: 'root',
         connector: mockConnector,
         state: ConnectionState.READY,
+        health_state: ConnectionHealthState.HEALTHY,
         created_at: '2023-04-01T12:00:00Z',
         updated_at: '2023-04-01T12:00:00Z',
     };

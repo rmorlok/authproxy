@@ -111,6 +111,15 @@ type C interface {
 	// has no preconnect steps. Returns the initial setup step response for the retry.
 	RetryConnectionSetup(ctx context.Context, id apid.ID, returnToUrl string) (ConnectionSetupResponse, error)
 
+	// ReauthConnection re-runs the credential-collection portion of setup against an existing Ready
+	// connection. Used for user-driven credential rotation (manual "Re-authenticate") and for the
+	// recovery path on an unhealthy connection. For api-key, returns the credentials form with no
+	// prior values pre-filled; on submit, InsertApiKeyCredential rotates the row in-place (the
+	// existing row is soft-deleted in the same transaction). For OAuth2, re-issues preconnect:0 if
+	// defined, otherwise re-initiates the OAuth redirect. The connection's State remains Ready
+	// throughout; only setup_step is reset and re-driven.
+	ReauthConnection(ctx context.Context, id apid.ID, returnToUrl string) (ConnectionSetupResponse, error)
+
 	/*
 	 *
 	 * Namespaces
