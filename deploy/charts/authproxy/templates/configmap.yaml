@@ -58,6 +58,19 @@ Secrets, not in this ConfigMap.
 {{- end -}}
 {{- $_ := set $cfg "connectors" $connectors -}}
 
+{{/* --- http_logging (server unconditionally wires up the log storage) --- */}}
+{{- $httpDb := dict -}}
+{{- if .Values.httpLogging.shareMainDatabase -}}
+{{-   $httpDb = $db -}}
+{{- else -}}
+{{-   $httpDb = .Values.httpLogging.database -}}
+{{- end -}}
+{{- $httpLogging := dict
+      "auto_migrate" .Values.httpLogging.autoMigrate
+      "full_request_recording" .Values.httpLogging.fullRequestRecording
+      "database" $httpDb -}}
+{{- $_ := set $cfg "http_logging" $httpLogging -}}
+
 {{/* --- s3 (request-log blob storage) --- */}}
 {{- if .Values.s3.enabled -}}
 {{-   $s3 := dict "provider" "s3" "bucket" .Values.s3.bucket "force_path_style" .Values.s3.forcePathStyle -}}

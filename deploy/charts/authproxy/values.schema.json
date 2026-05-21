@@ -221,6 +221,17 @@
       }
     },
 
+    "httpLogging": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "shareMainDatabase":    { "type": "boolean" },
+        "autoMigrate":          { "type": "boolean" },
+        "database":             { "type": "object" },
+        "fullRequestRecording": { "type": "string", "enum": ["never", "always"] }
+      }
+    },
+
     "config": { "type": "object" },
 
     "healthcheck": {

@@ -200,6 +200,27 @@ actors:
 hostApplication:
   initiateSessionUrl: ""
 
+# -- HTTP request/response logging. The AuthProxy server always wires up a
+# log storage service, so the rendered config must contain an `http_logging`
+# block with a database reference. By default the chart points it at the
+# main `database` block above — fine for small deploys, override for
+# production data-warehouse setups (e.g. a separate ClickHouse).
+httpLogging:
+  # -- Reuse the main `database` block. When true, the chart copies the
+  # main database section into `http_logging.database`. Set to false to
+  # configure a dedicated `database:` block below.
+  shareMainDatabase: true
+  # -- Run http_logging schema migrations at startup. Defaults to true on
+  # the server side; surfaced here so customers can disable it when a
+  # separate process owns the http-log schema.
+  autoMigrate: true
+  # -- Dedicated database block for http_logging metadata. Only consulted
+  # when `shareMainDatabase` is false. Same field shape as the top-level
+  # `database` block (provider, host, port, etc.).
+  database: {}
+  # -- Full request/response recording mode (`never` or `always`).
+  fullRequestRecording: never
+
 # -- Connector registry. AuthProxy refuses to start without the connectors
 # block — supply at least an empty `loadFromList` even when you intend to
 # manage connectors through the admin API at runtime.
