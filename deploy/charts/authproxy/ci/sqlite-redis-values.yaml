@@ -6,14 +6,17 @@
 #     before `ct install`, addressable at `redis:6379` in the test namespace)
 #   - JWT + encryption key Secrets are generated and applied by the workflow
 #     (the chart deliberately never creates them)
-#
-# image.tag pins to `main` so the CI exercises whatever is currently
-# published from rmorlok/authproxy@main, not whatever Chart.appVersion
-# happens to be at the time of the chart change.
+#   - Image is built from this branch's tree and loaded into the kind
+#     cluster (see `image:` below), so the chart is tested against the code
+#     on this PR rather than whatever is published as `:main` in GHCR.
 
 image:
-  tag: main
-  pullPolicy: IfNotPresent
+  # Built by the workflow's "Build local AuthProxy image" step and loaded
+  # into the kind cluster — pullPolicy: Never keeps kubelet from chasing a
+  # registry copy that doesn't exist for this branch.
+  repository: authproxy
+  tag: ci-local
+  pullPolicy: Never
 
 database:
   provider: sqlite

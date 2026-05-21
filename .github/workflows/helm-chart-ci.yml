@@ -83,6 +83,26 @@ jobs:
             echo "found=false" >> "$GITHUB_OUTPUT"
           fi
 
+      - name: Set up Docker Buildx
+        if: steps.changed.outputs.found == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build local AuthProxy image (amd64-only)
+        if: steps.changed.outputs.found == 'true'
+        # Build the image from the PR's tree so the chart is tested against
+        # the code on this branch, not whatever happens to be tagged `:main`
+        # in GHCR. amd64-only keeps the build under ~5 min; the runner is
+        # always amd64 anyway.
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: authproxy:ci-local
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
       - name: Create kind cluster
         if: steps.changed.outputs.found == 'true'
         uses: helm/kind-action@v1.10.0
@@ -90,6 +110,10 @@ jobs:
           version: v0.24.0
           node_image: kindest/node:v1.30.4
           wait: 120s
+
+      - name: Load local image into kind
+        if: steps.changed.outputs.found == 'true'
+        run: kind load docker-image authproxy:ci-local --name chart-testing
 
       - name: Create test namespace
         if: steps.changed.outputs.found == 'true'
