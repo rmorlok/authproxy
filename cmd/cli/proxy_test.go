@@ -75,6 +75,19 @@ func TestProxyCmd_InterspersedFalse_PreservesCurlArgs(t *testing.T) {
 	assert.Equal(t, []string{"curl", "-X", "POST", "https://api.example.com/v1/x", "--data", "@body.json"}, ran)
 }
 
+// Same boundary check, but with the `wget` discriminator. wget's flag
+// surface is smaller than curl's but still has things like -O, -q, and
+// --user-agent that must reach RunE intact.
+func TestProxyCmd_InterspersedFalse_PreservesWgetArgs(t *testing.T) {
+	var ran []string
+	cmd := cmdProxy()
+	cmd.RunE = func(c *cobra.Command, args []string) error { ran = args; return nil }
+
+	cmd.SetArgs([]string{"--connection", "cxn_x", "wget", "-O", "out.bin", "https://api.example.com/v1/big", "--user-agent", "ap"})
+	require.NoError(t, cmd.Execute())
+	assert.Equal(t, []string{"wget", "-O", "out.bin", "https://api.example.com/v1/big", "--user-agent", "ap"}, ran)
+}
+
 // TestProxyCmd_NoPositional_RunsListenerMode confirms the default
 // listener path: zero positional args, just the configured flags.
 func TestProxyCmd_NoPositional_RunsListenerMode(t *testing.T) {

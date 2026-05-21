@@ -55,9 +55,10 @@ go run ./cmd/cli signing-proxy --enableLoginRedirect=true --proxyTo=api
 # Connection-scoped streaming reverse proxy through /_proxy_raw.
 go run ./cmd/cli proxy --connection cxn_xxx --upstream-base https://api.openai.com
 
-# One-shot through curl. Everything after `curl` is forwarded to curl
-# verbatim; all ap proxy flags must come before it.
+# One-shot through curl or wget. Everything after `curl`/`wget` is
+# forwarded to the tool verbatim; all ap proxy flags must come before it.
 go run ./cmd/cli proxy --connection cxn_xxx curl https://api.openai.com/v1/models
+go run ./cmd/cli proxy --connection cxn_xxx wget https://api.openai.com/files/big.bin -O out.bin
 ```
 
 ### Other useful commands
@@ -153,7 +154,7 @@ Full reference: [`docs/telemetry.md`](docs/telemetry.md). Day-to-day rules when 
 
 ## Client configuration
 
-The CLI tool (`cmd/cli`) looks for config at `~/.authproxy.yaml`:
+Full CLI reference: [`docs/cli.md`](docs/cli.md). The short version: the CLI looks for `~/.authproxy.yaml`:
 
 ```yaml
 admin_username: bobdole

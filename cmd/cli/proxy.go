@@ -167,7 +167,7 @@ func cmdProxy() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "proxy --connection <id> [--upstream-base <url>] [curl <curl args>]",
+		Use:   "proxy --connection <id> [--upstream-base <url>] [curl|wget <args>]",
 		Short: "Reverse proxy that forwards requests through a connection's /_proxy_raw endpoint",
 		Long: `Boots a streaming reverse-proxy through the connection's /_proxy_raw
 endpoint. Bodies stream both directions so chunked uploads and SSE
@@ -182,12 +182,14 @@ Two modes:
     or the caller may set the header explicitly (then --upstream-base
     is optional).
 
-  One-shot curl:
+  One-shot through curl or wget:
     ap proxy --connection <id> curl https://api.example.com/v1/things -X POST -d @body.json
+    ap proxy --connection <id> wget https://api.example.com/files/big.bin -O out.bin
     Boots an ephemeral-port listener, derives --upstream-base from the
     URL's scheme+host, rewrites the URL to point at the listener, and
-    shells out to real curl with every arg after "curl" forwarded
-    verbatim. All ap proxy flags must come before the literal "curl".`,
+    shells out to the named tool with every arg after it forwarded
+    verbatim. All ap proxy flags must come before the literal
+    "curl"/"wget".`,
 		// SetInterspersed(false) is what makes the `curl ...` tail
 		// work: cobra stops flag parsing at the first positional, so
 		// curl's own flags (-X, -d, -H, --config, …) reach us as args
@@ -213,12 +215,15 @@ Two modes:
 				}
 			}
 
-			// `curl` discriminator: anything after it is curl's argv.
-			if len(args) > 0 && args[0] == "curl" {
-				return runProxyCurl(apiURL, connectionID, base, signer, args[1:])
-			}
+			// `curl` / `wget` discriminator: anything after it is the
+			// tool's argv, forwarded verbatim.
 			if len(args) > 0 {
-				return fmt.Errorf("ap proxy: unexpected positional %q (only `curl <args>` is supported)", args[0])
+				switch args[0] {
+				case "curl", "wget":
+					return runProxyExec(args[0], apiURL, connectionID, base, signer, args[1:])
+				default:
+					return fmt.Errorf("ap proxy: unexpected positional %q (only `curl <args>` or `wget <args>` are supported)", args[0])
+				}
 			}
 
 			return runProxyListener(apiURL, connectionID, base, signer, ip, port)
@@ -267,15 +272,19 @@ func runProxyListener(apiURL, connectionID string, base *url.URL, signer jwt.Sig
 	return server.ListenAndServe()
 }
 
-// runProxyCurl is the one-shot mode. Boots an ephemeral listener,
-// rewrites the URL in curlArgs to point at it (preserving path+query),
-// and shells out to real curl. If --upstream-base wasn't supplied
-// explicitly, it's derived from the URL's scheme+host so curl's view
-// of the request is unchanged.
-func runProxyCurl(apiURL, connectionID string, base *url.URL, signer jwt.Signer, curlArgs []string) error {
-	urlIdx, origURL, err := findURLArg(curlArgs)
+// runProxyExec is the one-shot mode. Boots an ephemeral listener,
+// rewrites the URL in toolArgs to point at it (preserving path+query),
+// and shells out to the named tool (curl or wget). If --upstream-base
+// wasn't supplied explicitly, it's derived from the URL's scheme+host
+// so the tool's view of the request is unchanged.
+func runProxyExec(tool, apiURL, connectionID string, base *url.URL, signer jwt.Signer, toolArgs []string) error {
+	if _, err := exec.LookPath(tool); err != nil {
+		return fmt.Errorf("ap proxy %s: %w", tool, err)
+	}
+
+	urlIdx, origURL, err := findURLArg(toolArgs)
 	if err != nil {
-		return fmt.Errorf("ap proxy curl: %w", err)
+		return fmt.Errorf("ap proxy %s: %w", tool, err)
 	}
 	if base == nil {
 		base, _ = url.Parse(origURL.Scheme + "://" + origURL.Host)
@@ -283,7 +292,7 @@ func runProxyCurl(apiURL, connectionID string, base *url.URL, signer jwt.Signer,
 
 	listenURL, shutdown, err := startRawProxyListener("127.0.0.1:0", apiURL, connectionID, base, signer)
 	if err != nil {
-		return fmt.Errorf("ap proxy curl: start listener: %w", err)
+		return fmt.Errorf("ap proxy %s: start listener: %w", tool, err)
 	}
 	defer func() {
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
@@ -299,23 +308,23 @@ func runProxyCurl(apiURL, connectionID string, base *url.URL, signer jwt.Signer,
 	// Replace the URL in argv. For --url=<value> the whole arg gets the
 	// flag prefix back; for --url <value> and positional we replace the
 	// single arg in place.
-	curlArgs = append([]string(nil), curlArgs...)
+	toolArgs = append([]string(nil), toolArgs...)
 	switch {
-	case strings.HasPrefix(curlArgs[urlIdx], "--url="):
-		curlArgs[urlIdx] = "--url=" + rewritten.String()
+	case strings.HasPrefix(toolArgs[urlIdx], "--url="):
+		toolArgs[urlIdx] = "--url=" + rewritten.String()
 	default:
-		curlArgs[urlIdx] = rewritten.String()
+		toolArgs[urlIdx] = rewritten.String()
 	}
 
 	ctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
 	defer cancel()
 
-	ccmd := exec.CommandContext(ctx, "curl", curlArgs...)
-	ccmd.Stdin = os.Stdin
-	ccmd.Stdout = os.Stdout
-	ccmd.Stderr = os.Stderr
-	if err := ccmd.Run(); err != nil {
-		// Propagate curl's exit code so callers can script on it.
+	tcmd := exec.CommandContext(ctx, tool, toolArgs...)
+	tcmd.Stdin = os.Stdin
+	tcmd.Stdout = os.Stdout
+	tcmd.Stderr = os.Stderr
+	if err := tcmd.Run(); err != nil {
+		// Propagate the tool's exit code so callers can script on it.
 		if ee, ok := err.(*exec.ExitError); ok {
 			os.Exit(ee.ExitCode())
 		}

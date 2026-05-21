@@ -36,6 +36,7 @@ Pre-built admin UI for managing connectors and connections:
   - [Admin UI](#admin-ui)
 - [Telemetry](#telemetry)
 - [Client Config](#client-config)
+- [CLI](docs/cli.md)
 - [Related Projects](#related-projects)
 - [License](#license)
 - [Documentation](#documentation)
@@ -44,6 +45,7 @@ Pre-built admin UI for managing connectors and connections:
 
 In-depth guides live under [`docs/`](docs/README.md):
 
+- [CLI (`ap`)](docs/cli.md) — config file shape, signing keys, every command (list, sign-jwt, signing-proxy, proxy + curl/wget modes, …).
 - [Rate limits](docs/rate-limits.md) — defining rate-limit resources, the connector-level reactive 429 handler, and the request-log attribution fields.
 - [Labels and annotations](docs/labels.md) — the label system, system labels under `apxy/`, carry-forward through namespaces and connectors, label selectors.
 - [Telemetry](docs/telemetry.md) — OpenTelemetry traces, metrics, and logs; OTLP configuration, label projection, signal coverage, and the local Grafana dev stack.
@@ -584,6 +586,7 @@ The full set of long-form guides lives under [`docs/`](docs/README.md):
 
 | Topic | Doc |
 |---|---|
+| `ap` CLI — config file, signing keys, every command | [docs/cli.md](docs/cli.md) |
 | Define rate-limit resources, connector reactive 429 handling, log attribution | [docs/rate-limits.md](docs/rate-limits.md) |
 | Label system, system labels, carry-forward, selectors | [docs/labels.md](docs/labels.md) |
 | OpenTelemetry traces / metrics / logs, OTLP config, label projection, dev Grafana stack | [docs/telemetry.md](docs/telemetry.md) |
