@@ -20,7 +20,6 @@ func main() {
 	rootCmd.AddCommand(cmdSigningProxy())
 	rootCmd.AddCommand(cmdRawProxyAlias())
 	rootCmd.AddCommand(cmdProxy())
-	rootCmd.AddCommand(cmdCurl())
 	rootCmd.AddCommand(cmdSignMarketplaceLoginUrl())
 	rootCmd.AddCommand(cmdMarketplaceLoginRedirect())
 

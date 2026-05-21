@@ -29,14 +29,6 @@ type Resolver struct {
 	adminUiUrl     string
 }
 
-// NewResolverFromDefaults builds a Resolver that reads everything from
-// ~/.authproxy.yaml (no flag overrides). Used by commands like `ap
-// curl` that DisableFlagParsing because their args must pass through
-// untouched to a downstream tool.
-func NewResolverFromDefaults() *Resolver {
-	return &Resolver{apis: "all"}
-}
-
 func WithConfigParams(cmd *cobra.Command) *Resolver {
 	r := Resolver{}
 
