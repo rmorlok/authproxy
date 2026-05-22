@@ -165,11 +165,16 @@ jobs:
           sleep 1
         done
 
-    - name: Create MinIO bucket
+    - name: Create MinIO buckets
       run: |
         docker run --rm --network host \
           -e MC_HOST_minio=http://minioadmin:minioadmin@localhost:9003 \
-          minio/mc mb --ignore-existing minio/authproxy-request-logs
+          --entrypoint /bin/sh \
+          minio/mc -c "
+            mc mb --ignore-existing minio/authproxy-request-logs &&
+            mc mb --ignore-existing minio/authproxy-streaming-test &&
+            mc anonymous set public minio/authproxy-streaming-test
+          "
 
     - name: Start OAuth2 test provider
       working-directory: integration_tests

@@ -553,6 +553,77 @@ func (env *IntegrationTestEnv) DoProxyRawRequest(
 	return w
 }
 
+// DoProxyRawStreamingRequest is the streaming counterpart to
+// DoProxyRawRequest. The request body is an io.Reader (so large
+// uploads don't have to be materialised as a []byte) and the
+// response is returned as a live *http.Response so callers can read
+// it incrementally rather than buffering it whole.
+//
+// contentLength controls the inbound framing: pass -1 for chunked
+// transfer-encoding (Content-Length omitted), or the exact byte
+// count for a known-length PUT. Some upstreams (notably S3 /
+// MinIO's raw API) reject chunked uploads and require a
+// Content-Length header — pass the known size in that case.
+//
+// Requires StartHTTPServer=true: the in-process gin path uses
+// httptest.ResponseRecorder which can't be observed mid-stream.
+// Caller is responsible for closing the returned response body.
+func (env *IntegrationTestEnv) DoProxyRawStreamingRequest(
+	t *testing.T,
+	connectionID, targetURL, method string,
+	body io.Reader,
+	contentLength int64,
+	extraHeaders http.Header,
+) *http.Response {
+	t.Helper()
+	require.NotEmptyf(t, env.ServerURL, "DoProxyRawStreamingRequest requires StartHTTPServer=true")
+
+	path := "/api/v1/connections/" + connectionID + "/_proxy_raw"
+	abs, err := url.Parse(env.ServerURL + path)
+	require.NoError(t, err)
+
+	// Wrap the body in struct{io.Reader} so http.NewRequest can't
+	// infer ContentLength from a recognised concrete type
+	// (bytes.Reader, strings.Reader, etc.). We then set
+	// ContentLength explicitly below to whatever framing the caller
+	// asked for.
+	var bodyReader io.Reader
+	if body != nil {
+		bodyReader = struct{ io.Reader }{body}
+	}
+
+	req, err := env.ApiAuthUtil.NewSignedRequestForActorExternalId(
+		method,
+		path,
+		bodyReader,
+		sconfig.RootNamespace,
+		"test-actor",
+		aschema.AllPermissions(),
+	)
+	require.NoError(t, err)
+	req.URL = abs
+	req.Host = abs.Host
+	req.RequestURI = ""
+	if body != nil {
+		if contentLength < 0 {
+			req.ContentLength = -1
+			req.TransferEncoding = []string{"chunked"}
+		} else {
+			req.ContentLength = contentLength
+		}
+	}
+	req.Header.Set("X-AuthProxy-Upstream-URL", targetURL)
+	for k, vv := range extraHeaders {
+		for _, v := range vv {
+			req.Header.Add(k, v)
+		}
+	}
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	return resp
+}
+
 // CreateConnection creates a connection directly in the database.
 func (env *IntegrationTestEnv) CreateConnection(t *testing.T, connectorID apid.ID, connectorVersion uint64) string {
 	t.Helper()
