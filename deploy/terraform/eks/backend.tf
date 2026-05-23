@@ -4,7 +4,7 @@
 # output here, then run `terraform init -migrate-state` in this dir.
 terraform {
   backend "s3" {
-    bucket         = "REPLACE_ME_FROM_BOOTSTRAP_OUTPUT"
+    bucket         = "authproxy-tf-state-530194034313"
     key            = "eks/terraform.tfstate"
     region         = "us-east-1"
     dynamodb_table = "authproxy-tf-locks"
