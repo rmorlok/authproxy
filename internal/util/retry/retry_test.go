@@ -292,6 +292,67 @@ func TestDo_MaxAttemptsBelowOneCoercedToOne(t *testing.T) {
 	assert.Equal(t, 1, res.Attempts)
 }
 
+func TestDo_OnRetryWaitOverridesBackoff(t *testing.T) {
+	// Verifies that an OnRetryWait override takes precedence over the
+	// Backoff strategy's wait, while leaving the Backoff progression in
+	// place (it's still advanced via NextBackOff each iteration).
+	fakeClk := tclock.NewFakeClock(time.Now())
+	ctx := apctx.WithClock(context.Background(), fakeClk)
+
+	const huge = time.Hour      // Backoff returns this — would hang the test
+	const override = 7 * time.Second
+
+	calls := make(chan int, 5)
+	done := make(chan struct{}, 1)
+
+	go func() {
+		_, _ = Do(ctx, Options[string]{
+			MaxAttempts: 3,
+			Backoff:     &backoff.ConstantBackOff{Interval: huge},
+			OnRetryWait: func(_ string, _ error) time.Duration {
+				return override
+			},
+		}, func(ctx context.Context) (string, error) {
+			calls <- 1
+			return "", errors.New("transient")
+		})
+		done <- struct{}{}
+	}()
+
+	<-calls
+	require.Eventually(t, fakeClk.HasWaiters, time.Second, time.Millisecond)
+	// Step the override exactly — if OnRetryWait were ignored, the helper
+	// would still be waiting for the huge Backoff interval and the next
+	// call would not fire.
+	fakeClk.Step(override)
+	<-calls
+
+	require.Eventually(t, fakeClk.HasWaiters, time.Second, time.Millisecond)
+	fakeClk.Step(override)
+	<-calls
+
+	<-done
+}
+
+func TestDo_OnRetryWaitNonPositiveFallsBackToBackoff(t *testing.T) {
+	ctx := context.Background()
+
+	calls := 0
+	_, err := Do(ctx, Options[string]{
+		MaxAttempts: 3,
+		Backoff:     &backoff.ConstantBackOff{Interval: 1 * time.Millisecond},
+		OnRetryWait: func(_ string, _ error) time.Duration {
+			return 0
+		},
+	}, func(ctx context.Context) (string, error) {
+		calls++
+		return "", errors.New("transient")
+	})
+
+	require.Error(t, err)
+	assert.Equal(t, 3, calls, "OnRetryWait returning 0 must not short-circuit; Backoff still runs")
+}
+
 func TestLinearBackOff(t *testing.T) {
 	b := &LinearBackOff{Step: 100 * time.Millisecond}
 
