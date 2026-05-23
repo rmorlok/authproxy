@@ -3,6 +3,7 @@ package core
 import (
 	"bytes"
 	"context"
+	"fmt"
 
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/httpf"
@@ -12,6 +13,12 @@ type probeHttp struct {
 	probeBase
 }
 
+// Invoke runs the probe and reports either success or error. Both branches
+// (proxy and raw) treat any non-2xx upstream response as a probe failure —
+// without this, an upstream that 401s the proxied request would silently be
+// considered a success and the probe-driven health signal would never flip
+// to unhealthy. The recorded error carries the status code so operators can
+// see what the upstream actually returned.
 func (p *probeHttp) Invoke(ctx context.Context) (string, error) {
 	return p.recordInvokeOutcome(ctx, func(ctx context.Context) (string, error) {
 		if p.cfg.ProxyHttp != nil {
@@ -30,13 +37,17 @@ func (p *probeHttp) Invoke(ctx context.Context) (string, error) {
 				BodyJson: h.BodyJson,
 			}
 
-			// TODO: translate result
-			_, err = proxy.ProxyRequest(ctx, httpf.RequestTypeProbe, &req)
+			resp, err := proxy.ProxyRequest(ctx, httpf.RequestTypeProbe, &req)
 			if err != nil {
 				return ProbeOutcomeError, err
-			} else {
-				return ProbeOutcomeSuccess, nil
 			}
+			if resp == nil {
+				return ProbeOutcomeError, fmt.Errorf("probe upstream returned no response")
+			}
+			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+				return ProbeOutcomeError, fmt.Errorf("probe upstream returned status %d", resp.StatusCode)
+			}
+			return ProbeOutcomeSuccess, nil
 		} else {
 			req := p.s.httpf.
 				ForConnection(p.c).
@@ -62,12 +73,17 @@ func (p *probeHttp) Invoke(ctx context.Context) (string, error) {
 				req.BodyString(h.Body)
 			}
 
-			_, err := req.Do()
+			resp, err := req.Do()
 			if err != nil {
 				return ProbeOutcomeError, err
-			} else {
-				return ProbeOutcomeSuccess, nil
 			}
+			if resp == nil {
+				return ProbeOutcomeError, fmt.Errorf("probe upstream returned no response")
+			}
+			if resp.StatusCode < 200 || resp.StatusCode >= 300 {
+				return ProbeOutcomeError, fmt.Errorf("probe upstream returned status %d", resp.StatusCode)
+			}
+			return ProbeOutcomeSuccess, nil
 		}
 	})
 }

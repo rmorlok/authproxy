@@ -106,6 +106,20 @@ type C interface {
 	// the verify step of the setup flow. The task advances the connection's setup step based on the outcome.
 	EnqueueVerifyConnection(ctx context.Context, id apid.ID) error
 
+	// RunProbe synchronously invokes a single probe against a connection and records the outcome
+	// against the connection's health-state counters — the same code path the periodic asynq probe
+	// task takes, just inline. Returns the probe's invocation error (or nil on success). Used by
+	// integration tests that need deterministic probe execution and by future callers that want to
+	// nudge a probe sooner than its next scheduled tick.
+	RunProbe(ctx context.Context, connectionId apid.ID, probeId string) error
+
+	// RunVerifyConnection synchronously runs every probe declared on the connection's connector
+	// and advances setup_step based on the outcome — the same code path the asynq verify task
+	// takes, just inline. Used by integration tests that drive the setup lifecycle without a
+	// background worker. Returns asynq.SkipRetry for non-recoverable shapes (connection not found,
+	// no longer in verify phase); other errors propagate unwrapped.
+	RunVerifyConnection(ctx context.Context, connectionId apid.ID) error
+
 	// RetryConnectionSetup resets a connection that is in the verify_failed terminal state so the user
 	// can try setup again — either restarting preconnect forms, or re-initiating OAuth if the connector
 	// has no preconnect steps. Returns the initial setup step response for the retry.

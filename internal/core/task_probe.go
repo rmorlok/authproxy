@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"log/slog"
 
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -62,25 +63,39 @@ func (s *service) runProbeForConnection(ctx context.Context, t *asynq.Task) erro
 		With("probe_id", p.ProbeId).
 		Build()
 
+	probe, invokeErr := s.runProbeInternal(ctx, logger, p.ConnectionId, p.ProbeId)
+	if probe != nil && invokeErr != nil {
+		return skipTaskErrorIfProbeIsPeriodic(probe, invokeErr)
+	}
+	return invokeErr
+}
+
+// runProbeInternal is the shared body executed by both the periodic asynq task
+// handler and the inline RunProbe entry point. It loads the connection, looks
+// up the probe by id, invokes it, and records the outcome against the
+// connection's health-state counters. Returns the probe (when found) and any
+// error from looking it up or invoking it; health-recording errors are logged
+// but not returned because they don't invalidate the probe outcome itself.
+func (s *service) runProbeInternal(ctx context.Context, logger *slog.Logger, connectionId apid.ID, probeId string) (iface.Probe, error) {
 	logger.Debug("getting connection")
-	conn, err := s.getConnection(ctx, p.ConnectionId)
+	conn, err := s.getConnection(ctx, connectionId)
 	if err != nil {
 		if errors.Is(database.ErrNotFound, err) {
 			logger.Error("connection not found", "error", err)
-			return asynq.SkipRetry
+			return nil, asynq.SkipRetry
 		}
 
-		return err
+		return nil, err
 	}
 
-	probe, err := conn.GetProbe(p.ProbeId)
+	probe, err := conn.GetProbe(probeId)
 	if err != nil {
 		if errors.Is(ErrProbeNotFound, err) {
 			logger.Error("probe not found", "error", err)
-			return fmt.Errorf("%s probe not found: %w", taskTypeProbe, asynq.SkipRetry)
+			return nil, fmt.Errorf("%s probe not found: %w", taskTypeProbe, asynq.SkipRetry)
 		}
 
-		return skipTaskErrorIfProbeIsPeriodic(probe, err)
+		return probe, err
 	}
 
 	_, invokeErr := probe.Invoke(ctx)
@@ -93,9 +108,19 @@ func (s *service) runProbeForConnection(ctx context.Context, t *asynq.Task) erro
 		logger.Error("failed to record probe outcome for health state", "error", healthErr)
 	}
 
-	if invokeErr != nil {
-		return skipTaskErrorIfProbeIsPeriodic(probe, invokeErr)
-	}
+	return probe, invokeErr
+}
 
-	return nil
+// RunProbe invokes a single probe synchronously and records the outcome
+// against health-state counters — see iface.C.RunProbe for the public
+// contract. The task handler shares the same underlying logic.
+func (s *service) RunProbe(ctx context.Context, connectionId apid.ID, probeId string) error {
+	logger := aplog.NewBuilder(s.logger).
+		WithCtx(ctx).
+		WithConnectionId(connectionId).
+		With("probe_id", probeId).
+		Build()
+
+	_, invokeErr := s.runProbeInternal(ctx, logger, connectionId, probeId)
+	return invokeErr
 }

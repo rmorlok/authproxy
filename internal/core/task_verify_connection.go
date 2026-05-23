@@ -48,11 +48,36 @@ func (s *service) verifyConnection(ctx context.Context, t *asynq.Task) error {
 		return fmt.Errorf("%s connection id not specified: %w", taskTypeVerifyConnection, asynq.SkipRetry)
 	}
 
-	logger = aplog.NewBuilder(logger).
-		WithConnectionId(p.ConnectionId).
+	if err := s.runVerifyConnection(ctx, p.ConnectionId); err != nil {
+		// Failures from onVerifyFailed propagate as retryable so asynq retries
+		// the bookkeeping write; non-recoverable shapes (not-found, no-op) are
+		// returned wrapped in SkipRetry by runVerifyConnection itself.
+		return err
+	}
+	return nil
+}
+
+// RunVerifyConnection is the synchronous counterpart to the verify_connection
+// asynq task — see iface.C.RunVerifyConnection. Used by integration tests
+// that need to drive the verify phase without running a worker and by code
+// paths that prefer inline execution.
+func (s *service) RunVerifyConnection(ctx context.Context, connectionId apid.ID) error {
+	return s.runVerifyConnection(ctx, connectionId)
+}
+
+// runVerifyConnection is the shared body of the verify_connection task and
+// the inline RunVerifyConnection entry. It loads the connection, runs every
+// probe in order, and advances the setup step based on the outcome. Returns
+// asynq.SkipRetry for non-recoverable shapes (not-found, wrong phase) so the
+// task handler can return without retrying; wraps onVerifyFailed errors
+// unchanged so they remain retryable.
+func (s *service) runVerifyConnection(ctx context.Context, connectionId apid.ID) error {
+	logger := aplog.NewBuilder(s.logger).
+		WithCtx(ctx).
+		WithConnectionId(connectionId).
 		Build()
 
-	conn, err := s.getConnection(ctx, p.ConnectionId)
+	conn, err := s.getConnection(ctx, connectionId)
 	if err != nil {
 		if errors.Is(err, database.ErrNotFound) {
 			logger.Error("connection not found", "error", err)
@@ -76,7 +101,6 @@ func (s *service) verifyConnection(ctx context.Context, t *asynq.Task) error {
 		}
 		logger.Error("probe failed during verify", "probe_id", probe.GetId(), "outcome", outcome, "error", invokeErr)
 		if failErr := conn.onVerifyFailed(ctx, probe.GetId(), invokeErr); failErr != nil {
-			// Return the failErr so asynq retries — probe outcome is preserved for a later attempt.
 			return fmt.Errorf("failed to record verify failure: %w", failErr)
 		}
 		return asynq.SkipRetry
