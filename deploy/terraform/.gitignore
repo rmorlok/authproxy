@@ -1,0 +1,19 @@
+# Local terraform working directories — provider binaries, plugin cache, etc.
+.terraform/
+
+# Plan files; never commit.
+*.tfplan
+*.tfplan.json
+
+# Per-environment overrides — keep secrets out of git.
+*.auto.tfvars
+*.auto.tfvars.json
+terraform.tfvars
+terraform.tfvars.json
+
+# State snapshots that might escape from a misconfigured run.
+*.tfstate
+*.tfstate.backup
+*.tfstate.lock.info
+
+# .terraform.lock.hcl is intentionally NOT ignored — commit it.

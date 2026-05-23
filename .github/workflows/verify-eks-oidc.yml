@@ -1,0 +1,63 @@
+# schema: https://json.schemastore.org/github-workflow.json
+name: Verify EKS OIDC
+
+# Manually-triggered no-op that proves the GH Actions ↔ AWS OIDC trust
+# chain works end-to-end:
+#   1. Assume the role configured by deploy/terraform/eks/iam_oidc.tf
+#   2. `aws eks update-kubeconfig` against the cluster
+#   3. `kubectl get ns` (no mutation; just confirms we can talk to the
+#      API server with cluster-admin permissions)
+#
+# The Terraform trust policy restricts assume-role to:
+#   - tag pushes (`refs/tags/v*`, `refs/tags/chart-v*`), and
+#   - workflow_dispatch runs that target the `gha-eks` environment.
+#
+# So this workflow uses `environment: gha-eks` to satisfy the
+# token.actions.githubusercontent.com:sub condition.
+
+on:
+  workflow_dispatch:
+    inputs:
+      cluster_name:
+        description: 'EKS cluster name'
+        required: true
+        default: 'authproxy-eks'
+        type: string
+      aws_region:
+        description: 'AWS region'
+        required: true
+        default: 'us-east-1'
+        type: string
+
+permissions:
+  contents: read
+  id-token: write    # required to mint the OIDC token used by aws-actions/configure-aws-credentials
+
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    # Matches the trust-policy condition in iam_oidc.tf:
+    #   "repo:rmorlok/authproxy:environment:gha-eks"
+    environment: gha-eks
+    timeout-minutes: 5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Assume GH Actions role via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ inputs.aws_region }}
+
+      - name: Sanity-check AWS identity
+        run: aws sts get-caller-identity
+
+      - name: Wire kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name "${{ inputs.cluster_name }}" \
+            --region "${{ inputs.aws_region }}"
+
+      - name: kubectl get ns (no-op smoke)
+        run: kubectl get ns
