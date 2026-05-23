@@ -85,7 +85,9 @@ func TestPKCEChallengeFor_UnknownMethodErrors(t *testing.T) {
 
 func TestAuthOAuth2_Validate_RejectsUnknownPKCEMethod(t *testing.T) {
 	a := &cschema.AuthOAuth2{
-		Type: cschema.AuthTypeOAuth2,
+		Type:         cschema.AuthTypeOAuth2,
+		ClientId:     common.NewStringValueDirect("client-id"),
+		ClientSecret: common.NewStringValueDirect("client-secret"),
 		Authorization: cschema.AuthOauth2Authorization{
 			Endpoint: "https://example.com/oauth/authorize",
 			PKCE:     &cschema.AuthOauth2PKCE{Method: "bogus"},
@@ -100,7 +102,9 @@ func TestAuthOAuth2_Validate_RejectsUnknownPKCEMethod(t *testing.T) {
 
 func TestAuthOAuth2_Validate_AcceptsS256(t *testing.T) {
 	a := &cschema.AuthOAuth2{
-		Type: cschema.AuthTypeOAuth2,
+		Type:         cschema.AuthTypeOAuth2,
+		ClientId:     common.NewStringValueDirect("client-id"),
+		ClientSecret: common.NewStringValueDirect("client-secret"),
 		Authorization: cschema.AuthOauth2Authorization{
 			Endpoint: "https://example.com/oauth/authorize",
 			PKCE:     &cschema.AuthOauth2PKCE{Method: cschema.PKCEMethodS256},
@@ -111,7 +115,9 @@ func TestAuthOAuth2_Validate_AcceptsS256(t *testing.T) {
 
 func TestAuthOAuth2_Validate_AcceptsPlain(t *testing.T) {
 	a := &cschema.AuthOAuth2{
-		Type: cschema.AuthTypeOAuth2,
+		Type:         cschema.AuthTypeOAuth2,
+		ClientId:     common.NewStringValueDirect("client-id"),
+		ClientSecret: common.NewStringValueDirect("client-secret"),
 		Authorization: cschema.AuthOauth2Authorization{
 			Endpoint: "https://example.com/oauth/authorize",
 			PKCE:     &cschema.AuthOauth2PKCE{Method: cschema.PKCEMethodPlain},
@@ -124,7 +130,9 @@ func TestAuthOAuth2_Validate_DefaultsMethodWhenBlockPresent(t *testing.T) {
 	// Block present but method omitted: schema-level validation must accept;
 	// runtime defaults to S256 via GetMethodOrDefault.
 	a := &cschema.AuthOAuth2{
-		Type: cschema.AuthTypeOAuth2,
+		Type:         cschema.AuthTypeOAuth2,
+		ClientId:     common.NewStringValueDirect("client-id"),
+		ClientSecret: common.NewStringValueDirect("client-secret"),
 		Authorization: cschema.AuthOauth2Authorization{
 			Endpoint: "https://example.com/oauth/authorize",
 			PKCE:     &cschema.AuthOauth2PKCE{},

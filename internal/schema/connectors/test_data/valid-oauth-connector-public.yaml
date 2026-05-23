@@ -1,0 +1,25 @@
+# $schema: ./schema.json
+
+labels:
+  type: asana
+display_name: Asana (Public Client)
+logo:
+  public_url: https://upload.wikimedia.org/wikipedia/commons/thumb/3/3b/Asana_logo.svg/2880px-Asana_logo.svg.png
+description: |
+  Public-client OAuth2 connector — no client_secret, PKCE-only proof of
+  possession (RFC 7591 §2, RFC 7636).
+auth:
+  type: OAuth2
+  token_endpoint_auth_method: none
+  client_id:
+    env_var: ASANA_CLIENT_ID
+  authorization:
+    endpoint: https://app.asana.com/-/oauth_authorize
+    pkce:
+      method: S256
+  token:
+    endpoint: https://app.asana.com/-/oauth_token
+  scopes:
+    - id: projects:read
+      reason: |
+        We need access to see the projects

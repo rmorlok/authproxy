@@ -56,6 +56,7 @@ type (
 	Connectors              = connectors.Connectors
 	PKCEMethod              = connectors.PKCEMethod
 	Scope                   = connectors.Scope
+	TokenEndpointAuthMethod = connectors.TokenEndpointAuthMethod
 )
 
 // Re-export constants from the connectors sub-package
@@ -70,4 +71,8 @@ const (
 
 	PKCEMethodS256  = connectors.PKCEMethodS256
 	PKCEMethodPlain = connectors.PKCEMethodPlain
+
+	TokenEndpointAuthClientSecretPost  = connectors.TokenEndpointAuthClientSecretPost
+	TokenEndpointAuthClientSecretBasic = connectors.TokenEndpointAuthClientSecretBasic
+	TokenEndpointAuthNone              = connectors.TokenEndpointAuthNone
 )

@@ -104,12 +104,7 @@ func (o *oAuth2Connection) refreshAccessTokenInner(ctx context.Context, token *d
 		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshNoRefreshToken, 0, "", 0, errNoRefreshToken)
 	}
 
-	clientId, err := o.auth.ClientId.GetValue(ctx)
-	if err != nil {
-		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, err)
-	}
-
-	clientSecret, err := o.auth.ClientSecret.GetValue(ctx)
+	clientId, clientSecret, err := o.resolveClientCredentials(ctx)
 	if err != nil {
 		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, err)
 	}
@@ -132,11 +127,16 @@ func (o *oAuth2Connection) refreshAccessTokenInner(ctx context.Context, token *d
 	values := url.Values{
 		"grant_type":    {"refresh_token"},
 		"refresh_token": {refreshToken},
-		"client_id":     {clientId},
-		"client_secret": {clientSecret},
 	}
 
-	refreshResp, attempts, err := o.postRefreshWithRetry(ctx, client, tokenEndpoint, values)
+	values, authHeader, err := applyTokenEndpointClientAuth(
+		o.auth.GetTokenEndpointAuthMethodOrDefault(), clientId, clientSecret, values,
+	)
+	if err != nil {
+		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, err)
+	}
+
+	refreshResp, attempts, err := o.postRefreshWithRetry(ctx, client, tokenEndpoint, values, authHeader)
 	if err != nil {
 		// Transport-layer failure — provider never produced a status code.
 		// Transient by classification; does not flip unhealthy.
@@ -257,6 +257,7 @@ func (o *oAuth2Connection) postRefreshWithRetry(
 	client *gentleman.Client,
 	tokenEndpoint string,
 	values url.Values,
+	authHeader string,
 ) (*gentleman.Response, int, error) {
 	var lastResp *gentleman.Response
 	var lastErr error
@@ -279,6 +280,10 @@ func (o *oAuth2Connection) postRefreshWithRetry(
 			SetHeader("Content-Type", "application/x-www-form-urlencoded").
 			AddHeader("accept", "application/json").
 			BodyString(values.Encode())
+
+		if authHeader != "" {
+			req = req.AddHeader("Authorization", authHeader)
+		}
 
 		resp, err := req.Send()
 
