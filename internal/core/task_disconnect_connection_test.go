@@ -135,9 +135,27 @@ func TestTaskDisconnectConnection(t *testing.T) {
 		task, err := newDisconnectConnectionTask(connectionId)
 		require.NoError(t, err)
 
-		// Use a fake clock so the inter-attempt sleeps return immediately.
+		// Use a fake clock so the inter-attempt backoff doesn't burn real
+		// time. The retry helper sleeps via clk.After + select, which is not
+		// auto-stepped by FakeClock (unlike clk.Sleep), so a stepper
+		// goroutine advances the clock whenever the helper subscribes.
 		fakeClk := tclock.NewFakeClock(time.Now())
 		retryCtx := apctx.WithClock(ctx, fakeClk)
+		stepperCtx, stopStepper := context.WithCancel(context.Background())
+		defer stopStepper()
+		go func() {
+			for {
+				select {
+				case <-stepperCtx.Done():
+					return
+				default:
+				}
+				if fakeClk.HasWaiters() {
+					fakeClk.Step(time.Second)
+				}
+				time.Sleep(time.Millisecond)
+			}
+		}()
 
 		err = svc.disconnectConnection(retryCtx, task)
 		assert.NoError(t, err, "disconnect should succeed even when revocation fails")
