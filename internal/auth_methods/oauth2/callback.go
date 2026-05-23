@@ -10,6 +10,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/util/retry"
 	gentleman "gopkg.in/h2non/gentleman.v2"
 )
 
@@ -249,19 +250,25 @@ func (o *oAuth2Connection) postTokenExchangeWithRetry(
 	values url.Values,
 	authHeader string,
 ) (*gentleman.Response, int, error) {
-	var lastResp *gentleman.Response
-	var lastErr error
-
-	for attempt := 1; attempt <= tokenExchangeMaxAttempts; attempt++ {
-		if attempt > 1 {
-			backoff := tokenExchangeBackoffStep * time.Duration(attempt-1)
-			select {
-			case <-ctx.Done():
-				return nil, attempt - 1, ctx.Err()
-			case <-time.After(backoff):
+	res, err := retry.Do(ctx, retry.Options[*gentleman.Response]{
+		MaxAttempts: tokenExchangeMaxAttempts,
+		Backoff:     &retry.LinearBackOff{Step: tokenExchangeBackoffStep},
+		Classify: func(resp *gentleman.Response, err error) bool {
+			return err != nil || (resp != nil && resp.StatusCode >= 500)
+		},
+		OnRetry: func(attempt int, resp *gentleman.Response, err error) {
+			args := []any{
+				slog.Int("attempt", attempt),
+				slog.Int("max_attempts", tokenExchangeMaxAttempts),
 			}
-		}
-
+			if err != nil {
+				args = append(args, slog.String("error", err.Error()))
+			} else {
+				args = append(args, slog.Int("provider_status_code", resp.StatusCode))
+			}
+			o.logger.WarnContext(ctx, "oauth token exchange transient failure; retrying", args...)
+		},
+	}, func(ctx context.Context) (*gentleman.Response, error) {
 		req := client.Request().
 			Method("POST").
 			URL(tokenEndpoint).
@@ -276,29 +283,16 @@ func (o *oAuth2Connection) postTokenExchangeWithRetry(
 			req = req.SetQuery(k, v)
 		}
 
-		resp, err := req.BodyString(values.Encode()).Send()
+		return req.BodyString(values.Encode()).Send()
+	})
 
-		if err == nil && resp.StatusCode < 500 {
-			return resp, attempt, nil
-		}
-
-		lastResp, lastErr = resp, err
-
-		if attempt < tokenExchangeMaxAttempts {
-			args := []any{
-				slog.Int("attempt", attempt),
-				slog.Int("max_attempts", tokenExchangeMaxAttempts),
-			}
-			if err != nil {
-				args = append(args, slog.String("error", err.Error()))
-			} else {
-				args = append(args, slog.Int("provider_status_code", resp.StatusCode))
-			}
-			o.logger.WarnContext(ctx, "oauth token exchange transient failure; retrying", args...)
-		}
+	// See postRefreshWithRetry for the rationale on dropping the response
+	// when err is non-nil — callers and tests treat any error as "no
+	// response to inspect".
+	if err != nil {
+		return nil, res.Attempts, err
 	}
-
-	return lastResp, tokenExchangeMaxAttempts, lastErr
+	return res.Value, res.Attempts, nil
 }
 
 // appendSetupPendingToReturnUrl augments the return URL with query params that signal the UI
