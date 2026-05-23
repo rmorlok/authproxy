@@ -12,6 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	mockLog "github.com/rmorlok/authproxy/internal/aplog/mock"
+	"github.com/rmorlok/authproxy/internal/auth_methods"
 	mockOauth2 "github.com/rmorlok/authproxy/internal/auth_methods/oauth2/mock"
 	"github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -43,11 +44,12 @@ func TestTaskDisconnectConnection(t *testing.T) {
 		logger, _ := mockLog.NewTestLogger(t)
 
 		return &service{
-			cfg:     nil,
-			db:      db,
-			encrypt: encrypt,
-			ac:      ac,
-			logger:  logger,
+			cfg:                 nil,
+			db:                  db,
+			encrypt:             encrypt,
+			ac:                  ac,
+			logger:              logger,
+			authMethodFactories: map[cschema.AuthType]auth_methods.Factory{},
 		}, db, ac, encrypt, ctrl
 	}
 
@@ -110,11 +112,10 @@ func TestTaskDisconnectConnection(t *testing.T) {
 		svc, dbMock, _, e, ctrl := setupWithMocks(t)
 		defer ctrl.Finish()
 
-		// Skip lazy init of the real OAuth2 factory by pre-populating the mock.
+		// Swap the OAuth2 factory in the auth-method registry with a mock.
 		o2Factory := mockOauth2.NewMockFactory(ctrl)
 		o2Conn := mockOauth2.NewMockOAuth2Connection(ctrl)
-		svc.o2Factory = o2Factory
-		svc.o2FactoryOnce.Do(func() {})
+		svc.authMethodFactories[cschema.AuthTypeOAuth2] = o2Factory
 
 		o2Factory.EXPECT().NewOAuth2(gomock.Any()).Return(o2Conn).AnyTimes()
 		o2Conn.EXPECT().SupportsRevokeTokens().Return(true).AnyTimes()

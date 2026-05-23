@@ -6,11 +6,10 @@ import (
 	"net/http"
 
 	"github.com/rmorlok/authproxy/internal/auth_methods"
-	"github.com/rmorlok/authproxy/internal/auth_methods/no_auth"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/proxy"
-	"github.com/rmorlok/authproxy/internal/schema/config"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 )
 
 var ErrProxyNotImplemented = errors.New("auth type for connection does not implement proxy")
@@ -28,7 +27,7 @@ func (c *connection) getProxyImpl() (iface.Proxy, error) {
 			return
 		}
 
-		auth, err := c.resolveAuthenticator(def.Auth.Inner())
+		auth, err := c.resolveAuthenticator(def)
 		if err != nil {
 			c.proxyImplErr = err
 			return
@@ -40,16 +39,12 @@ func (c *connection) getProxyImpl() (iface.Proxy, error) {
 	return c.proxyImpl, c.proxyImplErr
 }
 
-func (c *connection) resolveAuthenticator(authConfig any) (auth_methods.Authenticator, error) {
-	switch authConfig.(type) {
-	case *config.AuthOAuth2:
-		return c.s.getOAuth2Factory().NewAuthenticator(c), nil
-	case *config.AuthApiKey:
-		return c.s.getApiKeyFactory().NewAuthenticator(c), nil
-	case *config.AuthNoAuth:
-		return no_auth.NewAuthenticator(), nil
+func (c *connection) resolveAuthenticator(connector *cschema.Connector) (auth_methods.Authenticator, error) {
+	factory := c.s.getAuthMethodFactory(connector)
+	if factory == nil {
+		return nil, ErrProxyNotImplemented
 	}
-	return nil, ErrProxyNotImplemented
+	return factory.NewAuthenticator(c), nil
 }
 
 func (c *connection) ProxyRequest(

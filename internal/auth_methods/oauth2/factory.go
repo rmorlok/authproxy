@@ -103,6 +103,8 @@ func (f *factory) newConnection(connection coreIface.Connection) *oAuth2Connecti
 	return conn
 }
 
+var _ auth_methods.Factory = (*factory)(nil)
+
 func (f *factory) GetOAuth2State(ctx context.Context, actor IActorData, stateId apid.ID) (OAuth2Connection, error) {
 	conn, err := getOAuth2State(
 		ctx,
