@@ -82,7 +82,7 @@ func newRawTestProxy(t *testing.T, h http.Handler, auth *fakeAuth) (iface.Proxy,
 		Id:        apid.New(apid.PrefixConnection),
 		Namespace: "root/",
 	}
-	p := New(&stubHttpf{client: srv.Client()}, conn, auth)
+	p := New(&stubHttpf{client: srv.Client()}, conn, auth, nil)
 	return p, srv
 }
 

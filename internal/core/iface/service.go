@@ -120,6 +120,14 @@ type C interface {
 	// no longer in verify phase); other errors propagate unwrapped.
 	RunVerifyConnection(ctx context.Context, connectionId apid.ID) error
 
+	// EnqueueProbeNow schedules an immediate one-shot probe run for every probe configured on the
+	// connection. Used by the proxy's 401/403 detection path to cut detection lag from the
+	// configured probe interval to ~immediate when an upstream signals a credential failure on a
+	// user-initiated request. Per-(connection, probe) throttling caps the rate of enqueues so a
+	// 401 storm does not pile up tasks. Best-effort: errors are logged but do not surface to the
+	// caller, since the caller's response is already on its way.
+	EnqueueProbeNow(ctx context.Context, connectionId apid.ID) error
+
 	// RetryConnectionSetup resets a connection that is in the verify_failed terminal state so the user
 	// can try setup again — either restarting preconnect forms, or re-initiating OAuth if the connector
 	// has no preconnect steps. Returns the initial setup step response for the retry.
