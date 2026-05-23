@@ -1,0 +1,15 @@
+# Configuration for helm/chart-testing-action.
+# https://github.com/helm/chart-testing/blob/main/doc/ct_install.md
+chart-dirs:
+  - deploy/charts
+target-branch: main
+# We're pre-1.0; intentionally skip the chart-version-bump enforcement so
+# that internal chart iteration doesn't require a version bump on every
+# touch. A6 will gate releases on a proper version-bump policy.
+check-version-increment: false
+# Skip maintainers-must-match-a-known-user check; the chart only lists me
+# and gating CI on GH user existence is brittle.
+validate-maintainers: false
+# Use a per-PR-scoped values file via --helm-extra-set-args for sqlite + redis.
+# ct also auto-picks up `<chart>/ci/*-values.yaml` files and runs an install
+# per file — we ship one here for the minimum-deps profile.

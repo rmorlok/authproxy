@@ -1,0 +1,28 @@
+{{- if .Values.services.public.enabled -}}
+apiVersion: v1
+kind: Pod
+metadata:
+  name: {{ include "authproxy.fullname" . }}-test-healthz
+  labels:
+    {{- include "authproxy.labels" . | nindent 4 }}
+  annotations:
+    # Run when `helm test` is invoked; remove on success so the pod doesn't
+    # pile up in the namespace across reruns.
+    "helm.sh/hook": test
+    "helm.sh/hook-delete-policy": before-hook-creation,hook-succeeded
+spec:
+  restartPolicy: Never
+  containers:
+    - name: curl
+      image: curlimages/curl:8.10.1
+      command: ["sh", "-c"]
+      args:
+        - |
+          set -eu
+          url="http://{{ include "authproxy.fullname" . }}:{{ .Values.ports.public }}{{ .Values.healthcheck.path }}"
+          echo "curling $url"
+          # Retry for up to ~60s while the pod becomes ready and migrations run.
+          curl --silent --show-error --fail \
+            --retry 20 --retry-delay 3 --retry-connrefused --max-time 5 \
+            "$url"
+{{- end }}

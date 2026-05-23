@@ -165,13 +165,75 @@ jwt:
   publicKeyFile: system.pub
   privateKeyFile: system
 
-# -- Encryption keys (global AES key + actor signing keys), mounted as a
-# Secret volume.
+# -- Global encryption key, mounted as a single-file Secret volume. The
+# Secret should contain a key named `globalAesKeyFile` whose value is the
+# raw key bytes (e.g. `openssl rand 32 > global_aes.key`).
 encryptionKeys:
   existingSecret: ""
   mountPath: /etc/authproxy/keys/encryption
   globalAesKeyFile: global_aes.key
-  actorsKeysDir: actors
+
+# -- Configured admin actors, mounted as a Secret volume at `mountPath`.
+# Each actor is a pair of files in the Secret: `<name>` (private key) and
+# `<name>.pub` (public key). The AuthProxy server reads the directory at
+# startup and exposes each actor under its `<name>` external id.
+#
+# Lives in a separate Secret from `encryptionKeys.existingSecret` because
+# K8s Secret data keys can't carry nested directory structure — one Secret
+# = one mount directory.
+actors:
+  existingSecret: ""
+  mountPath: /etc/authproxy/keys/actors
+  # -- ACL permissions granted to every actor in the Secret. Mirrors
+  # AuthProxy's `system_auth.actors.permissions` block.
+  permissions:
+    - namespace: "root.**"
+      resources: ["*"]
+      verbs: ["*"]
+
+# -- Host application integration. AuthProxy redirects unauthenticated
+# users (e.g. anyone landing on the marketplace UI) to this URL with a
+# `return_to` query param so the host app can establish a session and
+# bounce back. Required by the AuthProxy server's config validator —
+# leave the placeholder set, but point at a real host login URL for any
+# deployment that actually fronts a UI.
+hostApplication:
+  initiateSessionUrl: ""
+
+# -- HTTP request/response logging. The AuthProxy server always wires up a
+# log storage service, so the rendered config must contain an `http_logging`
+# block with a database reference. By default the chart points it at the
+# main `database` block above — fine for small deploys, override for
+# production data-warehouse setups (e.g. a separate ClickHouse).
+httpLogging:
+  # -- Reuse the main `database` block. When true, the chart copies the
+  # main database section into `http_logging.database`. Set to false to
+  # configure a dedicated `database:` block below.
+  shareMainDatabase: true
+  # -- Run http_logging schema migrations at startup. Defaults to true on
+  # the server side; surfaced here so customers can disable it when a
+  # separate process owns the http-log schema.
+  autoMigrate: true
+  # -- Dedicated database block for http_logging metadata. Only consulted
+  # when `shareMainDatabase` is false. Same field shape as the top-level
+  # `database` block (provider, host, port, etc.).
+  database: {}
+  # -- Full request/response recording mode (`never` or `always`).
+  fullRequestRecording: never
+
+# -- Connector registry. AuthProxy refuses to start without the connectors
+# block — supply at least an empty `loadFromList` even when you intend to
+# manage connectors through the admin API at runtime.
+connectors:
+  # -- Run connector schema migrations at startup.
+  autoMigrate: true
+  # -- Inline connector definitions loaded at boot. See the AuthProxy
+  # connector schema docs for the format. Leave empty to manage connectors
+  # exclusively through the admin API.
+  loadFromList: []
+  # -- Labels used to identify connectors across reloads (matching the
+  # AuthProxy `connectors.identifying_labels` field).
+  identifyingLabels: []
 
 # -- Free-form config overlay merged on top of the rendered AuthProxy YAML.
 # Use this for fields the chart hasn't promoted to typed values yet.

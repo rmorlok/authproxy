@@ -17,7 +17,8 @@ func main() {
 	rootCmd.AddCommand(cmdList())
 	rootCmd.AddCommand(cmdSignJwt())
 	rootCmd.AddCommand(cmdVerifyJwt())
-	rootCmd.AddCommand(cmdRawProxy())
+	rootCmd.AddCommand(cmdSigningProxy())
+	rootCmd.AddCommand(cmdProxy())
 	rootCmd.AddCommand(cmdSignMarketplaceLoginUrl())
 	rootCmd.AddCommand(cmdMarketplaceLoginRedirect())
 

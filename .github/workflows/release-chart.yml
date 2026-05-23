@@ -1,0 +1,128 @@
+# schema: https://json.schemastore.org/github-workflow.json
+name: Release Chart
+
+# Tag-driven: pushing a `chart-vX.Y.Z` tag publishes the chart at that
+# version to oci://ghcr.io/<owner>/charts/authproxy. Chart versioning is
+# intentionally decoupled from the app's `vX.Y.Z` image tags so chart
+# fixes can ship without rebuilding the server.
+on:
+  push:
+    tags: ['chart-v*.*.*']
+  workflow_dispatch:
+    inputs:
+      chart_version:
+        description: 'Chart version (without leading v). Required for manual dispatch.'
+        required: true
+        type: string
+      app_version:
+        description: 'App version to pin (without leading v). Defaults to latest vX.Y.Z tag, or Chart.yaml appVersion if no tags exist.'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  packages: write
+
+env:
+  REGISTRY: ghcr.io
+  # The OCI namespace for charts. The chart name (`authproxy`) is appended
+  # by `helm push`, so consumers pull from oci://ghcr.io/<owner>/charts/authproxy.
+  CHART_REPO: ghcr.io/${{ github.repository_owner }}/charts
+  CHART_DIR: deploy/charts/authproxy
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          # Need full history so we can resolve the latest vX.Y.Z app tag.
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Derive chart + app versions
+        id: vers
+        run: |
+          set -euo pipefail
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            chart_version="${{ inputs.chart_version }}"
+            app_version_input="${{ inputs.app_version }}"
+          else
+            # Strip the `chart-v` prefix from the tag ref (refs/tags/chart-vX.Y.Z → X.Y.Z).
+            chart_version="${GITHUB_REF_NAME#chart-v}"
+            app_version_input=""
+          fi
+
+          # Validate chart_version is plain semver (no leading v, no suffix).
+          if ! [[ "$chart_version" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "::error::chart_version must be X.Y.Z (got '$chart_version')"
+            exit 1
+          fi
+
+          # Resolve app version. Precedence:
+          #   1. workflow_dispatch input (without leading v)
+          #   2. latest vX.Y.Z tag from git
+          #   3. Chart.yaml's existing appVersion (the no-tags-yet fallback)
+          if [ -n "$app_version_input" ]; then
+            app_version="$app_version_input"
+          else
+            latest_tag=$(git tag -l 'v*.*.*' --sort=-v:refname | head -n1 || true)
+            if [ -n "$latest_tag" ]; then
+              app_version="${latest_tag#v}"
+            else
+              app_version=$(grep '^appVersion:' "${CHART_DIR}/Chart.yaml" | awk '{print $2}' | tr -d '"')
+              echo "::notice::No vX.Y.Z app tags found; falling back to Chart.yaml appVersion='${app_version}'"
+            fi
+          fi
+
+          echo "chart_version=${chart_version}" >> "$GITHUB_OUTPUT"
+          echo "app_version=${app_version}" >> "$GITHUB_OUTPUT"
+          echo "Chart version: ${chart_version}"
+          echo "App version:   ${app_version}"
+
+      - name: Lint chart
+        run: helm lint "${CHART_DIR}"
+
+      - name: Package chart
+        id: pkg
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          helm package "${CHART_DIR}" \
+            --version "${{ steps.vers.outputs.chart_version }}" \
+            --app-version "${{ steps.vers.outputs.app_version }}" \
+            --destination dist
+          # Capture the produced .tgz so the next step doesn't have to guess.
+          echo "tgz=$(ls dist/authproxy-*.tgz | head -n1)" >> "$GITHUB_OUTPUT"
+
+      - name: Log in to GHCR (helm)
+        run: |
+          # helm registry login reads from stdin so the token never lands in
+          # the process arg list.
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | helm registry login "${REGISTRY}" \
+                --username "${{ github.actor }}" \
+                --password-stdin
+
+      - name: Push chart to OCI registry
+        run: |
+          helm push "${{ steps.pkg.outputs.tgz }}" "oci://${CHART_REPO}"
+
+      - name: Summary
+        run: |
+          {
+            echo "## Chart published"
+            echo ""
+            echo "- Chart version: \`${{ steps.vers.outputs.chart_version }}\`"
+            echo "- App version:   \`${{ steps.vers.outputs.app_version }}\`"
+            echo "- Pull command:"
+            echo ""
+            echo "  \`\`\`"
+            echo "  helm pull oci://${CHART_REPO}/authproxy --version ${{ steps.vers.outputs.chart_version }}"
+            echo "  \`\`\`"
+          } >> "$GITHUB_STEP_SUMMARY"

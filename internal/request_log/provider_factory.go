@@ -49,6 +49,7 @@ func NewRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorE
 	provider := cfg.GetProvider()
 	switch provider {
 	case config.DatabaseProviderSqlite:
+		return NewSqlRecordRetriever(cfg, cursorEncryptor, logger, dbOpts...)
 	case config.DatabaseProviderPostgres:
 		return NewSqlRecordRetriever(cfg, cursorEncryptor, logger, dbOpts...)
 	case config.DatabaseProviderClickhouse:
@@ -56,6 +57,4 @@ func NewRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorE
 	default:
 		panic(fmt.Sprintf("unknown http logging database provider: %s", provider))
 	}
-
-	panic(fmt.Sprintf("unknown http logging database provider: %s", provider))
 }

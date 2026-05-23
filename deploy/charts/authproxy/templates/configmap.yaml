@@ -46,6 +46,43 @@ Secrets, not in this ConfigMap.
 {{- end -}}
 {{- $_ := set $cfg "redis" $redis -}}
 
+{{/* --- host application (required by validator) --- */}}
+{{- if .Values.hostApplication.initiateSessionUrl -}}
+{{-   $_ := set $cfg "host_application" (dict "initiate_session_url" .Values.hostApplication.initiateSessionUrl) -}}
+{{- end -}}
+
+{{/* --- connectors block (required by validator; empty list is acceptable) --- */}}
+{{- $connectors := dict "auto_migrate" .Values.connectors.autoMigrate "load_from_list" .Values.connectors.loadFromList -}}
+{{- if .Values.connectors.identifyingLabels -}}
+{{-   $_ := set $connectors "identifying_labels" .Values.connectors.identifyingLabels -}}
+{{- end -}}
+{{- $_ := set $cfg "connectors" $connectors -}}
+
+{{/* --- http_logging (server unconditionally wires up the log storage) --- */}}
+{{/*
+  The http_log migrator + the main DB migrator share golang-migrate's
+  default `schema_migrations` table, so they can't run against the same
+  schema. For SQLite that means a sibling file (default path with a
+  `.http-log` suffix); for Postgres, http_log uses tables prefixed inside
+  the same DB and conflicts are not observed in practice.
+*/}}
+{{- $httpDb := dict -}}
+{{- if .Values.httpLogging.shareMainDatabase -}}
+{{-   if eq .Values.database.provider "sqlite" -}}
+{{-     $sharedPath := printf "%s.http-log" .Values.database.path -}}
+{{-     $httpDb = dict "provider" "sqlite" "path" $sharedPath -}}
+{{-   else -}}
+{{-     $httpDb = $db -}}
+{{-   end -}}
+{{- else -}}
+{{-   $httpDb = .Values.httpLogging.database -}}
+{{- end -}}
+{{- $httpLogging := dict
+      "auto_migrate" .Values.httpLogging.autoMigrate
+      "full_request_recording" .Values.httpLogging.fullRequestRecording
+      "database" $httpDb -}}
+{{- $_ := set $cfg "http_logging" $httpLogging -}}
+
 {{/* --- s3 (request-log blob storage) --- */}}
 {{- if .Values.s3.enabled -}}
 {{-   $s3 := dict "provider" "s3" "bucket" .Values.s3.bucket "force_path_style" .Values.s3.forcePathStyle -}}
@@ -64,7 +101,13 @@ Secrets, not in this ConfigMap.
         "private_key" (dict "path" (printf "%s/%s" .Values.jwt.mountPath .Values.jwt.privateKeyFile))) -}}
 {{-   if .Values.encryptionKeys.existingSecret -}}
 {{-     $_ := set $sysAuth "global_aes_key" (dict "path" (printf "%s/%s" .Values.encryptionKeys.mountPath .Values.encryptionKeys.globalAesKeyFile)) -}}
-{{-     $_ := set $sysAuth "actors" (dict "keys_path" (printf "%s/%s" .Values.encryptionKeys.mountPath .Values.encryptionKeys.actorsKeysDir)) -}}
+{{-   end -}}
+{{-   if .Values.actors.existingSecret -}}
+{{-     $actors := dict "keys_path" .Values.actors.mountPath -}}
+{{-     if .Values.actors.permissions -}}
+{{-       $_ := set $actors "permissions" .Values.actors.permissions -}}
+{{-     end -}}
+{{-     $_ := set $sysAuth "actors" $actors -}}
 {{-   end -}}
 {{-   $_ := set $cfg "system_auth" $sysAuth -}}
 {{- end -}}

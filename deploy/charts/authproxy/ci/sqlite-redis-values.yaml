@@ -1,0 +1,49 @@
+# chart-testing values for the helm-chart-ci workflow.
+#
+# Minimum-deps profile per A5 (#287):
+#   - SQLite database (no external DB)
+#   - real Redis as a tiny in-cluster Deployment (applied by the workflow
+#     before `ct install`, addressable at `redis:6379` in the test namespace)
+#   - JWT + encryption key Secrets are generated and applied by the workflow
+#     (the chart deliberately never creates them)
+#   - Image is built from this branch's tree and loaded into the kind
+#     cluster (see `image:` below), so the chart is tested against the code
+#     on this PR rather than whatever is published as `:main` in GHCR.
+
+image:
+  # Built by the workflow's "Build local AuthProxy image" step and loaded
+  # into the kind cluster — pullPolicy: Never keeps kubelet from chasing a
+  # registry copy that doesn't exist for this branch.
+  repository: authproxy
+  tag: ci-local
+  pullPolicy: Never
+
+database:
+  provider: sqlite
+  path: /tmp/authproxy.db
+
+redis:
+  address: redis:6379
+
+jwt:
+  existingSecret: authproxy-jwt
+
+encryptionKeys:
+  existingSecret: authproxy-encryption
+
+actors:
+  existingSecret: authproxy-actors
+
+# AuthProxy's config validator requires these even when nothing actually
+# uses them in the smoke test — placeholder URL + empty connector list.
+hostApplication:
+  initiateSessionUrl: http://placeholder.invalid/login
+
+connectors:
+  autoMigrate: true
+  loadFromList: []
+
+# Faster probes so the helm test pod's rollout wait doesn't stall.
+healthcheck:
+  initialDelaySeconds: 5
+  periodSeconds: 3
