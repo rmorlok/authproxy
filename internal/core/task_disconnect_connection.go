@@ -7,10 +7,10 @@ import (
 	"time"
 
 	"github.com/hibiken/asynq"
-	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/util/retry"
 )
 
 const taskTypeDisconnectConnection = "core:disconnect_connection"
@@ -58,34 +58,41 @@ func (s *service) disconnectConnection(ctx context.Context, t *asynq.Task) error
 	revokeOps := conn.getRevokeCredentialsOperations()
 	if len(revokeOps) > 0 {
 		logger.Info("revoking credentials")
-		clk := apctx.GetClock(ctx)
 		for _, op := range revokeOps {
-			var lastErr error
-			for attempt := 1; attempt <= maxRevokeAttempts; attempt++ {
-				if ctxErr := ctx.Err(); ctxErr != nil {
-					return ctxErr
+			// The Warn is emitted inside the op so every failing attempt
+			// (including the terminal one) gets a log line — matching the
+			// pre-consolidation behavior here, which differs from the OAuth
+			// callsites that only log on retries.
+			attempt := 0
+			res, err := retry.Do(ctx, retry.Options[struct{}]{
+				MaxAttempts: maxRevokeAttempts,
+				Backoff:     &retry.LinearBackOff{Step: 1 * time.Second},
+			}, func(ctx context.Context) (struct{}, error) {
+				attempt++
+				err := op(ctx)
+				if err != nil {
+					logger.Warn(
+						"revoke attempt failed",
+						"error", err,
+						"attempt", attempt,
+						"max_attempts", maxRevokeAttempts,
+					)
 				}
-				lastErr = op(ctx)
-				if lastErr == nil {
-					break
+				return struct{}{}, err
+			})
+			if err != nil {
+				// ctx errors are terminal — surface them so the task can be
+				// retried by asynq rather than swallowed under a "proceeding
+				// with disconnect" log line that doesn't apply.
+				if ctx.Err() != nil {
+					return ctx.Err()
 				}
-				logger.Warn(
-					"revoke attempt failed",
-					"error", lastErr,
-					"attempt", attempt,
-					"max_attempts", maxRevokeAttempts,
-				)
-				if attempt < maxRevokeAttempts {
-					clk.Sleep(time.Duration(attempt) * time.Second)
-				}
-			}
-			if lastErr != nil {
-				// Proceed with the rest of the disconnect so the connection
-				// does not stay stuck in `disconnecting` forever.
+				// Otherwise: proceed with the rest of the disconnect so the
+				// connection does not stay stuck in `disconnecting` forever.
 				logger.Error(
 					"revocation failed after max attempts; proceeding with disconnect",
-					"error", lastErr,
-					"attempts", maxRevokeAttempts,
+					"error", err,
+					"attempts", res.Attempts,
 				)
 			}
 		}
