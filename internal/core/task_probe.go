@@ -80,7 +80,11 @@ func (s *service) runProbeInternal(ctx context.Context, logger *slog.Logger, con
 	logger.Debug("getting connection")
 	conn, err := s.getConnection(ctx, connectionId)
 	if err != nil {
-		if errors.Is(database.ErrNotFound, err) {
+		// Arg order matters: errors.Is(err, target). s.getConnection
+		// wraps database.ErrNotFound inside iface.ErrConnectionNotFound,
+		// so the unwrap-aware order is required to detect the
+		// not-found case.
+		if errors.Is(err, database.ErrNotFound) {
 			logger.Error("connection not found", "error", err)
 			return nil, asynq.SkipRetry
 		}
@@ -90,7 +94,7 @@ func (s *service) runProbeInternal(ctx context.Context, logger *slog.Logger, con
 
 	probe, err := conn.GetProbe(probeId)
 	if err != nil {
-		if errors.Is(ErrProbeNotFound, err) {
+		if errors.Is(err, ErrProbeNotFound) {
 			logger.Error("probe not found", "error", err)
 			return nil, fmt.Errorf("%s probe not found: %w", taskTypeProbe, asynq.SkipRetry)
 		}
