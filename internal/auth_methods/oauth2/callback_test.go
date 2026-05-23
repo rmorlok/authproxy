@@ -165,6 +165,7 @@ func TestPostTokenExchangeWithRetry_SuccessFirstAttempt(t *testing.T) {
 		gentleman.New(),
 		srv.URL,
 		url.Values{"grant_type": {"authorization_code"}, "code": {"abc"}},
+		"",
 	)
 
 	require.NoError(t, err)
@@ -195,6 +196,7 @@ func TestPostTokenExchangeWithRetry_4xxNotRetried(t *testing.T) {
 				gentleman.New(),
 				srv.URL,
 				url.Values{"grant_type": {"authorization_code"}},
+				"",
 			)
 
 			require.NoError(t, err, "transport-layer call succeeded — 4xx is not a transport error")
@@ -220,6 +222,7 @@ func TestPostTokenExchangeWithRetry_5xxThenSuccess(t *testing.T) {
 		gentleman.New(),
 		srv.URL,
 		url.Values{},
+		"",
 	)
 	elapsed := time.Since(start)
 
@@ -249,6 +252,7 @@ func TestPostTokenExchangeWithRetry_5xxExhausted(t *testing.T) {
 		gentleman.New(),
 		srv.URL,
 		url.Values{},
+		"",
 	)
 
 	require.NoError(t, err, "5xx is an HTTP-level failure, not a transport error")
@@ -275,6 +279,7 @@ func TestPostTokenExchangeWithRetry_TransportErrorRetried(t *testing.T) {
 		gentleman.New(),
 		closedURL,
 		url.Values{},
+		"",
 	)
 
 	require.Error(t, err, "transport failure must surface as an error")
@@ -309,6 +314,7 @@ func TestPostTokenExchangeWithRetry_ContextCancelledBeforeRetry(t *testing.T) {
 		gentleman.New(),
 		srv.URL,
 		url.Values{},
+		"",
 	)
 
 	require.ErrorIs(t, err, context.Canceled)
@@ -346,6 +352,7 @@ func TestPostTokenExchangeWithRetry_QueryOverridesAppliedEachAttempt(t *testing.
 		gentleman.New(),
 		srv.URL,
 		url.Values{},
+		"",
 	)
 	require.NoError(t, err)
 	assert.Equal(t, tokenExchangeMaxAttempts, attempts)

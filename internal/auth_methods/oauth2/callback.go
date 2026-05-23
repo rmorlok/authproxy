@@ -146,16 +146,8 @@ func (o *oAuth2Connection) exchangeCodeAndAdvanceInner(ctx context.Context, quer
 		New().
 		UseContext(ctx)
 
-	clientId, err := o.auth.ClientId.GetValue(ctx)
+	clientId, clientSecret, err := o.resolveClientCredentials(ctx)
 	if err != nil {
-		err = fmt.Errorf("failed to get client id for connector: %w", err)
-		o.emitAndRecordExchangeFailure(ctx, tokenExchangeInternalError, o.tokenExchangeAttrsFromConn(err))
-		return "", err
-	}
-
-	clientSecret, err := o.auth.ClientSecret.GetValue(ctx)
-	if err != nil {
-		err = fmt.Errorf("failed to get client secret for connector: %w", err)
 		o.emitAndRecordExchangeFailure(ctx, tokenExchangeInternalError, o.tokenExchangeAttrsFromConn(err))
 		return "", err
 	}
@@ -168,11 +160,9 @@ func (o *oAuth2Connection) exchangeCodeAndAdvanceInner(ctx context.Context, quer
 	}
 
 	values := url.Values{
-		"client_id":     {clientId},
-		"client_secret": {clientSecret},
-		"grant_type":    {"authorization_code"},
-		"code":          {code},
-		"redirect_uri":  {callbackUrl},
+		"grant_type":   {"authorization_code"},
+		"code":         {code},
+		"redirect_uri": {callbackUrl},
 	}
 
 	// RFC 7636 §4.5 — the verifier is only sent on the initial code-for-token
@@ -182,11 +172,19 @@ func (o *oAuth2Connection) exchangeCodeAndAdvanceInner(ctx context.Context, quer
 		values.Set("code_verifier", o.state.PKCECodeVerifier)
 	}
 
+	values, authHeader, err := applyTokenEndpointClientAuth(
+		o.auth.GetTokenEndpointAuthMethodOrDefault(), clientId, clientSecret, values,
+	)
+	if err != nil {
+		o.emitAndRecordExchangeFailure(ctx, tokenExchangeInternalError, o.tokenExchangeAttrsFromConn(err))
+		return "", err
+	}
+
 	for k, v := range o.auth.Token.FormOverrides {
 		values.Set(k, v)
 	}
 
-	resp, attempts, err := o.postTokenExchangeWithRetry(ctx, c, tokenEndpoint, values)
+	resp, attempts, err := o.postTokenExchangeWithRetry(ctx, c, tokenEndpoint, values, authHeader)
 	if err != nil {
 		err = fmt.Errorf("failed to post to exchange authorization code for access token: %w", err)
 		attrs := o.tokenExchangeAttrsFromConn(err)
@@ -249,6 +247,7 @@ func (o *oAuth2Connection) postTokenExchangeWithRetry(
 	client *gentleman.Client,
 	tokenEndpoint string,
 	values url.Values,
+	authHeader string,
 ) (*gentleman.Response, int, error) {
 	var lastResp *gentleman.Response
 	var lastErr error
@@ -268,6 +267,10 @@ func (o *oAuth2Connection) postTokenExchangeWithRetry(
 			URL(tokenEndpoint).
 			Type("application/x-www-form-urlencoded").
 			AddHeader("accept", "application/json")
+
+		if authHeader != "" {
+			req = req.AddHeader("Authorization", authHeader)
+		}
 
 		for k, v := range o.auth.Token.QueryOverrides {
 			req = req.SetQuery(k, v)
