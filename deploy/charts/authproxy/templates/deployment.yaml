@@ -105,6 +105,11 @@ spec:
               mountPath: {{ $.Values.encryptionKeys.mountPath }}
               readOnly: true
             {{- end }}
+            {{- with .Values.actors.existingSecret }}
+            - name: actors-keys
+              mountPath: {{ $.Values.actors.mountPath }}
+              readOnly: true
+            {{- end }}
       volumes:
         - name: config
           configMap:
@@ -116,6 +121,11 @@ spec:
         {{- end }}
         {{- with .Values.encryptionKeys.existingSecret }}
         - name: encryption-keys
+          secret:
+            secretName: {{ . }}
+        {{- end }}
+        {{- with .Values.actors.existingSecret }}
+        - name: actors-keys
           secret:
             secretName: {{ . }}
         {{- end }}

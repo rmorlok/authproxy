@@ -1,0 +1,199 @@
+# schema: https://json.schemastore.org/github-workflow.json
+name: Helm Chart CI
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'deploy/charts/**'
+      - '.github/workflows/helm-chart-ci.yml'
+      - '.github/ct.yaml'
+  pull_request:
+    branches: [main]
+    paths:
+      - 'deploy/charts/**'
+      - '.github/workflows/helm-chart-ci.yml'
+      - '.github/ct.yaml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: helm-chart-ci-${{ github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  lint:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.6.1
+
+      - name: List changed charts
+        id: changed
+        run: |
+          changed=$(ct list-changed --config .github/ct.yaml --target-branch main)
+          if [ -n "$changed" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+            echo "Changed charts:"
+            echo "$changed"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+            echo "No chart changes detected."
+          fi
+
+      - name: ct lint
+        if: steps.changed.outputs.found == 'true'
+        run: ct lint --config .github/ct.yaml --target-branch main
+
+  install:
+    runs-on: ubuntu-latest
+    needs: lint
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Set up chart-testing
+        uses: helm/chart-testing-action@v2.6.1
+
+      - name: List changed charts
+        id: changed
+        run: |
+          changed=$(ct list-changed --config .github/ct.yaml --target-branch main)
+          if [ -n "$changed" ]; then
+            echo "found=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "found=false" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Set up Docker Buildx
+        if: steps.changed.outputs.found == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Build local AuthProxy image (amd64-only)
+        if: steps.changed.outputs.found == 'true'
+        # Build the image from the PR's tree so the chart is tested against
+        # the code on this branch, not whatever happens to be tagged `:main`
+        # in GHCR. amd64-only keeps the build under ~5 min; the runner is
+        # always amd64 anyway.
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          platforms: linux/amd64
+          push: false
+          load: true
+          tags: authproxy:ci-local
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+      - name: Create kind cluster
+        if: steps.changed.outputs.found == 'true'
+        uses: helm/kind-action@v1.10.0
+        with:
+          version: v0.24.0
+          node_image: kindest/node:v1.30.4
+          wait: 120s
+
+      - name: Load local image into kind
+        if: steps.changed.outputs.found == 'true'
+        run: kind load docker-image authproxy:ci-local --name chart-testing
+
+      - name: Create test namespace
+        if: steps.changed.outputs.found == 'true'
+        run: kubectl create namespace authproxy-ct
+
+      - name: Deploy in-cluster Redis sidecar
+        if: steps.changed.outputs.found == 'true'
+        run: |
+          # Deployed into the same namespace as `ct install` so the chart's
+          # `redis:6379` short-name resolves via in-namespace DNS.
+          kubectl apply -n authproxy-ct -f - <<'EOF'
+          apiVersion: apps/v1
+          kind: Deployment
+          metadata:
+            name: redis
+            labels: { app: redis }
+          spec:
+            replicas: 1
+            selector: { matchLabels: { app: redis } }
+            template:
+              metadata: { labels: { app: redis } }
+              spec:
+                containers:
+                  - name: redis
+                    image: redis:7-alpine
+                    args: ["--save", "", "--appendonly", "no"]
+                    ports: [{ name: redis, containerPort: 6379 }]
+                    readinessProbe:
+                      exec: { command: ["redis-cli", "ping"] }
+                      periodSeconds: 2
+          ---
+          apiVersion: v1
+          kind: Service
+          metadata:
+            name: redis
+          spec:
+            selector: { app: redis }
+            ports:
+              - port: 6379
+                targetPort: redis
+                name: redis
+          EOF
+          kubectl -n authproxy-ct rollout status deployment/redis --timeout=60s
+
+      - name: Generate crypto material + apply as K8s Secrets
+        if: steps.changed.outputs.found == 'true'
+        run: |
+          set -eu
+          workdir=$(mktemp -d)
+
+          # JWT signing keypair (RSA-2048; AuthProxy reads system/system.pub).
+          openssl genrsa -out "$workdir/system" 2048 2>/dev/null
+          openssl rsa -in "$workdir/system" -pubout -out "$workdir/system.pub" 2>/dev/null
+
+          # Global AES key (32 random bytes).
+          openssl rand -out "$workdir/global_aes.key" 32
+
+          # One admin actor keypair so the actors keys_path directory has at
+          # least one valid actor (smoke happy path).
+          openssl genrsa -out "$workdir/ci" 2048 2>/dev/null
+          openssl rsa -in "$workdir/ci" -pubout -out "$workdir/ci.pub" 2>/dev/null
+
+          # Namespace was created in a prior step (so Redis could land in it).
+          kubectl -n authproxy-ct create secret generic authproxy-jwt \
+            --from-file=system="$workdir/system" \
+            --from-file=system.pub="$workdir/system.pub"
+          kubectl -n authproxy-ct create secret generic authproxy-encryption \
+            --from-file=global_aes.key="$workdir/global_aes.key"
+          # Actor keypair files mount as <actors.mountPath>/<key>; key names
+          # carry no slashes (K8s Secret data keys can't), so files like
+          # `ci` and `ci.pub` are how the actors loader reads pairs.
+          kubectl -n authproxy-ct create secret generic authproxy-actors \
+            --from-file=ci="$workdir/ci" \
+            --from-file=ci.pub="$workdir/ci.pub"
+
+      - name: ct install
+        if: steps.changed.outputs.found == 'true'
+        run: |
+          ct install \
+            --config .github/ct.yaml \
+            --target-branch main \
+            --namespace authproxy-ct \
+            --helm-extra-args "--timeout=5m"

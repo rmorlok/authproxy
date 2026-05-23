@@ -179,8 +179,56 @@
       "properties": {
         "existingSecret":   { "type": "string" },
         "mountPath":        { "type": "string" },
-        "globalAesKeyFile": { "type": "string" },
-        "actorsKeysDir":    { "type": "string" }
+        "globalAesKeyFile": { "type": "string" }
+      }
+    },
+
+    "actors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "existingSecret": { "type": "string" },
+        "mountPath":      { "type": "string" },
+        "permissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "namespace": { "type": "string" },
+              "resources": { "type": "array", "items": { "type": "string" } },
+              "verbs":     { "type": "array", "items": { "type": "string" } }
+            }
+          }
+        }
+      }
+    },
+
+    "hostApplication": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "initiateSessionUrl": { "type": "string" }
+      }
+    },
+
+    "connectors": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "autoMigrate":       { "type": "boolean" },
+        "loadFromList":      { "type": "array" },
+        "identifyingLabels": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+
+    "httpLogging": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "shareMainDatabase":    { "type": "boolean" },
+        "autoMigrate":          { "type": "boolean" },
+        "database":             { "type": "object" },
+        "fullRequestRecording": { "type": "string", "enum": ["never", "always"] }
       }
     },
 
