@@ -59,9 +59,21 @@ Secrets, not in this ConfigMap.
 {{- $_ := set $cfg "connectors" $connectors -}}
 
 {{/* --- http_logging (server unconditionally wires up the log storage) --- */}}
+{{/*
+  The http_log migrator + the main DB migrator share golang-migrate's
+  default `schema_migrations` table, so they can't run against the same
+  schema. For SQLite that means a sibling file (default path with a
+  `.http-log` suffix); for Postgres, http_log uses tables prefixed inside
+  the same DB and conflicts are not observed in practice.
+*/}}
 {{- $httpDb := dict -}}
 {{- if .Values.httpLogging.shareMainDatabase -}}
-{{-   $httpDb = $db -}}
+{{-   if eq .Values.database.provider "sqlite" -}}
+{{-     $sharedPath := printf "%s.http-log" .Values.database.path -}}
+{{-     $httpDb = dict "provider" "sqlite" "path" $sharedPath -}}
+{{-   else -}}
+{{-     $httpDb = $db -}}
+{{-   end -}}
 {{- else -}}
 {{-   $httpDb = .Values.httpLogging.database -}}
 {{- end -}}
