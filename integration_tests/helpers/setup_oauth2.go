@@ -82,10 +82,16 @@ type OAuth2ConnectorOptions struct {
 	// RevocationEndpoint overrides provider.RevocationEndpoint() (only used
 	// when IncludeRevocation is true).
 	RevocationEndpoint string
+
 	// PKCE, when non-nil, enables RFC 7636 PKCE on the authorize/token-exchange
 	// pair for this connector. Mirror the production schema block — nil means
 	// PKCE is disabled (the default, current behavior).
 	PKCE *connectors.AuthOauth2PKCE
+
+	// Probes are appended to the connector definition verbatim. Tests that
+	// exercise probe-driven health configure these (e.g. a proxy_http probe
+	// pointing at provider.ResourceURL("/echo")).
+	Probes []connectors.Probe
 }
 
 // NewOAuth2Connector builds an authproxy connector wired to the given
@@ -142,6 +148,7 @@ func NewOAuth2Connector(connectorID apid.ID, displayName string, provider *OAuth
 		Auth: &connectors.Auth{
 			InnerVal: auth,
 		},
+		Probes: opts.Probes,
 	}
 }
 
