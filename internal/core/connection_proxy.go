@@ -34,7 +34,7 @@ func (c *connection) getProxyImpl() (iface.Proxy, error) {
 			return
 		}
 
-		c.proxyImpl = proxy.New(c.s.httpf, c, auth)
+		c.proxyImpl = proxy.New(c.s.httpf, c, auth, c.s)
 	})
 
 	return c.proxyImpl, c.proxyImplErr

@@ -15,23 +15,60 @@ import (
 	"net/http"
 
 	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/auth_methods"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	gentleman "gopkg.in/h2non/gentleman.v2"
 )
 
+// ProbeAccelerator is the subset of the core service the proxy relies on to
+// nudge probes when the upstream returns a credential-related failure. The
+// proxy only needs EnqueueProbeNow; keeping the surface narrow lets test
+// constructors pass a tiny fake instead of the full iface.C.
+type ProbeAccelerator interface {
+	EnqueueProbeNow(ctx context.Context, connectionId apid.ID) error
+}
+
 type proxy struct {
-	httpf httpf.F
-	conn  iface.Connection
-	auth  auth_methods.Authenticator
+	httpf       httpf.F
+	conn        iface.Connection
+	auth        auth_methods.Authenticator
+	accelerator ProbeAccelerator
 }
 
 // New constructs an iface.Proxy that orchestrates calls for a single
-// connection using the supplied Authenticator. One instance per
+// connection using the supplied Authenticator. The optional accelerator,
+// when non-nil, receives a fire-and-forget EnqueueProbeNow call on
+// upstream 401/403 responses so the probe-driven health signal can flip
+// without waiting for the next scheduled probe tick. One instance per
 // connection — held inside the connection's lazy proxy-impl cache.
-func New(h httpf.F, conn iface.Connection, auth auth_methods.Authenticator) iface.Proxy {
-	return &proxy{httpf: h, conn: conn, auth: auth}
+func New(h httpf.F, conn iface.Connection, auth auth_methods.Authenticator, accelerator ProbeAccelerator) iface.Proxy {
+	return &proxy{httpf: h, conn: conn, auth: auth, accelerator: accelerator}
+}
+
+// maybeAccelerateProbes fires a best-effort probe-now enqueue when the
+// upstream returns a credential-related status code on a user-initiated
+// request. Probe traffic itself is excluded — without that gate the
+// probe-now task's own 401 would re-enter this path and (even with the
+// per-probe throttle) waste an iteration of bookkeeping per failed probe.
+//
+// Errors from EnqueueProbeNow are intentionally swallowed: by the time
+// this runs, the customer's response is already on its way. Surfacing an
+// error would turn a layered optimisation into a brittle dependency on
+// the throttle store.
+func (p *proxy) maybeAccelerateProbes(ctx context.Context, reqType httpf.RequestType, statusCode int) {
+	if p.accelerator == nil {
+		return
+	}
+	if reqType == common.RequestTypeProbe {
+		return
+	}
+	if statusCode != http.StatusUnauthorized && statusCode != http.StatusForbidden {
+		return
+	}
+	_ = p.accelerator.EnqueueProbeNow(ctx, p.conn.GetId())
 }
 
 // ProxyRequest resolves credentials, sends the request, and on a 401
@@ -63,6 +100,13 @@ func (p *proxy) ProxyRequest(ctx context.Context, reqType httpf.RequestType, req
 			_ = recoverErr
 		}
 	}
+
+	// After the recover-and-retry dance has run its course, the final
+	// status code is what the customer will see. A persistent 401/403
+	// here means credentials are genuinely failing — accelerate probes
+	// so the probe-driven health signal flips without waiting for the
+	// next scheduled probe interval.
+	p.maybeAccelerateProbes(ctx, reqType, resp.StatusCode)
 
 	return iface.ProxyResponseFromGentlemen(resp)
 }
@@ -115,6 +159,10 @@ func (p *proxy) ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, 
 			_ = recoverErr
 		}
 	}
+
+	// Same 401/403 acceleration as the wrapped path. See ProxyRequest's
+	// comment for the rationale.
+	p.maybeAccelerateProbes(ctx, reqType, resp.StatusCode)
 
 	return streamResponse(w, resp)
 }
