@@ -33,25 +33,39 @@ const (
 type AuthOAuth2 struct {
 	Type AuthType `json:"type" yaml:"type"`
 	// TokenEndpointAuthMethod selects how client credentials are presented
-	// to the token endpoint. When empty, defaults to client_secret_post —
-	// matches the proxy's behavior before this field existed.
-	TokenEndpointAuthMethod TokenEndpointAuthMethod `json:"token_endpoint_auth_method,omitempty" yaml:"token_endpoint_auth_method,omitempty"`
-	ClientId                *common.StringValue     `json:"client_id,omitempty" yaml:"client_id,omitempty"`
-	ClientSecret            *common.StringValue     `json:"client_secret,omitempty" yaml:"client_secret,omitempty"`
-	Scopes                  []Scope                 `json:"scopes" yaml:"scopes"`
-	Authorization           AuthOauth2Authorization `json:"authorization" yaml:"authorization"`
-	Token                   AuthOauth2Token         `json:"token" yaml:"token"`
-	Revocation              *AuthOauth2Revocation   `json:"revocation,omitempty" yaml:"revocation,omitempty"`
+	// to the token endpoint. nil signals "use the default" and resolves to
+	// client_secret_post via GetTokenEndpointAuthMethodOrDefault, matching
+	// the proxy's behavior before this field existed. An explicit
+	// empty-string value is rejected by the validator — it is not a valid
+	// method per RFC 7591 §2 and must not silently fall through to the
+	// default.
+	TokenEndpointAuthMethod *TokenEndpointAuthMethod `json:"token_endpoint_auth_method,omitempty" yaml:"token_endpoint_auth_method,omitempty"`
+	ClientId                *common.StringValue      `json:"client_id,omitempty" yaml:"client_id,omitempty"`
+	ClientSecret            *common.StringValue      `json:"client_secret,omitempty" yaml:"client_secret,omitempty"`
+	Scopes                  []Scope                  `json:"scopes" yaml:"scopes"`
+	Authorization           AuthOauth2Authorization  `json:"authorization" yaml:"authorization"`
+	Token                   AuthOauth2Token          `json:"token" yaml:"token"`
+	Revocation              *AuthOauth2Revocation    `json:"revocation,omitempty" yaml:"revocation,omitempty"`
+}
+
+// NewTokenEndpointAuthMethod returns a pointer to m. Convenience constructor
+// for callers that need to set the optional connector field — Go does not
+// allow taking the address of a typed-string constant directly.
+func NewTokenEndpointAuthMethod(m TokenEndpointAuthMethod) *TokenEndpointAuthMethod {
+	return &m
 }
 
 // GetTokenEndpointAuthMethodOrDefault returns the configured method, defaulting
-// to client_secret_post when the field was omitted. Keeps the default in one
-// place so callsites don't have to repeat the empty-string check.
+// to client_secret_post only when the field was omitted (nil). This is the
+// single place where the nil → post collapse happens; callers that already
+// invoke this method receive a resolved, non-empty value and must not apply
+// any further default. An explicitly-set empty-string value is preserved as
+// empty — it is the validator's job to reject it, not this getter's.
 func (a *AuthOAuth2) GetTokenEndpointAuthMethodOrDefault() TokenEndpointAuthMethod {
-	if a == nil || a.TokenEndpointAuthMethod == "" {
+	if a == nil || a.TokenEndpointAuthMethod == nil {
 		return TokenEndpointAuthClientSecretPost
 	}
-	return a.TokenEndpointAuthMethod
+	return *a.TokenEndpointAuthMethod
 }
 
 func (a *AuthOAuth2) GetType() AuthType {
@@ -148,13 +162,26 @@ func (a *AuthOAuth2) Validate(vc *common.ValidationContext) error {
 		}
 	}
 
+	// An explicit empty-string value is rejected here rather than silently
+	// resolved to the default — the YAML author wrote *something* and we
+	// owe them a clear error rather than a surprising fallback. nil
+	// (field omitted) is the only "use the default" signal.
+	if a.TokenEndpointAuthMethod != nil && *a.TokenEndpointAuthMethod == "" {
+		result = multierror.Append(result, vc.NewErrorfForField("token_endpoint_auth_method",
+			"must not be empty; omit the field to use the default (%q), or set one of %q, %q, %q",
+			TokenEndpointAuthClientSecretPost,
+			TokenEndpointAuthClientSecretPost, TokenEndpointAuthClientSecretBasic, TokenEndpointAuthNone,
+		))
+		return result.ErrorOrNil()
+	}
+
 	hasSecret := a.ClientSecret != nil && a.ClientSecret.InnerVal != nil
-	switch a.TokenEndpointAuthMethod {
-	case "", TokenEndpointAuthClientSecretPost, TokenEndpointAuthClientSecretBasic:
+	method := a.GetTokenEndpointAuthMethodOrDefault()
+	switch method {
+	case TokenEndpointAuthClientSecretPost, TokenEndpointAuthClientSecretBasic:
 		if !hasSecret {
 			result = multierror.Append(result, vc.NewErrorfForField("client_secret",
-				"is required when token_endpoint_auth_method is %q",
-				a.GetTokenEndpointAuthMethodOrDefault(),
+				"is required when token_endpoint_auth_method is %q", method,
 			))
 		}
 	case TokenEndpointAuthNone:
@@ -173,7 +200,7 @@ func (a *AuthOAuth2) Validate(vc *common.ValidationContext) error {
 	default:
 		result = multierror.Append(result, vc.NewErrorfForField("token_endpoint_auth_method",
 			"%q is not a valid method; must be %q, %q, or %q",
-			a.TokenEndpointAuthMethod,
+			method,
 			TokenEndpointAuthClientSecretPost, TokenEndpointAuthClientSecretBasic, TokenEndpointAuthNone,
 		))
 	}

@@ -29,18 +29,12 @@ import (
 	"gopkg.in/h2non/gock.v1"
 )
 
-func TestApplyTokenEndpointClientAuth_PostDefault(t *testing.T) {
-	in := url.Values{"grant_type": {"authorization_code"}, "code": {"abc"}}
-
-	out, header, err := applyTokenEndpointClientAuth("", "client-id", "client-secret", in)
-	require.NoError(t, err)
-	assert.Empty(t, header, "post must not set Authorization header")
-	assert.Equal(t, "client-id", out.Get("client_id"))
-	assert.Equal(t, "client-secret", out.Get("client_secret"))
-	assert.Equal(t, "authorization_code", out.Get("grant_type"))
-	assert.Equal(t, "abc", out.Get("code"))
-	// Input not mutated.
-	assert.Empty(t, in.Get("client_id"))
+func TestApplyTokenEndpointClientAuth_RejectsEmptyMethod(t *testing.T) {
+	// Empty string is no longer silently defaulted — callers MUST pass a
+	// resolved method (typically via AuthOAuth2.GetTokenEndpointAuthMethodOrDefault).
+	// This guards against the helper drifting away from that contract.
+	_, _, err := applyTokenEndpointClientAuth("", "client-id", "client-secret", url.Values{})
+	require.Error(t, err)
 }
 
 func TestApplyTokenEndpointClientAuth_PostExplicit(t *testing.T) {
@@ -161,7 +155,7 @@ func callbackConnFor(t *testing.T, ctrl *gomock.Controller, method sconfig.Token
 
 	auth := &cschema.AuthOAuth2{
 		Type:                    cschema.AuthTypeOAuth2,
-		TokenEndpointAuthMethod: method,
+		TokenEndpointAuthMethod: cschema.NewTokenEndpointAuthMethod(method),
 		ClientId:                common.NewStringValueDirect("client-id"),
 		Token: cschema.AuthOauth2Token{
 			Endpoint: "https://example.com/oauth/token",
@@ -294,7 +288,7 @@ func TestCallback_None(t *testing.T) {
 func TestAuthOAuth2_Validate_BasicRequiresClientSecret(t *testing.T) {
 	a := &cschema.AuthOAuth2{
 		Type:                    cschema.AuthTypeOAuth2,
-		TokenEndpointAuthMethod: cschema.TokenEndpointAuthClientSecretBasic,
+		TokenEndpointAuthMethod: cschema.NewTokenEndpointAuthMethod(cschema.TokenEndpointAuthClientSecretBasic),
 		ClientId:                common.NewStringValueDirect("client-id"),
 		Authorization: cschema.AuthOauth2Authorization{
 			Endpoint: "https://example.com/oauth/authorize",
@@ -310,7 +304,7 @@ func TestAuthOAuth2_Validate_BasicRequiresClientSecret(t *testing.T) {
 func TestAuthOAuth2_Validate_NoneRejectsClientSecret(t *testing.T) {
 	a := &cschema.AuthOAuth2{
 		Type:                    cschema.AuthTypeOAuth2,
-		TokenEndpointAuthMethod: cschema.TokenEndpointAuthNone,
+		TokenEndpointAuthMethod: cschema.NewTokenEndpointAuthMethod(cschema.TokenEndpointAuthNone),
 		ClientId:                common.NewStringValueDirect("client-id"),
 		ClientSecret:            common.NewStringValueDirect("client-secret"),
 		Authorization: cschema.AuthOauth2Authorization{
@@ -329,7 +323,7 @@ func TestAuthOAuth2_Validate_NoneRejectsClientSecret(t *testing.T) {
 func TestAuthOAuth2_Validate_NoneRequiresPKCE(t *testing.T) {
 	a := &cschema.AuthOAuth2{
 		Type:                    cschema.AuthTypeOAuth2,
-		TokenEndpointAuthMethod: cschema.TokenEndpointAuthNone,
+		TokenEndpointAuthMethod: cschema.NewTokenEndpointAuthMethod(cschema.TokenEndpointAuthNone),
 		ClientId:                common.NewStringValueDirect("client-id"),
 		Authorization: cschema.AuthOauth2Authorization{
 			Endpoint: "https://example.com/oauth/authorize",
@@ -345,7 +339,7 @@ func TestAuthOAuth2_Validate_NoneRequiresPKCE(t *testing.T) {
 func TestAuthOAuth2_Validate_NoneAcceptsWhenPKCESet(t *testing.T) {
 	a := &cschema.AuthOAuth2{
 		Type:                    cschema.AuthTypeOAuth2,
-		TokenEndpointAuthMethod: cschema.TokenEndpointAuthNone,
+		TokenEndpointAuthMethod: cschema.NewTokenEndpointAuthMethod(cschema.TokenEndpointAuthNone),
 		ClientId:                common.NewStringValueDirect("client-id"),
 		Authorization: cschema.AuthOauth2Authorization{
 			Endpoint: "https://example.com/oauth/authorize",
@@ -355,13 +349,50 @@ func TestAuthOAuth2_Validate_NoneAcceptsWhenPKCESet(t *testing.T) {
 	require.NoError(t, a.Validate(&common.ValidationContext{}))
 }
 
+// TestAuthOAuth2_Validate_RejectsExplicitEmptyTokenEndpointAuthMethod
+// asserts that explicitly setting the field to "" is rejected — the
+// nil-vs-empty distinction is load-bearing. nil means "use the default",
+// empty string means the YAML author wrote something meaningless, and the
+// validator must surface that rather than silently falling through.
+func TestAuthOAuth2_Validate_RejectsExplicitEmptyTokenEndpointAuthMethod(t *testing.T) {
+	a := &cschema.AuthOAuth2{
+		Type:                    cschema.AuthTypeOAuth2,
+		TokenEndpointAuthMethod: cschema.NewTokenEndpointAuthMethod(""),
+		ClientId:                common.NewStringValueDirect("client-id"),
+		ClientSecret:            common.NewStringValueDirect("client-secret"),
+		Authorization: cschema.AuthOauth2Authorization{
+			Endpoint: "https://example.com/oauth/authorize",
+		},
+	}
+	err := a.Validate(&common.ValidationContext{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "token_endpoint_auth_method")
+	assert.Contains(t, err.Error(), "empty")
+}
+
+// TestAuthOAuth2_Validate_NilMethodAcceptedAsDefault asserts that omitting
+// the field (nil pointer) is accepted as "use the default" — preserves
+// the no-change behavior for every existing connector.
+func TestAuthOAuth2_Validate_NilMethodAcceptedAsDefault(t *testing.T) {
+	a := &cschema.AuthOAuth2{
+		Type:         cschema.AuthTypeOAuth2,
+		ClientId:     common.NewStringValueDirect("client-id"),
+		ClientSecret: common.NewStringValueDirect("client-secret"),
+		Authorization: cschema.AuthOauth2Authorization{
+			Endpoint: "https://example.com/oauth/authorize",
+		},
+	}
+	require.NoError(t, a.Validate(&common.ValidationContext{}))
+	assert.Equal(t, cschema.TokenEndpointAuthClientSecretPost, a.GetTokenEndpointAuthMethodOrDefault())
+}
+
 // TestAuthOAuth2_Validate_RejectsUnknownTokenEndpointAuthMethod guards
 // the validator against typos / unsupported RFC 7591 methods (client_secret_jwt
 // etc., out of scope).
 func TestAuthOAuth2_Validate_RejectsUnknownTokenEndpointAuthMethod(t *testing.T) {
 	a := &cschema.AuthOAuth2{
 		Type:                    cschema.AuthTypeOAuth2,
-		TokenEndpointAuthMethod: cschema.TokenEndpointAuthMethod("bogus"),
+		TokenEndpointAuthMethod: cschema.NewTokenEndpointAuthMethod(cschema.TokenEndpointAuthMethod("bogus")),
 		ClientId:                common.NewStringValueDirect("client-id"),
 		ClientSecret:            common.NewStringValueDirect("client-secret"),
 		Authorization: cschema.AuthOauth2Authorization{

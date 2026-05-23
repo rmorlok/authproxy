@@ -38,14 +38,10 @@ func (o *oAuth2Connection) resolveClientCredentials(ctx context.Context) (string
 // request body, and the value of the Authorization header to set on the
 // request (empty string when no header is required).
 //
-// Method semantics:
-//   - client_secret_post (default): client_id + client_secret go in the form
-//     body, no Authorization header.
-//   - client_secret_basic: Authorization: Basic base64(qs(id):qs(secret)) is
-//     set; neither client_id nor client_secret goes in the form body.
-//     RFC 6749 §2.3.1 forbids sending the credentials in two places.
-//   - none: client_id only in the form body, no client_secret, no header.
-//     The token endpoint relies on PKCE for proof-of-possession.
+// Callers MUST pass a resolved (non-empty) method — typically by routing
+// through AuthOAuth2.GetTokenEndpointAuthMethodOrDefault, which is the
+// single place where the nil → client_secret_post default is applied.
+// Empty-string is treated as invalid here, not silently defaulted.
 //
 // The values map is treated as input-only and not mutated; the returned
 // url.Values is a copy with the appropriate fields set.
@@ -54,12 +50,6 @@ func applyTokenEndpointClientAuth(
 	clientId, clientSecret string,
 	values url.Values,
 ) (url.Values, string, error) {
-	// Effective default — empty method behaves as client_secret_post for
-	// backwards compatibility.
-	if method == "" {
-		method = sconfig.TokenEndpointAuthClientSecretPost
-	}
-
 	out := make(url.Values, len(values)+2)
 	for k, v := range values {
 		out[k] = v
@@ -67,6 +57,10 @@ func applyTokenEndpointClientAuth(
 
 	switch method {
 	case sconfig.TokenEndpointAuthClientSecretPost:
+		// RFC 6749 §2.3.1 / RFC 7591 §2 — credentials in the form body.
+		// RFC 6749 §2.3.1 marks this NOT RECOMMENDED relative to Basic
+		// but it is widely supported and is AuthProxy's historical
+		// default, so it stays as the nil → default fallback.
 		out.Set("client_id", clientId)
 		out.Set("client_secret", clientSecret)
 		return out, "", nil
@@ -79,6 +73,10 @@ func applyTokenEndpointClientAuth(
 		encoded := base64.StdEncoding.EncodeToString([]byte(userPass))
 		return out, "Basic " + encoded, nil
 	case sconfig.TokenEndpointAuthNone:
+		// RFC 7591 §2 — public-client method. client_id identifies the
+		// client; no client_secret exists. Proof-of-possession comes from
+		// PKCE (RFC 7636), which the connector validator requires when
+		// this method is selected.
 		out.Set("client_id", clientId)
 		return out, "", nil
 	default:
