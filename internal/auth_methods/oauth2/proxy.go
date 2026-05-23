@@ -12,6 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/util/retry"
 	gentleman "gopkg.in/h2non/gentleman.v2"
 )
 
@@ -259,19 +260,25 @@ func (o *oAuth2Connection) postRefreshWithRetry(
 	values url.Values,
 	authHeader string,
 ) (*gentleman.Response, int, error) {
-	var lastResp *gentleman.Response
-	var lastErr error
-
-	for attempt := 1; attempt <= tokenRefreshMaxAttempts; attempt++ {
-		if attempt > 1 {
-			backoff := tokenRefreshBackoffStep * time.Duration(attempt-1)
-			select {
-			case <-ctx.Done():
-				return nil, attempt - 1, ctx.Err()
-			case <-time.After(backoff):
+	res, err := retry.Do(ctx, retry.Options[*gentleman.Response]{
+		MaxAttempts: tokenRefreshMaxAttempts,
+		Backoff:     &retry.LinearBackOff{Step: tokenRefreshBackoffStep},
+		Classify: func(resp *gentleman.Response, err error) bool {
+			return err != nil || (resp != nil && resp.StatusCode >= 500)
+		},
+		OnRetry: func(attempt int, resp *gentleman.Response, err error) {
+			args := []any{
+				slog.Int("attempt", attempt),
+				slog.Int("max_attempts", tokenRefreshMaxAttempts),
 			}
-		}
-
+			if err != nil {
+				args = append(args, slog.String("error", err.Error()))
+			} else {
+				args = append(args, slog.Int("provider_status_code", resp.StatusCode))
+			}
+			o.logger.WarnContext(ctx, "oauth token refresh transient failure; retrying", args...)
+		},
+	}, func(ctx context.Context) (*gentleman.Response, error) {
 		req := client.
 			UseContext(ctx).
 			Request().
@@ -285,27 +292,14 @@ func (o *oAuth2Connection) postRefreshWithRetry(
 			req = req.AddHeader("Authorization", authHeader)
 		}
 
-		resp, err := req.Send()
+		return req.Send()
+	})
 
-		if err == nil && resp.StatusCode < 500 {
-			return resp, attempt, nil
-		}
-
-		lastResp, lastErr = resp, err
-
-		if attempt < tokenRefreshMaxAttempts {
-			args := []any{
-				slog.Int("attempt", attempt),
-				slog.Int("max_attempts", tokenRefreshMaxAttempts),
-			}
-			if err != nil {
-				args = append(args, slog.String("error", err.Error()))
-			} else {
-				args = append(args, slog.Int("provider_status_code", resp.StatusCode))
-			}
-			o.logger.WarnContext(ctx, "oauth token refresh transient failure; retrying", args...)
-		}
+	// Mirror the original contract: a returned error always implies a nil
+	// response. Callers (and the unit tests) key on err first; a 5xx
+	// response left dangling on a ctx-cancelled return is just noise.
+	if err != nil {
+		return nil, res.Attempts, err
 	}
-
-	return lastResp, tokenRefreshMaxAttempts, lastErr
+	return res.Value, res.Attempts, nil
 }
