@@ -14,10 +14,22 @@ func (o *oAuth2Connection) SupportsRevokeTokens() bool {
 	return o.auth != nil && o.auth.Revocation != nil && o.auth.Revocation.Endpoint != ""
 }
 
+// SupportsRevoke is the generic auth_methods.Authenticator surface for
+// SupportsRevokeTokens. The OAuth2-specific name remains on OAuth2Connection
+// for callers that already work against the typed interface.
+func (o *oAuth2Connection) SupportsRevoke() bool {
+	return o.SupportsRevokeTokens()
+}
+
 func (o *oAuth2Connection) RevokeTokens(ctx context.Context) error {
 	return o.tel.withSpan(ctx, "revoke", o.connectorIDForTelemetry(), func(ctx context.Context) error {
 		return o.revokeTokensInner(ctx)
 	})
+}
+
+// Revoke is the generic auth_methods.Authenticator surface for RevokeTokens.
+func (o *oAuth2Connection) Revoke(ctx context.Context) error {
+	return o.RevokeTokens(ctx)
 }
 
 func (o *oAuth2Connection) revokeTokensInner(ctx context.Context) error {

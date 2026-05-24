@@ -13,6 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	mockLog "github.com/rmorlok/authproxy/internal/aplog/mock"
 	"github.com/rmorlok/authproxy/internal/auth_methods"
+	mockAuthMethods "github.com/rmorlok/authproxy/internal/auth_methods/mock"
 	mockOauth2 "github.com/rmorlok/authproxy/internal/auth_methods/oauth2/mock"
 	"github.com/rmorlok/authproxy/internal/core/mock"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -112,14 +113,17 @@ func TestTaskDisconnectConnection(t *testing.T) {
 		svc, dbMock, _, e, ctrl := setupWithMocks(t)
 		defer ctrl.Finish()
 
-		// Swap the OAuth2 factory in the auth-method registry with a mock.
+		// Swap the OAuth2 factory in the auth-method registry with a mock that
+		// returns a mock Authenticator. Disconnect drives revocation through
+		// the generic Authenticator surface (SupportsRevoke / Revoke), so the
+		// test mocks at that level rather than at the OAuth2-specific one.
 		o2Factory := mockOauth2.NewMockFactory(ctrl)
-		o2Conn := mockOauth2.NewMockOAuth2Connection(ctrl)
+		authMock := mockAuthMethods.NewMockAuthenticator(ctrl)
 		svc.authMethodFactories[cschema.AuthTypeOAuth2] = o2Factory
 
-		o2Factory.EXPECT().NewOAuth2(gomock.Any()).Return(o2Conn).AnyTimes()
-		o2Conn.EXPECT().SupportsRevokeTokens().Return(true).AnyTimes()
-		o2Conn.EXPECT().RevokeTokens(gomock.Any()).Return(errors.New("3rd party 400")).Times(maxRevokeAttempts)
+		o2Factory.EXPECT().NewAuthenticator(gomock.Any()).Return(authMock).AnyTimes()
+		authMock.EXPECT().SupportsRevoke().Return(true).AnyTimes()
+		authMock.EXPECT().Revoke(gomock.Any()).Return(errors.New("3rd party 400")).Times(maxRevokeAttempts)
 
 		mock.MockConnectionRetrieval(context.Background(), dbMock, e, connectionId, oauthConnector)
 

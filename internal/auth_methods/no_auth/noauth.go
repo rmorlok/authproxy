@@ -27,3 +27,13 @@ func (n *noAuthAuthenticator) Resolve(ctx context.Context) (auth_methods.AuthApp
 func (n *noAuthAuthenticator) RecoverFrom401(ctx context.Context) error {
 	return auth_methods.ErrCannotRecover
 }
+
+// SupportsRevoke returns false — there is no credential to revoke.
+func (n *noAuthAuthenticator) SupportsRevoke() bool {
+	return false
+}
+
+// Revoke is a no-op for no-auth connections.
+func (n *noAuthAuthenticator) Revoke(ctx context.Context) error {
+	return nil
+}

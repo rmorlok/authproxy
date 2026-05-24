@@ -1,27 +1,22 @@
 package core
 
-import (
-	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
-	"github.com/rmorlok/authproxy/internal/schema/config"
-)
-
-// getRevokeCredentialsOperations returns the operations that can be performed to revoke credentials for this
-// this may return a nil slice if no operations are supported. Support will depend on the auth type for the
-// connection and how that auth type is configured.
+// getRevokeCredentialsOperations returns the operations that can be performed
+// to revoke credentials for this connection. May return a nil slice if the
+// connection's auth method does not support revocation. Dispatch is generic
+// across auth types — the Authenticator interface carries SupportsRevoke /
+// Revoke so this function makes no assumptions about which method is in use.
 func (c *connection) getRevokeCredentialsOperations() []operation {
 	def := c.cv.GetDefinition()
-	if def == nil || def.Auth == nil {
+	if def == nil {
 		return nil
 	}
-	auth := def.Auth
-
-	if _, ok := auth.Inner().(*config.AuthOAuth2); ok {
-		o2 := c.s.getAuthMethodFactory(def).(oauth2.Factory).NewOAuth2(c)
-
-		if o2.SupportsRevokeTokens() {
-			return []operation{o2.RevokeTokens}
-		}
+	factory := c.s.getAuthMethodFactory(def)
+	if factory == nil {
+		return nil
 	}
-
-	return nil
+	auth := factory.NewAuthenticator(c)
+	if !auth.SupportsRevoke() {
+		return nil
+	}
+	return []operation{auth.Revoke}
 }
