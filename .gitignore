@@ -44,3 +44,4 @@ ui/*/embed/dist/*
 dev_config/keys/tls
 
 .claude/scheduled_tasks.lock
+.codex
