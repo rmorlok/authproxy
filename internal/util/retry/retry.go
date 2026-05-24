@@ -56,8 +56,21 @@ type Options[T any] struct {
 	// OnRetry, if non-nil, fires after each *retryable* failure that is
 	// not the last attempt in the budget — i.e. exactly when a retry is
 	// about to be scheduled. Use it to emit per-attempt structured logs
-	// without coupling those log strings into this package.
+	// without coupling those log strings into this package. Also a good
+	// spot to release per-attempt resources (e.g. closing an HTTP
+	// response body before the next iteration replaces it).
 	OnRetry func(attempt int, value T, err error)
+
+	// OnRetryWait, if non-nil, returns an override for the wait
+	// duration before the next attempt. Returning <= 0 falls through to
+	// the Backoff strategy. Called once per inter-attempt gap, between
+	// Classify (which decided to retry) and OnRetry; the Backoff is
+	// still advanced via NextBackOff so its progression is unchanged.
+	//
+	// Intended for callsites that need response-driven waits — e.g. a
+	// transport that honors HTTP Retry-After headers when present and
+	// falls back to exponential backoff otherwise.
+	OnRetryWait func(value T, err error) time.Duration
 }
 
 // Do runs op until it produces a non-retryable outcome, the attempt budget
@@ -120,6 +133,11 @@ func Do[T any](
 		wait := opts.Backoff.NextBackOff()
 		if wait == backoff.Stop {
 			break
+		}
+		if opts.OnRetryWait != nil {
+			if override := opts.OnRetryWait(val, err); override > 0 {
+				wait = override
+			}
 		}
 
 		select {
