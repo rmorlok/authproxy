@@ -1,6 +1,7 @@
 package core
 
 import (
+	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
@@ -15,8 +16,7 @@ func (c *connection) getRevokeCredentialsOperations() []operation {
 	auth := def.Auth
 
 	if _, ok := auth.Inner().(*config.AuthOAuth2); ok {
-		o2f := c.s.getOAuth2Factory()
-		o2 := o2f.NewOAuth2(c)
+		o2 := c.s.getAuthMethodFactory(def).(oauth2.Factory).NewOAuth2(c)
 
 		if o2.SupportsRevokeTokens() {
 			return []operation{o2.RevokeTokens}

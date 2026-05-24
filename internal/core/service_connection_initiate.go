@@ -8,6 +8,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
+	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
@@ -138,7 +139,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 		}
 
 		ra := core.GetAuthFromContext(ctx)
-		o2 := s.getOAuth2Factory().NewOAuth2(connection)
+		o2 := s.getAuthMethodFactory(connector).(oauth2.Factory).NewOAuth2(connection)
 		url, err := o2.SetStateAndGeneratePublicUrl(ctx, ra.MustGetActor(), req.ReturnToUrl)
 		if err != nil {
 			val.MarkErrorReturn()

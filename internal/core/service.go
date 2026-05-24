@@ -40,10 +40,10 @@ type service struct {
 
 	// authMethodFactories is the uniform auth-method dispatch registry.
 	// Populated once at NewCoreService and keyed by cschema.AuthType.
-	// getAuthMethodFactory looks up by connector.Auth.GetType(); per-
-	// method accessors (getOAuth2Factory, getApiKeyFactory) read from
-	// the same map and cast to the concrete factory interface so OAuth2-
-	// specific extras (NewOAuth2 / GetOAuth2State) remain available.
+	// Resolved by getAuthMethodFactory(connector); call sites that need
+	// per-method extras (e.g. oauth2.Factory.NewOAuth2) type-assert the
+	// returned auth_methods.Factory at the use site, guarded by the same
+	// auth-type check the caller already performs.
 	authMethodFactories map[cschema.AuthType]auth_methods.Factory
 }
 
