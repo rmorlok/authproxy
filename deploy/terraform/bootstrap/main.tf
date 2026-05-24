@@ -25,9 +25,9 @@ resource "aws_s3_bucket" "state" {
   # The state bucket is intentionally non-destroyable from this module —
   # tearing it down would orphan the eks/ module's state. To delete, empty
   # the bucket manually and remove this resource (or the whole module).
-  lifecycle {
-    prevent_destroy = true
-  }
+  # lifecycle {
+  #   prevent_destroy = true
+  # }
 }
 
 resource "aws_s3_bucket_versioning" "state" {
