@@ -1,0 +1,57 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/cli/schema.json",
+  "$defs": {
+    "Server": {
+      "type": "object",
+      "properties": {
+        "api": {
+          "$ref": "../common/schema.json#/$defs/StringValue",
+          "description": "Base URL of the AuthProxy API service (e.g. http://localhost:8081)."
+        },
+        "admin_api": {
+          "$ref": "../common/schema.json#/$defs/StringValue",
+          "description": "Base URL of the AuthProxy Admin API service (e.g. http://localhost:8082)."
+        },
+        "auth": {
+          "$ref": "../common/schema.json#/$defs/StringValue",
+          "description": "Base URL of the AuthProxy auth/public service (e.g. http://localhost:8080)."
+        },
+        "marketplace": {
+          "$ref": "../common/schema.json#/$defs/StringValue",
+          "description": "Base URL of the marketplace UI (e.g. http://localhost:5173)."
+        },
+        "admin_ui": {
+          "$ref": "../common/schema.json#/$defs/StringValue",
+          "description": "Base URL of the admin UI (e.g. http://localhost:5174)."
+        }
+      },
+      "additionalProperties": false,
+      "description": "URLs the CLI uses to reach the various AuthProxy services. Each may be a direct string or any of the StringValue variants (env var, file, etc.)."
+    },
+    "Root": {
+      "type": "object",
+      "properties": {
+        "admin_username": {
+          "$ref": "../common/schema.json#/$defs/StringValue",
+          "description": "Username/actor id used when signing admin JWTs."
+        },
+        "admin_private_key_path": {
+          "$ref": "../common/schema.json#/$defs/StringValue",
+          "description": "Path to the RSA/EC private key used to sign admin JWTs."
+        },
+        "admin_shared_key_path": {
+          "$ref": "../common/schema.json#/$defs/StringValue",
+          "description": "Path to the shared (HMAC) secret used to sign admin JWTs. Mutually exclusive with admin_private_key_path."
+        },
+        "server": {
+          "$ref": "#/$defs/Server"
+        }
+      },
+      "additionalProperties": false,
+      "description": "Root of the CLI config file (typically ~/.authproxy.yaml)."
+    }
+  },
+  "type": "object",
+  "$ref": "#/$defs/Root"
+}

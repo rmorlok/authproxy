@@ -1,0 +1,11 @@
+# $schema: ../schema.json
+
+admin_username: bobdole
+admin_private_key_path: /home/bob/.authproxy/admin.key
+admin_shared_key_path: /home/bob/.authproxy/shared.key
+server:
+  api: http://localhost:8081
+  admin_api: http://localhost:8082
+  auth: http://localhost:8080
+  marketplace: http://localhost:5173
+  admin_ui: http://localhost:5174

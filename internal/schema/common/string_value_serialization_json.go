@@ -62,10 +62,12 @@ func (sv *StringValue) UnmarshalJSON(data []byte) error {
 		svi = &StringValueEnvVar{}
 	} else if _, ok := valueMap["env_var_base64"]; ok {
 		svi = &StringValueEnvVarBase64{}
+	} else if _, ok := valueMap["template_env_vars"]; ok {
+		svi = &StringValueTemplatedEnvVars{}
 	} else if _, ok := valueMap["path"]; ok {
 		svi = &StringValueFile{}
 	} else {
-		return fmt.Errorf("invalid structure for value type; does not match value, base64, env_var, env_var_base64, path")
+		return fmt.Errorf("invalid structure for value type; does not match value, base64, env_var, env_var_base64, template_env_vars, path")
 	}
 
 	if err := json.Unmarshal(data, svi); err != nil {

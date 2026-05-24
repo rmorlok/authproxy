@@ -63,6 +63,19 @@ func TestStringValue(t *testing.T) {
 				},
 			},
 			{
+				name: "templated env vars",
+				Val: &StringValueTemplatedEnvVars{
+					Template: "https://{{HOST}}.example.com/{{VERSION}}/api",
+				},
+			},
+			{
+				name: "templated env vars - default",
+				Val: &StringValueTemplatedEnvVars{
+					Template: "https://{{HOST}}.example.com/{{VERSION}}/api",
+					Default:  util.ToPtr("https://default.example.com/v1/api"),
+				},
+			},
+			{
 				name: "file",
 				Val: &StringValueFile{
 					Path: "/some/file",
@@ -146,6 +159,26 @@ value: some value
 					},
 					data: `
 base64: ywAAAAAAQABAAACAUwAOw==
+`,
+				},
+				{
+					name: "templated env vars",
+					expected: &StringValueTemplatedEnvVars{
+						Template: "https://{{HOST}}.example.com/api",
+					},
+					data: `
+template_env_vars: https://{{HOST}}.example.com/api
+`,
+				},
+				{
+					name: "templated env vars - default",
+					expected: &StringValueTemplatedEnvVars{
+						Template: "https://{{HOST}}.example.com/api",
+						Default:  util.ToPtr("https://default.example.com/api"),
+					},
+					data: `
+template_env_vars: https://{{HOST}}.example.com/api
+default: https://default.example.com/api
 `,
 				},
 			}
@@ -314,6 +347,21 @@ base64: iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/wcAAwAB/1J8
 						Base64: "ywAAAAAAQABAAACAUwAOw==",
 					},
 					data: `{"base64":"ywAAAAAAQABAAACAUwAOw=="}`,
+				},
+				{
+					name: "templated env vars",
+					expected: &StringValueTemplatedEnvVars{
+						Template: "https://{{HOST}}.example.com/api",
+					},
+					data: `{"template_env_vars":"https://{{HOST}}.example.com/api"}`,
+				},
+				{
+					name: "templated env vars - default",
+					expected: &StringValueTemplatedEnvVars{
+						Template: "https://{{HOST}}.example.com/api",
+						Default:  util.ToPtr("https://default.example.com/api"),
+					},
+					data: `{"template_env_vars":"https://{{HOST}}.example.com/api","default":"https://default.example.com/api"}`,
 				},
 			}
 
