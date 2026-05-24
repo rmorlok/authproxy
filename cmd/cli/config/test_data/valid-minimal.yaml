@@ -1,0 +1,6 @@
+# $schema: ../schema.json
+
+admin_username: bobdole
+admin_private_key_path: /home/bob/.authproxy/admin.key
+server:
+  api: http://localhost:8081

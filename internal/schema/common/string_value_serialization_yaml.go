@@ -69,6 +69,9 @@ fieldLoop:
 		case "env_var_base64":
 			keyData = &StringValueEnvVarBase64{}
 			break fieldLoop
+		case "template_env_vars":
+			keyData = &StringValueTemplatedEnvVars{}
+			break fieldLoop
 		case "path":
 			keyData = &StringValueFile{}
 			break fieldLoop
@@ -76,7 +79,7 @@ fieldLoop:
 	}
 
 	if keyData == nil {
-		return fmt.Errorf("invalid structure for value type; does not match value, base64, env_var, file")
+		return fmt.Errorf("invalid structure for value type; does not match value, base64, env_var, env_var_base64, template_env_vars, path")
 	}
 
 	if err := value.Decode(keyData); err != nil {

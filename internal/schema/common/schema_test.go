@@ -512,6 +512,31 @@ func TestSchema(t *testing.T) {
 					Data:  `{"test": {"env_var_base64": "SOME_ENV_VAR", "default": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=", "other": "value"}}`,
 				},
 				{
+					Name:  "templated env vars",
+					Valid: true,
+					Data:  `{"test": {"template_env_vars": "https://{{HOST}}.example.com/api"}}`,
+				},
+				{
+					Name:  "templated env vars - default",
+					Valid: true,
+					Data:  `{"test": {"template_env_vars": "https://{{HOST}}.example.com/api", "default": "https://default.example.com/api"}}`,
+				},
+				{
+					Name:  "templated env vars - default - doesn't coerce number to string",
+					Valid: false,
+					Data:  `{"test": {"template_env_vars": "https://{{HOST}}.example.com/api", "default": 8080}}`,
+				},
+				{
+					Name:  "templated env vars - default - doesn't coerce bool to string",
+					Valid: false,
+					Data:  `{"test": {"template_env_vars": "https://{{HOST}}.example.com/api", "default": true}}`,
+				},
+				{
+					Name:  "templated env vars - other attributes",
+					Valid: false,
+					Data:  `{"test": {"template_env_vars": "https://{{HOST}}.example.com/api", "default": "https://default.example.com/api", "other": "value"}}`,
+				},
+				{
 					Name:  "file",
 					Valid: true,
 					Data:  `{"test": {"path": "/path/to/file"}}`,
@@ -716,6 +741,21 @@ func TestSchema(t *testing.T) {
 					Name:  "env var base64 - other attributes",
 					Valid: false,
 					Data:  `{"test": {"env_var_base64": "SOME_ENV_VAR", "default": "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAwMCAO+ip1sAAAAASUVORK5CYII=", "other": "value"}}`,
+				},
+				{
+					Name:  "templated env vars",
+					Valid: true,
+					Data:  `{"test": {"template_env_vars": "{{SOME_BOOL}}"}}`,
+				},
+				{
+					Name:  "templated env vars - default",
+					Valid: true,
+					Data:  `{"test": {"template_env_vars": "{{SOME_BOOL}}", "default": "false"}}`,
+				},
+				{
+					Name:  "templated env vars - other attributes",
+					Valid: false,
+					Data:  `{"test": {"template_env_vars": "{{SOME_BOOL}}", "default": "false", "other": "value"}}`,
 				},
 				{
 					Name:  "file",

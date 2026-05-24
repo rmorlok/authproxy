@@ -1,0 +1,18 @@
+# $schema: ../schema.json
+
+admin_username:
+  env_var: AUTHPROXY_ADMIN_USERNAME
+  default: bobdole
+admin_private_key_path:
+  path: ~/.authproxy/admin.key
+server:
+  api:
+    env_var: AUTHPROXY_API_URL
+    default: http://localhost:8081
+  admin_api:
+    template_env_vars: http://{{AUTHPROXY_HOST}}:{{AUTHPROXY_ADMIN_API_PORT}}
+    default: http://localhost:8082
+  marketplace:
+    env_var: AUTHPROXY_MARKETPLACE_URL
+  admin_ui:
+    value: http://localhost:5174
