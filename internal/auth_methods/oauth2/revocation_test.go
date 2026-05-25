@@ -34,21 +34,21 @@ func noAuthorizationHeader(req *http.Request, _ *gock.Request) (bool, error) {
 
 func TestSupportsRevokeRefreshToken(t *testing.T) {
 	o2 := oAuth2Connection{}
-	require.False(t, o2.SupportsRevokeTokens())
+	require.False(t, o2.SupportsRevoke())
 
 	o2.auth = &cschema.AuthOAuth2{
 		Type: cschema.AuthTypeOAuth2,
 	}
 
-	require.False(t, o2.SupportsRevokeTokens())
+	require.False(t, o2.SupportsRevoke())
 
 	o2.auth.Revocation = &cschema.AuthOauth2Revocation{}
 
-	require.False(t, o2.SupportsRevokeTokens())
+	require.False(t, o2.SupportsRevoke())
 
 	o2.auth.Revocation.Endpoint = "https://example.com/revoke"
 
-	require.True(t, o2.SupportsRevokeTokens())
+	require.True(t, o2.SupportsRevoke())
 }
 
 func TestRevokeRefreshToken(t *testing.T) {
@@ -114,7 +114,7 @@ func TestRevokeRefreshToken(t *testing.T) {
 			BodyString("token=some-access-token&token_type_hint=access_token").
 			Reply(200)
 
-		err := o2.RevokeTokens(context.Background())
+		err := o2.Revoke(context.Background())
 		require.NoError(t, err)
 	})
 
@@ -145,7 +145,7 @@ func TestRevokeRefreshToken(t *testing.T) {
 			BodyString("token=some-refresh-token&token_type_hint=refresh_token").
 			Reply(200)
 
-		err := o2.RevokeTokens(context.Background())
+		err := o2.Revoke(context.Background())
 		require.NoError(t, err)
 	})
 }

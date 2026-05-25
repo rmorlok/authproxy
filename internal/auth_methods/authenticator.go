@@ -5,6 +5,8 @@ import (
 	"errors"
 )
 
+//go:generate mockgen -source=./authenticator.go -destination=./mock/authenticator.go -package=mock
+
 // ErrCannotRecover is returned by Authenticator.RecoverFrom401 when the auth
 // method has no mechanism to obtain new credentials without user
 // interaction. The proxy orchestrator treats it as terminal: the 401 is
@@ -45,4 +47,18 @@ type Authenticator interface {
 	// returns ErrCannotRecover and the orchestrator surfaces the
 	// upstream 401 unchanged.
 	RecoverFrom401(ctx context.Context) error
+
+	// SupportsRevoke reports whether the auth method can revoke the
+	// credentials it has stored for this connection. OAuth2 returns true
+	// when the connector declares a revocation endpoint; api_key and
+	// no_auth return false because there is no remote credential to
+	// invalidate. Callers gate on this before invoking Revoke.
+	SupportsRevoke() bool
+
+	// Revoke invalidates any stored credentials for this connection at
+	// the source (e.g. POSTing the OAuth2 revocation endpoint and
+	// deleting the local token row). No-op for auth methods whose
+	// SupportsRevoke is false. Idempotent — callers that haven't gated
+	// on SupportsRevoke still get safe behavior.
+	Revoke(ctx context.Context) error
 }

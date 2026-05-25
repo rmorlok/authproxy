@@ -53,6 +53,9 @@ func (a *fakeAuth) RecoverFrom401(ctx context.Context) error {
 	return nil
 }
 
+func (a *fakeAuth) SupportsRevoke() bool          { return false }
+func (a *fakeAuth) Revoke(ctx context.Context) error { return nil }
+
 // stubHttpf returns a single supplied http.Client through NewHTTPClient,
 // ignoring all chain methods. Sufficient for testing the orchestrator —
 // the real chain semantics are covered by httpf's own tests.

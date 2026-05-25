@@ -10,18 +10,25 @@ import (
 	"github.com/rmorlok/authproxy/internal/httpf"
 )
 
-func (o *oAuth2Connection) SupportsRevokeTokens() bool {
+// SupportsRevoke reports whether the connector declares a revocation endpoint
+// — true means Revoke will make HTTP calls to invalidate stored tokens; false
+// means Revoke is a no-op for this connection.
+func (o *oAuth2Connection) SupportsRevoke() bool {
 	return o.auth != nil && o.auth.Revocation != nil && o.auth.Revocation.Endpoint != ""
 }
 
-func (o *oAuth2Connection) RevokeTokens(ctx context.Context) error {
+// Revoke invalidates the connection's stored OAuth2 tokens at the provider's
+// revocation endpoint, then deletes the local token row. No-op when
+// SupportsRevoke is false. Wrapped in a "revoke" telemetry span so the OTel
+// trace records the revocation operation regardless of inner outcome.
+func (o *oAuth2Connection) Revoke(ctx context.Context) error {
 	return o.tel.withSpan(ctx, "revoke", o.connectorIDForTelemetry(), func(ctx context.Context) error {
 		return o.revokeTokensInner(ctx)
 	})
 }
 
 func (o *oAuth2Connection) revokeTokensInner(ctx context.Context) error {
-	if !o.SupportsRevokeTokens() {
+	if !o.SupportsRevoke() {
 		return nil
 	}
 

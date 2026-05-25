@@ -29,6 +29,8 @@ func NewFactory(db database.DB, encrypt encrypt.E, httpf httpf.F, logger *slog.L
 	}
 }
 
+var _ auth_methods.Factory = (*factory)(nil)
+
 func (f *factory) NewAuthenticator(connection coreIface.Connection) auth_methods.Authenticator {
 	return &apiKeyConnection{
 		db:         f.db,

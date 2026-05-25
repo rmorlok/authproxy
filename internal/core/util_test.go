@@ -8,10 +8,12 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	mockLog "github.com/rmorlok/authproxy/internal/aplog/mock"
 	"github.com/rmorlok/authproxy/internal/apredis/mock"
+	"github.com/rmorlok/authproxy/internal/auth_methods"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
 	mockE "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	mockF "github.com/rmorlok/authproxy/internal/httpf/mock"
+	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 
 	"github.com/rmorlok/authproxy/internal/database"
 )
@@ -25,13 +27,14 @@ func FullMockService(tb testing.TB, ctrl *gomock.Controller) (*service, *mockDb.
 	logger, _ := mockLog.NewTestLogger(tb)
 
 	return &service{
-		cfg:     nil,
-		db:      db,
-		encrypt: encrypt,
-		ac:      ac,
-		httpf:   h,
-		r:       r,
-		logger:  logger,
+		cfg:                 nil,
+		db:                  db,
+		encrypt:             encrypt,
+		ac:                  ac,
+		httpf:               h,
+		r:                   r,
+		logger:              logger,
+		authMethodFactories: map[cschema.AuthType]auth_methods.Factory{},
 	}, db, r, h, ac, encrypt
 }
 

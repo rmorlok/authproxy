@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
+	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
@@ -209,7 +210,7 @@ func (c *connection) initiateAuthStep(ctx context.Context, returnToUrl string, c
 	}
 
 	ra := apauthcore.GetAuthFromContext(ctx)
-	o2 := c.s.getOAuth2Factory().NewOAuth2(c)
+	o2 := c.s.getAuthMethodFactory(connector).(oauth2.Factory).NewOAuth2(c)
 	url, err := o2.SetStateAndGeneratePublicUrl(ctx, ra.MustGetActor(), returnToUrl)
 	if err != nil {
 		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to generate OAuth redirect URL: %w", err))

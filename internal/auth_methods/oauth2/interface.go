@@ -35,6 +35,4 @@ type OAuth2Connection interface {
 		returnToUrl string,
 	) (string, error)
 	CallbackFrom3rdParty(ctx context.Context, query url.Values) (string, error)
-	SupportsRevokeTokens() bool
-	RevokeTokens(ctx context.Context) error
 }
