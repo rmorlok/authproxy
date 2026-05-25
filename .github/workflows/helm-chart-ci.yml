@@ -205,13 +205,15 @@ jobs:
 
       - name: ct install
         if: steps.changed.outputs.found == 'true'
-        # authproxy-bootstrap is install-skipped: it depends on AWS LB,
-        # Route53, and Let's Encrypt — none of which kind can fake. Lint
-        # coverage in the previous job is the right granularity for it.
+        # authproxy-bootstrap can't be functionally installed in kind
+        # (AWS LB, Route53, Let's Encrypt — none of it works). The
+        # chart's ci/all-disabled-values.yaml turns every subchart and
+        # the ClusterIssuer template off, so `ct install` exercises the
+        # rendering + enable-toggle paths and produces an empty release
+        # rather than a real one.
         run: |
           ct install \
             --config .github/ct.yaml \
             --target-branch main \
             --namespace authproxy-ct \
-            --excluded-charts authproxy-bootstrap \
             --helm-extra-args "--timeout=5m"
