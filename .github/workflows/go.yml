@@ -56,7 +56,19 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        database: [sqlite, postgres]
+        # The two axes are independent — main DB selector is
+        # AUTH_PROXY_TEST_DATABASE_PROVIDER, request_log selector is
+        # AUTH_PROXY_REQUEST_LOG_TEST_DATABASE_PROVIDER — so we pick
+        # explicit combinations via include rather than a 2x3 cartesian
+        # explosion. Coverage goal: every main-DB provider + every
+        # request_log provider gets exercised at least once.
+        include:
+          - database: sqlite
+            request_log_database: sqlite
+          - database: postgres
+            request_log_database: postgres
+          - database: sqlite
+            request_log_database: clickhouse
     services:
       postgres:
         image: postgres:16
@@ -68,6 +80,23 @@ jobs:
           POSTGRES_DB: postgres
         options: >-
           --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      clickhouse:
+        image: clickhouse/clickhouse-server:latest
+        ports:
+          - 8123:8123
+        # Recent images enforce a password on the implicit `default` user
+        # the moment you set CLICKHOUSE_USER, so provision an explicit
+        # authproxy/authproxy/authproxy triple (matches the
+        # integration-test job + dev_config/clickhouse/users.xml).
+        env:
+          CLICKHOUSE_DB: authproxy
+          CLICKHOUSE_USER: authproxy
+          CLICKHOUSE_PASSWORD: authproxy
+        options: >-
+          --health-cmd "wget --no-verbose --tries=1 --spider http://localhost:8123/ping || exit 1"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -90,6 +119,13 @@ jobs:
         POSTGRES_TEST_OPTIONS: sslmode=disable
         POSTGRES_TEST_MAX_PARALLEL: "2"
         POSTGRES_TEST_MAX_CONNS: "2"
+        AUTH_PROXY_REQUEST_LOG_TEST_DATABASE_PROVIDER: ${{ matrix.request_log_database }}
+        CLICKHOUSE_TEST_HOST: localhost
+        CLICKHOUSE_TEST_PORT: "8123"
+        CLICKHOUSE_TEST_USER: authproxy
+        CLICKHOUSE_TEST_PASSWORD: authproxy
+        CLICKHOUSE_TEST_DATABASE: authproxy
+        CLICKHOUSE_TEST_MAX_PARALLEL: "2"
       run: go test -v ./...
 
   integration-test:

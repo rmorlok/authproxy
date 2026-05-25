@@ -142,16 +142,27 @@ func (s *clickhouseRecordStore) Migrate(ctx context.Context) error {
 		}
 	}
 
-	driver, err := chmigrate.WithInstance(s.db, &chmigrate.Config{
+	// The clickhouse migrate driver takes ownership of the *sql.DB it's given
+	// and closes it when the migrator does — so we must hand it a dedicated
+	// connection rather than the long-lived store handle.
+	chOpts, err := s.cfg.ToClickhouseOptions()
+	if err != nil {
+		return fmt.Errorf("failed to derive clickhouse options for migration: %w", err)
+	}
+	migrationConn := sql.OpenDB(clickhouse.Connector(chOpts))
+
+	driver, err := chmigrate.WithInstance(migrationConn, &chmigrate.Config{
 		DatabaseName:          dbName,
 		MultiStatementEnabled: true,
 	})
 	if err != nil {
+		_ = migrationConn.Close()
 		return fmt.Errorf("failed to setup clickhouse http log migration driver: %w", err)
 	}
 
 	m, err := migrate.NewWithInstance("iofs", src, "clickhouse", driver)
 	if err != nil {
+		_ = migrationConn.Close()
 		return fmt.Errorf("failed to setup clickhouse http log migrator: %w", err)
 	}
 	defer func() {

@@ -107,6 +107,18 @@ If the `.env` file does not exist, PostgreSQL tests cannot run. Tests will defau
 
 **Critical rule:** Always run tests on **both** SQLite and PostgreSQL before considering work complete.
 
+### Request-log database (separate)
+
+The `internal/request_log` package uses a *separate* database from this one and supports **three** providers: SQLite, PostgreSQL, and ClickHouse. It has its own selector env var so the two layers can be chosen independently:
+
+- `AUTH_PROXY_REQUEST_LOG_TEST_DATABASE_PROVIDER` — `sqlite` | `postgres` | `clickhouse` (default `sqlite`).
+- Postgres reuses the `POSTGRES_TEST_*` pool above; pgtestdb creates an isolated per-test database against that shared server.
+- ClickHouse uses `CLICKHOUSE_TEST_{HOST,PORT,USER,PASSWORD,DATABASE,MAX_PARALLEL}`; the harness creates a unique per-test database (dropped on cleanup).
+
+Use `request_log.MustNewBlankRequestLogStore(t)` to get a migrated store/retriever pair driven by whichever provider is selected.
+
+**Critical rule:** Schema changes to the request_log entry-records table must land in **all three** migration trees (`internal/request_log/migrations/{sqlite,postgres,clickhouse}`) — they share a single `entry_records` schema and the test matrix in CI will fail any cell whose provider hasn't been updated.
+
 ### Test Setup
 
 Use `MustApplyBlankTestDbConfigRaw(t, nil)` to get a fresh migrated database with a `root` namespace pre-created. This returns `(config, DB, *sql.DB)` where the raw `*sql.DB` can be used for direct SQL when needed.
