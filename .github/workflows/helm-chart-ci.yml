@@ -52,6 +52,19 @@ jobs:
             echo "No chart changes detected."
           fi
 
+      - name: helm dependency update (bootstrap)
+        # `ct lint` runs `helm lint`, which requires subchart tarballs to
+        # already be downloaded under charts/. The bootstrap chart depends
+        # on four upstream charts; the authproxy chart has no deps so this
+        # is a no-op for it (kept the call non-failing for that reason).
+        if: steps.changed.outputs.found == 'true'
+        run: |
+          for chart in deploy/charts/*/; do
+            if grep -q '^dependencies:' "$chart/Chart.yaml" 2>/dev/null; then
+              helm dependency update "$chart"
+            fi
+          done
+
       - name: ct lint
         if: steps.changed.outputs.found == 'true'
         run: ct lint --config .github/ct.yaml --target-branch main
@@ -191,9 +204,13 @@ jobs:
 
       - name: ct install
         if: steps.changed.outputs.found == 'true'
+        # authproxy-bootstrap is install-skipped: it depends on AWS LB,
+        # Route53, and Let's Encrypt — none of which kind can fake. Lint
+        # coverage in the previous job is the right granularity for it.
         run: |
           ct install \
             --config .github/ct.yaml \
             --target-branch main \
             --namespace authproxy-ct \
+            --excluded-charts authproxy-bootstrap \
             --helm-extra-args "--timeout=5m"

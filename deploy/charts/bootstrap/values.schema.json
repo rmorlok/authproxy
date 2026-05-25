@@ -1,0 +1,27 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "AuthProxy bootstrap chart values",
+  "type": "object",
+  "additionalProperties": true,
+  "properties": {
+    "global": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "acmeEmail":    { "type": "string" },
+        "hostedZoneId": { "type": "string" },
+        "domain":       { "type": "string" }
+      }
+    },
+    "clusterIssuer": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":             { "type": "boolean" },
+        "name":                { "type": "string", "minLength": 1 },
+        "server":              { "type": "string", "format": "uri" },
+        "solverIngressClass":  { "type": "string", "minLength": 1 }
+      }
+    }
+  }
+}

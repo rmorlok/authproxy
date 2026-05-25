@@ -1,0 +1,56 @@
+apiVersion: v2
+name: authproxy-bootstrap
+description: |
+  Cluster bootstrap layer for an AuthProxy EKS install: ingress-nginx,
+  cert-manager, external-dns, metrics-server, plus a Let's Encrypt
+  ClusterIssuer. Helm-of-helms — depends on each upstream chart.
+type: application
+
+# Chart version follows its own semver, decoupled from the upstreams
+# below. Bumped when bootstrap surface (values, ClusterIssuer config,
+# pinned versions) changes.
+version: 0.1.0
+
+# appVersion has no single meaning for a meta-chart; the upstream
+# chart versions in `dependencies` are what actually matters.
+appVersion: "0.1.0"
+
+home: https://github.com/rmorlok/authproxy
+sources:
+  - https://github.com/rmorlok/authproxy
+
+maintainers:
+  - name: Ryan Morlok
+    url: https://github.com/rmorlok
+
+keywords:
+  - authproxy
+  - bootstrap
+  - ingress-nginx
+  - cert-manager
+  - external-dns
+  - metrics-server
+
+annotations:
+  category: Infrastructure
+
+# Pinned to specific chart versions so an operator running this chart
+# six months from now gets the same bootstrap stack everyone else got.
+# Bump deliberately; never to "latest".
+dependencies:
+  - name: ingress-nginx
+    version: 4.11.2
+    repository: https://kubernetes.github.io/ingress-nginx
+    condition: ingress-nginx.enabled
+  - name: cert-manager
+    version: v1.16.1
+    repository: https://charts.jetstack.io
+    condition: cert-manager.enabled
+  - name: external-dns
+    version: 1.15.0
+    repository: https://kubernetes-sigs.github.io/external-dns/
+    condition: external-dns.enabled
+  - name: metrics-server
+    version: 3.12.2
+    repository: https://kubernetes-sigs.github.io/metrics-server/
+    condition: metrics-server.enabled

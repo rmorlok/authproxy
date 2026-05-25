@@ -1,0 +1,35 @@
+{{- /*
+  Let's Encrypt prod ClusterIssuer. Templated by this chart rather than
+  the cert-manager subchart so we can pin the issuer name/email to
+  values shared with downstream chart consumers.
+
+  Helm hook deferral: the cert-manager CRDs land via the subchart in
+  the normal install step, but ClusterIssuer is itself one of those
+  CRDs — applying it in the same pass races against the CRD's
+  Established=True condition. The post-install/post-upgrade hook
+  guarantees the CRD exists before this apply.
+
+  Hook delete policy: hook-succeeded would garbage-collect the issuer
+  after each install. We want it to stick around, so delete only when
+  the hook itself fails (preserve a working issuer across upgrades).
+*/ -}}
+{{- if .Values.clusterIssuer.enabled -}}
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: {{ .Values.clusterIssuer.name | quote }}
+  annotations:
+    helm.sh/hook: post-install,post-upgrade
+    helm.sh/hook-weight: "0"
+    helm.sh/hook-delete-policy: hook-failed
+spec:
+  acme:
+    server: {{ .Values.clusterIssuer.server | quote }}
+    email: {{ required "global.acmeEmail is required when clusterIssuer.enabled" .Values.global.acmeEmail | quote }}
+    privateKeySecretRef:
+      name: {{ printf "%s-account-key" .Values.clusterIssuer.name | quote }}
+    solvers:
+      - http01:
+          ingress:
+            ingressClassName: {{ .Values.clusterIssuer.solverIngressClass | quote }}
+{{- end }}
