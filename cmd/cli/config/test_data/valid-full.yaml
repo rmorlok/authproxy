@@ -9,3 +9,7 @@ server:
   auth: http://localhost:8080
   marketplace: http://localhost:5173
   admin_ui: http://localhost:5174
+signing_proxy:
+  port:
+    env_var: AUTHPROXY_SIGNING_PROXY_PORT
+    default: "8888"
