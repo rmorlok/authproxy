@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/connectors/schema.json",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/resources/connectors/schema.json",
   "$defs": {
     "AuthApiKey": {
       "type": "object",
@@ -83,10 +83,10 @@
           "type": "string"
         },
         "period": {
-          "$ref": "../common/schema.json#/$defs/HumanDuration"
+          "$ref": "../../common/schema.json#/$defs/HumanDuration"
         },
         "cron": {
-          "$ref": "../common/schema.json#/$defs/Cron"
+          "$ref": "../../common/schema.json#/$defs/Cron"
         },
         "proxy_http": {
           "$ref": "#/$defs/ProbeHttp"
@@ -145,7 +145,7 @@
           "type": "string"
         },
         "timeout": {
-          "$ref": "../common/schema.json#/$defs/HumanDuration"
+          "$ref": "../../common/schema.json#/$defs/HumanDuration"
         }
       }
     },
@@ -241,10 +241,10 @@
   },
   "properties": {
     "id": {
-      "$ref": "../common/schema.json#/$defs/UUID"
+      "$ref": "../../common/schema.json#/$defs/UUID"
     },
     "namespace": {
-      "$ref": "../auth/schema.json#/$defs/NamespacePath"
+      "$ref": "../namespace/schema.json#/$defs/NamespacePath"
     },
     "labels": {
       "type": "object",
@@ -262,7 +262,7 @@
       "type": "string"
     },
     "logo": {
-      "$ref": "../common/schema.json#/$defs/Image"
+      "$ref": "../../common/schema.json#/$defs/Image"
     },
     "highlight": {
       "type": "string"

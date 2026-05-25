@@ -22,7 +22,7 @@ import (
 	mockH "github.com/rmorlok/authproxy/internal/httpf/mock"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	genmock "gopkg.in/h2non/gentleman-mock.v2"
@@ -403,4 +403,3 @@ func TestAuthOAuth2_Validate_RejectsUnknownTokenEndpointAuthMethod(t *testing.T)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "token_endpoint_auth_method")
 }
-

@@ -5,7 +5,7 @@ import (
 	"fmt"
 
 	"github.com/rmorlok/authproxy/internal/database"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 // onVerifyPassed advances the connection to the next setup step after all probes have run

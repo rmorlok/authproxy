@@ -35,10 +35,11 @@ func loadSchema(t *testing.T, c *jsonschemav5.Compiler, path string) string {
 func Test_SchemaAgainstRealData(t *testing.T) {
 	c := jsonschemav5.NewCompiler()
 
+	_ = loadSchema(t, c, "../resources/namespace/schema.json")
 	_ = loadSchema(t, c, "../auth/schema.json")
 	_ = loadSchema(t, c, "../common/schema.json")
-	_ = loadSchema(t, c, "../connectors/schema-oauth.json")
-	_ = loadSchema(t, c, "../connectors/schema.json")
+	_ = loadSchema(t, c, "../resources/connectors/schema-oauth.json")
+	_ = loadSchema(t, c, "../resources/connectors/schema.json")
 	schemaId := loadSchema(t, c, "./schema.json")
 
 	require.Equal(t, SchemaIdConfig, schemaId, "schema ID should be the same as the one in the schema")
@@ -108,10 +109,11 @@ type entities struct {
 func compileTestSchema(t *testing.T, schemaJSON string) *jsonschemav5.Schema {
 	c := jsonschemav5.NewCompiler()
 
+	_ = loadSchema(t, c, "../resources/namespace/schema.json")
 	_ = loadSchema(t, c, "../auth/schema.json")
 	_ = loadSchema(t, c, "../common/schema.json")
-	_ = loadSchema(t, c, "../connectors/schema-oauth.json")
-	_ = loadSchema(t, c, "../connectors/schema.json")
+	_ = loadSchema(t, c, "../resources/connectors/schema-oauth.json")
+	_ = loadSchema(t, c, "../resources/connectors/schema.json")
 
 	sid := loadSchema(t, c, "./schema.json")
 	require.Equal(t, SchemaIdConfig, sid)

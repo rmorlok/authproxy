@@ -128,6 +128,10 @@ Asynq, fronted by `internal/apasynq` (testable interface) with API-exposed wrapp
 
 YAML-based, loaded from `internal/schema/config`. Dev configs in `dev_config/`. Connector definitions support three auth types: **OAuth2**, **API Key** (placements: `bearer`, `header`, `query`, `basic`), and **NoAuth**. Connectors can declare **probes** to validate connection health.
 
+### Schema packages
+
+Schema ownership lives under `internal/schema`; read `internal/schema/AGENTS.md` before moving API or resource contract types. REST-managed resources belong under `internal/schema/resources/...`, configuration syntax belongs under `internal/schema/config`, auth/JWT-specific types belong under `internal/schema/auth`, and shared primitives belong under `internal/schema/common`. Resource packages must not import `internal/schema/api`.
+
 ### Other packages worth knowing
 
 - `internal/apctx` — request context with correlation ids, an injectable clock, and value-applier helpers. Use `apctx.GetClock(ctx)` instead of `time.Now()` in any code under test.

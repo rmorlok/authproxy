@@ -7,8 +7,8 @@ import (
 
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apid"
-	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	nschema "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
 type Connector struct {
@@ -159,7 +159,7 @@ func (c *Connector) Validate(vc *common.ValidationContext) error {
 	}
 
 	if c.Namespace != nil {
-		if err := aschema.ValidateNamespacePath(*c.Namespace); err != nil {
+		if err := nschema.ValidateNamespacePath(*c.Namespace); err != nil {
 			result = multierror.Append(result, err)
 		}
 	}
@@ -281,7 +281,7 @@ func (c *Connector) IsDraft() bool {
 // GetNamespace returns the namespace of the connector. Defaults to root if unspecified.
 func (c *Connector) GetNamespace() string {
 	if c == nil || c.Namespace == nil {
-		return aschema.RootNamespace
+		return nschema.RootNamespace
 	}
 
 	return *c.Namespace

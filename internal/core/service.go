@@ -16,8 +16,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/ratelimit"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 type service struct {

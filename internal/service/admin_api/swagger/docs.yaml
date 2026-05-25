@@ -2,7 +2,7 @@ basePath: /api/v1
 definitions:
   github_com_rmorlok_authproxy_internal_schema_config.KeyData:
     type: object
-  github_com_rmorlok_authproxy_internal_schema_rate_limit.RateLimit:
+  github_com_rmorlok_authproxy_internal_schema_resources_rate_limit.RateLimit:
     type: object
   routes.ActorJson:
     properties:
@@ -895,7 +895,7 @@ definitions:
           type: string
         type: object
       definition:
-        $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_rate_limit.RateLimit'
+        $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_resources_rate_limit.RateLimit'
       labels:
         additionalProperties:
           type: string

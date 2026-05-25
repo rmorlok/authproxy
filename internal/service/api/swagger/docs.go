@@ -7431,7 +7431,7 @@ const docTemplateApi = `{
         "github_com_rmorlok_authproxy_internal_schema_config.KeyData": {
             "type": "object"
         },
-        "github_com_rmorlok_authproxy_internal_schema_rate_limit.RateLimit": {
+        "github_com_rmorlok_authproxy_internal_schema_resources_rate_limit.RateLimit": {
             "type": "object"
         },
         "routes.ActorJson": {
@@ -8673,7 +8673,7 @@ const docTemplateApi = `{
                     }
                 },
                 "definition": {
-                    "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_rate_limit.RateLimit"
+                    "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_resources_rate_limit.RateLimit"
                 },
                 "labels": {
                     "type": "object",

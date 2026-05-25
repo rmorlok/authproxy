@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/rmorlok/authproxy/internal/apid"
-	rlschema "github.com/rmorlok/authproxy/internal/schema/rate_limit"
+	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/stretchr/testify/require"
 )
 

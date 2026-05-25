@@ -4,7 +4,7 @@ import (
 	"strconv"
 	"strings"
 
-	rlschema "github.com/rmorlok/authproxy/internal/schema/rate_limit"
+	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 )
 
 // BucketKey is the projection of a matched request into independent
