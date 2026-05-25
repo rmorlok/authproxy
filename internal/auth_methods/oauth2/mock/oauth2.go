@@ -257,20 +257,6 @@ func (mr *MockOAuth2ConnectionMockRecorder) RecordCancelSessionAfterAuth(ctx, sh
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RecordCancelSessionAfterAuth", reflect.TypeOf((*MockOAuth2Connection)(nil).RecordCancelSessionAfterAuth), ctx, shouldCancel)
 }
 
-// RevokeTokens mocks base method.
-func (m *MockOAuth2Connection) RevokeTokens(ctx context.Context) error {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "RevokeTokens", ctx)
-	ret0, _ := ret[0].(error)
-	return ret0
-}
-
-// RevokeTokens indicates an expected call of RevokeTokens.
-func (mr *MockOAuth2ConnectionMockRecorder) RevokeTokens(ctx interface{}) *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "RevokeTokens", reflect.TypeOf((*MockOAuth2Connection)(nil).RevokeTokens), ctx)
-}
-
 // SetStateAndGeneratePublicUrl mocks base method.
 func (m *MockOAuth2Connection) SetStateAndGeneratePublicUrl(ctx context.Context, actor oauth2.IActorData, returnToUrl string) (string, error) {
 	m.ctrl.T.Helper()
@@ -284,18 +270,4 @@ func (m *MockOAuth2Connection) SetStateAndGeneratePublicUrl(ctx context.Context,
 func (mr *MockOAuth2ConnectionMockRecorder) SetStateAndGeneratePublicUrl(ctx, actor, returnToUrl interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SetStateAndGeneratePublicUrl", reflect.TypeOf((*MockOAuth2Connection)(nil).SetStateAndGeneratePublicUrl), ctx, actor, returnToUrl)
-}
-
-// SupportsRevokeTokens mocks base method.
-func (m *MockOAuth2Connection) SupportsRevokeTokens() bool {
-	m.ctrl.T.Helper()
-	ret := m.ctrl.Call(m, "SupportsRevokeTokens")
-	ret0, _ := ret[0].(bool)
-	return ret0
-}
-
-// SupportsRevokeTokens indicates an expected call of SupportsRevokeTokens.
-func (mr *MockOAuth2ConnectionMockRecorder) SupportsRevokeTokens() *gomock.Call {
-	mr.mock.ctrl.T.Helper()
-	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "SupportsRevokeTokens", reflect.TypeOf((*MockOAuth2Connection)(nil).SupportsRevokeTokens))
 }

@@ -416,7 +416,7 @@ func TestCallbackFrom3rdParty_TemplatedEndpoint(t *testing.T) {
 	})
 }
 
-func TestRevokeTokens_TemplatedEndpoint(t *testing.T) {
+func TestRevoke_TemplatedEndpoint(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection)
 	tokenId := apid.New(apid.PrefixOAuth2Token)
 
@@ -476,7 +476,7 @@ func TestRevokeTokens_TemplatedEndpoint(t *testing.T) {
 			MatchType("application/x-www-form-urlencoded").
 			Reply(200)
 
-		err := o2.RevokeTokens(context.Background())
+		err := o2.Revoke(context.Background())
 		require.NoError(t, err)
 	})
 
@@ -509,7 +509,7 @@ func TestRevokeTokens_TemplatedEndpoint(t *testing.T) {
 			MatchType("application/x-www-form-urlencoded").
 			Reply(200)
 
-		err := o2.RevokeTokens(context.Background())
+		err := o2.Revoke(context.Background())
 		require.NoError(t, err)
 	})
 
@@ -569,10 +569,10 @@ func TestRevokeTokens_TemplatedEndpoint(t *testing.T) {
 			MatchType("application/x-www-form-urlencoded").
 			Reply(200)
 
-		err := o2a.RevokeTokens(context.Background())
+		err := o2a.Revoke(context.Background())
 		require.NoError(t, err)
 
-		err = o2b.RevokeTokens(context.Background())
+		err = o2b.Revoke(context.Background())
 		require.NoError(t, err)
 	})
 }
