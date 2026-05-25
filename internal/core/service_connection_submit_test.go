@@ -59,7 +59,7 @@ func newTestConnectionWithSetupFlowAndAsynq(t *testing.T, ctrl *gomock.Controlle
 		Connection: database.Connection{
 			Id:               "cxn_test1111111111aa",
 			Namespace:        "root",
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 			HealthState:      database.ConnectionHealthStateHealthy,
 			ConnectorId:      cv.GetId(),
 			ConnectorVersion: cv.GetVersion(),
@@ -188,7 +188,7 @@ func TestSubmitForm(t *testing.T) {
 
 		db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, gomock.Any()).Return(nil)
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
-		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateReady).Return(nil)
+		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
 
 		resp, err := conn.SubmitForm(context.Background(), iface.SubmitConnectionRequest{
 			StepId: "workspace",
@@ -244,7 +244,7 @@ func TestSubmitForm(t *testing.T) {
 		// Second submit — merges workspace into existing config
 		db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, gomock.Any()).Return(nil)
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
-		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateReady).Return(nil)
+		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
 
 		resp, err = conn.SubmitForm(context.Background(), iface.SubmitConnectionRequest{
 			StepId: "step2",

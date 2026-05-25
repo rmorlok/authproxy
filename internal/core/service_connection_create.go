@@ -39,7 +39,7 @@ func (s *service) CreateConnection(
 		ConnectorVersion: cv.GetVersion(),
 		CreatedAt:        now,
 		UpdatedAt:        now,
-		State:            database.ConnectionStateCreated,
+		State:            database.ConnectionStateSetup,
 	}
 
 	err = s.db.CreateConnection(ctx, &dbConn)

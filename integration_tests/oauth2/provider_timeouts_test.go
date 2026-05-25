@@ -113,7 +113,7 @@ func TestTokenExchangeTimeout_RetriesAndExhausts(t *testing.T) {
 
 	// Connection in auth_failed terminal state.
 	conn := rig.env.GetConnection(t, connID)
-	assert.Equal(t, database.ConnectionStateCreated, conn.State)
+	assert.Equal(t, database.ConnectionStateSetup, conn.State)
 	require.NotNil(t, conn.SetupStep)
 	assert.Truef(t, conn.SetupStep.Equals(cschema.SetupStepAuthFailed),
 		"exhausted timeout should land in auth_failed; got %q", conn.SetupStep.String())
@@ -276,7 +276,7 @@ func TestUpstreamApiTimeout_SurfacedToCaller(t *testing.T) {
 	// is not a credential problem; flipping unhealthy here would
 	// paint a working connection broken.
 	conn := rig.env.GetConnection(t, connID)
-	assert.Equal(t, database.ConnectionStateReady, conn.State,
+	assert.Equal(t, database.ConnectionStateConfigured, conn.State,
 		"upstream transport failure must not change the connection state")
 	assert.Equalf(t, database.ConnectionHealthStateHealthy, conn.HealthState,
 		"upstream transport failure must not flip the connection unhealthy; got %q", conn.HealthState)

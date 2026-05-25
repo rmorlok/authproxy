@@ -635,7 +635,7 @@ func (env *IntegrationTestEnv) CreateConnection(t *testing.T, connectorID apid.I
 		Namespace:        sconfig.RootNamespace,
 		ConnectorId:      connectorID,
 		ConnectorVersion: connectorVersion,
-		State:            database.ConnectionStateCreated,
+		State:            database.ConnectionStateSetup,
 	})
 	require.NoError(t, err)
 

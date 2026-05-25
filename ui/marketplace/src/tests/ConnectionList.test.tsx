@@ -44,7 +44,7 @@ const makeConnection = (overrides: Partial<Connection> = {}): Connection => ({
     id: 'c-1',
     namespace: 'root',
     connector: connector,
-    state: ConnectionState.READY,
+    state: ConnectionState.CONFIGURED,
     health_state: ConnectionHealthState.HEALTHY,
     created_at: '2024-01-01T00:00:00Z',
     updated_at: '2024-01-01T00:00:00Z',

@@ -156,7 +156,7 @@ func TestCallbackRejection_ActorMismatch(t *testing.T) {
 
 	// 7. Connection still in `created`, no setup_step transition.
 	conn := env.GetConnection(t, connID)
-	assert.Equal(t, database.ConnectionStateCreated, conn.State,
+	assert.Equal(t, database.ConnectionStateSetup, conn.State,
 		"connection state should remain `created` after a rejected callback")
 	assert.Nil(t, conn.SetupStep, "no setup_step should be recorded on a rejected callback")
 	assert.Nil(t, conn.SetupError, "no setup_error should be recorded on a rejected callback")

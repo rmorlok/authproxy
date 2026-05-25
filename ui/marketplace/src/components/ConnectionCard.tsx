@@ -60,13 +60,13 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
   // Determine the status color
   let statusColor: 'success' | 'error' | 'warning' | 'default' = 'default';
   switch (connection.state) {
-    case ConnectionState.READY:
+    case ConnectionState.CONFIGURED:
       statusColor = 'success';
       break;
     case ConnectionState.DISABLED:
       statusColor = 'error';
       break;
-    case ConnectionState.CREATED:
+    case ConnectionState.SETUP:
       statusColor = 'warning';
       break;
     case ConnectionState.DISCONNECTING:
@@ -98,10 +98,10 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
     });
   };
 
-  // Reauth is meaningful only on Ready connections (any state earlier is still
+  // Reauth is meaningful only on Configured connections (any state earlier is still
   // in initial setup; later states are tearing down). Visibility itself is the
   // signal — when health is unhealthy the button is emphasized.
-  const canReauth = connection.state === ConnectionState.READY;
+  const canReauth = connection.state === ConnectionState.CONFIGURED;
   const isUnhealthy = connection.health_state === ConnectionHealthState.UNHEALTHY;
 
   // Handle disconnect button click
@@ -228,7 +228,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
               Re-authenticate
             </Button>
           )}
-          {connection.state === ConnectionState.READY && connector?.has_configure && (
+          {connection.state === ConnectionState.CONFIGURED && connector?.has_configure && (
             <Button
               size="small"
               startIcon={<SettingsIcon />}

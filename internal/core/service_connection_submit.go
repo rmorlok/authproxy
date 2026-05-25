@@ -77,7 +77,7 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 		if err := c.SetSetupStep(ctx, nil); err != nil {
 			return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to clear setup step: %w", err))
 		}
-		if err := c.SetState(ctx, database.ConnectionStateReady); err != nil {
+		if err := c.SetState(ctx, database.ConnectionStateConfigured); err != nil {
 			return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to set connection state to ready: %w", err))
 		}
 		return &iface.ConnectionSetupComplete{

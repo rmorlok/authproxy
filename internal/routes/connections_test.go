@@ -103,7 +103,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -153,7 +153,7 @@ func TestConnections(t *testing.T) {
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, u, resp.Id)
-			require.Equal(t, database.ConnectionStateCreated, resp.State)
+			require.Equal(t, database.ConnectionStateSetup, resp.State)
 		})
 
 		t.Run("allowed with matching resource id permission", func(t *testing.T) {
@@ -231,7 +231,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root",
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -242,7 +242,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root.child",
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -253,7 +253,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root.child",
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -264,7 +264,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root.child.grandchild",
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -350,7 +350,7 @@ func TestConnections(t *testing.T) {
 				Namespace:        "root",
 				ConnectorId:      connectorId,
 				ConnectorVersion: connectorVersion,
-				State:            database.ConnectionStateCreated,
+				State:            database.ConnectionStateSetup,
 				Labels:           database.Labels{"env": "test-label-conn"},
 			})
 			require.NoError(t, err)
@@ -380,7 +380,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateReady,
+			State:            database.ConnectionStateConfigured,
 		})
 		require.NoError(t, err)
 
@@ -473,7 +473,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 			Labels:           database.Labels{"existing": "value"},
 		})
 		require.NoError(t, err)
@@ -635,7 +635,7 @@ func TestConnections(t *testing.T) {
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, u, resp.Id)
-			require.Equal(t, database.ConnectionStateCreated, resp.State)
+			require.Equal(t, database.ConnectionStateSetup, resp.State)
 		})
 	})
 
@@ -648,7 +648,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 			Labels:           database.Labels{"env": "prod", "team": "backend"},
 		})
 		require.NoError(t, err)
@@ -723,7 +723,7 @@ func TestConnections(t *testing.T) {
 				Namespace:        sconfig.RootNamespace,
 				ConnectorId:      connectorId,
 				ConnectorVersion: connectorVersion,
-				State:            database.ConnectionStateCreated,
+				State:            database.ConnectionStateSetup,
 			})
 			require.NoError(t, err)
 
@@ -758,7 +758,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 			Labels:           database.Labels{"env": "staging"},
 		})
 		require.NoError(t, err)
@@ -852,7 +852,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -1023,7 +1023,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 			Labels:           database.Labels{"env": "prod", "team": "backend"},
 		})
 		require.NoError(t, err)
@@ -1110,7 +1110,7 @@ func TestConnections(t *testing.T) {
 				Namespace:        sconfig.RootNamespace,
 				ConnectorId:      connectorId,
 				ConnectorVersion: connectorVersion,
-				State:            database.ConnectionStateCreated,
+				State:            database.ConnectionStateSetup,
 				Labels:           database.Labels{"to-delete": "value", "to-keep": "value2"},
 			})
 			require.NoError(t, err)
@@ -1145,7 +1145,7 @@ func TestConnections(t *testing.T) {
 				Namespace:        sconfig.RootNamespace,
 				ConnectorId:      connectorId,
 				ConnectorVersion: connectorVersion,
-				State:            database.ConnectionStateCreated,
+				State:            database.ConnectionStateSetup,
 				Labels:           database.Labels{"label": "value"},
 			})
 			require.NoError(t, err)
@@ -1184,7 +1184,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -1253,7 +1253,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("allowed with matching resource id permission", func(t *testing.T) {
 			// Reset state first
-			err := tu.Db.SetConnectionState(context.Background(), u, database.ConnectionStateCreated)
+			err := tu.Db.SetConnectionState(context.Background(), u, database.ConnectionStateSetup)
 			require.NoError(t, err)
 
 			w := httptest.NewRecorder()
@@ -1283,7 +1283,7 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				"/connections/"+u.String()+"/_force_state",
-				util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateReady}),
+				util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateConfigured}),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "force_state", otherResourceId.String()),
@@ -1304,7 +1304,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 			Annotations:      database.Annotations{"note": "important", "owner": "team-a"},
 		})
 		require.NoError(t, err)
@@ -1363,7 +1363,7 @@ func TestConnections(t *testing.T) {
 				Namespace:        sconfig.RootNamespace,
 				ConnectorId:      connectorId,
 				ConnectorVersion: connectorVersion,
-				State:            database.ConnectionStateCreated,
+				State:            database.ConnectionStateSetup,
 			})
 			require.NoError(t, err)
 
@@ -1397,7 +1397,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 			Annotations:      database.Annotations{"note": "important"},
 		})
 		require.NoError(t, err)
@@ -1475,7 +1475,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -1606,7 +1606,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 			Annotations:      database.Annotations{"note": "important", "owner": "team-a"},
 		})
 		require.NoError(t, err)
@@ -1661,7 +1661,7 @@ func TestConnections(t *testing.T) {
 				Namespace:        sconfig.RootNamespace,
 				ConnectorId:      connectorId,
 				ConnectorVersion: connectorVersion,
-				State:            database.ConnectionStateCreated,
+				State:            database.ConnectionStateSetup,
 				Annotations:      database.Annotations{"to-delete": "value", "to-keep": "value2"},
 			})
 			require.NoError(t, err)
@@ -1699,7 +1699,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -1818,7 +1818,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -1871,7 +1871,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -1923,7 +1923,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -1977,7 +1977,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        sconfig.RootNamespace,
 			ConnectorId:      connectorId,
 			ConnectorVersion: connectorVersion,
-			State:            database.ConnectionStateReady,
+			State:            database.ConnectionStateConfigured,
 		})
 		require.NoError(t, err)
 
@@ -2045,7 +2045,7 @@ func TestConnections(t *testing.T) {
 				Namespace:        sconfig.RootNamespace,
 				ConnectorId:      oauthConnectorId,
 				ConnectorVersion: oauthConnectorVersion,
-				State:            database.ConnectionStateReady,
+				State:            database.ConnectionStateConfigured,
 			})
 			require.NoError(t, err)
 

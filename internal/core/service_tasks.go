@@ -29,8 +29,8 @@ func (s *service) GetCronTasks() []*asynq.PeriodicTaskConfig {
 	err := s.db.ListConnectionsBuilder().
 		WithDeletedHandling(database.DeletedHandlingExclude).
 		ForStates([]database.ConnectionState{
-			database.ConnectionStateCreated,
-			database.ConnectionStateReady,
+			database.ConnectionStateSetup,
+			database.ConnectionStateConfigured,
 		}).
 		Enumerate(
 			context.Background(),

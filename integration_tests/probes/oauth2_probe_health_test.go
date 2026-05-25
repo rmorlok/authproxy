@@ -120,7 +120,7 @@ func TestOAuth2ProbeHealth_FailureAndRecovery(t *testing.T) {
 	require.NoError(t, env.RunVerifyConnection(t, connID))
 
 	conn := env.GetConnection(t, connID)
-	require.Equal(t, database.ConnectionStateReady, conn.State,
+	require.Equal(t, database.ConnectionStateConfigured, conn.State,
 		"connection should land Ready after a successful verify")
 	require.Equal(t, database.ConnectionHealthStateHealthy, conn.HealthState,
 		"healthy is the baseline after a successful initial verify")
@@ -142,7 +142,7 @@ func TestOAuth2ProbeHealth_FailureAndRecovery(t *testing.T) {
 	require.Error(t, probeErr, "probe must surface upstream 401 as a failure outcome")
 
 	conn = env.GetConnection(t, connID)
-	assert.Equal(t, database.ConnectionStateReady, conn.State,
+	assert.Equal(t, database.ConnectionStateConfigured, conn.State,
 		"state should still be Ready — only health_state flips on probe failures")
 	require.Equal(t, database.ConnectionHealthStateUnhealthy, conn.HealthState,
 		"failure_threshold=1: a single failed probe must flip health to unhealthy")

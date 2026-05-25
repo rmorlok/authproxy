@@ -2162,7 +2162,7 @@ func TestConnectorVersionLabelChangePropagation(t *testing.T) {
 			Namespace:        "root.cv",
 			ConnectorId:      cvID,
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 		}))
 
 		c, err := db.GetConnection(ctx, connID)
@@ -2208,7 +2208,7 @@ func TestReconcileCarryForwardLabels(t *testing.T) {
 		connID := apid.New(apid.PrefixConnection)
 		require.NoError(t, db.CreateConnection(ctx, &Connection{
 			Id: connID, Namespace: "root.recon", ConnectorId: cvID, ConnectorVersion: 1,
-			State: ConnectionStateCreated,
+			State: ConnectionStateSetup,
 		}))
 		require.NoError(t, db.CreateEncryptionKey(ctx, &EncryptionKey{
 			Id: apid.New(apid.PrefixEncryptionKey), Namespace: "root.recon", State: EncryptionKeyStateActive,

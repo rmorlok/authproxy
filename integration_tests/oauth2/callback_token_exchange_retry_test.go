@@ -148,7 +148,7 @@ func TestTokenExchange_TransientRetrySucceeds(t *testing.T) {
 		"successful retry should land on return_to_url; got %q", loc)
 
 	conn := rig.env.GetConnection(t, connID)
-	assert.Equal(t, database.ConnectionStateReady, conn.State,
+	assert.Equal(t, database.ConnectionStateConfigured, conn.State,
 		"retried success must transition the connection to ready")
 	assert.Nil(t, conn.SetupStep, "successful retry must not record an auth_failed setup_step")
 	assert.Nil(t, conn.SetupError, "successful retry must not record a setup_error")
@@ -212,7 +212,7 @@ func TestTokenExchange_TransientRetryExhausted(t *testing.T) {
 	require.Nil(t, rig.env.GetOAuth2Token(t, connID))
 
 	conn := rig.env.GetConnection(t, connID)
-	assert.Equal(t, database.ConnectionStateCreated, conn.State)
+	assert.Equal(t, database.ConnectionStateSetup, conn.State)
 	require.NotNil(t, conn.SetupStep)
 	assert.Truef(t, conn.SetupStep.Equals(cschema.SetupStepAuthFailed),
 		"exhausted retry should land in auth_failed; got %q", conn.SetupStep.String())

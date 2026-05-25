@@ -29,7 +29,7 @@ func TestProbeNoOp_Invoke(t *testing.T) {
 		Connection: database.Connection{
 			Id:               apid.New(apid.PrefixConnection),
 			Namespace:        "root",
-			State:            database.ConnectionStateReady,
+			State:            database.ConnectionStateConfigured,
 			HealthState:      database.ConnectionHealthStateHealthy,
 			ConnectorId:      cv.GetId(),
 			ConnectorVersion: cv.GetVersion(),
