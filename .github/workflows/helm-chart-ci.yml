@@ -52,18 +52,19 @@ jobs:
             echo "No chart changes detected."
           fi
 
-      - name: helm dependency update (bootstrap)
-        # `ct lint` runs `helm lint`, which requires subchart tarballs to
-        # already be downloaded under charts/. The bootstrap chart depends
-        # on four upstream charts; the authproxy chart has no deps so this
-        # is a no-op for it (kept the call non-failing for that reason).
+      - name: Register Helm repos for chart dependencies
+        # `ct lint` runs `helm dependency build` internally, which only
+        # resolves dependencies whose `repository:` URL is registered as
+        # a named helm repo on this runner. Pre-register the four the
+        # bootstrap chart pulls from. Idempotent — `helm repo add` is a
+        # no-op when the alias already exists with the same URL.
         if: steps.changed.outputs.found == 'true'
         run: |
-          for chart in deploy/charts/*/; do
-            if grep -q '^dependencies:' "$chart/Chart.yaml" 2>/dev/null; then
-              helm dependency update "$chart"
-            fi
-          done
+          helm repo add ingress-nginx  https://kubernetes.github.io/ingress-nginx
+          helm repo add jetstack       https://charts.jetstack.io
+          helm repo add external-dns   https://kubernetes-sigs.github.io/external-dns/
+          helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+          helm repo update
 
       - name: ct lint
         if: steps.changed.outputs.found == 'true'
