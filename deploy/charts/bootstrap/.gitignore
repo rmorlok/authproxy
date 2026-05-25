@@ -1,0 +1,10 @@
+# Subchart tarballs are downloaded fresh by `helm dependency update`
+# (CI does this on every run); committing them bloats the repo and
+# courts merge conflicts every time a dependency version is bumped.
+charts/*.tgz
+
+# Chart.lock pins the *exact* hash of each downloaded tarball. Since
+# Chart.yaml's `dependencies[*].version` is already a fixed version
+# (not a range), the lock adds no reproducibility we don't already
+# have, and re-locks noisily on every `helm dep update`.
+Chart.lock

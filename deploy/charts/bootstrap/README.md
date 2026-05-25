@@ -27,10 +27,12 @@ template owned by this chart directly is `templates/cluster_issuer.yaml`.
    terraform output domain_name
    ```
 
-3. Local `kubectl` wired to the cluster:
+3. Local `kubectl` wired to the cluster — **required**, helm uses your
+   current kubectl context:
 
    ```bash
-   $(terraform output -raw kubeconfig_command)
+   $(cd ../../terraform/eks && terraform output -raw kubeconfig_command)
+   kubectl get nodes   # smoke-test before running helm
    ```
 
 4. Helm 3.16+ installed.
@@ -45,12 +47,26 @@ helm dependency update     # fetch the four upstream charts into charts/
 helm upgrade --install authproxy-bootstrap . \
   --namespace kube-system \
   --create-namespace \
+  --wait --timeout 5m \
   --set "global.acmeEmail=you@example.com" \
   --set "global.hostedZoneId=$(cd ../../terraform/eks && terraform output -raw route53_zone_id)" \
   --set "global.domain=$(cd ../../terraform/eks && terraform output -raw domain_name)" \
   --set "external-dns.serviceAccount.annotations.eks\.amazonaws\.com/role-arn=$(cd ../../terraform/eks && terraform output -raw external_dns_role_arn)" \
-  --set "external-dns.domainFilters[0]=$(cd ../../terraform/eks && terraform output -raw domain_name)"
+  --set "external-dns.domainFilters[0]=$(cd ../../terraform/eks && terraform output -raw domain_name)" \
+  --set "external-dns.zoneIdFilters[0]=$(cd ../../terraform/eks && terraform output -raw route53_zone_id)"
 ```
+
+`zoneIdFilters` pins external-dns to the exact terraform-managed
+hosted zone — important when AWS has auto-created a second
+`authproxy.net` zone at domain registration time. Without this pin,
+external-dns tries to write to all matching zones, and a single
+AccessDenied on any one of them marks the whole reconcile failed.
+
+`--wait` is important: cert-manager's webhook needs to be serving before
+the post-install ClusterIssuer hook fires, and `--wait` blocks the
+install until the main release's pods are Ready. Without it, the first
+install commonly trips a "no endpoints available for service
+…cert-manager-webhook" race.
 
 The post-install NOTES print a verification checklist; follow them in
 order.

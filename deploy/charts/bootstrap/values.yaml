@@ -93,6 +93,15 @@ external-dns:
   # plumbing through.
   domainFilters: []
 
+  # Zone-id filter is a stricter version of domainFilters — pins the
+  # exact hosted zone external-dns is allowed to write to. Important
+  # when more than one zone for the same domain exists in the account
+  # (e.g. a registrar auto-created zone alongside the terraform-managed
+  # one); without this pin, external-dns tries to write to ALL matching
+  # zones and a single AccessDenied marks the whole reconcile failed.
+  # Set from `terraform output route53_zone_id`.
+  zoneIdFilters: []
+
   # Match records this instance owns so concurrent installs (per-branch
   # dev envs) don't fight over the same records.
   txtOwnerId: "authproxy"
