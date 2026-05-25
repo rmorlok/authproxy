@@ -6,6 +6,6 @@
 - `config`: application configuration file syntax.
 - `auth`: authentication and authorization contract types.
 - `resources`: REST-managed resource models.
-- `api`: API request/response DTOs, added as the API contract consolidation continues.
+- `api`: API request/response DTOs.
 
 Resource packages are intentionally separate from API DTOs. API models can compose resources, but resources must not depend on API-specific request or response wrappers.

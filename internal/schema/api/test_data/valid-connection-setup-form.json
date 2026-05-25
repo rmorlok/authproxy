@@ -1,0 +1,21 @@
+{
+  "id": "cxn_test0000000000002",
+  "type": "form",
+  "step_id": "preconnect:0",
+  "step_title": "Choose workspace",
+  "current_step": 1,
+  "total_steps": 1,
+  "json_schema": {
+    "type": "object",
+    "properties": {
+      "workspace": {
+        "type": "string"
+      }
+    }
+  },
+  "ui_schema": {
+    "workspace": {
+      "ui:widget": "select"
+    }
+  }
+}

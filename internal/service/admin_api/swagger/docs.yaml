@@ -40,43 +40,64 @@ definitions:
     description: Completion response for connection setup
     properties:
       id:
-        description: Connection UUID
-        example: req_test550e8400abcde
+        description: Connection UUID.
+        example: cxn_test550e8400abcde
         type: string
       type:
-        description: Response type (always "complete")
+        description: Response type.
         example: complete
         type: string
     type: object
   routes.ConnectionSetupForm:
     description: Form response for connection setup
     properties:
+      current_step:
+        description: Current step number in the setup phase.
+        example: 1
+        type: integer
       id:
-        description: Connection UUID
-        example: req_test550e8400abcde
+        description: Connection UUID.
+        example: cxn_test550e8400abcde
         type: string
       json_schema:
-        description: JSON Schema defining the form fields
+        description: JSON Schema defining the form fields.
+        type: object
+      step_description:
+        description: Step description.
+        type: string
+      step_id:
+        description: Step ID being submitted.
+        example: preconnect:0
+        type: string
+      step_title:
+        description: Step title.
+        example: Choose workspace
+        type: string
+      total_steps:
+        description: Total number of steps in the setup phase.
+        example: 2
+        type: integer
       type:
-        description: Response type (always "form")
+        description: Response type.
         example: form
         type: string
       ui_schema:
-        description: UI Schema for JSON Forms rendering
+        description: UI Schema for JSON Forms rendering.
+        type: object
     type: object
   routes.ConnectionSetupRedirect:
     description: Redirect response for connection setup
     properties:
       id:
-        description: Connection UUID
-        example: req_test550e8400abcde
+        description: Connection UUID.
+        example: cxn_test550e8400abcde
         type: string
       redirect_url:
-        description: URL to redirect the user to
+        description: URL to redirect the user to.
         example: https://oauth.provider.com/authorize?...
         type: string
       type:
-        description: Response type (always "redirect")
+        description: Response type.
         example: redirect
         type: string
     type: object
@@ -129,11 +150,11 @@ definitions:
     description: Data source option for form select fields
     properties:
       label:
-        description: Human-readable label
+        description: Human-readable label.
         example: My Workspace
         type: string
       value:
-        description: Option value
+        description: Option value.
         example: ws-123
         type: string
     type: object
@@ -152,20 +173,22 @@ definitions:
     description: Request to initiate a connection
     properties:
       connector_id:
-        description: ID of the connector to initiate the connection for
-        example: req_test550e8400abcde
+        description: ID of the connector to initiate the connection for.
+        example: cxr_test550e8400abcde
         type: string
       connector_version:
-        description: Version of the connector (optional, defaults to primary version)
+        description: Version of the connector to initiate connection for; if not specified
+          defaults to the primary version.
         example: 1
         type: integer
       into_namespace:
-        description: Namespace to create the connection in (optional, defaults to
-          connector namespace)
-        example: acme
+        description: |-
+          The namespace to create the connection in. Must be the namespace of connector or a child namespace of that
+          namespace. Defaults to the connector namespace if not specified.
+        example: root.acme
         type: string
       return_to_url:
-        description: URL to return to after the connection is completed
+        description: The URL to return to after the connection is completed.
         example: https://example.com/callback
         type: string
     type: object
@@ -258,7 +281,19 @@ definitions:
     description: Form submission data
     properties:
       data:
-        description: Form data matching the JSON Schema provided in the form response
+        description: Data is the form data submitted by the user for the current step.
+        type: object
+      return_to_url:
+        description: |-
+          ReturnToUrl is required when the next step after form submission is an auth redirect.
+          The client should provide this so the OAuth callback knows where to return.
+        example: https://example.com/callback
+        type: string
+      step_id:
+        description: StepId is the id of the step being submitted. Must match the
+          current setup step's id.
+        example: preconnect:0
+        type: string
     type: object
   routes.SwaggerConnectionJson:
     description: Connection to an external service

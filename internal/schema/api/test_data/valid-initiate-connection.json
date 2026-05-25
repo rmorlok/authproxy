@@ -1,0 +1,6 @@
+{
+  "connector_id": "cxr_test0000000000001",
+  "connector_version": 1,
+  "into_namespace": "root.acme",
+  "return_to_url": "https://example.com/callback"
+}

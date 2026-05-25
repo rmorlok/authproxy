@@ -8,7 +8,7 @@ This directory owns AuthProxy's public and internal data contracts. Keep schema 
 - `internal/schema/config` contains YAML/JSON config-file syntax. It may reference common primitives, auth permissions, and resource definitions used in config.
 - `internal/schema/auth` contains auth/JWT-specific schema such as permissions. Namespace path and matcher helpers live in `internal/schema/resources/namespace`; the auth package only re-exports namespace helpers for compatibility.
 - `internal/schema/resources/...` contains REST-managed resource models. Use this tree for system resources such as connectors, namespaces, and rate limits.
-- `internal/schema/api` is reserved for API request/response DTOs. Resource packages must not import it.
+- `internal/schema/api` contains API request/response DTOs. Resource packages must not import it.
 
 ## Conventions
 

@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 )
 
 // ErrorResponse is the standardized error response format for authproxy API errors.
@@ -16,73 +17,12 @@ type ErrorResponse struct {
 	StackTrace string `json:"stack_trace,omitempty"`
 }
 
-// InitiateConnectionRequest represents a request to initiate a connection to an external service.
-//
-//	@Description	Request to initiate a connection
-type InitiateConnectionRequest struct {
-	// ID of the connector to initiate the connection for
-	ConnectorId apid.ID `swaggertype:"string" json:"connector_id" example:"req_test550e8400abcde"`
-	// Version of the connector (optional, defaults to primary version)
-	ConnectorVersion uint64 `json:"connector_version,omitempty" example:"1"`
-	// Namespace to create the connection in (optional, defaults to connector namespace)
-	IntoNamespace string `json:"into_namespace,omitempty" example:"acme"`
-	// URL to return to after the connection is completed
-	ReturnToUrl string `json:"return_to_url" example:"https://example.com/callback"`
-}
-
-// ConnectionSetupRedirect represents the response when a connection requires a redirect for OAuth.
-//
-//	@Description	Redirect response for connection setup
-type ConnectionSetupRedirect struct {
-	// Connection UUID
-	Id apid.ID `swaggertype:"string" json:"id" example:"req_test550e8400abcde"`
-	// Response type (always "redirect")
-	Type string `json:"type" example:"redirect"`
-	// URL to redirect the user to
-	RedirectUrl string `json:"redirect_url" example:"https://oauth.provider.com/authorize?..."`
-}
-
-// ConnectionSetupForm represents the response when a connection requires form input.
-//
-//	@Description	Form response for connection setup
-type ConnectionSetupForm struct {
-	// Connection UUID
-	Id apid.ID `swaggertype:"string" json:"id" example:"req_test550e8400abcde"`
-	// Response type (always "form")
-	Type string `json:"type" example:"form"`
-	// JSON Schema defining the form fields
-	JsonSchema interface{} `json:"json_schema"`
-	// UI Schema for JSON Forms rendering
-	UiSchema interface{} `json:"ui_schema"`
-}
-
-// ConnectionSetupComplete represents the response when a connection setup is complete.
-//
-//	@Description	Completion response for connection setup
-type ConnectionSetupComplete struct {
-	// Connection UUID
-	Id apid.ID `swaggertype:"string" json:"id" example:"req_test550e8400abcde"`
-	// Response type (always "complete")
-	Type string `json:"type" example:"complete"`
-}
-
-// SubmitConnectionRequest represents a form data submission for a connection setup step.
-//
-//	@Description	Form submission data
-type SubmitConnectionRequest struct {
-	// Form data matching the JSON Schema provided in the form response
-	Data interface{} `json:"data"`
-}
-
-// DataSourceOptionJson represents a single option from a data source for populating form dropdowns.
-//
-//	@Description	Data source option for form select fields
-type DataSourceOptionJson struct {
-	// Option value
-	Value string `json:"value" example:"ws-123"`
-	// Human-readable label
-	Label string `json:"label" example:"My Workspace"`
-}
+type InitiateConnectionRequest = schemaapi.InitiateConnectionRequest
+type ConnectionSetupRedirect = schemaapi.ConnectionSetupRedirect
+type ConnectionSetupForm = schemaapi.ConnectionSetupForm
+type ConnectionSetupComplete = schemaapi.ConnectionSetupComplete
+type SubmitConnectionRequest = schemaapi.SubmitConnectionRequest
+type DataSourceOptionJson = schemaapi.DataSourceOptionJson
 
 // ProxyRequest represents a request to proxy through a connection.
 //

@@ -1,0 +1,6 @@
+{
+  "id": "cxn_test0000000000002",
+  "type": "error",
+  "error": "probe verification failed",
+  "can_retry": true
+}

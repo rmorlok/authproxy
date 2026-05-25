@@ -1,0 +1,7 @@
+{
+  "step_id": "preconnect:0",
+  "data": {
+    "workspace": "ws-123"
+  },
+  "return_to_url": "https://example.com/callback"
+}

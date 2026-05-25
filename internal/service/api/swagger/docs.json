@@ -7482,12 +7482,12 @@
             "type": "object",
             "properties": {
                 "id": {
-                    "description": "Connection UUID",
+                    "description": "Connection UUID.",
                     "type": "string",
-                    "example": "req_test550e8400abcde"
+                    "example": "cxn_test550e8400abcde"
                 },
                 "type": {
-                    "description": "Response type (always \"complete\")",
+                    "description": "Response type.",
                     "type": "string",
                     "example": "complete"
                 }
@@ -7497,21 +7497,47 @@
             "description": "Form response for connection setup",
             "type": "object",
             "properties": {
+                "current_step": {
+                    "description": "Current step number in the setup phase.",
+                    "type": "integer",
+                    "example": 1
+                },
                 "id": {
-                    "description": "Connection UUID",
+                    "description": "Connection UUID.",
                     "type": "string",
-                    "example": "req_test550e8400abcde"
+                    "example": "cxn_test550e8400abcde"
                 },
                 "json_schema": {
-                    "description": "JSON Schema defining the form fields"
+                    "description": "JSON Schema defining the form fields.",
+                    "type": "object"
+                },
+                "step_description": {
+                    "description": "Step description.",
+                    "type": "string"
+                },
+                "step_id": {
+                    "description": "Step ID being submitted.",
+                    "type": "string",
+                    "example": "preconnect:0"
+                },
+                "step_title": {
+                    "description": "Step title.",
+                    "type": "string",
+                    "example": "Choose workspace"
+                },
+                "total_steps": {
+                    "description": "Total number of steps in the setup phase.",
+                    "type": "integer",
+                    "example": 2
                 },
                 "type": {
-                    "description": "Response type (always \"form\")",
+                    "description": "Response type.",
                     "type": "string",
                     "example": "form"
                 },
                 "ui_schema": {
-                    "description": "UI Schema for JSON Forms rendering"
+                    "description": "UI Schema for JSON Forms rendering.",
+                    "type": "object"
                 }
             }
         },
@@ -7520,17 +7546,17 @@
             "type": "object",
             "properties": {
                 "id": {
-                    "description": "Connection UUID",
+                    "description": "Connection UUID.",
                     "type": "string",
-                    "example": "req_test550e8400abcde"
+                    "example": "cxn_test550e8400abcde"
                 },
                 "redirect_url": {
-                    "description": "URL to redirect the user to",
+                    "description": "URL to redirect the user to.",
                     "type": "string",
                     "example": "https://oauth.provider.com/authorize?..."
                 },
                 "type": {
-                    "description": "Response type (always \"redirect\")",
+                    "description": "Response type.",
                     "type": "string",
                     "example": "redirect"
                 }
@@ -7610,12 +7636,12 @@
             "type": "object",
             "properties": {
                 "label": {
-                    "description": "Human-readable label",
+                    "description": "Human-readable label.",
                     "type": "string",
                     "example": "My Workspace"
                 },
                 "value": {
-                    "description": "Option value",
+                    "description": "Option value.",
                     "type": "string",
                     "example": "ws-123"
                 }
@@ -7641,22 +7667,22 @@
             "type": "object",
             "properties": {
                 "connector_id": {
-                    "description": "ID of the connector to initiate the connection for",
+                    "description": "ID of the connector to initiate the connection for.",
                     "type": "string",
-                    "example": "req_test550e8400abcde"
+                    "example": "cxr_test550e8400abcde"
                 },
                 "connector_version": {
-                    "description": "Version of the connector (optional, defaults to primary version)",
+                    "description": "Version of the connector to initiate connection for; if not specified defaults to the primary version.",
                     "type": "integer",
                     "example": 1
                 },
                 "into_namespace": {
-                    "description": "Namespace to create the connection in (optional, defaults to connector namespace)",
+                    "description": "The namespace to create the connection in. Must be the namespace of connector or a child namespace of that\nnamespace. Defaults to the connector namespace if not specified.",
                     "type": "string",
-                    "example": "acme"
+                    "example": "root.acme"
                 },
                 "return_to_url": {
-                    "description": "URL to return to after the connection is completed",
+                    "description": "The URL to return to after the connection is completed.",
                     "type": "string",
                     "example": "https://example.com/callback"
                 }
@@ -7790,7 +7816,18 @@
             "type": "object",
             "properties": {
                 "data": {
-                    "description": "Form data matching the JSON Schema provided in the form response"
+                    "description": "Data is the form data submitted by the user for the current step.",
+                    "type": "object"
+                },
+                "return_to_url": {
+                    "description": "ReturnToUrl is required when the next step after form submission is an auth redirect.\nThe client should provide this so the OAuth callback knows where to return.",
+                    "type": "string",
+                    "example": "https://example.com/callback"
+                },
+                "step_id": {
+                    "description": "StepId is the id of the step being submitted. Must match the current setup step's id.",
+                    "type": "string",
+                    "example": "preconnect:0"
                 }
             }
         },
