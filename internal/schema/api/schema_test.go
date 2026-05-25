@@ -61,6 +61,16 @@ func TestSchemaSamples(t *testing.T) {
 		{name: "setup error", ref: "./schema.json#/$defs/ConnectionSetupError", file: "valid-connection-setup-error.json"},
 		{name: "submit connection", ref: "./schema.json#/$defs/SubmitConnectionRequest", file: "valid-submit-connection.json"},
 		{name: "data source option", ref: "./schema.json#/$defs/DataSourceOption", file: "valid-data-source-option.json"},
+		{name: "namespace", ref: "./schema.json#/$defs/Namespace", file: "valid-namespace.json"},
+		{name: "create namespace", ref: "./schema.json#/$defs/CreateNamespaceRequest", file: "valid-create-namespace.json"},
+		{name: "update namespace", ref: "./schema.json#/$defs/UpdateNamespaceRequest", file: "valid-update-namespace.json"},
+		{name: "list namespaces", ref: "./schema.json#/$defs/ListNamespacesResponse", file: "valid-list-namespaces.json"},
+		{name: "set namespace encryption key", ref: "./schema.json#/$defs/SetNamespaceEncryptionKeyRequest", file: "valid-set-namespace-encryption-key.json"},
+		{name: "namespace encryption key", ref: "./schema.json#/$defs/NamespaceEncryptionKey", file: "valid-namespace-encryption-key.json"},
+		{name: "actor", ref: "./schema.json#/$defs/Actor", file: "valid-actor.json"},
+		{name: "create actor", ref: "./schema.json#/$defs/CreateActorRequest", file: "valid-create-actor.json"},
+		{name: "update actor", ref: "./schema.json#/$defs/UpdateActorRequest", file: "valid-update-actor.json"},
+		{name: "list actors", ref: "./schema.json#/$defs/ListActorsResponse", file: "valid-list-actors.json"},
 	}
 
 	for _, tt := range tests {

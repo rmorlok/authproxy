@@ -1,0 +1,9 @@
+{
+  "path": "root.acme",
+  "labels": {
+    "team": "platform"
+  },
+  "annotations": {
+    "owner": "integrations"
+  }
+}

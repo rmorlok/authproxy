@@ -4,7 +4,6 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
@@ -16,32 +15,19 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 
 	"net/http"
 )
 
-type NamespaceJson struct {
-	Path            string                  `json:"path"`
-	State           database.NamespaceState `json:"state"`
-	EncryptionKeyId *string                 `json:"encryption_key_id,omitempty"`
-	Labels          map[string]string       `json:"labels,omitempty"`
-	Annotations     map[string]string       `json:"annotations,omitempty"`
-	CreatedAt       time.Time               `json:"created_at"`
-	UpdatedAt       time.Time               `json:"updated_at"`
-}
-
-type CreateNamespaceRequestJson struct {
-	Path        string            `json:"path"`
-	Labels      map[string]string `json:"labels"`
-	Annotations map[string]string `json:"annotations"`
-}
-
-type UpdateNamespaceRequestJson struct {
-	Labels      map[string]string `json:"labels"`
-	Annotations map[string]string `json:"annotations"`
-}
+type NamespaceJson = schemaapi.NamespaceJson
+type CreateNamespaceRequestJson = schemaapi.CreateNamespaceRequestJson
+type UpdateNamespaceRequestJson = schemaapi.UpdateNamespaceRequestJson
+type ListNamespacesResponseJson = schemaapi.ListNamespacesResponseJson
+type SetNamespaceEncryptionKeyRequestJson = schemaapi.SetNamespaceEncryptionKeyRequestJson
+type NamespaceEncryptionKeyJson = schemaapi.NamespaceEncryptionKeyJson
 
 func NamespaceToJson(ns coreIface.Namespace) NamespaceJson {
 	var ekId *string
@@ -52,7 +38,7 @@ func NamespaceToJson(ns coreIface.Namespace) NamespaceJson {
 
 	return NamespaceJson{
 		Path:            ns.GetPath(),
-		State:           ns.GetState(),
+		State:           schemaapi.NamespaceState(ns.GetState()),
 		EncryptionKeyId: ekId,
 		Labels:          ns.GetLabels(),
 		Annotations:     ns.GetAnnotations(),
@@ -69,11 +55,6 @@ type ListNamespacesRequestQueryParams struct {
 	NamespaceVal  *string                  `form:"namespace"`
 	LabelSelector *string                  `form:"label_selector"`
 	OrderByVal    *string                  `form:"order_by"`
-}
-
-type ListNamespacesResponseJson struct {
-	Items  []NamespaceJson `json:"items"`
-	Cursor string          `json:"cursor,omitempty"`
 }
 
 type NamespacesRoutes struct {
@@ -538,14 +519,6 @@ func (r *NamespacesRoutes) putAnnotation(gctx *gin.Context) { r.annotsAdapter.Ha
 // @Security		BearerAuth
 // @Router			/namespaces/{path}/annotations/{annotation} [delete]
 func (r *NamespacesRoutes) deleteAnnotation(gctx *gin.Context) { r.annotsAdapter.HandleDelete(gctx) }
-
-type SetNamespaceEncryptionKeyRequestJson struct {
-	EncryptionKeyId string `json:"encryption_key_id"`
-}
-
-type NamespaceEncryptionKeyJson struct {
-	EncryptionKeyId string `json:"encryption_key_id"`
-}
 
 func (r *NamespacesRoutes) getEncryptionKey(gctx *gin.Context) {
 	ctx := gctx.Request.Context()

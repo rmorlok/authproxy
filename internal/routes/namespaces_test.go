@@ -150,7 +150,7 @@ func TestNamespaces(t *testing.T) {
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "root.dev", resp.Path)
-			require.Equal(t, database.NamespaceStateActive, resp.State)
+			require.Equal(t, string(database.NamespaceStateActive), string(resp.State))
 		})
 
 		t.Run("allowed with matching resource id permission", func(t *testing.T) {
@@ -285,7 +285,7 @@ func TestNamespaces(t *testing.T) {
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, "root.allowed", resp.Path)
-			require.Equal(t, database.NamespaceStateActive, resp.State)
+			require.Equal(t, string(database.NamespaceStateActive), string(resp.State))
 		})
 
 		t.Run("valid with labels", func(t *testing.T) {

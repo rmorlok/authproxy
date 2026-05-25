@@ -23,6 +23,8 @@ type ConnectionSetupForm = schemaapi.ConnectionSetupForm
 type ConnectionSetupComplete = schemaapi.ConnectionSetupComplete
 type SubmitConnectionRequest = schemaapi.SubmitConnectionRequest
 type DataSourceOptionJson = schemaapi.DataSourceOptionJson
+type SwaggerNamespaceJson = schemaapi.NamespaceJson
+type SwaggerListNamespacesResponse = schemaapi.ListNamespacesResponseJson
 
 // ProxyRequest represents a request to proxy through a connection.
 //
@@ -110,24 +112,6 @@ type SwaggerConnectorJson struct {
 	// Labels assigned to the connector
 	Labels map[string]string `json:"labels,omitempty"`
 	// Annotations assigned to the connector
-	Annotations map[string]string `json:"annotations,omitempty"`
-	// Creation timestamp
-	CreatedAt time.Time `json:"created_at"`
-	// Last update timestamp
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// SwaggerNamespaceJson is a simplified namespace model for swagger documentation
-//
-//	@Description	Namespace for organizing resources
-type SwaggerNamespaceJson struct {
-	// Namespace path (e.g., "acme" or "acme/sales")
-	Path string `json:"path" example:"acme"`
-	// Namespace state (active, suspended)
-	State string `json:"state" example:"active"`
-	// Labels assigned to the namespace
-	Labels map[string]string `json:"labels,omitempty"`
-	// Annotations assigned to the namespace
 	Annotations map[string]string `json:"annotations,omitempty"`
 	// Creation timestamp
 	CreatedAt time.Time `json:"created_at"`
@@ -231,16 +215,6 @@ type SwaggerConnectorVersionJson struct {
 type SwaggerListConnectorVersionsResponse struct {
 	// List of connector versions
 	Items []SwaggerConnectorVersionJson `json:"items"`
-	// Pagination cursor for next page
-	Cursor string `json:"cursor,omitempty"`
-}
-
-// SwaggerListNamespacesResponse is the response for list namespaces
-//
-//	@Description	Paginated list of namespaces
-type SwaggerListNamespacesResponse struct {
-	// List of namespaces
-	Items []SwaggerNamespaceJson `json:"items"`
 	// Pagination cursor for next page
 	Cursor string `json:"cursor,omitempty"`
 }

@@ -16,12 +16,12 @@ import (
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 
 	"log/slog"
 	"net/http"
-	"time"
 )
 
 type ActorsRoutes struct {
@@ -36,27 +36,10 @@ type ActorsRoutes struct {
 	annotsAdapter key_value.Adapter[apid.ID]
 }
 
-type ActorJson struct {
-	Id          apid.ID           `json:"id" swaggertype:"string"`
-	Namespace   string            `json:"namespace"`
-	ExternalId  string            `json:"external_id"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-	CreatedAt   time.Time         `json:"created_at"`
-	UpdatedAt   time.Time         `json:"updated_at"`
-}
-
-type CreateActorRequestJson struct {
-	ExternalId  string            `json:"external_id"`
-	Namespace   string            `json:"namespace"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-}
-
-type UpdateActorRequestJson struct {
-	Labels      map[string]string `json:"labels"`
-	Annotations map[string]string `json:"annotations"`
-}
+type ActorJson = schemaapi.ActorJson
+type CreateActorRequestJson = schemaapi.CreateActorRequestJson
+type UpdateActorRequestJson = schemaapi.UpdateActorRequestJson
+type ListActorsResponseJson = schemaapi.ListActorsResponseJson
 
 func DatabaseActorToJson(a *database.Actor) ActorJson {
 	return ActorJson{
@@ -77,11 +60,6 @@ type ListActorsRequestQuery struct {
 	NamespaceVal  *string `form:"namespace"`
 	LabelSelector *string `form:"label_selector"`
 	OrderByVal    *string `form:"order_by"`
-}
-
-type ListActorsResponseJson struct {
-	Items  []ActorJson `json:"items"`
-	Cursor string      `json:"cursor,omitempty"`
 }
 
 // @Summary		List actors

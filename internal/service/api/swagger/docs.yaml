@@ -5,6 +5,7 @@ definitions:
   github_com_rmorlok_authproxy_internal_schema_resources_rate_limit.RateLimit:
     type: object
   routes.ActorJson:
+    description: Actor identity within a namespace
     properties:
       annotations:
         additionalProperties:
@@ -13,14 +14,17 @@ definitions:
       created_at:
         type: string
       external_id:
+        example: user-123
         type: string
       id:
+        example: act_test550e8400abcde
         type: string
       labels:
         additionalProperties:
           type: string
         type: object
       namespace:
+        example: root.acme
         type: string
       updated_at:
         type: string
@@ -102,18 +106,21 @@ definitions:
         type: string
     type: object
   routes.CreateActorRequestJson:
+    description: Actor creation request
     properties:
       annotations:
         additionalProperties:
           type: string
         type: object
       external_id:
+        example: user-123
         type: string
       labels:
         additionalProperties:
           type: string
         type: object
       namespace:
+        example: root.acme
         type: string
     type: object
   routes.CreateEncryptionKeyRequestJson:
@@ -132,6 +139,7 @@ definitions:
         type: string
     type: object
   routes.CreateNamespaceRequestJson:
+    description: Namespace creation request
     properties:
       annotations:
         additionalProperties:
@@ -142,6 +150,7 @@ definitions:
           type: string
         type: object
       path:
+        example: root.acme
         type: string
     type: object
   routes.CreateRateLimitRequestJson:
@@ -209,12 +218,13 @@ definitions:
         type: string
     type: object
   routes.ListActorsResponseJson:
+    description: Paginated list of actors
     properties:
       cursor:
         type: string
       items:
         items:
-          $ref: '#/definitions/routes.ActorJson'
+          type: object
         type: array
     type: object
   routes.ProxyRequest:
@@ -675,12 +685,10 @@ definitions:
     description: Paginated list of namespaces
     properties:
       cursor:
-        description: Pagination cursor for next page
         type: string
       items:
-        description: List of namespaces
         items:
-          $ref: '#/definitions/routes.SwaggerNamespaceJson'
+          type: object
         type: array
     type: object
   routes.SwaggerListRateLimitsResponse:
@@ -716,26 +724,23 @@ definitions:
       annotations:
         additionalProperties:
           type: string
-        description: Annotations assigned to the namespace
         type: object
       created_at:
-        description: Creation timestamp
+        type: string
+      encryption_key_id:
+        example: ek_test550e8400abcde
         type: string
       labels:
         additionalProperties:
           type: string
-        description: Labels assigned to the namespace
         type: object
       path:
-        description: Namespace path (e.g., "acme" or "acme/sales")
-        example: acme
+        example: root.acme
         type: string
       state:
-        description: Namespace state (active, suspended)
         example: active
         type: string
       updated_at:
-        description: Last update timestamp
         type: string
     type: object
   routes.SwaggerPutKeyValueRequest:
@@ -889,6 +894,7 @@ definitions:
     - TaskStateUnknown
     - TaskStateActive
   routes.UpdateActorRequestJson:
+    description: Actor update request
     properties:
       annotations:
         additionalProperties:
@@ -913,6 +919,7 @@ definitions:
         type: string
     type: object
   routes.UpdateNamespaceRequestJson:
+    description: Namespace update request
     properties:
       annotations:
         additionalProperties:

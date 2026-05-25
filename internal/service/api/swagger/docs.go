@@ -7435,6 +7435,7 @@ const docTemplateApi = `{
             "type": "object"
         },
         "routes.ActorJson": {
+            "description": "Actor identity within a namespace",
             "type": "object",
             "properties": {
                 "annotations": {
@@ -7447,10 +7448,12 @@ const docTemplateApi = `{
                     "type": "string"
                 },
                 "external_id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "user-123"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "act_test550e8400abcde"
                 },
                 "labels": {
                     "type": "object",
@@ -7459,7 +7462,8 @@ const docTemplateApi = `{
                     }
                 },
                 "namespace": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "root.acme"
                 },
                 "updated_at": {
                     "type": "string"
@@ -7569,6 +7573,7 @@ const docTemplateApi = `{
             }
         },
         "routes.CreateActorRequestJson": {
+            "description": "Actor creation request",
             "type": "object",
             "properties": {
                 "annotations": {
@@ -7578,7 +7583,8 @@ const docTemplateApi = `{
                     }
                 },
                 "external_id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "user-123"
                 },
                 "labels": {
                     "type": "object",
@@ -7587,7 +7593,8 @@ const docTemplateApi = `{
                     }
                 },
                 "namespace": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "root.acme"
                 }
             }
         },
@@ -7615,6 +7622,7 @@ const docTemplateApi = `{
             }
         },
         "routes.CreateNamespaceRequestJson": {
+            "description": "Namespace creation request",
             "type": "object",
             "properties": {
                 "annotations": {
@@ -7630,7 +7638,8 @@ const docTemplateApi = `{
                     }
                 },
                 "path": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "root.acme"
                 }
             }
         },
@@ -7720,6 +7729,7 @@ const docTemplateApi = `{
             }
         },
         "routes.ListActorsResponseJson": {
+            "description": "Paginated list of actors",
             "type": "object",
             "properties": {
                 "cursor": {
@@ -7728,7 +7738,7 @@ const docTemplateApi = `{
                 "items": {
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/routes.ActorJson"
+                        "type": "object"
                     }
                 }
             }
@@ -8355,14 +8365,12 @@ const docTemplateApi = `{
             "type": "object",
             "properties": {
                 "cursor": {
-                    "description": "Pagination cursor for next page",
                     "type": "string"
                 },
                 "items": {
-                    "description": "List of namespaces",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/routes.SwaggerNamespaceJson"
+                        "type": "object"
                     }
                 }
             }
@@ -8410,35 +8418,33 @@ const docTemplateApi = `{
             "type": "object",
             "properties": {
                 "annotations": {
-                    "description": "Annotations assigned to the namespace",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
                 "created_at": {
-                    "description": "Creation timestamp",
                     "type": "string"
                 },
+                "encryption_key_id": {
+                    "type": "string",
+                    "example": "ek_test550e8400abcde"
+                },
                 "labels": {
-                    "description": "Labels assigned to the namespace",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
                 "path": {
-                    "description": "Namespace path (e.g., \"acme\" or \"acme/sales\")",
                     "type": "string",
-                    "example": "acme"
+                    "example": "root.acme"
                 },
                 "state": {
-                    "description": "Namespace state (active, suspended)",
                     "type": "string",
                     "example": "active"
                 },
                 "updated_at": {
-                    "description": "Last update timestamp",
                     "type": "string"
                 }
             }
@@ -8647,6 +8653,7 @@ const docTemplateApi = `{
             ]
         },
         "routes.UpdateActorRequestJson": {
+            "description": "Actor update request",
             "type": "object",
             "properties": {
                 "annotations": {
@@ -8684,6 +8691,7 @@ const docTemplateApi = `{
             }
         },
         "routes.UpdateNamespaceRequestJson": {
+            "description": "Namespace update request",
             "type": "object",
             "properties": {
                 "annotations": {

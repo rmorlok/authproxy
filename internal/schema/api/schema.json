@@ -6,6 +6,16 @@
       "type": "string",
       "enum": ["redirect", "form", "complete", "verifying", "error"]
     },
+    "NamespaceState": {
+      "type": "string",
+      "enum": ["active", "destroying", "destroyed"]
+    },
+    "StringMap": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "string"
+      }
+    },
     "InitiateConnectionRequest": {
       "type": "object",
       "properties": {
@@ -107,6 +117,123 @@
         "label": { "type": "string" }
       },
       "required": ["value", "label"],
+      "additionalProperties": false
+    },
+    "Namespace": {
+      "type": "object",
+      "properties": {
+        "path": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "state": { "$ref": "#/$defs/NamespaceState" },
+        "encryption_key_id": { "type": "string" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["path", "state", "created_at", "updated_at"],
+      "additionalProperties": false
+    },
+    "CreateNamespaceRequest": {
+      "type": "object",
+      "properties": {
+        "path": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" }
+      },
+      "required": ["path"],
+      "additionalProperties": false
+    },
+    "UpdateNamespaceRequest": {
+      "type": "object",
+      "properties": {
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" }
+      },
+      "additionalProperties": false
+    },
+    "ListNamespacesResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Namespace" }
+        },
+        "cursor": { "type": "string" }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    },
+    "SetNamespaceEncryptionKeyRequest": {
+      "type": "object",
+      "properties": {
+        "encryption_key_id": { "type": "string" }
+      },
+      "required": ["encryption_key_id"],
+      "additionalProperties": false
+    },
+    "NamespaceEncryptionKey": {
+      "type": "object",
+      "properties": {
+        "encryption_key_id": { "type": "string" }
+      },
+      "required": ["encryption_key_id"],
+      "additionalProperties": false
+    },
+    "Actor": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "external_id": { "type": "string" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "namespace", "external_id", "created_at", "updated_at"],
+      "additionalProperties": false
+    },
+    "CreateActorRequest": {
+      "type": "object",
+      "properties": {
+        "external_id": { "type": "string" },
+        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" }
+      },
+      "required": ["external_id", "namespace"],
+      "additionalProperties": false
+    },
+    "UpdateActorRequest": {
+      "type": "object",
+      "properties": {
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" }
+      },
+      "additionalProperties": false
+    },
+    "ListActorsResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Actor" }
+        },
+        "cursor": { "type": "string" }
+      },
+      "required": ["items"],
       "additionalProperties": false
     }
   }
