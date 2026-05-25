@@ -21,7 +21,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/httpf"
 	hmock "github.com/rmorlok/authproxy/internal/httpf/mock"
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"

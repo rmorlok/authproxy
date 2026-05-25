@@ -8,7 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/schema/config"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 // ReauthConnection drives the unified re-authentication flow for an existing

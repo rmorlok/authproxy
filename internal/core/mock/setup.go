@@ -12,7 +12,7 @@ import (
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	mockE "github.com/rmorlok/authproxy/internal/encrypt/mock"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 // MockConnectionRetrieval sets up the service to retrieve a connection with an associated connector any number of times

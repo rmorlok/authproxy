@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/rate_limit/schema.json",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/resources/rate_limit/schema.json",
   "$defs": {
     "Mode": {
       "type": "string",
@@ -47,7 +47,7 @@
         "request_types": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "../common/schema.json#/$defs/RequestType" },
+          "items": { "$ref": "../../common/schema.json#/$defs/RequestType" },
           "description": "Request types the rule applies to. Omit (not empty list) to use the default [proxy, probe]; an empty list is rejected so a misconfigured rule can't go inert."
         }
       }
@@ -90,7 +90,7 @@
       "required": ["window", "limit"],
       "additionalProperties": false,
       "properties": {
-        "window": { "$ref": "../common/schema.json#/$defs/HumanDuration" },
+        "window": { "$ref": "../../common/schema.json#/$defs/HumanDuration" },
         "limit": {
           "type": "integer",
           "minimum": 1,
@@ -108,7 +108,7 @@
       "required": ["window", "limit", "mode"],
       "additionalProperties": false,
       "properties": {
-        "window": { "$ref": "../common/schema.json#/$defs/HumanDuration" },
+        "window": { "$ref": "../../common/schema.json#/$defs/HumanDuration" },
         "limit": {
           "type": "integer",
           "minimum": 1

@@ -7,7 +7,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/stretchr/testify/require"
 	clock "k8s.io/utils/clock/testing"

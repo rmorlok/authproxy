@@ -11,7 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
-	rlschema "github.com/rmorlok/authproxy/internal/schema/rate_limit"
+	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 )
 
 // fixedWindowScript atomically increments the counter for the current
@@ -75,11 +75,11 @@ return {1, limit - count - 1}
 `)
 
 type fixedWindowLimiter struct {
-	ruleID   apid.ID
-	limit    int
-	window   time.Duration
-	redis    apredis.Client
-	logger   *slog.Logger
+	ruleID apid.ID
+	limit  int
+	window time.Duration
+	redis  apredis.Client
+	logger *slog.Logger
 }
 
 func newFixedWindowLimiter(ruleID apid.ID, params rlschema.FixedWindow, r apredis.Client, logger *slog.Logger) *fixedWindowLimiter {

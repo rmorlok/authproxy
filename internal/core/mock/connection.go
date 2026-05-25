@@ -11,7 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 type Connection struct {

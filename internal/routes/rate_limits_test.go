@@ -28,7 +28,7 @@ import (
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
-	rlschema "github.com/rmorlok/authproxy/internal/schema/rate_limit"
+	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/stretchr/testify/require"
 )

@@ -47,7 +47,7 @@
         },
         "load_from_list": {
           "items": {
-            "$ref": "../connectors/schema.json"
+            "$ref": "../resources/connectors/schema.json"
           },
           "type": "array"
         },

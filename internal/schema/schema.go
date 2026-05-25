@@ -11,7 +11,7 @@ import (
 	jsonschemav5 "github.com/santhosh-tekuri/jsonschema/v5"
 )
 
-//go:embed **/schema*.json
+//go:embed **/schema*.json resources/*/schema*.json
 var schemaFs embed.FS
 
 type schemaIdStruct struct {

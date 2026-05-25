@@ -12,7 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
-	rlschema "github.com/rmorlok/authproxy/internal/schema/rate_limit"
+	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 )
 
 // slidingWindowLogScript: ZSET of (score=timestamp_ms, member=unique tag).
@@ -152,12 +152,12 @@ return {1, remaining}
 `)
 
 type slidingWindowLimiter struct {
-	ruleID  apid.ID
-	limit   int
-	window  time.Duration
-	mode    rlschema.SlidingWindowMode
-	redis   apredis.Client
-	logger  *slog.Logger
+	ruleID apid.ID
+	limit  int
+	window time.Duration
+	mode   rlschema.SlidingWindowMode
+	redis  apredis.Client
+	logger *slog.Logger
 }
 
 func newSlidingWindowLimiter(ruleID apid.ID, params rlschema.SlidingWindow, r apredis.Client, logger *slog.Logger) *slidingWindowLimiter {

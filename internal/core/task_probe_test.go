@@ -12,7 +12,7 @@ import (
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
 	mockEncrypt "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	mockH "github.com/rmorlok/authproxy/internal/httpf/mock"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	genmock "gopkg.in/h2non/gentleman-mock.v2"

@@ -12,7 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -75,21 +75,21 @@ func IsValidConnectionHealthState[T string | ConnectionHealthState](state T) boo
 const ConnectionsTable = "connections"
 
 type Connection struct {
-	Id                      apid.ID
-	Namespace               string
-	State                   ConnectionState
-	HealthState             ConnectionHealthState
-	ConnectorId             apid.ID
-	ConnectorVersion        uint64
-	Labels                  Labels
-	Annotations             Annotations
-	EncryptedConfiguration  *encfield.EncryptedField
-	EncryptedAt             *time.Time
-	SetupStep               *cschema.SetupStep
-	SetupError              *string
-	CreatedAt               time.Time
-	UpdatedAt               time.Time
-	DeletedAt               *time.Time
+	Id                     apid.ID
+	Namespace              string
+	State                  ConnectionState
+	HealthState            ConnectionHealthState
+	ConnectorId            apid.ID
+	ConnectorVersion       uint64
+	Labels                 Labels
+	Annotations            Annotations
+	EncryptedConfiguration *encfield.EncryptedField
+	EncryptedAt            *time.Time
+	SetupStep              *cschema.SetupStep
+	SetupError             *string
+	CreatedAt              time.Time
+	UpdatedAt              time.Time
+	DeletedAt              *time.Time
 }
 
 func (c *Connection) cols() []string {
@@ -568,19 +568,19 @@ type ListConnectionsBuilder interface {
 }
 
 type listConnectionsFilters struct {
-	s                    *service                `json:"-"`
-	LimitVal             uint64                  `json:"limit"`
-	Offset               uint64                  `json:"offset"`
-	StatesVal            []ConnectionState       `json:"states,omitempty"`
-	ConnectorIdsVal      []apid.ID               `json:"connector_ids,omitempty"`
-	NamespaceMatchers    []string                `json:"namespace_matchers,omitempty"`
-	OrderByFieldVal      *ConnectionOrderByField `json:"order_by_field"`
-	OrderByVal           *pagination.OrderBy     `json:"order_by"`
-	IncludeDeletedVal    bool                    `json:"include_deleted,omitempty"`
-	LabelSelectorVal     *string                 `json:"label_selector,omitempty"`
-	SetupStepNotNullVal  bool                    `json:"setup_step_not_null,omitempty"`
-	UpdatedBeforeVal     *time.Time              `json:"updated_before,omitempty"`
-	Errors               *multierror.Error       `json:"-"`
+	s                   *service                `json:"-"`
+	LimitVal            uint64                  `json:"limit"`
+	Offset              uint64                  `json:"offset"`
+	StatesVal           []ConnectionState       `json:"states,omitempty"`
+	ConnectorIdsVal     []apid.ID               `json:"connector_ids,omitempty"`
+	NamespaceMatchers   []string                `json:"namespace_matchers,omitempty"`
+	OrderByFieldVal     *ConnectionOrderByField `json:"order_by_field"`
+	OrderByVal          *pagination.OrderBy     `json:"order_by"`
+	IncludeDeletedVal   bool                    `json:"include_deleted,omitempty"`
+	LabelSelectorVal    *string                 `json:"label_selector,omitempty"`
+	SetupStepNotNullVal bool                    `json:"setup_step_not_null,omitempty"`
+	UpdatedBeforeVal    *time.Time              `json:"updated_before,omitempty"`
+	Errors              *multierror.Error       `json:"-"`
 }
 
 func (l *listConnectionsFilters) addError(e error) ListConnectionsBuilder {

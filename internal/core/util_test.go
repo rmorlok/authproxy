@@ -13,7 +13,7 @@ import (
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
 	mockE "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	mockF "github.com/rmorlok/authproxy/internal/httpf/mock"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 
 	"github.com/rmorlok/authproxy/internal/database"
 )

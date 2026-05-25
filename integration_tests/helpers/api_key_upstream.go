@@ -11,7 +11,7 @@ import (
 	"sync/atomic"
 	"testing"
 
-	"github.com/rmorlok/authproxy/internal/schema/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/require"
 )
 
@@ -32,12 +32,12 @@ type ApiKeyStubUpstream struct {
 	headerPrefix string
 	paramName    string // when placement == "query"
 
-	mu              sync.RWMutex
-	acceptedKey     string
-	acceptedUser    string // basic placement only
-	requests        []ApiKeyStubRequest
-	requestCount    atomic.Int64
-	successCount    atomic.Int64
+	mu                sync.RWMutex
+	acceptedKey       string
+	acceptedUser      string // basic placement only
+	requests          []ApiKeyStubRequest
+	requestCount      atomic.Int64
+	successCount      atomic.Int64
 	unauthorizedCount atomic.Int64
 }
 
@@ -45,11 +45,11 @@ type ApiKeyStubUpstream struct {
 // later inspection. Headers and the raw query are recorded so tests can prove
 // that a particular byte string never traversed the upstream after a rotation.
 type ApiKeyStubRequest struct {
-	Method     string
-	Path       string
-	RawQuery   string
-	Headers    http.Header
-	Status     int
+	Method   string
+	Path     string
+	RawQuery string
+	Headers  http.Header
+	Status   int
 }
 
 // ApiKeyStubOptions configures NewApiKeyStubUpstream.

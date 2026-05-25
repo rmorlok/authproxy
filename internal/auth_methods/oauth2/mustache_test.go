@@ -22,7 +22,7 @@ import (
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 	genmock "gopkg.in/h2non/gentleman-mock.v2"
@@ -583,7 +583,7 @@ type mockActorData struct {
 }
 
 func (m *mockActorData) GetId() apid.ID                       { return m.id }
-func (m *mockActorData) GetExternalId() string                 { return "ext-123" }
-func (m *mockActorData) GetLabels() map[string]string          { return nil }
-func (m *mockActorData) GetPermissions() []aschema.Permission  { return nil }
-func (m *mockActorData) GetNamespace() string                  { return "/" }
+func (m *mockActorData) GetExternalId() string                { return "ext-123" }
+func (m *mockActorData) GetLabels() map[string]string         { return nil }
+func (m *mockActorData) GetPermissions() []aschema.Permission { return nil }
+func (m *mockActorData) GetNamespace() string                 { return "/" }

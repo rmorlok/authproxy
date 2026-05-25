@@ -4,7 +4,7 @@ import (
 	"net/http"
 
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/schema/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"gopkg.in/h2non/gentleman.v2"
 )
 

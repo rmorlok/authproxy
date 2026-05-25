@@ -13,7 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -256,4 +256,3 @@ func TestTokenExchange_5xxVariants_AllRetried(t *testing.T) {
 	require.Nil(t, rig.env.GetOAuth2Token(t, connID))
 	assert.Equal(t, 3, rig.tokenCallCount())
 }
-

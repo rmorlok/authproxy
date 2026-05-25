@@ -6,7 +6,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
-	rlschema "github.com/rmorlok/authproxy/internal/schema/rate_limit"
+	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 

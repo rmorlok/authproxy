@@ -8,7 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/common"
-	rlschema "github.com/rmorlok/authproxy/internal/schema/rate_limit"
+	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/stretchr/testify/require"
 )
 

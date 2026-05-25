@@ -7,8 +7,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
-	rlschema "github.com/rmorlok/authproxy/internal/schema/rate_limit"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/tasks"
 )
 

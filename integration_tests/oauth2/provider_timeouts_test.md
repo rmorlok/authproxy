@@ -29,7 +29,7 @@ The proxy has **no HTTP-level timeout configured**:
 
 - `internal/httpf/factory.go` wraps `http.DefaultTransport` and never
   sets `Timeout` on the underlying client.
-- `internal/schema/connectors/auth_oauth2_token.go`'s `RefreshTimeout`
+- `internal/schema/resources/connectors/auth_oauth2_token.go`'s `RefreshTimeout`
   (default 30s) is used only by the Redis mutex (`lock.go` →
   `apredis.MutexOption*`), not by any HTTP client.
 

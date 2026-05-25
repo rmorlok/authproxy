@@ -3,7 +3,7 @@ package config
 import (
 	"testing"
 
-	"github.com/rmorlok/authproxy/internal/schema/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/stretchr/testify/require"
 	"gopkg.in/yaml.v3"

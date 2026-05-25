@@ -6,7 +6,7 @@ import (
 	"fmt"
 
 	"github.com/rmorlok/authproxy/internal/database"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 // authApplication is the pure-data result of applying a credential to a

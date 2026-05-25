@@ -7,8 +7,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
-	rlschema "github.com/rmorlok/authproxy/internal/schema/rate_limit"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"golang.org/x/time/rate"
 )

@@ -11,7 +11,7 @@ import (
 	gomock "github.com/golang/mock/gomock"
 	apid "github.com/rmorlok/authproxy/internal/apid"
 	httpf "github.com/rmorlok/authproxy/internal/httpf"
-	connectors "github.com/rmorlok/authproxy/internal/schema/connectors"
+	connectors "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	gentleman "gopkg.in/h2non/gentleman.v2"
 )
 

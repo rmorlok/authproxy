@@ -48,7 +48,7 @@ func TestSchema(t *testing.T) {
 		Tests  []testCase
 	}
 
-	const testSchemaId = "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/rate_limit/test.json"
+	const testSchemaId = "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/resources/rate_limit/test.json"
 	mkSchema := func(ref string) string {
 		return strings.TrimSpace(`
 {
@@ -199,7 +199,7 @@ func TestSchema(t *testing.T) {
 	for _, e := range entities {
 		t.Run(e.Name, func(t *testing.T) {
 			c := jsonschemav5.NewCompiler()
-			_ = loadSchemaInto(t, c, "../common/schema.json")
+			_ = loadSchemaInto(t, c, "../../common/schema.json")
 			_ = loadSchemaInto(t, c, "./schema.json")
 			require.NoError(t, c.AddResource(testSchemaId, strings.NewReader(e.Schema)))
 

@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/connectors/schema-oauth.json",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/resources/connectors/schema-oauth.json",
   "$defs": {
     "Scope": {
       "properties": {
@@ -57,13 +57,13 @@
           "type": "object"
         },
         "refresh_timeout": {
-          "$ref": "../common/schema.json#/$defs/HumanDuration"
+          "$ref": "../../common/schema.json#/$defs/HumanDuration"
         },
         "refresh_in_background": {
           "type": "boolean"
         },
         "refresh_time_before_expiry": {
-          "$ref": "../common/schema.json#/$defs/HumanDuration"
+          "$ref": "../../common/schema.json#/$defs/HumanDuration"
         },
         "auth_in_body": {
           "type": "boolean"
@@ -98,10 +98,10 @@
       "const": "OAuth2"
     },
     "client_id": {
-      "$ref": "../common/schema.json#/$defs/StringValue"
+      "$ref": "../../common/schema.json#/$defs/StringValue"
     },
     "client_secret": {
-      "$ref": "../common/schema.json#/$defs/StringValue"
+      "$ref": "../../common/schema.json#/$defs/StringValue"
     },
     "token_endpoint_auth_method": {
       "enum": ["client_secret_post", "client_secret_basic", "none"]
@@ -113,16 +113,16 @@
       "$ref": "#/$defs/Token"
     },
     "initiate_to_redirect_ttl": {
-      "$ref": "../common/schema.json#/$defs/HumanDuration"
+      "$ref": "../../common/schema.json#/$defs/HumanDuration"
     },
     "round_trip_ttl": {
-      "$ref": "../common/schema.json#/$defs/HumanDuration"
+      "$ref": "../../common/schema.json#/$defs/HumanDuration"
     },
     "refresh_tokens_in_background": {
       "type": "boolean"
     },
     "refresh_tokens_time_before_expiry": {
-      "$ref": "../common/schema.json#/$defs/HumanDuration"
+      "$ref": "../../common/schema.json#/$defs/HumanDuration"
     },
     "refresh_tokens_cron_schedule": {
       "type": "string"

@@ -3,7 +3,7 @@ package httpf
 import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/common"
-	"github.com/rmorlok/authproxy/internal/schema/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 // RequestType is re-exported from schema/common so callers within the

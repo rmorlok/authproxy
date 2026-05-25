@@ -9,7 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/auth_methods/api_key"
 	"github.com/rmorlok/authproxy/internal/auth_methods/no_auth"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 // TestGetAuthMethodFactory_ReturnsRegisteredFactoryForEachAuthType verifies

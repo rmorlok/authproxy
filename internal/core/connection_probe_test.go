@@ -4,7 +4,7 @@ import (
 	"testing"
 
 	"github.com/rmorlok/authproxy/internal/schema/common"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/require"
 )
 

@@ -13,8 +13,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
-	"github.com/rmorlok/authproxy/internal/schema/connectors"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 // Connection is a wrapper for the lower level database equivalent that handles wiring up logic specified in this

@@ -15,7 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encfield"
 	mockEncrypt "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	mockH "github.com/rmorlok/authproxy/internal/httpf/mock"
-	cschema "github.com/rmorlok/authproxy/internal/schema/connectors"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/require"
 	genmock "gopkg.in/h2non/gentleman-mock.v2"
 	gock "gopkg.in/h2non/gock.v1"

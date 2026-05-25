@@ -12,7 +12,7 @@ import (
 	"testing"
 
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
-	"github.com/rmorlok/authproxy/internal/schema/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )

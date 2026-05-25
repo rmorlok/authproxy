@@ -14,8 +14,8 @@ import (
 	database "github.com/rmorlok/authproxy/internal/database"
 	encfield "github.com/rmorlok/authproxy/internal/encfield"
 	auth "github.com/rmorlok/authproxy/internal/schema/auth"
-	connectors "github.com/rmorlok/authproxy/internal/schema/connectors"
-	rate_limit "github.com/rmorlok/authproxy/internal/schema/rate_limit"
+	connectors "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	rate_limit "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	pagination "github.com/rmorlok/authproxy/internal/util/pagination"
 	rate "golang.org/x/time/rate"
 )
