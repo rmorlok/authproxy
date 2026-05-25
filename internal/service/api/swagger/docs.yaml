@@ -1,5 +1,55 @@
 basePath: /api/v1
 definitions:
+  github_com_rmorlok_authproxy_internal_schema_api.ActorJson:
+    description: Actor identity within a namespace
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      created_at:
+        type: string
+      external_id:
+        example: user-123
+        type: string
+      id:
+        example: act_test550e8400abcde
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      namespace:
+        example: root.acme
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson:
+    description: Namespace for organizing resources
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      created_at:
+        type: string
+      encryption_key_id:
+        example: ek_test550e8400abcde
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      path:
+        example: root.acme
+        type: string
+      state:
+        example: active
+        type: string
+      updated_at:
+        type: string
+    type: object
   github_com_rmorlok_authproxy_internal_schema_config.KeyData:
     type: object
   github_com_rmorlok_authproxy_internal_schema_resources_rate_limit.RateLimit:
@@ -216,16 +266,6 @@ definitions:
       actor_id:
         description: This should include any configuration the SPA needs
         type: string
-    type: object
-  routes.ListActorsResponseJson:
-    description: Paginated list of actors
-    properties:
-      cursor:
-        type: string
-      items:
-        items:
-          type: object
-        type: array
     type: object
   routes.ProxyRequest:
     description: Request to proxy an HTTP request through a connection
@@ -633,6 +673,18 @@ definitions:
         example: production
         type: string
     type: object
+  routes.SwaggerListActorsResponse:
+    description: Paginated list of actors
+    properties:
+      cursor:
+        description: Pagination cursor for next page
+        type: string
+      items:
+        description: List of actors
+        items:
+          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ActorJson'
+        type: array
+    type: object
   routes.SwaggerListConnectionResponse:
     description: Paginated list of connections
     properties:
@@ -685,10 +737,12 @@ definitions:
     description: Paginated list of namespaces
     properties:
       cursor:
+        description: Pagination cursor for next page
         type: string
       items:
+        description: List of namespaces
         items:
-          type: object
+          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson'
         type: array
     type: object
   routes.SwaggerListRateLimitsResponse:
@@ -988,7 +1042,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ListActorsResponseJson'
+            $ref: '#/definitions/routes.SwaggerListActorsResponse'
         "400":
           description: Bad Request
           schema:

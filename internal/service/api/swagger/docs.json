@@ -69,7 +69,7 @@
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ListActorsResponseJson"
+                            "$ref": "#/definitions/routes.SwaggerListActorsResponse"
                         }
                     },
                     "400": {
@@ -7422,6 +7422,78 @@
         }
     },
     "definitions": {
+        "github_com_rmorlok_authproxy_internal_schema_api.ActorJson": {
+            "description": "Actor identity within a namespace",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "external_id": {
+                    "type": "string",
+                    "example": "user-123"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "act_test550e8400abcde"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson": {
+            "description": "Namespace for organizing resources",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "encryption_key_id": {
+                    "type": "string",
+                    "example": "ek_test550e8400abcde"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "path": {
+                    "type": "string",
+                    "example": "root.acme"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "active"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_rmorlok_authproxy_internal_schema_config.KeyData": {
             "type": "object"
         },
@@ -7719,21 +7791,6 @@
                 "actor_id": {
                     "description": "This should include any configuration the SPA needs",
                     "type": "string"
-                }
-            }
-        },
-        "routes.ListActorsResponseJson": {
-            "description": "Paginated list of actors",
-            "type": "object",
-            "properties": {
-                "cursor": {
-                    "type": "string"
-                },
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "type": "object"
-                    }
                 }
             }
         },
@@ -8286,6 +8343,23 @@
                 }
             }
         },
+        "routes.SwaggerListActorsResponse": {
+            "description": "Paginated list of actors",
+            "type": "object",
+            "properties": {
+                "cursor": {
+                    "description": "Pagination cursor for next page",
+                    "type": "string"
+                },
+                "items": {
+                    "description": "List of actors",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ActorJson"
+                    }
+                }
+            }
+        },
         "routes.SwaggerListConnectionResponse": {
             "description": "Paginated list of connections",
             "type": "object",
@@ -8359,12 +8433,14 @@
             "type": "object",
             "properties": {
                 "cursor": {
+                    "description": "Pagination cursor for next page",
                     "type": "string"
                 },
                 "items": {
+                    "description": "List of namespaces",
                     "type": "array",
                     "items": {
-                        "type": "object"
+                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson"
                     }
                 }
             }

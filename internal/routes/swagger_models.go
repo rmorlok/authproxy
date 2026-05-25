@@ -24,7 +24,26 @@ type ConnectionSetupComplete = schemaapi.ConnectionSetupComplete
 type SubmitConnectionRequest = schemaapi.SubmitConnectionRequest
 type DataSourceOptionJson = schemaapi.DataSourceOptionJson
 type SwaggerNamespaceJson = schemaapi.NamespaceJson
-type SwaggerListNamespacesResponse = schemaapi.ListNamespacesResponseJson
+
+// SwaggerListActorsResponse is the response for list actors.
+//
+//	@Description	Paginated list of actors
+type SwaggerListActorsResponse struct {
+	// List of actors
+	Items []schemaapi.ActorJson `json:"items"`
+	// Pagination cursor for next page
+	Cursor string `json:"cursor,omitempty"`
+}
+
+// SwaggerListNamespacesResponse is the response for list namespaces.
+//
+//	@Description	Paginated list of namespaces
+type SwaggerListNamespacesResponse struct {
+	// List of namespaces
+	Items []schemaapi.NamespaceJson `json:"items"`
+	// Pagination cursor for next page
+	Cursor string `json:"cursor,omitempty"`
+}
 
 // ProxyRequest represents a request to proxy through a connection.
 //

@@ -73,7 +73,7 @@ type ListActorsRequestQuery struct {
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			label_selector	query		string	false	"Filter by label selector"
 // @Param			order_by		query		string	false	"Order by field (e.g., 'created_at:asc')"
-// @Success		200				{object}	ListActorsResponseJson
+// @Success		200				{object}	SwaggerListActorsResponse
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
 // @Failure		500				{object}	ErrorResponse
