@@ -115,7 +115,7 @@ Or start Vault ad hoc:
 ```bash
 docker run -d --name vault -p 8200:8200 --cap-add=IPC_LOCK \
   -e VAULT_DEV_ROOT_TOKEN_ID=dev-only-token \
-  hashicorp/vault:latest server -dev
+  hashicorp/vault:1.20.4 server -dev
 ```
 
 Notes:

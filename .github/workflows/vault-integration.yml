@@ -1,6 +1,9 @@
 # schema: https://json.schemastore.org/github-workflow.json
 name: HashiCorp Vault Integration Tests
 
+env:
+  VAULT_IMAGE: hashicorp/vault:1.20.4
+
 on:
   push:
     branches: [ "main" ]
@@ -76,11 +79,19 @@ jobs:
           -e VAULT_DEV_ROOT_TOKEN_ID=dev-only-token \
           -e VAULT_DEV_LISTEN_ADDRESS=0.0.0.0:8200 \
           -e SKIP_SETCAP=true \
-          hashicorp/vault:latest server -dev
+          "$VAULT_IMAGE" server -dev
         for i in $(seq 1 30); do
-          curl -sf http://localhost:8200/v1/sys/health && break
+          if curl -sf http://localhost:8200/v1/sys/health; then
+            exit 0
+          fi
+          if ! docker ps --format '{{.Names}}' | grep -qx vault; then
+            docker logs vault
+            exit 1
+          fi
           sleep 1
         done
+        docker logs vault
+        exit 1
 
     - name: HashiCorp Vault Integration Tests
       working-directory: integration_tests
