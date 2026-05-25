@@ -44,4 +44,5 @@ ui/*/embed/dist/*
 dev_config/keys/tls
 
 .claude/scheduled_tasks.lock
-.codex
+.codex/config.local.toml
+.codex/local/*
