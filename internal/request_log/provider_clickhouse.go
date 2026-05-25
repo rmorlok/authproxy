@@ -11,6 +11,9 @@ import (
 
 	"github.com/ClickHouse/clickhouse-go/v2"
 	sq "github.com/Masterminds/squirrel"
+	"github.com/golang-migrate/migrate/v4"
+	chmigrate "github.com/golang-migrate/migrate/v4/database/clickhouse"
+	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
@@ -124,49 +127,48 @@ func (s *clickhouseRecordStore) StoreRecord(ctx context.Context, record *LogReco
 
 func (s *clickhouseRecordStore) Migrate(ctx context.Context) error {
 	s.logger.Info("running clickhouse http log migrations")
+	defer s.logger.Info("clickhouse http log migrations complete")
 
-	ddl := fmt.Sprintf(`CREATE TABLE IF NOT EXISTS %s (
-		request_id String,
-		namespace String,
-		type String,
-		correlation_id String,
-		timestamp_ms Int64,
-		duration_ms Int64,
-		connection_id String,
-		connector_id String,
-		connector_version UInt64,
-		method String,
-		host String,
-		scheme String,
-		path String,
-		response_status_code Int32,
-		response_error String,
-		request_http_version String,
-		request_size_bytes Int64,
-		request_mime_type String,
-		response_http_version String,
-		response_size_bytes Int64,
-		response_mime_type String,
-		internal_timeout Bool,
-		request_cancelled Bool,
-		full_request_recorded Bool,
-		labels String DEFAULT '{}',
-		response_source String DEFAULT 'upstream',
-		rate_limit_id String DEFAULT '',
-		rate_limit_mode String DEFAULT '',
-		rate_limit_bucket String DEFAULT '{}',
-		rate_limit_matched String DEFAULT '[]',
-		request_body_skipped String DEFAULT '',
-		response_body_skipped String DEFAULT ''
-	) ENGINE = MergeTree()
-	ORDER BY (namespace, timestamp_ms, request_id)`, entryRecordsTable)
-
-	_, err := s.db.ExecContext(ctx, ddl)
+	src, err := iofs.New(httpLogMigrationsFs, "migrations/clickhouse")
 	if err != nil {
-		return fmt.Errorf("failed to create clickhouse table: %w", err)
+		return fmt.Errorf("failed to load clickhouse http log migrations: %w", err)
 	}
 
-	s.logger.Info("clickhouse http log migrations complete")
+	var dbName string
+	if s.cfg.Database != nil {
+		dbName, err = s.cfg.Database.GetValue(ctx)
+		if err != nil {
+			return fmt.Errorf("failed to resolve clickhouse database name: %w", err)
+		}
+	}
+
+	driver, err := chmigrate.WithInstance(s.db, &chmigrate.Config{
+		DatabaseName:          dbName,
+		MultiStatementEnabled: true,
+	})
+	if err != nil {
+		return fmt.Errorf("failed to setup clickhouse http log migration driver: %w", err)
+	}
+
+	m, err := migrate.NewWithInstance("iofs", src, "clickhouse", driver)
+	if err != nil {
+		return fmt.Errorf("failed to setup clickhouse http log migrator: %w", err)
+	}
+	defer func() {
+		sourceErr, dbErr := m.Close()
+		if sourceErr != nil || dbErr != nil {
+			s.logger.Warn("failed to close clickhouse migrator", "source_err", sourceErr, "db_err", dbErr)
+		}
+	}()
+
+	if err := m.Up(); err != nil {
+		if errors.Is(err, migrate.ErrNoChange) {
+			s.logger.Info("no clickhouse http log migrations required")
+			return nil
+		}
+		return fmt.Errorf("failed to migrate clickhouse http log database: %w", err)
+	}
+
 	return nil
 }
 

@@ -1,0 +1,28 @@
+CREATE TABLE IF NOT EXISTS http_log_entry_records (
+    request_id String,
+    namespace String,
+    type String,
+    correlation_id String DEFAULT '',
+    timestamp_ms Int64,
+    duration_ms Int64 DEFAULT 0,
+    connection_id String DEFAULT '',
+    connector_id String DEFAULT '',
+    connector_version UInt64 DEFAULT 0,
+    method String DEFAULT '',
+    host String DEFAULT '',
+    scheme String DEFAULT '',
+    path String DEFAULT '',
+    response_status_code Int32 DEFAULT 0,
+    response_error String DEFAULT '',
+    request_http_version String DEFAULT '',
+    request_size_bytes Int64 DEFAULT 0,
+    request_mime_type String DEFAULT '',
+    response_http_version String DEFAULT '',
+    response_size_bytes Int64 DEFAULT 0,
+    response_mime_type String DEFAULT '',
+    internal_timeout Bool DEFAULT false,
+    request_cancelled Bool DEFAULT false,
+    full_request_recorded Bool DEFAULT false,
+    labels String DEFAULT '{}'
+) ENGINE = MergeTree()
+ORDER BY (namespace, timestamp_ms, request_id);
