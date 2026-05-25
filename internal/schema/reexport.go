@@ -1,6 +1,7 @@
 package schema
 
 import (
+	"github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/config"
@@ -9,6 +10,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 )
 
+const SchemaIdAPI = api.SchemaIdAPI
 const SchemaIdAuth = auth.SchemaIdAuth
 const SchemaIdCommon = common.SchemaIdCommon
 const SchemaIdConfig = config.SchemaIdConfig
@@ -17,6 +19,7 @@ const SchemaIdNamespace = namespace.SchemaIdNamespace
 const SchemaIdRateLimit = rate_limit.SchemaIdRateLimit
 
 var allSchemas = []string{
+	SchemaIdAPI,
 	SchemaIdAuth,
 	SchemaIdCommon,
 	SchemaIdConfig,

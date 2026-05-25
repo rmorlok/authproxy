@@ -1,0 +1,113 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/api/schema.json",
+  "$defs": {
+    "ConnectionSetupResponseType": {
+      "type": "string",
+      "enum": ["redirect", "form", "complete", "verifying", "error"]
+    },
+    "InitiateConnectionRequest": {
+      "type": "object",
+      "properties": {
+        "connector_id": { "type": "string" },
+        "connector_version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "into_namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "return_to_url": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "required": ["connector_id", "return_to_url"],
+      "additionalProperties": false
+    },
+    "ConnectionSetupRedirect": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "const": "redirect" },
+        "redirect_url": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "required": ["id", "type", "redirect_url"],
+      "additionalProperties": false
+    },
+    "ConnectionSetupForm": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "const": "form" },
+        "step_id": { "type": "string" },
+        "step_title": { "type": "string" },
+        "step_description": { "type": "string" },
+        "current_step": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "total_steps": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "json_schema": { "type": "object" },
+        "ui_schema": { "type": "object" }
+      },
+      "required": ["id", "type", "step_id", "current_step", "total_steps", "json_schema", "ui_schema"],
+      "additionalProperties": false
+    },
+    "ConnectionSetupComplete": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "const": "complete" }
+      },
+      "required": ["id", "type"],
+      "additionalProperties": false
+    },
+    "ConnectionSetupVerifying": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "const": "verifying" }
+      },
+      "required": ["id", "type"],
+      "additionalProperties": false
+    },
+    "ConnectionSetupError": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "const": "error" },
+        "error": { "type": "string" },
+        "can_retry": { "type": "boolean" }
+      },
+      "required": ["id", "type", "error", "can_retry"],
+      "additionalProperties": false
+    },
+    "SubmitConnectionRequest": {
+      "type": "object",
+      "properties": {
+        "step_id": { "type": "string" },
+        "data": {},
+        "return_to_url": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "required": ["step_id", "data"],
+      "additionalProperties": false
+    },
+    "DataSourceOption": {
+      "type": "object",
+      "properties": {
+        "value": { "type": "string" },
+        "label": { "type": "string" }
+      },
+      "required": ["value", "label"],
+      "additionalProperties": false
+    }
+  }
+}
