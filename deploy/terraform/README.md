@@ -14,7 +14,9 @@ deploy/terraform/
 | `eks/`        | S3 (from bootstrap) | Second   | The main infrastructure                        |
 
 See each module's README for details. This file covers the cross-module
-apply procedure and one-time manual steps.
+apply procedure and one-time manual steps. For ongoing operations
+(granting kubectl access, rotating credentials, recovering from stuck
+deploys, cost monitoring), see [`../docs/runbook.md`](../docs/runbook.md).
 
 ## Steady-state cost
 
