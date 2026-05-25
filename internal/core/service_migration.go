@@ -478,6 +478,42 @@ func (s *service) precheckConnectorForMigration(ctx context.Context, configConne
 				return fmt.Errorf("connector %s currently has namespace path '%s' and cannot be changed to '%s'", configConnector.Id, results[0].Namespace, configConnector.GetNamespace())
 			}
 		}
+
+		if configConnector.HasVersion() {
+			existingVersion, err := s.db.GetConnectorVersionForLabelsAndVersion(ctx, labelSelector, configConnector.Version)
+			if err != nil && !errors.Is(err, database.ErrNotFound) {
+				return fmt.Errorf("failed to check for existing connector version for precheck: %w", err)
+			}
+
+			if errors.Is(err, database.ErrNotFound) {
+				if len(results) == 0 {
+					if configConnector.Version != 1 {
+						return fmt.Errorf("connector with identifying labels %s does not have previous versions and must start with version 1", labelSelector)
+					}
+				} else {
+					newestVersion, err := s.db.NewestConnectorVersionForId(ctx, results[0].Id)
+					if err != nil && !errors.Is(err, database.ErrNotFound) {
+						return fmt.Errorf("failed to get newest version of connector for precheck: %w", err)
+					}
+					if newestVersion != nil && newestVersion.Version+1 != configConnector.Version {
+						return fmt.Errorf("connector with identifying labels %s currently has version %d and cannot be incremented to %d", labelSelector, newestVersion.Version, configConnector.Version)
+					}
+				}
+			} else {
+				if configConnector.State == "" {
+					// Unless specified, this is trying to be the primary version; important for hash
+					configConnector.State = string(database.ConnectorVersionStatePrimary)
+				}
+
+				if existingVersion.Namespace != configConnector.GetNamespace() {
+					return fmt.Errorf("connector with identifying labels %s currently has namespace '%s' and cannot be changed to %s", labelSelector, existingVersion.Namespace, configConnector.GetNamespace())
+				}
+
+				if existingVersion.State != database.ConnectorVersionStateDraft && existingVersion.Hash != configConnector.Hash() {
+					return fmt.Errorf("connector with identifying labels %s version %d has been published and cannot be modified", labelSelector, configConnector.Version)
+				}
+			}
+		}
 	}
 
 	return nil
@@ -553,7 +589,7 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 		// Pattern C: version only, no ID - use label-based lookup
 		labelValues := configConnector.GetIdentifyingLabelValues(identifyingLabels)
 		labelSelector := database.BuildLabelSelectorFromMap(labelValues)
-		existingVersion, err := s.db.GetConnectorVersionForLabelsAndVersion(ctx, labelSelector, configConnector.Version)
+		existingVersion, err = s.db.GetConnectorVersionForLabelsAndVersion(ctx, labelSelector, configConnector.Version)
 		if err != nil && !errors.Is(err, database.ErrNotFound) {
 			return apid.Nil, fmt.Errorf("failed to get connector version for labels/version: %w", err)
 		}
@@ -571,6 +607,15 @@ func (s *service) migrateConnector(ctx context.Context, configConnectors *config
 			if err == nil && cv.Hash == existingVersion.Hash {
 				// No update required
 				return id, nil
+			}
+		} else {
+			existingVersion, err = s.db.GetConnectorVersionForLabels(ctx, labelSelector)
+			if err != nil && !errors.Is(err, database.ErrNotFound) {
+				return apid.Nil, fmt.Errorf("failed to get connector version for labels: %w", err)
+			}
+
+			if existingVersion != nil {
+				id = existingVersion.Id
 			}
 		}
 	} else {

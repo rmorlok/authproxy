@@ -922,6 +922,128 @@ func TestMigration(t *testing.T) {
 			})
 		})
 
+		t.Run("type and version", func(t *testing.T) {
+			t.Run("changed once preserves generated id", func(t *testing.T) {
+				cleanup := setup(t, []cschema.Connector{
+					{
+						Version:     1,
+						Labels:      map[string]string{"type": "fake"},
+						DisplayName: "initial",
+					},
+				})
+				defer cleanup()
+
+				err := service.MigrateConnectors(context.Background())
+				require.NoError(t, err)
+
+				cfg.GetRoot().Connectors.LoadFromList[0].Version = 2
+				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
+
+				err = service.MigrateConnectors(context.Background())
+				require.NoError(t, err)
+
+				type connectorResult struct {
+					Id          string
+					Version     int64
+					State       string
+					DisplayName string
+				}
+
+				rows, err := rawDb.Query(withDisplayNameExpr(cfg, `
+			SELECT id, version, state, DISPLAY_NAME_EXPR as display_name
+			FROM connector_versions
+			WHERE deleted_at IS NULL
+			ORDER BY version;
+		`))
+				require.NoError(t, err)
+				defer rows.Close()
+
+				var results []connectorResult
+				for rows.Next() {
+					var result connectorResult
+					require.NoError(t, rows.Scan(&result.Id, &result.Version, &result.State, &result.DisplayName))
+					results = append(results, result)
+				}
+				require.NoError(t, rows.Err())
+				require.Len(t, results, 2)
+				require.Equal(t, results[0].Id, results[1].Id)
+				require.Equal(t, connectorResult{
+					Id:          results[0].Id,
+					Version:     1,
+					State:       "active",
+					DisplayName: "initial",
+				}, results[0])
+				require.Equal(t, connectorResult{
+					Id:          results[0].Id,
+					Version:     2,
+					State:       "primary",
+					DisplayName: "changed",
+				}, results[1])
+			})
+
+			t.Run("initial version must start at one", func(t *testing.T) {
+				cleanup := setup(t, []cschema.Connector{
+					{
+						Version:     2,
+						Labels:      map[string]string{"type": "fake"},
+						DisplayName: "initial",
+					},
+				})
+				defer cleanup()
+
+				err := service.MigrateConnectors(context.Background())
+				require.Error(t, err)
+
+				type connectorResult struct {
+					Id      string
+					Version int64
+					State   string
+				}
+
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT id, version, state FROM connector_versions WHERE deleted_at IS NULL;
+		`, []connectorResult{})
+			})
+
+			t.Run("cannot change published version", func(t *testing.T) {
+				cleanup := setup(t, []cschema.Connector{
+					{
+						Version:     1,
+						Labels:      map[string]string{"type": "fake"},
+						DisplayName: "initial",
+					},
+				})
+				defer cleanup()
+
+				err := service.MigrateConnectors(context.Background())
+				require.NoError(t, err)
+
+				cfg.GetRoot().Connectors.LoadFromList[0].DisplayName = "changed"
+
+				err = service.MigrateConnectors(context.Background())
+				require.Error(t, err)
+
+				type connectorResult struct {
+					Version     int64
+					State       string
+					DisplayName string
+				}
+
+				assertSqlWithDisplayName(t, rawDb, cfg, `
+			SELECT version, state, DISPLAY_NAME_EXPR as display_name
+			FROM connector_versions
+			WHERE deleted_at IS NULL
+			ORDER BY version;
+		`, []connectorResult{
+					{
+						Version:     1,
+						State:       "primary",
+						DisplayName: "initial",
+					},
+				})
+			})
+		})
+
 		t.Run("type only", func(t *testing.T) {
 			t.Run("single initial", func(t *testing.T) {
 				cleanup := setup(t, []cschema.Connector{
