@@ -64,13 +64,13 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 		conn.SetupStep = &authStep
 
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
-		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateReady).Return(nil)
+		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
 
 		outcome, err := conn.HandleCredentialsEstablished(context.Background())
 		require.NoError(t, err)
 		assert.False(t, outcome.SetupPending)
 		assert.Nil(t, conn.GetSetupStep())
-		assert.Equal(t, database.ConnectionStateReady, conn.GetState())
+		assert.Equal(t, database.ConnectionStateConfigured, conn.GetState())
 	})
 
 	t.Run("marks ready when no setup step and no probes/configure", func(t *testing.T) {
@@ -79,13 +79,13 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 
 		conn, db := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
 
-		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateReady).Return(nil)
+		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
 
 		outcome, err := conn.HandleCredentialsEstablished(context.Background())
 		require.NoError(t, err)
 		assert.False(t, outcome.SetupPending)
 		assert.Nil(t, conn.GetSetupStep())
-		assert.Equal(t, database.ConnectionStateReady, conn.GetState())
+		assert.Equal(t, database.ConnectionStateConfigured, conn.GetState())
 	})
 }
 

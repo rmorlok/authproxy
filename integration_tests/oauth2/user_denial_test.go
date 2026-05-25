@@ -143,7 +143,7 @@ func TestUserDenialFlow(t *testing.T) {
 	// 5. Connection sits in the auth_failed setup phase, retryable. State stays
 	//    at `created` because we never reached HandleCredentialsEstablished.
 	conn := env.GetConnection(t, connectionID)
-	assert.Equal(t, database.ConnectionStateCreated, conn.State,
+	assert.Equal(t, database.ConnectionStateSetup, conn.State,
 		"connection should remain in created state when authorization was denied")
 	require.NotNilf(t, conn.SetupStep, "denied connection should have a setup_step recorded")
 	assert.Truef(t, conn.SetupStep.Equals(cschema.SetupStepAuthFailed),

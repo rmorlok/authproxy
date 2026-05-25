@@ -36,7 +36,7 @@ func (c *connection) onVerifyPassed(ctx context.Context) error {
 		if err := c.SetSetupStep(ctx, nil); err != nil {
 			return fmt.Errorf("failed to clear setup step after verify: %w", err)
 		}
-		if err := c.SetState(ctx, database.ConnectionStateReady); err != nil {
+		if err := c.SetState(ctx, database.ConnectionStateConfigured); err != nil {
 			return fmt.Errorf("failed to set connection ready after verify: %w", err)
 		}
 		return nil

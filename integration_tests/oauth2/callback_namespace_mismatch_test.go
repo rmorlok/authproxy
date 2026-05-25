@@ -115,7 +115,7 @@ func TestCallbackRejection_NamespaceMismatchActor(t *testing.T) {
 	// rejected callback never reached the token exchange.
 	require.Nil(t, env.GetOAuth2Token(t, connID))
 	connAfter := env.GetConnection(t, connID)
-	assert.Equal(t, database.ConnectionStateCreated, connAfter.State)
+	assert.Equal(t, database.ConnectionStateSetup, connAfter.State)
 
 	tokenReqs := provider.Requests(helpers.RequestsFilter{
 		Endpoint: helpers.EndpointToken,
@@ -227,7 +227,7 @@ func TestCallbackRejection_NamespaceMismatchConnection(t *testing.T) {
 	require.Nil(t, env.GetOAuth2Token(t, bobConnID),
 		"bob's connection must not have a token attached after a rejected forgery")
 	bobConnAfter := env.GetConnection(t, bobConnID)
-	assert.Equal(t, database.ConnectionStateCreated, bobConnAfter.State,
+	assert.Equal(t, database.ConnectionStateSetup, bobConnAfter.State,
 		"bob's connection state should remain `created`")
 	assert.Nil(t, bobConnAfter.SetupStep)
 	assert.Nil(t, bobConnAfter.SetupError)

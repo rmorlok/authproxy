@@ -13,7 +13,7 @@ import (
 // its setup step to the first configure step. The connection must be in the ready
 // state and its connector must have configure steps defined.
 func (c *connection) Reconfigure(ctx context.Context) (iface.ConnectionSetupResponse, error) {
-	if c.GetState() != database.ConnectionStateReady {
+	if c.GetState() != database.ConnectionStateConfigured {
 		return nil, httperr.BadRequest("connection must be in ready state to reconfigure")
 	}
 

@@ -22,7 +22,7 @@ func newTestConnectionWithService(s *service) *connection {
 		Connection: database.Connection{
 			Id:               connId,
 			Namespace:        "root",
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 			ConnectorId:      cv.GetId(),
 			ConnectorVersion: cv.GetVersion(),
 		},

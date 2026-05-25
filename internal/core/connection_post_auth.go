@@ -44,8 +44,8 @@ func (c *connection) HandleCredentialsEstablished(ctx context.Context) (iface.Po
 			return iface.PostAuthOutcome{}, fmt.Errorf("failed to clear setup step: %w", err)
 		}
 	}
-	if c.GetState() != database.ConnectionStateReady {
-		if err := c.SetState(ctx, database.ConnectionStateReady); err != nil {
+	if c.GetState() != database.ConnectionStateConfigured {
+		if err := c.SetState(ctx, database.ConnectionStateConfigured); err != nil {
 			return iface.PostAuthOutcome{}, fmt.Errorf("failed to set connection ready: %w", err)
 		}
 	}

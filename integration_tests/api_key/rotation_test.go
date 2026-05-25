@@ -52,7 +52,7 @@ func TestApiKeyManualRotation(t *testing.T) {
 	require.NoError(t, env.RunVerifyConnection(t, connectionID))
 
 	cReady := env.GetConnection(t, connectionID)
-	require.Equal(t, database.ConnectionStateReady, cReady.State)
+	require.Equal(t, database.ConnectionStateConfigured, cReady.State)
 
 	// Snapshot the active credential row before rotation so we can confirm
 	// the row id changes (i.e. a new row was inserted, not the old one
@@ -98,7 +98,7 @@ func TestApiKeyManualRotation(t *testing.T) {
 	require.NoError(t, env.RunVerifyConnection(t, connectionID))
 
 	cAfter := env.GetConnection(t, connectionID)
-	require.Equal(t, database.ConnectionStateReady, cAfter.State)
+	require.Equal(t, database.ConnectionStateConfigured, cAfter.State)
 	assert.Equal(t, database.ConnectionHealthStateHealthy, cAfter.HealthState)
 
 	// 5. Active credential row was replaced — different id, different

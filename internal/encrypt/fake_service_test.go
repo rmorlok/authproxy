@@ -45,7 +45,7 @@ func TestFakeService(t *testing.T) {
 				Namespace:        "root.some-namespace",
 				ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 				ConnectorVersion: 1,
-				State:            database.ConnectionStateReady,
+				State:            database.ConnectionStateConfigured,
 			}
 			require.NoError(t, db.CreateConnection(context.Background(), &connection))
 

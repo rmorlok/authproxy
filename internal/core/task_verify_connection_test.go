@@ -86,7 +86,7 @@ func TestRunVerifyConnection_NoProbes_AdvancesToReady(t *testing.T) {
 	conn := &database.Connection{
 		Id:               connectionId,
 		Namespace:        "root",
-		State:            database.ConnectionStateCreated,
+		State:            database.ConnectionStateSetup,
 		HealthState:      database.ConnectionHealthStateHealthy,
 		ConnectorId:      connector.Id,
 		ConnectorVersion: connector.Version,
@@ -102,7 +102,7 @@ func TestRunVerifyConnection_NoProbes_AdvancesToReady(t *testing.T) {
 		SetConnectionSetupStep(gomock.Any(), connectionId, (*cschema.SetupStep)(nil)).
 		Return(nil)
 	db.EXPECT().
-		SetConnectionState(gomock.Any(), connectionId, database.ConnectionStateReady).
+		SetConnectionState(gomock.Any(), connectionId, database.ConnectionStateConfigured).
 		Return(nil)
 
 	require.NoError(t, svc.RunVerifyConnection(context.Background(), connectionId))
@@ -123,7 +123,7 @@ func TestRunVerifyConnection_StalePhase_SkipsCleanly(t *testing.T) {
 	conn := &database.Connection{
 		Id:               connectionId,
 		Namespace:        "root",
-		State:            database.ConnectionStateReady,
+		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
 		ConnectorId:      connector.Id,
 		ConnectorVersion: connector.Version,
@@ -184,7 +184,7 @@ func TestRunVerifyConnection_ProbeFailure(t *testing.T) {
 	conn := &database.Connection{
 		Id:               connectionId,
 		Namespace:        "root",
-		State:            database.ConnectionStateCreated,
+		State:            database.ConnectionStateSetup,
 		HealthState:      database.ConnectionHealthStateHealthy,
 		ConnectorId:      connector.Id,
 		ConnectorVersion: connector.Version,

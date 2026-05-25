@@ -23,7 +23,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root",
 			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 		}
 		assert.Error(t, c.Validate())
 	})
@@ -33,7 +33,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root",
 			ConnectorId:      apid.New(apid.PrefixActor), // wrong prefix
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 		}
 		assert.Error(t, c.Validate())
 	})
@@ -48,7 +48,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root.some-namespace",
 			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 		})
 		assert.NoError(t, err)
 
@@ -56,7 +56,7 @@ func TestConnections(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, c)
 		assert.Equal(t, c.Id, u)
-		assert.Equal(t, c.State, ConnectionStateCreated)
+		assert.Equal(t, c.State, ConnectionStateSetup)
 		assert.True(t, c.CreatedAt.Equal(now))
 		assert.True(t, c.UpdatedAt.Equal(now))
 	})
@@ -75,7 +75,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root.some-namespace",
 			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 			Labels:           labels,
 		})
 		assert.NoError(t, err)
@@ -111,7 +111,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root.some-namespace",
 			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated})
+			State:            ConnectionStateSetup})
 		assert.NoError(t, err)
 
 		test_utils.AssertSql(t, rawDb, `
@@ -119,7 +119,7 @@ func TestConnections(t *testing.T) {
 		`, []connectionResult{
 			{
 				Id:        u.String(),
-				State:     string(ConnectionStateCreated),
+				State:     string(ConnectionStateSetup),
 				DeletedAt: nil,
 			},
 		})
@@ -134,7 +134,7 @@ func TestConnections(t *testing.T) {
 		`, []connectionResult{
 			{
 				Id:        u.String(),
-				State:     string(ConnectionStateCreated),
+				State:     string(ConnectionStateSetup),
 				DeletedAt: nil,
 			},
 		})
@@ -147,7 +147,7 @@ func TestConnections(t *testing.T) {
 		`, []connectionResult{
 			{
 				Id:        u.String(),
-				State:     string(ConnectionStateCreated),
+				State:     string(ConnectionStateSetup),
 				DeletedAt: &now,
 			},
 		})
@@ -174,7 +174,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root.some-namespace",
 			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 		})
 		assert.NoError(t, err)
 
@@ -183,7 +183,7 @@ func TestConnections(t *testing.T) {
 		`, []connectionResult{
 			{
 				Id:        u.String(),
-				State:     string(ConnectionStateCreated),
+				State:     string(ConnectionStateSetup),
 				UpdatedAt: now,
 			},
 		})
@@ -192,7 +192,7 @@ func TestConnections(t *testing.T) {
 		ctx = apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(newNow)).Build()
 
 		// Attempt update for connection that does not exist
-		err = db.SetConnectionState(ctx, apid.New(apid.PrefixConnection), ConnectionStateReady)
+		err = db.SetConnectionState(ctx, apid.New(apid.PrefixConnection), ConnectionStateConfigured)
 		assert.ErrorIs(t, err, ErrNotFound)
 
 		// Unchanged
@@ -201,12 +201,12 @@ func TestConnections(t *testing.T) {
 		`, []connectionResult{
 			{
 				Id:        u.String(),
-				State:     string(ConnectionStateCreated),
+				State:     string(ConnectionStateSetup),
 				UpdatedAt: now,
 			},
 		})
 
-		err = db.SetConnectionState(ctx, u, ConnectionStateReady)
+		err = db.SetConnectionState(ctx, u, ConnectionStateConfigured)
 		assert.NoError(t, err)
 
 		test_utils.AssertSql(t, rawDb, `
@@ -214,7 +214,7 @@ func TestConnections(t *testing.T) {
 		`, []connectionResult{
 			{
 				Id:        u.String(),
-				State:     string(ConnectionStateReady),
+				State:     string(ConnectionStateConfigured),
 				UpdatedAt: newNow,
 			},
 		})
@@ -230,7 +230,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root.some-namespace",
 			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 		})
 		assert.NoError(t, err)
 
@@ -239,7 +239,7 @@ func TestConnections(t *testing.T) {
 		assert.NoError(t, err)
 
 		// Attempting to set state on a soft-deleted connection should return ErrNotFound
-		err = db.SetConnectionState(ctx, u, ConnectionStateReady)
+		err = db.SetConnectionState(ctx, u, ConnectionStateConfigured)
 		assert.ErrorIs(t, err, ErrNotFound)
 	})
 
@@ -260,9 +260,9 @@ func TestConnections(t *testing.T) {
 			}
 			lastUuid = u
 
-			state := ConnectionStateCreated
+			state := ConnectionStateSetup
 			if i%2 == 1 {
-				state = ConnectionStateReady
+				state = ConnectionStateConfigured
 			}
 
 			err := db.CreateConnection(ctx, &Connection{
@@ -365,7 +365,7 @@ func TestConnections(t *testing.T) {
 		t.Run("filter by state", func(t *testing.T) {
 			total := 0
 
-			q := db.ListConnectionsBuilder().Limit(10).ForState(ConnectionStateReady)
+			q := db.ListConnectionsBuilder().Limit(10).ForState(ConnectionStateConfigured)
 			for {
 				result := q.FetchPage(ctx)
 				assert.NoError(t, result.Error)
@@ -418,7 +418,7 @@ func TestConnections(t *testing.T) {
 				Namespace:        "root",
 				ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 				ConnectorVersion: 1,
-				State:            ConnectionStateCreated,
+				State:            ConnectionStateSetup,
 				Labels:           conn.labels,
 			})
 			assert.NoError(t, err)
@@ -495,7 +495,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root.some-namespace",
 			ConnectorId:      connectorId,
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 			Labels:           Labels{"existing": "value"},
 		})
 		assert.NoError(t, err)
@@ -547,7 +547,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root.some-namespace",
 			ConnectorId:      connectorId,
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 			Labels:           Labels{"env": "prod", "team": "backend", "version": "v1"},
 		})
 		assert.NoError(t, err)
@@ -600,7 +600,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root.some-namespace",
 			ConnectorId:      connectorId,
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 			Labels:           Labels{"old": "value", "other": "data"},
 		})
 		assert.NoError(t, err)
@@ -661,7 +661,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root.some-namespace",
 			ConnectorId:      connectorId,
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 			Annotations:      Annotations{"existing": "value"},
 		})
 		assert.NoError(t, err)
@@ -713,7 +713,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root.some-namespace",
 			ConnectorId:      connectorId,
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 			Annotations:      Annotations{"env": "prod", "team": "backend", "version": "v1"},
 		})
 		assert.NoError(t, err)
@@ -766,7 +766,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root.some-namespace",
 			ConnectorId:      connectorId,
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 			Annotations:      Annotations{"old": "value", "other": "data"},
 		})
 		assert.NoError(t, err)
@@ -821,9 +821,9 @@ func TestConnections(t *testing.T) {
 
 			u := apid.New(apid.PrefixConnection)
 
-			state := ConnectionStateCreated
+			state := ConnectionStateSetup
 			if i%2 == 1 {
-				state = ConnectionStateReady
+				state = ConnectionStateConfigured
 			}
 
 			err := db.CreateConnection(ctx, &Connection{
@@ -894,7 +894,7 @@ func TestConnections(t *testing.T) {
 			total := 0
 			err := db.
 				ListConnectionsBuilder().
-				ForStates([]ConnectionState{ConnectionStateCreated, ConnectionStateReady}).
+				ForStates([]ConnectionState{ConnectionStateSetup, ConnectionStateConfigured}).
 				WithDeletedHandling(DeletedHandlingExclude).
 				Enumerate(ctx, func(pr pagination.PageResult[Connection]) (keepGoing pagination.KeepGoing, err error) {
 					total += len(pr.Results)
@@ -907,7 +907,7 @@ func TestConnections(t *testing.T) {
 			total := 0
 			err := db.
 				ListConnectionsBuilder().
-				ForStates([]ConnectionState{ConnectionStateReady}).
+				ForStates([]ConnectionState{ConnectionStateConfigured}).
 				WithDeletedHandling(DeletedHandlingExclude).
 				Enumerate(ctx, func(pr pagination.PageResult[Connection]) (keepGoing pagination.KeepGoing, err error) {
 					total += len(pr.Results)
@@ -936,7 +936,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root.some-namespace",
 			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -1010,7 +1010,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root",
 			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -1034,7 +1034,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root.some-namespace",
 			ConnectorId:      apid.New(apid.PrefixConnectorVersion),
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 		})
 		require.NoError(t, err)
 
@@ -1097,7 +1097,7 @@ func TestConnections(t *testing.T) {
 			Namespace:              "root.some-namespace",
 			ConnectorId:            apid.New(apid.PrefixConnectorVersion),
 			ConnectorVersion:       1,
-			State:                  ConnectionStateCreated,
+			State:                  ConnectionStateSetup,
 			SetupStep:              &step,
 			EncryptedConfiguration: &ef,
 			EncryptedAt:            &now,
@@ -1146,7 +1146,7 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root.tenant-a",
 			ConnectorId:      connectorID,
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 			Labels:           Labels{"subscription": "gold"},
 		}))
 
@@ -1213,14 +1213,14 @@ func TestConnections(t *testing.T) {
 			Namespace:        "root.sel",
 			ConnectorId:      cvDrive,
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 		}))
 		require.NoError(t, db.CreateConnection(ctx, &Connection{
 			Id:               apid.New(apid.PrefixConnection),
 			Namespace:        "root.sel",
 			ConnectorId:      cvSlack,
 			ConnectorVersion: 1,
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 		}))
 
 		// Filter connections by the parent connector version's user label —

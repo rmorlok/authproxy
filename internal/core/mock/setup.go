@@ -24,7 +24,7 @@ func MockConnectionRetrieval(ctx context.Context, dbMock *mockDb.MockDB, e *mock
 		GetConnection(gomock.Any(), connUuuid).
 		Return(&database.Connection{
 			Id:               connUuuid,
-			State:            database.ConnectionStateReady,
+			State:            database.ConnectionStateConfigured,
 			ConnectorId:      c.Id,
 			ConnectorVersion: c.Version,
 			CreatedAt:        clock.Now(),

@@ -206,7 +206,7 @@ func TestScopeMismatch_RequiredMissing(t *testing.T) {
 	connectionID := s.driveApprovalAndGetConnectionId(t)
 
 	conn := s.env.GetConnection(t, connectionID)
-	assert.Equal(t, database.ConnectionStateCreated, conn.State,
+	assert.Equal(t, database.ConnectionStateSetup, conn.State,
 		"connection should remain in created state when required scopes are missing")
 	require.NotNilf(t, conn.SetupStep, "auth-failed connection should have a setup_step")
 	assert.Truef(t, conn.SetupStep.Equals(cschema.SetupStepAuthFailed),
@@ -240,7 +240,7 @@ func TestScopeMismatch_OptionalMissing(t *testing.T) {
 	connectionID := s.driveApprovalAndGetConnectionId(t)
 
 	conn := s.env.GetConnection(t, connectionID)
-	assert.Equal(t, database.ConnectionStateReady, conn.State,
+	assert.Equal(t, database.ConnectionStateConfigured, conn.State,
 		"missing-optional should not block the connection from going ready")
 
 	token := s.env.GetOAuth2Token(t, connectionID)
@@ -269,7 +269,7 @@ func TestScopeMismatch_AllScopesGranted(t *testing.T) {
 	connectionID := s.driveApprovalAndGetConnectionId(t)
 
 	conn := s.env.GetConnection(t, connectionID)
-	assert.Equal(t, database.ConnectionStateReady, conn.State)
+	assert.Equal(t, database.ConnectionStateConfigured, conn.State)
 
 	token := s.env.GetOAuth2Token(t, connectionID)
 	require.NotNil(t, token)
@@ -298,7 +298,7 @@ func TestScopeMismatch_ExtraGranted(t *testing.T) {
 	connectionID := s.driveApprovalAndGetConnectionId(t)
 
 	conn := s.env.GetConnection(t, connectionID)
-	assert.Equal(t, database.ConnectionStateReady, conn.State,
+	assert.Equal(t, database.ConnectionStateConfigured, conn.State,
 		"extra scopes should not block the connection from going ready")
 
 	token := s.env.GetOAuth2Token(t, connectionID)
@@ -332,7 +332,7 @@ func TestScopeMismatch_ProviderOmitsScope(t *testing.T) {
 	connectionID := s.driveApprovalAndGetConnectionId(t)
 
 	conn := s.env.GetConnection(t, connectionID)
-	assert.Equal(t, database.ConnectionStateReady, conn.State)
+	assert.Equal(t, database.ConnectionStateConfigured, conn.State)
 
 	token := s.env.GetOAuth2Token(t, connectionID)
 	require.NotNil(t, token)

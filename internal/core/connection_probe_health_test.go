@@ -76,7 +76,7 @@ func newProbeHealthTestConn(
 		Connection: database.Connection{
 			Id:               connId,
 			Namespace:        "root",
-			State:            database.ConnectionStateReady,
+			State:            database.ConnectionStateConfigured,
 			HealthState:      initialHealth,
 			ConnectorId:      cv.GetId(),
 			ConnectorVersion: cv.GetVersion(),
@@ -325,7 +325,7 @@ func TestRecordPeriodicProbeOutcome_ApiKeyStampsLastValidatedAt(t *testing.T) {
 		Connection: database.Connection{
 			Id:               connId,
 			Namespace:        "root",
-			State:            database.ConnectionStateReady,
+			State:            database.ConnectionStateConfigured,
 			HealthState:      database.ConnectionHealthStateHealthy,
 			ConnectorId:      cv.GetId(),
 			ConnectorVersion: cv.GetVersion(),
@@ -368,7 +368,7 @@ func TestRecordPeriodicProbeOutcome_OAuth2SkipsLastValidatedAt(t *testing.T) {
 		Connection: database.Connection{
 			Id:               connId,
 			Namespace:        "root",
-			State:            database.ConnectionStateReady,
+			State:            database.ConnectionStateConfigured,
 			HealthState:      database.ConnectionHealthStateHealthy,
 			ConnectorId:      cv.GetId(),
 			ConnectorVersion: cv.GetVersion(),

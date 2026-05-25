@@ -147,7 +147,7 @@ func (r *tokenExchangeFailureRig) requireOneFailureEvent(t *testing.T, category 
 func (r *tokenExchangeFailureRig) requireAuthFailedConnection(t *testing.T, connectionID, errorSubstring string) {
 	t.Helper()
 	conn := r.env.GetConnection(t, connectionID)
-	assert.Equal(t, database.ConnectionStateCreated, conn.State,
+	assert.Equal(t, database.ConnectionStateSetup, conn.State,
 		"connection state should remain `created` on token-exchange failure")
 	require.NotNilf(t, conn.SetupStep, "auth-failed connection should have a setup_step recorded")
 	assert.Truef(t, conn.SetupStep.Equals(cschema.SetupStepAuthFailed),

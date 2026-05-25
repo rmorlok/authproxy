@@ -40,7 +40,7 @@ func TestRunProbe_Success(t *testing.T) {
 	conn := &database.Connection{
 		Id:               connectionId,
 		Namespace:        "root",
-		State:            database.ConnectionStateReady,
+		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
 		ConnectorId:      connector.Id,
 		ConnectorVersion: connector.Version,
@@ -91,7 +91,7 @@ func TestRunProbe_FailureBelowThreshold(t *testing.T) {
 	conn := &database.Connection{
 		Id:               connectionId,
 		Namespace:        "root",
-		State:            database.ConnectionStateReady,
+		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
 		ConnectorId:      connector.Id,
 		ConnectorVersion: connector.Version,
@@ -144,7 +144,7 @@ func TestRunProbe_FailureCrossesThreshold(t *testing.T) {
 	conn := &database.Connection{
 		Id:               connectionId,
 		Namespace:        "root",
-		State:            database.ConnectionStateReady,
+		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
 		ConnectorId:      connector.Id,
 		ConnectorVersion: connector.Version,
@@ -187,7 +187,7 @@ func TestRunProbe_ProbeNotFound(t *testing.T) {
 	conn := &database.Connection{
 		Id:               connectionId,
 		Namespace:        "root",
-		State:            database.ConnectionStateReady,
+		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
 		ConnectorId:      connector.Id,
 		ConnectorVersion: connector.Version,

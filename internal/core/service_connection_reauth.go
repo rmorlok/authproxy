@@ -38,7 +38,7 @@ func (s *service) ReauthConnection(ctx context.Context, id apid.ID, returnToUrl 
 		return nil, err
 	}
 
-	if conn.GetState() != database.ConnectionStateReady {
+	if conn.GetState() != database.ConnectionStateConfigured {
 		return nil, httperr.BadRequest("connection is not in a reauthable state")
 	}
 

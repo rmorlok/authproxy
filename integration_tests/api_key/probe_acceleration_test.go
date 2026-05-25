@@ -185,6 +185,6 @@ func countPendingProbeTasksForConnection(t *testing.T, env *helpers.IntegrationT
 		}
 		count++
 	}
-	_ = database.ConnectionStateReady // keep import referenced
+	_ = database.ConnectionStateConfigured // keep import referenced
 	return count
 }

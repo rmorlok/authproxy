@@ -65,7 +65,7 @@ func TestApiKeyAutoReauth(t *testing.T) {
 	require.NoError(t, env.RunVerifyConnection(t, connectionID))
 
 	cReady := env.GetConnection(t, connectionID)
-	require.Equal(t, database.ConnectionStateReady, cReady.State)
+	require.Equal(t, database.ConnectionStateConfigured, cReady.State)
 	require.Equal(t, database.ConnectionHealthStateHealthy, cReady.HealthState,
 		"connection should be healthy after a successful verify")
 
@@ -78,7 +78,7 @@ func TestApiKeyAutoReauth(t *testing.T) {
 		"probe should fail after upstream rotation invalidated the stored key")
 
 	cUnhealthy := env.GetConnection(t, connectionID)
-	assert.Equal(t, database.ConnectionStateReady, cUnhealthy.State,
+	assert.Equal(t, database.ConnectionStateConfigured, cUnhealthy.State,
 		"state should still be Ready — only health_state flips")
 	require.Equal(t, database.ConnectionHealthStateUnhealthy, cUnhealthy.HealthState,
 		"connection should be unhealthy after one failed probe (threshold=1)")
@@ -101,7 +101,7 @@ func TestApiKeyAutoReauth(t *testing.T) {
 	require.NoError(t, env.RunVerifyConnection(t, connectionID))
 
 	cRecovered := env.GetConnection(t, connectionID)
-	require.Equal(t, database.ConnectionStateReady, cRecovered.State)
+	require.Equal(t, database.ConnectionStateConfigured, cRecovered.State)
 	require.Equal(t, database.ConnectionHealthStateHealthy, cRecovered.HealthState,
 		"connection should be healthy again after submitting the new key")
 

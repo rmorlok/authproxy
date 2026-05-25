@@ -347,7 +347,7 @@ func (s *service) EnumerateOAuth2TokensExpiringWithin(
 			Where(sq.Eq{
 				"t.deleted_at": nil,
 				"c.deleted_at": nil,
-				"c.state":      ConnectionStateReady,
+				"c.state":      ConnectionStateConfigured,
 			}).
 			Where("t.access_token_expires_at <= ?", expirationThreshold).
 			OrderBy("t.created_at DESC").

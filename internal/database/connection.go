@@ -29,8 +29,15 @@ func init() {
 type ConnectionState string
 
 const (
-	ConnectionStateCreated       ConnectionState = "created"
-	ConnectionStateReady         ConnectionState = "ready"
+	// ConnectionStateSetup is the initial state — a connection in setup
+	// has been persisted and has one or more setup steps in progress.
+	ConnectionStateSetup ConnectionState = "setup"
+	// ConnectionStateConfigured means setup is complete. The connection
+	// may or may not be currently usable; whether the credentials still
+	// work is the orthogonal ConnectionHealthState axis (e.g. an OAuth2
+	// connection with a revoked refresh token stays Configured but flips
+	// unhealthy until reauth).
+	ConnectionStateConfigured    ConnectionState = "configured"
 	ConnectionStateDisabled      ConnectionState = "disabled"
 	ConnectionStateDisconnecting ConnectionState = "disconnecting"
 	ConnectionStateDisconnected  ConnectionState = "disconnected"
@@ -38,8 +45,8 @@ const (
 
 func IsValidConnectionState[T string | ConnectionState](state T) bool {
 	switch ConnectionState(state) {
-	case ConnectionStateCreated,
-		ConnectionStateReady,
+	case ConnectionStateSetup,
+		ConnectionStateConfigured,
 		ConnectionStateDisabled,
 		ConnectionStateDisconnecting,
 		ConnectionStateDisconnected:
@@ -50,11 +57,12 @@ func IsValidConnectionState[T string | ConnectionState](state T) bool {
 }
 
 // ConnectionHealthState is the operational health signal for a connection,
-// distinct from its lifecycle state. A connection can be Ready and unhealthy
-// simultaneously — for example, an OAuth2 connection whose refresh token has
-// been revoked stays in ConnectionStateReady but flips to unhealthy until the
-// user re-authenticates. Probe-driven and refresh-driven signals both write
-// to this field; UI surfaces it to drive the unified reauth action.
+// distinct from its lifecycle state. A connection can be Configured and
+// unhealthy simultaneously — for example, an OAuth2 connection whose refresh
+// token has been revoked stays in ConnectionStateConfigured but flips to
+// unhealthy until the user re-authenticates. Probe-driven and refresh-driven
+// signals both write to this field; UI surfaces it to drive the unified
+// reauth action.
 type ConnectionHealthState string
 
 const (

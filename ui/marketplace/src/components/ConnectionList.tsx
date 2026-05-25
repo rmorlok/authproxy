@@ -118,7 +118,7 @@ const ConnectionList: React.FC = () => {
     // If the connection is already ready, the form is from a reconfigure flow.
     // Clearing the form step alone leaves setup_step=configure:0 on the server,
     // so the dialog reappears on next load — call cancel_setup to clear it server-side.
-    if (conn && conn.state === ConnectionState.READY) {
+    if (conn && conn.state === ConnectionState.CONFIGURED) {
       dispatch(cancelSetupConnectionAsync(conn.id));
     }
     dispatch(clearFormStep());

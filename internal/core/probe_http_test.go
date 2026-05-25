@@ -50,7 +50,7 @@ func newProbeTestConnection(t *testing.T, ctrl *gomock.Controller, def cschema.C
 		Connection: database.Connection{
 			Id:               apid.New(apid.PrefixConnection),
 			Namespace:        "root",
-			State:            database.ConnectionStateReady,
+			State:            database.ConnectionStateConfigured,
 			HealthState:      database.ConnectionHealthStateHealthy,
 			ConnectorId:      cv.GetId(),
 			ConnectorVersion: cv.GetVersion(),
@@ -210,7 +210,7 @@ func TestProbeHttp_RawHttp_Success(t *testing.T) {
 		Connection: database.Connection{
 			Id:               apid.New(apid.PrefixConnection),
 			Namespace:        "root",
-			State:            database.ConnectionStateReady,
+			State:            database.ConnectionStateConfigured,
 			HealthState:      database.ConnectionHealthStateHealthy,
 			ConnectorId:      cv.GetId(),
 			ConnectorVersion: cv.GetVersion(),
@@ -250,7 +250,7 @@ func TestProbeHttp_RawHttp_Non2xxIsFailure(t *testing.T) {
 		Connection: database.Connection{
 			Id:               apid.New(apid.PrefixConnection),
 			Namespace:        "root",
-			State:            database.ConnectionStateReady,
+			State:            database.ConnectionStateConfigured,
 			HealthState:      database.ConnectionHealthStateHealthy,
 			ConnectorId:      cv.GetId(),
 			ConnectorVersion: cv.GetVersion(),
