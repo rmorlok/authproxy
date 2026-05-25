@@ -97,6 +97,25 @@ gh workflow run "Verify EKS OIDC"
 (Or use the Actions UI → "Verify EKS OIDC" → "Run workflow".) A green
 run = the federated trust policy is wired correctly.
 
+### 8. Install the in-cluster bootstrap layer
+
+Once the cluster is up, install ingress-nginx + cert-manager + external-dns
++ metrics-server via the bootstrap chart. See
+[`../charts/bootstrap/README.md`](../charts/bootstrap/README.md) for the
+full procedure. Quick version:
+
+```bash
+cd ../charts/bootstrap
+helm dependency update
+helm upgrade --install authproxy-bootstrap . \
+  --namespace kube-system \
+  --set "global.acmeEmail=you@example.com" \
+  --set "global.hostedZoneId=$(cd ../../terraform/eks && terraform output -raw route53_zone_id)" \
+  --set "global.domain=$(cd ../../terraform/eks && terraform output -raw domain_name)" \
+  --set "external-dns.serviceAccount.annotations.eks\.amazonaws\.com/role-arn=$(cd ../../terraform/eks && terraform output -raw external_dns_role_arn)" \
+  --set "external-dns.domainFilters[0]=$(cd ../../terraform/eks && terraform output -raw domain_name)"
+```
+
 ## Day-2: routine `terraform apply`
 
 For routine config drift correction or version bumps, re-run `terraform

@@ -1,0 +1,121 @@
+# authproxy-bootstrap values.
+#
+# Section guide:
+#   global              — shared inputs (LE email, hosted-zone id, role ARN)
+#   ingress-nginx       — passthrough values forwarded to the upstream chart
+#   cert-manager        — passthrough values forwarded to the upstream chart
+#   external-dns        — passthrough values forwarded to the upstream chart
+#   metrics-server      — passthrough values forwarded to the upstream chart
+#   clusterIssuer       — Let's Encrypt prod ClusterIssuer config (this chart's own template)
+
+global:
+  # -- Email used by the Let's Encrypt ACME registration. **Required** —
+  # LE bounces ACME registrations without a contact email.
+  acmeEmail: ""
+
+  # -- Route53 hosted zone id external-dns is authoritative for. From
+  # `terraform output route53_zone_id`. Required when external-dns is
+  # enabled.
+  hostedZoneId: ""
+
+  # -- DNS domain external-dns scopes its writes to. From
+  # `terraform output domain_name`. Required when external-dns is enabled.
+  domain: ""
+
+# --- ingress-nginx ----------------------------------------------------------
+# Front the cluster with an NLB (AWS preferred). UDP listeners are
+# disabled by default; only HTTP + HTTPS land on the NLB.
+ingress-nginx:
+  enabled: true
+  controller:
+    replicaCount: 2
+    service:
+      annotations:
+        # NLB instead of the legacy CLB — faster, IP-target ready.
+        service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+        # external traffic policy = Local preserves client IP at the
+        # cost of node-affinity for the LB target health checks.
+        # Matches the "I want X-Forwarded-For to mean something" path.
+        service.beta.kubernetes.io/aws-load-balancer-external-traffic-policy: "Local"
+      externalTrafficPolicy: Local
+
+    # IngressClass that workload Ingresses reference. Stays `nginx` to
+    # match the AuthProxy chart's default.
+    ingressClassResource:
+      name: nginx
+      enabled: true
+      default: true
+
+    config:
+      # Reasonable defaults; tighten in customer overrides if needed.
+      use-forwarded-headers: "true"
+      compute-full-forwarded-for: "true"
+
+    metrics:
+      enabled: true
+      serviceMonitor:
+        # Off by default; flip on when a Prometheus stack lands.
+        enabled: false
+
+# --- cert-manager -----------------------------------------------------------
+cert-manager:
+  enabled: true
+  # cert-manager 1.16+: install CRDs as part of the helm install
+  # (avoids the "apply CRDs separately" step).
+  crds:
+    enabled: true
+    keep: true
+
+  # Modest resource asks; cert-manager isn't a hot path.
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+
+# --- external-dns -----------------------------------------------------------
+external-dns:
+  enabled: true
+  provider: aws
+
+  # IRSA wiring: the SA in the upstream chart picks up this annotation.
+  # roleArn comes from `terraform output external_dns_role_arn`. Set via
+  # --set or values overlay at install time.
+  serviceAccount:
+    create: true
+    name: external-dns
+    annotations: {}
+    # eks.amazonaws.com/role-arn: <set this via global.externalDnsRoleArn below>
+
+  # Domain filter prevents external-dns from touching unrelated zones
+  # in the same account. Set from global.domain via the helpers below
+  # in templates/_helpers.tpl is too elaborate — just have the operator
+  # set this directly; we render it from global in NOTES.txt rather than
+  # plumbing through.
+  domainFilters: []
+
+  # Match records this instance owns so concurrent installs (per-branch
+  # dev envs) don't fight over the same records.
+  txtOwnerId: "authproxy"
+  registry: "txt"
+  policy: "sync"
+
+  sources:
+    - service
+    - ingress
+
+# --- metrics-server ---------------------------------------------------------
+metrics-server:
+  enabled: true
+  args:
+    - --kubelet-preferred-address-types=InternalIP
+
+# --- ClusterIssuer (this chart's own template) ------------------------------
+clusterIssuer:
+  # -- Create a Let's Encrypt prod ClusterIssuer named `letsencrypt-prod`.
+  # Disable if a separate process manages issuers.
+  enabled: true
+  name: letsencrypt-prod
+  server: https://acme-v02.api.letsencrypt.org/directory
+  # solverIngressClass matches the ingress-nginx IngressClass above so
+  # cert-manager can complete HTTP-01 challenges via the same controller.
+  solverIngressClass: nginx

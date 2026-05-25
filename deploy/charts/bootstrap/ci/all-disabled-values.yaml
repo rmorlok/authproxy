@@ -1,0 +1,26 @@
+# chart-testing values for the helm-chart-ci workflow.
+#
+# Disables every subchart + the ClusterIssuer template so `ct install`
+# can render and "install" the chart against a kind cluster without
+# needing real AWS resources (NLB, Route53, Let's Encrypt). The install
+# becomes an effectively-empty Helm release — what we're verifying is
+# that the chart's `enabled` toggles + template gates work correctly,
+# not that the upstream components themselves run.
+#
+# Real-world installs against EKS go through `helm install` with the
+# values documented in deploy/charts/bootstrap/README.md.
+
+ingress-nginx:
+  enabled: false
+
+cert-manager:
+  enabled: false
+
+external-dns:
+  enabled: false
+
+metrics-server:
+  enabled: false
+
+clusterIssuer:
+  enabled: false

@@ -1,0 +1,79 @@
+# Throwaway smoke test for the bootstrap layer.
+#
+# Once the bootstrap chart is installed and external-dns / cert-manager
+# are running, applying this should — within ~3 min — produce:
+#   - DNS:  hello.<your-domain> → the NLB (external-dns)
+#   - TLS:  a Let's Encrypt cert in the `hello-echo` ns (cert-manager)
+#   - HTTP: `curl https://hello.<your-domain>/` returns echo's response
+#
+# Replace YOUR_DOMAIN below with your actual domain (e.g. authproxy.net)
+# before applying.
+
+---
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: hello-echo
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: hello-echo
+  namespace: hello-echo
+spec:
+  replicas: 1
+  selector:
+    matchLabels: { app: hello-echo }
+  template:
+    metadata:
+      labels: { app: hello-echo }
+    spec:
+      containers:
+        - name: echo
+          image: ealen/echo-server:0.9.2
+          ports:
+            - containerPort: 80
+              name: http
+          readinessProbe:
+            httpGet: { path: /, port: 80 }
+            initialDelaySeconds: 2
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: hello-echo
+  namespace: hello-echo
+spec:
+  selector: { app: hello-echo }
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: hello-echo
+  namespace: hello-echo
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+spec:
+  ingressClassName: nginx
+  tls:
+    - hosts:
+        - hello.YOUR_DOMAIN
+      secretName: hello-echo-tls
+  rules:
+    - host: hello.YOUR_DOMAIN
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: hello-echo
+                port:
+                  name: http

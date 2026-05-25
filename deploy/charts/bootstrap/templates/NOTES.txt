@@ -1,0 +1,44 @@
+{{- /*
+  Post-install notes printed by `helm install/upgrade`. Surfaces the
+  operator-facing checklist: confirm IRSA wiring, verify components are
+  healthy, and run the throwaway echo smoke test.
+*/ -}}
+authproxy-bootstrap installed.
+
+Next steps
+----------
+1. Verify external-dns picked up its IRSA role:
+
+     kubectl -n kube-system describe sa external-dns | grep eks.amazonaws.com/role-arn
+
+   The annotation must show the ARN you supplied via
+   `--set external-dns.serviceAccount.annotations.eks\.amazonaws\.com/role-arn=...`.
+   No ARN = external-dns will silently fail to write DNS records.
+
+2. Watch all four bootstrap components reach Ready:
+
+     kubectl get pods -n kube-system -l 'app.kubernetes.io/name in (ingress-nginx,cert-manager,external-dns,metrics-server)'
+
+3. Confirm the ClusterIssuer reached Ready (cert-manager has to register
+   with Let's Encrypt — takes ~10-30s):
+
+     kubectl get clusterissuer {{ .Values.clusterIssuer.name }} -o wide
+
+4. Smoke test — apply examples/hello-echo.yaml from this chart's source
+   tree, then watch DNS + TLS land:
+
+     kubectl apply -f deploy/charts/bootstrap/examples/hello-echo.yaml
+     kubectl -n hello-echo get ingress,certificate -w
+
+   Within ~3 min: DNS A record visible, certificate Ready, curling
+   https://hello.{{ .Values.global.domain }} returns the echo response.
+{{- if not .Values.global.acmeEmail }}
+
+WARNING: global.acmeEmail is unset — the ClusterIssuer will fail to
+register with Let's Encrypt. Set this before relying on cert issuance.
+{{- end }}
+{{- if not .Values.global.domain }}
+
+WARNING: global.domain is unset — external-dns will not be domain-
+scoped and could touch unrelated zones. Set this to the zone you own.
+{{- end }}

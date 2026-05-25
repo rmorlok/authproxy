@@ -42,3 +42,13 @@ output "kubeconfig_command" {
   description = "Convenience: copy-paste command to wire local kubectl to this cluster."
   value       = "aws eks update-kubeconfig --region ${var.region} --name ${module.eks.cluster_name}"
 }
+
+output "external_dns_role_arn" {
+  description = "ARN of the IRSA role the external-dns ServiceAccount assumes. Pass as the bootstrap chart's `externalDns.iamRoleArn` value."
+  value       = aws_iam_role.external_dns.arn
+}
+
+output "oidc_provider_arn" {
+  description = "ARN of the cluster's OIDC provider. Future IRSA roles bind their trust policy to this."
+  value       = module.eks.oidc_provider_arn
+}
