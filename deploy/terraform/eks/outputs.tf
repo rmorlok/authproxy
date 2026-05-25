@@ -33,6 +33,11 @@ output "route53_zone_id" {
   value       = aws_route53_zone.primary.zone_id
 }
 
+output "domain_name" {
+  description = "Public domain the Route53 hosted zone is authoritative for. Echoes var.domain_name; the bootstrap chart's `global.domain` and external-dns `domainFilters` reference this."
+  value       = var.domain_name
+}
+
 output "route53_name_servers" {
   description = "Authoritative NS records for the hosted zone. Delegate the registrar's NS records to these."
   value       = aws_route53_zone.primary.name_servers

@@ -9,6 +9,14 @@
   Established=True condition. The post-install/post-upgrade hook
   guarantees the CRD exists before this apply.
 
+  Hook weight: cert-manager's own `startupapicheck` Job is also a
+  post-install hook at weight "1" — it pokes the cert-manager API
+  through the validating webhook, only succeeding once the webhook
+  is actually serving. Set this weight HIGHER than that so the
+  ClusterIssuer apply doesn't race the webhook coming up. Helm runs
+  hooks in ascending weight order; using "10" leaves headroom for
+  any future "between" hook we want to add.
+
   Hook delete policy: hook-succeeded would garbage-collect the issuer
   after each install. We want it to stick around, so delete only when
   the hook itself fails (preserve a working issuer across upgrades).
@@ -20,7 +28,7 @@ metadata:
   name: {{ .Values.clusterIssuer.name | quote }}
   annotations:
     helm.sh/hook: post-install,post-upgrade
-    helm.sh/hook-weight: "0"
+    helm.sh/hook-weight: "10"
     helm.sh/hook-delete-policy: hook-failed
 spec:
   acme:

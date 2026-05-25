@@ -109,6 +109,7 @@ cd ../charts/bootstrap
 helm dependency update
 helm upgrade --install authproxy-bootstrap . \
   --namespace kube-system \
+  --wait --timeout 5m \
   --set "global.acmeEmail=you@example.com" \
   --set "global.hostedZoneId=$(cd ../../terraform/eks && terraform output -raw route53_zone_id)" \
   --set "global.domain=$(cd ../../terraform/eks && terraform output -raw domain_name)" \
