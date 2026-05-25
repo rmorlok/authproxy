@@ -114,7 +114,8 @@ helm upgrade --install authproxy-bootstrap . \
   --set "global.hostedZoneId=$(cd ../../terraform/eks && terraform output -raw route53_zone_id)" \
   --set "global.domain=$(cd ../../terraform/eks && terraform output -raw domain_name)" \
   --set "external-dns.serviceAccount.annotations.eks\.amazonaws\.com/role-arn=$(cd ../../terraform/eks && terraform output -raw external_dns_role_arn)" \
-  --set "external-dns.domainFilters[0]=$(cd ../../terraform/eks && terraform output -raw domain_name)"
+  --set "external-dns.domainFilters[0]=$(cd ../../terraform/eks && terraform output -raw domain_name)" \
+  --set "external-dns.zoneIdFilters[0]=$(cd ../../terraform/eks && terraform output -raw route53_zone_id)"
 ```
 
 ## Day-2: routine `terraform apply`

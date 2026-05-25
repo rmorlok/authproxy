@@ -52,8 +52,15 @@ helm upgrade --install authproxy-bootstrap . \
   --set "global.hostedZoneId=$(cd ../../terraform/eks && terraform output -raw route53_zone_id)" \
   --set "global.domain=$(cd ../../terraform/eks && terraform output -raw domain_name)" \
   --set "external-dns.serviceAccount.annotations.eks\.amazonaws\.com/role-arn=$(cd ../../terraform/eks && terraform output -raw external_dns_role_arn)" \
-  --set "external-dns.domainFilters[0]=$(cd ../../terraform/eks && terraform output -raw domain_name)"
+  --set "external-dns.domainFilters[0]=$(cd ../../terraform/eks && terraform output -raw domain_name)" \
+  --set "external-dns.zoneIdFilters[0]=$(cd ../../terraform/eks && terraform output -raw route53_zone_id)"
 ```
+
+`zoneIdFilters` pins external-dns to the exact terraform-managed
+hosted zone — important when AWS has auto-created a second
+`authproxy.net` zone at domain registration time. Without this pin,
+external-dns tries to write to all matching zones, and a single
+AccessDenied on any one of them marks the whole reconcile failed.
 
 `--wait` is important: cert-manager's webhook needs to be serving before
 the post-install ClusterIssuer hook fires, and `--wait` blocks the
