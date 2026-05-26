@@ -5349,6 +5349,69 @@ const docTemplateadmin_api = `{
                 }
             }
         },
+        "/metrics/query": {
+            "post": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Query application metrics over a time range",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "metrics"
+                ],
+                "summary": "Query application metrics",
+                "parameters": [
+                    {
+                        "description": "Metrics query request",
+                        "name": "request",
+                        "in": "body",
+                        "required": true,
+                        "schema": {
+                            "$ref": "#/definitions/routes.SwaggerMetricsQueryRequest"
+                        }
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/routes.SwaggerMetricsQueryResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/metrics/request-events": {
             "get": {
                 "security": [
@@ -8486,6 +8549,130 @@ const docTemplateadmin_api = `{
                 "total": {
                     "description": "Total count of matching records (if requested)",
                     "type": "integer"
+                }
+            }
+        },
+        "routes.SwaggerMetricsPoint": {
+            "description": "Single bucket value in a metrics series",
+            "type": "object",
+            "properties": {
+                "timestamp": {
+                    "type": "string"
+                },
+                "value": {
+                    "type": "number",
+                    "example": 42
+                }
+            }
+        },
+        "routes.SwaggerMetricsQueryRef": {
+            "description": "One metric series request",
+            "type": "object",
+            "properties": {
+                "aggregation": {
+                    "type": "string",
+                    "example": "count"
+                },
+                "group_by": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "method",
+                        "response_status_code"
+                    ]
+                },
+                "metric": {
+                    "type": "string",
+                    "example": "request_events"
+                },
+                "ref_id": {
+                    "type": "string",
+                    "example": "requests"
+                }
+            }
+        },
+        "routes.SwaggerMetricsQueryRequest": {
+            "description": "Generic application metrics query request",
+            "type": "object",
+            "properties": {
+                "label_selector": {
+                    "type": "string",
+                    "example": "env=prod,team=api"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.**"
+                },
+                "queries": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/routes.SwaggerMetricsQueryRef"
+                    }
+                },
+                "range": {
+                    "$ref": "#/definitions/routes.SwaggerMetricsRange"
+                }
+            }
+        },
+        "routes.SwaggerMetricsQueryResponse": {
+            "description": "Generic application metrics query response",
+            "type": "object",
+            "properties": {
+                "series": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/routes.SwaggerMetricsSeries"
+                    }
+                }
+            }
+        },
+        "routes.SwaggerMetricsRange": {
+            "description": "Time range and bucket size for a metrics query",
+            "type": "object",
+            "properties": {
+                "end": {
+                    "type": "string",
+                    "example": "2026-05-25T13:00:00Z"
+                },
+                "start": {
+                    "type": "string",
+                    "example": "2026-05-25T12:00:00Z"
+                },
+                "step": {
+                    "type": "string",
+                    "example": "15m"
+                }
+            }
+        },
+        "routes.SwaggerMetricsSeries": {
+            "description": "Labeled metric time series",
+            "type": "object",
+            "properties": {
+                "aggregation": {
+                    "type": "string",
+                    "example": "count"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "metric": {
+                    "type": "string",
+                    "example": "request_events"
+                },
+                "points": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/routes.SwaggerMetricsPoint"
+                    }
+                },
+                "ref_id": {
+                    "type": "string",
+                    "example": "requests"
                 }
             }
         },

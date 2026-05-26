@@ -235,6 +235,98 @@
       },
       "required": ["items"],
       "additionalProperties": false
+    },
+    "MetricsRange": {
+      "type": "object",
+      "properties": {
+        "start": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "end": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "step": { "type": "string" }
+      },
+      "required": ["start", "end", "step"],
+      "additionalProperties": false
+    },
+    "MetricsQueryRef": {
+      "type": "object",
+      "properties": {
+        "ref_id": { "type": "string" },
+        "metric": {
+          "type": "string",
+          "enum": ["request_events", "request_events.errors", "request_events.duration_ms"]
+        },
+        "aggregation": {
+          "type": "string",
+          "enum": ["count", "avg", "p95"]
+        },
+        "group_by": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["type", "method", "response_status_code", "response_source", "connector_id"]
+          }
+        }
+      },
+      "required": ["ref_id", "metric", "aggregation"],
+      "additionalProperties": false
+    },
+    "MetricsQueryRequest": {
+      "type": "object",
+      "properties": {
+        "range": { "$ref": "#/$defs/MetricsRange" },
+        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespaceMatcher" },
+        "label_selector": { "type": "string" },
+        "queries": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/MetricsQueryRef" },
+          "minItems": 1
+        }
+      },
+      "required": ["range", "queries"],
+      "additionalProperties": false
+    },
+    "MetricsPoint": {
+      "type": "object",
+      "properties": {
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "value": { "type": "number" }
+      },
+      "required": ["timestamp", "value"],
+      "additionalProperties": false
+    },
+    "MetricsSeries": {
+      "type": "object",
+      "properties": {
+        "ref_id": { "type": "string" },
+        "metric": { "type": "string" },
+        "aggregation": { "type": "string" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "points": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/MetricsPoint" }
+        }
+      },
+      "required": ["ref_id", "metric", "aggregation", "points"],
+      "additionalProperties": false
+    },
+    "MetricsQueryResponse": {
+      "type": "object",
+      "properties": {
+        "series": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/MetricsSeries" }
+        }
+      },
+      "required": ["series"],
+      "additionalProperties": false
     }
   }
 }

@@ -8,6 +8,7 @@ export * from './actors';
 export * from './connectors';
 export * from './connections';
 export * from './encryptionKeys';
+export * from './metrics';
 export * from './namespaces';
 export * from './proxy';
 export * from './rateLimits';
