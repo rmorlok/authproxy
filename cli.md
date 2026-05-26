@@ -39,9 +39,18 @@ server:
   auth: http://localhost:8080
   marketplace: http://localhost:5173
   admin_ui: http://localhost:5174
+
+# Defaults for `ap signing-proxy`. Useful when several AuthProxy clones
+# share one machine — each clone's signing-proxy needs its own port. The
+# `env_var` form lets one shared ~/.authproxy.yaml pick up the per-clone
+# value from the clone's .env (AUTHPROXY_SIGNING_PROXY_PORT).
+signing_proxy:
+  port:
+    env_var: AUTHPROXY_SIGNING_PROXY_PORT
+    default: "8888"
 ```
 
-Every value here can be overridden per-invocation by the flag of the same shape (`--apiUrl`, `--privateKeyPath`, `--actorId`, etc.).
+Every value here can be overridden per-invocation by the flag of the same shape (`--apiUrl`, `--privateKeyPath`, `--actorId`, `--port`, etc.).
 
 ### Signing keys
 
@@ -102,6 +111,8 @@ ap signing-proxy --proxyTo=admin-api --enableLoginRedirect=true
 ```
 
 `--proxyTo` accepts a service id (`api`, `admin-api`, `public`) or an absolute URL. `--enableLoginRedirect` adds a `/login-redirect` handler that simulates the host application's session-initiation flow — wire `host_application.initiate_session_url` (or `admin_api.ui.initiate_session_url`) at the printed URL.
+
+`--port` defaults to `8888`. If the CLI config sets `signing_proxy.port`, that value is used instead when `--port` is not given on the command line. Multiple clones on one machine should set `AUTHPROXY_SIGNING_PROXY_PORT` per clone in their `.env` and reference it from a shared `~/.authproxy.yaml` via `signing_proxy.port.env_var`.
 
 ### `ap proxy` — connection-scoped streaming proxy
 
@@ -176,6 +187,34 @@ ap proxy --connection cxn_openai curl -N \
 ```
 
 The `-N` (`--no-buffer`) is curl's, not ours — it disables curl's own line buffering so the tokens print as they arrive.
+
+### Run several AuthProxy clones on one machine
+
+Each clone (`~/src/authproxy1`, `~/src/authproxy2`, …) needs its own port pool so they don't collide. The pool lives in each clone's `.env` (gitignored) — see [`.env.example`](../.env.example) for the slot table. The `AUTHPROXY_SIGNING_PROXY_PORT` slot picks the listen port for `ap signing-proxy`:
+
+| Clone | `AUTHPROXY_SIGNING_PROXY_PORT` |
+|---|---|
+| authproxy1 | 8888 (default) |
+| authproxy2 | 8898 |
+| authproxy3 | 8908 |
+| authproxy*N* | 8888 + (N−1)·10 |
+
+A single shared `~/.authproxy.yaml` picks up whichever clone you ran `ap` from by reading the env var loaded from that clone's `.env`:
+
+```yaml
+signing_proxy:
+  port:
+    env_var: AUTHPROXY_SIGNING_PROXY_PORT
+    default: "8888"
+```
+
+```bash
+cd ~/src/authproxy3 && ap signing-proxy --proxyTo=api   # listens on 8908
+cd ~/src/authproxy1 && ap signing-proxy --proxyTo=api   # listens on 8888
+ap signing-proxy --proxyTo=api --port 9000              # --port always wins
+```
+
+The matching `AUTHPROXY_HOST_APP_INITIATE_SESSION_URL` in each `.env` is templated `http://127.0.0.1:${AUTHPROXY_SIGNING_PROXY_PORT}/login-redirect`, so the server's session-initiation URL automatically matches the port the local signing-proxy listens on.
 
 ## See also
 
