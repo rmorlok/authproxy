@@ -50,6 +50,30 @@ definitions:
       updated_at:
         type: string
     type: object
+  github_com_rmorlok_authproxy_internal_schema_api_openapi.ListActorsResponseJson:
+    description: Paginated list of actors
+    properties:
+      cursor:
+        description: Pagination cursor for next page.
+        type: string
+      items:
+        description: List of actors.
+        items:
+          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ActorJson'
+        type: array
+    type: object
+  github_com_rmorlok_authproxy_internal_schema_api_openapi.ListNamespacesResponseJson:
+    description: Paginated list of namespaces
+    properties:
+      cursor:
+        description: Pagination cursor for next page.
+        type: string
+      items:
+        description: List of namespaces.
+        items:
+          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson'
+        type: array
+    type: object
   github_com_rmorlok_authproxy_internal_schema_config.KeyData:
     type: object
   github_com_rmorlok_authproxy_internal_schema_resources_rate_limit.RateLimit:
@@ -673,18 +697,6 @@ definitions:
         example: production
         type: string
     type: object
-  routes.SwaggerListActorsResponse:
-    description: Paginated list of actors
-    properties:
-      cursor:
-        description: Pagination cursor for next page
-        type: string
-      items:
-        description: List of actors
-        items:
-          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ActorJson'
-        type: array
-    type: object
   routes.SwaggerListConnectionResponse:
     description: Paginated list of connections
     properties:
@@ -731,18 +743,6 @@ definitions:
         description: List of encryption keys
         items:
           $ref: '#/definitions/routes.SwaggerEncryptionKeyJson'
-        type: array
-    type: object
-  routes.SwaggerListNamespacesResponse:
-    description: Paginated list of namespaces
-    properties:
-      cursor:
-        description: Pagination cursor for next page
-        type: string
-      items:
-        description: List of namespaces
-        items:
-          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson'
         type: array
     type: object
   routes.SwaggerListRateLimitsResponse:
@@ -1042,7 +1042,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.SwaggerListActorsResponse'
+            $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api_openapi.ListActorsResponseJson'
         "400":
           description: Bad Request
           schema:
@@ -4523,7 +4523,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.SwaggerListNamespacesResponse'
+            $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api_openapi.ListNamespacesResponseJson'
         "400":
           description: Bad Request
           schema:

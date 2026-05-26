@@ -75,7 +75,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerListActorsResponse"
+                            "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api_openapi.ListActorsResponseJson"
                         }
                     },
                     "400": {
@@ -5415,7 +5415,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerListNamespacesResponse"
+                            "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api_openapi.ListNamespacesResponseJson"
                         }
                     },
                     "400": {
@@ -7500,6 +7500,40 @@ const docTemplateApi = `{
                 }
             }
         },
+        "github_com_rmorlok_authproxy_internal_schema_api_openapi.ListActorsResponseJson": {
+            "description": "Paginated list of actors",
+            "type": "object",
+            "properties": {
+                "cursor": {
+                    "description": "Pagination cursor for next page.",
+                    "type": "string"
+                },
+                "items": {
+                    "description": "List of actors.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ActorJson"
+                    }
+                }
+            }
+        },
+        "github_com_rmorlok_authproxy_internal_schema_api_openapi.ListNamespacesResponseJson": {
+            "description": "Paginated list of namespaces",
+            "type": "object",
+            "properties": {
+                "cursor": {
+                    "description": "Pagination cursor for next page.",
+                    "type": "string"
+                },
+                "items": {
+                    "description": "List of namespaces.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson"
+                    }
+                }
+            }
+        },
         "github_com_rmorlok_authproxy_internal_schema_config.KeyData": {
             "type": "object"
         },
@@ -8349,23 +8383,6 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerListActorsResponse": {
-            "description": "Paginated list of actors",
-            "type": "object",
-            "properties": {
-                "cursor": {
-                    "description": "Pagination cursor for next page",
-                    "type": "string"
-                },
-                "items": {
-                    "description": "List of actors",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ActorJson"
-                    }
-                }
-            }
-        },
         "routes.SwaggerListConnectionResponse": {
             "description": "Paginated list of connections",
             "type": "object",
@@ -8430,23 +8447,6 @@ const docTemplateApi = `{
                     "type": "array",
                     "items": {
                         "$ref": "#/definitions/routes.SwaggerEncryptionKeyJson"
-                    }
-                }
-            }
-        },
-        "routes.SwaggerListNamespacesResponse": {
-            "description": "Paginated list of namespaces",
-            "type": "object",
-            "properties": {
-                "cursor": {
-                    "description": "Pagination cursor for next page",
-                    "type": "string"
-                },
-                "items": {
-                    "description": "List of namespaces",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson"
                     }
                 }
             }

@@ -16,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
+	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 
@@ -28,6 +29,8 @@ type UpdateNamespaceRequestJson = schemaapi.UpdateNamespaceRequestJson
 type ListNamespacesResponseJson = schemaapi.ListNamespacesResponseJson
 type SetNamespaceEncryptionKeyRequestJson = schemaapi.SetNamespaceEncryptionKeyRequestJson
 type NamespaceEncryptionKeyJson = schemaapi.NamespaceEncryptionKeyJson
+
+var _ = schemaapiopenapi.ListNamespacesResponseJson{}
 
 func NamespaceToJson(ns coreIface.Namespace) NamespaceJson {
 	var ekId *string
@@ -207,7 +210,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 // @Param			namespace		query		string	false	"Filter by namespace path pattern"
 // @Param			label_selector	query		string	false	"Filter by label selector"
 // @Param			order_by		query		string	false	"Order by field (e.g., 'path:asc')"
-// @Success		200				{object}	SwaggerListNamespacesResponse
+// @Success		200				{object}	schemaapiopenapi.ListNamespacesResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
 // @Failure		500				{object}	ErrorResponse
