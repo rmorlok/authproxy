@@ -55,7 +55,7 @@ type Actor interface {
 type F interface {
 	New() *gentleman.Client
 	// NewHTTPClient returns a stock *http.Client whose Transport is the
-	// same wrapped RoundTripper chain (request-log, rate-limit enforcer,
+	// same wrapped RoundTripper chain (request-events, rate-limit enforcer,
 	// OTel, …) used by New(). Use this for the streaming raw-proxy path
 	// — gentleman's Send() buffers the response body, which defeats SSE
 	// and other long-lived streams.

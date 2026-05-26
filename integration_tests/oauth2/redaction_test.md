@@ -78,11 +78,11 @@ slog emitted.
   values would appear there even if it were captured. If the proxy
   ever moves access logging onto slog, this test starts checking it
   automatically.
-- **Structured request_log (full HTTP transcripts → ClickHouse).**
-  `internal/request_log` applies its own redaction layer (see
+- **Structured app metrics request events (full HTTP transcripts → ClickHouse).**
+  `internal/app_metrics` applies its own redaction layer (see
   `attribution_codec.go`). The integration-test harness does not wire
-  request_log up by default, so this boundary test cannot exercise
-  it. Unit tests in `internal/request_log` cover that layer.
+  app_metrics up by default, so this boundary test cannot exercise
+  it. Unit tests in `internal/app_metrics` cover that layer.
 - **OpenTelemetry metric attributes.** `telemetry.go` only uses
   bounded enum labels (`result`, `reason`, `revocation_kind`) plus
   the projected connection-label allowlist; no token values can

@@ -113,6 +113,17 @@ func cmdSigningProxy() *cobra.Command {
 				return err
 			}
 
+			// If --port was not explicitly set, fall back to the config file's
+			// signing_proxy.port value (if any). The flag's own default still
+			// wins if neither is set.
+			if !cmd.Flags().Changed("port") {
+				if cfgPort, err := resolver.ResolveSigningProxyPort(); err != nil {
+					return fmt.Errorf("invalid signing_proxy.port in config: %w", err)
+				} else if cfgPort != 0 {
+					port = cfgPort
+				}
+			}
+
 			baseUrl := ""
 			if strings.HasPrefix(proxyTo, "http") {
 				baseUrl = proxyTo

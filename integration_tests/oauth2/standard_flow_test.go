@@ -150,7 +150,7 @@ func TestStandardAuthorizationCodeFlow(t *testing.T) {
 
 	// 7. Connection lands in `ready` (no probes/configure on this connector).
 	conn := env.GetConnection(t, connectionID)
-	assert.Equal(t, database.ConnectionStateReady, conn.State,
+	assert.Equal(t, database.ConnectionStateConfigured, conn.State,
 		"connection should be ready after a successful flow with no probes/configure steps")
 
 	// 8. Proxy a request to the provider's resource endpoint and expect 200.

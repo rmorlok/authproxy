@@ -8,7 +8,7 @@ import (
 )
 
 func newTestConnection(c cschema.Connector) *connection {
-	return newTestConnectionWithDetails(apid.New(apid.PrefixActor), database.ConnectionStateReady, c)
+	return newTestConnectionWithDetails(apid.New(apid.PrefixActor), database.ConnectionStateConfigured, c)
 }
 
 func newTestConnectionWithDetails(u apid.ID, s database.ConnectionState, c cschema.Connector) *connection {

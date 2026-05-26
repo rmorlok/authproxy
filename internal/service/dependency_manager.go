@@ -12,6 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apauth/tasks"
 	authSync "github.com/rmorlok/authproxy/internal/apauth/tasks"
 	"github.com/rmorlok/authproxy/internal/aplog"
+	"github.com/rmorlok/authproxy/internal/app_metrics"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/aptelemetry"
 	"github.com/rmorlok/authproxy/internal/config"
@@ -21,7 +22,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/ratelimit"
-	"github.com/rmorlok/authproxy/internal/request_log"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -38,8 +38,8 @@ type DependencyManager struct {
 	r                 apredis.Client
 	db                database.DB
 	httpf             httpf.F
-	logRetriever      request_log.LogRetriever
-	logStorageService *request_log.StorageService
+	logRetriever      app_metrics.LogRetriever
+	appMetricsService *app_metrics.StorageService
 	e                 encrypt.E
 	asynqClient       apasynq.Client
 	asynqInspector    *asynq.Inspector
@@ -135,10 +135,10 @@ func (dm *DependencyManager) RegisterAsynqClientPing() {
 	})
 }
 
-// RegisterLogStoragePing registers a ping for the log storage service.
-func (dm *DependencyManager) RegisterLogStoragePing() {
-	dm.RegisterPing("logStorage", func(ctx context.Context) bool {
-		return dm.GetLogStorageService().Ping(ctx)
+// RegisterAppMetricsPing registers a ping for the app metrics service.
+func (dm *DependencyManager) RegisterAppMetricsPing() {
+	dm.RegisterPing("appMetrics", func(ctx context.Context) bool {
+		return dm.GetAppMetricsService().Ping(ctx)
 	})
 }
 
@@ -251,11 +251,11 @@ func (dm *DependencyManager) AutoMigrateDatabase() {
 	}
 }
 
-func (dm *DependencyManager) GetLogStorageService() *request_log.StorageService {
+func (dm *DependencyManager) GetAppMetricsService() *app_metrics.StorageService {
 	ctx := context.Background()
 	var err error
-	if dm.logStorageService == nil {
-		dm.logStorageService, err = request_log.NewStorageService(
+	if dm.appMetricsService == nil {
+		dm.appMetricsService, err = app_metrics.NewStorageService(
 			ctx,
 			dm.GetConfigRoot().HttpLogging,
 			pagination.NewRandomCursorEncryptor(),
@@ -269,7 +269,7 @@ func (dm *DependencyManager) GetLogStorageService() *request_log.StorageService 
 		}
 	}
 
-	return dm.logStorageService
+	return dm.appMetricsService
 }
 
 func (dm *DependencyManager) GetRateLimitFactory() *ratelimit.Factory {
@@ -323,7 +323,7 @@ func (dm *DependencyManager) GetHttpf() httpf.F {
 		dm.httpf = httpf.CreateFactory(
 			dm.GetConfig(),
 			dm.GetRedisClient(),
-			dm.GetLogStorageService(),
+			dm.GetAppMetricsService(),
 			dm.GetLogger(),
 			middlewares...,
 		)
@@ -332,9 +332,9 @@ func (dm *DependencyManager) GetHttpf() httpf.F {
 	return dm.httpf
 }
 
-func (dm *DependencyManager) AutoMigrateLogStorageService() {
+func (dm *DependencyManager) AutoMigrateAppMetricsService() {
 	if dm.GetConfigRoot().HttpLogging.GetAutoMigrate() {
-		store := dm.GetLogStorageService()
+		store := dm.GetAppMetricsService()
 		err := store.Migrate(context.Background())
 		if err != nil {
 			panic(err)
@@ -571,7 +571,7 @@ func (dm *DependencyManager) AutoMigrateSyncKeysToDatabase() {
 
 func (dm *DependencyManager) AutoMigrateAll() {
 	dm.AutoMigrateDatabase()
-	dm.AutoMigrateLogStorageService()
+	dm.AutoMigrateAppMetricsService()
 	dm.AutoMigrateSyncKeysToDatabase()
 	dm.AutoMigrateCore()
 	dm.AutoMigratePredefinedActors()

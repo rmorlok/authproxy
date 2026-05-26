@@ -33,7 +33,7 @@ type HttpLogging struct {
 	// with API calls to specific resources, or always on.
 	FullRequestRecording *FullRequestRecording `json:"full_request_recording,omitempty" yaml:"full_request_recording,omitempty"`
 
-	// FullRequestRetention is how long the full request logs should be retained. If unset, defaults to 30 days.
+	// FullRequestRetention is how long the full request events should be retained. If unset, defaults to 30 days.
 	FullRequestRetention *HumanDuration `json:"full_request_retention,omitempty" yaml:"full_request_retention,omitempty"`
 
 	// FlushInterval is how often buffered records are flushed the database. Defaults to 5s.
@@ -47,7 +47,7 @@ type HttpLogging struct {
 	Database *Database `json:"database" yaml:"database"`
 
 	// BlobStorage configures the blob storage backend used for storing full request/response logs.
-	// If not configured, full request logging will use an in-memory store (not suitable for production).
+	// If not configured, full request-event logging will use an in-memory store (not suitable for production).
 	BlobStorage *BlobStorage `json:"blob_storage,omitempty" yaml:"blob_storage,omitempty"`
 }
 

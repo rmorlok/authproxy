@@ -386,6 +386,6 @@ export const selectRetryingConnection = (state: RootState) => state.connections.
 
 // Helper selectors
 export const selectActiveConnections = (state: RootState) =>
-    state.connections.items.filter(conn => conn.state === ConnectionState.READY);
+    state.connections.items.filter(conn => conn.state === ConnectionState.CONFIGURED);
 
 export default connectionsSlice.reducer;

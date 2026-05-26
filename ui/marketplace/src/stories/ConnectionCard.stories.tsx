@@ -71,7 +71,7 @@ const mockConnection: Connection = {
       description: "A google calendar connector",
       logo: "https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg"
   },
-  state: ConnectionState.READY,
+  state: ConnectionState.CONFIGURED,
   health_state: ConnectionHealthState.HEALTHY,
   created_at: '2023-04-01T12:00:00Z',
   updated_at: '2023-04-01T12:00:00Z',
@@ -96,7 +96,7 @@ export const Created: Story = {
   args: {
     connection: {
       ...mockConnection,
-      state: ConnectionState.CREATED,
+      state: ConnectionState.SETUP,
     },
   },
 };

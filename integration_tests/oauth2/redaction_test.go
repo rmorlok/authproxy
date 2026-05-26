@@ -47,10 +47,10 @@ import (
 //     latency — none of the listed sensitive values would appear there
 //     either, but if the proxy ever changes to emit access logs through
 //     slog, this test will start checking them automatically.
-//   - The structured request_log (full HTTP transcripts persisted to
-//     ClickHouse). request_log applies its own redaction layer; that's
-//     tested in `internal/request_log`. The integration-test harness
-//     doesn't wire request_log up by default, so this test cannot
+//   - The structured app metrics request events (full HTTP transcripts
+//     persisted to ClickHouse). app_metrics applies its own redaction layer; that's
+//     tested in `internal/app_metrics`. The integration-test harness
+//     doesn't wire app_metrics up by default, so this test cannot
 //     exercise it from the boundary.
 //
 // PKCE code verifiers, raw provider credentials beyond client_secret, and

@@ -58,7 +58,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 	var healthChecker *gin.Engine
 	if service.Port() != service.HealthCheckPort() {
 		healthChecker = apgin.ForService(service, logger, dm.GetConfig().IsDebugMode(),
-		apgin.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry, dm.GetServiceId()))
+			apgin.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry, dm.GetServiceId()))
 	} else {
 		healthChecker = server
 	}
@@ -72,7 +72,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 
 	dm.RegisterDatabasePing()
 	dm.RegisterRedisPing()
-	dm.RegisterLogStoragePing()
+	dm.RegisterAppMetricsPing()
 
 	healthChecker.GET("/healthz", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 1*time.Second)
@@ -127,10 +127,10 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		dm.GetEncryptService(),
 		dm.GetAsyncInspector(),
 	)
-	routesRequestLog := common_routes.NewRequestLogRoutes(
+	routesRequestEvents := common_routes.NewRequestEventsRoutes(
 		dm.GetConfig(),
 		authService,
-		dm.GetLogStorageService(),
+		dm.GetAppMetricsService(),
 	)
 	routesActors := common_routes.NewActorsRoutes(
 		dm.GetConfig(),
@@ -154,7 +154,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 	routesNamespaces.Register(api)
 	routesProxy.Register(api)
 	routesTasks.Register(api)
-	routesRequestLog.Register(api)
+	routesRequestEvents.Register(api)
 	routesActors.Register(api)
 	routesRateLimits.Register(api)
 

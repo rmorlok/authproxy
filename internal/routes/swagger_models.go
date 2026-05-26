@@ -118,10 +118,10 @@ type SwaggerConnectorJson struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// SwaggerRequestLogEntry is a simplified request log entry for swagger documentation
+// SwaggerRequestEventsEntry is a simplified request events entry for swagger documentation
 //
-//	@Description	HTTP request log entry
-type SwaggerRequestLogEntry struct {
+//	@Description	HTTP request events entry
+type SwaggerRequestEventsEntry struct {
 	// Namespace of the connection
 	Namespace string `json:"namespace" example:"acme"`
 	// Request type (proxy, oauth, probe)
@@ -326,12 +326,12 @@ type SwaggerDryRunNotMatched struct {
 	Reason      string `json:"reason"`
 }
 
-// SwaggerListRequestsResponse is the response for list request logs
+// SwaggerListRequestEventsResponse is the response for listing request events
 //
-//	@Description	Paginated list of request log entries
-type SwaggerListRequestsResponse struct {
-	// List of request log entries
-	Items []SwaggerRequestLogEntry `json:"items"`
+//	@Description	Paginated list of request events entries
+type SwaggerListRequestEventsResponse struct {
+	// List of request events entries
+	Items []SwaggerRequestEventsEntry `json:"items"`
 	// Pagination cursor for next page
 	Cursor string `json:"cursor,omitempty"`
 	// Total count of matching records (if requested)

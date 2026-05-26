@@ -8,8 +8,8 @@ import (
 	"strings"
 
 	"github.com/gin-gonic/gin"
-	"github.com/rmorlok/authproxy/internal/apgin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/httperr"
@@ -147,7 +147,7 @@ func parseRawProxyEnvelope(req *http.Request) (*rawProxyEnvelope, *httperr.Error
 }
 
 // parseLabelHeaders splits each X-AuthProxy-Label value at the first
-// `=`. Keys are validated downstream by the rate-limit / request-log
+// `=`. Keys are validated downstream by the rate-limit / request-events
 // label pipeline (same path the wrapped ProxyRequest takes), so this
 // layer only enforces structural validity — key non-empty, separator
 // present, value may be empty.

@@ -166,7 +166,7 @@ func TestCallbackRejection_CrossNamespace(t *testing.T) {
 	require.Nil(t, env.GetOAuth2Token(t, connID), "no oauth2_token row should exist for the rejected callback")
 
 	conn := env.GetConnection(t, connID)
-	assert.Equal(t, database.ConnectionStateCreated, conn.State,
+	assert.Equal(t, database.ConnectionStateSetup, conn.State,
 		"connection state should remain `created` after a rejected callback")
 	assert.Nil(t, conn.SetupStep, "no setup_step should be recorded on a rejected callback")
 	assert.Nil(t, conn.SetupError, "no setup_error should be recorded on a rejected callback")

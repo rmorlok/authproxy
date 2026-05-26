@@ -40,12 +40,12 @@ func TestOnVerifyPassed(t *testing.T) {
 		conn, db := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
 
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
-		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateReady).Return(nil)
+		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
 
 		err := conn.onVerifyPassed(context.Background())
 		require.NoError(t, err)
 		assert.Nil(t, conn.GetSetupStep())
-		assert.Equal(t, database.ConnectionStateReady, conn.GetState())
+		assert.Equal(t, database.ConnectionStateConfigured, conn.GetState())
 	})
 
 	t.Run("flips health back to healthy when previously unhealthy", func(t *testing.T) {
@@ -57,7 +57,7 @@ func TestOnVerifyPassed(t *testing.T) {
 
 		db.EXPECT().SetConnectionHealthState(gomock.Any(), conn.Id, database.ConnectionHealthStateHealthy).Return(nil)
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
-		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateReady).Return(nil)
+		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
 
 		err := conn.onVerifyPassed(context.Background())
 		require.NoError(t, err)

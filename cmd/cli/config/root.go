@@ -2,6 +2,7 @@ package config
 
 import (
 	"context"
+	"strconv"
 
 	scommon "github.com/rmorlok/authproxy/internal/schema/common"
 	"gopkg.in/yaml.v3"
@@ -18,6 +19,9 @@ type Root struct {
 		MarketplaceVal scommon.StringValue `json:"marketplace" yaml:"marketplace"`
 		AdminUiVal     scommon.StringValue `json:"admin_ui" yaml:"admin_ui"`
 	} `json:"server" yaml:"server"`
+	SigningProxyVal struct {
+		PortVal scommon.StringValue `json:"port" yaml:"port"`
+	} `json:"signing_proxy" yaml:"signing_proxy"`
 }
 
 func UnmarshallYamlRoot(data []byte) (*Root, error) {
@@ -123,4 +127,27 @@ func (r *Root) AdminUiUrl() string {
 	}
 
 	return ""
+}
+
+// SigningProxyPort returns the configured port for `ap signing-proxy`, or 0 if
+// unset. Returns an error only if the value is set but doesn't parse as an int.
+func (r *Root) SigningProxyPort() (int, error) {
+	if r == nil {
+		return 0, nil
+	}
+
+	if !r.SigningProxyVal.PortVal.HasValue(context.Background()) {
+		return 0, nil
+	}
+
+	val, err := r.SigningProxyVal.PortVal.GetValue(context.Background())
+	if err != nil {
+		return 0, err
+	}
+
+	if val == "" {
+		return 0, nil
+	}
+
+	return strconv.Atoi(val)
 }

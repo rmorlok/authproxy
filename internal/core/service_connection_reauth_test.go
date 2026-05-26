@@ -24,7 +24,7 @@ func TestReauthConnection(t *testing.T) {
 		conn, db, _ := newTestApiKeyConnection(t, ctrl, &cschema.ApiKeyPlacement{
 			Type: cschema.ApiKeyPlacementBearer,
 		}, nil)
-		conn.State = database.ConnectionStateCreated
+		conn.State = database.ConnectionStateSetup
 
 		db.EXPECT().GetConnection(gomock.Any(), conn.Id).Return(&conn.Connection, nil).AnyTimes()
 		db.EXPECT().GetConnectorVersion(gomock.Any(), conn.cv.Id, conn.cv.Version).Return(&database.ConnectorVersion{
@@ -51,7 +51,7 @@ func TestReauthConnection(t *testing.T) {
 		conn, db, _ := newTestApiKeyConnection(t, ctrl, &cschema.ApiKeyPlacement{
 			Type: cschema.ApiKeyPlacementBearer,
 		}, nil)
-		conn.State = database.ConnectionStateReady
+		conn.State = database.ConnectionStateConfigured
 		conn.s.encrypt = encrypt.NewFakeEncryptService(false)
 
 		db.EXPECT().GetConnection(gomock.Any(), conn.Id).Return(&conn.Connection, nil).AnyTimes()
@@ -93,7 +93,7 @@ func TestReauthConnection(t *testing.T) {
 		conn, db, _ := newTestApiKeyConnection(t, ctrl, &cschema.ApiKeyPlacement{
 			Type: cschema.ApiKeyPlacementBearer,
 		}, nil)
-		conn.State = database.ConnectionStateReady
+		conn.State = database.ConnectionStateConfigured
 		conn.HealthState = database.ConnectionHealthStateUnhealthy
 
 		db.EXPECT().GetConnection(gomock.Any(), conn.Id).Return(&conn.Connection, nil).AnyTimes()
@@ -122,7 +122,7 @@ func TestReauthConnection(t *testing.T) {
 		conn, db, _ := newTestApiKeyConnection(t, ctrl, &cschema.ApiKeyPlacement{
 			Type: cschema.ApiKeyPlacementBearer,
 		}, nil)
-		conn.State = database.ConnectionStateReady
+		conn.State = database.ConnectionStateConfigured
 		priorErr := "earlier verify error that should be wiped"
 		conn.SetupError = &priorErr
 
@@ -171,7 +171,7 @@ func TestReauthConnection(t *testing.T) {
 			Connection: database.Connection{
 				Id:               "cxn_test1111111111aa",
 				Namespace:        "root",
-				State:            database.ConnectionStateReady,
+				State:            database.ConnectionStateConfigured,
 				HealthState:      database.ConnectionHealthStateUnhealthy,
 				ConnectorId:      cv.GetId(),
 				ConnectorVersion: cv.GetVersion(),
@@ -224,7 +224,7 @@ func TestReauthConnection(t *testing.T) {
 			Connection: database.Connection{
 				Id:               "cxn_test1111111111aa",
 				Namespace:        "root",
-				State:            database.ConnectionStateReady,
+				State:            database.ConnectionStateConfigured,
 				HealthState:      database.ConnectionHealthStateHealthy,
 				ConnectorId:      cv.GetId(),
 				ConnectorVersion: cv.GetVersion(),

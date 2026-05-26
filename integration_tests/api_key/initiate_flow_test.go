@@ -157,7 +157,7 @@ func runPerPlacementLifecycle(
 	require.NoError(t, env.RunVerifyConnection(t, connectionID), "verify should succeed against stub upstream")
 
 	conn2 := env.GetConnection(t, connectionID)
-	require.Equalf(t, database.ConnectionStateReady, conn2.State,
+	require.Equalf(t, database.ConnectionStateConfigured, conn2.State,
 		"connection should be Ready after submit + verify; got %s (setup_step=%v, setup_error=%v)",
 		conn2.State, conn2.SetupStep, conn2.SetupError)
 	assert.Equal(t, database.ConnectionHealthStateHealthy, conn2.HealthState,

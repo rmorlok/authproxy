@@ -3,18 +3,22 @@ import {Connector} from './connectors';
 import {ListResponse} from './common';
 
 // Connection models
+//
+// SETUP: connection is persisted and one or more setup steps are in progress.
+// CONFIGURED: setup is complete. The connection may or may not be currently
+// usable; the orthogonal ConnectionHealthState axis carries that signal.
 export enum ConnectionState {
-    CREATED = 'created',
-    READY = 'ready',
+    SETUP = 'setup',
+    CONFIGURED = 'configured',
     DISABLED = 'disabled',
     DISCONNECTING = 'disconnecting',
     DISCONNECTED = 'disconnected',
 }
 
 // Operational health signal for a connection. Distinct from ConnectionState:
-// a Ready connection whose credentials have stopped working flips to UNHEALTHY
-// without leaving the Ready lifecycle state. UIs surface this to drive the
-// unified re-authentication action.
+// a Configured connection whose credentials have stopped working flips to
+// UNHEALTHY without leaving the Configured lifecycle state. UIs surface this
+// to drive the unified re-authentication action.
 export enum ConnectionHealthState {
     HEALTHY = 'healthy',
     UNHEALTHY = 'unhealthy',

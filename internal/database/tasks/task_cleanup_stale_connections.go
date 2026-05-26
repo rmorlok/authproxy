@@ -20,7 +20,7 @@ func (th *taskHandler) cleanupStaleConnections(ctx context.Context, t *asynq.Tas
 	var cleaned int
 	err := th.db.ListConnectionsBuilder().
 		WithDeletedHandling(database.DeletedHandlingExclude).
-		ForStates([]database.ConnectionState{database.ConnectionStateCreated}).
+		ForStates([]database.ConnectionState{database.ConnectionStateSetup}).
 		WithSetupStepNotNull().
 		UpdatedBefore(cutoff).
 		Enumerate(ctx, func(pr pagination.PageResult[database.Connection]) (pagination.KeepGoing, error) {

@@ -11,9 +11,9 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/app_metrics"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/httpf"
-	"github.com/rmorlok/authproxy/internal/request_log"
 	"github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -195,7 +195,7 @@ func TestRoundTripper_BlocksSubsequentRequests(t *testing.T) {
 	assert.Contains(t, string(body), "rate limited")
 }
 
-// Synthetic 429 short-circuit must stamp the request_log.Attribution so
+// Synthetic 429 short-circuit must stamp the app_metrics.Attribution so
 // downstream observers can tell apart a real upstream 429 and our
 // connector-level cool-down. This was the gap closed by #222.
 func TestRoundTripper_ShortCircuitStampsAttribution(t *testing.T) {
@@ -205,8 +205,8 @@ func TestRoundTripper_ShortCircuitStampsAttribution(t *testing.T) {
 
 	require.NoError(t, store.SetRateLimited(ctx, connID, 30*time.Second))
 
-	attr := &request_log.Attribution{}
-	ctx = request_log.ContextWithAttribution(ctx, attr)
+	attr := &app_metrics.Attribution{}
+	ctx = app_metrics.ContextWithAttribution(ctx, attr)
 
 	transport := &mockTransport{resp: &http.Response{StatusCode: 200}}
 	rt := &RoundTripper{
@@ -222,20 +222,20 @@ func TestRoundTripper_ShortCircuitStampsAttribution(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, 429, resp.StatusCode)
 	require.False(t, transport.called)
-	require.Equal(t, request_log.ResponseSourceConnectorRateLimiter, attr.Source,
-		"synthetic 429 must mark the attribution so the request log can distinguish it from upstream")
+	require.Equal(t, app_metrics.ResponseSourceConnectorRateLimiter, attr.Source,
+		"synthetic 429 must mark the attribution so the request events can distinguish it from upstream")
 }
 
 // Real upstream 429s must NOT stamp the connector-rate-limiter source.
 // They should fall through to the default ResponseSourceUpstream when
-// the request log eventually populates the LogRecord.
+// the request events eventually populates the LogRecord.
 func TestRoundTripper_UpstreamPassThroughLeavesAttributionDefault(t *testing.T) {
 	store, _ := newTestStore(t)
 	connID := testConnectionID()
 	ctx := testCtx()
 
-	attr := &request_log.Attribution{}
-	ctx = request_log.ContextWithAttribution(ctx, attr)
+	attr := &app_metrics.Attribution{}
+	ctx = app_metrics.ContextWithAttribution(ctx, attr)
 
 	transport := &mockTransport{
 		resp: &http.Response{
@@ -255,7 +255,7 @@ func TestRoundTripper_UpstreamPassThroughLeavesAttributionDefault(t *testing.T) 
 	require.NoError(t, err)
 	require.Equal(t, 429, resp.StatusCode)
 	require.True(t, transport.called)
-	require.Equal(t, request_log.ResponseSource(""), attr.Source,
+	require.Equal(t, app_metrics.ResponseSource(""), attr.Source,
 		"a real upstream 429 must not stamp connector_rate_limiter; the default upstream value is applied later")
 }
 

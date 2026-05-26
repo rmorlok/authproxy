@@ -76,7 +76,7 @@ func openInstrumentedDB(driverName, dsn, dbSystem string, opts *telemetryOpts) (
 }
 
 // OpenInstrumentedSQL is the exported counterpart of openInstrumentedDB.
-// Other packages that own their own sql.DB constructors (e.g. request_log,
+// Other packages that own their own sql.DB constructors (e.g. app_metrics,
 // which opens separate Postgres / SQLite connections for HTTP request
 // logging) call this to inherit the same telemetry treatment as the main
 // database without duplicating the plumbing.

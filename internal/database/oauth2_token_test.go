@@ -444,7 +444,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 
 		createdConnection := Connection{
 			Id:               apid.MustParse("cxn_test0000000000001"),
-			State:            ConnectionStateCreated,
+			State:            ConnectionStateSetup,
 			ConnectorId:      apid.MustParse("cxr_test0000000000001"),
 			ConnectorVersion: 1,
 			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
@@ -453,7 +453,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 
 		readyConnection1 := Connection{
 			Id:               apid.MustParse("cxn_test0000000000002"),
-			State:            ConnectionStateReady,
+			State:            ConnectionStateConfigured,
 			ConnectorId:      apid.MustParse("cxr_test0000000000001"),
 			ConnectorVersion: 1,
 			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
@@ -462,7 +462,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 
 		readyConnection2 := Connection{
 			Id:               apid.MustParse("cxn_test0000000000003"),
-			State:            ConnectionStateReady,
+			State:            ConnectionStateConfigured,
 			ConnectorId:      apid.MustParse("cxr_test0000000000001"),
 			ConnectorVersion: 1,
 			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
@@ -480,7 +480,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 
 		deletedConnection := Connection{
 			Id:               apid.MustParse("cxn_test0000000000005"),
-			State:            ConnectionStateReady,
+			State:            ConnectionStateConfigured,
 			ConnectorId:      apid.MustParse("cxr_test0000000000001"),
 			ConnectorVersion: 1,
 			CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),
@@ -492,7 +492,7 @@ func TestEnumerateOAuth2TokensExpiringWithin(t *testing.T) {
 		for i := 0; i < 200; i++ {
 			manyReadyConnections = append(manyReadyConnections, Connection{
 				Id:               apid.New(apid.PrefixConnection),
-				State:            ConnectionStateReady,
+				State:            ConnectionStateConfigured,
 				ConnectorId:      apid.MustParse("cxr_test0000000000001"),
 				ConnectorVersion: 1,
 				CreatedAt:        apctx.GetClock(ctx).Now().Add(-1 * time.Hour),

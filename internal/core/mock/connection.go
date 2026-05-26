@@ -179,7 +179,7 @@ func (m *Connection) Reconfigure(ctx context.Context) (iface.ConnectionSetupResp
 }
 
 func (m *Connection) CancelSetup(ctx context.Context) error {
-	if m.State != database.ConnectionStateReady {
+	if m.State != database.ConnectionStateConfigured {
 		return fmt.Errorf("connection is not in a state that can cancel setup")
 	}
 	m.SetupStep = nil

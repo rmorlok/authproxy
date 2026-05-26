@@ -268,7 +268,7 @@ func TestTokenExchangeMalformed_CurrentlyAccepted(t *testing.T) {
 
 			// Connection advanced to Ready, no auth_failed setup_step.
 			conn := rig.env.GetConnection(t, connID)
-			assert.Equalf(t, database.ConnectionStateReady, conn.State,
+			assert.Equalf(t, database.ConnectionStateConfigured, conn.State,
 				"%s (%s): accepted exchange should transition to Ready", tc.name, tc.note)
 			assert.Nilf(t, conn.SetupStep,
 				"%s (%s): accepted exchange must not record an auth_failed setup_step", tc.name, tc.note)

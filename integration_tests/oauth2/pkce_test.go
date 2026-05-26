@@ -212,7 +212,7 @@ func TestPKCE_HappyPath_S256(t *testing.T) {
 		"PKCE success path token should not be pre-expired (expires_at=%s)", token.AccessTokenExpiresAt)
 
 	conn := env.GetConnection(t, connectionID)
-	assert.Equal(t, database.ConnectionStateReady, conn.State,
+	assert.Equal(t, database.ConnectionStateConfigured, conn.State,
 		"PKCE success path should land the connection in ready")
 
 	// Provider must have observed a /token POST carrying code_verifier.
@@ -438,7 +438,7 @@ func TestPKCE_TokenExchangeRejected(t *testing.T) {
 			// stays `created` because the connection never reached the
 			// credentials-established transition.
 			connAfter := env.GetConnection(t, connID)
-			assert.Equal(t, database.ConnectionStateCreated, connAfter.State,
+			assert.Equal(t, database.ConnectionStateSetup, connAfter.State,
 				"connection state should remain `created` on PKCE rejection")
 			require.NotNilf(t, connAfter.SetupStep,
 				"PKCE-rejected connection should have a setup_step recorded")

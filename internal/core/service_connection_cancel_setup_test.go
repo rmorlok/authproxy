@@ -21,7 +21,7 @@ func TestCancelSetup(t *testing.T) {
 				Steps: []cschema.SetupFlowStep{{Id: "x", JsonSchema: workspaceSchema}},
 			},
 		})
-		conn.State = database.ConnectionStateReady
+		conn.State = database.ConnectionStateConfigured
 		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0)
 		conn.SetupStep = &step
 		errMsg := "stale"
@@ -33,7 +33,7 @@ func TestCancelSetup(t *testing.T) {
 		require.NoError(t, conn.CancelSetup(context.Background()))
 		assert.Nil(t, conn.GetSetupStep())
 		assert.Nil(t, conn.GetSetupError())
-		assert.Equal(t, database.ConnectionStateReady, conn.GetState())
+		assert.Equal(t, database.ConnectionStateConfigured, conn.GetState())
 	})
 
 	t.Run("no-op when ready and nothing to clear", func(t *testing.T) {
@@ -41,7 +41,7 @@ func TestCancelSetup(t *testing.T) {
 		defer ctrl.Finish()
 
 		conn, _ := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
-		conn.State = database.ConnectionStateReady
+		conn.State = database.ConnectionStateConfigured
 
 		require.NoError(t, conn.CancelSetup(context.Background()))
 	})
@@ -51,7 +51,7 @@ func TestCancelSetup(t *testing.T) {
 		defer ctrl.Finish()
 
 		conn, _ := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
-		conn.State = database.ConnectionStateCreated
+		conn.State = database.ConnectionStateSetup
 
 		err := conn.CancelSetup(context.Background())
 		require.Error(t, err)

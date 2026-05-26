@@ -3,7 +3,6 @@
 interface ImportMetaEnv {
     readonly VITE_APP_TITLE: string
     readonly VITE_APP_URL: string
-    readonly VITE_LOGIN_URL_TEMPLATE: string
     readonly VITE_ADMIN_BASE_URL: string
 }
 

@@ -49,7 +49,7 @@ func newTestApiKeyConnection(
 		Connection: database.Connection{
 			Id:               "cxn_test1111111111aa",
 			Namespace:        "root",
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 			HealthState:      database.ConnectionHealthStateHealthy,
 			ConnectorId:      cv.GetId(),
 			ConnectorVersion: cv.GetVersion(),
@@ -107,7 +107,7 @@ func TestApiKeySubmit_BearerPersistsCredentialAndAdvancesToReady(t *testing.T) {
 		InsertApiKeyCredential(gomock.Any(), conn.Id, credCap, gomock.AssignableToTypeOf(&cschema.ApiKeyPlacement{}), &actorId).
 		Return(&database.ApiKeyCredential{Id: apid.New(apid.PrefixApiKeyCredential)}, nil)
 	db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
-	db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateReady).Return(nil)
+	db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
 
 	resp, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{
 		StepId: cschema.SynthesizedApiKeyCredentialsStepId,
@@ -142,7 +142,7 @@ func TestApiKeySubmit_BasicPersistsBothCredentialFields(t *testing.T) {
 		InsertApiKeyCredential(gomock.Any(), conn.Id, credCap, gomock.AssignableToTypeOf(&cschema.ApiKeyPlacement{}), &actorId).
 		Return(&database.ApiKeyCredential{Id: apid.New(apid.PrefixApiKeyCredential)}, nil)
 	db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
-	db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateReady).Return(nil)
+	db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
 
 	resp, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{
 		StepId: cschema.SynthesizedApiKeyCredentialsStepId,
@@ -202,7 +202,7 @@ func TestApiKeySubmit_NoReplay_PriorCredentialNeverDecryptedIntoForm(t *testing.
 		InsertApiKeyCredential(gomock.Any(), conn.Id, gomock.Any(), gomock.Any(), &actorId).
 		Return(&database.ApiKeyCredential{Id: apid.New(apid.PrefixApiKeyCredential)}, nil)
 	db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
-	db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateReady).Return(nil)
+	db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
 
 	// CRITICAL: GetActiveApiKeyCredential must NOT be called during submit.
 	// gomock fails ctrl.Finish() if submit reads the prior credential.
@@ -257,7 +257,7 @@ func TestApiKeySubmit_PreconnectFieldNamedApiKeyIsNotTreatedAsCredential(t *test
 		Connection: database.Connection{
 			Id:               "cxn_test2222222222aa",
 			Namespace:        "root",
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 			ConnectorId:      cv.GetId(),
 			ConnectorVersion: cv.GetVersion(),
 		},
@@ -329,7 +329,7 @@ func TestApiKeySubmit_TransitionsToConfigureWhenNoProbes(t *testing.T) {
 		Connection: database.Connection{
 			Id:               "cxn_test3333333333aa",
 			Namespace:        "root",
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 			ConnectorId:      cv.GetId(),
 			ConnectorVersion: cv.GetVersion(),
 		},
@@ -459,7 +459,7 @@ func TestApiKeySubmit_RejectsUnknownAuthTypeOnCredentialsPhase(t *testing.T) {
 		Connection: database.Connection{
 			Id:               "cxn_test4444444444aa",
 			Namespace:        "root",
-			State:            database.ConnectionStateCreated,
+			State:            database.ConnectionStateSetup,
 			ConnectorId:      cv.GetId(),
 			ConnectorVersion: cv.GetVersion(),
 		},

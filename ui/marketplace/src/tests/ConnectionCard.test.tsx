@@ -61,7 +61,7 @@ describe('ConnectionCard', () => {
         id: '123e4567-e89b-12d3-a456-426614174000',
         namespace: 'root',
         connector: mockConnector,
-        state: ConnectionState.READY,
+        state: ConnectionState.CONFIGURED,
         health_state: ConnectionHealthState.HEALTHY,
         created_at: '2023-04-01T12:00:00Z',
         updated_at: '2023-04-01T12:00:00Z',
@@ -83,7 +83,7 @@ describe('ConnectionCard', () => {
         expect(screen.getByText(/Connected on/)).toBeInTheDocument();
 
         // Check if the status chip label is displayed (state string)
-        expect(screen.getByText('ready')).toBeInTheDocument();
+        expect(screen.getByText('configured')).toBeInTheDocument();
     });
 
     test('renders with unknown connector fallback when connector missing', () => {
@@ -102,8 +102,8 @@ describe('ConnectionCard', () => {
 
     test('renders different status labels based on connection state', () => {
         const states = [
-            {state: ConnectionState.READY, label: 'ready'},
-            {state: ConnectionState.CREATED, label: 'created'},
+            {state: ConnectionState.CONFIGURED, label: 'configured'},
+            {state: ConnectionState.SETUP, label: 'setup'},
             {state: ConnectionState.DISABLED, label: 'disabled'},
             {state: ConnectionState.DISCONNECTED, label: 'disconnected'},
         ];

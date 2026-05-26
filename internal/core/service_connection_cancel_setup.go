@@ -13,7 +13,7 @@ import (
 // is already ready — abandoning setup mid-creation should use AbortConnection, which
 // also revokes credentials and removes the connection.
 func (c *connection) CancelSetup(ctx context.Context) error {
-	if c.GetState() != database.ConnectionStateReady {
+	if c.GetState() != database.ConnectionStateConfigured {
 		return httperr.BadRequest("connection is not in a state that can cancel setup")
 	}
 

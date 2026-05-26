@@ -35,7 +35,7 @@ func TestEnqueueProbeNow_EnqueuesEachProbeWhenThrottleAllows(t *testing.T) {
 	conn := &database.Connection{
 		Id:               connectionId,
 		Namespace:        "root",
-		State:            database.ConnectionStateReady,
+		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
 		ConnectorId:      connector.Id,
 		ConnectorVersion: connector.Version,
@@ -66,7 +66,7 @@ func TestEnqueueProbeNow_ThrottleSkipsEnqueue(t *testing.T) {
 	conn := &database.Connection{
 		Id:               connectionId,
 		Namespace:        "root",
-		State:            database.ConnectionStateReady,
+		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
 		ConnectorId:      connector.Id,
 		ConnectorVersion: connector.Version,
@@ -98,7 +98,7 @@ func TestEnqueueProbeNow_MixedThrottle(t *testing.T) {
 	conn := &database.Connection{
 		Id:               connectionId,
 		Namespace:        "root",
-		State:            database.ConnectionStateReady,
+		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
 		ConnectorId:      connector.Id,
 		ConnectorVersion: connector.Version,
@@ -134,7 +134,7 @@ func TestEnqueueProbeNow_NoProbesShortCircuits(t *testing.T) {
 	conn := &database.Connection{
 		Id:               connectionId,
 		Namespace:        "root",
-		State:            database.ConnectionStateReady,
+		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
 		ConnectorId:      connector.Id,
 		ConnectorVersion: connector.Version,
@@ -166,7 +166,7 @@ func TestEnqueueProbeNow_RedisErrorIsSwallowedPerProbe(t *testing.T) {
 	conn := &database.Connection{
 		Id:               connectionId,
 		Namespace:        "root",
-		State:            database.ConnectionStateReady,
+		State:            database.ConnectionStateConfigured,
 		HealthState:      database.ConnectionHealthStateHealthy,
 		ConnectorId:      connector.Id,
 		ConnectorVersion: connector.Version,

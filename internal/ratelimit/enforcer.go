@@ -12,10 +12,10 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/app_metrics"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
-	"github.com/rmorlok/authproxy/internal/request_log"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 )
@@ -73,7 +73,7 @@ func (f *EnforcerFactory) NewRoundTripper(ri httpf.RequestInfo, transport http.R
 //     hot — flipping a rule from observe to enforce shouldn't reset its
 //     bucket. Their decisions don't reject anything.
 //
-// Every match (enforce or observe) is recorded on the request log's
+// Every match (enforce or observe) is recorded on the request-event
 // Attribution so the firing rule, all matched rules, and the resolved
 // bucket are visible to operators downstream.
 //
@@ -108,7 +108,7 @@ func (rt *EnforcerRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 	// Limiter; here we just collect what each one returned and look for
 	// rejections.
 	var firing *matchedRule
-	matchedSet := make([]request_log.RateLimitMatch, 0, len(matched))
+	matchedSet := make([]app_metrics.RateLimitMatch, 0, len(matched))
 
 	for i := range matched {
 		m := &matched[i]
@@ -128,7 +128,7 @@ func (rt *EnforcerRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 		_ = decideErr
 
 		m.decision = decision
-		matchedSet = append(matchedSet, request_log.RateLimitMatch{
+		matchedSet = append(matchedSet, app_metrics.RateLimitMatch{
 			Id:     m.rule.Id,
 			Mode:   string(m.effectiveMode),
 			Bucket: m.bucket.AsMap(),
@@ -143,16 +143,16 @@ func (rt *EnforcerRoundTripper) RoundTrip(req *http.Request) (*http.Response, er
 		}
 	}
 
-	// Stamp the request log's Attribution with the firing rule (if any)
+	// Stamp the request-event Attribution with the firing rule (if any)
 	// plus the full match set. When only observe rules matched, the
 	// top-level RateLimit* fields are still populated (with the first
 	// observe match) so a single log filter on rate_limit_id catches
 	// both enforce-rejected and observe-only entries.
-	if attr := request_log.AttributionFromContext(ctx); attr != nil {
+	if attr := app_metrics.AttributionFromContext(ctx); attr != nil {
 		attr.RateLimitMatched = matchedSet
 		switch {
 		case firing != nil:
-			attr.Source = request_log.ResponseSourceRateLimit
+			attr.Source = app_metrics.ResponseSourceRateLimit
 			attr.RateLimitId = firing.rule.Id
 			attr.RateLimitMode = string(rlschema.ModeEnforce)
 			attr.RateLimitBucket = firing.bucket.AsMap()

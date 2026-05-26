@@ -1655,7 +1655,7 @@ func TestMigration(t *testing.T) {
 					Namespace:        "root",
 					ConnectorId:      apid.MustParse("cxr_test0000000000002"),
 					ConnectorVersion: 1,
-					State:            database.ConnectionStateReady,
+					State:            database.ConnectionStateConfigured,
 				})
 				require.NoError(t, err)
 
