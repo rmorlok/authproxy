@@ -1,10 +1,7 @@
 basePath: /api/v1
 definitions:
-  github_com_rmorlok_authproxy_internal_schema_config.KeyData:
-    type: object
-  github_com_rmorlok_authproxy_internal_schema_resources_rate_limit.RateLimit:
-    type: object
-  routes.ActorJson:
+  github_com_rmorlok_authproxy_internal_schema_api.ActorJson:
+    description: Actor identity within a namespace
     properties:
       annotations:
         additionalProperties:
@@ -13,14 +10,95 @@ definitions:
       created_at:
         type: string
       external_id:
+        example: user-123
         type: string
       id:
+        example: act_test550e8400abcde
         type: string
       labels:
         additionalProperties:
           type: string
         type: object
       namespace:
+        example: root.acme
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson:
+    description: Namespace for organizing resources
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      created_at:
+        type: string
+      encryption_key_id:
+        example: ek_test550e8400abcde
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      path:
+        example: root.acme
+        type: string
+      state:
+        example: active
+        type: string
+      updated_at:
+        type: string
+    type: object
+  github_com_rmorlok_authproxy_internal_schema_api_openapi.ListActorsResponseJson:
+    description: Paginated list of actors
+    properties:
+      cursor:
+        description: Pagination cursor for next page.
+        type: string
+      items:
+        description: List of actors.
+        items:
+          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ActorJson'
+        type: array
+    type: object
+  github_com_rmorlok_authproxy_internal_schema_api_openapi.ListNamespacesResponseJson:
+    description: Paginated list of namespaces
+    properties:
+      cursor:
+        description: Pagination cursor for next page.
+        type: string
+      items:
+        description: List of namespaces.
+        items:
+          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson'
+        type: array
+    type: object
+  github_com_rmorlok_authproxy_internal_schema_config.KeyData:
+    type: object
+  github_com_rmorlok_authproxy_internal_schema_resources_rate_limit.RateLimit:
+    type: object
+  routes.ActorJson:
+    description: Actor identity within a namespace
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      created_at:
+        type: string
+      external_id:
+        example: user-123
+        type: string
+      id:
+        example: act_test550e8400abcde
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      namespace:
+        example: root.acme
         type: string
       updated_at:
         type: string
@@ -102,18 +180,21 @@ definitions:
         type: string
     type: object
   routes.CreateActorRequestJson:
+    description: Actor creation request
     properties:
       annotations:
         additionalProperties:
           type: string
         type: object
       external_id:
+        example: user-123
         type: string
       labels:
         additionalProperties:
           type: string
         type: object
       namespace:
+        example: root.acme
         type: string
     type: object
   routes.CreateEncryptionKeyRequestJson:
@@ -132,6 +213,7 @@ definitions:
         type: string
     type: object
   routes.CreateNamespaceRequestJson:
+    description: Namespace creation request
     properties:
       annotations:
         additionalProperties:
@@ -142,6 +224,7 @@ definitions:
           type: string
         type: object
       path:
+        example: root.acme
         type: string
     type: object
   routes.CreateRateLimitRequestJson:
@@ -207,15 +290,6 @@ definitions:
       actor_id:
         description: This should include any configuration the SPA needs
         type: string
-    type: object
-  routes.ListActorsResponseJson:
-    properties:
-      cursor:
-        type: string
-      items:
-        items:
-          $ref: '#/definitions/routes.ActorJson'
-        type: array
     type: object
   routes.ProxyRequest:
     description: Request to proxy an HTTP request through a connection
@@ -671,18 +745,6 @@ definitions:
           $ref: '#/definitions/routes.SwaggerEncryptionKeyJson'
         type: array
     type: object
-  routes.SwaggerListNamespacesResponse:
-    description: Paginated list of namespaces
-    properties:
-      cursor:
-        description: Pagination cursor for next page
-        type: string
-      items:
-        description: List of namespaces
-        items:
-          $ref: '#/definitions/routes.SwaggerNamespaceJson'
-        type: array
-    type: object
   routes.SwaggerListRateLimitsResponse:
     description: Paginated list of rate limits
     properties:
@@ -716,26 +778,23 @@ definitions:
       annotations:
         additionalProperties:
           type: string
-        description: Annotations assigned to the namespace
         type: object
       created_at:
-        description: Creation timestamp
+        type: string
+      encryption_key_id:
+        example: ek_test550e8400abcde
         type: string
       labels:
         additionalProperties:
           type: string
-        description: Labels assigned to the namespace
         type: object
       path:
-        description: Namespace path (e.g., "acme" or "acme/sales")
-        example: acme
+        example: root.acme
         type: string
       state:
-        description: Namespace state (active, suspended)
         example: active
         type: string
       updated_at:
-        description: Last update timestamp
         type: string
     type: object
   routes.SwaggerPutKeyValueRequest:
@@ -889,6 +948,7 @@ definitions:
     - TaskStateUnknown
     - TaskStateActive
   routes.UpdateActorRequestJson:
+    description: Actor update request
     properties:
       annotations:
         additionalProperties:
@@ -913,6 +973,7 @@ definitions:
         type: string
     type: object
   routes.UpdateNamespaceRequestJson:
+    description: Namespace update request
     properties:
       annotations:
         additionalProperties:
@@ -981,7 +1042,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.ListActorsResponseJson'
+            $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api_openapi.ListActorsResponseJson'
         "400":
           description: Bad Request
           schema:
@@ -4599,7 +4660,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.SwaggerListNamespacesResponse'
+            $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api_openapi.ListNamespacesResponseJson'
         "400":
           description: Bad Request
           schema:

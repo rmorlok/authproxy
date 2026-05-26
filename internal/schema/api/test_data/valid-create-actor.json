@@ -1,0 +1,10 @@
+{
+  "external_id": "user-123",
+  "namespace": "root.acme",
+  "labels": {
+    "team": "platform"
+  },
+  "annotations": {
+    "owner": "integrations"
+  }
+}

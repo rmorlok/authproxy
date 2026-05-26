@@ -1,0 +1,13 @@
+{
+  "path": "root.acme",
+  "state": "active",
+  "encryption_key_id": "ek_test550e8400abcde",
+  "labels": {
+    "team": "platform"
+  },
+  "annotations": {
+    "owner": "integrations"
+  },
+  "created_at": "2026-05-25T12:00:00Z",
+  "updated_at": "2026-05-25T12:30:00Z"
+}

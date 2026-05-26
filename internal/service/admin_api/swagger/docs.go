@@ -75,7 +75,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ListActorsResponseJson"
+                            "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api_openapi.ListActorsResponseJson"
                         }
                     },
                     "400": {
@@ -5626,7 +5626,7 @@ const docTemplateadmin_api = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerListNamespacesResponse"
+                            "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api_openapi.ListNamespacesResponseJson"
                         }
                     },
                     "400": {
@@ -7428,13 +7428,8 @@ const docTemplateadmin_api = `{
         }
     },
     "definitions": {
-        "github_com_rmorlok_authproxy_internal_schema_config.KeyData": {
-            "type": "object"
-        },
-        "github_com_rmorlok_authproxy_internal_schema_resources_rate_limit.RateLimit": {
-            "type": "object"
-        },
-        "routes.ActorJson": {
+        "github_com_rmorlok_authproxy_internal_schema_api.ActorJson": {
+            "description": "Actor identity within a namespace",
             "type": "object",
             "properties": {
                 "annotations": {
@@ -7447,10 +7442,12 @@ const docTemplateadmin_api = `{
                     "type": "string"
                 },
                 "external_id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "user-123"
                 },
                 "id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "act_test550e8400abcde"
                 },
                 "labels": {
                     "type": "object",
@@ -7459,7 +7456,120 @@ const docTemplateadmin_api = `{
                     }
                 },
                 "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                },
+                "updated_at": {
                     "type": "string"
+                }
+            }
+        },
+        "github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson": {
+            "description": "Namespace for organizing resources",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "encryption_key_id": {
+                    "type": "string",
+                    "example": "ek_test550e8400abcde"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "path": {
+                    "type": "string",
+                    "example": "root.acme"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "active"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "github_com_rmorlok_authproxy_internal_schema_api_openapi.ListActorsResponseJson": {
+            "description": "Paginated list of actors",
+            "type": "object",
+            "properties": {
+                "cursor": {
+                    "description": "Pagination cursor for next page.",
+                    "type": "string"
+                },
+                "items": {
+                    "description": "List of actors.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ActorJson"
+                    }
+                }
+            }
+        },
+        "github_com_rmorlok_authproxy_internal_schema_api_openapi.ListNamespacesResponseJson": {
+            "description": "Paginated list of namespaces",
+            "type": "object",
+            "properties": {
+                "cursor": {
+                    "description": "Pagination cursor for next page.",
+                    "type": "string"
+                },
+                "items": {
+                    "description": "List of namespaces.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson"
+                    }
+                }
+            }
+        },
+        "github_com_rmorlok_authproxy_internal_schema_config.KeyData": {
+            "type": "object"
+        },
+        "github_com_rmorlok_authproxy_internal_schema_resources_rate_limit.RateLimit": {
+            "type": "object"
+        },
+        "routes.ActorJson": {
+            "description": "Actor identity within a namespace",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "external_id": {
+                    "type": "string",
+                    "example": "user-123"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "act_test550e8400abcde"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
                 },
                 "updated_at": {
                     "type": "string"
@@ -7569,6 +7679,7 @@ const docTemplateadmin_api = `{
             }
         },
         "routes.CreateActorRequestJson": {
+            "description": "Actor creation request",
             "type": "object",
             "properties": {
                 "annotations": {
@@ -7578,7 +7689,8 @@ const docTemplateadmin_api = `{
                     }
                 },
                 "external_id": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "user-123"
                 },
                 "labels": {
                     "type": "object",
@@ -7587,7 +7699,8 @@ const docTemplateadmin_api = `{
                     }
                 },
                 "namespace": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "root.acme"
                 }
             }
         },
@@ -7615,6 +7728,7 @@ const docTemplateadmin_api = `{
             }
         },
         "routes.CreateNamespaceRequestJson": {
+            "description": "Namespace creation request",
             "type": "object",
             "properties": {
                 "annotations": {
@@ -7630,7 +7744,8 @@ const docTemplateadmin_api = `{
                     }
                 },
                 "path": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "root.acme"
                 }
             }
         },
@@ -7716,20 +7831,6 @@ const docTemplateadmin_api = `{
                 "actor_id": {
                     "description": "This should include any configuration the SPA needs",
                     "type": "string"
-                }
-            }
-        },
-        "routes.ListActorsResponseJson": {
-            "type": "object",
-            "properties": {
-                "cursor": {
-                    "type": "string"
-                },
-                "items": {
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/routes.ActorJson"
-                    }
                 }
             }
         },
@@ -8350,23 +8451,6 @@ const docTemplateadmin_api = `{
                 }
             }
         },
-        "routes.SwaggerListNamespacesResponse": {
-            "description": "Paginated list of namespaces",
-            "type": "object",
-            "properties": {
-                "cursor": {
-                    "description": "Pagination cursor for next page",
-                    "type": "string"
-                },
-                "items": {
-                    "description": "List of namespaces",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/routes.SwaggerNamespaceJson"
-                    }
-                }
-            }
-        },
         "routes.SwaggerListRateLimitsResponse": {
             "description": "Paginated list of rate limits",
             "type": "object",
@@ -8410,35 +8494,33 @@ const docTemplateadmin_api = `{
             "type": "object",
             "properties": {
                 "annotations": {
-                    "description": "Annotations assigned to the namespace",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
                 "created_at": {
-                    "description": "Creation timestamp",
                     "type": "string"
                 },
+                "encryption_key_id": {
+                    "type": "string",
+                    "example": "ek_test550e8400abcde"
+                },
                 "labels": {
-                    "description": "Labels assigned to the namespace",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
                 "path": {
-                    "description": "Namespace path (e.g., \"acme\" or \"acme/sales\")",
                     "type": "string",
-                    "example": "acme"
+                    "example": "root.acme"
                 },
                 "state": {
-                    "description": "Namespace state (active, suspended)",
                     "type": "string",
                     "example": "active"
                 },
                 "updated_at": {
-                    "description": "Last update timestamp",
                     "type": "string"
                 }
             }
@@ -8647,6 +8729,7 @@ const docTemplateadmin_api = `{
             ]
         },
         "routes.UpdateActorRequestJson": {
+            "description": "Actor update request",
             "type": "object",
             "properties": {
                 "annotations": {
@@ -8684,6 +8767,7 @@ const docTemplateadmin_api = `{
             }
         },
         "routes.UpdateNamespaceRequestJson": {
+            "description": "Namespace update request",
             "type": "object",
             "properties": {
                 "annotations": {
