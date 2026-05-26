@@ -11,7 +11,7 @@ export * from './encryptionKeys';
 export * from './namespaces';
 export * from './proxy';
 export * from './rateLimits';
-export * from './requests';
+export * from './requestEvents';
 export * from './session';
 export * from './tasks';
 export * from './taskMonitoring';

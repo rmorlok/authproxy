@@ -25,11 +25,11 @@ import CloseIcon from '@mui/icons-material/Close';
 import ContentCopyIcon from '@mui/icons-material/ContentCopy';
 import OpenInNewIcon from '@mui/icons-material/OpenInNew';
 import {Duration, HttpStatusChip} from '../util'
-import {getRequest, RequestEntry, RequestEntryRecord} from '@authproxy/api';
+import {getRequestEvent, RequestEvent, RequestEventRecord} from '@authproxy/api';
 import Chip from "@mui/material/Chip";
 
 function useRequest(id: string | undefined) {
-    const [data, setData] = useState<RequestEntry | null>(null);
+    const [data, setData] = useState<RequestEvent | null>(null);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
@@ -41,7 +41,7 @@ function useRequest(id: string | undefined) {
             setLoading(true);
             setError(null);
             try {
-                const resp = await getRequest(id);
+                const resp = await getRequestEvent(id);
                 if (!active) return;
                 if (resp.status === 200) setData(resp.data);
                 else setError('Failed to load request');
@@ -121,7 +121,7 @@ function headersToHar(headers: Record<string, string[]> | undefined): {name: str
     return arr;
 }
 
-function toHar(entry: RequestEntry) {
+function toHar(entry: RequestEvent) {
     const urlObj = new URL(entry.req.u);
     const queryString = Array.from(urlObj.searchParams.entries()).map(([name, value]) => ({name, value}));
 
@@ -199,7 +199,7 @@ function shellEscapeSingleQuotes(s: string): string {
     return s.replace(/'/g, `'"'"'`);
 }
 
-function toCurl(entry: RequestEntry): string {
+function toCurl(entry: RequestEvent): string {
     const lines: string[] = [];
     lines.push(`curl -X ${entry.req.m} \\\n  '${entry.req.u}'`);
     // headers
@@ -223,7 +223,7 @@ function toCurl(entry: RequestEntry): string {
     return lines.join(' \\\n');
 }
 
-function CopyMenu({data}: {data: RequestEntry}) {
+function CopyMenu({data}: {data: RequestEvent}) {
     const [anchorEl, setAnchorEl] = useState<null | HTMLElement>(null);
     const open = Boolean(anchorEl);
     const handleOpen = (e: React.MouseEvent<HTMLElement>) => setAnchorEl(e.currentTarget);
@@ -314,7 +314,7 @@ function CopyButton({getText}: { getText: () => string }) {
 
 export interface RequestDetailProps {
     requestId: string;
-    record?: RequestEntryRecord;
+    record?: RequestEventRecord;
     onClose?: () => void;
     showOpenFullPage?: boolean;
 }

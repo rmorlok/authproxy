@@ -48,7 +48,7 @@ The SDK exports modules mirroring the server endpoints:
 - Actors: `listActors`, `getActorById`, `getActorByExternalId`, `getMe`, `deleteActorById`, `deleteActorByExternalId`
 - Connectors: `listConnectors`, `getConnector`
 - Connections: `listConnections`, `getConnection`, `initiateConnection`, `disconnectConnection`, `forceConnectionState`
-- Request Log: `listRequests`, `getRequest`
+- Request Events: `listRequestEvents`, `getRequestEvent`, `requestEvents`
 - Session: `session.initiate`, `session.terminate`, plus `isInitiateSessionSuccessResponse`
 - Tasks: `getTask`, `pollForTaskFinalized`
 

@@ -1,7 +1,7 @@
 // Package proxy orchestrates a single proxied request through a connection:
 // resolve credentials via the auth method's Authenticator, send the request
 // through the httpf client (which carries rate-limit / telemetry /
-// request-log middleware), and on a 401 from the upstream attempt the
+// request-events middleware), and on a 401 from the upstream attempt the
 // retry-once-after-recover dance. Owns both the wrapped (structured)
 // ProxyRequest and the streaming ProxyRequestRaw paths so the
 // per-auth-method packages only have to describe "how to apply this

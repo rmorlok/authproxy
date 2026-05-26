@@ -42,7 +42,7 @@ func CreateFactory(
 	// Order matters: in New() below, each middleware wraps the previous
 	// parent, so the *last* entry in this slice becomes the outermost in
 	// execution order (the first to see the request, the last to see the
-	// response on the way back). Request logging must be outermost so it
+	// response on the way back). Request-event logging must be outermost so it
 	// records every request — including ones that inner middlewares
 	// short-circuit with a synth 429 — and so it can install the
 	// per-request Attribution onto the context before any inner middleware

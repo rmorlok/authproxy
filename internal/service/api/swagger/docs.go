@@ -5349,6 +5349,217 @@ const docTemplateApi = `{
                 }
             }
         },
+        "/metrics/request-events": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "List request events entries with optional filtering and pagination",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "request-events"
+                ],
+                "summary": "List request events entries",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Pagination cursor",
+                        "name": "cursor",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Maximum number of results to return",
+                        "name": "limit",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Order by field (e.g., 'timestamp:desc')",
+                        "name": "order_by",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by namespace",
+                        "name": "namespace",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by request type",
+                        "name": "request_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by correlation ID",
+                        "name": "correlation_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by connection UUID",
+                        "name": "connection_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by connector type",
+                        "name": "connector_type",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by connector UUID",
+                        "name": "connector_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by connector version",
+                        "name": "connector_version",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by HTTP method",
+                        "name": "method",
+                        "in": "query"
+                    },
+                    {
+                        "type": "integer",
+                        "description": "Filter by exact status code",
+                        "name": "status_code",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by status code range (e.g., '200-299')",
+                        "name": "status_code_range",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by timestamp range",
+                        "name": "timestamp_range",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by exact path",
+                        "name": "path",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by path regex",
+                        "name": "path_regex",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
+                        "description": "Filter by label selector (e.g., 'env=prod,team=api')",
+                        "name": "label_selector",
+                        "in": "query"
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/routes.SwaggerListRequestEventsResponse"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
+        "/metrics/request-events/{id}": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get a specific request events entry by its UUID",
+                "consumes": [
+                    "application/json"
+                ],
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "request-events"
+                ],
+                "summary": "Get request events entry",
+                "parameters": [
+                    {
+                        "type": "string",
+                        "description": "Request events entry UUID",
+                        "name": "id",
+                        "in": "path",
+                        "required": true
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/routes.SwaggerRequestEventsEntry"
+                        }
+                    },
+                    "400": {
+                        "description": "Bad Request",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "404": {
+                        "description": "Not Found",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "500": {
+                        "description": "Internal Server Error",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/namespaces": {
             "get": {
                 "security": [
@@ -7066,217 +7277,6 @@ const docTemplateApi = `{
                 }
             }
         },
-        "/request-log": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "List request log entries with optional filtering and pagination",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "request-log"
-                ],
-                "summary": "List request log entries",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Pagination cursor",
-                        "name": "cursor",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Maximum number of results to return",
-                        "name": "limit",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Order by field (e.g., 'timestamp:desc')",
-                        "name": "order_by",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter by namespace",
-                        "name": "namespace",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter by request type",
-                        "name": "request_type",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter by correlation ID",
-                        "name": "correlation_id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter by connection UUID",
-                        "name": "connection_id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter by connector type",
-                        "name": "connector_type",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter by connector UUID",
-                        "name": "connector_id",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Filter by connector version",
-                        "name": "connector_version",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter by HTTP method",
-                        "name": "method",
-                        "in": "query"
-                    },
-                    {
-                        "type": "integer",
-                        "description": "Filter by exact status code",
-                        "name": "status_code",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter by status code range (e.g., '200-299')",
-                        "name": "status_code_range",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter by timestamp range",
-                        "name": "timestamp_range",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter by exact path",
-                        "name": "path",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter by path regex",
-                        "name": "path_regex",
-                        "in": "query"
-                    },
-                    {
-                        "type": "string",
-                        "description": "Filter by label selector (e.g., 'env=prod,team=api')",
-                        "name": "label_selector",
-                        "in": "query"
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.SwaggerListRequestsResponse"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
-        "/request-log/{id}": {
-            "get": {
-                "security": [
-                    {
-                        "BearerAuth": []
-                    }
-                ],
-                "description": "Get a specific request log entry by its UUID",
-                "consumes": [
-                    "application/json"
-                ],
-                "produces": [
-                    "application/json"
-                ],
-                "tags": [
-                    "request-log"
-                ],
-                "summary": "Get request log entry",
-                "parameters": [
-                    {
-                        "type": "string",
-                        "description": "Request log entry UUID",
-                        "name": "id",
-                        "in": "path",
-                        "required": true
-                    }
-                ],
-                "responses": {
-                    "200": {
-                        "description": "OK",
-                        "schema": {
-                            "$ref": "#/definitions/routes.SwaggerRequestLogEntry"
-                        }
-                    },
-                    "400": {
-                        "description": "Bad Request",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "401": {
-                        "description": "Unauthorized",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "404": {
-                        "description": "Not Found",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    },
-                    "500": {
-                        "description": "Internal Server Error",
-                        "schema": {
-                            "$ref": "#/definitions/routes.ErrorResponse"
-                        }
-                    }
-                }
-            }
-        },
         "/session/_initiate": {
             "post": {
                 "description": "Initiate or establish a session with the server. If successful, returns actor info. If not authenticated, returns a redirect URL for authentication.",
@@ -8347,8 +8347,8 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerListRequestsResponse": {
-            "description": "Paginated list of request log entries",
+        "routes.SwaggerListRequestEventsResponse": {
+            "description": "Paginated list of request events entries",
             "type": "object",
             "properties": {
                 "cursor": {
@@ -8356,10 +8356,10 @@ const docTemplateApi = `{
                     "type": "string"
                 },
                 "items": {
-                    "description": "List of request log entries",
+                    "description": "List of request events entries",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/routes.SwaggerRequestLogEntry"
+                        "$ref": "#/definitions/routes.SwaggerRequestEventsEntry"
                     }
                 },
                 "total": {
@@ -8460,8 +8460,8 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerRequestLogEntry": {
-            "description": "HTTP request log entry",
+        "routes.SwaggerRequestEventsEntry": {
+            "description": "HTTP request events entry",
             "type": "object",
             "properties": {
                 "connection_id": {

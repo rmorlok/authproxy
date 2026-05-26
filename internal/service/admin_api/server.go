@@ -18,9 +18,9 @@ import (
 	common_routes "github.com/rmorlok/authproxy/internal/routes"
 	"github.com/rmorlok/authproxy/internal/service"
 	admin_api_swagger "github.com/rmorlok/authproxy/internal/service/admin_api/swagger"
+	adminembed "github.com/rmorlok/authproxy/ui/admin/embed"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
-	adminembed "github.com/rmorlok/authproxy/ui/admin/embed"
 )
 
 func GetCorsConfig(cfg config.C) *cors.Config {
@@ -97,7 +97,7 @@ func GetGinServer(
 	var healthChecker *gin.Engine
 	if service.Port() != service.HealthCheckPort() {
 		healthChecker = apgin.ForService(service, logger, dm.GetConfig().IsDebugMode(),
-		apgin.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry, dm.GetServiceId()))
+			apgin.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry, dm.GetServiceId()))
 	} else {
 		healthChecker = server
 	}
@@ -111,7 +111,7 @@ func GetGinServer(
 
 	dm.RegisterDatabasePing()
 	dm.RegisterRedisPing()
-	dm.RegisterLogStoragePing()
+	dm.RegisterAppMetricsPing()
 
 	healthChecker.GET("/healthz", func(c *gin.Context) {
 		ctx, cancel := context.WithTimeout(c.Request.Context(), 1*time.Second)
@@ -150,10 +150,10 @@ func GetGinServer(
 		authService,
 		dm.GetCoreService(),
 	)
-	routesRequestLog := common_routes.NewRequestLogRoutes(
+	routesRequestEvents := common_routes.NewRequestEventsRoutes(
 		dm.GetConfig(),
 		authService,
-		dm.GetLogStorageService(),
+		dm.GetAppMetricsService(),
 	)
 	routesActors := common_routes.NewActorsRoutes(
 		dm.GetConfig(),
@@ -188,7 +188,7 @@ func GetGinServer(
 	routesNamespaces.Register(api)
 	routesEncryptionKeys.Register(api)
 	routesRateLimits.Register(api)
-	routesRequestLog.Register(api)
+	routesRequestEvents.Register(api)
 	routesActors.Register(api)
 	routesTaskMonitoring.Register(api)
 

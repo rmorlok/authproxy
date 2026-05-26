@@ -28,7 +28,7 @@ const (
 	PrefixApiKeyCredential     Prefix = "akc_"
 	PrefixProbeOutcome         Prefix = "pou_"
 	PrefixNonce                Prefix = "non_"
-	PrefixRequestLog           Prefix = "req_"
+	PrefixRequestEvents        Prefix = "req_"
 	PrefixCorrelation          Prefix = "cor_"
 	PrefixJwtId                Prefix = "jti_"
 	PrefixEncryptionKey        Prefix = "ek_"
@@ -46,7 +46,7 @@ var validPrefixes = map[Prefix]bool{
 	PrefixApiKeyCredential:     true,
 	PrefixProbeOutcome:         true,
 	PrefixNonce:                true,
-	PrefixRequestLog:           true,
+	PrefixRequestEvents:        true,
 	PrefixCorrelation:          true,
 	PrefixJwtId:                true,
 	PrefixOauth2State:          true,

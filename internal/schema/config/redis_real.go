@@ -42,7 +42,7 @@ func (d *RedisReal) GetProvider() RedisProvider {
 func (d *RedisReal) ToRedisOptions(ctx context.Context) (*redis.Options, error) {
 	protocol := 2 // Needed because RESP3 is unstable for Redis Search
 	if d.Protocol == 3 {
-		// This will break the request log features
+		// This will break the request events features
 		protocol = 3
 	}
 
