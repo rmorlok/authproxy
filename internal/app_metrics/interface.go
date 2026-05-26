@@ -13,4 +13,5 @@ type LogRetriever interface {
 	GetFullLog(ctx context.Context, id apid.ID) (*FullLog, error)
 	NewListRequestsBuilder() ListRequestBuilder
 	ListRequestsFromCursor(ctx context.Context, cursor string) (ListRequestExecutor, error)
+	QueryRequestEventMetrics(ctx context.Context, queries []RequestEventMetricsQuery) ([]RequestEventMetricSeries, error)
 }

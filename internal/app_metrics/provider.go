@@ -35,4 +35,7 @@ type RecordRetriever interface {
 
 	// ListRequestsFromCursor resumes a paginated listing from a cursor string.
 	ListRequestsFromCursor(ctx context.Context, cursor string) (ListRequestExecutor, error)
+
+	// QueryRequestEventMetrics executes time-series metric queries over request events.
+	QueryRequestEventMetrics(ctx context.Context, queries []RequestEventMetricsQuery) ([]RequestEventMetricSeries, error)
 }

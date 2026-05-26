@@ -20,6 +20,7 @@ type recordOpts struct {
 	host             string
 	path             string
 	statusCode       int
+	duration         time.Duration
 	requestType      httpf.RequestType
 	correlationId    string
 	connectionId     apid.ID
@@ -54,13 +55,16 @@ func makeRecord(namespace string, o recordOpts) *LogRecord {
 	if o.requestType == "" {
 		o.requestType = httpf.RequestTypeProxy
 	}
+	if o.duration == 0 {
+		o.duration = 123 * time.Millisecond
+	}
 	return &LogRecord{
 		RequestId:           apid.New(apid.PrefixRequestEvents),
 		Namespace:           namespace,
 		Type:                o.requestType,
 		CorrelationId:       o.correlationId,
 		Timestamp:           o.timestamp,
-		MillisecondDuration: MillisecondDuration(123 * time.Millisecond),
+		MillisecondDuration: MillisecondDuration(o.duration),
 		ConnectionId:        o.connectionId,
 		ConnectorId:         o.connectorId,
 		ConnectorVersion:    o.connectorVersion,
@@ -416,10 +420,168 @@ func TestRequestEvents_List_Pagination_CursorRoundTrip(t *testing.T) {
 	}
 }
 
+func TestRequestEvents_Metrics_CountAndEmptyBuckets(t *testing.T) {
+	store, retriever, _ := MustNewBlankRequestEventsStore(t)
+	ctx := context.Background()
+
+	base := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
+	require.NoError(t, store.StoreRecords(ctx, []*LogRecord{
+		makeRecord("root", recordOpts{timestamp: base.Add(1 * time.Minute)}),
+		makeRecord("root", recordOpts{timestamp: base.Add(3 * time.Minute)}),
+		makeRecord("root", recordOpts{timestamp: base.Add(17 * time.Minute)}),
+		makeRecord("root", recordOpts{timestamp: base.Add(45 * time.Minute)}),
+	}))
+
+	series, err := retriever.QueryRequestEventMetrics(ctx, []RequestEventMetricsQuery{{
+		RefID:  "requests",
+		Metric: RequestEventMetricCount,
+		Start:  base,
+		End:    base.Add(45 * time.Minute),
+		Step:   15 * time.Minute,
+	}})
+	require.NoError(t, err)
+	require.Len(t, series, 1)
+	require.Equal(t, "requests", series[0].RefID)
+	require.Equal(t, []RequestEventMetricPoint{
+		{Timestamp: base, Value: 2},
+		{Timestamp: base.Add(15 * time.Minute), Value: 1},
+		{Timestamp: base.Add(30 * time.Minute), Value: 0},
+	}, series[0].Points)
+}
+
+func TestRequestEvents_Metrics_FiltersAndGroups(t *testing.T) {
+	store, retriever, _ := MustNewBlankRequestEventsStore(t)
+	ctx := context.Background()
+
+	base := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
+	connectorA := apid.New(apid.PrefixConnectorVersion)
+	connectorB := apid.New(apid.PrefixConnectorVersion)
+	require.NoError(t, store.StoreRecords(ctx, []*LogRecord{
+		makeRecord("root.team", recordOpts{
+			timestamp:   base.Add(time.Minute),
+			method:      "GET",
+			connectorId: connectorA,
+			labels:      database.Labels{"env": "prod"},
+		}),
+		makeRecord("root.team", recordOpts{
+			timestamp:   base.Add(2 * time.Minute),
+			method:      "POST",
+			connectorId: connectorB,
+			labels:      database.Labels{"env": "prod"},
+		}),
+		makeRecord("root.team", recordOpts{
+			timestamp:   base.Add(3 * time.Minute),
+			method:      "GET",
+			connectorId: connectorA,
+			labels:      database.Labels{"env": "staging"},
+		}),
+		makeRecord("root.other", recordOpts{
+			timestamp:   base.Add(4 * time.Minute),
+			method:      "GET",
+			connectorId: connectorA,
+			labels:      database.Labels{"env": "prod"},
+		}),
+	}))
+
+	series, err := retriever.QueryRequestEventMetrics(ctx, []RequestEventMetricsQuery{{
+		RefID:             "by-method",
+		Metric:            RequestEventMetricCount,
+		Start:             base,
+		End:               base.Add(15 * time.Minute),
+		Step:              15 * time.Minute,
+		NamespaceMatchers: []string{"root.team"},
+		LabelSelector:     "env=prod",
+		GroupBy:           []RequestEventGroupBy{RequestEventGroupByMethod, RequestEventGroupByConnectorID},
+	}})
+	require.NoError(t, err)
+	require.Len(t, series, 2)
+
+	values := metricSeriesValuesByLabels(series)
+	require.Equal(t, 1.0, values["connector_id="+connectorA.String()+"\x00method=GET\x00"][0])
+	require.Equal(t, 1.0, values["connector_id="+connectorB.String()+"\x00method=POST\x00"][0])
+
+	series, err = retriever.QueryRequestEventMetrics(ctx, []RequestEventMetricsQuery{{
+		RefID:             "by-outcome",
+		Metric:            RequestEventMetricCount,
+		Start:             base,
+		End:               base.Add(15 * time.Minute),
+		Step:              15 * time.Minute,
+		NamespaceMatchers: []string{"root.team"},
+		GroupBy: []RequestEventGroupBy{
+			RequestEventGroupByType,
+			RequestEventGroupByResponseStatusCode,
+			RequestEventGroupByResponseSource,
+		},
+	}})
+	require.NoError(t, err)
+	values = metricSeriesValuesByLabels(series)
+	require.Equal(t, 3.0, values["response_source=upstream\x00response_status_code=200\x00type=proxy\x00"][0])
+}
+
+func TestRequestEvents_Metrics_ErrorsAndDurations(t *testing.T) {
+	store, retriever, _ := MustNewBlankRequestEventsStore(t)
+	ctx := context.Background()
+
+	base := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
+	require.NoError(t, store.StoreRecords(ctx, []*LogRecord{
+		makeRecord("root", recordOpts{timestamp: base.Add(time.Minute), statusCode: 200, duration: 100 * time.Millisecond}),
+		makeRecord("root", recordOpts{timestamp: base.Add(2 * time.Minute), statusCode: 500, duration: 200 * time.Millisecond}),
+		makeRecord("root", recordOpts{timestamp: base.Add(3 * time.Minute), statusCode: 404, duration: 900 * time.Millisecond}),
+		makeRecord("root", recordOpts{timestamp: base.Add(20 * time.Minute), statusCode: 200, duration: 300 * time.Millisecond}),
+	}))
+
+	series, err := retriever.QueryRequestEventMetrics(ctx, []RequestEventMetricsQuery{
+		{
+			RefID:  "errors",
+			Metric: RequestEventMetricErrorsCount,
+			Start:  base,
+			End:    base.Add(30 * time.Minute),
+			Step:   15 * time.Minute,
+		},
+		{
+			RefID:  "avg",
+			Metric: RequestEventMetricDurationAvgMS,
+			Start:  base,
+			End:    base.Add(30 * time.Minute),
+			Step:   15 * time.Minute,
+		},
+		{
+			RefID:  "p95",
+			Metric: RequestEventMetricDurationP95MS,
+			Start:  base,
+			End:    base.Add(30 * time.Minute),
+			Step:   15 * time.Minute,
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, series, 3)
+
+	byRef := map[string][]float64{}
+	for _, s := range series {
+		for _, point := range s.Points {
+			byRef[s.RefID] = append(byRef[s.RefID], point.Value)
+		}
+	}
+	require.Equal(t, []float64{2, 0}, byRef["errors"])
+	require.Equal(t, []float64{400, 300}, byRef["avg"])
+	require.Equal(t, []float64{900, 300}, byRef["p95"])
+}
+
 func collectIDs(records []*LogRecord) map[apid.ID]bool {
 	out := make(map[apid.ID]bool, len(records))
 	for _, r := range records {
 		out[r.RequestId] = true
+	}
+	return out
+}
+
+func metricSeriesValuesByLabels(series []RequestEventMetricSeries) map[string][]float64 {
+	out := map[string][]float64{}
+	for _, s := range series {
+		key := requestEventMetricGroupKey(s.Labels)
+		for _, point := range s.Points {
+			out[key] = append(out[key], point.Value)
+		}
 	}
 	return out
 }

@@ -339,6 +339,12 @@ func (r *sqlRecordRetriever) ListRequestsFromCursor(ctx context.Context, cursor 
 	return b.fromCursor(ctx, cursor)
 }
 
+func (r *sqlRecordRetriever) QueryRequestEventMetrics(ctx context.Context, queries []RequestEventMetricsQuery) ([]RequestEventMetricSeries, error) {
+	return executeRequestEventMetricsQueries(ctx, queries, func(ctx context.Context, query RequestEventMetricsQuery) ([]*LogRecord, error) {
+		return fetchRequestEventMetricRecords(ctx, r.db, r.placeholderFormat, r.provider, query)
+	})
+}
+
 var _ RecordRetriever = (*sqlRecordRetriever)(nil)
 
 // --- SQL ListRequestBuilder ---
@@ -498,6 +504,34 @@ func (l *sqlListRequestsBuilder) buildQuery() sq.SelectBuilder {
 		From(entryRecordsTable).
 		PlaceholderFormat(l.placeholderFormat)
 
+	builder = l.applyFilters(builder)
+
+	// Order by
+	orderColumn := "timestamp_ms"
+	orderDir := "DESC"
+
+	if l.OrderByFieldVal != nil {
+		if col, ok := sqlOrderByColumns[*l.OrderByFieldVal]; ok {
+			orderColumn = col
+		}
+	}
+	if l.OrderByVal != nil && *l.OrderByVal == pagination.OrderByAsc {
+		orderDir = "ASC"
+	}
+
+	builder = builder.OrderBy(orderColumn + " " + orderDir)
+
+	limit := l.LimitVal
+	if limit <= 0 {
+		limit = 100
+	}
+	builder = builder.Limit(uint64(limit + 1))
+	builder = builder.Offset(uint64(l.Offset))
+
+	return builder
+}
+
+func (l *sqlListRequestsBuilder) applyFilters(builder sq.SelectBuilder) sq.SelectBuilder {
 	if l.RequestType != nil {
 		builder = builder.Where(sq.Eq{"type": *l.RequestType})
 	}
@@ -585,28 +619,6 @@ func (l *sqlListRequestsBuilder) buildQuery() sq.SelectBuilder {
 	if l.RateLimitId != nil {
 		builder = builder.Where(sq.Eq{"rate_limit_id": l.RateLimitId.String()})
 	}
-
-	// Order by
-	orderColumn := "timestamp_ms"
-	orderDir := "DESC"
-
-	if l.OrderByFieldVal != nil {
-		if col, ok := sqlOrderByColumns[*l.OrderByFieldVal]; ok {
-			orderColumn = col
-		}
-	}
-	if l.OrderByVal != nil && *l.OrderByVal == pagination.OrderByAsc {
-		orderDir = "ASC"
-	}
-
-	builder = builder.OrderBy(orderColumn + " " + orderDir)
-
-	limit := l.LimitVal
-	if limit <= 0 {
-		limit = 100
-	}
-	builder = builder.Limit(uint64(limit + 1))
-	builder = builder.Offset(uint64(l.Offset))
 
 	return builder
 }
@@ -704,6 +716,49 @@ func (l *sqlListRequestsBuilder) Enumerate(ctx context.Context, callback paginat
 
 var _ ListRequestExecutor = (*sqlListRequestsBuilder)(nil)
 var _ ListRequestBuilder = (*sqlListRequestsBuilder)(nil)
+
+func fetchRequestEventMetricRecords(
+	ctx context.Context,
+	db *sql.DB,
+	placeholderFormat sq.PlaceholderFormat,
+	provider config.DatabaseProvider,
+	query RequestEventMetricsQuery,
+) ([]*LogRecord, error) {
+	builder := &sqlListRequestsBuilder{
+		ListFilters:       requestEventMetricsFilters(query),
+		db:                db,
+		placeholderFormat: placeholderFormat,
+		provider:          provider,
+	}
+	selectBuilder := builder.applyFilters(sq.Select(entryRecordColumns...).
+		From(entryRecordsTable).
+		PlaceholderFormat(placeholderFormat)).
+		OrderBy("timestamp_ms ASC")
+
+	sqlQuery, args, err := selectBuilder.ToSql()
+	if err != nil {
+		return nil, fmt.Errorf("failed to build request event metrics query: %w", err)
+	}
+
+	rows, err := db.QueryContext(ctx, sqlQuery, args...)
+	if err != nil {
+		return nil, fmt.Errorf("failed to execute request event metrics query: %w", err)
+	}
+	defer rows.Close()
+
+	records := make([]*LogRecord, 0)
+	for rows.Next() {
+		record, err := scanLogRecord(rows)
+		if err != nil {
+			return nil, fmt.Errorf("failed to scan request event metric record: %w", err)
+		}
+		records = append(records, record)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, fmt.Errorf("failed to iterate request event metric records: %w", err)
+	}
+	return records, nil
+}
 
 // Suppress unused import warnings
 var _ = regexp.Compile

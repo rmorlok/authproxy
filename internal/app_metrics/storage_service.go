@@ -48,6 +48,11 @@ func (ss *StorageService) ListRequestsFromCursor(ctx context.Context, cursor str
 	return ss.retriever.ListRequestsFromCursor(ctx, cursor)
 }
 
+// QueryRequestEventMetrics executes time-series metric queries over request events.
+func (ss *StorageService) QueryRequestEventMetrics(ctx context.Context, queries []RequestEventMetricsQuery) ([]RequestEventMetricSeries, error) {
+	return ss.retriever.QueryRequestEventMetrics(ctx, queries)
+}
+
 func (ss *StorageService) GetFullLog(ctx context.Context, id apid.ID) (*FullLog, error) {
 	log, err := ss.GetRecord(ctx, id)
 	if err != nil {
