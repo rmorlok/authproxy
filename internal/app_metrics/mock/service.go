@@ -79,3 +79,18 @@ func (mr *MockLogRetrieverMockRecorder) NewListRequestsBuilder() *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "NewListRequestsBuilder", reflect.TypeOf((*MockLogRetriever)(nil).NewListRequestsBuilder))
 }
+
+// QueryRequestEventMetrics mocks base method.
+func (m *MockLogRetriever) QueryRequestEventMetrics(ctx context.Context, queries []app_metrics.RequestEventMetricsQuery) ([]app_metrics.RequestEventMetricSeries, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "QueryRequestEventMetrics", ctx, queries)
+	ret0, _ := ret[0].([]app_metrics.RequestEventMetricSeries)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// QueryRequestEventMetrics indicates an expected call of QueryRequestEventMetrics.
+func (mr *MockLogRetrieverMockRecorder) QueryRequestEventMetrics(ctx, queries interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryRequestEventMetrics", reflect.TypeOf((*MockLogRetriever)(nil).QueryRequestEventMetrics), ctx, queries)
+}
