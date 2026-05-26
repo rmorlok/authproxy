@@ -104,6 +104,9 @@ func TestSchema(t *testing.T) {
 				{Name: "server with all fields", Valid: true, Data: `{"server": {"api": "http://localhost:8081", "admin_api": "http://localhost:8082", "auth": "http://localhost:8080", "marketplace": "http://localhost:5173", "admin_ui": "http://localhost:5174"}}`},
 				{Name: "server extra property rejected", Valid: false, Data: `{"server": {"api": "http://localhost:8081", "bogus": "x"}}`},
 				{Name: "server is not an object", Valid: false, Data: `{"server": "http://localhost"}`},
+				{Name: "signing_proxy with port string", Valid: true, Data: `{"signing_proxy": {"port": "8898"}}`},
+				{Name: "signing_proxy with port via env var", Valid: true, Data: `{"signing_proxy": {"port": {"env_var": "SP_PORT", "default": "8888"}}}`},
+				{Name: "signing_proxy extra property rejected", Valid: false, Data: `{"signing_proxy": {"port": "8898", "bogus": "x"}}`},
 				{Name: "admin_private_key_path as env var", Valid: true, Data: `{"admin_private_key_path": {"env_var": "ADMIN_KEY_PATH"}}`},
 				{Name: "admin_shared_key_path as path", Valid: true, Data: `{"admin_shared_key_path": {"path": "~/.authproxy/shared.key"}}`},
 				{Name: "admin_username inline bool coerced", Valid: true, Data: `{"admin_username": true}`},
@@ -123,6 +126,16 @@ func TestSchema(t *testing.T) {
 				{Name: "api inline bool coerced", Valid: true, Data: `{"api": true}`},
 				{Name: "api inline number coerced", Valid: true, Data: `{"api": 99}`},
 				{Name: "api object with mixed forms rejected", Valid: false, Data: `{"api": {"value": "x", "path": "/p"}}`},
+			},
+		},
+		{
+			Def: "SigningProxy",
+			Cases: []schemaTest{
+				{Name: "empty", Valid: true, Data: `{}`},
+				{Name: "port string", Valid: true, Data: `{"port": "8888"}`},
+				{Name: "port via env var with default", Valid: true, Data: `{"port": {"env_var": "AUTHPROXY_SIGNING_PROXY_PORT", "default": "8888"}}`},
+				{Name: "port inline number coerced", Valid: true, Data: `{"port": 8888}`},
+				{Name: "extra property rejected", Valid: false, Data: `{"port": "8888", "extra": "bogus"}`},
 			},
 		},
 	}

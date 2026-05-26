@@ -124,6 +124,48 @@ server:
 		assert.Equal(t, "", root.AuthUrl())
 		assert.Equal(t, "", root.MarketplaceUrl())
 		assert.Equal(t, "", root.AdminUiUrl())
+
+		port, err := root.SigningProxyPort()
+		require.NoError(t, err)
+		assert.Equal(t, 0, port)
+	})
+
+	t.Run("signing_proxy port direct value", func(t *testing.T) {
+		data := []byte(`
+signing_proxy:
+  port: "8898"
+`)
+		root, err := UnmarshallYamlRoot(data)
+		require.NoError(t, err)
+		port, err := root.SigningProxyPort()
+		require.NoError(t, err)
+		assert.Equal(t, 8898, port)
+	})
+
+	t.Run("signing_proxy port via env var", func(t *testing.T) {
+		t.Setenv("CLI_ROOT_TEST_SIGNING_PROXY_PORT", "8908")
+		data := []byte(`
+signing_proxy:
+  port:
+    env_var: CLI_ROOT_TEST_SIGNING_PROXY_PORT
+    default: "8888"
+`)
+		root, err := UnmarshallYamlRoot(data)
+		require.NoError(t, err)
+		port, err := root.SigningProxyPort()
+		require.NoError(t, err)
+		assert.Equal(t, 8908, port)
+	})
+
+	t.Run("signing_proxy port invalid value returns error", func(t *testing.T) {
+		data := []byte(`
+signing_proxy:
+  port: "not-a-number"
+`)
+		root, err := UnmarshallYamlRoot(data)
+		require.NoError(t, err)
+		_, err = root.SigningProxyPort()
+		require.Error(t, err)
 	})
 
 	t.Run("malformed yaml returns error", func(t *testing.T) {
@@ -145,4 +187,8 @@ func TestRoot_NilReceiverSafety(t *testing.T) {
 	assert.Equal(t, "", r.AuthUrl())
 	assert.Equal(t, "", r.MarketplaceUrl())
 	assert.Equal(t, "", r.AdminUiUrl())
+
+	port, err := r.SigningProxyPort()
+	require.NoError(t, err)
+	assert.Equal(t, 0, port)
 }

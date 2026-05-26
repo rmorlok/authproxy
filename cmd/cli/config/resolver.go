@@ -260,3 +260,15 @@ func (j *Resolver) ResolveAdminUiUrl() (string, error) {
 
 	return root.AdminUiUrl(), nil
 }
+
+// ResolveSigningProxyPort returns the configured signing-proxy port from the
+// CLI config file, or 0 if unset. Callers should treat 0 as "fall back to the
+// command's own --port default."
+func (j *Resolver) ResolveSigningProxyPort() (int, error) {
+	root, err := j.resolveRoot()
+	if err != nil {
+		return 0, err
+	}
+
+	return root.SigningProxyPort()
+}

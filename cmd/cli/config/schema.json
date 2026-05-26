@@ -29,6 +29,17 @@
       "additionalProperties": false,
       "description": "URLs the CLI uses to reach the various AuthProxy services. Each may be a direct string or any of the StringValue variants (env var, file, etc.)."
     },
+    "SigningProxy": {
+      "type": "object",
+      "properties": {
+        "port": {
+          "$ref": "../common/schema.json#/$defs/StringValue",
+          "description": "Default listen port for `ap signing-proxy`. Overridable per-invocation with --port."
+        }
+      },
+      "additionalProperties": false,
+      "description": "Defaults for `ap signing-proxy`. Useful when running multiple AuthProxy clones on one machine so each clone's signing-proxy listens on its own port."
+    },
     "Root": {
       "type": "object",
       "properties": {
@@ -46,6 +57,9 @@
         },
         "server": {
           "$ref": "#/$defs/Server"
+        },
+        "signing_proxy": {
+          "$ref": "#/$defs/SigningProxy"
         }
       },
       "additionalProperties": false,
