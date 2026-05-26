@@ -1,0 +1,9 @@
+# Locally-generated demo admin keypair (never commit private keys).
+dev_keys/
+
+# Vite build output. `backend/embed/dist/.gitkeep` + `placeholder.html`
+# are committed so //go:embed always has at least one file on a fresh
+# checkout; everything else is build-time output.
+backend/embed/dist/*
+!backend/embed/dist/.gitkeep
+!backend/embed/dist/placeholder.html

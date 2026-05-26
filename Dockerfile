@@ -11,6 +11,12 @@ RUN corepack enable
 COPY package.json yarn.lock .yarnrc.yml ./
 COPY ui ui
 COPY sdks sdks
+# `demos/*/frontend` is declared as a workspace in the root package.json.
+# `yarn install --immutable` insists every declared workspace exists on
+# disk even when we won't build the demo image here (demos/shell ships
+# in its own image — see A19/#306). Copying the dir keeps yarn happy
+# without affecting any subsequent build steps.
+COPY demos demos
 
 RUN yarn install --immutable
 RUN yarn workspace @authproxy/admin build \
