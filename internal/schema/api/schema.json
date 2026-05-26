@@ -10,6 +10,10 @@
       "type": "string",
       "enum": ["active", "destroying", "destroyed"]
     },
+    "ConnectorVersionState": {
+      "type": "string",
+      "enum": ["draft", "primary", "active", "archived"]
+    },
     "StringMap": {
       "type": "object",
       "additionalProperties": {
@@ -234,6 +238,125 @@
         "cursor": { "type": "string" }
       },
       "required": ["items"],
+      "additionalProperties": false
+    },
+    "Connector": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "state": { "$ref": "#/$defs/ConnectorVersionState" },
+        "display_name": { "type": "string" },
+        "highlight": { "type": "string" },
+        "description": { "type": "string" },
+        "status_page_url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "logo": { "type": "string" },
+        "has_configure": { "type": "boolean" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "versions": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "states": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ConnectorVersionState" }
+        }
+      },
+      "required": ["id", "version", "namespace", "state", "display_name", "description", "logo", "has_configure", "created_at", "updated_at"],
+      "additionalProperties": false
+    },
+    "ListConnectorsResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Connector" }
+        },
+        "cursor": { "type": "string" }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    },
+    "ConnectorVersion": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "version": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "state": { "$ref": "#/$defs/ConnectorVersionState" },
+        "definition": { "$ref": "../resources/connectors/schema.json" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "version", "namespace", "state", "definition", "created_at", "updated_at"],
+      "additionalProperties": false
+    },
+    "ListConnectorVersionsResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ConnectorVersion" }
+        },
+        "cursor": { "type": "string" }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    },
+    "CreateConnectorRequest": {
+      "type": "object",
+      "properties": {
+        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "definition": { "$ref": "../resources/connectors/schema.json" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" }
+      },
+      "required": ["namespace", "definition"],
+      "additionalProperties": false
+    },
+    "UpdateConnectorRequest": {
+      "type": "object",
+      "properties": {
+        "definition": { "$ref": "../resources/connectors/schema.json" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" }
+      },
+      "additionalProperties": false
+    },
+    "CreateConnectorVersionRequest": {
+      "type": "object",
+      "properties": {
+        "definition": { "$ref": "../resources/connectors/schema.json" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" }
+      },
       "additionalProperties": false
     }
   }

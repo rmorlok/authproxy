@@ -634,7 +634,7 @@ func TestConnectors(t *testing.T) {
 			require.NotEqual(t, apid.Nil, resp.Id)
 			require.Equal(t, uint64(1), resp.Version)
 			require.Equal(t, "root", resp.Namespace)
-			require.Equal(t, database.ConnectorVersionStateDraft, resp.State)
+			require.Equal(t, string(database.ConnectorVersionStateDraft), string(resp.State))
 			require.Equal(t, "New Connector", resp.Definition.DisplayName)
 			require.Equal(t, "A brand new connector", resp.Definition.Description)
 			require.Equal(t, "test", resp.Labels["env"])
@@ -760,7 +760,7 @@ func TestConnectors(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, connectorId, resp.Id)
 			require.Equal(t, uint64(2), resp.Version) // New draft version
-			require.Equal(t, database.ConnectorVersionStateDraft, resp.State)
+			require.Equal(t, string(database.ConnectorVersionStateDraft), string(resp.State))
 			require.Equal(t, "Updated Connector", resp.Definition.DisplayName)
 		})
 
@@ -845,7 +845,7 @@ func TestConnectors(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, connectorId, resp.Id)
 			require.Equal(t, uint64(2), resp.Version)
-			require.Equal(t, database.ConnectorVersionStateDraft, resp.State)
+			require.Equal(t, string(database.ConnectorVersionStateDraft), string(resp.State))
 			require.Equal(t, "Test ConnectorJson", resp.Definition.DisplayName)
 		})
 
@@ -1091,7 +1091,7 @@ func TestConnectors(t *testing.T) {
 			require.NoError(t, err)
 			require.Equal(t, connectorId, resp.Id)
 			require.Equal(t, draftVersion, resp.Version)
-			require.Equal(t, database.ConnectorVersionStateDraft, resp.State)
+			require.Equal(t, string(database.ConnectorVersionStateDraft), string(resp.State))
 			require.Equal(t, "Updated Draft", resp.Definition.DisplayName)
 		})
 	})
@@ -1690,7 +1690,7 @@ func TestConnectors(t *testing.T) {
 			var resp ConnectorVersionJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, database.ConnectorVersionStateArchived, resp.State)
+			require.Equal(t, string(database.ConnectorVersionStateArchived), string(resp.State))
 		})
 
 		t.Run("already in desired state", func(t *testing.T) {
@@ -1712,7 +1712,7 @@ func TestConnectors(t *testing.T) {
 			var resp ConnectorVersionJson
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
-			require.Equal(t, database.ConnectorVersionStatePrimary, resp.State)
+			require.Equal(t, string(database.ConnectorVersionStatePrimary), string(resp.State))
 		})
 	})
 
