@@ -6,8 +6,8 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"gopkg.in/h2non/gentleman.v2"
 )
@@ -134,7 +134,7 @@ type RawProxyRequest struct {
 	// apply, but gentleman's body buffering does not).
 	Outbound *http.Request
 	// Labels are forwarded to httpf's ForLabels chain (rate-limit,
-	// request log, OTel) — same shape as ProxyRequest.Labels for the
+	// request events, OTel) — same shape as ProxyRequest.Labels for the
 	// wrapped path.
 	Labels map[string]string
 }

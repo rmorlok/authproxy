@@ -278,12 +278,12 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 	// database is always seeded with the key, regardless of what other packages
 	// are doing concurrently.
 	//
-	// This must happen before AutoMigrateLogStorageService because that call
+	// This must happen before AutoMigrateAppMetricsService because that call
 	// can trigger GetEncryptService(), which starts the syncLoop goroutine that
 	// immediately tries to read the global key from the database.
 	require.NoError(t, encrypt.SyncKeysToDatabase(context.Background(), cfg, dm.GetDatabase(), dm.GetLogger(), nil))
 
-	dm.AutoMigrateLogStorageService()
+	dm.AutoMigrateAppMetricsService()
 	dm.AutoMigrateCore()
 	dm.AutoMigratePredefinedActors()
 

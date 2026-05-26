@@ -32,7 +32,7 @@ const otelInstrumentationName = "github.com/rmorlok/authproxy/internal/aplog"
 // Safe to call with any combination of nil providers / disabled signals /
 // nil base — returns base unchanged when there's nothing to add.
 //
-// The existing CorrelationId field on LogRecord (the request-log entity)
+// The existing CorrelationId field on LogRecord (the request-events entity)
 // is unaffected; it carries through independently from trace_id, so logs
 // emitted within a traced request carry both.
 func WrapWithTelemetry(base *slog.Logger, providers *aptelemetry.Providers, cfg *sconfig.Telemetry) *slog.Logger {

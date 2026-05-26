@@ -13,10 +13,10 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
+	"github.com/rmorlok/authproxy/internal/app_metrics"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
-	"github.com/rmorlok/authproxy/internal/request_log"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/stretchr/testify/require"
@@ -49,9 +49,9 @@ func (e *enforcerEnv) ctx() context.Context {
 
 // withAttribution returns a context pre-stamped with an Attribution and
 // the attribution itself so tests can inspect it after the round trip.
-func (e *enforcerEnv) ctxWithAttr() (context.Context, *request_log.Attribution) {
-	attr := &request_log.Attribution{}
-	return request_log.ContextWithAttribution(e.ctx(), attr), attr
+func (e *enforcerEnv) ctxWithAttr() (context.Context, *app_metrics.Attribution) {
+	attr := &app_metrics.Attribution{}
+	return app_metrics.ContextWithAttribution(e.ctx(), attr), attr
 }
 
 func (e *enforcerEnv) step(d time.Duration) {
@@ -167,7 +167,7 @@ func TestEnforcer_RuleMatchesButUnderLimit_PassThrough(t *testing.T) {
 	// Match recorded but no rejection.
 	require.Len(t, attr.RateLimitMatched, 1)
 	require.Equal(t, apid.ID("rl_a"), attr.RateLimitMatched[0].Id)
-	require.Equal(t, request_log.ResponseSource(""), attr.Source, "no source stamped when no rule fired")
+	require.Equal(t, app_metrics.ResponseSource(""), attr.Source, "no source stamped when no rule fired")
 }
 
 func TestEnforcer_RuleDoesNotMatch_PassThrough(t *testing.T) {
@@ -216,12 +216,12 @@ func TestEnforcer_SingleRuleRejects_SyntheticRetryAfterAndAttribution(t *testing
 	require.Equal(t, "rl_a", parsed["rate_limit_id"])
 
 	// Attribution stamped on the rejected request.
-	require.Equal(t, request_log.ResponseSourceRateLimit, attr2.Source)
+	require.Equal(t, app_metrics.ResponseSourceRateLimit, attr2.Source)
 	require.Equal(t, apid.ID("rl_a"), attr2.RateLimitId)
 	require.Equal(t, "enforce", attr2.RateLimitMode)
 
 	// First request didn't get rejected so its Source stayed default.
-	require.NotEqual(t, request_log.ResponseSourceRateLimit, attr.Source)
+	require.NotEqual(t, app_metrics.ResponseSourceRateLimit, attr.Source)
 }
 
 // --- multi-rule all-apply ---
@@ -280,12 +280,12 @@ func TestEnforcer_ObserveModeOnly_PassThroughButLogged(t *testing.T) {
 	require.Equal(t, 200, resp.StatusCode, "observe mode never rejects")
 	require.True(t, ft.called)
 
-	// Observe-only matches still surface on the request log.
+	// Observe-only matches still surface on the request events.
 	require.Len(t, attr.RateLimitMatched, 1)
 	require.Equal(t, "observe", attr.RateLimitMatched[0].Mode)
 	require.Equal(t, apid.ID("rl_obs"), attr.RateLimitId)
 	require.Equal(t, "observe", attr.RateLimitMode)
-	require.Equal(t, request_log.ResponseSource(""), attr.Source,
+	require.Equal(t, app_metrics.ResponseSource(""), attr.Source,
 		"observe-only must NOT stamp Source = rate_limit — the response really came from upstream")
 }
 
@@ -303,7 +303,7 @@ func TestEnforcer_ObservePlusEnforce_EnforceWins(t *testing.T) {
 	resp, err := rt.RoundTrip(mkProxyReq(t, ctx, "https://upstream.example.com/x"))
 	require.NoError(t, err)
 	require.Equal(t, http.StatusTooManyRequests, resp.StatusCode)
-	require.Equal(t, request_log.ResponseSourceRateLimit, attr.Source)
+	require.Equal(t, app_metrics.ResponseSourceRateLimit, attr.Source)
 	require.Equal(t, apid.ID("rl_enf"), attr.RateLimitId, "enforce rule must be the firing one")
 	require.Len(t, attr.RateLimitMatched, 2)
 }
@@ -404,7 +404,7 @@ func TestEnforcerFactory_NilCacheSkips(t *testing.T) {
 // --- attribution wired correctly without pre-installed attribution ---
 
 func TestEnforcer_NoAttributionInContext_DoesNotPanic(t *testing.T) {
-	// In production an Attribution is installed by the request-log
+	// In production an Attribution is installed by the request-events
 	// round-tripper before the enforcer runs; tests that don't go
 	// through that path shouldn't crash.
 	env := newEnforcerEnv(t)

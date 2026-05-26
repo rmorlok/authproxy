@@ -14,7 +14,7 @@ import (
 
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/request_log"
+	"github.com/rmorlok/authproxy/internal/app_metrics"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -45,15 +45,15 @@ func newUpstreamEcho(t *testing.T) *upstreamEcho {
 	return e
 }
 
-// waitForLog polls the request log retriever for a record matching the
+// waitForLog polls app metrics for a request event matching the
 // connection id, up to deadline. Necessary because the round-tripper
-// persists the log in a detached goroutine.
-func waitForLog(t *testing.T, env *helpers.IntegrationTestEnv, connectionID string, deadline time.Duration) *request_log.LogRecord {
+// persists the event in a detached goroutine.
+func waitForLog(t *testing.T, env *helpers.IntegrationTestEnv, connectionID string, deadline time.Duration) *app_metrics.LogRecord {
 	t.Helper()
 	connID, err := apid.Parse(connectionID)
 	require.NoError(t, err)
 
-	store := env.DM.GetLogStorageService()
+	store := env.DM.GetAppMetricsService()
 	end := time.Now().Add(deadline)
 	for time.Now().Before(end) {
 		page := store.NewListRequestsBuilder().
@@ -70,13 +70,13 @@ func waitForLog(t *testing.T, env *helpers.IntegrationTestEnv, connectionID stri
 }
 
 // TestProxyRawBodyCapture_TeeDecision is the end-to-end version of the
-// unit-test invariants in request_log/roundtripper_test.go: the raw
+// unit-test invariants in app_metrics/roundtripper_test.go: the raw
 // /_proxy_raw path drives the same RoundTripper, so the
 // streaming/too_large/captured choice must show up on the LogRecord
 // without any per-path special-casing.
 //
 // Per-subtest cleanup builds a fresh env so each one gets its own
-// in-process state (the request log accumulates across subtests
+// in-process state (app metrics accumulate across subtests
 // otherwise).
 func TestProxyRawBodyCapture_TeeDecision(t *testing.T) {
 	connectorID := apid.MustParse("cxr_test0000000000302")
@@ -121,7 +121,7 @@ func TestProxyRawBodyCapture_TeeDecision(t *testing.T) {
 		assert.Equal(t, int64(len(body)), upstream.received.Load(), "upstream must receive the full body, not the truncated cap")
 
 		record := waitForLog(t, env, conn, 5*time.Second)
-		assert.Equal(t, request_log.BodySkippedTooLarge, record.RequestBodySkipped,
+		assert.Equal(t, app_metrics.BodySkippedTooLarge, record.RequestBodySkipped,
 			"oversized body must record too_large skip reason")
 	})
 
@@ -141,7 +141,7 @@ func TestProxyRawBodyCapture_TeeDecision(t *testing.T) {
 		assert.Equal(t, int64(len(body)), upstream.received.Load(), "upstream must receive the full body even when chunked")
 
 		record := waitForLog(t, env, conn, 5*time.Second)
-		assert.Equal(t, request_log.BodySkippedStreaming, record.RequestBodySkipped,
+		assert.Equal(t, app_metrics.BodySkippedStreaming, record.RequestBodySkipped,
 			"chunked body must record streaming skip reason")
 	})
 }

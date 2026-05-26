@@ -695,16 +695,16 @@ definitions:
           $ref: '#/definitions/routes.SwaggerRateLimitJson'
         type: array
     type: object
-  routes.SwaggerListRequestsResponse:
-    description: Paginated list of request log entries
+  routes.SwaggerListRequestEventsResponse:
+    description: Paginated list of request events entries
     properties:
       cursor:
         description: Pagination cursor for next page
         type: string
       items:
-        description: List of request log entries
+        description: List of request events entries
         items:
-          $ref: '#/definitions/routes.SwaggerRequestLogEntry'
+          $ref: '#/definitions/routes.SwaggerRequestEventsEntry'
         type: array
       total:
         description: Total count of matching records (if requested)
@@ -778,8 +778,8 @@ definitions:
         description: Last update timestamp
         type: string
     type: object
-  routes.SwaggerRequestLogEntry:
-    description: HTTP request log entry
+  routes.SwaggerRequestEventsEntry:
+    description: HTTP request events entry
     properties:
       connection_id:
         description: Connection UUID
@@ -4422,6 +4422,143 @@ paths:
       summary: Set a label for an encryption key
       tags:
       - encryption_keys
+  /metrics/request-events:
+    get:
+      consumes:
+      - application/json
+      description: List request events entries with optional filtering and pagination
+      parameters:
+      - description: Pagination cursor
+        in: query
+        name: cursor
+        type: string
+      - description: Maximum number of results to return
+        in: query
+        name: limit
+        type: integer
+      - description: Order by field (e.g., 'timestamp:desc')
+        in: query
+        name: order_by
+        type: string
+      - description: Filter by namespace
+        in: query
+        name: namespace
+        type: string
+      - description: Filter by request type
+        in: query
+        name: request_type
+        type: string
+      - description: Filter by correlation ID
+        in: query
+        name: correlation_id
+        type: string
+      - description: Filter by connection UUID
+        in: query
+        name: connection_id
+        type: string
+      - description: Filter by connector type
+        in: query
+        name: connector_type
+        type: string
+      - description: Filter by connector UUID
+        in: query
+        name: connector_id
+        type: string
+      - description: Filter by connector version
+        in: query
+        name: connector_version
+        type: integer
+      - description: Filter by HTTP method
+        in: query
+        name: method
+        type: string
+      - description: Filter by exact status code
+        in: query
+        name: status_code
+        type: integer
+      - description: Filter by status code range (e.g., '200-299')
+        in: query
+        name: status_code_range
+        type: string
+      - description: Filter by timestamp range
+        in: query
+        name: timestamp_range
+        type: string
+      - description: Filter by exact path
+        in: query
+        name: path
+        type: string
+      - description: Filter by path regex
+        in: query
+        name: path_regex
+        type: string
+      - description: Filter by label selector (e.g., 'env=prod,team=api')
+        in: query
+        name: label_selector
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerListRequestEventsResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: List request events entries
+      tags:
+      - request-events
+  /metrics/request-events/{id}:
+    get:
+      consumes:
+      - application/json
+      description: Get a specific request events entry by its UUID
+      parameters:
+      - description: Request events entry UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.SwaggerRequestEventsEntry'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get request events entry
+      tags:
+      - request-events
   /namespaces:
     get:
       consumes:
@@ -5533,143 +5670,6 @@ paths:
       summary: Set a label for a rate limit
       tags:
       - rate_limits
-  /request-log:
-    get:
-      consumes:
-      - application/json
-      description: List request log entries with optional filtering and pagination
-      parameters:
-      - description: Pagination cursor
-        in: query
-        name: cursor
-        type: string
-      - description: Maximum number of results to return
-        in: query
-        name: limit
-        type: integer
-      - description: Order by field (e.g., 'timestamp:desc')
-        in: query
-        name: order_by
-        type: string
-      - description: Filter by namespace
-        in: query
-        name: namespace
-        type: string
-      - description: Filter by request type
-        in: query
-        name: request_type
-        type: string
-      - description: Filter by correlation ID
-        in: query
-        name: correlation_id
-        type: string
-      - description: Filter by connection UUID
-        in: query
-        name: connection_id
-        type: string
-      - description: Filter by connector type
-        in: query
-        name: connector_type
-        type: string
-      - description: Filter by connector UUID
-        in: query
-        name: connector_id
-        type: string
-      - description: Filter by connector version
-        in: query
-        name: connector_version
-        type: integer
-      - description: Filter by HTTP method
-        in: query
-        name: method
-        type: string
-      - description: Filter by exact status code
-        in: query
-        name: status_code
-        type: integer
-      - description: Filter by status code range (e.g., '200-299')
-        in: query
-        name: status_code_range
-        type: string
-      - description: Filter by timestamp range
-        in: query
-        name: timestamp_range
-        type: string
-      - description: Filter by exact path
-        in: query
-        name: path
-        type: string
-      - description: Filter by path regex
-        in: query
-        name: path_regex
-        type: string
-      - description: Filter by label selector (e.g., 'env=prod,team=api')
-        in: query
-        name: label_selector
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.SwaggerListRequestsResponse'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: List request log entries
-      tags:
-      - request-log
-  /request-log/{id}:
-    get:
-      consumes:
-      - application/json
-      description: Get a specific request log entry by its UUID
-      parameters:
-      - description: Request log entry UUID
-        in: path
-        name: id
-        required: true
-        type: string
-      produces:
-      - application/json
-      responses:
-        "200":
-          description: OK
-          schema:
-            $ref: '#/definitions/routes.SwaggerRequestLogEntry'
-        "400":
-          description: Bad Request
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "401":
-          description: Unauthorized
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "404":
-          description: Not Found
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-        "500":
-          description: Internal Server Error
-          schema:
-            $ref: '#/definitions/routes.ErrorResponse'
-      security:
-      - BearerAuth: []
-      summary: Get request log entry
-      tags:
-      - request-log
   /session/_initiate:
     post:
       consumes:

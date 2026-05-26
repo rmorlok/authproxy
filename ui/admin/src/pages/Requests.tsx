@@ -11,8 +11,8 @@ import InputLabel from '@mui/material/InputLabel';
 import Select from '@mui/material/Select';
 import MenuItem from '@mui/material/MenuItem';
 import {
-    ListResponse, RequestEntryRecord,
-    RequestType, ResponseSource, ListRequestsParams, listRequests
+    ListResponse, RequestEventRecord,
+    RequestType, ResponseSource, ListRequestEventsParams, listRequestEvents
 } from '@authproxy/api';
 import { Link as RouterLink } from 'react-router-dom';
 import Link from '@mui/material/Link';
@@ -25,7 +25,7 @@ import RequestDetail from "../components/RequestDetail";
 import {useSelector} from "react-redux";
 import {selectCurrentNamespacePath} from "../store/namespacesSlice";
 
-export const columns: (GridColDef<RequestEntryRecord> & {hideInitial?: boolean})[] = [
+export const columns: (GridColDef<RequestEventRecord> & {hideInitial?: boolean})[] = [
     {
         field: 'timestamp',
         headerName: 'Timestamp',
@@ -256,7 +256,7 @@ export default function Requests() {
     const stateVals = useMemo(() => stateOptions.map(opt => opt.value), [stateOptions]);
     const ns = useSelector(selectCurrentNamespacePath);
 
-    const [rows, setRows] = useState<RequestEntryRecord[]>([]);
+    const [rows, setRows] = useState<RequestEventRecord[]>([]);
     const [rowCount, setRowCount] = useState<number>(-1);
     const [loading, setLoading] = useState<boolean>(false);
     const [error, setError] = useState<string | null>(null);
@@ -272,7 +272,7 @@ export default function Requests() {
     const [hasNextPage, setHasNextPage] = useState<boolean>(false);
 
     // Simple cache to allow going back without re-fetching
-    const responsesCacheRef = useRef<ListResponse<RequestEntryRecord>[]>([]);
+    const responsesCacheRef = useRef<ListResponse<RequestEventRecord>[]>([]);
     const pageRequestCacheRef = useRef<Set<number>>(new Set());
 
     // Handle row click with meta/ctrl key checking
@@ -341,7 +341,7 @@ export default function Requests() {
                 const thisPage = responsesCacheRef.current.length;
                 const prevResp = responsesCacheRef.current[responsesCacheRef.current.length - 1];
 
-                const params: ListRequestsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
+                const params: ListRequestEventsParams = prevResp?.cursor ? {cursor: prevResp.cursor} : {
                     namespace: ns + ".**",
                     request_type: (typeFilter as RequestType) || undefined,
                     label_selector: labelSelector || undefined,
@@ -349,7 +349,7 @@ export default function Requests() {
                     limit: pageSize,
                 };
 
-                const resp = await listRequests(params);
+                const resp = await listRequestEvents(params);
 
                 if(resp.status !== 200) {
                     setError("Failed to fetch page of results from server");

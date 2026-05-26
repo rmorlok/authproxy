@@ -63,7 +63,7 @@ func Serve(cfg config.C) {
 	dm.RegisterDatabasePing()
 	dm.RegisterRedisPing()
 	dm.RegisterAsynqClientPing()
-	dm.RegisterLogStoragePing()
+	dm.RegisterAppMetricsPing()
 	dm.RegisterPing("asynqServer", func(ctx context.Context) bool {
 		return asyncRunning && !asyncHasError
 	})

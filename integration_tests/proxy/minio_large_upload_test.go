@@ -15,7 +15,7 @@ import (
 
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/request_log"
+	"github.com/rmorlok/authproxy/internal/app_metrics"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -105,7 +105,7 @@ func TestProxyRaw_MinIOLargeUpload(t *testing.T) {
 	// declined to tee, which is the no-buffer guarantee we care
 	// about. 50 MiB ≫ the default max_request_size of 250 KiB.
 	record := waitForLog(t, env, conn, 5*time.Second)
-	assert.Equal(t, request_log.BodySkippedTooLarge, record.RequestBodySkipped,
+	assert.Equal(t, app_metrics.BodySkippedTooLarge, record.RequestBodySkipped,
 		"50 MiB upload must record too_large skip reason")
 
 	// Coarse memory check. A 50 MiB full-body buffer in the proxy

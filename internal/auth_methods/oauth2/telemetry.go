@@ -131,7 +131,7 @@ func (t *telemetry) metricsActive() bool {
 // attribute. Span attributes can carry high-cardinality identifiers (spans
 // aren't a time series — they're stored per-trace), so a per-connector id
 // is fine on spans. Operators correlate per-connector activity through
-// traces (Tempo) and the structured request log, which already indexes
+// traces (Tempo) and the structured request events, which already indexes
 // connection_id.
 //
 // Deliberately NOT used as a metric dimension. AuthProxy deployments can
