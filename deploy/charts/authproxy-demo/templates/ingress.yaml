@@ -45,42 +45,49 @@ spec:
             backend:
               service:
                 name: {{ include "authproxy-demo.authproxy.serviceName" . }}
-                port: { name: adminApi }
+                port:
+                  name: adminApi
           - path: /admin
             pathType: Prefix
             backend:
               service:
                 name: {{ include "authproxy-demo.authproxy.serviceName" . }}
-                port: { name: adminApi }
+                port:
+                  name: adminApi
           - path: /marketplace
             pathType: Prefix
             backend:
               service:
                 name: {{ include "authproxy-demo.authproxy.serviceName" . }}
-                port: { name: public }
+                port:
+                  name: public
           - path: /api
             pathType: Prefix
             backend:
               service:
                 name: {{ include "authproxy-demo.authproxy.serviceName" . }}
-                port: { name: api }
+                port:
+                  name: api
           - path: /public
             pathType: Prefix
             backend:
               service:
                 name: {{ include "authproxy-demo.authproxy.serviceName" . }}
-                port: { name: public }
+                port:
+                  name: public
           - path: /oauth2
             pathType: Prefix
             backend:
               service:
                 name: {{ include "authproxy-demo.goOauth2Server.name" . }}
-                port: { number: 80 }
+                port:
+                  number: 80
           # Demo-shell catches everything else (it's the landing page).
           - path: /
             pathType: Prefix
             backend:
               service:
                 name: {{ include "authproxy-demo.demoShell.name" . }}
-                port: { number: 80 }
+                port:
+                  number: 80
 {{- end -}}

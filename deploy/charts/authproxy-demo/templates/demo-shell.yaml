@@ -48,7 +48,9 @@ spec:
               mountPath: /etc/authproxy/demo-shell
               readOnly: true
           readinessProbe:
-            httpGet: { path: /healthz, port: http }
+            httpGet:
+              path: /healthz
+              port: http
             initialDelaySeconds: 2
             periodSeconds: 5
           resources:
