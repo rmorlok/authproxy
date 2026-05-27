@@ -78,6 +78,31 @@ definitions:
         example: 2
         type: integer
     type: object
+  github_com_rmorlok_authproxy_internal_schema_api.EncryptionKeyJson:
+    description: Encryption key API response
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      created_at:
+        type: string
+      id:
+        example: ek_test550e8400abcde
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      namespace:
+        example: root.acme
+        type: string
+      state:
+        example: active
+        type: string
+      updated_at:
+        type: string
+    type: object
   github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson:
     description: Namespace for organizing resources
     properties:
@@ -128,8 +153,6 @@ definitions:
         type: array
     type: object
   github_com_rmorlok_authproxy_internal_schema_config.KeyData:
-    type: object
-  github_com_rmorlok_authproxy_internal_schema_resources_rate_limit.RateLimit:
     type: object
   routes.ActorJson:
     description: Actor identity within a namespace
@@ -251,6 +274,7 @@ definitions:
         type: string
     type: object
   routes.CreateEncryptionKeyRequestJson:
+    description: Request to create a new encryption key
     properties:
       annotations:
         additionalProperties:
@@ -263,6 +287,7 @@ definitions:
           type: string
         type: object
       namespace:
+        example: root.acme
         type: string
     type: object
   routes.CreateNamespaceRequestJson:
@@ -279,8 +304,6 @@ definitions:
       path:
         example: root.acme
         type: string
-    type: object
-  routes.CreateRateLimitRequestJson:
     type: object
   routes.DataSourceOptionJson:
     description: Data source option for form select fields
@@ -582,6 +605,24 @@ definitions:
           type: string
         type: object
     type: object
+  routes.SwaggerCreateRateLimitRequest:
+    description: Request to create a rate limit
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      definition:
+        additionalProperties: {}
+        type: object
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      namespace:
+        example: root.acme
+        type: string
+    type: object
   routes.SwaggerDisconnectResponse:
     description: Response for disconnect operation
     properties:
@@ -593,58 +634,12 @@ definitions:
         description: Task ID for tracking the disconnect operation
         type: string
     type: object
-  routes.SwaggerDryRunContext:
-    description: Identity the request runs under
-    properties:
-      actor_id:
-        type: string
-      connection_id:
-        type: string
-      namespace:
-        type: string
-    type: object
-  routes.SwaggerDryRunMatch:
-    properties:
-      algorithm_summary:
-        example: token bucket 60 @ 1/s
-        type: string
-      bucket_key:
-        example: actor=act_abc|labels/team=acme
-        type: string
-      effective_mode:
-        example: enforce
-        type: string
-      namespace:
-        type: string
-      peek_failed:
-        type: boolean
-      rate_limit_id:
-        example: rl_test550e8400
-        type: string
-      remaining:
-        type: integer
-      retry_after_ms:
-        type: integer
-      would_allow:
-        type: boolean
-    type: object
-  routes.SwaggerDryRunNotMatched:
-    properties:
-      namespace:
-        type: string
-      rate_limit_id:
-        type: string
-      reason:
-        type: string
-    type: object
   routes.SwaggerDryRunRequest:
     description: 'Dry-run input: a proxy-shaped request + request type + the identity
       it runs under'
     properties:
-      context:
-        $ref: '#/definitions/routes.SwaggerDryRunContext'
-      request:
-        $ref: '#/definitions/routes.ProxyRequest'
+      context: {}
+      request: {}
       request_type:
         example: proxy
         type: string
@@ -653,12 +648,10 @@ definitions:
     description: Per-rule match + peek-driven would-allow result
     properties:
       matched:
-        items:
-          $ref: '#/definitions/routes.SwaggerDryRunMatch'
+        items: {}
         type: array
       not_matched:
-        items:
-          $ref: '#/definitions/routes.SwaggerDryRunNotMatched'
+        items: {}
         type: array
       request_label_snapshot:
         additionalProperties:
@@ -666,35 +659,28 @@ definitions:
         type: object
     type: object
   routes.SwaggerEncryptionKeyJson:
-    description: Encryption key configuration
+    description: Encryption key API response
     properties:
       annotations:
         additionalProperties:
           type: string
-        description: Annotations assigned to the encryption key
         type: object
       created_at:
-        description: Creation timestamp
         type: string
       id:
-        description: Encryption key ID
         example: ek_test550e8400abcde
         type: string
       labels:
         additionalProperties:
           type: string
-        description: Labels assigned to the encryption key
         type: object
       namespace:
-        description: Namespace path
-        example: acme
+        example: root.acme
         type: string
       state:
-        description: State (active, disabled)
         example: active
         type: string
       updated_at:
-        description: Last update timestamp
         type: string
     type: object
   routes.SwaggerForceConnectorVersionStateRequest:
@@ -765,24 +751,19 @@ definitions:
     description: Paginated list of encryption keys
     properties:
       cursor:
-        description: Pagination cursor for next page
         type: string
       items:
-        description: List of encryption keys
         items:
-          $ref: '#/definitions/routes.SwaggerEncryptionKeyJson'
+          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.EncryptionKeyJson'
         type: array
     type: object
   routes.SwaggerListRateLimitsResponse:
     description: Paginated list of rate limits
     properties:
       cursor:
-        description: Pagination cursor for next page
         type: string
       items:
-        description: List of rate limits
-        items:
-          $ref: '#/definitions/routes.SwaggerRateLimitJson'
+        items: {}
         type: array
     type: object
   routes.SwaggerListRequestEventsResponse:
@@ -834,35 +815,28 @@ definitions:
         type: string
     type: object
   routes.SwaggerRateLimitJson:
-    description: Rate limit configuration
+    description: Rate-limit API response
     properties:
       annotations:
         additionalProperties:
           type: string
-        description: Annotations assigned to the rate limit
         type: object
       created_at:
-        description: Creation timestamp
         type: string
       definition:
-        additionalProperties: true
-        description: JSON-serialised definition (mode, selector, bucket, algorithm)
+        additionalProperties: {}
         type: object
       id:
-        description: Rate limit ID
         example: rl_test550e8400abcde
         type: string
       labels:
         additionalProperties:
           type: string
-        description: Labels assigned to the rate limit
         type: object
       namespace:
-        description: Namespace path
-        example: acme
+        example: root.acme
         type: string
       updated_at:
-        description: Last update timestamp
         type: string
     type: object
   routes.SwaggerRequestEventsEntry:
@@ -953,6 +927,36 @@ definitions:
           type: string
         type: object
     type: object
+  routes.SwaggerUpdateEncryptionKeyRequest:
+    description: Request to update an encryption key
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      state:
+        example: disabled
+        type: string
+    type: object
+  routes.SwaggerUpdateRateLimitRequest:
+    description: Request to update a rate limit
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      definition:
+        additionalProperties: {}
+        type: object
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+    type: object
   routes.TaskInfoJson:
     properties:
       id:
@@ -984,19 +988,6 @@ definitions:
           type: string
         type: object
     type: object
-  routes.UpdateEncryptionKeyRequestJson:
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      state:
-        type: string
-    type: object
   routes.UpdateNamespaceRequestJson:
     description: Namespace update request
     properties:
@@ -1004,19 +995,6 @@ definitions:
         additionalProperties:
           type: string
         type: object
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-    type: object
-  routes.UpdateRateLimitRequestJson:
-    properties:
-      annotations:
-        additionalProperties:
-          type: string
-        type: object
-      definition:
-        $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_resources_rate_limit.RateLimit'
       labels:
         additionalProperties:
           type: string
@@ -4136,7 +4114,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.UpdateEncryptionKeyRequestJson'
+          $ref: '#/definitions/routes.SwaggerUpdateEncryptionKeyRequest'
       produces:
       - application/json
       responses:
@@ -5227,7 +5205,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.CreateRateLimitRequestJson'
+          $ref: '#/definitions/routes.SwaggerCreateRateLimitRequest'
       produces:
       - application/json
       responses:
@@ -5385,7 +5363,7 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.UpdateRateLimitRequestJson'
+          $ref: '#/definitions/routes.SwaggerUpdateRateLimitRequest'
       produces:
       - application/json
       responses:

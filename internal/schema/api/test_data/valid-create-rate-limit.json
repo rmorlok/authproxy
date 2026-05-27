@@ -1,0 +1,26 @@
+{
+  "namespace": "root.acme",
+  "definition": {
+    "mode": "enforce",
+    "selector": {
+      "methods": ["GET"],
+      "path_match": {
+        "kind": "glob",
+        "value": "/reports/*"
+      }
+    },
+    "bucket": {
+      "dimensions": ["connection"]
+    },
+    "algorithm": {
+      "sliding_window": {
+        "window": "5m",
+        "limit": 500,
+        "mode": "counter"
+      }
+    }
+  },
+  "labels": {
+    "team": "analytics"
+  }
+}

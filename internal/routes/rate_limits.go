@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
@@ -17,33 +16,20 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
-	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-type RateLimitJson struct {
-	Id          apid.ID            `json:"id"`
-	Namespace   string             `json:"namespace"`
-	Definition  rlschema.RateLimit `json:"definition"`
-	Labels      map[string]string  `json:"labels,omitempty"`
-	Annotations map[string]string  `json:"annotations,omitempty"`
-	CreatedAt   time.Time          `json:"created_at"`
-	UpdatedAt   time.Time          `json:"updated_at"`
-}
-
-type CreateRateLimitRequestJson struct {
-	Namespace   string             `json:"namespace"`
-	Definition  rlschema.RateLimit `json:"definition"`
-	Labels      map[string]string  `json:"labels,omitempty"`
-	Annotations map[string]string  `json:"annotations,omitempty"`
-}
-
-type UpdateRateLimitRequestJson struct {
-	Definition  *rlschema.RateLimit `json:"definition,omitempty"`
-	Labels      *map[string]string  `json:"labels,omitempty"`
-	Annotations *map[string]string  `json:"annotations,omitempty"`
-}
+type RateLimitJson = schemaapi.RateLimitJson
+type CreateRateLimitRequestJson = schemaapi.CreateRateLimitRequestJson
+type UpdateRateLimitRequestJson = schemaapi.UpdateRateLimitRequestJson
+type ListRateLimitsResponseJson = schemaapi.ListRateLimitsResponseJson
+type DryRunRequestJson = schemaapi.DryRunRequestJson
+type DryRunContextJson = schemaapi.DryRunContextJson
+type DryRunResponseJson = schemaapi.DryRunResponseJson
+type DryRunMatchJson = schemaapi.DryRunMatchJson
+type DryRunNotMatchedJson = schemaapi.DryRunNotMatchedJson
 
 type ListRateLimitsRequestQueryParams struct {
 	Cursor        *string `form:"cursor"`
@@ -51,11 +37,6 @@ type ListRateLimitsRequestQueryParams struct {
 	NamespaceVal  *string `form:"namespace"`
 	LabelSelector *string `form:"label_selector"`
 	OrderByVal    *string `form:"order_by"`
-}
-
-type ListRateLimitsResponseJson struct {
-	Items  []RateLimitJson `json:"items"`
-	Cursor string          `json:"cursor,omitempty"`
 }
 
 func RateLimitToJson(r coreIface.RateLimit) RateLimitJson {
@@ -78,53 +59,18 @@ type RateLimitsRoutes struct {
 	annotsAdapter key_value.Adapter[apid.ID]
 }
 
-// DryRunRequestJson is the wire shape for POST /rate-limits/_dry_run.
-// Reuses iface.ProxyRequest for the request half — same shape as the
-// real /connections/{id}/_proxy endpoint, so a future "send this for
-// real" button can hand the same payload to that endpoint without
-// reshaping. RequestType + Context live alongside since the proxy
-// path takes request_type as a sibling param, not on the request.
-type DryRunRequestJson struct {
-	Request     coreIface.ProxyRequest `json:"request"`
-	RequestType string                 `json:"request_type"`
-	Context     DryRunContextJson      `json:"context"`
-}
-
-type DryRunContextJson struct {
-	ConnectionId *apid.ID `json:"connection_id,omitempty"`
-	ActorId      *apid.ID `json:"actor_id,omitempty"`
-	Namespace    *string  `json:"namespace,omitempty"`
-}
-
-type DryRunResponseJson struct {
-	RequestLabelSnapshot map[string]string      `json:"request_label_snapshot"`
-	Matched              []DryRunMatchJson      `json:"matched"`
-	NotMatched           []DryRunNotMatchedJson `json:"not_matched"`
-}
-
-type DryRunMatchJson struct {
-	RateLimitId      apid.ID `json:"rate_limit_id"`
-	Namespace        string  `json:"namespace"`
-	EffectiveMode    string  `json:"effective_mode"`
-	BucketKey        string  `json:"bucket_key"`
-	AlgorithmSummary string  `json:"algorithm_summary"`
-	WouldAllow       bool    `json:"would_allow"`
-	Remaining        int     `json:"remaining"`
-	RetryAfterMs     int64   `json:"retry_after_ms"`
-	PeekFailed       bool    `json:"peek_failed"`
-}
-
-type DryRunNotMatchedJson struct {
-	RateLimitId apid.ID `json:"rate_limit_id"`
-	Namespace   string  `json:"namespace"`
-	Reason      string  `json:"reason"`
-}
-
-// toCore translates the wire request to the structured input the core
+// dryRunRequestToCore translates the wire request to the structured input the core
 // service consumes. Nothing here does business logic — it's just shape.
-func (r DryRunRequestJson) toCore() coreIface.DryRunRateLimitRequest {
+func dryRunRequestToCore(r DryRunRequestJson) coreIface.DryRunRateLimitRequest {
 	return coreIface.DryRunRateLimitRequest{
-		Request:     r.Request,
+		Request: coreIface.ProxyRequest{
+			URL:      r.Request.URL,
+			Method:   r.Request.Method,
+			Headers:  r.Request.Headers,
+			Labels:   r.Request.Labels,
+			BodyRaw:  r.Request.BodyRaw,
+			BodyJson: r.Request.BodyJson,
+		},
 		RequestType: r.RequestType,
 		Context: coreIface.DryRunRequestContext{
 			ConnectionId: r.Context.ConnectionId,
@@ -213,7 +159,7 @@ func (r *RateLimitsRoutes) get(gctx *gin.Context) {
 // @Tags			rate_limits
 // @Accept			json
 // @Produce		json
-// @Param			request	body		CreateRateLimitRequestJson	true	"Rate limit creation request"
+// @Param			request	body		SwaggerCreateRateLimitRequest	true	"Rate limit creation request"
 // @Success		200		{object}	SwaggerRateLimitJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
@@ -364,7 +310,7 @@ func (r *RateLimitsRoutes) list(gctx *gin.Context) {
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string							true	"Rate limit ID"
-// @Param			request	body		UpdateRateLimitRequestJson		true	"Update request"
+// @Param			request	body		SwaggerUpdateRateLimitRequest		true	"Update request"
 // @Success		200		{object}	SwaggerRateLimitJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
@@ -555,7 +501,7 @@ func (r *RateLimitsRoutes) dryRun(gctx *gin.Context) {
 		return
 	}
 
-	result, err := r.core.DryRunRateLimit(ctx, req.toCore())
+	result, err := r.core.DryRunRateLimit(ctx, dryRunRequestToCore(req))
 	if err != nil {
 		switch {
 		case errors.Is(err, core.ErrInvalidArgument):

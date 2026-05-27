@@ -5,7 +5,6 @@ import (
 	"errors"
 	"fmt"
 	"net/http"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
@@ -17,33 +16,15 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
-	cfgschema "github.com/rmorlok/authproxy/internal/schema/config"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-type EncryptionKeyJson struct {
-	Id          apid.ID                     `json:"id"`
-	Namespace   string                      `json:"namespace"`
-	State       database.EncryptionKeyState `json:"state"`
-	Labels      map[string]string           `json:"labels,omitempty"`
-	Annotations map[string]string           `json:"annotations,omitempty"`
-	CreatedAt   time.Time                   `json:"created_at"`
-	UpdatedAt   time.Time                   `json:"updated_at"`
-}
-
-type CreateEncryptionKeyRequestJson struct {
-	Namespace   string             `json:"namespace"`
-	KeyData     *cfgschema.KeyData `json:"key_data,omitempty"`
-	Labels      map[string]string  `json:"labels,omitempty"`
-	Annotations map[string]string  `json:"annotations,omitempty"`
-}
-
-type UpdateEncryptionKeyRequestJson struct {
-	State       *database.EncryptionKeyState `json:"state,omitempty"`
-	Labels      *map[string]string           `json:"labels,omitempty"`
-	Annotations *map[string]string           `json:"annotations,omitempty"`
-}
+type EncryptionKeyJson = schemaapi.EncryptionKeyJson
+type CreateEncryptionKeyRequestJson = schemaapi.CreateEncryptionKeyRequestJson
+type UpdateEncryptionKeyRequestJson = schemaapi.UpdateEncryptionKeyRequestJson
+type ListEncryptionKeysResponseJson = schemaapi.ListEncryptionKeysResponseJson
 
 type ListEncryptionKeysRequestQueryParams struct {
 	Cursor        *string                      `form:"cursor"`
@@ -54,16 +35,11 @@ type ListEncryptionKeysRequestQueryParams struct {
 	OrderByVal    *string                      `form:"order_by"`
 }
 
-type ListEncryptionKeysResponseJson struct {
-	Items  []EncryptionKeyJson `json:"items"`
-	Cursor string              `json:"cursor,omitempty"`
-}
-
 func EncryptionKeyToJson(ek coreIface.EncryptionKey) EncryptionKeyJson {
 	return EncryptionKeyJson{
 		Id:          ek.GetId(),
 		Namespace:   ek.GetNamespace(),
-		State:       ek.GetState(),
+		State:       schemaapi.EncryptionKeyState(ek.GetState()),
 		Labels:      ek.GetLabels(),
 		Annotations: ek.GetAnnotations(),
 		CreatedAt:   ek.GetCreatedAt(),
@@ -289,7 +265,7 @@ func (r *EncryptionKeysRoutes) list(gctx *gin.Context) {
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string								true	"Encryption key ID"
-// @Param			request	body		UpdateEncryptionKeyRequestJson		true	"Update request"
+// @Param			request	body		SwaggerUpdateEncryptionKeyRequest		true	"Update request"
 // @Success		200		{object}	SwaggerEncryptionKeyJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
@@ -317,7 +293,7 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 	}
 
 	// Validate state if provided
-	if req.State != nil && !database.IsValidEncryptionKeyState(*req.State) {
+	if req.State != nil && !database.IsValidEncryptionKeyState(string(*req.State)) {
 		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid state '%s'", *req.State))
 		val.MarkErrorReturn()
 		return
@@ -361,7 +337,7 @@ func (r *EncryptionKeysRoutes) update(gctx *gin.Context) {
 	}
 
 	if req.State != nil {
-		err = r.core.SetEncryptionKeyState(ctx, id, *req.State)
+		err = r.core.SetEncryptionKeyState(ctx, id, database.EncryptionKeyState(*req.State))
 		if err != nil {
 			if errors.Is(err, core.ErrNotFound) {
 				apgin.WriteError(gctx, nil, httperr.NotFound(fmt.Sprintf("encryption key '%s' not found", id), httperr.WithInternalErr(err)))

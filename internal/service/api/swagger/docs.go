@@ -4783,7 +4783,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.UpdateEncryptionKeyRequestJson"
+                            "$ref": "#/definitions/routes.SwaggerUpdateEncryptionKeyRequest"
                         }
                     }
                 ],
@@ -6469,7 +6469,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.CreateRateLimitRequestJson"
+                            "$ref": "#/definitions/routes.SwaggerCreateRateLimitRequest"
                         }
                     }
                 ],
@@ -6711,7 +6711,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.UpdateRateLimitRequestJson"
+                            "$ref": "#/definitions/routes.SwaggerUpdateRateLimitRequest"
                         }
                     }
                 ],
@@ -7538,6 +7538,42 @@ const docTemplateApi = `{
                 }
             }
         },
+        "github_com_rmorlok_authproxy_internal_schema_api.EncryptionKeyJson": {
+            "description": "Encryption key API response",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "ek_test550e8400abcde"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "active"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson": {
             "description": "Namespace for organizing resources",
             "type": "object",
@@ -7609,9 +7645,6 @@ const docTemplateApi = `{
             }
         },
         "github_com_rmorlok_authproxy_internal_schema_config.KeyData": {
-            "type": "object"
-        },
-        "github_com_rmorlok_authproxy_internal_schema_resources_rate_limit.RateLimit": {
             "type": "object"
         },
         "routes.ActorJson": {
@@ -7779,6 +7812,7 @@ const docTemplateApi = `{
             }
         },
         "routes.CreateEncryptionKeyRequestJson": {
+            "description": "Request to create a new encryption key",
             "type": "object",
             "properties": {
                 "annotations": {
@@ -7797,7 +7831,8 @@ const docTemplateApi = `{
                     }
                 },
                 "namespace": {
-                    "type": "string"
+                    "type": "string",
+                    "example": "root.acme"
                 }
             }
         },
@@ -7822,9 +7857,6 @@ const docTemplateApi = `{
                     "example": "root.acme"
                 }
             }
-        },
-        "routes.CreateRateLimitRequestJson": {
-            "type": "object"
         },
         "routes.DataSourceOptionJson": {
             "description": "Data source option for form select fields",
@@ -8230,6 +8262,32 @@ const docTemplateApi = `{
                 }
             }
         },
+        "routes.SwaggerCreateRateLimitRequest": {
+            "description": "Request to create a rate limit",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "definition": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                }
+            }
+        },
         "routes.SwaggerDisconnectResponse": {
             "description": "Response for disconnect operation",
             "type": "object",
@@ -8248,81 +8306,12 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerDryRunContext": {
-            "description": "Identity the request runs under",
-            "type": "object",
-            "properties": {
-                "actor_id": {
-                    "type": "string"
-                },
-                "connection_id": {
-                    "type": "string"
-                },
-                "namespace": {
-                    "type": "string"
-                }
-            }
-        },
-        "routes.SwaggerDryRunMatch": {
-            "type": "object",
-            "properties": {
-                "algorithm_summary": {
-                    "type": "string",
-                    "example": "token bucket 60 @ 1/s"
-                },
-                "bucket_key": {
-                    "type": "string",
-                    "example": "actor=act_abc|labels/team=acme"
-                },
-                "effective_mode": {
-                    "type": "string",
-                    "example": "enforce"
-                },
-                "namespace": {
-                    "type": "string"
-                },
-                "peek_failed": {
-                    "type": "boolean"
-                },
-                "rate_limit_id": {
-                    "type": "string",
-                    "example": "rl_test550e8400"
-                },
-                "remaining": {
-                    "type": "integer"
-                },
-                "retry_after_ms": {
-                    "type": "integer"
-                },
-                "would_allow": {
-                    "type": "boolean"
-                }
-            }
-        },
-        "routes.SwaggerDryRunNotMatched": {
-            "type": "object",
-            "properties": {
-                "namespace": {
-                    "type": "string"
-                },
-                "rate_limit_id": {
-                    "type": "string"
-                },
-                "reason": {
-                    "type": "string"
-                }
-            }
-        },
         "routes.SwaggerDryRunRequest": {
             "description": "Dry-run input: a proxy-shaped request + request type + the identity it runs under",
             "type": "object",
             "properties": {
-                "context": {
-                    "$ref": "#/definitions/routes.SwaggerDryRunContext"
-                },
-                "request": {
-                    "$ref": "#/definitions/routes.ProxyRequest"
-                },
+                "context": {},
+                "request": {},
                 "request_type": {
                     "type": "string",
                     "example": "proxy"
@@ -8335,15 +8324,11 @@ const docTemplateApi = `{
             "properties": {
                 "matched": {
                     "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/routes.SwaggerDryRunMatch"
-                    }
+                    "items": {}
                 },
                 "not_matched": {
                     "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/routes.SwaggerDryRunNotMatched"
-                    }
+                    "items": {}
                 },
                 "request_label_snapshot": {
                     "type": "object",
@@ -8354,44 +8339,37 @@ const docTemplateApi = `{
             }
         },
         "routes.SwaggerEncryptionKeyJson": {
-            "description": "Encryption key configuration",
+            "description": "Encryption key API response",
             "type": "object",
             "properties": {
                 "annotations": {
-                    "description": "Annotations assigned to the encryption key",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
                 "created_at": {
-                    "description": "Creation timestamp",
                     "type": "string"
                 },
                 "id": {
-                    "description": "Encryption key ID",
                     "type": "string",
                     "example": "ek_test550e8400abcde"
                 },
                 "labels": {
-                    "description": "Labels assigned to the encryption key",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
                 "namespace": {
-                    "description": "Namespace path",
                     "type": "string",
-                    "example": "acme"
+                    "example": "root.acme"
                 },
                 "state": {
-                    "description": "State (active, disabled)",
                     "type": "string",
                     "example": "active"
                 },
                 "updated_at": {
-                    "description": "Last update timestamp",
                     "type": "string"
                 }
             }
@@ -8488,14 +8466,12 @@ const docTemplateApi = `{
             "type": "object",
             "properties": {
                 "cursor": {
-                    "description": "Pagination cursor for next page",
                     "type": "string"
                 },
                 "items": {
-                    "description": "List of encryption keys",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/routes.SwaggerEncryptionKeyJson"
+                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.EncryptionKeyJson"
                     }
                 }
             }
@@ -8505,15 +8481,11 @@ const docTemplateApi = `{
             "type": "object",
             "properties": {
                 "cursor": {
-                    "description": "Pagination cursor for next page",
                     "type": "string"
                 },
                 "items": {
-                    "description": "List of rate limits",
                     "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/routes.SwaggerRateLimitJson"
-                    }
+                    "items": {}
                 }
             }
         },
@@ -8586,44 +8558,37 @@ const docTemplateApi = `{
             }
         },
         "routes.SwaggerRateLimitJson": {
-            "description": "Rate limit configuration",
+            "description": "Rate-limit API response",
             "type": "object",
             "properties": {
                 "annotations": {
-                    "description": "Annotations assigned to the rate limit",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
                 "created_at": {
-                    "description": "Creation timestamp",
                     "type": "string"
                 },
                 "definition": {
-                    "description": "JSON-serialised definition (mode, selector, bucket, algorithm)",
                     "type": "object",
-                    "additionalProperties": true
+                    "additionalProperties": {}
                 },
                 "id": {
-                    "description": "Rate limit ID",
                     "type": "string",
                     "example": "rl_test550e8400abcde"
                 },
                 "labels": {
-                    "description": "Labels assigned to the rate limit",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
                 "namespace": {
-                    "description": "Namespace path",
                     "type": "string",
-                    "example": "acme"
+                    "example": "root.acme"
                 },
                 "updated_at": {
-                    "description": "Last update timestamp",
                     "type": "string"
                 }
             }
@@ -8745,6 +8710,50 @@ const docTemplateApi = `{
                 }
             }
         },
+        "routes.SwaggerUpdateEncryptionKeyRequest": {
+            "description": "Request to update an encryption key",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "state": {
+                    "type": "string",
+                    "example": "disabled"
+                }
+            }
+        },
+        "routes.SwaggerUpdateRateLimitRequest": {
+            "description": "Request to update a rate limit",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "definition": {
+                    "type": "object",
+                    "additionalProperties": {}
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
         "routes.TaskInfoJson": {
             "type": "object",
             "properties": {
@@ -8791,26 +8800,6 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.UpdateEncryptionKeyRequestJson": {
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "state": {
-                    "type": "string"
-                }
-            }
-        },
         "routes.UpdateNamespaceRequestJson": {
             "description": "Namespace update request",
             "type": "object",
@@ -8820,26 +8809,6 @@ const docTemplateApi = `{
                     "additionalProperties": {
                         "type": "string"
                     }
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "routes.UpdateRateLimitRequestJson": {
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "definition": {
-                    "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_resources_rate_limit.RateLimit"
                 },
                 "labels": {
                     "type": "object",
