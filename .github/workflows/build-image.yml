@@ -19,12 +19,24 @@ concurrency:
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository_owner }}/authproxy
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
     timeout-minutes: 60
+
+    strategy:
+      # Don't cancel one image's build if the other fails — both images
+      # share the same shape and one breaking shouldn't keep the other
+      # from publishing.
+      fail-fast: false
+      matrix:
+        image:
+          - name: authproxy
+            dockerfile: Dockerfile
+          - name: authproxy-demo-shell
+            dockerfile: demos/shell/Dockerfile
+
     steps:
       - uses: actions/checkout@v4
 
@@ -46,7 +58,7 @@ jobs:
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/${{ matrix.image.name }}
           tags: |
             type=ref,event=branch
             type=ref,event=pr,prefix=pr-
@@ -59,6 +71,7 @@ jobs:
         uses: docker/build-push-action@v6
         with:
           context: .
+          file: ${{ matrix.image.dockerfile }}
           # arm64 builds run under QEMU emulation on GH-hosted amd64 runners,
           # which is ~5x slower than native — fine for the merge/tag path
           # where we ship the multi-arch manifest, but it pushes PR builds
@@ -67,5 +80,7 @@ jobs:
           push: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
           tags: ${{ steps.meta.outputs.tags }}
           labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+          # Separate cache scopes per image — otherwise two builds in the
+          # same workflow stomp each other's layers.
+          cache-from: type=gha,scope=${{ matrix.image.name }}
+          cache-to: type=gha,scope=${{ matrix.image.name }},mode=max

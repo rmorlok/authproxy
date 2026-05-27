@@ -265,6 +265,12 @@ func (r *clickhouseRecordRetriever) ListRequestsFromCursor(ctx context.Context, 
 	return b.fromCursor(ctx, cursor)
 }
 
+func (r *clickhouseRecordRetriever) QueryRequestEventMetrics(ctx context.Context, queries []RequestEventMetricsQuery) ([]RequestEventMetricSeries, error) {
+	return executeRequestEventMetricsQueries(ctx, queries, func(ctx context.Context, query RequestEventMetricsQuery) ([]*LogRecord, error) {
+		return fetchRequestEventMetricRecords(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, query)
+	})
+}
+
 var _ RecordRetriever = (*clickhouseRecordRetriever)(nil)
 
 // --- ClickHouse ListRequestBuilder (wraps SQL builder) ---

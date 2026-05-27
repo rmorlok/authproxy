@@ -92,6 +92,29 @@ you're redirected to the AuthProxy admin UI as `demo-admin` with a fresh
 session. Pick `fresh-user` + Marketplace → empty marketplace, no
 connections.
 
+## Local smoke via docker-compose
+
+Self-contained recipe that pulls `authproxy` + `authproxy-demo-shell`
+from GHCR — no local Go / Node toolchain required.
+
+```bash
+cd demos/shell/compose
+./init-keys.sh         # one-time keypair generation into ./keys/
+docker compose up
+open http://localhost:8888
+```
+
+The recipe wires:
+- `authproxy:main` (postgres + redis + AuthProxy) on ports 8080/8081/8082
+- `authproxy-demo-shell:main` on port 8888, mounting the generated
+  private key + pointing at the host-mapped AuthProxy URLs
+
+`./keys/demo-shell.pub` is bind-mounted into AuthProxy's actors directory
+so `dev_config/docker.yaml`'s `keys_path` picks it up and registers
+`demo-shell` as an admin actor. The smoke recipe lives entirely under
+`demos/shell/compose/` — pin to a non-`:main` image via
+`IMAGE_TAG=pr-NNN docker compose up` when testing branches.
+
 ## Configuration reference
 
 The backend reads the following env vars:
