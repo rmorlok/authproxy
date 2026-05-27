@@ -27,8 +27,11 @@ demoShell:
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
-    requests: { cpu: 10m, memory: 32Mi }
-    limits:   { memory: 128Mi }
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
   # -- Container port the backend listens on (matches PORT env, default 8888).
   port: 8888
 
@@ -41,8 +44,11 @@ goOauth2Server:
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
-    requests: { cpu: 10m, memory: 32Mi }
-    limits:   { memory: 128Mi }
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
   # -- Container port the upstream image listens on.
   port: 8080
 
