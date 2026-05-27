@@ -25,7 +25,7 @@ func TestRetryConnectionSetup(t *testing.T) {
 				},
 			},
 		})
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		step := cschema.MustNewSetupStep("tenant")
 		conn.SetupStep = &step
 		conn.s.encrypt = encrypt.NewFakeEncryptService(false)
 
@@ -72,7 +72,7 @@ func TestRetryConnectionSetup(t *testing.T) {
 		}, nil).AnyTimes()
 
 		db.EXPECT().SetConnectionSetupError(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0))).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep("tenant"))).Return(nil)
 
 		resp, err := conn.s.RetryConnectionSetup(context.Background(), conn.Id, "")
 		require.NoError(t, err)
@@ -110,7 +110,7 @@ func TestRetryConnectionSetup(t *testing.T) {
 		}, nil).AnyTimes()
 
 		db.EXPECT().SetConnectionSetupError(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0))).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep("tenant"))).Return(nil)
 
 		resp, err := conn.s.RetryConnectionSetup(context.Background(), conn.Id, "")
 		require.NoError(t, err)

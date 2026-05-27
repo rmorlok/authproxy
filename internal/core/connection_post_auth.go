@@ -32,9 +32,9 @@ func (c *connection) HandleCredentialsEstablished(ctx context.Context) (iface.Po
 	}
 
 	if connectorDef.SetupFlow.HasConfigure() {
-		first := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0)
+		first := cschema.MustNewSetupStep(connectorDef.SetupFlow.Configure.Steps[0].Id)
 		if err := c.SetSetupStep(ctx, &first); err != nil {
-			return iface.PostAuthOutcome{}, fmt.Errorf("failed to set setup step to configure:0: %w", err)
+			return iface.PostAuthOutcome{}, fmt.Errorf("failed to set setup step to first configure step: %w", err)
 		}
 		return iface.PostAuthOutcome{SetupPending: true}, nil
 	}

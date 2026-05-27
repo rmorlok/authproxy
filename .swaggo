@@ -1,0 +1,4 @@
+// The API DTOs use the full connector resource type at runtime, but Swagger
+// should document connector definitions as opaque objects instead of walking
+// the full connector config graph.
+replace github.com/rmorlok/authproxy/internal/schema/resources/connectors.Connector interface{}

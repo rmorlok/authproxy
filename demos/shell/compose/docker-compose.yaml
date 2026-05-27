@@ -1,0 +1,63 @@
+# Local smoke recipe for demos/shell.
+#
+#   ./init-keys.sh         # one-time keypair generation (into ./keys/)
+#   docker compose up
+#   open http://localhost:8888
+#
+# Pulls the pre-built `authproxy` + `authproxy-demo-shell` images from
+# GHCR. To exercise an unpublished image (e.g. testing your own
+# branch's build), set IMAGE_TAG=pr-NNN in the environment and re-run.
+
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: authproxy
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  redis:
+    image: redis:7-alpine
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  authproxy:
+    image: ghcr.io/rmorlok/authproxy:${IMAGE_TAG:-main}
+    pull_policy: always
+    ports:
+      - "8080:8080"   # marketplace + public service
+      - "8081:8081"   # api
+      - "8082:8082"   # admin UI + admin api
+    volumes:
+      # Mount the demo-shell's public key into AuthProxy's actors
+      # directory so dev_config/docker.yaml's `keys_path: ...keys/admin`
+      # picks it up and registers `demo-shell` as an admin actor.
+      - ./keys/demo-shell.pub:/app/dev_config/keys/admin/demo-shell.pub:ro
+    depends_on:
+      postgres: { condition: service_healthy }
+      redis:    { condition: service_healthy }
+
+  demo-shell:
+    image: ghcr.io/rmorlok/authproxy-demo-shell:${IMAGE_TAG:-main}
+    pull_policy: always
+    ports:
+      - "8888:8888"
+    environment:
+      ADMIN_USERNAME: demo-shell
+      ADMIN_PRIVATE_KEY_PATH: /keys/demo-shell
+      # URLs the BROWSER reaches — must be host-mapped, not container DNS.
+      AUTHPROXY_AUTH_URL: http://localhost:8080
+      AUTHPROXY_MARKETPLACE_URL: http://localhost:8080
+      AUTHPROXY_ADMIN_UI_URL: http://localhost:8082
+    volumes:
+      - ./keys/demo-shell:/keys/demo-shell:ro
+    depends_on:
+      authproxy: { condition: service_started }

@@ -9,7 +9,6 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
-	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 // GetDataSource fetches data from an external API through the connection's authenticated proxy,
@@ -20,13 +19,13 @@ func (c *connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 		return nil, httperr.BadRequest("connection has no active setup step")
 	}
 
-	if setupStep.Phase() != cschema.SetupPhaseConfigure {
-		return nil, httperr.BadRequest("data sources are only available during configure steps")
-	}
-
 	connector := c.cv.GetDefinition()
 	if connector == nil || connector.SetupFlow == nil {
 		return nil, httperr.BadRequest("connector has no setup flow")
+	}
+
+	if !connector.SetupFlow.IsConfigureStep(*setupStep) {
+		return nil, httperr.BadRequest("data sources are only available during configure steps")
 	}
 
 	step, _, err := connector.SetupFlow.GetStepBySetupStep(*setupStep)

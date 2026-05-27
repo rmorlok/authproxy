@@ -31,7 +31,10 @@ func loadSchema(t *testing.T, c *jsonschemav5.Compiler, path string) string {
 func compileRefSchema(t *testing.T, ref string) *jsonschemav5.Schema {
 	c := jsonschemav5.NewCompiler()
 
+	_ = loadSchema(t, c, "../common/schema.json")
 	_ = loadSchema(t, c, "../resources/namespace/schema.json")
+	_ = loadSchema(t, c, "../resources/connectors/schema-oauth.json")
+	_ = loadSchema(t, c, "../resources/connectors/schema.json")
 	sid := loadSchema(t, c, "./schema.json")
 	require.Equal(t, SchemaIdAPI, sid)
 
@@ -72,6 +75,13 @@ func TestSchemaSamples(t *testing.T) {
 		{name: "update actor", ref: "./schema.json#/$defs/UpdateActorRequest", file: "valid-update-actor.json"},
 		{name: "list actors", ref: "./schema.json#/$defs/ListActorsResponse", file: "valid-list-actors.json"},
 		{name: "metrics query", ref: "./schema.json#/$defs/MetricsQueryRequest", file: "valid-metrics-query.json"},
+		{name: "connector", ref: "./schema.json#/$defs/Connector", file: "valid-connector.json"},
+		{name: "list connectors", ref: "./schema.json#/$defs/ListConnectorsResponse", file: "valid-list-connectors.json"},
+		{name: "connector version", ref: "./schema.json#/$defs/ConnectorVersion", file: "valid-connector-version.json"},
+		{name: "list connector versions", ref: "./schema.json#/$defs/ListConnectorVersionsResponse", file: "valid-list-connector-versions.json"},
+		{name: "create connector", ref: "./schema.json#/$defs/CreateConnectorRequest", file: "valid-create-connector.json"},
+		{name: "update connector", ref: "./schema.json#/$defs/UpdateConnectorRequest", file: "valid-update-connector.json"},
+		{name: "create connector version", ref: "./schema.json#/$defs/CreateConnectorVersionRequest", file: "valid-create-connector-version.json"},
 	}
 
 	for _, tt := range tests {

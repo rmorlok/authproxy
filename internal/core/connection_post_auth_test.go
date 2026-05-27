@@ -34,7 +34,7 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 		assert.Equal(t, cschema.SetupStepVerify, *conn.GetSetupStep())
 	})
 
-	t.Run("enters configure:0 when connector has configure but no probes", func(t *testing.T) {
+	t.Run("enters first configure when connector has configure but no probes", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -46,13 +46,13 @@ func TestHandleCredentialsEstablished(t *testing.T) {
 			},
 		})
 
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0))).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep("workspace"))).Return(nil)
 
 		outcome, err := conn.HandleCredentialsEstablished(context.Background())
 		require.NoError(t, err)
 		assert.True(t, outcome.SetupPending)
 		require.NotNil(t, conn.GetSetupStep())
-		assert.Equal(t, "configure:0", conn.GetSetupStep().String())
+		assert.Equal(t, "workspace", conn.GetSetupStep().String())
 	})
 
 	t.Run("clears setup step and marks ready when connector has neither probes nor configure", func(t *testing.T) {

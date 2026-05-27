@@ -52,7 +52,7 @@ func TestGetDataSource(t *testing.T) {
 				},
 			},
 		})
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		step := cschema.MustNewSetupStep("tenant")
 		conn.SetupStep = &step
 
 		_, err := conn.GetDataSource(context.Background(), "some_source")
@@ -84,7 +84,7 @@ func TestGetDataSource(t *testing.T) {
 		defer ctrl.Finish()
 
 		conn, _ := newTestConnectionWithSetupFlow(t, ctrl, nil)
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0)
+		step := cschema.MustNewSetupStep("workspace")
 		conn.SetupStep = &step
 
 		_, err := conn.GetDataSource(context.Background(), "workspaces")
@@ -111,7 +111,7 @@ func TestGetDataSource(t *testing.T) {
 				},
 			},
 		})
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0)
+		step := cschema.MustNewSetupStep("workspace")
 		conn.SetupStep = &step
 
 		_, err := conn.GetDataSource(context.Background(), "nonexistent")
@@ -143,7 +143,7 @@ func TestGetDataSource(t *testing.T) {
 				},
 			},
 		})
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0)
+		step := cschema.MustNewSetupStep("workspace")
 		conn.SetupStep = &step
 
 		_, err := conn.GetDataSource(context.Background(), "workspaces")

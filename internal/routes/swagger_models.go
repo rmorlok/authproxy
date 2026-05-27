@@ -5,6 +5,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
+	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 )
 
 // ErrorResponse is the standardized error response format for authproxy API errors.
@@ -24,6 +25,13 @@ type ConnectionSetupComplete = schemaapi.ConnectionSetupComplete
 type SubmitConnectionRequest = schemaapi.SubmitConnectionRequest
 type DataSourceOptionJson = schemaapi.DataSourceOptionJson
 type SwaggerNamespaceJson = schemaapi.NamespaceJson
+type SwaggerConnectorJson = schemaapi.ConnectorJson
+type SwaggerListConnectorsResponse = schemaapiopenapi.ListConnectorsResponseJson
+type SwaggerConnectorVersionJson = schemaapiopenapi.ConnectorVersionJson
+type SwaggerListConnectorVersionsResponse = schemaapiopenapi.ListConnectorVersionsResponseJson
+type SwaggerCreateConnectorRequest = schemaapiopenapi.CreateConnectorRequestJson
+type SwaggerUpdateConnectorRequest = schemaapiopenapi.UpdateConnectorRequestJson
+type SwaggerCreateConnectorVersionRequest = schemaapiopenapi.CreateConnectorVersionRequestJson
 
 // ProxyRequest represents a request to proxy through a connection.
 //
@@ -74,44 +82,11 @@ type SwaggerConnectionJson struct {
 	// Operational health signal (healthy, unhealthy). Distinct from State: a Ready connection
 	// whose credentials have stopped working flips to unhealthy without changing State.
 	HealthState string `json:"health_state" example:"healthy"`
-	// Current setup step if connection setup is in progress
-	SetupStep *string `json:"setup_step,omitempty" example:"preconnect:0"`
+	// Current setup step if connection setup is in progress. Either a user-authored step id from
+	// the connector definition or an apxy:* pseudo-step (e.g. apxy:verify, apxy:auth_failed).
+	SetupStep *string `json:"setup_step_id,omitempty" example:"tenant"`
 	// Connector information
 	Connector SwaggerConnectorJson `json:"connector"`
-	// Creation timestamp
-	CreatedAt time.Time `json:"created_at"`
-	// Last update timestamp
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// SwaggerConnectorJson is a simplified connector model for swagger documentation
-//
-//	@Description	Connector definition for external service integration
-type SwaggerConnectorJson struct {
-	// Connector UUID
-	Id apid.ID `swaggertype:"string" json:"id" example:"req_test550e8400abcde"`
-	// Connector version number
-	Version uint64 `json:"version" example:"1"`
-	// Namespace path
-	Namespace string `json:"namespace" example:"acme"`
-	// State (draft, active, deprecated, archived)
-	State string `json:"state" example:"active"`
-	// Display name
-	DisplayName string `json:"display_name" example:"Salesforce"`
-	// Short highlight text
-	Highlight string `json:"highlight,omitempty" example:"CRM platform"`
-	// Full description
-	Description string `json:"description" example:"Salesforce CRM integration"`
-	// Status page URL for tracking 3rd party outages
-	StatusPageUrl string `json:"status_page_url,omitempty" example:"https://status.salesforce.com"`
-	// Logo URL
-	Logo string `json:"logo,omitempty" example:"https://example.com/logo.png"`
-	// Whether the connector defines configure setup steps (controls reconfigure availability)
-	HasConfigure bool `json:"has_configure" example:"false"`
-	// Labels assigned to the connector
-	Labels map[string]string `json:"labels,omitempty"`
-	// Annotations assigned to the connector
-	Annotations map[string]string `json:"annotations,omitempty"`
 	// Creation timestamp
 	CreatedAt time.Time `json:"created_at"`
 	// Last update timestamp
@@ -172,50 +147,6 @@ type SwaggerDisconnectResponse struct {
 	TaskId string `json:"task_id"`
 	// Connection being disconnected
 	Connection SwaggerConnectionJson `json:"connection"`
-}
-
-// SwaggerListConnectorsResponse is the response for list connectors
-//
-//	@Description	Paginated list of connectors
-type SwaggerListConnectorsResponse struct {
-	// List of connectors
-	Items []SwaggerConnectorJson `json:"items"`
-	// Pagination cursor for next page
-	Cursor string `json:"cursor,omitempty"`
-}
-
-// SwaggerConnectorVersionJson is the detailed connector version
-//
-//	@Description	Detailed connector version information
-type SwaggerConnectorVersionJson struct {
-	// Connector UUID
-	Id apid.ID `swaggertype:"string" json:"id" example:"req_test550e8400abcde"`
-	// Connector version number
-	Version uint64 `json:"version" example:"1"`
-	// Namespace path
-	Namespace string `json:"namespace" example:"acme"`
-	// State (draft, active, deprecated, archived)
-	State string `json:"state" example:"active"`
-	// Connector definition (full schema)
-	Definition interface{} `json:"definition"`
-	// Labels assigned to the connector
-	Labels map[string]string `json:"labels,omitempty"`
-	// Annotations assigned to the connector version
-	Annotations map[string]string `json:"annotations,omitempty"`
-	// Creation timestamp
-	CreatedAt time.Time `json:"created_at"`
-	// Last update timestamp
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
-// SwaggerListConnectorVersionsResponse is the response for list connector versions
-//
-//	@Description	Paginated list of connector versions
-type SwaggerListConnectorVersionsResponse struct {
-	// List of connector versions
-	Items []SwaggerConnectorVersionJson `json:"items"`
-	// Pagination cursor for next page
-	Cursor string `json:"cursor,omitempty"`
 }
 
 // SwaggerEncryptionKeyJson is a simplified encryption key model for swagger documentation
@@ -336,44 +267,6 @@ type SwaggerListRequestEventsResponse struct {
 	Cursor string `json:"cursor,omitempty"`
 	// Total count of matching records (if requested)
 	Total *int64 `json:"total,omitempty"`
-}
-
-// SwaggerCreateConnectorRequest is the request to create a new connector
-//
-//	@Description	Request to create a new connector
-type SwaggerCreateConnectorRequest struct {
-	// Namespace path for the connector
-	Namespace string `json:"namespace" example:"acme"`
-	// Connector definition (full schema)
-	Definition interface{} `json:"definition"`
-	// Labels to set on the connector
-	Labels map[string]string `json:"labels,omitempty"`
-	// Annotations to set on the connector
-	Annotations map[string]string `json:"annotations,omitempty"`
-}
-
-// SwaggerUpdateConnectorRequest is the request to update a connector or connector version
-//
-//	@Description	Request to update a connector or connector version
-type SwaggerUpdateConnectorRequest struct {
-	// Connector definition (full schema, optional - nil keeps existing)
-	Definition interface{} `json:"definition,omitempty"`
-	// Labels to set on the connector (optional - nil keeps existing)
-	Labels *map[string]string `json:"labels,omitempty"`
-	// Annotations to set on the connector (optional - nil keeps existing)
-	Annotations *map[string]string `json:"annotations,omitempty"`
-}
-
-// SwaggerCreateConnectorVersionRequest is the request to create a new connector version
-//
-//	@Description	Request to create a new draft connector version
-type SwaggerCreateConnectorVersionRequest struct {
-	// Connector definition (optional - nil copies from latest version)
-	Definition interface{} `json:"definition,omitempty"`
-	// Labels to set on the new version (optional - nil copies from latest)
-	Labels *map[string]string `json:"labels,omitempty"`
-	// Annotations to set on the new version (optional - nil copies from latest)
-	Annotations *map[string]string `json:"annotations,omitempty"`
 }
 
 // SwaggerForceStateRequest is the request to force a connection state

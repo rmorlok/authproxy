@@ -288,7 +288,7 @@ export const connectionsSlice = createSlice({
                 if (idx !== -1) {
                     state.items[idx] = {
                         ...state.items[idx],
-                        setup_step: undefined,
+                        setup_step_id: undefined,
                         setup_error: undefined,
                     };
                 }

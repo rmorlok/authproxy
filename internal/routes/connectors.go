@@ -5,7 +5,6 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
-	"time"
 
 	"github.com/gin-gonic/gin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
@@ -17,36 +16,25 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-type ConnectorJson struct {
-	Id            apid.ID                        `json:"id" swaggertype:"string"`
-	Version       uint64                         `json:"version"`
-	Namespace     string                         `json:"namespace"`
-	State         database.ConnectorVersionState `json:"state"`
-	DisplayName   string                         `json:"display_name"`
-	Highlight     string                         `json:"highlight,omitempty"`
-	Description   string                         `json:"description"`
-	StatusPageUrl string                         `json:"status_page_url,omitempty"`
-	Logo          string                         `json:"logo"`
-	HasConfigure  bool                           `json:"has_configure"`
-	Labels        map[string]string              `json:"labels,omitempty"`
-	Annotations   map[string]string              `json:"annotations,omitempty"`
-	CreatedAt     time.Time                      `json:"created_at"`
-	UpdatedAt     time.Time                      `json:"updated_at"`
-
-	Versions int64                           `json:"versions,omitempty"`
-	States   database.ConnectorVersionStates `json:"states,omitempty"`
-}
+type ConnectorJson = schemaapi.ConnectorJson
+type ListConnectorsResponseJson = schemaapi.ListConnectorsResponseJson
+type ConnectorVersionJson = schemaapi.ConnectorVersionJson
+type ListConnectorVersionsResponseJson = schemaapi.ListConnectorVersionsResponseJson
+type CreateConnectorRequestJson = schemaapi.CreateConnectorRequestJson
+type UpdateConnectorRequestJson = schemaapi.UpdateConnectorRequestJson
+type CreateConnectorVersionRequestJson = schemaapi.CreateConnectorVersionRequestJson
 
 func ConnectorToJson(c connIface.Connector) ConnectorJson {
 	result := ConnectorVersionToConnectorJson(c)
 	result.Versions = c.GetTotalVersions()
-	result.States = c.GetStates()
+	result.States = connectorVersionStatesToAPI(c.GetStates())
 	return result
 }
 
@@ -61,7 +49,7 @@ func ConnectorVersionToConnectorJson(cv connIface.ConnectorVersion) ConnectorJso
 		Id:            cv.GetId(),
 		Version:       cv.GetVersion(),
 		Namespace:     cv.GetNamespace(),
-		State:         cv.GetState(),
+		State:         schemaapi.ConnectorVersionState(cv.GetState()),
 		Highlight:     def.Highlight,
 		DisplayName:   def.DisplayName,
 		Description:   def.Description,
@@ -84,23 +72,6 @@ type ListConnectorsRequestQueryParams struct {
 	OrderByVal    *string                         `form:"order_by"`
 }
 
-type ListConnectorsResponseJson struct {
-	Items  []ConnectorJson `json:"items"`
-	Cursor string          `json:"cursor,omitempty"`
-}
-
-type ConnectorVersionJson struct {
-	Id          apid.ID                        `json:"id" swaggertype:"string"`
-	Version     uint64                         `json:"version"`
-	Namespace   string                         `json:"namespace"`
-	State       database.ConnectorVersionState `json:"state"`
-	Definition  cschema.Connector              `json:"definition"`
-	Labels      map[string]string              `json:"labels,omitempty"`
-	Annotations map[string]string              `json:"annotations,omitempty"`
-	CreatedAt   time.Time                      `json:"created_at"`
-	UpdatedAt   time.Time                      `json:"updated_at"`
-}
-
 func ConnectorVersionToJson(cv connIface.ConnectorVersion) ConnectorVersionJson {
 	def := cv.GetDefinition()
 
@@ -108,7 +79,7 @@ func ConnectorVersionToJson(cv connIface.ConnectorVersion) ConnectorVersionJson 
 		Id:          cv.GetId(),
 		Version:     cv.GetVersion(),
 		Namespace:   cv.GetNamespace(),
-		State:       cv.GetState(),
+		State:       schemaapi.ConnectorVersionState(cv.GetState()),
 		Definition:  *def,
 		Labels:      cv.GetLabels(),
 		Annotations: cv.GetAnnotations(),
@@ -126,33 +97,6 @@ type ListConnectorVersionsRequestQueryParams struct {
 	OrderByVal    *string                         `form:"order_by"`
 }
 
-type ListConnectorVersionsResponseJson struct {
-	Items  []ConnectorVersionJson `json:"items"`
-	Cursor string                 `json:"cursor,omitempty"`
-}
-
-// CreateConnectorRequestJson is the request body for POST /connectors
-type CreateConnectorRequestJson struct {
-	Namespace   string            `json:"namespace"`
-	Definition  cschema.Connector `json:"definition"`
-	Labels      map[string]string `json:"labels,omitempty"`
-	Annotations map[string]string `json:"annotations,omitempty"`
-}
-
-// UpdateConnectorRequestJson is the request body for PATCH /connectors/:id and PATCH /connectors/:id/versions/:version
-type UpdateConnectorRequestJson struct {
-	Definition  *cschema.Connector `json:"definition,omitempty"`
-	Labels      *map[string]string `json:"labels,omitempty"`
-	Annotations *map[string]string `json:"annotations,omitempty"`
-}
-
-// CreateConnectorVersionRequestJson is the request body for POST /connectors/:id/versions
-type CreateConnectorVersionRequestJson struct {
-	Definition  *cschema.Connector `json:"definition,omitempty"`
-	Labels      *map[string]string `json:"labels,omitempty"`
-	Annotations *map[string]string `json:"annotations,omitempty"`
-}
-
 // connectorVersionID is the composite identifier used by the version-level
 // label/annotation adapters.
 type connectorVersionID struct {
@@ -168,6 +112,17 @@ type ConnectorsRoutes struct {
 	annotsAdapter        key_value.Adapter[apid.ID]
 	versionLabelsAdapter key_value.Adapter[connectorVersionID]
 	versionAnnotsAdapter key_value.Adapter[connectorVersionID]
+}
+
+func connectorVersionStatesToAPI(states database.ConnectorVersionStates) schemaapi.ConnectorVersionStates {
+	if states == nil {
+		return nil
+	}
+	result := make(schemaapi.ConnectorVersionStates, len(states))
+	for i, state := range states {
+		result[i] = schemaapi.ConnectorVersionState(state)
+	}
+	return result
 }
 
 // @Summary		Get connector

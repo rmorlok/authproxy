@@ -1,0 +1,16 @@
+{
+  "definition": {
+    "display_name": "Salesforce",
+    "logo": "https://example.com/logo.png",
+    "description": "Updated Salesforce integration",
+    "auth": {
+      "type": "no-auth"
+    },
+    "labels": {
+      "service": "salesforce"
+    }
+  },
+  "labels": {
+    "team": "integrations"
+  }
+}

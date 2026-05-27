@@ -22,6 +22,6 @@ func (c *connection) Reconfigure(ctx context.Context) (iface.ConnectionSetupResp
 		return nil, httperr.BadRequest("connector has no configure steps to reconfigure")
 	}
 
-	first := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0)
+	first := cschema.MustNewSetupStep(connector.SetupFlow.Configure.Steps[0].Id)
 	return c.buildFormResponse(ctx, first, connector.SetupFlow)
 }
