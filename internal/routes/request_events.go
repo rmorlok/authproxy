@@ -407,8 +407,8 @@ func (r *RequestEventsRoutes) list(gctx *gin.Context) {
 // @Tags			metrics
 // @Accept			json
 // @Produce		json
-// @Param			request	body		SwaggerMetricsQueryRequest	true	"Metrics query request"
-// @Success		200		{object}	SwaggerMetricsQueryResponse
+// @Param			request	body		object	true	"Metrics query request"
+// @Success		200		{object}	object
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse

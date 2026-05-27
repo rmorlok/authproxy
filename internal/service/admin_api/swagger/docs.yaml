@@ -772,93 +772,6 @@ definitions:
         description: Total count of matching records (if requested)
         type: integer
     type: object
-  routes.SwaggerMetricsPoint:
-    description: Single bucket value in a metrics series
-    properties:
-      timestamp:
-        type: string
-      value:
-        example: 42
-        type: number
-    type: object
-  routes.SwaggerMetricsQueryRef:
-    description: One metric series request
-    properties:
-      aggregation:
-        example: count
-        type: string
-      group_by:
-        example:
-        - method
-        - response_status_code
-        items:
-          type: string
-        type: array
-      metric:
-        example: request_events
-        type: string
-      ref_id:
-        example: requests
-        type: string
-    type: object
-  routes.SwaggerMetricsQueryRequest:
-    description: Generic application metrics query request
-    properties:
-      label_selector:
-        example: env=prod,team=api
-        type: string
-      namespace:
-        example: root.**
-        type: string
-      queries:
-        items:
-          $ref: '#/definitions/routes.SwaggerMetricsQueryRef'
-        type: array
-      range:
-        $ref: '#/definitions/routes.SwaggerMetricsRange'
-    type: object
-  routes.SwaggerMetricsQueryResponse:
-    description: Generic application metrics query response
-    properties:
-      series:
-        items:
-          $ref: '#/definitions/routes.SwaggerMetricsSeries'
-        type: array
-    type: object
-  routes.SwaggerMetricsRange:
-    description: Time range and bucket size for a metrics query
-    properties:
-      end:
-        example: "2026-05-25T13:00:00Z"
-        type: string
-      start:
-        example: "2026-05-25T12:00:00Z"
-        type: string
-      step:
-        example: 15m
-        type: string
-    type: object
-  routes.SwaggerMetricsSeries:
-    description: Labeled metric time series
-    properties:
-      aggregation:
-        example: count
-        type: string
-      labels:
-        additionalProperties:
-          type: string
-        type: object
-      metric:
-        example: request_events
-        type: string
-      points:
-        items:
-          $ref: '#/definitions/routes.SwaggerMetricsPoint'
-        type: array
-      ref_id:
-        example: requests
-        type: string
-    type: object
   routes.SwaggerNamespaceJson:
     description: Namespace for organizing resources
     properties:
@@ -4581,14 +4494,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.SwaggerMetricsQueryRequest'
+          type: object
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.SwaggerMetricsQueryResponse'
+            type: object
         "400":
           description: Bad Request
           schema:

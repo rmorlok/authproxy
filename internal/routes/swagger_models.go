@@ -25,61 +25,6 @@ type SubmitConnectionRequest = schemaapi.SubmitConnectionRequest
 type DataSourceOptionJson = schemaapi.DataSourceOptionJson
 type SwaggerNamespaceJson = schemaapi.NamespaceJson
 
-// SwaggerMetricsRange describes the time range and bucket size for a metrics query.
-//
-//	@Description	Time range and bucket size for a metrics query
-type SwaggerMetricsRange struct {
-	Start time.Time `json:"start" example:"2026-05-25T12:00:00Z"`
-	End   time.Time `json:"end" example:"2026-05-25T13:00:00Z"`
-	Step  string    `json:"step" example:"15m"`
-}
-
-// SwaggerMetricsQueryRef describes one metric series request.
-//
-//	@Description	One metric series request
-type SwaggerMetricsQueryRef struct {
-	RefID       string   `json:"ref_id" example:"requests"`
-	Metric      string   `json:"metric" example:"request_events"`
-	Aggregation string   `json:"aggregation" example:"count"`
-	GroupBy     []string `json:"group_by,omitempty" example:"method,response_status_code"`
-}
-
-// SwaggerMetricsQueryRequest is the generic metrics query request.
-//
-//	@Description	Generic application metrics query request
-type SwaggerMetricsQueryRequest struct {
-	Range         SwaggerMetricsRange      `json:"range"`
-	Namespace     *string                  `json:"namespace,omitempty" example:"root.**"`
-	LabelSelector *string                  `json:"label_selector,omitempty" example:"env=prod,team=api"`
-	Queries       []SwaggerMetricsQueryRef `json:"queries"`
-}
-
-// SwaggerMetricsPoint is a single bucket value in a metrics series.
-//
-//	@Description	Single bucket value in a metrics series
-type SwaggerMetricsPoint struct {
-	Timestamp time.Time `json:"timestamp"`
-	Value     float64   `json:"value" example:"42"`
-}
-
-// SwaggerMetricsSeries is one labeled time series returned for a query ref.
-//
-//	@Description	Labeled metric time series
-type SwaggerMetricsSeries struct {
-	RefID       string                `json:"ref_id" example:"requests"`
-	Metric      string                `json:"metric" example:"request_events"`
-	Aggregation string                `json:"aggregation" example:"count"`
-	Labels      map[string]string     `json:"labels,omitempty"`
-	Points      []SwaggerMetricsPoint `json:"points"`
-}
-
-// SwaggerMetricsQueryResponse is the response for a metrics query.
-//
-//	@Description	Generic application metrics query response
-type SwaggerMetricsQueryResponse struct {
-	Series []SwaggerMetricsSeries `json:"series"`
-}
-
 // ProxyRequest represents a request to proxy through a connection.
 //
 //	@Description	Request to proxy an HTTP request through a connection
