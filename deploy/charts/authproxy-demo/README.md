@@ -43,25 +43,61 @@ First install takes ~3-5 min once the bitnami subcharts finish their
 PVC provisioning + initial schema. The NOTES print a verification
 checklist.
 
-## What gets auto-generated
+## What gets auto-generated vs. operator-provided
 
 When `secrets.autoGenerate: true` (the default), the chart materializes
-the following Secrets on first install:
+the following Secrets on first install via sprig template helpers
+(`randAlphaNum`):
 
-| Secret                  | Contents                                          |
-|-------------------------|---------------------------------------------------|
-| `<release>-jwt`         | RSA keypair for AuthProxy JWT signing             |
-| `<release>-encryption`  | 32-byte global AES key                            |
-| `<release>-demo-shell-key` | demo-shell admin RSA keypair (`private` + `<name>.pub`) |
-| `<release>-actors`      | `demo-shell.pub` for AuthProxy's actors keys_path |
-| `<release>-db`          | Postgres password                                 |
-| `<release>-redis-creds` | Redis password                                    |
-| `<release>-minio-creds` | MinIO root password                               |
+| Secret                  | Contents                |
+|-------------------------|-------------------------|
+| `<release>-db`          | Postgres password       |
+| `<release>-redis-creds` | Redis password          |
+| `<release>-minio-creds` | MinIO root password     |
 
 On `helm upgrade`, the templates `lookup` the existing Secrets and
-reuse their values — sessions persist, no rotation surprises. To
-rotate, `kubectl delete secret <release>-...` then `helm upgrade` will
-mint fresh material.
+reuse their values — passwords persist across upgrades. To rotate,
+`kubectl delete secret <release>-...` then `helm upgrade`.
+
+**Operator-provided** (sprig can't derive a public key from a private
+key, so these need real openssl). Create them in the release namespace
+**before `helm install`**:
+
+| Secret                     | Keys expected                                  |
+|----------------------------|------------------------------------------------|
+| `<release>-jwt`            | `system` (RSA private), `system.pub`           |
+| `<release>-encryption`     | `global_aes.key` (32 raw bytes)                |
+| `<release>-demo-shell-key` | `private` (RSA private), `demo-shell.pub`      |
+| `<release>-actors`         | `demo-shell.pub` (matching the above)          |
+
+A reference one-shot generator:
+
+```bash
+RELEASE=demo
+NS=demo
+work=$(mktemp -d)
+openssl genrsa -out "$work/system" 2048
+openssl rsa -in "$work/system" -pubout -out "$work/system.pub"
+openssl genrsa -out "$work/demo-shell" 2048
+openssl rsa -in "$work/demo-shell" -pubout -out "$work/demo-shell.pub"
+openssl rand -out "$work/global_aes.key" 32
+
+kubectl create ns "$NS" --dry-run=client -o yaml | kubectl apply -f -
+kubectl -n "$NS" create secret generic "$RELEASE-jwt" \
+  --from-file=system="$work/system" \
+  --from-file=system.pub="$work/system.pub"
+kubectl -n "$NS" create secret generic "$RELEASE-encryption" \
+  --from-file=global_aes.key="$work/global_aes.key"
+kubectl -n "$NS" create secret generic "$RELEASE-demo-shell-key" \
+  --from-file=private="$work/demo-shell" \
+  --from-file=demo-shell.pub="$work/demo-shell.pub"
+kubectl -n "$NS" create secret generic "$RELEASE-actors" \
+  --from-file=demo-shell.pub="$work/demo-shell.pub"
+```
+
+A Helm pre-install hook Job that generates the keypair Secrets is a
+reasonable follow-up — would unify the operator UX with the
+auto-generated random material above. Tracked separately.
 
 ## Sub-path routing
 
