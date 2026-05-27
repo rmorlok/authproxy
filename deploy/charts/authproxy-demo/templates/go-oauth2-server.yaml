@@ -1,0 +1,59 @@
+{{- if .Values.goOauth2Server.enabled }}
+{{/*
+  Inline Deployment + Service for go-oauth2-server. Used as the demo
+  connector target — AuthProxy proxies through it for the demo OAuth
+  flow. No upstream Helm chart for this image, so the manifests live
+  here in the umbrella rather than as a separate chart.
+*/}}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "authproxy-demo.goOauth2Server.name" . }}
+  labels:
+    {{- include "authproxy-demo.labels" . | nindent 4 }}
+    app.kubernetes.io/component: go-oauth2-server
+spec:
+  replicas: {{ .Values.goOauth2Server.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: go-oauth2-server
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: go-oauth2-server
+    spec:
+      containers:
+        - name: go-oauth2-server
+          image: "{{ .Values.goOauth2Server.image.repository }}:{{ .Values.goOauth2Server.image.tag }}"
+          imagePullPolicy: {{ .Values.goOauth2Server.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.goOauth2Server.port }}
+          readinessProbe:
+            httpGet:
+              path: /
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.goOauth2Server.resources | nindent 12 }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "authproxy-demo.goOauth2Server.name" . }}
+  labels:
+    {{- include "authproxy-demo.labels" . | nindent 4 }}
+    app.kubernetes.io/component: go-oauth2-server
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: go-oauth2-server
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+{{- end }}

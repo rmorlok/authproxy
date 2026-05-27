@@ -1,0 +1,85 @@
+{{- if .Values.demoShell.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "authproxy-demo.demoShell.name" . }}
+  labels:
+    {{- include "authproxy-demo.labels" . | nindent 4 }}
+    app.kubernetes.io/component: demo-shell
+spec:
+  replicas: {{ .Values.demoShell.replicaCount }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: {{ .Release.Name }}
+      app.kubernetes.io/component: demo-shell
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/instance: {{ .Release.Name }}
+        app.kubernetes.io/component: demo-shell
+    spec:
+      containers:
+        - name: demo-shell
+          image: "{{ .Values.demoShell.image.repository }}:{{ include "authproxy-demo.demoShell.imageTag" . }}"
+          imagePullPolicy: {{ .Values.demoShell.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.demoShell.port }}
+          env:
+            - name: PORT
+              value: {{ .Values.demoShell.port | quote }}
+            - name: ADMIN_USERNAME
+              value: "demo-shell"
+            # The umbrella's auto-generated demo-shell admin keypair lands
+            # in a Secret that's bind-mounted at /etc/authproxy/demo-shell/.
+            # AuthProxy's actors keys_path picks up the matching .pub from
+            # a sibling Secret (see actors-keys mount on the authproxy pod).
+            - name: ADMIN_PRIVATE_KEY_PATH
+              value: "/etc/authproxy/demo-shell/private"
+            # External URLs the BROWSER reaches — same hostname, sub-paths.
+            - name: AUTHPROXY_AUTH_URL
+              value: "https://{{ .Values.global.hostname }}/public"
+            - name: AUTHPROXY_MARKETPLACE_URL
+              value: "https://{{ .Values.global.hostname }}/marketplace"
+            - name: AUTHPROXY_ADMIN_UI_URL
+              value: "https://{{ .Values.global.hostname }}/admin"
+          volumeMounts:
+            - name: admin-key
+              mountPath: /etc/authproxy/demo-shell
+              readOnly: true
+          readinessProbe:
+            httpGet:
+              path: /healthz
+              port: http
+            initialDelaySeconds: 2
+            periodSeconds: 5
+          resources:
+            {{- toYaml .Values.demoShell.resources | nindent 12 }}
+      volumes:
+        - name: admin-key
+          secret:
+            secretName: {{ printf "%s-demo-shell-key" .Release.Name | quote }}
+            items:
+              - key: private
+                path: private
+              # The .pub also lives in this Secret but we only mount it
+              # on the AuthProxy side (under its actors keys_path). The
+              # demo-shell itself only needs the private key.
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "authproxy-demo.demoShell.name" . }}
+  labels:
+    {{- include "authproxy-demo.labels" . | nindent 4 }}
+    app.kubernetes.io/component: demo-shell
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/instance: {{ .Release.Name }}
+    app.kubernetes.io/component: demo-shell
+  ports:
+    - name: http
+      port: 80
+      targetPort: http
+{{- end }}

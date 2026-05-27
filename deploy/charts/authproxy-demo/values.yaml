@@ -1,0 +1,140 @@
+# authproxy-demo umbrella chart values.
+#
+# Section guide:
+#   global           — shared inputs (hostname, ACME issuer, image tags)
+#   demoShell        — inline Deployment for the SSO stand-in host
+#   goOauth2Server   — inline Deployment for the demo connector target
+#   ingress          — single Ingress, sub-path routing
+#   secrets          — auto-generation toggles for keys + passwords
+#   authproxy / postgresql / redis / minio — subchart passthroughs
+
+global:
+  # -- Public hostname the demo lives at. Required. Example: demo.authproxy.net.
+  hostname: ""
+
+  # -- cert-manager ClusterIssuer name to bind the TLS cert against.
+  # Defaults to the issuer installed by the bootstrap chart (`letsencrypt-prod`).
+  clusterIssuer: "letsencrypt-prod"
+
+  # -- IngressClass for the umbrella Ingress. Matches the bootstrap chart default.
+  ingressClassName: "nginx"
+
+demoShell:
+  enabled: true
+  image:
+    repository: ghcr.io/rmorlok/authproxy-demo-shell
+    tag: ""               # falls back to .Chart.AppVersion
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+  # -- Container port the backend listens on (matches PORT env, default 8888).
+  port: 8888
+
+goOauth2Server:
+  enabled: true
+  image:
+    # go-oauth2-server image — see https://github.com/rmorlok/go-oauth2-server.
+    repository: ghcr.io/rmorlok/go-oauth2-server
+    tag: "main"
+    pullPolicy: IfNotPresent
+  replicaCount: 1
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+  # -- Container port the upstream image listens on.
+  port: 8080
+
+ingress:
+  # -- Toggle the umbrella Ingress. Disable when something else fronts the
+  # stack (e.g. local port-forwarding).
+  enabled: true
+  annotations: {}
+  # -- TLS handled by cert-manager via the cluster-issuer annotation.
+  tls: true
+
+secrets:
+  # -- When true, the chart auto-generates JWT signing keys + global AES
+  # key + demo-shell admin keypair the first time it's installed.
+  # Subsequent upgrades reuse the existing Secrets (via the `lookup`
+  # template helper) so sessions don't invalidate.
+  autoGenerate: true
+
+# ---------------------------------------------------------------------------
+# Subchart passthroughs — see each upstream's values.yaml for the full
+# surface. Only the most relevant overrides are surfaced here; deeper
+# tuning happens via `--set <subchart>.foo=bar` at install time.
+# ---------------------------------------------------------------------------
+
+authproxy:
+  enabled: true
+  # No Ingress on the inner authproxy chart — the umbrella handles routing.
+  ingress:
+    enabled: false
+  # Inner chart's database / redis blocks point at the bitnami sibling
+  # subcharts (whose Service names are templated from this release).
+  database:
+    provider: postgres
+    host: "{{ .Release.Name }}-postgresql"
+    port: 5432
+    database: authproxy
+    user: authproxy
+    sslmode: disable
+    autoMigrate: true
+    existingSecret: "{{ .Release.Name }}-db"   # contains AUTHPROXY_DB_PASSWORD
+  redis:
+    address: "{{ .Release.Name }}-redis-master:6379"
+    existingSecret: "{{ .Release.Name }}-redis-creds"
+  jwt:
+    existingSecret: "{{ .Release.Name }}-jwt"
+  encryptionKeys:
+    existingSecret: "{{ .Release.Name }}-encryption"
+  actors:
+    existingSecret: "{{ .Release.Name }}-actors"
+  hostApplication:
+    initiateSessionUrl: "https://{{ .Values.global.hostname }}/"
+  connectors:
+    autoMigrate: true
+    loadFromList: []
+
+postgresql:
+  enabled: true
+  auth:
+    username: authproxy
+    database: authproxy
+    existingSecret: "{{ .Release.Name }}-db"
+    secretKeys:
+      adminPasswordKey: AUTHPROXY_DB_PASSWORD
+      userPasswordKey: AUTHPROXY_DB_PASSWORD
+  primary:
+    persistence:
+      enabled: true
+      size: 8Gi
+
+redis:
+  enabled: true
+  auth:
+    existingSecret: "{{ .Release.Name }}-redis-creds"
+    existingSecretPasswordKey: AUTHPROXY_REDIS_PASSWORD
+  architecture: standalone
+  master:
+    persistence:
+      enabled: true
+      size: 4Gi
+
+minio:
+  enabled: true
+  auth:
+    rootUser: "authproxy"
+    existingSecret: "{{ .Release.Name }}-minio-creds"
+  defaultBuckets: "authproxy-request-logs"
+  persistence:
+    enabled: true
+    size: 8Gi

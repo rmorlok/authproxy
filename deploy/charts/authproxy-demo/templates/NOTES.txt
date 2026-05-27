@@ -1,0 +1,25 @@
+{{- if .Values.global.hostname }}
+authproxy-demo installed at https://{{ .Values.global.hostname }}.
+
+Next steps
+----------
+1. Wait for cert-manager to issue the TLS cert (~1-3 min):
+
+     kubectl -n {{ .Release.Namespace }} get certificate {{ include "authproxy-demo.fullname" . }}-tls -w
+
+2. Wait for all bitnami subcharts to settle (postgres + redis + minio):
+
+     kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}
+
+3. Open https://{{ .Values.global.hostname }} — pick a demo actor + destination, click sign-in.
+
+The shell signs a JWT using the auto-generated demo-shell admin keypair
+(stored in Secret `{{ .Release.Name }}-demo-shell-key`) and redirects you
+into the picked AuthProxy UI. Sessions persist across `helm upgrade`s
+because the Secret-generation templates reuse existing keys via lookup.
+{{- else }}
+
+WARNING: global.hostname is unset. The Ingress was not rendered; the
+demo will be unreachable from outside the cluster. Re-install with
+`--set global.hostname=demo.your-domain` to bind a host.
+{{- end }}
