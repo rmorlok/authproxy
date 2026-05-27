@@ -112,7 +112,7 @@ func (c *Connection) cols() []string {
 		"annotations",
 		"encrypted_configuration",
 		"encrypted_at",
-		"setup_step",
+		"setup_step_id",
 		"setup_error",
 		"created_at",
 		"updated_at",
@@ -440,7 +440,7 @@ func (s *service) SetConnectionSetupStep(ctx context.Context, id apid.ID, setupS
 	dbResult, err := s.sq.
 		Update(ConnectionsTable).
 		Set("updated_at", now).
-		Set("setup_step", setupStep).
+		Set("setup_step_id", setupStep).
 		Where(sq.Eq{"id": id, "deleted_at": nil}).
 		RunWith(s.db).
 		Exec()
@@ -726,7 +726,7 @@ func (l *listConnectionsFilters) applyRestrictions(ctx context.Context) sq.Selec
 	}
 
 	if l.SetupStepNotNullVal {
-		q = q.Where(sq.NotEq{"setup_step": nil})
+		q = q.Where(sq.NotEq{"setup_step_id": nil})
 	}
 
 	if l.UpdatedBeforeVal != nil {

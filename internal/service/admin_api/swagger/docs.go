@@ -7882,10 +7882,10 @@ const docTemplateadmin_api = `{
                     "type": "string",
                     "example": "acme"
                 },
-                "setup_step": {
-                    "description": "Current setup step if connection setup is in progress",
+                "setup_step_id": {
+                    "description": "Current setup step if connection setup is in progress. Either a user-authored step id from\nthe connector definition or an apxy:* pseudo-step (e.g. apxy:verify, apxy:auth_failed).",
                     "type": "string",
-                    "example": "preconnect:0"
+                    "example": "tenant"
                 },
                 "state": {
                     "description": "Connection state (pending, connected, disconnecting, disconnected, error)",

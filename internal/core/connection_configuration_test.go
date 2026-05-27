@@ -40,11 +40,11 @@ func TestConnectionGetSetupStep(t *testing.T) {
 
 	t.Run("returns the setup step value", func(t *testing.T) {
 		conn := newTestConnection(cschema.Connector{})
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		step := cschema.MustNewSetupStep("step_a")
 		conn.SetupStep = &step
 		result := conn.GetSetupStep()
 		require.NotNil(t, result)
-		assert.Equal(t, "preconnect:0", result.String())
+		assert.Equal(t, "step_a", result.String())
 	})
 }
 
@@ -56,13 +56,13 @@ func TestConnectionSetSetupStep(t *testing.T) {
 		s, db, _, _, _, _ := FullMockService(t, ctrl)
 		conn := newTestConnectionWithService(s)
 
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 1)
+		step := cschema.MustNewSetupStep("step_b")
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &step).Return(nil)
 
 		err := conn.SetSetupStep(context.Background(), &step)
 		require.NoError(t, err)
 		require.NotNil(t, conn.SetupStep)
-		assert.Equal(t, "configure:1", conn.SetupStep.String())
+		assert.Equal(t, "step_b", conn.SetupStep.String())
 	})
 
 	t.Run("clears setup step when nil", func(t *testing.T) {
@@ -71,7 +71,7 @@ func TestConnectionSetSetupStep(t *testing.T) {
 
 		s, db, _, _, _, _ := FullMockService(t, ctrl)
 		conn := newTestConnectionWithService(s)
-		existing := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		existing := cschema.MustNewSetupStep("step_a")
 		conn.SetupStep = &existing
 
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
@@ -88,7 +88,7 @@ func TestConnectionSetSetupStep(t *testing.T) {
 		s, db, _, _, _, _ := FullMockService(t, ctrl)
 		conn := newTestConnectionWithService(s)
 
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		step := cschema.MustNewSetupStep("step_a")
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &step).Return(database.ErrNotFound)
 
 		err := conn.SetSetupStep(context.Background(), &step)

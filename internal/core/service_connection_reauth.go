@@ -62,11 +62,11 @@ func (s *service) ReauthConnection(ctx context.Context, id apid.ID, returnToUrl 
 		if !connector.SetupFlow.HasCredentials() {
 			return nil, httperr.InternalServerErrorMsg("api-key connector has no credentials step")
 		}
-		first := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
+		first := cschema.MustNewSetupStep(connector.SetupFlow.Credentials.Steps[0].Id)
 		return conn.buildFormResponse(ctx, first, connector.SetupFlow)
 	case *config.AuthOAuth2:
 		if connector.SetupFlow.HasPreconnect() {
-			first := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+			first := cschema.MustNewSetupStep(connector.SetupFlow.Preconnect.Steps[0].Id)
 			return conn.buildFormResponse(ctx, first, connector.SetupFlow)
 		}
 		return conn.initiateAuthStep(ctx, returnToUrl, connector)

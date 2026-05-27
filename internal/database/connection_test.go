@@ -925,9 +925,9 @@ func TestConnections(t *testing.T) {
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
 		type connectionResult struct {
-			Id        string
-			SetupStep *string
-			UpdatedAt time.Time
+			Id          string
+			SetupStepId *string
+			UpdatedAt   time.Time
 		}
 
 		u := apid.New(apid.PrefixConnection)
@@ -949,18 +949,18 @@ func TestConnections(t *testing.T) {
 		newNow := time.Date(1955, time.November, 6, 6, 29, 0, 0, time.UTC)
 		ctx = apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(newNow)).Build()
 
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		step := cschema.MustNewSetupStep("preconnect_0")
 		err = db.SetConnectionSetupStep(ctx, u, &step)
 		require.NoError(t, err)
 
 		stepStr := step.String()
 		test_utils.AssertSql(t, rawDb, `
-			SELECT id, setup_step, updated_at FROM connections;
+			SELECT id, setup_step_id, updated_at FROM connections;
 		`, []connectionResult{
 			{
-				Id:        u.String(),
-				SetupStep: &stepStr,
-				UpdatedAt: newNow,
+				Id:          u.String(),
+				SetupStepId: &stepStr,
+				UpdatedAt:   newNow,
 			},
 		})
 
@@ -968,17 +968,17 @@ func TestConnections(t *testing.T) {
 		c, err = db.GetConnection(ctx, u)
 		require.NoError(t, err)
 		require.NotNil(t, c.SetupStep)
-		assert.Equal(t, "preconnect:0", c.SetupStep.String())
+		assert.Equal(t, "preconnect_0", c.SetupStep.String())
 
 		// Update to a different step
-		step2 := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0)
+		step2 := cschema.MustNewSetupStep("configure_0")
 		err = db.SetConnectionSetupStep(ctx, u, &step2)
 		require.NoError(t, err)
 
 		c, err = db.GetConnection(ctx, u)
 		require.NoError(t, err)
 		require.NotNil(t, c.SetupStep)
-		assert.Equal(t, "configure:0", c.SetupStep.String())
+		assert.Equal(t, "configure_0", c.SetupStep.String())
 
 		// Clear setup step (set to nil)
 		err = db.SetConnectionSetupStep(ctx, u, nil)
@@ -994,7 +994,7 @@ func TestConnections(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		step := cschema.MustNewSetupStep("preconnect_0")
 		err := db.SetConnectionSetupStep(ctx, apid.New(apid.PrefixConnection), &step)
 		assert.ErrorIs(t, err, ErrNotFound)
 	})
@@ -1017,7 +1017,7 @@ func TestConnections(t *testing.T) {
 		err = db.DeleteConnection(ctx, u)
 		require.NoError(t, err)
 
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		step := cschema.MustNewSetupStep("preconnect_0")
 		err = db.SetConnectionSetupStep(ctx, u, &step)
 		assert.ErrorIs(t, err, ErrNotFound)
 	})
@@ -1089,7 +1089,7 @@ func TestConnections(t *testing.T) {
 		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
 
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		step := cschema.MustNewSetupStep("preconnect_0")
 		ef := encfield.EncryptedField{ID: "ekv_test1234", Data: "encrypted-config-data"}
 		u := apid.New(apid.PrefixConnection)
 		err := db.CreateConnection(ctx, &Connection{
@@ -1107,7 +1107,7 @@ func TestConnections(t *testing.T) {
 		c, err := db.GetConnection(ctx, u)
 		require.NoError(t, err)
 		require.NotNil(t, c.SetupStep)
-		assert.Equal(t, "preconnect:0", c.SetupStep.String())
+		assert.Equal(t, "preconnect_0", c.SetupStep.String())
 		require.NotNil(t, c.EncryptedConfiguration)
 		assert.Equal(t, apid.ID("ekv_test1234"), c.EncryptedConfiguration.ID)
 		assert.Equal(t, "encrypted-config-data", c.EncryptedConfiguration.Data)

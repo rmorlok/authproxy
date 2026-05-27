@@ -98,7 +98,7 @@ func TestSubmitForm(t *testing.T) {
 		defer ctrl.Finish()
 
 		conn, _ := newTestConnectionWithSetupFlow(t, ctrl, nil)
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		step := cschema.MustNewSetupStep("tenant")
 		conn.SetupStep = &step
 
 		_, err := conn.SubmitForm(context.Background(), iface.SubmitConnectionRequest{
@@ -123,11 +123,11 @@ func TestSubmitForm(t *testing.T) {
 		}
 
 		conn, db := newTestConnectionWithSetupFlow(t, ctrl, sf)
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		step := cschema.MustNewSetupStep("tenant")
 		conn.SetupStep = &step
 
 		db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, gomock.Any()).Return(nil)
-		nextStep := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 1)
+		nextStep := cschema.MustNewSetupStep("region")
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &nextStep).Return(nil)
 
 		resp, err := conn.SubmitForm(context.Background(), iface.SubmitConnectionRequest{
@@ -157,7 +157,7 @@ func TestSubmitForm(t *testing.T) {
 		}
 
 		conn, db := newTestConnectionWithSetupFlow(t, ctrl, sf)
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		step := cschema.MustNewSetupStep("tenant")
 		conn.SetupStep = &step
 
 		db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, gomock.Any()).Return(nil)
@@ -183,7 +183,7 @@ func TestSubmitForm(t *testing.T) {
 		}
 
 		conn, db := newTestConnectionWithSetupFlow(t, ctrl, sf)
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0)
+		step := cschema.MustNewSetupStep("workspace")
 		conn.SetupStep = &step
 
 		db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, gomock.Any()).Return(nil)
@@ -226,12 +226,12 @@ func TestSubmitForm(t *testing.T) {
 		}
 
 		conn, db := newTestConnectionWithSetupFlow(t, ctrl, sf)
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0)
+		step := cschema.MustNewSetupStep("step1")
 		conn.SetupStep = &step
 
 		// First submit — sets config with tenant
 		db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, gomock.Any()).Return(nil)
-		nextStep := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 1)
+		nextStep := cschema.MustNewSetupStep("step2")
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &nextStep).Return(nil)
 
 		resp, err := conn.SubmitForm(context.Background(), iface.SubmitConnectionRequest{
@@ -285,7 +285,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 			},
 		}
 		conn, db := newTestConnectionWithSetupFlow(t, ctrl, sf)
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		step := cschema.MustNewSetupStep("tenant")
 		conn.SetupStep = &step
 
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &step).Return(nil)
@@ -332,7 +332,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 			},
 		}
 		conn, db := newTestConnectionWithSetupFlow(t, ctrl, sf)
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0)
+		step := cschema.MustNewSetupStep("workspace")
 		conn.SetupStep = &step
 
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &step).Return(nil)

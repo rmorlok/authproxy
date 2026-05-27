@@ -34,9 +34,9 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 
 	currentSetupStep := *setupStep
 
-	// Only the indexed phases (preconnect, credentials, configure) accept form submissions.
-	if !currentSetupStep.Phase().IsIndexed() {
-		return nil, httperr.BadRequestf("cannot submit form for phase %q", currentSetupStep.Phase())
+	// Only schema-defined steps (preconnect, credentials, configure) accept form submissions.
+	if !connector.SetupFlow.IsSchemaStep(currentSetupStep) {
+		return nil, httperr.BadRequestf("cannot submit form for step %q", currentSetupStep.String())
 	}
 
 	// Look up the current step definition
@@ -47,7 +47,7 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 
 	// Credential submissions are dispatched to the auth method — no merge into
 	// the general config blob, no risk of field-name collisions with preconnect.
-	if currentSetupStep.Phase() == cschema.SetupPhaseCredentials {
+	if connector.SetupFlow.IsCredentialsStep(currentSetupStep) {
 		return c.submitCredentialsStep(ctx, req, currentStep, connector)
 	}
 
@@ -93,10 +93,8 @@ func (c *connection) SubmitForm(ctx context.Context, req iface.SubmitConnectionR
 	}
 
 	// Next step is a form step (could be another preconnect, the credentials
-	// phase, or a configure step).
-	if nextStep.Phase() == cschema.SetupPhaseCredentials && req.ReturnToUrl == "" {
-		// Credential steps don't need a returnTo, but log nothing — just build the form.
-	}
+	// phase, or a configure step). Credential steps don't need a returnTo;
+	// just build the form.
 	return c.buildFormResponse(ctx, nextStep, connector.SetupFlow)
 }
 
@@ -268,19 +266,19 @@ func (c *connection) GetCurrentSetupStepResponse(ctx context.Context) (iface.Con
 
 	parsed := *setupStep
 
-	switch parsed.Phase() {
-	case cschema.SetupPhaseAuth:
+	switch {
+	case parsed.Equals(cschema.SetupStepAuth):
 		// The connection is waiting for the OAuth callback — tell the UI
 		return &iface.ConnectionSetupRedirect{
 			Id:   c.GetId(),
 			Type: iface.ConnectionSetupResponseTypeRedirect,
 		}, nil
-	case cschema.SetupPhaseVerify:
+	case parsed.Equals(cschema.SetupStepVerify):
 		return &iface.ConnectionSetupVerifying{
 			Id:   c.GetId(),
 			Type: iface.ConnectionSetupResponseTypeVerifying,
 		}, nil
-	case cschema.SetupPhaseVerifyFailed, cschema.SetupPhaseAuthFailed:
+	case parsed.IsTerminalFailure():
 		msg := ""
 		if e := c.GetSetupError(); e != nil {
 			msg = *e

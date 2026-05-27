@@ -36,7 +36,7 @@ func (s *service) RetryConnectionSetup(ctx context.Context, id apid.ID, returnTo
 	}
 
 	if connector.SetupFlow.HasPreconnect() {
-		first := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		first := cschema.MustNewSetupStep(connector.SetupFlow.Preconnect.Steps[0].Id)
 		return conn.buildFormResponse(ctx, first, connector.SetupFlow)
 	}
 

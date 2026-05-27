@@ -53,7 +53,7 @@ export interface Connection {
     connector: Connector;
     state: ConnectionState;
     health_state: ConnectionHealthState;
-    setup_step?: string;
+    setup_step_id?: string;
     setup_error?: string;
     labels?: Record<string, string>;
     annotations?: Record<string, string>;
@@ -338,7 +338,7 @@ export const reconfigureConnection = (id: string) => {
 };
 
 /**
- * Cancel an in-flight reconfigure on a ready connection by clearing setup_step and setup_error.
+ * Cancel an in-flight reconfigure on a ready connection by clearing setup_step_id and setup_error.
  * The connection remains ready and its previously stored configuration continues to apply.
  */
 export const cancelSetupConnection = (id: string) => {
