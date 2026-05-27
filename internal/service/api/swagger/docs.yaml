@@ -26,7 +26,7 @@ definitions:
         type: string
     type: object
   github_com_rmorlok_authproxy_internal_schema_api.ConnectorJson:
-    description: Connector definition summary
+    description: Connector API summary response
     properties:
       annotations:
         additionalProperties:
@@ -470,7 +470,7 @@ definitions:
         type: string
     type: object
   routes.SwaggerConnectorJson:
-    description: Connector definition summary
+    description: Connector API summary response
     properties:
       annotations:
         additionalProperties:

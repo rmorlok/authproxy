@@ -241,6 +241,7 @@
       "additionalProperties": false
     },
     "Connector": {
+      "description": "API summary projection of a connector version. This intentionally differs from the resource connector definition schema: fields such as logo are flattened for responses, while runtime fields such as state, has_configure, timestamps, version counts, and state summaries are added by the API. Request bodies and version detail responses reference the canonical resource schema under their definition fields.",
       "type": "object",
       "properties": {
         "id": { "type": "string" },

@@ -19,9 +19,9 @@ const (
 
 type ConnectorVersionStates []ConnectorVersionState
 
-// ConnectorJson represents a connector summary returned by the API.
+// ConnectorJson represents the API summary projection of a connector version.
 //
-//	@Description	Connector definition summary
+//	@Description	Connector API summary response
 type ConnectorJson struct {
 	Id            apid.ID                `json:"id" yaml:"id" swaggertype:"string" example:"cxr_test550e8400abcde"`
 	Version       uint64                 `json:"version" yaml:"version" example:"1"`

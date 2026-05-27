@@ -7465,7 +7465,7 @@ const docTemplateadmin_api = `{
             }
         },
         "github_com_rmorlok_authproxy_internal_schema_api.ConnectorJson": {
-            "description": "Connector definition summary",
+            "description": "Connector API summary response",
             "type": "object",
             "properties": {
                 "annotations": {
@@ -8074,7 +8074,7 @@ const docTemplateadmin_api = `{
             }
         },
         "routes.SwaggerConnectorJson": {
-            "description": "Connector definition summary",
+            "description": "Connector API summary response",
             "type": "object",
             "properties": {
                 "annotations": {
