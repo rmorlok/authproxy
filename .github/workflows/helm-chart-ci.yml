@@ -55,15 +55,19 @@ jobs:
       - name: Register Helm repos for chart dependencies
         # `ct lint` runs `helm dependency build` internally, which only
         # resolves dependencies whose `repository:` URL is registered as
-        # a named helm repo on this runner. Pre-register the four the
-        # bootstrap chart pulls from. Idempotent — `helm repo add` is a
-        # no-op when the alias already exists with the same URL.
+        # a named helm repo on this runner. Pre-register every external
+        # repo across all charts in this monorepo. Idempotent — `helm
+        # repo add` is a no-op when the alias already exists with the
+        # same URL.
         if: steps.changed.outputs.found == 'true'
         run: |
+          # bootstrap chart
           helm repo add ingress-nginx  https://kubernetes.github.io/ingress-nginx
           helm repo add jetstack       https://charts.jetstack.io
           helm repo add external-dns   https://kubernetes-sigs.github.io/external-dns/
           helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+          # authproxy-demo umbrella chart
+          helm repo add bitnami        https://charts.bitnami.com/bitnami
           helm repo update
 
       - name: ct lint
@@ -96,6 +100,18 @@ jobs:
           else
             echo "found=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Register Helm repos for chart dependencies
+        if: steps.changed.outputs.found == 'true'
+        # Same list as the lint job — `ct install` also runs `helm
+        # dependency build` and needs the repos registered.
+        run: |
+          helm repo add ingress-nginx  https://kubernetes.github.io/ingress-nginx
+          helm repo add jetstack       https://charts.jetstack.io
+          helm repo add external-dns   https://kubernetes-sigs.github.io/external-dns/
+          helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
+          helm repo add bitnami        https://charts.bitnami.com/bitnami
+          helm repo update
 
       - name: Set up Docker Buildx
         if: steps.changed.outputs.found == 'true'
