@@ -13,7 +13,7 @@ import (
 )
 
 func TestOnVerifyPassed(t *testing.T) {
-	t.Run("advances to configure:0 when configure exists", func(t *testing.T) {
+	t.Run("advances to first configure when configure exists", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -25,12 +25,12 @@ func TestOnVerifyPassed(t *testing.T) {
 			},
 		})
 
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0))).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep("workspace"))).Return(nil)
 
 		err := conn.onVerifyPassed(context.Background())
 		require.NoError(t, err)
 		require.NotNil(t, conn.GetSetupStep())
-		assert.Equal(t, "configure:0", conn.GetSetupStep().String())
+		assert.Equal(t, "workspace", conn.GetSetupStep().String())
 	})
 
 	t.Run("clears setup step and marks ready when no further steps", func(t *testing.T) {

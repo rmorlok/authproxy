@@ -255,7 +255,7 @@ type ConnectionJson struct {
 	Annotations map[string]string              `json:"annotations,omitempty"`
 	State       database.ConnectionState       `json:"state"`
 	HealthState database.ConnectionHealthState `json:"health_state"`
-	SetupStep   *cschema.SetupStep             `json:"setup_step,omitempty" swaggertype:"string"`
+	SetupStep   *cschema.SetupStep             `json:"setup_step_id,omitempty" swaggertype:"string"`
 	SetupError  *string                        `json:"setup_error,omitempty"`
 	Connector   ConnectorJson                  `json:"connector"`
 	CreatedAt   time.Time                      `json:"created_at"`

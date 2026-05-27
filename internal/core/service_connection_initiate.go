@@ -89,7 +89,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 	// touching the auth phase or the credentials phase.
 	if connector.SetupFlow.HasPreconnect() {
 		firstStep := connector.SetupFlow.Preconnect.Steps[0]
-		first := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		first := cschema.MustNewSetupStep(firstStep.Id)
 		if err := connection.SetSetupStep(ctx, &first); err != nil {
 			val.MarkErrorReturn()
 			return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
@@ -113,7 +113,7 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 	// data to the auth method instead of merging it into the connection config.
 	if connector.SetupFlow.HasCredentials() {
 		firstStep := connector.SetupFlow.Credentials.Steps[0]
-		first := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
+		first := cschema.MustNewSetupStep(firstStep.Id)
 		if err := connection.SetSetupStep(ctx, &first); err != nil {
 			val.MarkErrorReturn()
 			return nil, httperr.InternalServerError(httperr.WithInternalErr(err))

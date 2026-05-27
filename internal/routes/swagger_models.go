@@ -74,8 +74,9 @@ type SwaggerConnectionJson struct {
 	// Operational health signal (healthy, unhealthy). Distinct from State: a Ready connection
 	// whose credentials have stopped working flips to unhealthy without changing State.
 	HealthState string `json:"health_state" example:"healthy"`
-	// Current setup step if connection setup is in progress
-	SetupStep *string `json:"setup_step,omitempty" example:"preconnect:0"`
+	// Current setup step if connection setup is in progress. Either a user-authored step id from
+	// the connector definition or an apxy:* pseudo-step (e.g. apxy:verify, apxy:auth_failed).
+	SetupStep *string `json:"setup_step_id,omitempty" example:"tenant"`
 	// Connector information
 	Connector SwaggerConnectorJson `json:"connector"`
 	// Creation timestamp

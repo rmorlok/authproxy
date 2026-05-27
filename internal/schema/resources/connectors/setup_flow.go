@@ -5,7 +5,6 @@ import (
 	"database/sql/driver"
 	"encoding/json"
 	"fmt"
-	"strconv"
 	"strings"
 
 	"github.com/hashicorp/go-multierror"
@@ -102,121 +101,80 @@ func (sf *SetupFlow) TotalSteps() int {
 	return total
 }
 
-// SetupStepPhase identifies which phase of the setup flow a step belongs to. The indexed
-// phases (preconnect, configure) carry an integer index in their canonical setup-step form;
-// the others are singleton pseudo-steps with no index.
-type SetupStepPhase string
+// ApxyStepPrefix is the reserved prefix for system-emitted step ids. User-
+// authored step ids must not start with this prefix. The auth-method-emitted
+// steps that #366 introduces use "apxy:auth:<val>"; terminal pseudo-steps use
+// "apxy:verify_failed" / "apxy:auth_failed"; the verify pseudo-step is
+// "apxy:verify". The placeholder "apxy:auth" is the OAuth2-only wait state
+// until #366 replaces it with the auth-method-emitted redirect step.
+const ApxyStepPrefix = "apxy:"
 
-const (
-	SetupPhasePreconnect   SetupStepPhase = "preconnect"
-	SetupPhaseCredentials  SetupStepPhase = "credentials"
-	SetupPhaseAuth         SetupStepPhase = "auth"
-	SetupPhaseVerify       SetupStepPhase = "verify"
-	SetupPhaseConfigure    SetupStepPhase = "configure"
-	SetupPhaseVerifyFailed SetupStepPhase = "verify_failed"
-	SetupPhaseAuthFailed   SetupStepPhase = "auth_failed"
-)
-
-// String returns the underlying phase identifier.
-func (p SetupStepPhase) String() string { return string(p) }
-
-// IsIndexed reports whether the phase carries a 0-based step index in its canonical form
-// (preconnect, credentials, configure). Singleton pseudo-steps return false.
-func (p SetupStepPhase) IsIndexed() bool {
-	return p == SetupPhasePreconnect || p == SetupPhaseCredentials || p == SetupPhaseConfigure
-}
-
-// IsTerminalFailure reports whether the phase represents a terminal failure pseudo-step
-// (verify_failed, auth_failed). Connections in this phase are retryable via the retry endpoint.
-func (p SetupStepPhase) IsTerminalFailure() bool {
-	return p == SetupPhaseVerifyFailed || p == SetupPhaseAuthFailed
-}
-
-// IsValid reports whether p is one of the recognized phases.
-func (p SetupStepPhase) IsValid() bool {
-	switch p {
-	case SetupPhasePreconnect, SetupPhaseCredentials, SetupPhaseAuth, SetupPhaseVerify, SetupPhaseConfigure,
-		SetupPhaseVerifyFailed, SetupPhaseAuthFailed:
-		return true
-	}
-	return false
-}
-
-// SetupStep is a typed representation of a setup-flow step. It captures the phase and, for
-// indexed phases, the 0-based step index. The zero SetupStep is invalid; use ParseSetupStep,
-// NewSetupStep, or NewIndexedSetupStep to construct one.
+// SetupStep is the typed identifier for a step within a connection's setup
+// flow. It is the value stored in connections.setup_step_id and threaded
+// through the API surface. User-authored steps carry the id from the
+// connector YAML; system-emitted steps use the apxy: prefix.
 type SetupStep struct {
-	phase SetupStepPhase
-	index int
+	id string
 }
 
-// NewSetupStep returns a SetupStep for a singleton (non-indexed) phase.
-// Returns an error if phase is indexed or unknown.
-func NewSetupStep(phase SetupStepPhase) (SetupStep, error) {
-	if !phase.IsValid() {
-		return SetupStep{}, fmt.Errorf("unknown setup phase %q", phase)
+// NewSetupStep constructs a SetupStep from an id string. The empty id is
+// rejected; use the zero SetupStep (i.e. omit the field) for "no active step."
+func NewSetupStep(id string) (SetupStep, error) {
+	if id == "" {
+		return SetupStep{}, fmt.Errorf("setup step id is required")
 	}
-	if phase.IsIndexed() {
-		return SetupStep{}, fmt.Errorf("phase %q is indexed; use NewIndexedSetupStep", phase)
-	}
-	return SetupStep{phase: phase}, nil
+	return SetupStep{id: id}, nil
 }
 
-// NewIndexedSetupStep returns a SetupStep for an indexed phase (preconnect, configure).
-// Returns an error if phase is not indexed or index is negative.
-func NewIndexedSetupStep(phase SetupStepPhase, index int) (SetupStep, error) {
-	if !phase.IsIndexed() {
-		return SetupStep{}, fmt.Errorf("phase %q is not indexed", phase)
-	}
-	if index < 0 {
-		return SetupStep{}, fmt.Errorf("setup step index must be non-negative, got %d", index)
-	}
-	return SetupStep{phase: phase, index: index}, nil
-}
-
-// MustNewIndexedSetupStep is like NewIndexedSetupStep but panics on error.
-func MustNewIndexedSetupStep(phase SetupStepPhase, index int) SetupStep {
-	step, err := NewIndexedSetupStep(phase, index)
+// MustNewSetupStep is like NewSetupStep but panics on error. Useful for
+// constructing predefined singleton steps at package init time.
+func MustNewSetupStep(id string) SetupStep {
+	step, err := NewSetupStep(id)
 	if err != nil {
 		panic(err)
 	}
 	return step
 }
 
-// Predefined SetupSteps for the singleton phases.
+// Predefined SetupSteps for the system-emitted pseudo-steps.
+//
+//   - SetupStepAuth is the OAuth2-only "waiting for callback" placeholder.
+//     #366 replaces direct use of this with auth-method-emitted redirect
+//     steps whose ids are method-specific (e.g. apxy:auth:oauth2_authorize).
+//   - SetupStepVerify is the post-auth "probes running" pseudo-step.
+//   - SetupStepVerifyFailed and SetupStepAuthFailed are terminal failure
+//     pseudo-steps; connections in these are retryable via the retry endpoint.
 var (
-	SetupStepAuth         = SetupStep{phase: SetupPhaseAuth}
-	SetupStepVerify       = SetupStep{phase: SetupPhaseVerify}
-	SetupStepVerifyFailed = SetupStep{phase: SetupPhaseVerifyFailed}
-	SetupStepAuthFailed   = SetupStep{phase: SetupPhaseAuthFailed}
+	SetupStepAuth         = MustNewSetupStep(ApxyStepPrefix + "auth")
+	SetupStepVerify       = MustNewSetupStep(ApxyStepPrefix + "verify")
+	SetupStepVerifyFailed = MustNewSetupStep(ApxyStepPrefix + "verify_failed")
+	SetupStepAuthFailed   = MustNewSetupStep(ApxyStepPrefix + "auth_failed")
 )
 
-// Phase returns the step's phase.
-func (s SetupStep) Phase() SetupStepPhase { return s.phase }
+// Id returns the underlying id string.
+func (s SetupStep) Id() string { return s.id }
 
-// Index returns the 0-based index for indexed phases. Returns 0 for singleton phases.
-func (s SetupStep) Index() int { return s.index }
+// String renders the step id. The zero SetupStep returns "".
+func (s SetupStep) String() string { return s.id }
 
-// String renders the canonical setup-step form: "phase:index" for indexed phases, "phase"
-// for singletons. The zero SetupStep returns "".
-func (s SetupStep) String() string {
-	if s.phase == "" {
-		return ""
-	}
-	if s.phase.IsIndexed() {
-		return fmt.Sprintf("%s:%d", s.phase, s.index)
-	}
-	return string(s.phase)
-}
-
-// IsZero reports whether s is the zero SetupStep (no phase set).
-func (s SetupStep) IsZero() bool { return s.phase == "" }
+// IsZero reports whether s is the zero SetupStep (no id set).
+func (s SetupStep) IsZero() bool { return s.id == "" }
 
 // Equals reports whether s and other are identical.
-func (s SetupStep) Equals(other SetupStep) bool { return s == other }
+func (s SetupStep) Equals(other SetupStep) bool { return s.id == other.id }
 
-// IsTerminalFailure reports whether the step is in a terminal failure phase.
-func (s SetupStep) IsTerminalFailure() bool { return s.phase.IsTerminalFailure() }
+// IsTerminalFailure reports whether the step is in a terminal failure state
+// (verify_failed or auth_failed) — connections in this state are retryable
+// via the retry endpoint.
+func (s SetupStep) IsTerminalFailure() bool {
+	return s.Equals(SetupStepVerifyFailed) || s.Equals(SetupStepAuthFailed)
+}
+
+// IsApxyEmitted reports whether the step id is system-emitted (i.e. carries
+// the reserved apxy: prefix). User-authored steps return false.
+func (s SetupStep) IsApxyEmitted() bool {
+	return strings.HasPrefix(s.id, ApxyStepPrefix)
+}
 
 // Value implements driver.Valuer so SetupStep can be stored as a database column.
 // The zero SetupStep round-trips as SQL NULL.
@@ -224,7 +182,7 @@ func (s SetupStep) Value() (driver.Value, error) {
 	if s.IsZero() {
 		return nil, nil
 	}
-	return s.String(), nil
+	return s.id, nil
 }
 
 // Scan implements sql.Scanner so SetupStep can be read from a database column.
@@ -245,27 +203,18 @@ func (s *SetupStep) Scan(value interface{}) error {
 		return fmt.Errorf("cannot scan %T into SetupStep", value)
 	}
 
-	if str == "" {
-		*s = SetupStep{}
-		return nil
-	}
-
-	parsed, err := ParseSetupStep(str)
-	if err != nil {
-		return err
-	}
-	*s = parsed
+	*s = SetupStep{id: str}
 	return nil
 }
 
-// MarshalJSON renders SetupStep as the canonical setup-step string. The zero
-// SetupStep marshals as JSON null so it round-trips cleanly with omitempty
-// pointer fields and database NULL.
+// MarshalJSON renders SetupStep as the step id string. The zero SetupStep
+// marshals as JSON null so it round-trips cleanly with omitempty pointer
+// fields and database NULL.
 func (s SetupStep) MarshalJSON() ([]byte, error) {
 	if s.IsZero() {
 		return []byte("null"), nil
 	}
-	return json.Marshal(s.String())
+	return json.Marshal(s.id)
 }
 
 // UnmarshalJSON parses a SetupStep from a JSON string, accepting null and the
@@ -281,26 +230,17 @@ func (s *SetupStep) UnmarshalJSON(data []byte) error {
 		return fmt.Errorf("setup step must be a JSON string: %w", err)
 	}
 
-	if str == "" {
-		*s = SetupStep{}
-		return nil
-	}
-
-	parsed, err := ParseSetupStep(str)
-	if err != nil {
-		return err
-	}
-	*s = parsed
+	*s = SetupStep{id: str}
 	return nil
 }
 
-// MarshalYAML renders SetupStep as the canonical setup-step string. The zero
-// SetupStep marshals as YAML null.
+// MarshalYAML renders SetupStep as the step id string. The zero SetupStep
+// marshals as YAML null.
 func (s SetupStep) MarshalYAML() (interface{}, error) {
 	if s.IsZero() {
 		return nil, nil
 	}
-	return s.String(), nil
+	return s.id, nil
 }
 
 // UnmarshalYAML parses a SetupStep from a YAML scalar, accepting null and the
@@ -316,158 +256,236 @@ func (s *SetupStep) UnmarshalYAML(value *yaml.Node) error {
 		return fmt.Errorf("setup step must be a YAML string: %w", err)
 	}
 
-	if str == "" {
-		*s = SetupStep{}
-		return nil
-	}
-
-	parsed, err := ParseSetupStep(str)
-	if err != nil {
-		return err
-	}
-	*s = parsed
+	*s = SetupStep{id: str}
 	return nil
 }
 
-// ParseSetupStep parses a setup-step string into a SetupStep. Indexed forms must be
-// "phase:index" (e.g. "preconnect:0", "configure:3"); singleton phases ("auth", "verify",
-// "verify_failed", "auth_failed") parse as a SetupStep with index 0.
+// ParseSetupStep parses a setup-step string into a SetupStep. The empty
+// string returns the zero SetupStep.
 func ParseSetupStep(setupStep string) (SetupStep, error) {
-	phase := SetupStepPhase(setupStep)
-	if phase.IsValid() && !phase.IsIndexed() {
-		return SetupStep{phase: phase}, nil
+	if setupStep == "" {
+		return SetupStep{}, nil
 	}
-
-	parts := strings.SplitN(setupStep, ":", 2)
-	if len(parts) != 2 {
-		return SetupStep{}, fmt.Errorf("invalid setup step format %q", setupStep)
-	}
-
-	phase = SetupStepPhase(parts[0])
-	if !phase.IsIndexed() {
-		return SetupStep{}, fmt.Errorf("invalid setup step phase %q", phase)
-	}
-
-	index, err := strconv.Atoi(parts[1])
-	if err != nil {
-		return SetupStep{}, fmt.Errorf("invalid setup step index %q: %w", parts[1], err)
-	}
-
-	if index < 0 {
-		return SetupStep{}, fmt.Errorf("setup step index must be non-negative, got %d", index)
-	}
-
-	return SetupStep{phase: phase, index: index}, nil
+	return SetupStep{id: setupStep}, nil
 }
 
-// GetStepBySetupStep returns the step definition and its 0-based global index for the given
-// setup step. Returns an error if step is not an indexed phase or its index is out of range.
+// IsConfigureStep returns true when the supplied step belongs to the
+// schema's configure phase. Data sources are only available during configure
+// steps (preconnect cannot use them because credentials are not yet
+// established); callers use this to gate proxy-driven data-source requests.
+func (sf *SetupFlow) IsConfigureStep(step SetupStep) bool {
+	return phaseContainsId(sf.configurePhase(), step.id)
+}
+
+// IsCredentialsStep returns true when the supplied step belongs to the
+// schema's credentials phase. The credentials phase is owned by an auth
+// method (currently AuthApiKey); submissions to it are routed to the auth
+// method instead of merged into the connection's config.
+func (sf *SetupFlow) IsCredentialsStep(step SetupStep) bool {
+	return phaseContainsId(sf.credentialsPhase(), step.id)
+}
+
+// IsSchemaStep returns true when the supplied step is a user-authored step
+// from preconnect, credentials, or configure — i.e. one that accepts form
+// submissions. Apxy-emitted pseudo-steps return false.
+func (sf *SetupFlow) IsSchemaStep(step SetupStep) bool {
+	_, _, ok := sf.findStepById(step.id)
+	return ok
+}
+
+func (sf *SetupFlow) credentialsPhase() *SetupFlowPhase {
+	if sf == nil {
+		return nil
+	}
+	return sf.Credentials
+}
+
+func (sf *SetupFlow) configurePhase() *SetupFlowPhase {
+	if sf == nil {
+		return nil
+	}
+	return sf.Configure
+}
+
+func phaseContainsId(phase *SetupFlowPhase, id string) bool {
+	if phase == nil || id == "" {
+		return false
+	}
+	for i := range phase.Steps {
+		if phase.Steps[i].Id == id {
+			return true
+		}
+	}
+	return false
+}
+
+// findStepById walks the schema-defined arrays (preconnect, credentials,
+// configure) and returns the array slot the id lives in. ok=false if the id
+// is not user-authored (e.g. an apxy:* pseudo-step or unknown id).
+func (sf *SetupFlow) findStepById(id string) (step *SetupFlowStep, globalIndex int, ok bool) {
+	if sf == nil || id == "" {
+		return nil, 0, false
+	}
+	idx := 0
+	if sf.Preconnect != nil {
+		for i := range sf.Preconnect.Steps {
+			if sf.Preconnect.Steps[i].Id == id {
+				return &sf.Preconnect.Steps[i], idx, true
+			}
+			idx++
+		}
+	}
+	if sf.Credentials != nil {
+		for i := range sf.Credentials.Steps {
+			if sf.Credentials.Steps[i].Id == id {
+				return &sf.Credentials.Steps[i], idx, true
+			}
+			idx++
+		}
+	}
+	if sf.Configure != nil {
+		for i := range sf.Configure.Steps {
+			if sf.Configure.Steps[i].Id == id {
+				return &sf.Configure.Steps[i], idx, true
+			}
+			idx++
+		}
+	}
+	return nil, 0, false
+}
+
+// GetStepBySetupStep returns the step definition and its 0-based global index
+// (across preconnect + credentials + configure) for the given setup step.
+// Returns an error if the step id is not a user-authored schema step (e.g.
+// an apxy:* pseudo-step) or is unknown.
+//
+// DEPRECATED: #366 replaces direct callers with ManifestSetupFlow.StepById.
+// Kept transitional so the pre-#366 dispatch path keeps compiling.
 func (sf *SetupFlow) GetStepBySetupStep(step SetupStep) (*SetupFlowStep, int, error) {
-	switch step.phase {
-	case SetupPhasePreconnect:
-		if sf.Preconnect == nil || step.index >= len(sf.Preconnect.Steps) {
-			return nil, 0, fmt.Errorf("preconnect step index %d out of range", step.index)
-		}
-		return &sf.Preconnect.Steps[step.index], step.index, nil
-	case SetupPhaseCredentials:
-		if sf.Credentials == nil || step.index >= len(sf.Credentials.Steps) {
-			return nil, 0, fmt.Errorf("credentials step index %d out of range", step.index)
-		}
-		globalIndex := step.index
-		if sf.Preconnect != nil {
-			globalIndex += len(sf.Preconnect.Steps)
-		}
-		return &sf.Credentials.Steps[step.index], globalIndex, nil
-	case SetupPhaseConfigure:
-		if sf.Configure == nil || step.index >= len(sf.Configure.Steps) {
-			return nil, 0, fmt.Errorf("configure step index %d out of range", step.index)
-		}
-		globalIndex := step.index
-		if sf.Preconnect != nil {
-			globalIndex += len(sf.Preconnect.Steps)
-		}
-		if sf.Credentials != nil {
-			globalIndex += len(sf.Credentials.Steps)
-		}
-		return &sf.Configure.Steps[step.index], globalIndex, nil
-	default:
-		return nil, 0, fmt.Errorf("phase %q does not have indexed steps", step.phase)
+	found, idx, ok := sf.findStepById(step.id)
+	if !ok {
+		return nil, 0, fmt.Errorf("step %q is not a schema-defined step", step.id)
 	}
+	return found, idx, nil
 }
 
-// FirstSetupStep returns the first step in the flow. Returns the zero SetupStep when the
-// flow has no steps (caller should check IsZero).
+// FirstSetupStep returns the first step in the flow. Returns the zero
+// SetupStep when the flow has no steps (caller should check IsZero).
+//
+// DEPRECATED: #366 replaces direct callers with ManifestSetupFlow.FirstStep.
 func (sf *SetupFlow) FirstSetupStep() SetupStep {
 	if sf == nil {
 		return SetupStep{}
 	}
 	if sf.HasPreconnect() {
-		return SetupStep{phase: SetupPhasePreconnect}
+		return SetupStep{id: sf.Preconnect.Steps[0].Id}
 	}
 	if sf.HasCredentials() {
-		return SetupStep{phase: SetupPhaseCredentials}
+		return SetupStep{id: sf.Credentials.Steps[0].Id}
 	}
 	if sf.HasConfigure() {
-		return SetupStep{phase: SetupPhaseConfigure}
+		return SetupStep{id: sf.Configure.Steps[0].Id}
 	}
 	return SetupStep{}
 }
 
-// NextSetupStep returns the step that follows current.
+// NextSetupStep returns the step that follows current in the linear flow.
 //
-// The credentials phase is owned by an auth method (currently AuthApiKey): when
-// the setup flow has a credentials phase, preconnect transitions there before
-// any auth phase. When it doesn't, preconnect transitions directly to the
-// OAuth2-style auth phase (which OAuth2 connectors use to redirect+wait).
+// Navigation rules (same as the prior phase-based encoding, just keyed by id):
+//   - Within preconnect / credentials / configure arrays: advance to the
+//     next entry of the same array.
+//   - End of preconnect: jump to credentials:0 if present, else SetupStepAuth.
+//   - End of credentials: jump to SetupStepVerify if hasProbes, else configure:0,
+//     else done.
+//   - SetupStepAuth: jump to SetupStepVerify if hasProbes, else configure:0,
+//     else done.
+//   - SetupStepVerify: jump to configure:0 if present, else done.
+//   - End of configure: done.
 //
-// When the connector has probes, a verify phase runs between credential
-// establishment and configure. Returns the zero SetupStep (IsZero) when current
-// is the final step.
+// DEPRECATED: #366 replaces direct callers with ManifestSetupFlow.NextStep.
+// Kept transitional so the pre-#366 dispatch path keeps compiling.
 func (sf *SetupFlow) NextSetupStep(current SetupStep, hasProbes bool) (SetupStep, error) {
-	switch current.phase {
-	case SetupPhasePreconnect:
-		if sf.Preconnect != nil && current.index+1 < len(sf.Preconnect.Steps) {
-			return SetupStep{phase: SetupPhasePreconnect, index: current.index + 1}, nil
-		}
-		if sf.HasCredentials() {
-			return SetupStep{phase: SetupPhaseCredentials}, nil
-		}
-		// No credentials phase — fall through to the auth phase (OAuth2's redirect step).
-		return SetupStepAuth, nil
-	case SetupPhaseCredentials:
-		if sf.Credentials != nil && current.index+1 < len(sf.Credentials.Steps) {
-			return SetupStep{phase: SetupPhaseCredentials, index: current.index + 1}, nil
-		}
-		// Credentials done — credentials phase replaces the auth phase for its
-		// auth method, so we go straight to verify / configure / ready.
-		if hasProbes {
-			return SetupStepVerify, nil
-		}
-		if sf.HasConfigure() {
-			return SetupStep{phase: SetupPhaseConfigure}, nil
-		}
-		return SetupStep{}, nil // Complete
-	case SetupPhaseAuth:
-		if hasProbes {
-			return SetupStepVerify, nil
-		}
-		if sf.HasConfigure() {
-			return SetupStep{phase: SetupPhaseConfigure}, nil
-		}
-		return SetupStep{}, nil // Complete
-	case SetupPhaseVerify:
-		if sf.HasConfigure() {
-			return SetupStep{phase: SetupPhaseConfigure}, nil
-		}
-		return SetupStep{}, nil // Complete
-	case SetupPhaseConfigure:
-		if sf.Configure != nil && current.index+1 < len(sf.Configure.Steps) {
-			return SetupStep{phase: SetupPhaseConfigure, index: current.index + 1}, nil
-		}
-		return SetupStep{}, nil // Complete
-	default:
-		return SetupStep{}, fmt.Errorf("no successor defined for phase %q", current.phase)
+	if current.IsZero() {
+		return SetupStep{}, fmt.Errorf("cannot compute next from zero SetupStep")
 	}
+
+	// Pseudo-steps: explicit transitions.
+	if current.Equals(SetupStepAuth) {
+		return sf.afterCredentialsEstablished(hasProbes), nil
+	}
+	if current.Equals(SetupStepVerify) {
+		if sf.HasConfigure() {
+			return SetupStep{id: sf.Configure.Steps[0].Id}, nil
+		}
+		return SetupStep{}, nil
+	}
+	if current.IsApxyEmitted() {
+		return SetupStep{}, fmt.Errorf("no successor defined for pseudo-step %q", current.id)
+	}
+
+	// Schema-defined step: locate which array it lives in and advance.
+	if sf.HasPreconnect() {
+		if next, ok := nextInArray(sf.Preconnect.Steps, current.id); ok {
+			return next, nil
+		}
+		if sf.isLastInArray(sf.Preconnect.Steps, current.id) {
+			if sf.HasCredentials() {
+				return SetupStep{id: sf.Credentials.Steps[0].Id}, nil
+			}
+			return SetupStepAuth, nil
+		}
+	}
+	if sf.HasCredentials() {
+		if next, ok := nextInArray(sf.Credentials.Steps, current.id); ok {
+			return next, nil
+		}
+		if sf.isLastInArray(sf.Credentials.Steps, current.id) {
+			return sf.afterCredentialsEstablished(hasProbes), nil
+		}
+	}
+	if sf.HasConfigure() {
+		if next, ok := nextInArray(sf.Configure.Steps, current.id); ok {
+			return next, nil
+		}
+		if sf.isLastInArray(sf.Configure.Steps, current.id) {
+			return SetupStep{}, nil
+		}
+	}
+	return SetupStep{}, fmt.Errorf("unknown step id %q", current.id)
+}
+
+// afterCredentialsEstablished returns the step that follows credential
+// establishment (end of credentials phase, or OAuth2 auth phase).
+func (sf *SetupFlow) afterCredentialsEstablished(hasProbes bool) SetupStep {
+	if hasProbes {
+		return SetupStepVerify
+	}
+	if sf.HasConfigure() {
+		return SetupStep{id: sf.Configure.Steps[0].Id}
+	}
+	return SetupStep{} // Complete
+}
+
+// nextInArray returns the successor id within a single array, ok=false when
+// id is not present in the array or is the last entry.
+func nextInArray(steps []SetupFlowStep, id string) (SetupStep, bool) {
+	for i := range steps {
+		if steps[i].Id == id {
+			if i+1 < len(steps) {
+				return SetupStep{id: steps[i+1].Id}, true
+			}
+			return SetupStep{}, false
+		}
+	}
+	return SetupStep{}, false
+}
+
+// isLastInArray returns true when id is the last entry of the supplied array.
+func (sf *SetupFlow) isLastInArray(steps []SetupFlowStep, id string) bool {
+	if len(steps) == 0 {
+		return false
+	}
+	return steps[len(steps)-1].Id == id
 }
 
 // SetupFlowPhase is a sequential list of form steps within a phase (preconnect or configure).
@@ -500,6 +518,8 @@ func (p *SetupFlowPhase) Validate(vc *common.ValidationContext, seenIds map[stri
 // SetupFlowStep defines a single form step in the setup flow.
 type SetupFlowStep struct {
 	// Id is a unique identifier for this step within the connector's setup flow.
+	// Must not start with the apxy: prefix, which is reserved for system-emitted
+	// steps.
 	Id string `json:"id" yaml:"id"`
 
 	// Title is the human-readable title shown above the form.
@@ -524,6 +544,8 @@ func (s *SetupFlowStep) Validate(vc *common.ValidationContext, seenIds map[strin
 
 	if s.Id == "" {
 		result = multierror.Append(result, vc.NewErrorfForField("id", "step id is required"))
+	} else if strings.HasPrefix(s.Id, ApxyStepPrefix) {
+		result = multierror.Append(result, vc.NewErrorfForField("id", "step id %q must not start with reserved prefix %q", s.Id, ApxyStepPrefix))
 	} else if seenIds[s.Id] {
 		result = multierror.Append(result, vc.NewErrorfForField("id", "duplicate step id %q", s.Id))
 	} else {

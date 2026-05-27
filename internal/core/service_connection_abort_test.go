@@ -50,7 +50,7 @@ func TestAbortConnection(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+		step := cschema.MustNewSetupStep("tenant")
 		conn, db := setupAbortTest(t, ctrl, &cschema.SetupFlow{
 			Preconnect: &cschema.SetupFlowPhase{
 				Steps: []cschema.SetupFlowStep{
@@ -90,7 +90,7 @@ func TestAbortConnection(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0)
+		step := cschema.MustNewSetupStep("workspace")
 		conn, db := setupAbortTest(t, ctrl, &cschema.SetupFlow{
 			Configure: &cschema.SetupFlowPhase{
 				Steps: []cschema.SetupFlowStep{

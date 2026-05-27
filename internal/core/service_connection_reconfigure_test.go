@@ -74,7 +74,7 @@ func TestReconfigure(t *testing.T) {
 		})
 		conn.State = database.ConnectionStateConfigured
 
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0))).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep("workspace"))).Return(nil)
 
 		resp, err := conn.Reconfigure(context.Background())
 		require.NoError(t, err)
@@ -101,7 +101,7 @@ func TestReconfigure(t *testing.T) {
 		})
 		conn.State = database.ConnectionStateConfigured
 
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0))).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep("workspace"))).Return(nil)
 
 		resp, err := conn.Reconfigure(context.Background())
 		require.NoError(t, err)

@@ -22,7 +22,7 @@ func TestCancelSetup(t *testing.T) {
 			},
 		})
 		conn.State = database.ConnectionStateConfigured
-		step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0)
+		step := cschema.MustNewSetupStep("workspace")
 		conn.SetupStep = &step
 		errMsg := "stale"
 		conn.SetupError = &errMsg

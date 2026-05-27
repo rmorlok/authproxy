@@ -92,7 +92,7 @@ func TestApiKeySubmit_BearerPersistsCredentialAndAdvancesToReady(t *testing.T) {
 		Type: cschema.ApiKeyPlacementBearer,
 	}, nil)
 
-	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
+	step := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
 	conn.SetupStep = &step
 
 	credCap := &captureEncCredential{}
@@ -132,7 +132,7 @@ func TestApiKeySubmit_BasicPersistsBothCredentialFields(t *testing.T) {
 		UsernameField: "account_id",
 	}, nil)
 
-	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
+	step := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
 	conn.SetupStep = &step
 
 	credCap := &captureEncCredential{}
@@ -167,7 +167,7 @@ func TestApiKeySubmit_TransitionsToVerifyWhenProbesPresent(t *testing.T) {
 			{Id: "ping", Http: &cschema.ProbeHttp{Method: "GET", URL: "https://example.com/ping"}},
 		},
 	)
-	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
+	step := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
 	conn.SetupStep = &step
 
 	ctx, actorId := contextWithActor(t)
@@ -194,7 +194,7 @@ func TestApiKeySubmit_NoReplay_PriorCredentialNeverDecryptedIntoForm(t *testing.
 	conn, db, _ := newTestApiKeyConnection(t, ctrl, &cschema.ApiKeyPlacement{
 		Type: cschema.ApiKeyPlacementBearer,
 	}, nil)
-	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
+	step := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
 	conn.SetupStep = &step
 
 	ctx, actorId := contextWithActor(t)
@@ -266,7 +266,7 @@ func TestApiKeySubmit_PreconnectFieldNamedApiKeyIsNotTreatedAsCredential(t *test
 		logger: aplog.NewNoopLogger(),
 	}
 
-	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0)
+	step := cschema.MustNewSetupStep("tenant")
 	conn.SetupStep = &step
 
 	// Critical invariants:
@@ -285,7 +285,7 @@ func TestApiKeySubmit_PreconnectFieldNamedApiKeyIsNotTreatedAsCredential(t *test
 		})
 	// After preconnect completes the next step is the synthesized credentials step,
 	// so SubmitForm returns that form (not complete).
-	credsStep := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
+	credsStep := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
 	db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &credsStep).Return(nil)
 
 	ctx, _ := contextWithActor(t)
@@ -338,11 +338,11 @@ func TestApiKeySubmit_TransitionsToConfigureWhenNoProbes(t *testing.T) {
 		logger: aplog.NewNoopLogger(),
 	}
 
-	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
+	step := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
 	conn.SetupStep = &step
 
 	ctx, actorId := contextWithActor(t)
-	configureFirst := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseConfigure, 0)
+	configureFirst := cschema.MustNewSetupStep("workspace")
 	db.EXPECT().
 		InsertApiKeyCredential(gomock.Any(), conn.Id, gomock.Any(), gomock.Any(), &actorId).
 		Return(&database.ApiKeyCredential{Id: apid.New(apid.PrefixApiKeyCredential)}, nil)
@@ -371,7 +371,7 @@ func TestApiKeySubmit_RejectsMismatchedStepId(t *testing.T) {
 	conn, _, _ := newTestApiKeyConnection(t, ctrl, &cschema.ApiKeyPlacement{
 		Type: cschema.ApiKeyPlacementBearer,
 	}, nil)
-	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
+	step := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
 	conn.SetupStep = &step
 
 	// No InsertApiKeyCredential expected — submit should error before that.
@@ -394,7 +394,7 @@ func TestApiKeySubmit_RejectsSchemaViolation(t *testing.T) {
 	conn, _, _ := newTestApiKeyConnection(t, ctrl, &cschema.ApiKeyPlacement{
 		Type: cschema.ApiKeyPlacementBearer,
 	}, nil)
-	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
+	step := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
 	conn.SetupStep = &step
 
 	// No InsertApiKeyCredential expected.
@@ -418,7 +418,7 @@ func TestApiKeySubmit_RejectsBasicMissingUsername(t *testing.T) {
 		Type:          cschema.ApiKeyPlacementBasic,
 		UsernameField: "account_id",
 	}, nil)
-	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
+	step := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
 	conn.SetupStep = &step
 
 	// No InsertApiKeyCredential expected.
@@ -467,7 +467,7 @@ func TestApiKeySubmit_RejectsUnknownAuthTypeOnCredentialsPhase(t *testing.T) {
 		cv:     cv,
 		logger: aplog.NewNoopLogger(),
 	}
-	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
+	step := cschema.MustNewSetupStep("creds")
 	conn.SetupStep = &step
 
 	ctx, _ := contextWithActor(t)
@@ -489,7 +489,7 @@ func TestApiKeySubmit_DBErrorSurfacesUnchanged(t *testing.T) {
 	conn, db, _ := newTestApiKeyConnection(t, ctrl, &cschema.ApiKeyPlacement{
 		Type: cschema.ApiKeyPlacementBearer,
 	}, nil)
-	step := cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0)
+	step := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
 	conn.SetupStep = &step
 
 	ctx, actorId := contextWithActor(t)

@@ -403,9 +403,11 @@ definitions:
         description: Namespace path
         example: acme
         type: string
-      setup_step:
-        description: Current setup step if connection setup is in progress
-        example: preconnect:0
+      setup_step_id:
+        description: |-
+          Current setup step if connection setup is in progress. Either a user-authored step id from
+          the connector definition or an apxy:* pseudo-step (e.g. apxy:verify, apxy:auth_failed).
+        example: tenant
         type: string
       state:
         description: Connection state (pending, connected, disconnecting, disconnected,

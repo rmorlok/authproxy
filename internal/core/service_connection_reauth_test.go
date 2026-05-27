@@ -65,7 +65,7 @@ func TestReauthConnection(t *testing.T) {
 		}, nil).AnyTimes()
 
 		db.EXPECT().SetConnectionSetupError(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0))).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId))).Return(nil)
 
 		resp, err := conn.s.ReauthConnection(context.Background(), conn.Id, "")
 		require.NoError(t, err)
@@ -107,7 +107,7 @@ func TestReauthConnection(t *testing.T) {
 		}, nil).AnyTimes()
 
 		db.EXPECT().SetConnectionSetupError(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0))).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId))).Return(nil)
 
 		resp, err := conn.s.ReauthConnection(context.Background(), conn.Id, "")
 		require.NoError(t, err)
@@ -138,7 +138,7 @@ func TestReauthConnection(t *testing.T) {
 
 		// Expect setup_error nil-write.
 		db.EXPECT().SetConnectionSetupError(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewIndexedSetupStep(cschema.SetupPhaseCredentials, 0))).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId))).Return(nil)
 
 		// gomock validates the (*string)(nil) write happened — the in-memory
 		// `conn` is not the same instance ReauthConnection operates on (the
@@ -192,7 +192,7 @@ func TestReauthConnection(t *testing.T) {
 		}, nil).AnyTimes()
 
 		db.EXPECT().SetConnectionSetupError(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewIndexedSetupStep(cschema.SetupPhasePreconnect, 0))).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep("tenant"))).Return(nil)
 
 		resp, err := s.ReauthConnection(context.Background(), conn.Id, "")
 		require.NoError(t, err)
