@@ -25,6 +25,59 @@ definitions:
       updated_at:
         type: string
     type: object
+  github_com_rmorlok_authproxy_internal_schema_api.ConnectorJson:
+    description: Connector API summary response
+    properties:
+      annotations:
+        additionalProperties:
+          type: string
+        type: object
+      created_at:
+        type: string
+      description:
+        example: Salesforce CRM integration
+        type: string
+      display_name:
+        example: Salesforce
+        type: string
+      has_configure:
+        example: false
+        type: boolean
+      highlight:
+        example: CRM platform
+        type: string
+      id:
+        example: cxr_test550e8400abcde
+        type: string
+      labels:
+        additionalProperties:
+          type: string
+        type: object
+      logo:
+        example: https://example.com/logo.png
+        type: string
+      namespace:
+        example: root.acme
+        type: string
+      state:
+        example: primary
+        type: string
+      states:
+        items:
+          type: string
+        type: array
+      status_page_url:
+        example: https://status.salesforce.com
+        type: string
+      updated_at:
+        type: string
+      version:
+        example: 1
+        type: integer
+      versions:
+        example: 2
+        type: integer
+    type: object
   github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson:
     description: Namespace for organizing resources
     properties:
@@ -419,64 +472,56 @@ definitions:
         type: string
     type: object
   routes.SwaggerConnectorJson:
-    description: Connector definition for external service integration
+    description: Connector API summary response
     properties:
       annotations:
         additionalProperties:
           type: string
-        description: Annotations assigned to the connector
         type: object
       created_at:
-        description: Creation timestamp
         type: string
       description:
-        description: Full description
         example: Salesforce CRM integration
         type: string
       display_name:
-        description: Display name
         example: Salesforce
         type: string
       has_configure:
-        description: Whether the connector defines configure setup steps (controls
-          reconfigure availability)
         example: false
         type: boolean
       highlight:
-        description: Short highlight text
         example: CRM platform
         type: string
       id:
-        description: Connector UUID
-        example: req_test550e8400abcde
+        example: cxr_test550e8400abcde
         type: string
       labels:
         additionalProperties:
           type: string
-        description: Labels assigned to the connector
         type: object
       logo:
-        description: Logo URL
         example: https://example.com/logo.png
         type: string
       namespace:
-        description: Namespace path
-        example: acme
+        example: root.acme
         type: string
       state:
-        description: State (draft, active, deprecated, archived)
-        example: active
+        example: primary
         type: string
+      states:
+        items:
+          type: string
+        type: array
       status_page_url:
-        description: Status page URL for tracking 3rd party outages
         example: https://status.salesforce.com
         type: string
       updated_at:
-        description: Last update timestamp
         type: string
       version:
-        description: Connector version number
         example: 1
+        type: integer
+      versions:
+        example: 2
         type: integer
     type: object
   routes.SwaggerConnectorVersionJson:
@@ -485,35 +530,26 @@ definitions:
       annotations:
         additionalProperties:
           type: string
-        description: Annotations assigned to the connector version
         type: object
       created_at:
-        description: Creation timestamp
         type: string
-      definition:
-        description: Connector definition (full schema)
+      definition: {}
       id:
-        description: Connector UUID
-        example: req_test550e8400abcde
+        example: cxr_test550e8400abcde
         type: string
       labels:
         additionalProperties:
           type: string
-        description: Labels assigned to the connector
         type: object
       namespace:
-        description: Namespace path
-        example: acme
+        example: root.acme
         type: string
       state:
-        description: State (draft, active, deprecated, archived)
-        example: active
+        example: primary
         type: string
       updated_at:
-        description: Last update timestamp
         type: string
       version:
-        description: Connector version number
         example: 1
         type: integer
     type: object
@@ -523,18 +559,14 @@ definitions:
       annotations:
         additionalProperties:
           type: string
-        description: Annotations to set on the connector
         type: object
-      definition:
-        description: Connector definition (full schema)
+      definition: {}
       labels:
         additionalProperties:
           type: string
-        description: Labels to set on the connector
         type: object
       namespace:
-        description: Namespace path for the connector
-        example: acme
+        example: root.acme
         type: string
     type: object
   routes.SwaggerCreateConnectorVersionRequest:
@@ -543,16 +575,11 @@ definitions:
       annotations:
         additionalProperties:
           type: string
-        description: Annotations to set on the new version (optional - nil copies
-          from latest)
         type: object
-      definition:
-        description: Connector definition (optional - nil copies from latest version)
+      definition: {}
       labels:
         additionalProperties:
           type: string
-        description: Labels to set on the new version (optional - nil copies from
-          latest)
         type: object
     type: object
   routes.SwaggerDisconnectResponse:
@@ -715,24 +742,23 @@ definitions:
     description: Paginated list of connector versions
     properties:
       cursor:
-        description: Pagination cursor for next page
+        description: Pagination cursor for next page.
         type: string
       items:
-        description: List of connector versions
-        items:
-          $ref: '#/definitions/routes.SwaggerConnectorVersionJson'
+        description: List of connector versions.
+        items: {}
         type: array
     type: object
   routes.SwaggerListConnectorsResponse:
     description: Paginated list of connectors
     properties:
       cursor:
-        description: Pagination cursor for next page
+        description: Pagination cursor for next page.
         type: string
       items:
-        description: List of connectors
+        description: List of connectors.
         items:
-          $ref: '#/definitions/routes.SwaggerConnectorJson'
+          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ConnectorJson'
         type: array
     type: object
   routes.SwaggerListEncryptionKeysResponse:
@@ -920,14 +946,11 @@ definitions:
       annotations:
         additionalProperties:
           type: string
-        description: Annotations to set on the connector (optional - nil keeps existing)
         type: object
-      definition:
-        description: Connector definition (full schema, optional - nil keeps existing)
+      definition: {}
       labels:
         additionalProperties:
           type: string
-        description: Labels to set on the connector (optional - nil keeps existing)
         type: object
     type: object
   routes.TaskInfoJson:

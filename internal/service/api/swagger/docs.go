@@ -7464,6 +7464,80 @@ const docTemplateApi = `{
                 }
             }
         },
+        "github_com_rmorlok_authproxy_internal_schema_api.ConnectorJson": {
+            "description": "Connector API summary response",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Salesforce CRM integration"
+                },
+                "display_name": {
+                    "type": "string",
+                    "example": "Salesforce"
+                },
+                "has_configure": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "highlight": {
+                    "type": "string",
+                    "example": "CRM platform"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "cxr_test550e8400abcde"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "logo": {
+                    "type": "string",
+                    "example": "https://example.com/logo.png"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "primary"
+                },
+                "states": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "status_page_url": {
+                    "type": "string",
+                    "example": "https://status.salesforce.com"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "versions": {
+                    "type": "integer",
+                    "example": 2
+                }
+            }
+        },
         "github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson": {
             "description": "Namespace for organizing resources",
             "type": "object",
@@ -8000,80 +8074,76 @@ const docTemplateApi = `{
             }
         },
         "routes.SwaggerConnectorJson": {
-            "description": "Connector definition for external service integration",
+            "description": "Connector API summary response",
             "type": "object",
             "properties": {
                 "annotations": {
-                    "description": "Annotations assigned to the connector",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
                 "created_at": {
-                    "description": "Creation timestamp",
                     "type": "string"
                 },
                 "description": {
-                    "description": "Full description",
                     "type": "string",
                     "example": "Salesforce CRM integration"
                 },
                 "display_name": {
-                    "description": "Display name",
                     "type": "string",
                     "example": "Salesforce"
                 },
                 "has_configure": {
-                    "description": "Whether the connector defines configure setup steps (controls reconfigure availability)",
                     "type": "boolean",
                     "example": false
                 },
                 "highlight": {
-                    "description": "Short highlight text",
                     "type": "string",
                     "example": "CRM platform"
                 },
                 "id": {
-                    "description": "Connector UUID",
                     "type": "string",
-                    "example": "req_test550e8400abcde"
+                    "example": "cxr_test550e8400abcde"
                 },
                 "labels": {
-                    "description": "Labels assigned to the connector",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
                 "logo": {
-                    "description": "Logo URL",
                     "type": "string",
                     "example": "https://example.com/logo.png"
                 },
                 "namespace": {
-                    "description": "Namespace path",
                     "type": "string",
-                    "example": "acme"
+                    "example": "root.acme"
                 },
                 "state": {
-                    "description": "State (draft, active, deprecated, archived)",
                     "type": "string",
-                    "example": "active"
+                    "example": "primary"
+                },
+                "states": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
                 },
                 "status_page_url": {
-                    "description": "Status page URL for tracking 3rd party outages",
                     "type": "string",
                     "example": "https://status.salesforce.com"
                 },
                 "updated_at": {
-                    "description": "Last update timestamp",
                     "type": "string"
                 },
                 "version": {
-                    "description": "Connector version number",
                     "type": "integer",
                     "example": 1
+                },
+                "versions": {
+                    "type": "integer",
+                    "example": 2
                 }
             }
         },
@@ -8082,47 +8152,37 @@ const docTemplateApi = `{
             "type": "object",
             "properties": {
                 "annotations": {
-                    "description": "Annotations assigned to the connector version",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
                 "created_at": {
-                    "description": "Creation timestamp",
                     "type": "string"
                 },
-                "definition": {
-                    "description": "Connector definition (full schema)"
-                },
+                "definition": {},
                 "id": {
-                    "description": "Connector UUID",
                     "type": "string",
-                    "example": "req_test550e8400abcde"
+                    "example": "cxr_test550e8400abcde"
                 },
                 "labels": {
-                    "description": "Labels assigned to the connector",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
                 "namespace": {
-                    "description": "Namespace path",
                     "type": "string",
-                    "example": "acme"
+                    "example": "root.acme"
                 },
                 "state": {
-                    "description": "State (draft, active, deprecated, archived)",
                     "type": "string",
-                    "example": "active"
+                    "example": "primary"
                 },
                 "updated_at": {
-                    "description": "Last update timestamp",
                     "type": "string"
                 },
                 "version": {
-                    "description": "Connector version number",
                     "type": "integer",
                     "example": 1
                 }
@@ -8133,26 +8193,21 @@ const docTemplateApi = `{
             "type": "object",
             "properties": {
                 "annotations": {
-                    "description": "Annotations to set on the connector",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
-                "definition": {
-                    "description": "Connector definition (full schema)"
-                },
+                "definition": {},
                 "labels": {
-                    "description": "Labels to set on the connector",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
                 "namespace": {
-                    "description": "Namespace path for the connector",
                     "type": "string",
-                    "example": "acme"
+                    "example": "root.acme"
                 }
             }
         },
@@ -8161,17 +8216,13 @@ const docTemplateApi = `{
             "type": "object",
             "properties": {
                 "annotations": {
-                    "description": "Annotations to set on the new version (optional - nil copies from latest)",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
-                "definition": {
-                    "description": "Connector definition (optional - nil copies from latest version)"
-                },
+                "definition": {},
                 "labels": {
-                    "description": "Labels to set on the new version (optional - nil copies from latest)",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
@@ -8405,15 +8456,13 @@ const docTemplateApi = `{
             "type": "object",
             "properties": {
                 "cursor": {
-                    "description": "Pagination cursor for next page",
+                    "description": "Pagination cursor for next page.",
                     "type": "string"
                 },
                 "items": {
-                    "description": "List of connector versions",
+                    "description": "List of connector versions.",
                     "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/routes.SwaggerConnectorVersionJson"
-                    }
+                    "items": {}
                 }
             }
         },
@@ -8422,14 +8471,14 @@ const docTemplateApi = `{
             "type": "object",
             "properties": {
                 "cursor": {
-                    "description": "Pagination cursor for next page",
+                    "description": "Pagination cursor for next page.",
                     "type": "string"
                 },
                 "items": {
-                    "description": "List of connectors",
+                    "description": "List of connectors.",
                     "type": "array",
                     "items": {
-                        "$ref": "#/definitions/routes.SwaggerConnectorJson"
+                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ConnectorJson"
                     }
                 }
             }
@@ -8682,17 +8731,13 @@ const docTemplateApi = `{
             "type": "object",
             "properties": {
                 "annotations": {
-                    "description": "Annotations to set on the connector (optional - nil keeps existing)",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
-                "definition": {
-                    "description": "Connector definition (full schema, optional - nil keeps existing)"
-                },
+                "definition": {},
                 "labels": {
-                    "description": "Labels to set on the connector (optional - nil keeps existing)",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
