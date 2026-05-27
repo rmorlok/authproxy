@@ -18,6 +18,7 @@ This directory holds long-form documentation that supplements the [main repo REA
 ## Reference
 
 - **[OAuth test provider gaps](oauth_test_provider_gaps.md)** — limitations of the in-repo OAuth test provider that the integration tests run against.
+- **[Schema and OpenAPI generation](schema-openapi-generation.md)** — recommendation on keeping `swaggo/swag` vs. moving toward JSON Schema-driven OpenAPI generation.
 
 ## Architecture diagrams
 
