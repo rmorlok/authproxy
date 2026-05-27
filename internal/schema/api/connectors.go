@@ -54,7 +54,7 @@ type ConnectorVersionJson struct {
 	Version     uint64                `json:"version" yaml:"version" example:"1"`
 	Namespace   string                `json:"namespace" yaml:"namespace" example:"root.acme"`
 	State       ConnectorVersionState `json:"state" yaml:"state" swaggertype:"string" example:"primary"`
-	Definition  cschema.Connector     `json:"definition" yaml:"definition" swaggertype:"object"`
+	Definition  cschema.Connector     `json:"definition" yaml:"definition"`
 	Labels      map[string]string     `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Annotations map[string]string     `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 	CreatedAt   time.Time             `json:"created_at" yaml:"created_at"`
@@ -71,7 +71,7 @@ type ListConnectorVersionsResponseJson struct {
 //	@Description	Request to create a new connector
 type CreateConnectorRequestJson struct {
 	Namespace   string            `json:"namespace" yaml:"namespace" example:"root.acme"`
-	Definition  cschema.Connector `json:"definition" yaml:"definition" swaggertype:"object"`
+	Definition  cschema.Connector `json:"definition" yaml:"definition"`
 	Labels      map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Annotations map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
@@ -80,7 +80,7 @@ type CreateConnectorRequestJson struct {
 //
 //	@Description	Request to update a connector or connector version
 type UpdateConnectorRequestJson struct {
-	Definition  *cschema.Connector `json:"definition,omitempty" yaml:"definition,omitempty" swaggertype:"object"`
+	Definition  *cschema.Connector `json:"definition,omitempty" yaml:"definition,omitempty"`
 	Labels      *map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Annotations *map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
@@ -89,7 +89,7 @@ type UpdateConnectorRequestJson struct {
 //
 //	@Description	Request to create a new draft connector version
 type CreateConnectorVersionRequestJson struct {
-	Definition  *cschema.Connector `json:"definition,omitempty" yaml:"definition,omitempty" swaggertype:"object"`
+	Definition  *cschema.Connector `json:"definition,omitempty" yaml:"definition,omitempty"`
 	Labels      *map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Annotations *map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
