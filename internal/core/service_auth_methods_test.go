@@ -71,7 +71,9 @@ func TestGetAuthMethodFactory_NilOrMissingReturnsNil(t *testing.T) {
 
 	assert.Nil(t, svc.getAuthMethodFactory(nil))
 	assert.Nil(t, svc.getAuthMethodFactory(&cschema.Connector{}))
-	// Unknown type with an empty registry resolves to nil.
+	// Empty the registry to assert that an unknown type also resolves to nil
+	// — independent of whether the production registry would have populated it.
+	svc.authMethodFactories = nil
 	assert.Nil(t, svc.getAuthMethodFactory(&cschema.Connector{
 		Auth: &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
 	}))

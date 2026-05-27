@@ -10,6 +10,7 @@ import (
 	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
+	"github.com/rmorlok/authproxy/internal/auth_methods/api_key"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
@@ -33,7 +34,12 @@ func newTestApiKeyConnection(
 
 	e := encrypt.NewFakeEncryptService(false)
 	s, db, _, _, ac, _ := FullMockService(t, ctrl)
+	// Replace the registry's default api-key factory with one bound to the
+	// fake encrypt service so the captured blob in tests round-trips as
+	// plaintext JSON (rather than the production-style ciphertext that the
+	// mock encrypt service in FullMockService would produce).
 	s.encrypt = e
+	s.authMethodFactories[cschema.AuthTypeAPIKey] = api_key.NewFactory(db, e, s.httpf, s.logger)
 
 	connector := cschema.Connector{
 		Auth: &cschema.Auth{InnerVal: &cschema.AuthApiKey{
@@ -241,6 +247,7 @@ func TestApiKeySubmit_PreconnectFieldNamedApiKeyIsNotTreatedAsCredential(t *test
 	e := encrypt.NewFakeEncryptService(false)
 	s, db, _, _, _, _ := FullMockService(t, ctrl)
 	s.encrypt = e
+	s.authMethodFactories[cschema.AuthTypeAPIKey] = api_key.NewFactory(db, e, s.httpf, s.logger)
 
 	connector := cschema.Connector{
 		Auth: &cschema.Auth{InnerVal: &cschema.AuthApiKey{
@@ -309,6 +316,7 @@ func TestApiKeySubmit_TransitionsToConfigureWhenNoProbes(t *testing.T) {
 	e := encrypt.NewFakeEncryptService(false)
 	s, db, _, _, _, _ := FullMockService(t, ctrl)
 	s.encrypt = e
+	s.authMethodFactories[cschema.AuthTypeAPIKey] = api_key.NewFactory(db, e, s.httpf, s.logger)
 
 	configureStep := cschema.SetupFlowStep{
 		Id:         "workspace",

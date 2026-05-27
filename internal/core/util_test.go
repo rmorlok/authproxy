@@ -8,12 +8,10 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	mockLog "github.com/rmorlok/authproxy/internal/aplog/mock"
 	"github.com/rmorlok/authproxy/internal/apredis/mock"
-	"github.com/rmorlok/authproxy/internal/auth_methods"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
 	mockE "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	mockF "github.com/rmorlok/authproxy/internal/httpf/mock"
-	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 
 	"github.com/rmorlok/authproxy/internal/database"
 )
@@ -26,16 +24,21 @@ func FullMockService(tb testing.TB, ctrl *gomock.Controller) (*service, *mockDb.
 	encrypt := mockE.NewMockE(ctrl)
 	logger, _ := mockLog.NewTestLogger(tb)
 
-	return &service{
-		cfg:                 nil,
-		db:                  db,
-		encrypt:             encrypt,
-		ac:                  ac,
-		httpf:               h,
-		r:                   r,
-		logger:              logger,
-		authMethodFactories: map[cschema.AuthType]auth_methods.Factory{},
-	}, db, r, h, ac, encrypt
+	s := &service{
+		cfg:     nil,
+		db:      db,
+		encrypt: encrypt,
+		ac:      ac,
+		httpf:   h,
+		r:       r,
+		logger:  logger,
+	}
+	// Build a registry matching production wiring so call sites that resolve
+	// through getAuthMethodFactory find a real factory (backed by the same
+	// mock db / encrypt that the test set up). Tests that want a mocked
+	// factory swap it into authMethodFactories themselves.
+	s.authMethodFactories = s.buildAuthMethodFactories()
+	return s, db, r, h, ac, encrypt
 }
 
 func TestGetConnectorVersionIdsForConnections(t *testing.T) {

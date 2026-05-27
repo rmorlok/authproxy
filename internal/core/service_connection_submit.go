@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 
 	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
+	"github.com/rmorlok/authproxy/internal/auth_methods/api_key"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -128,7 +129,11 @@ func (c *connection) submitCredentialsStep(
 
 	switch auth := connector.Auth.Inner().(type) {
 	case *config.AuthApiKey:
-		if err := c.persistApiKeyCredentials(ctx, credData, auth.Placement); err != nil {
+		factory, ok := c.s.getAuthMethodFactory(connector).(api_key.Factory)
+		if !ok {
+			return nil, httperr.InternalServerErrorMsg("api-key factory missing from registry")
+		}
+		if err := factory.PersistCredentials(ctx, c, auth.Placement, credData); err != nil {
 			return nil, err
 		}
 	default:
@@ -139,52 +144,6 @@ func (c *connection) submitCredentialsStep(
 		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to advance after credentials submission: %w", err))
 	}
 	return c.GetCurrentSetupStepResponse(ctx)
-}
-
-// persistApiKeyCredentials extracts the api-key credential field values from
-// credData, encrypts the resulting plaintext as a single JSON blob, and inserts
-// it into api_key_credentials.
-func (c *connection) persistApiKeyCredentials(
-	ctx context.Context,
-	credData map[string]any,
-	placement *cschema.ApiKeyPlacement,
-) error {
-	if placement == nil {
-		return httperr.InternalServerErrorMsg("api-key connector missing placement at credential submission time")
-	}
-
-	plaintext := database.ApiKeyCredentialPlaintext{}
-	if v, ok := credData["api_key"].(string); ok {
-		plaintext.ApiKey = v
-	}
-	if plaintext.ApiKey == "" {
-		return httperr.BadRequest("api_key is required")
-	}
-	if placement.Type == cschema.ApiKeyPlacementBasic {
-		if placement.UsernameField == "" {
-			return httperr.InternalServerErrorMsg("basic placement missing username_field at credential submission time")
-		}
-		v, _ := credData[placement.UsernameField].(string)
-		if v == "" {
-			return httperr.BadRequestf("%q is required for basic placement", placement.UsernameField)
-		}
-		plaintext.Username = v
-	}
-
-	blobJSON, err := json.Marshal(plaintext)
-	if err != nil {
-		return httperr.InternalServerError(httperr.WithInternalErrorf("failed to marshal api-key plaintext: %w", err))
-	}
-	encrypted, err := c.s.encrypt.EncryptStringForNamespace(ctx, c.Namespace, string(blobJSON))
-	if err != nil {
-		return httperr.InternalServerError(httperr.WithInternalErrorf("failed to encrypt api-key credentials: %w", err))
-	}
-
-	actorId := apauthcore.GetAuthFromContext(ctx).MustGetActor().GetId()
-	if _, err := c.s.db.InsertApiKeyCredential(ctx, c.Id, encrypted, placement, &actorId); err != nil {
-		return httperr.InternalServerError(httperr.WithInternalErrorf("failed to persist api-key credentials: %w", err))
-	}
-	return nil
 }
 
 // initiateAuthStep starts the OAuth flow after preconnect steps are complete.
