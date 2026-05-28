@@ -64,12 +64,14 @@ Below are summaries and comparison tables for the projects in this repo's list. 
 | [Pipedream](https://pipedream.com/) | Commercial (free tier) | Traditional iPaaS | \"Thousands of apps\" | No (publicly stated no self-host option) | Code-first workflows with triggers/actions and webhook support. |
 | [Workato](https://www.workato.com/) | Commercial | Traditional iPaaS | 1,000+ connectors | Partial (on-prem agent for private systems) | Enterprise automation, recipe-based workflows. |
 | [Tray.io](https://tray.io/) | Commercial | Traditional iPaaS | Not publicly stated | Partial (on-prem agent for private systems) | Visual workflow builder with strong API tooling. |
+| [Apache Camel](https://camel.apache.org/) | Open Source (Apache-2.0) | Integration framework; adjacent to traditional iPaaS via Camel K / Karavan | 370 non-core components (plus core components and Kamelets) | Yes (library/runtime you operate; Camel K runs on Kubernetes) | Enterprise Integration Patterns, route DSLs, components, Kamelets, and low-code/Kubernetes tooling. |
 
 **Traditional iPaaS Product Notes**
 
 - **n8n**: OSS workflow automation with a very large app catalog; their integrations pages note 1,000+ apps. Docs explicitly support self-hosted editions. See: https://n8n.io/integrations/ and https://docs.n8n.io/choose-n8n/.
 - **Pipedream**: Developer-first automation platform with triggers/actions and code steps; docs describe integrations as \"thousands of apps.\" Pipedream staff state there is no self-host option at this time. See: https://pipedream.com/docs/apps, https://pipedream.com/docs/workflows/building-workflows/triggers/, and https://pipedream.com/community/t/how-can-i-self-host-pipedream-on-my-development-machine-and-ec2-instance/4978.
 - **Workato** and **Tray.io**: included above; widely used enterprise iPaaS tools with large connector libraries and visual builders.
+- **Apache Camel**: Long-running open-source integration framework based on Enterprise Integration Patterns. Camel Core is a small embeddable Java library with DSLs for routes, URI-addressed endpoints, data formats, and a large component catalog; the current component reference lists 370 non-core components. It is not an embedded SaaS integration product by itself: teams operate it inside their own applications or infrastructure. Related projects make it more platform-like: Camel K runs Camel integrations natively on Kubernetes, Karavan provides a low-code UI for designing/configuring routes with Kamelets and components, and Kamelets package source/sink connector snippets behind simpler interfaces. Compared with AuthProxy, Camel is much broader for routing, transformation, and message mediation, but does not primarily focus on customer-facing connection lifecycle, tenant-scoped OAuth/API-key credential storage, or authenticating proxy behavior. See: https://camel.apache.org/manual/faq/what-is-camel.html, https://camel.apache.org/components/4.18.x/index.html, https://camel.apache.org/docs/, and https://camel.apache.org/.
 
 ---
 
@@ -103,11 +105,13 @@ Below are summaries and comparison tables for the projects in this repo's list. 
 | --- | --- | --- | --- | --- | --- |
 | [Frigg](https://friggframework.org/) | Open Source | Embedded framework | Not publicly stated | Yes (runs in your cloud) | Serverless framework + API modules library. |
 | [Ampersand Connectors](https://github.com/amp-labs/connectors) | Open Source | Embedded building blocks | Not publicly stated | Yes (library you run yourself) | OSS connector library used by Ampersand. |
+| [Apache Camel](https://camel.apache.org/) | Open Source (Apache-2.0) | Integration framework / building block | 370 non-core components (plus core components and Kamelets) | Yes (library/runtime you operate) | EIP-based routing and mediation framework with route DSLs, components, data formats, Camel K, and Karavan. |
 
 **Framework Notes**
 
 - **Frigg**: OSS framework for teams that want to own infrastructure and build embedded integrations; provides a modular API library and serverless architecture, and runs in your cloud. See: https://lefthook.com/frigg/ and https://docs.friggframework.org/.
 - **Ampersand Connectors**: OSS connector library used by Ampersand; useful for teams building their own integration infrastructure. See: https://github.com/amp-labs/connectors.
+- **Apache Camel**: OSS integration building block for teams that want full control over routes, transports, and deployment. It is strongest when the problem is message routing, mediation, protocol bridging, transformation, or running integration logic inside Java/Spring Boot/Quarkus/Kubernetes environments. It is less directly comparable to embedded iPaaS products because it does not provide a hosted multi-tenant connection UI, unified API model, or credential lifecycle out of the box. See: https://camel.apache.org/manual/faq/what-is-camel.html and https://camel.apache.org/docs/.
 
 ---
 
@@ -134,3 +138,4 @@ Below are summaries and comparison tables for the projects in this repo's list. 
 | LiteLLM | LLM gateway | Code-first | N/A | Provider integrations | Yes (OSS self-host; cloud option) |
 | Bifrost | LLM gateway | Code-first | N/A | Provider integrations | Yes (self-hostable gateway) |
 | Agent Vault | Credential brokerage for AI agents | Code-first (CLI + SDK) | N/A (network-layer proxy) | User-registered services + credentials; no prebuilt connectors | Yes (OSS MIT; binary or Docker) |
+| Apache Camel | Routing, mediation, and protocol integration framework | Code-first DSLs + Karavan low-code tooling | Routes, timers, polling, messaging components, Kamelets | Components, route DSLs, Kamelets | Yes (OSS library/runtime; Camel K on Kubernetes) |
