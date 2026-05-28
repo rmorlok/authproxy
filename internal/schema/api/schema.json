@@ -643,7 +643,7 @@
       },
       "additionalProperties": false
     },
-    "InitiateParams": {
+    "SessionInitiateParams": {
       "type": "object",
       "properties": {
         "return_to_url": {
@@ -654,7 +654,7 @@
       "required": ["return_to_url"],
       "additionalProperties": false
     },
-    "InitiateFailureResponse": {
+    "SessionInitiateFailureResponse": {
       "type": "object",
       "properties": {
         "redirect_url": {
@@ -665,7 +665,7 @@
       "required": ["redirect_url"],
       "additionalProperties": false
     },
-    "InitiateSuccessResponse": {
+    "SessionInitiateSuccessResponse": {
       "type": "object",
       "properties": {
         "actor_id": { "type": "string" }

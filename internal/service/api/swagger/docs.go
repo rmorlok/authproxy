@@ -7360,7 +7360,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.InitiateParams"
+                            "$ref": "#/definitions/routes.SessionInitiateParams"
                         }
                     }
                 ],
@@ -7368,7 +7368,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.InitiateSuccessResponse"
+                            "$ref": "#/definitions/routes.SessionInitiateSuccessResponse"
                         }
                     },
                     "400": {
@@ -7380,7 +7380,7 @@ const docTemplateApi = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/routes.InitiateFailureResponse"
+                            "$ref": "#/definitions/routes.SessionInitiateFailureResponse"
                         }
                     },
                     "500": {
@@ -7978,33 +7978,6 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.InitiateFailureResponse": {
-            "type": "object",
-            "properties": {
-                "redirect_url": {
-                    "type": "string",
-                    "example": "https://example.com/auth"
-                }
-            }
-        },
-        "routes.InitiateParams": {
-            "type": "object",
-            "properties": {
-                "return_to_url": {
-                    "type": "string",
-                    "example": "https://example.com/return"
-                }
-            }
-        },
-        "routes.InitiateSuccessResponse": {
-            "type": "object",
-            "properties": {
-                "actor_id": {
-                    "type": "string",
-                    "example": "act_test550e8400abcde"
-                }
-            }
-        },
         "routes.ProxyRequest": {
             "description": "Request to proxy an HTTP request through a connection",
             "type": "object",
@@ -8086,6 +8059,33 @@ const docTemplateApi = `{
             "properties": {
                 "return_to_url": {
                     "type": "string"
+                }
+            }
+        },
+        "routes.SessionInitiateFailureResponse": {
+            "type": "object",
+            "properties": {
+                "redirect_url": {
+                    "type": "string",
+                    "example": "https://example.com/auth"
+                }
+            }
+        },
+        "routes.SessionInitiateParams": {
+            "type": "object",
+            "properties": {
+                "return_to_url": {
+                    "type": "string",
+                    "example": "https://example.com/return"
+                }
+            }
+        },
+        "routes.SessionInitiateSuccessResponse": {
+            "type": "object",
+            "properties": {
+                "actor_id": {
+                    "type": "string",
+                    "example": "act_test550e8400abcde"
                 }
             }
         },

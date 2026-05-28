@@ -39,18 +39,18 @@ type SessionRoutes struct {
 	logger                      *slog.Logger
 }
 
-type InitiateParams = schemaapi.InitiateParams
-type InitiateFailureResponse = schemaapi.InitiateFailureResponse
-type InitiateSuccessResponse = schemaapi.InitiateSuccessResponse
+type SessionInitiateParams = schemaapi.SessionInitiateParams
+type SessionInitiateFailureResponse = schemaapi.SessionInitiateFailureResponse
+type SessionInitiateSuccessResponse = schemaapi.SessionInitiateSuccessResponse
 
 //	@Summary		Initiate session
 //	@Description	Initiate or establish a session with the server. If successful, returns actor info. If not authenticated, returns a redirect URL for authentication.
 //	@Tags			session
 //	@Accept			json
 //	@Produce		json
-//	@Param			request	body		InitiateParams	true	"Session initiation parameters"
-//	@Success		200		{object}	InitiateSuccessResponse
-//	@Failure		401		{object}	InitiateFailureResponse
+//	@Param			request	body		SessionInitiateParams	true	"Session initiation parameters"
+//	@Success		200		{object}	SessionInitiateSuccessResponse
+//	@Failure		401		{object}	SessionInitiateFailureResponse
 //	@Failure		400		{object}	ErrorResponse
 //	@Failure		500		{object}	ErrorResponse
 //	@Router			/session/_initiate [post]
@@ -71,7 +71,7 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 
 	logger.Debug("received initiate request")
 
-	var req InitiateParams
+	var req SessionInitiateParams
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
 		apgin.WriteError(gctx, r.logger, httperr.BadRequestErr(err))
 		return
@@ -81,7 +81,7 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 	if !ra.IsAuthenticated() {
 		logger.Debug("request was not authenticated, returning redirect url")
 		apgin.AddDebugHeader(gctx, "auth not present on context")
-		gctx.PureJSON(http.StatusUnauthorized, InitiateFailureResponse{
+		gctx.PureJSON(http.StatusUnauthorized, SessionInitiateFailureResponse{
 			RedirectUrl: r.sessionInitiateUrlGenerator.GetInitiateSessionUrl(req.ReturnToUrl),
 		})
 		return
@@ -100,7 +100,7 @@ func (r *SessionRoutes) initiate(gctx *gin.Context) {
 
 	a := ra.MustGetActor()
 
-	gctx.PureJSON(http.StatusOK, InitiateSuccessResponse{
+	gctx.PureJSON(http.StatusOK, SessionInitiateSuccessResponse{
 		ActorId: a.Id,
 	})
 }

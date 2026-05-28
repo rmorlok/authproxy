@@ -6,15 +6,21 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 )
 
-type InitiateParams struct {
+// SessionInitiateParams is the request body for POST /session/_initiate.
+// ReturnToUrl is where the browser should land after host authentication.
+type SessionInitiateParams struct {
 	ReturnToUrl string `json:"return_to_url" yaml:"return_to_url" example:"https://example.com/return"`
 }
 
-type InitiateFailureResponse struct {
+// SessionInitiateFailureResponse tells the SPA where to redirect when the
+// current request cannot establish a session yet.
+type SessionInitiateFailureResponse struct {
 	RedirectUrl string `json:"redirect_url" yaml:"redirect_url" example:"https://example.com/auth"`
 }
 
-type InitiateSuccessResponse struct {
+// SessionInitiateSuccessResponse is returned once a session already exists or
+// has been established from the request authentication.
+type SessionInitiateSuccessResponse struct {
 	ActorId apid.ID `json:"actor_id" yaml:"actor_id" swaggertype:"string" example:"act_test550e8400abcde"`
 }
 

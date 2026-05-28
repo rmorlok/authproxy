@@ -351,24 +351,6 @@ definitions:
         example: https://example.com/callback
         type: string
     type: object
-  routes.InitiateFailureResponse:
-    properties:
-      redirect_url:
-        example: https://example.com/auth
-        type: string
-    type: object
-  routes.InitiateParams:
-    properties:
-      return_to_url:
-        example: https://example.com/return
-        type: string
-    type: object
-  routes.InitiateSuccessResponse:
-    properties:
-      actor_id:
-        example: act_test550e8400abcde
-        type: string
-    type: object
   routes.ProxyRequest:
     description: Request to proxy an HTTP request through a connection
     properties:
@@ -427,6 +409,24 @@ definitions:
   routes.RetryConnectionRequest:
     properties:
       return_to_url:
+        type: string
+    type: object
+  routes.SessionInitiateFailureResponse:
+    properties:
+      redirect_url:
+        example: https://example.com/auth
+        type: string
+    type: object
+  routes.SessionInitiateParams:
+    properties:
+      return_to_url:
+        example: https://example.com/return
+        type: string
+    type: object
+  routes.SessionInitiateSuccessResponse:
+    properties:
+      actor_id:
+        example: act_test550e8400abcde
         type: string
     type: object
   routes.SubmitConnectionRequest:
@@ -5771,14 +5771,14 @@ paths:
         name: request
         required: true
         schema:
-          $ref: '#/definitions/routes.InitiateParams'
+          $ref: '#/definitions/routes.SessionInitiateParams'
       produces:
       - application/json
       responses:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.InitiateSuccessResponse'
+            $ref: '#/definitions/routes.SessionInitiateSuccessResponse'
         "400":
           description: Bad Request
           schema:
@@ -5786,7 +5786,7 @@ paths:
         "401":
           description: Unauthorized
           schema:
-            $ref: '#/definitions/routes.InitiateFailureResponse'
+            $ref: '#/definitions/routes.SessionInitiateFailureResponse'
         "500":
           description: Internal Server Error
           schema:
