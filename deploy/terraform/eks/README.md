@@ -2,14 +2,14 @@
 
 Provisions the EKS cluster the deployment pipeline runs against.
 
-| Resource                | Notes                                                      |
-|-------------------------|------------------------------------------------------------|
-| VPC                     | 3 AZs, public + private subnets, single NAT (~$32/mo)      |
-| EKS                     | 1.30, managed node group (t3.medium x 2, scale 1-4)        |
-| Cluster addons          | coredns, kube-proxy, vpc-cni, ebs-csi-driver               |
-| IAM OIDC provider       | Federates GH Actions from `rmorlok/authproxy`              |
+| Resource                | Notes                                                         |
+|-------------------------|---------------------------------------------------------------|
+| VPC                     | 3 AZs, public + private subnets, single NAT (~$32/mo)         |
+| EKS                     | 1.34, managed node group (t3.medium x 2, scale 1-4)           |
+| Cluster addons          | coredns, kube-proxy, vpc-cni, ebs-csi-driver                  |
+| IAM OIDC provider       | Federates GH Actions from `rmorlok/authproxy`                 |
 | GH Actions role         | Tag pushes (`v*`, `chart-v*`) + dispatches with `gha-eks` env |
-| Route53 hosted zone     | `authproxy.net` (NS delegation done manually at registrar) |
+| Route53 hosted zone     | `authproxy.net` (NS delegation done manually at registrar)    |
 
 Steady-state cost target: **~$150/mo** (single NAT + 2× t3.medium + EKS control plane).
 
