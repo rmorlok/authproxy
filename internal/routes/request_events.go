@@ -11,9 +11,11 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/app_metrics"
 	"github.com/rmorlok/authproxy/internal/config"
+	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
-	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
+	sapi "github.com/rmorlok/authproxy/internal/schema/api"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -144,23 +146,23 @@ func (q *ListRequestEventsQuery) ApplyToBuilder(
 	return b, nil
 }
 
-type ListRequestEventsResponseJson = schemaapi.ListRequestEventsResponseJson
+type ListRequestEventsResponseJson = sapi.ListRequestEventsResponseJson
 
-func requestEventToJson(r *app_metrics.LogRecord) *schemaapi.RequestEventJson {
+func requestEventToJson(r *app_metrics.LogRecord) *sapi.RequestEventJson {
 	if r == nil {
 		return nil
 	}
 
-	matches := make([]schemaapi.RequestEventRateLimit, len(r.RateLimitMatched))
+	matches := make([]sapi.RequestEventRateLimit, len(r.RateLimitMatched))
 	for i, m := range r.RateLimitMatched {
-		matches[i] = schemaapi.RequestEventRateLimit{
+		matches[i] = sapi.RequestEventRateLimit{
 			Id:     m.Id,
 			Mode:   m.Mode,
 			Bucket: m.Bucket,
 		}
 	}
 
-	return &schemaapi.RequestEventJson{
+	return &sapi.RequestEventJson{
 		Namespace:           r.Namespace,
 		Type:                string(r.Type),
 		RequestId:           r.RequestId,
@@ -194,6 +196,97 @@ func requestEventToJson(r *app_metrics.LogRecord) *schemaapi.RequestEventJson {
 		RateLimitBucket:     r.RateLimitBucket,
 		RateLimitMatched:    matches,
 	}
+}
+
+func metricsQueryToRequestEventQuery(
+	req sapi.MetricsQueryRequestJson,
+	ref sapi.MetricsQueryRefJson,
+	effectiveNamespaceMatchers []string,
+	step time.Duration,
+) (app_metrics.RequestEventMetricsQuery, error) {
+	metric, err := requestEventMetricFromAPI(ref.Metric, ref.Aggregation)
+	if err != nil {
+		return app_metrics.RequestEventMetricsQuery{}, err
+	}
+
+	groupBy := make([]app_metrics.RequestEventGroupBy, 0, len(ref.GroupBy))
+	for _, raw := range ref.GroupBy {
+		gb := app_metrics.RequestEventGroupBy(raw)
+		switch gb {
+		case app_metrics.RequestEventGroupByType,
+			app_metrics.RequestEventGroupByMethod,
+			app_metrics.RequestEventGroupByResponseStatusCode,
+			app_metrics.RequestEventGroupByResponseSource,
+			app_metrics.RequestEventGroupByConnectorID:
+			groupBy = append(groupBy, gb)
+		default:
+			return app_metrics.RequestEventMetricsQuery{}, httperr.BadRequestf("invalid group_by %q", raw)
+		}
+	}
+
+	query := app_metrics.RequestEventMetricsQuery{
+		RefID:             ref.RefID,
+		Metric:            metric,
+		Start:             req.Range.Start,
+		End:               req.Range.End,
+		Step:              step,
+		NamespaceMatchers: effectiveNamespaceMatchers,
+		GroupBy:           groupBy,
+	}
+	if req.LabelSelector != nil {
+		query.LabelSelector = *req.LabelSelector
+	}
+	return query, nil
+}
+
+func requestEventMetricFromAPI(metric, aggregation string) (app_metrics.RequestEventMetric, error) {
+	switch metric {
+	case "request_events":
+		if aggregation == "count" {
+			return app_metrics.RequestEventMetricCount, nil
+		}
+	case "request_events.errors":
+		if aggregation == "count" {
+			return app_metrics.RequestEventMetricErrorsCount, nil
+		}
+	case "request_events.duration_ms":
+		switch aggregation {
+		case "avg":
+			return app_metrics.RequestEventMetricDurationAvgMS, nil
+		case "p95":
+			return app_metrics.RequestEventMetricDurationP95MS, nil
+		}
+	}
+	return "", httperr.BadRequestf("unsupported metric aggregation %q/%q", metric, aggregation)
+}
+
+func metricsResponseFromAPIRequest(req sapi.MetricsQueryRequestJson, series []app_metrics.RequestEventMetricSeries) sapi.MetricsQueryResponseJson {
+	refsByID := make(map[string]sapi.MetricsQueryRefJson, len(req.Queries))
+	for _, ref := range req.Queries {
+		refsByID[ref.RefID] = ref
+	}
+
+	out := sapi.MetricsQueryResponseJson{
+		Series: make([]sapi.MetricsSeriesJson, 0, len(series)),
+	}
+	for _, s := range series {
+		ref := refsByID[s.RefID]
+		points := make([]sapi.MetricsPointJson, 0, len(s.Points))
+		for _, p := range s.Points {
+			points = append(points, sapi.MetricsPointJson{
+				Timestamp: p.Timestamp,
+				Value:     p.Value,
+			})
+		}
+		out.Series = append(out.Series, sapi.MetricsSeriesJson{
+			RefID:       s.RefID,
+			Metric:      ref.Metric,
+			Aggregation: ref.Aggregation,
+			Labels:      s.Labels,
+			Points:      points,
+		})
+	}
+	return out
 }
 
 // @Summary		Get request events entry
@@ -356,6 +449,93 @@ func (r *RequestEventsRoutes) list(gctx *gin.Context) {
 	})
 }
 
+// @Summary		Query application metrics
+// @Description	Query application metrics over a time range
+// @Tags			metrics
+// @Accept			json
+// @Produce		json
+// @Param			request	body		object	true	"Metrics query request"
+// @Success		200		{object}	object
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/metrics/query [post]
+func (r *RequestEventsRoutes) queryMetrics(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	var req sapi.MetricsQueryRequestJson
+	if err := gctx.ShouldBindJSON(&req); err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest(err.Error(), httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+
+	if req.Range.Start.IsZero() || req.Range.End.IsZero() {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("range.start and range.end are required"))
+		val.MarkErrorReturn()
+		return
+	}
+	if !req.Range.Start.Before(req.Range.End) {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("range.start must be before range.end"))
+		val.MarkErrorReturn()
+		return
+	}
+	step, err := time.ParseDuration(req.Range.Step)
+	if err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("range.step must be a positive duration", httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+	if step <= 0 {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("range.step must be a positive duration"))
+		val.MarkErrorReturn()
+		return
+	}
+	if len(req.Queries) == 0 {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("queries is required"))
+		val.MarkErrorReturn()
+		return
+	}
+	if req.Namespace != nil {
+		if err := aschema.ValidateNamespaceMatcher(*req.Namespace); err != nil {
+			apgin.WriteError(gctx, nil, httperr.BadRequest("invalid namespace matcher", httperr.WithInternalErr(err)))
+			val.MarkErrorReturn()
+			return
+		}
+	}
+	if req.LabelSelector != nil {
+		if _, err := database.ParseLabelSelector(*req.LabelSelector); err != nil {
+			apgin.WriteError(gctx, nil, httperr.BadRequest("invalid label selector", httperr.WithInternalErr(err)))
+			val.MarkErrorReturn()
+			return
+		}
+	}
+
+	effectiveNamespaceMatchers := val.GetEffectiveNamespaceMatchers(req.Namespace)
+	requestEventQueries := make([]app_metrics.RequestEventMetricsQuery, 0, len(req.Queries))
+	for _, ref := range req.Queries {
+		q, err := metricsQueryToRequestEventQuery(req, ref, effectiveNamespaceMatchers, step)
+		if err != nil {
+			apgin.WriteErr(gctx, nil, err)
+			val.MarkErrorReturn()
+			return
+		}
+		requestEventQueries = append(requestEventQueries, q)
+	}
+
+	series, err := r.rl.QueryRequestEventMetrics(ctx, requestEventQueries)
+	if err != nil {
+		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid metrics query", httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, metricsResponseFromAPIRequest(req, series))
+}
+
 func (r *RequestEventsRoutes) Register(g gin.IRouter) {
 	g.GET(
 		"/metrics/request-events/:id",
@@ -373,6 +553,14 @@ func (r *RequestEventsRoutes) Register(g gin.IRouter) {
 			ForVerb("list").
 			Build(),
 		r.list,
+	)
+	g.POST(
+		"/metrics/query",
+		r.auth.NewRequiredBuilder().
+			ForResource("request-events").
+			ForVerb("list").
+			Build(),
+		r.queryMetrics,
 	)
 }
 

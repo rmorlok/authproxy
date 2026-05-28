@@ -50,6 +50,30 @@
       "properties": {
         "autoGenerate": { "type": "boolean" }
       }
+    },
+    "seed": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":      { "type": "boolean" },
+        "image":        { "type": "object" },
+        "resources":    { "type": "object" },
+        "adminApiPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+        "actors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "external_id": { "type": "string", "minLength": 1 },
+              "namespace":   { "type": "string" },
+              "labels":      { "type": "object", "additionalProperties": { "type": "string" } },
+              "annotations": { "type": "object", "additionalProperties": { "type": "string" } }
+            },
+            "required": ["external_id"]
+          }
+        }
+      }
     }
   }
 }

@@ -4471,6 +4471,46 @@ paths:
       summary: Set a label for an encryption key
       tags:
       - encryption_keys
+  /metrics/query:
+    post:
+      consumes:
+      - application/json
+      description: Query application metrics over a time range
+      parameters:
+      - description: Metrics query request
+        in: body
+        name: request
+        required: true
+        schema:
+          type: object
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            type: object
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Query application metrics
+      tags:
+      - metrics
   /metrics/request-events:
     get:
       consumes:

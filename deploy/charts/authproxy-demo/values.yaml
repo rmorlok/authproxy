@@ -61,11 +61,48 @@ ingress:
   tls: true
 
 secrets:
-  # -- When true, the chart auto-generates JWT signing keys + global AES
-  # key + demo-shell admin keypair the first time it's installed.
-  # Subsequent upgrades reuse the existing Secrets (via the `lookup`
-  # template helper) so sessions don't invalidate.
+  # -- When true, the chart auto-generates DB / Redis / MinIO passwords
+  # on first install via sprig random helpers. Subsequent upgrades
+  # reuse the existing Secrets (via the `lookup` template helper) so
+  # sessions don't invalidate. Keypair Secrets (JWT signing, demo-shell
+  # admin) need real openssl and must be operator-provided — see README.
   autoGenerate: true
+
+seed:
+  # -- When true, install a post-install/post-upgrade hook Job that
+  # creates the demo actors via the AuthProxy admin API. Idempotent —
+  # safe to leave on for every `helm upgrade`.
+  enabled: true
+  image:
+    repository: ghcr.io/rmorlok/authproxy-demo-seed
+    tag: ""               # falls back to .Chart.AppVersion
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      cpu: 10m
+      memory: 32Mi
+    limits:
+      memory: 128Mi
+  # -- Admin-api port to target. Matches the inner authproxy chart's
+  # default service port for the `adminApi` service.
+  adminApiPort: 8082
+  # -- Actors to seed. Each entry is the schema the demo-seed binary
+  # consumes — `external_id` is the only required field. Add or
+  # override via `--set` / values overlay to seed customer-specific
+  # actors alongside the defaults.
+  actors:
+    - external_id: demo-admin
+      labels:
+        demo: "true"
+        role: admin
+    - external_id: demo-user
+      labels:
+        demo: "true"
+        role: user
+    - external_id: fresh-user
+      labels:
+        demo: "true"
+        role: user
 
 # ---------------------------------------------------------------------------
 # Subchart passthroughs — see each upstream's values.yaml for the full
