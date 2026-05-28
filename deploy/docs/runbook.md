@@ -163,6 +163,46 @@ kubectl delete ns hello-echo
 
 ---
 
+### 1.10 Wire the auto-deploy workflow
+
+The `Deploy Demo` workflow (`.github/workflows/deploy-demo.yml`)
+helm-upgrades the umbrella chart on every push to `main` with the
+image tag pinned to that commit's `sha-<short>`. One-time setup:
+
+1. **Create the demo namespace + keypair Secrets** (these are
+   operator-provided, not auto-generated — see
+   [`deploy/charts/authproxy-demo/README.md`](../charts/authproxy-demo/README.md)
+   for the openssl one-shot). The workflow assumes
+   `demo-jwt`, `demo-encryption`, `demo-demo-shell-key`, and
+   `demo-actors` already exist in the `demo` namespace.
+
+2. **Set repo Variables** (Settings → Variables → Actions):
+
+   | Variable        | Example          |
+   |-----------------|------------------|
+   | `AWS_REGION`    | `us-east-1`      |
+   | `EKS_CLUSTER`   | `authproxy-eks`  |
+   | `DEMO_HOSTNAME` | `demo.authproxy.net` |
+   | `ACME_EMAIL`    | `you@example.com`|
+
+   `AWS_ROLE_ARN` should already be set as a Secret from Section 1.6.
+
+3. **Confirm the `gha-eks` environment** (from Section 1.6) exists.
+   No required reviewers = fully automatic deploys; add reviewers in
+   repo settings to gate deploys on approval without changing the
+   workflow.
+
+4. (Optional) **Trigger the first run manually** before the next
+   merge to confirm wiring:
+
+   ```bash
+   gh workflow run "Deploy Demo"
+   gh run watch
+   ```
+
+   Once green, every subsequent merge to `main` deploys automatically
+   within ~5 min.
+
 ## 2. Granting kubectl access
 
 The cluster uses the **modern EKS access-entry model**
