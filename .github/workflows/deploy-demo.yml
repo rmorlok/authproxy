@@ -1,0 +1,190 @@
+# schema: https://json.schemastore.org/github-workflow.json
+name: Deploy Demo
+
+# Auto-deploys the authproxy-demo umbrella chart on every push to main.
+# Image tag is pinned to `sha-<short>` so the deploy targets the exact
+# build produced by the Build Image workflow for this commit.
+#
+# Trust + auth: this workflow assumes the `authproxy-eks-gh-actions`
+# IAM role via OIDC. The role's trust policy (from
+# deploy/terraform/eks/iam_oidc.tf) only honors `sts:AssumeRoleWithWebIdentity`
+# when the JWT's `sub` claim contains `environment:gha-eks` (or matches
+# one of the release-tag patterns) — hence the `environment: gha-eks`
+# declaration on the deploy job. Add required reviewers to the `gha-eks`
+# environment in repo settings to gate deploys on approval; leaving it
+# empty makes deploys fully automatic.
+#
+# Pre-requisites the workflow assumes (one-time operator setup;
+# documented in deploy/docs/runbook.md):
+#   - EKS cluster up (A7) + bootstrap chart installed (A8)
+#   - `demo` namespace exists, with the four keypair Secrets created
+#     manually (jwt, encryption, demo-shell-key, actors) — A10 README's
+#     openssl one-shot covers this
+#   - Repo secrets:
+#       AWS_ROLE_ARN  : the role from `terraform output gh_actions_role_arn`
+#   - Repo variables (Settings → Variables):
+#       AWS_REGION    : e.g. us-east-1
+#       EKS_CLUSTER   : e.g. authproxy-eks
+#       DEMO_HOSTNAME : e.g. demo.authproxy.net
+#       ACME_EMAIL    : LE registration email
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Override image tag (default: sha-<short>)'
+        required: false
+        type: string
+
+permissions:
+  contents: read
+  id-token: write    # OIDC token mint
+
+concurrency:
+  # One deploy at a time per branch — protects against racing pushes
+  # leaving the cluster in a torn state. cancel-in-progress: false so
+  # a newer push waits behind the in-flight rollout instead of
+  # interrupting it mid-helm.
+  group: deploy-demo-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    # Required by the IAM role's trust policy — see header.
+    environment: gha-eks
+    timeout-minutes: 15
+
+    env:
+      RELEASE_NAME: demo
+      RELEASE_NS:   demo
+      CHART_PATH:   deploy/charts/authproxy-demo
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0      # helm relies on the .git context for some chart hooks
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Resolve image tag
+        id: tag
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.image_tag }}" ]; then
+            tag="${{ inputs.image_tag }}"
+          else
+            # Match docker/metadata-action's `type=sha,prefix=sha-,format=short`
+            tag="sha-$(git rev-parse --short HEAD)"
+          fi
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "Deploying image tag: ${tag}"
+
+      - name: Assume GH Actions role via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Wire kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name "${{ vars.EKS_CLUSTER }}" \
+            --region "${{ vars.AWS_REGION }}"
+          kubectl get nodes -o wide
+
+      - name: Register Helm repos for subcharts
+        run: |
+          # Same set the helm-chart-ci lint/install jobs use.
+          helm repo add bitnami        https://charts.bitnami.com/bitnami
+          helm repo update
+
+      - name: helm dependency update
+        run: helm dependency update "${CHART_PATH}"
+
+      - name: Capture pre-deploy revision (for rollback)
+        id: pre
+        run: |
+          set -euo pipefail
+          # Pre-existing revision, or empty when this is the first install.
+          rev=$(helm history "${RELEASE_NAME}" -n "${RELEASE_NS}" -o json 2>/dev/null \
+                | jq -r '[.[] | select(.status=="deployed")] | last | .revision // empty')
+          echo "previous_revision=${rev}" >> "$GITHUB_OUTPUT"
+          echo "Previous deployed revision: ${rev:-<none>}"
+
+      - name: helm upgrade --install
+        id: upgrade
+        run: |
+          set -euo pipefail
+          helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \
+            --namespace "${RELEASE_NS}" --create-namespace \
+            --wait --timeout 10m \
+            --set "global.hostname=${{ vars.DEMO_HOSTNAME }}" \
+            --set "global.acmeEmail=${{ vars.ACME_EMAIL }}" \
+            --set "authproxy.image.tag=${{ steps.tag.outputs.tag }}" \
+            --set "demoShell.image.tag=${{ steps.tag.outputs.tag }}" \
+            --set "seed.image.tag=${{ steps.tag.outputs.tag }}"
+
+      - name: Wait for workload rollouts
+        # `helm --wait` already blocks on the main release, but the
+        # umbrella's inline Deployments (demo-shell, go-oauth2-server)
+        # may need additional time. Cap at 5 min — past that, fall
+        # through to rollback.
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          for d in \
+            "${RELEASE_NAME}-authproxy" \
+            "${RELEASE_NAME}-demo-shell" \
+            "${RELEASE_NAME}-go-oauth2-server" \
+          ; do
+            echo "Waiting for $d..."
+            kubectl -n "${RELEASE_NS}" rollout status "deployment/$d" --timeout=5m
+          done
+
+      - name: Smoke test (HTTP 200 + TLS)
+        # Until A17 lands a real smoke suite, a curl to the demo's
+        # landing page is the minimum signal: DNS resolves, ingress +
+        # cert work, demo-shell serves something.
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          url="https://${{ vars.DEMO_HOSTNAME }}/"
+          echo "Smoke-testing ${url}"
+          # Retry up to 12 times (60s) — external-dns + nginx-ingress
+          # may need a moment to converge after rollout.
+          for i in $(seq 1 12); do
+            if curl -fsS --max-time 10 -o /dev/null "${url}"; then
+              echo "OK"
+              exit 0
+            fi
+            echo "attempt ${i}: not ready yet, sleeping 5s"
+            sleep 5
+          done
+          echo "Smoke test failed after 60s" >&2
+          exit 1
+
+      - name: helm rollback (on failure)
+        if: failure() && steps.pre.outputs.previous_revision != ''
+        run: |
+          set -euo pipefail
+          rev="${{ steps.pre.outputs.previous_revision }}"
+          echo "Rolling back to revision ${rev}"
+          helm rollback "${RELEASE_NAME}" "${rev}" -n "${RELEASE_NS}" --wait --timeout 5m
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Demo deploy"
+            echo ""
+            echo "- Result:      ${{ job.status }}"
+            echo "- Image tag:   \`${{ steps.tag.outputs.tag }}\`"
+            echo "- Hostname:    \`https://${{ vars.DEMO_HOSTNAME }}/\`"
+            echo "- Helm rev:    \`$(helm history "${RELEASE_NAME}" -n "${RELEASE_NS}" -o json 2>/dev/null | jq -r '[.[] | select(.status=="deployed")] | last | .revision // "?"')\`"
+          } >> "$GITHUB_STEP_SUMMARY"
