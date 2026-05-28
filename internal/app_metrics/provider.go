@@ -15,6 +15,12 @@ type RecordStore interface {
 	StoreRecords(ctx context.Context, records []*LogRecord) error
 }
 
+// ResourceSampleStore persists point-in-time resource samples for app metrics.
+type ResourceSampleStore interface {
+	StoreConnectionResourceSamples(ctx context.Context, samples []*ConnectionResourceSample) error
+	StoreActorResourceSamples(ctx context.Context, samples []*ActorResourceSample) error
+}
+
 type migratable interface {
 	// Migrate runs any necessary schema migrations for the storage backend.
 	Migrate(ctx context.Context) error
@@ -38,4 +44,10 @@ type RecordRetriever interface {
 
 	// QueryRequestEventMetrics executes time-series metric queries over request events.
 	QueryRequestEventMetrics(ctx context.Context, queries []RequestEventMetricsQuery) ([]RequestEventMetricSeries, error)
+}
+
+// ResourceSampleRetriever queries point-in-time resource samples for app metrics.
+type ResourceSampleRetriever interface {
+	ListConnectionResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ConnectionResourceSample, error)
+	ListActorResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ActorResourceSample, error)
 }

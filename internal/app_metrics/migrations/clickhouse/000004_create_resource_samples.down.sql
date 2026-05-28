@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS app_metrics_actor_resource_samples;
+DROP TABLE IF EXISTS app_metrics_connection_resource_samples;
