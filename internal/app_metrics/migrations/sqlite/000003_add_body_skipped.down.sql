@@ -1,2 +1,2 @@
-ALTER TABLE http_log_entry_records DROP COLUMN request_body_skipped;
-ALTER TABLE http_log_entry_records DROP COLUMN response_body_skipped;
+ALTER TABLE app_metrics_request_events DROP COLUMN request_body_skipped;
+ALTER TABLE app_metrics_request_events DROP COLUMN response_body_skipped;

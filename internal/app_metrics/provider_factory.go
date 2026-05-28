@@ -9,7 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-// dbSystemFor returns the otel semconv db.system value for an HTTP-logging
+// dbSystemFor returns the otel semconv db.system value for an app metrics
 // provider. Used to tag spans + metrics emitted by the instrumented DB
 // connection so dashboards can break out request-events SQL activity by engine.
 func dbSystemFor(p config.DatabaseProvider) string {
@@ -25,7 +25,7 @@ func dbSystemFor(p config.DatabaseProvider) string {
 	}
 }
 
-// NewRecordStore creates an RecordStore based on the HttpLogging configuration.
+// NewRecordStore creates a RecordStore based on the app metrics database configuration.
 // dbOpts are forwarded to the underlying instrumented DB constructor —
 // callers pass database.WithTelemetry(...) to enable spans + metrics on the
 // request-events database tier.
@@ -40,11 +40,11 @@ func NewRecordStore(cfg *config.Database, logger *slog.Logger, dbOpts ...databas
 	case config.DatabaseProviderClickhouse:
 		return NewClickhouseRecordStore(cfg, logger, dbOpts...)
 	default:
-		panic(fmt.Sprintf("unknown http logging database provider: %s", provider))
+		panic(fmt.Sprintf("unknown app metrics database provider: %s", provider))
 	}
 }
 
-// NewRecordRetriever creates an RecordRetriever based on the HttpLogging configuration.
+// NewRecordRetriever creates a RecordRetriever based on the app metrics database configuration.
 func NewRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorEncryptor, logger *slog.Logger, dbOpts ...database.Option) RecordRetriever {
 	provider := cfg.GetProvider()
 	switch provider {
@@ -55,6 +55,6 @@ func NewRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorE
 	case config.DatabaseProviderClickhouse:
 		return NewClickhouseRecordRetriever(cfg, cursorEncryptor, logger, dbOpts...)
 	default:
-		panic(fmt.Sprintf("unknown http logging database provider: %s", provider))
+		panic(fmt.Sprintf("unknown app metrics database provider: %s", provider))
 	}
 }

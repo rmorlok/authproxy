@@ -15,7 +15,7 @@ type captureConfig struct {
 	fullRequestExpiration time.Duration
 }
 
-func (c *captureConfig) setFromConfig(cfg *sconfig.HttpLogging) {
+func (c *captureConfig) setFromConfig(cfg *sconfig.AppMetricsRequestEvents) {
 	c.expiration = cfg.GetRetention()
 	c.recordFullRequest = cfg.GetFullRequestRecording() == sconfig.FullRequestRecordingAlways
 	c.maxFullRequestSize = cfg.GetMaxRequestSize()

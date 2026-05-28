@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS http_log_entry_records (
+CREATE TABLE IF NOT EXISTS app_metrics_request_events (
     request_id String,
     namespace String,
     type String,

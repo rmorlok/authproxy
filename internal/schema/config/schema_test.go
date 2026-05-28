@@ -94,6 +94,39 @@ func Test_SchemaAgainstRealData(t *testing.T) {
 	}
 }
 
+func Test_SchemaAppMetricsShape(t *testing.T) {
+	c := jsonschemav5.NewCompiler()
+
+	_ = loadSchema(t, c, "../resources/namespace/schema.json")
+	_ = loadSchema(t, c, "../auth/schema.json")
+	_ = loadSchema(t, c, "../common/schema.json")
+	_ = loadSchema(t, c, "../resources/connectors/schema-oauth.json")
+	_ = loadSchema(t, c, "../resources/connectors/schema.json")
+	schemaId := loadSchema(t, c, "./schema.json")
+
+	schema, err := c.Compile(schemaId)
+	require.NoError(t, err)
+
+	require.NoError(t, schema.Validate(map[string]any{
+		"app_metrics": map[string]any{
+			"resource_snapshot_interval": "15m",
+			"database": map[string]any{
+				"provider": "sqlite",
+				"path":     "./tmp/app_metrics.db",
+			},
+			"request_events": map[string]any{
+				"full_request_recording": "always",
+			},
+		},
+	}))
+
+	require.Error(t, schema.Validate(map[string]any{
+		"http_logging": map[string]any{
+			"full_request_recording": "always",
+		},
+	}))
+}
+
 type test struct {
 	Name  string
 	Valid bool

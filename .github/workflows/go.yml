@@ -57,18 +57,18 @@ jobs:
       fail-fast: false
       matrix:
         # The two axes are independent — main DB selector is
-        # AUTH_PROXY_TEST_DATABASE_PROVIDER, request_log selector is
-        # AUTH_PROXY_REQUEST_LOG_TEST_DATABASE_PROVIDER — so we pick
+        # AUTH_PROXY_TEST_DATABASE_PROVIDER, app_metrics selector is
+        # AUTH_PROXY_APP_METRICS_TEST_DATABASE_PROVIDER — so we pick
         # explicit combinations via include rather than a 2x3 cartesian
         # explosion. Coverage goal: every main-DB provider + every
-        # request_log provider gets exercised at least once.
+        # app_metrics provider gets exercised at least once.
         include:
           - database: sqlite
-            request_log_database: sqlite
+            app_metrics_database: sqlite
           - database: postgres
-            request_log_database: postgres
+            app_metrics_database: postgres
           - database: sqlite
-            request_log_database: clickhouse
+            app_metrics_database: clickhouse
     services:
       postgres:
         image: postgres:16
@@ -119,7 +119,7 @@ jobs:
         POSTGRES_TEST_OPTIONS: sslmode=disable
         POSTGRES_TEST_MAX_PARALLEL: "2"
         POSTGRES_TEST_MAX_CONNS: "2"
-        AUTH_PROXY_REQUEST_LOG_TEST_DATABASE_PROVIDER: ${{ matrix.request_log_database }}
+        AUTH_PROXY_APP_METRICS_TEST_DATABASE_PROVIDER: ${{ matrix.app_metrics_database }}
         CLICKHOUSE_TEST_HOST: localhost
         CLICKHOUSE_TEST_PORT: "8123"
         CLICKHOUSE_TEST_USER: authproxy

@@ -73,9 +73,29 @@ logging:
   type: tint
   level: debug
 
-http_logging:
-  enabled: true
-  full_request_recording: always
+app_metrics:
+  resource_snapshot_interval: 15m
+  request_events:
+    full_request_recording: always
+  database:
+    provider: clickhouse
+    auto_migrate: true
+    user: authproxy
+    password: authproxy
+    addresses:
+      - clickhouse:8123
+    database: authproxy
+  blob_storage:
+    provider: s3
+    endpoint: http://minio:9000
+    region: us-east-1
+    bucket: authproxy-request-logs
+    credentials:
+      type: access_key
+      access_key_id: minioadmin
+      secret_access_key: minioadmin
+    force_path_style: true
+    prefix: "rlf/"
 
 redis:
   provider: redis

@@ -57,8 +57,14 @@ logging:
   type: tint
   level: debug
 
-http_logging:
-  full_request_recording: always
+app_metrics:
+  resource_snapshot_interval: 15m
+  request_events:
+    full_request_recording: always
+  database:
+    provider: sqlite
+    auto_migrate: true
+    path: ./tmp/app_metrics.db
   # full_request_recording: never
 
 #redis:

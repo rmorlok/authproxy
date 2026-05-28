@@ -1,4 +1,4 @@
-ALTER TABLE http_log_entry_records
+ALTER TABLE app_metrics_request_events
     DROP COLUMN IF EXISTS rate_limit_matched,
     DROP COLUMN IF EXISTS rate_limit_bucket,
     DROP COLUMN IF EXISTS rate_limit_mode,

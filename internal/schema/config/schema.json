@@ -273,11 +273,30 @@
       "additionalProperties": false,
       "type": "object"
     },
-    "HttpLogging": {
+    "AppMetrics": {
       "properties": {
         "auto_migrate": {
           "type": "boolean"
         },
+        "database": {
+          "$ref": "#/$defs/DatabaseOrWarehouse"
+        },
+        "blob_storage": {
+          "$ref": "#/$defs/BlobStorage"
+        },
+        "resource_snapshot_interval": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "request_events": {
+          "$ref": "#/$defs/AppMetricsRequestEvents"
+        }
+      },
+      "additionalProperties": false,
+      "required": ["database"],
+      "type": "object"
+    },
+    "AppMetricsRequestEvents": {
+      "properties": {
         "retention": {
           "$ref": "../common/schema.json#/$defs/HumanDuration"
         },
@@ -301,12 +320,6 @@
         },
         "flush_batch_size": {
           "type": "integer"
-        },
-        "database": {
-          "$ref": "#/$defs/DatabaseOrWarehouse"
-        },
-        "blob_storage": {
-          "$ref": "#/$defs/BlobStorage"
         }
       },
       "additionalProperties": false,
@@ -934,8 +947,8 @@
     "connectors": {
       "$ref": "#/$defs/Connectors"
     },
-    "http_logging": {
-      "$ref": "#/$defs/HttpLogging"
+    "app_metrics": {
+      "$ref": "#/$defs/AppMetrics"
     },
     "tasks": {
       "$ref": "#/$defs/Tasks"

@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS http_log_entry_records (
+CREATE TABLE IF NOT EXISTS app_metrics_request_events (
     request_id TEXT PRIMARY KEY,
     namespace TEXT NOT NULL,
     type TEXT NOT NULL,
@@ -26,8 +26,8 @@ CREATE TABLE IF NOT EXISTS http_log_entry_records (
     labels TEXT NOT NULL DEFAULT '{}'
 );
 
-CREATE INDEX IF NOT EXISTS idx_entry_records_namespace ON http_log_entry_records (namespace);
-CREATE INDEX IF NOT EXISTS idx_entry_records_timestamp ON http_log_entry_records (timestamp_ms);
-CREATE INDEX IF NOT EXISTS idx_entry_records_connection ON http_log_entry_records (connection_id);
-CREATE INDEX IF NOT EXISTS idx_entry_records_connector ON http_log_entry_records (connector_id);
-CREATE INDEX IF NOT EXISTS idx_entry_records_status ON http_log_entry_records (response_status_code);
+CREATE INDEX IF NOT EXISTS idx_app_metrics_request_events_namespace ON app_metrics_request_events (namespace);
+CREATE INDEX IF NOT EXISTS idx_app_metrics_request_events_timestamp ON app_metrics_request_events (timestamp_ms);
+CREATE INDEX IF NOT EXISTS idx_app_metrics_request_events_connection ON app_metrics_request_events (connection_id);
+CREATE INDEX IF NOT EXISTS idx_app_metrics_request_events_connector ON app_metrics_request_events (connector_id);
+CREATE INDEX IF NOT EXISTS idx_app_metrics_request_events_status ON app_metrics_request_events (response_status_code);

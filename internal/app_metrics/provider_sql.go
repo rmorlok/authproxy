@@ -25,9 +25,9 @@ import (
 )
 
 //go:embed migrations/**/*.sql
-var httpLogMigrationsFs embed.FS
+var appMetricsMigrationsFs embed.FS
 
-const entryRecordsTable = "http_log_entry_records"
+const entryRecordsTable = "app_metrics_request_events"
 
 // --- SQL RecordStore ---
 
@@ -43,7 +43,7 @@ type sqlRecordStore struct {
 func NewSqlRecordStore(cfg *config.Database, logger *slog.Logger, opts ...database.Option) RecordStore {
 	db, err := database.OpenInstrumentedSQL(cfg.GetDriver(), cfg.GetDsn(), dbSystemFor(cfg.GetProvider()), opts...)
 	if err != nil {
-		panic(fmt.Errorf("failed to open http logging database: %w", err))
+		panic(fmt.Errorf("failed to open app metrics database: %w", err))
 	}
 
 	return &sqlRecordStore{
@@ -170,17 +170,17 @@ func (s *sqlRecordStore) StoreRecords(ctx context.Context, records []*LogRecord)
 
 func (s *sqlRecordStore) Migrate(ctx context.Context) error {
 	provider := string(s.cfg.GetProvider())
-	s.logger.Info("running http log database migrations", "provider", provider)
-	defer s.logger.Info("http log database migrations complete")
+	s.logger.Info("running app metrics database migrations", "provider", provider)
+	defer s.logger.Info("app metrics database migrations complete")
 
-	d, err := iofs.New(httpLogMigrationsFs, fmt.Sprintf("migrations/%s", provider))
+	d, err := iofs.New(appMetricsMigrationsFs, fmt.Sprintf("migrations/%s", provider))
 	if err != nil {
-		return fmt.Errorf("failed to load http log migrations for '%s': %w", provider, err)
+		return fmt.Errorf("failed to load app metrics migrations for '%s': %w", provider, err)
 	}
 
 	m, err := migrate.NewWithSourceInstance("iofs", d, s.uri)
 	if err != nil {
-		return fmt.Errorf("failed to setup http log migrations: %w", err)
+		return fmt.Errorf("failed to setup app metrics migrations: %w", err)
 	}
 	defer func() {
 		sourceErr, dbErr := m.Close()
@@ -192,10 +192,10 @@ func (s *sqlRecordStore) Migrate(ctx context.Context) error {
 	err = m.Up()
 	if err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {
-			s.logger.Info("no http log migrations required")
+			s.logger.Info("no app metrics migrations required")
 			return nil
 		}
-		return fmt.Errorf("failed to migrate http log database: %w", err)
+		return fmt.Errorf("failed to migrate app metrics database: %w", err)
 	}
 
 	return nil
@@ -220,7 +220,7 @@ type sqlRecordRetriever struct {
 func NewSqlRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorEncryptor, logger *slog.Logger, opts ...database.Option) RecordRetriever {
 	db, err := database.OpenInstrumentedSQL(cfg.GetDriver(), cfg.GetDsn(), dbSystemFor(cfg.GetProvider()), opts...)
 	if err != nil {
-		panic(fmt.Errorf("failed to open http logging database for retrieval: %w", err))
+		panic(fmt.Errorf("failed to open app metrics database for retrieval: %w", err))
 	}
 
 	return &sqlRecordRetriever{

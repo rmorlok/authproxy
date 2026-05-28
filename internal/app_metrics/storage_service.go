@@ -2,6 +2,7 @@ package app_metrics
 
 import (
 	"context"
+	"fmt"
 	"log/slog"
 	"net/http"
 
@@ -99,8 +100,8 @@ func (ss *StorageService) Ping(ctx context.Context) bool {
 
 // Migrate runs any necessary schema migrations for the storage backend.
 func (ss *StorageService) Migrate(ctx context.Context) error {
-	ss.logger.Info("running request events migrations")
-	defer ss.logger.Info("request events migrations complete")
+	ss.logger.Info("running app metrics migrations")
+	defer ss.logger.Info("app metrics migrations complete")
 
 	if m, ok := ss.store.(migratable); ok {
 		ss.logger.Info("running store migrations")
@@ -121,18 +122,24 @@ func (ss *StorageService) Migrate(ctx context.Context) error {
 	return nil
 }
 
-// NewStorageService that will store the log records and the full request/response.
+// NewStorageService that will store app metrics records and full request/response details.
 // dbOpts are forwarded to the underlying DB constructors — pass
 // database.WithTelemetry(...) to instrument the request-events database tier.
 func NewStorageService(
 	ctx context.Context,
-	cfg *config.HttpLogging,
+	cfg *config.AppMetrics,
 	cursorEncryptor pagination.CursorEncryptor,
 	encryptor Encryptor,
 	logger *slog.Logger,
 	dbOpts ...database.Option,
 ) (*StorageService, error) {
 	logger = logger.With("service", "app_metrics")
+	if cfg == nil {
+		cfg = &config.AppMetrics{}
+	}
+	if cfg.Database == nil {
+		return nil, fmt.Errorf("app metrics database is required")
+	}
 	store := NewRecordStore(cfg.Database, logger, dbOpts...)
 	retriever := NewRecordRetriever(cfg.Database, cursorEncryptor, logger, dbOpts...)
 	blobStore, err := apblob.NewFromConfig(ctx, cfg.BlobStorage)
@@ -142,7 +149,7 @@ func NewStorageService(
 	fullStore := NewBlobStore(blobStore, encryptor, logger)
 
 	cc := captureConfig{}
-	cc.setFromConfig(cfg)
+	cc.setFromConfig(cfg.GetRequestEvents())
 
 	return &StorageService{
 		store:         store,
