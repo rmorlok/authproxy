@@ -37,6 +37,20 @@ func (m *MockFactory) EXPECT() *MockFactoryMockRecorder {
 	return m.recorder
 }
 
+// ManifestSetupSteps mocks base method.
+func (m *MockFactory) ManifestSetupSteps(connection iface.Connection, connector *connectors.Connector) []iface.ManifestSetupStep {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ManifestSetupSteps", connection, connector)
+	ret0, _ := ret[0].([]iface.ManifestSetupStep)
+	return ret0
+}
+
+// ManifestSetupSteps indicates an expected call of ManifestSetupSteps.
+func (mr *MockFactoryMockRecorder) ManifestSetupSteps(connection, connector interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ManifestSetupSteps", reflect.TypeOf((*MockFactory)(nil).ManifestSetupSteps), connection, connector)
+}
+
 // NewAuthenticator mocks base method.
 func (m *MockFactory) NewAuthenticator(connection iface.Connection) auth_methods.Authenticator {
 	m.ctrl.T.Helper()

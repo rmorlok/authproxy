@@ -11,6 +11,7 @@ import (
 	"testing"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/auth_methods/api_key"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
@@ -97,7 +98,6 @@ func NewApiKeyConnector(connectorID apid.ID, displayName string, opts ApiKeyConn
 	// migration sees it. The migration path also normalizes via Validate, but
 	// we call it here too so callers (and tests that inspect the returned
 	// definition) see the same shape that lands in the database.
-	c.Normalize()
 
 	return c
 }
@@ -256,7 +256,7 @@ func (env *IntegrationTestEnv) doSignedRequest(t *testing.T, method, path string
 // with this id; tests must echo it back on submit. Exported to keep tests
 // from hardcoding the magic string.
 func ApiKeySubmitFormStepId() string {
-	return connectors.SynthesizedApiKeyCredentialsStepId
+	return api_key.SynthesizedApiKeyCredentialsStepId
 }
 
 // ContainsBytes is a small helper for the no-replay assertion — checks

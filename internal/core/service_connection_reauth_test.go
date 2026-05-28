@@ -8,6 +8,7 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/aplog"
+	"github.com/rmorlok/authproxy/internal/auth_methods/api_key"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
@@ -65,7 +66,7 @@ func TestReauthConnection(t *testing.T) {
 		}, nil).AnyTimes()
 
 		db.EXPECT().SetConnectionSetupError(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId))).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep(api_key.SynthesizedApiKeyCredentialsStepId))).Return(nil)
 
 		resp, err := conn.s.ReauthConnection(context.Background(), conn.Id, "")
 		require.NoError(t, err)
@@ -73,7 +74,7 @@ func TestReauthConnection(t *testing.T) {
 		assert.Equal(t, iface.ConnectionSetupResponseTypeForm, resp.GetType())
 
 		form := resp.(*iface.ConnectionSetupForm)
-		assert.Equal(t, cschema.SynthesizedApiKeyCredentialsStepId, form.StepId)
+		assert.Equal(t, api_key.SynthesizedApiKeyCredentialsStepId, form.StepId)
 
 		// No-replay invariant: the prior credential bytes must not appear anywhere
 		// in the form payload. Serialize the whole response and grep.
@@ -107,7 +108,7 @@ func TestReauthConnection(t *testing.T) {
 		}, nil).AnyTimes()
 
 		db.EXPECT().SetConnectionSetupError(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId))).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep(api_key.SynthesizedApiKeyCredentialsStepId))).Return(nil)
 
 		resp, err := conn.s.ReauthConnection(context.Background(), conn.Id, "")
 		require.NoError(t, err)
@@ -138,7 +139,7 @@ func TestReauthConnection(t *testing.T) {
 
 		// Expect setup_error nil-write.
 		db.EXPECT().SetConnectionSetupError(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId))).Return(nil)
+		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep(api_key.SynthesizedApiKeyCredentialsStepId))).Return(nil)
 
 		// gomock validates the (*string)(nil) write happened — the in-memory
 		// `conn` is not the same instance ReauthConnection operates on (the
@@ -165,7 +166,6 @@ func TestReauthConnection(t *testing.T) {
 				},
 			},
 		}
-		connector.Normalize()
 		cv := NewTestConnectorVersion(connector)
 		conn := &connection{
 			Connection: database.Connection{
@@ -218,7 +218,6 @@ func TestReauthConnection(t *testing.T) {
 				},
 			},
 		}
-		connector.Normalize()
 		cv := NewTestConnectorVersion(connector)
 		conn := &connection{
 			Connection: database.Connection{
@@ -243,7 +242,8 @@ func TestReauthConnection(t *testing.T) {
 			Hash:                conn.cv.Hash,
 			EncryptedDefinition: conn.cv.EncryptedDefinition,
 		}, nil).AnyTimes()
-		db.EXPECT().SetConnectionSetupError(gomock.Any(), conn.Id, (*string)(nil)).Return(nil)
+		// Rejected before any state-mutating writes — no SetConnectionSetupError /
+		// SetConnectionSetupStep calls are expected.
 
 		_, err := s.ReauthConnection(context.Background(), conn.Id, "")
 		require.Error(t, err)

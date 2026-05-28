@@ -1,24 +1,31 @@
-package connectors
+package api_key
 
 import (
 	"encoding/json"
 
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
-// SynthesizedApiKeyCredentialsStepId is the id assigned to the auto-generated
-// credentials step for api-key connectors that did not declare their own
-// setup_flow.credentials.
+// SynthesizedApiKeyCredentialsStepId is the canonical id assigned to the
+// auto-generated credentials step for api-key connectors. Today every api-key
+// connection's credential step uses this id; once #367 introduces
+// user-authored credential steps as a first-class kind, this id remains the
+// default fallback.
 const SynthesizedApiKeyCredentialsStepId = "_authproxy_api_key_credentials"
 
-// SynthesizeApiKeyCredentialsStep builds a credential-collection SetupFlowStep
-// for an api-key placement, lives in setup_flow.credentials. The returned step
-// has a JSON Schema requiring "api_key" (plus the placement's UsernameField
-// for basic auth) and a JSONForms UI Schema rendering each field — api_key is
-// rendered with a password input so the value is masked.
+// synthesizeCredentialsStep builds a credential-collection form spec for an
+// api-key placement. The returned SetupFlowStep is not stored in any
+// connector definition — it is materialized at runtime by the api-key
+// factory's ManifestSetupSteps and discarded after the credential is
+// submitted.
+//
+// The JSON Schema requires "api_key" plus, for basic placements, the
+// configured username field. The JSONForms UI Schema renders each field;
+// "api_key" uses a password input so the value is masked.
 //
 // Returns nil if placement is nil.
-func SynthesizeApiKeyCredentialsStep(placement *ApiKeyPlacement) *SetupFlowStep {
+func synthesizeCredentialsStep(placement *cschema.ApiKeyPlacement) *cschema.SetupFlowStep {
 	if placement == nil {
 		return nil
 	}
@@ -52,7 +59,7 @@ func SynthesizeApiKeyCredentialsStep(placement *ApiKeyPlacement) *SetupFlowStep 
 	}
 	ui := uiSchema{Type: "VerticalLayout", Elements: []uiControl{}}
 
-	if placement.Type == ApiKeyPlacementBasic && placement.UsernameField != "" {
+	if placement.Type == cschema.ApiKeyPlacementBasic && placement.UsernameField != "" {
 		js.Required = append(js.Required, placement.UsernameField)
 		js.Properties[placement.UsernameField] = schemaProp{
 			Type:      "string",
@@ -81,14 +88,14 @@ func SynthesizeApiKeyCredentialsStep(placement *ApiKeyPlacement) *SetupFlowStep 
 	if err != nil {
 		// json.Marshal on these inline types cannot fail; if it ever does, panic
 		// is appropriate since this is config-load-time code with no recovery.
-		panic("connectors: failed to marshal synthesized api-key json_schema: " + err.Error())
+		panic("api_key: failed to marshal synthesized json_schema: " + err.Error())
 	}
 	uiBytes, err := json.Marshal(ui)
 	if err != nil {
-		panic("connectors: failed to marshal synthesized api-key ui_schema: " + err.Error())
+		panic("api_key: failed to marshal synthesized ui_schema: " + err.Error())
 	}
 
-	return &SetupFlowStep{
+	return &cschema.SetupFlowStep{
 		Id:          SynthesizedApiKeyCredentialsStepId,
 		Title:       "Enter your API key",
 		Description: "Provide the API key used to authenticate with this service.",

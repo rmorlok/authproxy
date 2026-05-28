@@ -576,181 +576,48 @@ func TestSetupFlowTotalSteps(t *testing.T) {
 	assert.Equal(t, 3, sf.TotalSteps())
 }
 
-func TestSetupFlowFirstSetupStep(t *testing.T) {
-	assert.True(t, (*SetupFlow)(nil).FirstSetupStep().IsZero())
+// TestSetupFlow_FindStepById covers the schema-only step lookup. The runtime
+// ManifestSetupFlow (core/iface) handles auth-method-emitted + pseudo steps;
+// this method only sees user-authored preconnect / configure steps.
+func TestSetupFlow_FindStepById(t *testing.T) {
+	sf := &SetupFlow{
+		Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "tenant"}, {Id: "region"}}},
+		Configure:  &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "workspace"}}},
+	}
 
-	t.Run("preconnect first", func(t *testing.T) {
-		sf := &SetupFlow{
-			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "tenant"}}},
-			Configure:  &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "workspace"}}},
-		}
-		assert.Equal(t, "tenant", sf.FirstSetupStep().String())
+	t.Run("preconnect step", func(t *testing.T) {
+		s, ok := sf.FindStepById("tenant")
+		require.True(t, ok)
+		assert.Equal(t, "tenant", s.Id)
 	})
 
-	t.Run("configure only", func(t *testing.T) {
-		sf := &SetupFlow{
-			Configure: &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "workspace"}}},
-		}
-		assert.Equal(t, "workspace", sf.FirstSetupStep().String())
+	t.Run("configure step", func(t *testing.T) {
+		s, ok := sf.FindStepById("workspace")
+		require.True(t, ok)
+		assert.Equal(t, "workspace", s.Id)
 	})
 
-	t.Run("credentials when no preconnect", func(t *testing.T) {
-		sf := &SetupFlow{
-			Credentials: &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "api_key_step"}}},
-		}
-		assert.Equal(t, "api_key_step", sf.FirstSetupStep().String())
+	t.Run("unknown id", func(t *testing.T) {
+		_, ok := sf.FindStepById("nope")
+		assert.False(t, ok)
+	})
+
+	t.Run("nil flow", func(t *testing.T) {
+		_, ok := (*SetupFlow)(nil).FindStepById("x")
+		assert.False(t, ok)
 	})
 }
 
-func TestSetupFlowNextSetupStep(t *testing.T) {
+func TestSetupFlow_IsConfigureStep(t *testing.T) {
 	sf := &SetupFlow{
-		Preconnect: &SetupFlowPhase{
-			Steps: []SetupFlowStep{{Id: "tenant"}, {Id: "region"}},
-		},
-		Configure: &SetupFlowPhase{
-			Steps: []SetupFlowStep{{Id: "workspace"}, {Id: "sync"}},
-		},
+		Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "tenant"}}},
+		Configure:  &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "workspace"}}},
 	}
 
-	t.Run("preconnect[0] -> preconnect[1]", func(t *testing.T) {
-		next, err := sf.NextSetupStep(MustNewSetupStep("tenant"), false)
-		require.NoError(t, err)
-		assert.Equal(t, "region", next.String())
-	})
-
-	t.Run("last preconnect -> apxy:auth", func(t *testing.T) {
-		next, err := sf.NextSetupStep(MustNewSetupStep("region"), false)
-		require.NoError(t, err)
-		assert.True(t, next.Equals(SetupStepAuth))
-	})
-
-	t.Run("apxy:auth -> first configure", func(t *testing.T) {
-		next, err := sf.NextSetupStep(SetupStepAuth, false)
-		require.NoError(t, err)
-		assert.Equal(t, "workspace", next.String())
-	})
-
-	t.Run("apxy:auth with probes -> apxy:verify", func(t *testing.T) {
-		next, err := sf.NextSetupStep(SetupStepAuth, true)
-		require.NoError(t, err)
-		assert.True(t, next.Equals(SetupStepVerify))
-	})
-
-	t.Run("apxy:verify -> first configure", func(t *testing.T) {
-		next, err := sf.NextSetupStep(SetupStepVerify, true)
-		require.NoError(t, err)
-		assert.Equal(t, "workspace", next.String())
-	})
-
-	t.Run("apxy:verify with no configure -> zero", func(t *testing.T) {
-		sfNoConfig := &SetupFlow{
-			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "tenant"}}},
-		}
-		next, err := sfNoConfig.NextSetupStep(SetupStepVerify, true)
-		require.NoError(t, err)
-		assert.True(t, next.IsZero())
-	})
-
-	t.Run("configure[0] -> configure[1]", func(t *testing.T) {
-		next, err := sf.NextSetupStep(MustNewSetupStep("workspace"), false)
-		require.NoError(t, err)
-		assert.Equal(t, "sync", next.String())
-	})
-
-	t.Run("last configure -> zero (complete)", func(t *testing.T) {
-		next, err := sf.NextSetupStep(MustNewSetupStep("sync"), false)
-		require.NoError(t, err)
-		assert.True(t, next.IsZero())
-	})
-
-	t.Run("apxy:auth with no configure -> zero", func(t *testing.T) {
-		sfNoConfig := &SetupFlow{
-			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "tenant"}}},
-		}
-		next, err := sfNoConfig.NextSetupStep(SetupStepAuth, false)
-		require.NoError(t, err)
-		assert.True(t, next.IsZero())
-	})
-
-	t.Run("unknown id returns error", func(t *testing.T) {
-		_, err := sf.NextSetupStep(MustNewSetupStep("unknown"), false)
-		assert.Error(t, err)
-	})
-}
-
-func TestSetupFlowGetStepBySetupStep(t *testing.T) {
-	sf := &SetupFlow{
-		Preconnect: &SetupFlowPhase{
-			Steps: []SetupFlowStep{{Id: "tenant"}, {Id: "region"}},
-		},
-		Configure: &SetupFlowPhase{
-			Steps: []SetupFlowStep{{Id: "workspace"}},
-		},
-	}
-
-	t.Run("first preconnect", func(t *testing.T) {
-		step, idx, err := sf.GetStepBySetupStep(MustNewSetupStep("tenant"))
-		require.NoError(t, err)
-		assert.Equal(t, "tenant", step.Id)
-		assert.Equal(t, 0, idx)
-	})
-
-	t.Run("second preconnect", func(t *testing.T) {
-		step, idx, err := sf.GetStepBySetupStep(MustNewSetupStep("region"))
-		require.NoError(t, err)
-		assert.Equal(t, "region", step.Id)
-		assert.Equal(t, 1, idx)
-	})
-
-	t.Run("configure step has global index including preconnect", func(t *testing.T) {
-		step, idx, err := sf.GetStepBySetupStep(MustNewSetupStep("workspace"))
-		require.NoError(t, err)
-		assert.Equal(t, "workspace", step.Id)
-		assert.Equal(t, 2, idx) // 2 preconnect steps before this
-	})
-
-	t.Run("unknown id returns error", func(t *testing.T) {
-		_, _, err := sf.GetStepBySetupStep(MustNewSetupStep("nope"))
-		assert.Error(t, err)
-	})
-
-	t.Run("rejects pseudo-step", func(t *testing.T) {
-		_, _, err := sf.GetStepBySetupStep(SetupStepAuth)
-		assert.Error(t, err)
-	})
-}
-
-func TestSetupFlow_IsSchemaStep_IsConfigureStep_IsCredentialsStep(t *testing.T) {
-	sf := &SetupFlow{
-		Preconnect:  &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "tenant"}}},
-		Credentials: &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "cred"}}},
-		Configure:   &SetupFlowPhase{Steps: []SetupFlowStep{{Id: "workspace"}}},
-	}
-
-	t.Run("IsSchemaStep accepts preconnect/credentials/configure", func(t *testing.T) {
-		assert.True(t, sf.IsSchemaStep(MustNewSetupStep("tenant")))
-		assert.True(t, sf.IsSchemaStep(MustNewSetupStep("cred")))
-		assert.True(t, sf.IsSchemaStep(MustNewSetupStep("workspace")))
-	})
-
-	t.Run("IsSchemaStep rejects pseudo-steps and unknown ids", func(t *testing.T) {
-		assert.False(t, sf.IsSchemaStep(SetupStepAuth))
-		assert.False(t, sf.IsSchemaStep(SetupStepVerify))
-		assert.False(t, sf.IsSchemaStep(MustNewSetupStep("nope")))
-	})
-
-	t.Run("IsConfigureStep only true for configure-array entries", func(t *testing.T) {
-		assert.False(t, sf.IsConfigureStep(MustNewSetupStep("tenant")))
-		assert.False(t, sf.IsConfigureStep(MustNewSetupStep("cred")))
-		assert.True(t, sf.IsConfigureStep(MustNewSetupStep("workspace")))
-		assert.False(t, sf.IsConfigureStep(SetupStepAuth))
-	})
-
-	t.Run("IsCredentialsStep only true for credentials-array entries", func(t *testing.T) {
-		assert.False(t, sf.IsCredentialsStep(MustNewSetupStep("tenant")))
-		assert.True(t, sf.IsCredentialsStep(MustNewSetupStep("cred")))
-		assert.False(t, sf.IsCredentialsStep(MustNewSetupStep("workspace")))
-	})
+	assert.False(t, sf.IsConfigureStep(MustNewSetupStep("tenant")))
+	assert.True(t, sf.IsConfigureStep(MustNewSetupStep("workspace")))
+	assert.False(t, sf.IsConfigureStep(SetupStepAuth))
+	assert.False(t, sf.IsConfigureStep(SetupStep{}))
 }
 
 func TestSetupFlowYAMLRoundtrip(t *testing.T) {

@@ -15,20 +15,15 @@ import (
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
-// SetupFlow defines the multi-step setup flow for a connector. Customers define this in their
-// connector YAML to configure what forms are presented to users during connection setup.
+// SetupFlow defines the user-authored portion of a connector's setup flow.
+// Auth-method-emitted credential steps (api-key form, OAuth2 redirect) are
+// not described here — they are materialized at runtime by the auth method
+// and inserted between preconnect and configure by the core flow builder.
 type SetupFlow struct {
 	// Preconnect defines form steps shown before any credential acquisition. Values
 	// collected here are available for mustache templating in auth configuration
 	// (e.g. tenant subdomain in OAuth endpoints).
 	Preconnect *SetupFlowPhase `json:"preconnect,omitempty" yaml:"preconnect,omitempty"`
-
-	// Credentials defines form steps owned by the auth method for collecting
-	// credential material. Populated by AuthApiKey (synthesized or explicit);
-	// OAuth2 doesn't use this phase — it has its own redirect-based auth step.
-	// Form data submitted here is dispatched to the auth method and never merges
-	// into the connection's general config blob.
-	Credentials *SetupFlowPhase `json:"credentials,omitempty" yaml:"credentials,omitempty"`
 
 	// Configure defines form steps shown after credentials are established.
 	// These steps can use data sources that make proxied API calls using the
@@ -52,12 +47,6 @@ func (sf *SetupFlow) Validate(vc *common.ValidationContext) error {
 		}
 	}
 
-	if sf.Credentials != nil {
-		if err := sf.Credentials.Validate(vc.PushField("credentials"), seenIds, false); err != nil {
-			result = multierror.Append(result, err)
-		}
-	}
-
 	if sf.Configure != nil {
 		if err := sf.Configure.Validate(vc.PushField("configure"), seenIds, true); err != nil {
 			result = multierror.Append(result, err)
@@ -72,18 +61,14 @@ func (sf *SetupFlow) HasPreconnect() bool {
 	return sf != nil && sf.Preconnect != nil && len(sf.Preconnect.Steps) > 0
 }
 
-// HasCredentials returns true if the setup flow has credential-collection steps.
-// Auth methods (currently AuthApiKey) own these steps; OAuth2 returns false.
-func (sf *SetupFlow) HasCredentials() bool {
-	return sf != nil && sf.Credentials != nil && len(sf.Credentials.Steps) > 0
-}
-
 // HasConfigure returns true if the setup flow has configure steps.
 func (sf *SetupFlow) HasConfigure() bool {
 	return sf != nil && sf.Configure != nil && len(sf.Configure.Steps) > 0
 }
 
-// TotalSteps returns the total number of form steps across all phases.
+// TotalSteps returns the total number of user-authored form steps in the
+// schema (preconnect + configure). Excludes auth-method-emitted steps — the
+// runtime ManifestSetupFlow counts those separately.
 func (sf *SetupFlow) TotalSteps() int {
 	if sf == nil {
 		return 0
@@ -91,9 +76,6 @@ func (sf *SetupFlow) TotalSteps() int {
 	total := 0
 	if sf.Preconnect != nil {
 		total += len(sf.Preconnect.Steps)
-	}
-	if sf.Credentials != nil {
-		total += len(sf.Credentials.Steps)
 	}
 	if sf.Configure != nil {
 		total += len(sf.Configure.Steps)
@@ -274,218 +256,40 @@ func ParseSetupStep(setupStep string) (SetupStep, error) {
 // steps (preconnect cannot use them because credentials are not yet
 // established); callers use this to gate proxy-driven data-source requests.
 func (sf *SetupFlow) IsConfigureStep(step SetupStep) bool {
-	return phaseContainsId(sf.configurePhase(), step.id)
-}
-
-// IsCredentialsStep returns true when the supplied step belongs to the
-// schema's credentials phase. The credentials phase is owned by an auth
-// method (currently AuthApiKey); submissions to it are routed to the auth
-// method instead of merged into the connection's config.
-func (sf *SetupFlow) IsCredentialsStep(step SetupStep) bool {
-	return phaseContainsId(sf.credentialsPhase(), step.id)
-}
-
-// IsSchemaStep returns true when the supplied step is a user-authored step
-// from preconnect, credentials, or configure — i.e. one that accepts form
-// submissions. Apxy-emitted pseudo-steps return false.
-func (sf *SetupFlow) IsSchemaStep(step SetupStep) bool {
-	_, _, ok := sf.findStepById(step.id)
-	return ok
-}
-
-func (sf *SetupFlow) credentialsPhase() *SetupFlowPhase {
-	if sf == nil {
-		return nil
-	}
-	return sf.Credentials
-}
-
-func (sf *SetupFlow) configurePhase() *SetupFlowPhase {
-	if sf == nil {
-		return nil
-	}
-	return sf.Configure
-}
-
-func phaseContainsId(phase *SetupFlowPhase, id string) bool {
-	if phase == nil || id == "" {
+	if sf == nil || sf.Configure == nil || step.IsZero() {
 		return false
 	}
-	for i := range phase.Steps {
-		if phase.Steps[i].Id == id {
+	for i := range sf.Configure.Steps {
+		if sf.Configure.Steps[i].Id == step.id {
 			return true
 		}
 	}
 	return false
 }
 
-// findStepById walks the schema-defined arrays (preconnect, credentials,
-// configure) and returns the array slot the id lives in. ok=false if the id
-// is not user-authored (e.g. an apxy:* pseudo-step or unknown id).
-func (sf *SetupFlow) findStepById(id string) (step *SetupFlowStep, globalIndex int, ok bool) {
+// FindStepById returns the user-authored step definition with the given id
+// from preconnect or configure. ok=false if the id does not match any
+// schema-defined step (e.g. it's an apxy:* pseudo-step or an
+// auth-method-emitted step id).
+func (sf *SetupFlow) FindStepById(id string) (step *SetupFlowStep, ok bool) {
 	if sf == nil || id == "" {
-		return nil, 0, false
+		return nil, false
 	}
-	idx := 0
 	if sf.Preconnect != nil {
 		for i := range sf.Preconnect.Steps {
 			if sf.Preconnect.Steps[i].Id == id {
-				return &sf.Preconnect.Steps[i], idx, true
+				return &sf.Preconnect.Steps[i], true
 			}
-			idx++
-		}
-	}
-	if sf.Credentials != nil {
-		for i := range sf.Credentials.Steps {
-			if sf.Credentials.Steps[i].Id == id {
-				return &sf.Credentials.Steps[i], idx, true
-			}
-			idx++
 		}
 	}
 	if sf.Configure != nil {
 		for i := range sf.Configure.Steps {
 			if sf.Configure.Steps[i].Id == id {
-				return &sf.Configure.Steps[i], idx, true
+				return &sf.Configure.Steps[i], true
 			}
-			idx++
 		}
 	}
-	return nil, 0, false
-}
-
-// GetStepBySetupStep returns the step definition and its 0-based global index
-// (across preconnect + credentials + configure) for the given setup step.
-// Returns an error if the step id is not a user-authored schema step (e.g.
-// an apxy:* pseudo-step) or is unknown.
-//
-// DEPRECATED: #366 replaces direct callers with ManifestSetupFlow.StepById.
-// Kept transitional so the pre-#366 dispatch path keeps compiling.
-func (sf *SetupFlow) GetStepBySetupStep(step SetupStep) (*SetupFlowStep, int, error) {
-	found, idx, ok := sf.findStepById(step.id)
-	if !ok {
-		return nil, 0, fmt.Errorf("step %q is not a schema-defined step", step.id)
-	}
-	return found, idx, nil
-}
-
-// FirstSetupStep returns the first step in the flow. Returns the zero
-// SetupStep when the flow has no steps (caller should check IsZero).
-//
-// DEPRECATED: #366 replaces direct callers with ManifestSetupFlow.FirstStep.
-func (sf *SetupFlow) FirstSetupStep() SetupStep {
-	if sf == nil {
-		return SetupStep{}
-	}
-	if sf.HasPreconnect() {
-		return SetupStep{id: sf.Preconnect.Steps[0].Id}
-	}
-	if sf.HasCredentials() {
-		return SetupStep{id: sf.Credentials.Steps[0].Id}
-	}
-	if sf.HasConfigure() {
-		return SetupStep{id: sf.Configure.Steps[0].Id}
-	}
-	return SetupStep{}
-}
-
-// NextSetupStep returns the step that follows current in the linear flow.
-//
-// Navigation rules (same as the prior phase-based encoding, just keyed by id):
-//   - Within preconnect / credentials / configure arrays: advance to the
-//     next entry of the same array.
-//   - End of preconnect: jump to credentials:0 if present, else SetupStepAuth.
-//   - End of credentials: jump to SetupStepVerify if hasProbes, else configure:0,
-//     else done.
-//   - SetupStepAuth: jump to SetupStepVerify if hasProbes, else configure:0,
-//     else done.
-//   - SetupStepVerify: jump to configure:0 if present, else done.
-//   - End of configure: done.
-//
-// DEPRECATED: #366 replaces direct callers with ManifestSetupFlow.NextStep.
-// Kept transitional so the pre-#366 dispatch path keeps compiling.
-func (sf *SetupFlow) NextSetupStep(current SetupStep, hasProbes bool) (SetupStep, error) {
-	if current.IsZero() {
-		return SetupStep{}, fmt.Errorf("cannot compute next from zero SetupStep")
-	}
-
-	// Pseudo-steps: explicit transitions.
-	if current.Equals(SetupStepAuth) {
-		return sf.afterCredentialsEstablished(hasProbes), nil
-	}
-	if current.Equals(SetupStepVerify) {
-		if sf.HasConfigure() {
-			return SetupStep{id: sf.Configure.Steps[0].Id}, nil
-		}
-		return SetupStep{}, nil
-	}
-	if current.IsApxyEmitted() {
-		return SetupStep{}, fmt.Errorf("no successor defined for pseudo-step %q", current.id)
-	}
-
-	// Schema-defined step: locate which array it lives in and advance.
-	if sf.HasPreconnect() {
-		if next, ok := nextInArray(sf.Preconnect.Steps, current.id); ok {
-			return next, nil
-		}
-		if sf.isLastInArray(sf.Preconnect.Steps, current.id) {
-			if sf.HasCredentials() {
-				return SetupStep{id: sf.Credentials.Steps[0].Id}, nil
-			}
-			return SetupStepAuth, nil
-		}
-	}
-	if sf.HasCredentials() {
-		if next, ok := nextInArray(sf.Credentials.Steps, current.id); ok {
-			return next, nil
-		}
-		if sf.isLastInArray(sf.Credentials.Steps, current.id) {
-			return sf.afterCredentialsEstablished(hasProbes), nil
-		}
-	}
-	if sf.HasConfigure() {
-		if next, ok := nextInArray(sf.Configure.Steps, current.id); ok {
-			return next, nil
-		}
-		if sf.isLastInArray(sf.Configure.Steps, current.id) {
-			return SetupStep{}, nil
-		}
-	}
-	return SetupStep{}, fmt.Errorf("unknown step id %q", current.id)
-}
-
-// afterCredentialsEstablished returns the step that follows credential
-// establishment (end of credentials phase, or OAuth2 auth phase).
-func (sf *SetupFlow) afterCredentialsEstablished(hasProbes bool) SetupStep {
-	if hasProbes {
-		return SetupStepVerify
-	}
-	if sf.HasConfigure() {
-		return SetupStep{id: sf.Configure.Steps[0].Id}
-	}
-	return SetupStep{} // Complete
-}
-
-// nextInArray returns the successor id within a single array, ok=false when
-// id is not present in the array or is the last entry.
-func nextInArray(steps []SetupFlowStep, id string) (SetupStep, bool) {
-	for i := range steps {
-		if steps[i].Id == id {
-			if i+1 < len(steps) {
-				return SetupStep{id: steps[i+1].Id}, true
-			}
-			return SetupStep{}, false
-		}
-	}
-	return SetupStep{}, false
-}
-
-// isLastInArray returns true when id is the last entry of the supplied array.
-func (sf *SetupFlow) isLastInArray(steps []SetupFlowStep, id string) bool {
-	if len(steps) == 0 {
-		return false
-	}
-	return steps[len(steps)-1].Id == id
+	return nil, false
 }
 
 // SetupFlowPhase is a sequential list of form steps within a phase (preconnect or configure).

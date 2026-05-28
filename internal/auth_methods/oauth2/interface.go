@@ -8,6 +8,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/auth_methods"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 type IActorData interface {
@@ -22,6 +23,7 @@ type IActorData interface {
 type Factory interface {
 	NewOAuth2(connection coreIface.Connection) OAuth2Connection
 	NewAuthenticator(connection coreIface.Connection) auth_methods.Authenticator
+	ManifestSetupSteps(connection coreIface.Connection, connector *cschema.Connector) []coreIface.ManifestSetupStep
 	GetOAuth2State(ctx context.Context, actor IActorData, stateId apid.ID) (OAuth2Connection, error)
 }
 

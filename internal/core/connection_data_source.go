@@ -28,9 +28,9 @@ func (c *connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 		return nil, httperr.BadRequest("data sources are only available during configure steps")
 	}
 
-	step, _, err := connector.SetupFlow.GetStepBySetupStep(*setupStep)
-	if err != nil {
-		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to get current step: %w", err))
+	step, ok := connector.SetupFlow.FindStepById(setupStep.Id())
+	if !ok {
+		return nil, httperr.InternalServerErrorMsg("current setup step not found in connector definition")
 	}
 
 	ds, ok := step.DataSources[sourceId]

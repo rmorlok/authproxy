@@ -48,7 +48,6 @@ func newTestApiKeyConnection(
 		}},
 		Probes: probes,
 	}
-	connector.Normalize()
 	cv := NewTestConnectorVersion(connector)
 
 	conn := &connection{
@@ -98,7 +97,7 @@ func TestApiKeySubmit_BearerPersistsCredentialAndAdvancesToReady(t *testing.T) {
 		Type: cschema.ApiKeyPlacementBearer,
 	}, nil)
 
-	step := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
+	step := cschema.MustNewSetupStep(api_key.SynthesizedApiKeyCredentialsStepId)
 	conn.SetupStep = &step
 
 	credCap := &captureEncCredential{}
@@ -116,7 +115,7 @@ func TestApiKeySubmit_BearerPersistsCredentialAndAdvancesToReady(t *testing.T) {
 	db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
 
 	resp, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{
-		StepId: cschema.SynthesizedApiKeyCredentialsStepId,
+		StepId: api_key.SynthesizedApiKeyCredentialsStepId,
 		Data:   json.RawMessage(`{"api_key":"sk-abc-123"}`),
 	})
 	require.NoError(t, err)
@@ -138,7 +137,7 @@ func TestApiKeySubmit_BasicPersistsBothCredentialFields(t *testing.T) {
 		UsernameField: "account_id",
 	}, nil)
 
-	step := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
+	step := cschema.MustNewSetupStep(api_key.SynthesizedApiKeyCredentialsStepId)
 	conn.SetupStep = &step
 
 	credCap := &captureEncCredential{}
@@ -151,7 +150,7 @@ func TestApiKeySubmit_BasicPersistsBothCredentialFields(t *testing.T) {
 	db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
 
 	resp, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{
-		StepId: cschema.SynthesizedApiKeyCredentialsStepId,
+		StepId: api_key.SynthesizedApiKeyCredentialsStepId,
 		Data:   json.RawMessage(`{"api_key":"key-xyz","account_id":"acct-001"}`),
 	})
 	require.NoError(t, err)
@@ -173,7 +172,7 @@ func TestApiKeySubmit_TransitionsToVerifyWhenProbesPresent(t *testing.T) {
 			{Id: "ping", Http: &cschema.ProbeHttp{Method: "GET", URL: "https://example.com/ping"}},
 		},
 	)
-	step := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
+	step := cschema.MustNewSetupStep(api_key.SynthesizedApiKeyCredentialsStepId)
 	conn.SetupStep = &step
 
 	ctx, actorId := contextWithActor(t)
@@ -184,7 +183,7 @@ func TestApiKeySubmit_TransitionsToVerifyWhenProbesPresent(t *testing.T) {
 	ac.EXPECT().EnqueueContext(gomock.Any(), gomock.Any(), gomock.Any()).Return(nil, nil)
 
 	resp, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{
-		StepId: cschema.SynthesizedApiKeyCredentialsStepId,
+		StepId: api_key.SynthesizedApiKeyCredentialsStepId,
 		Data:   json.RawMessage(`{"api_key":"sk-abc"}`),
 	})
 	require.NoError(t, err)
@@ -200,7 +199,7 @@ func TestApiKeySubmit_NoReplay_PriorCredentialNeverDecryptedIntoForm(t *testing.
 	conn, db, _ := newTestApiKeyConnection(t, ctrl, &cschema.ApiKeyPlacement{
 		Type: cschema.ApiKeyPlacementBearer,
 	}, nil)
-	step := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
+	step := cschema.MustNewSetupStep(api_key.SynthesizedApiKeyCredentialsStepId)
 	conn.SetupStep = &step
 
 	ctx, actorId := contextWithActor(t)
@@ -214,7 +213,7 @@ func TestApiKeySubmit_NoReplay_PriorCredentialNeverDecryptedIntoForm(t *testing.
 	// gomock fails ctrl.Finish() if submit reads the prior credential.
 
 	resp, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{
-		StepId: cschema.SynthesizedApiKeyCredentialsStepId,
+		StepId: api_key.SynthesizedApiKeyCredentialsStepId,
 		Data:   json.RawMessage(`{"api_key":"new-key"}`),
 	})
 	require.NoError(t, err)
@@ -258,7 +257,6 @@ func TestApiKeySubmit_PreconnectFieldNamedApiKeyIsNotTreatedAsCredential(t *test
 			Preconnect: &cschema.SetupFlowPhase{Steps: []cschema.SetupFlowStep{preconnect}},
 		},
 	}
-	connector.Normalize()
 	cv := NewTestConnectorVersion(connector)
 	conn := &connection{
 		Connection: database.Connection{
@@ -292,7 +290,7 @@ func TestApiKeySubmit_PreconnectFieldNamedApiKeyIsNotTreatedAsCredential(t *test
 		})
 	// After preconnect completes the next step is the synthesized credentials step,
 	// so SubmitForm returns that form (not complete).
-	credsStep := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
+	credsStep := cschema.MustNewSetupStep(api_key.SynthesizedApiKeyCredentialsStepId)
 	db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &credsStep).Return(nil)
 
 	ctx, _ := contextWithActor(t)
@@ -303,7 +301,7 @@ func TestApiKeySubmit_PreconnectFieldNamedApiKeyIsNotTreatedAsCredential(t *test
 	require.NoError(t, err)
 	form, ok := resp.(*iface.ConnectionSetupForm)
 	require.True(t, ok, "expected next step to be the credentials form, got %T", resp)
-	require.Equal(t, cschema.SynthesizedApiKeyCredentialsStepId, form.StepId)
+	require.Equal(t, api_key.SynthesizedApiKeyCredentialsStepId, form.StepId)
 }
 
 // TestApiKeySubmit_TransitionsToConfigureWhenNoProbes covers the third
@@ -331,7 +329,6 @@ func TestApiKeySubmit_TransitionsToConfigureWhenNoProbes(t *testing.T) {
 			Configure: &cschema.SetupFlowPhase{Steps: []cschema.SetupFlowStep{configureStep}},
 		},
 	}
-	connector.Normalize()
 	cv := NewTestConnectorVersion(connector)
 	conn := &connection{
 		Connection: database.Connection{
@@ -346,7 +343,7 @@ func TestApiKeySubmit_TransitionsToConfigureWhenNoProbes(t *testing.T) {
 		logger: aplog.NewNoopLogger(),
 	}
 
-	step := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
+	step := cschema.MustNewSetupStep(api_key.SynthesizedApiKeyCredentialsStepId)
 	conn.SetupStep = &step
 
 	ctx, actorId := contextWithActor(t)
@@ -354,14 +351,12 @@ func TestApiKeySubmit_TransitionsToConfigureWhenNoProbes(t *testing.T) {
 	db.EXPECT().
 		InsertApiKeyCredential(gomock.Any(), conn.Id, gomock.Any(), gomock.Any(), &actorId).
 		Return(&database.ApiKeyCredential{Id: apid.New(apid.PrefixApiKeyCredential)}, nil)
-	db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &configureFirst).Return(nil)
-	// Resuming via GetCurrentSetupStepResponse: rebuilds the configure form,
-	// which requires SetConnectionSetupStep to be called once more with the
-	// same step (buildFormResponse re-asserts the setup step).
+	// Single transition: dispatcher advances to the first configure step after
+	// PersistCredentials returns. The render-form path is read-only.
 	db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &configureFirst).Return(nil)
 
 	resp, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{
-		StepId: cschema.SynthesizedApiKeyCredentialsStepId,
+		StepId: api_key.SynthesizedApiKeyCredentialsStepId,
 		Data:   json.RawMessage(`{"api_key":"sk-abc"}`),
 	})
 	require.NoError(t, err)
@@ -379,7 +374,7 @@ func TestApiKeySubmit_RejectsMismatchedStepId(t *testing.T) {
 	conn, _, _ := newTestApiKeyConnection(t, ctrl, &cschema.ApiKeyPlacement{
 		Type: cschema.ApiKeyPlacementBearer,
 	}, nil)
-	step := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
+	step := cschema.MustNewSetupStep(api_key.SynthesizedApiKeyCredentialsStepId)
 	conn.SetupStep = &step
 
 	// No InsertApiKeyCredential expected — submit should error before that.
@@ -402,14 +397,14 @@ func TestApiKeySubmit_RejectsSchemaViolation(t *testing.T) {
 	conn, _, _ := newTestApiKeyConnection(t, ctrl, &cschema.ApiKeyPlacement{
 		Type: cschema.ApiKeyPlacementBearer,
 	}, nil)
-	step := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
+	step := cschema.MustNewSetupStep(api_key.SynthesizedApiKeyCredentialsStepId)
 	conn.SetupStep = &step
 
 	// No InsertApiKeyCredential expected.
 
 	ctx, _ := contextWithActor(t)
 	_, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{
-		StepId: cschema.SynthesizedApiKeyCredentialsStepId,
+		StepId: api_key.SynthesizedApiKeyCredentialsStepId,
 		Data:   json.RawMessage(`{}`), // missing required api_key
 	})
 	require.Error(t, err)
@@ -426,65 +421,17 @@ func TestApiKeySubmit_RejectsBasicMissingUsername(t *testing.T) {
 		Type:          cschema.ApiKeyPlacementBasic,
 		UsernameField: "account_id",
 	}, nil)
-	step := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
+	step := cschema.MustNewSetupStep(api_key.SynthesizedApiKeyCredentialsStepId)
 	conn.SetupStep = &step
 
 	// No InsertApiKeyCredential expected.
 
 	ctx, _ := contextWithActor(t)
 	_, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{
-		StepId: cschema.SynthesizedApiKeyCredentialsStepId,
+		StepId: api_key.SynthesizedApiKeyCredentialsStepId,
 		Data:   json.RawMessage(`{"api_key":"sk-abc"}`), // missing required account_id
 	})
 	require.Error(t, err)
-}
-
-// TestApiKeySubmit_RejectsUnknownAuthTypeOnCredentialsPhase guards against a
-// malformed connector configuration: a credentials phase declared in YAML for
-// a non-api-key auth type. submitCredentialsStep's default branch should
-// surface a 500 rather than persisting anything.
-func TestApiKeySubmit_RejectsUnknownAuthTypeOnCredentialsPhase(t *testing.T) {
-	ctrl := gomock.NewController(t)
-	defer ctrl.Finish()
-
-	e := encrypt.NewFakeEncryptService(false)
-	s, _, _, _, _, _ := FullMockService(t, ctrl)
-	s.encrypt = e
-
-	// OAuth2 connector with a manually-declared credentials phase — not
-	// produced by Normalize, but possible if a YAML author hand-writes it.
-	connector := cschema.Connector{
-		Auth: &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
-		SetupFlow: &cschema.SetupFlow{
-			Credentials: &cschema.SetupFlowPhase{Steps: []cschema.SetupFlowStep{{
-				Id:         "creds",
-				JsonSchema: common.RawJSON(`{"type":"object","properties":{"api_key":{"type":"string"}},"required":["api_key"]}`),
-			}}},
-		},
-	}
-	cv := NewTestConnectorVersion(connector)
-	conn := &connection{
-		Connection: database.Connection{
-			Id:               "cxn_test4444444444aa",
-			Namespace:        "root",
-			State:            database.ConnectionStateSetup,
-			ConnectorId:      cv.GetId(),
-			ConnectorVersion: cv.GetVersion(),
-		},
-		s:      s,
-		cv:     cv,
-		logger: aplog.NewNoopLogger(),
-	}
-	step := cschema.MustNewSetupStep("creds")
-	conn.SetupStep = &step
-
-	ctx, _ := contextWithActor(t)
-	_, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{
-		StepId: "creds",
-		Data:   json.RawMessage(`{"api_key":"sk-abc"}`),
-	})
-	require.Error(t, err)
-	require.Contains(t, err.Error(), "does not accept credentials submissions")
 }
 
 // TestApiKeySubmit_DBErrorSurfacesUnchanged asserts a database failure from
@@ -497,7 +444,7 @@ func TestApiKeySubmit_DBErrorSurfacesUnchanged(t *testing.T) {
 	conn, db, _ := newTestApiKeyConnection(t, ctrl, &cschema.ApiKeyPlacement{
 		Type: cschema.ApiKeyPlacementBearer,
 	}, nil)
-	step := cschema.MustNewSetupStep(cschema.SynthesizedApiKeyCredentialsStepId)
+	step := cschema.MustNewSetupStep(api_key.SynthesizedApiKeyCredentialsStepId)
 	conn.SetupStep = &step
 
 	ctx, actorId := contextWithActor(t)
@@ -508,7 +455,7 @@ func TestApiKeySubmit_DBErrorSurfacesUnchanged(t *testing.T) {
 	// error out before advancing.
 
 	_, err := conn.SubmitForm(ctx, iface.SubmitConnectionRequest{
-		StepId: cschema.SynthesizedApiKeyCredentialsStepId,
+		StepId: api_key.SynthesizedApiKeyCredentialsStepId,
 		Data:   json.RawMessage(`{"api_key":"sk-abc"}`),
 	})
 	require.Error(t, err)
