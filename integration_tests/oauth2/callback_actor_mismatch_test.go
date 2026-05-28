@@ -12,6 +12,7 @@ import (
 	"github.com/chromedp/chromedp"
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/database"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
@@ -154,11 +155,15 @@ func TestCallbackRejection_ActorMismatch(t *testing.T) {
 	// 6. No token row was written.
 	require.Nil(t, env.GetOAuth2Token(t, connID), "no oauth2_token row should exist after actor_mismatch rejection")
 
-	// 7. Connection still in `created`, no setup_step transition.
+	// 7. Connection still in Setup, parked on the OAuth2 authorize step
+	// (where _initiate placed it) — rejection short-circuited before any
+	// state-machine transition.
 	conn := env.GetConnection(t, connID)
 	assert.Equal(t, database.ConnectionStateSetup, conn.State,
-		"connection state should remain `created` after a rejected callback")
-	assert.Nil(t, conn.SetupStep, "no setup_step should be recorded on a rejected callback")
+		"connection state should remain Setup after a rejected callback")
+	require.NotNil(t, conn.SetupStep)
+	assert.Equal(t, oauth2.OAuth2AuthorizeStepId, conn.SetupStep.Id(),
+		"setup_step should remain on the OAuth2 authorize step")
 	assert.Nil(t, conn.SetupError, "no setup_error should be recorded on a rejected callback")
 
 	// 8. Provider observed zero /token calls — the token exchange path was
