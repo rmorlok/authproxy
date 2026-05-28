@@ -36,6 +36,8 @@ jobs:
             dockerfile: Dockerfile
           - name: authproxy-demo-shell
             dockerfile: demos/shell/Dockerfile
+          - name: authproxy-demo-seed
+            dockerfile: demos/seed/Dockerfile
 
     steps:
       - uses: actions/checkout@v4

@@ -99,6 +99,29 @@ A Helm pre-install hook Job that generates the keypair Secrets is a
 reasonable follow-up — would unify the operator UX with the
 auto-generated random material above. Tracked separately.
 
+## Demo actors (seeded on every install/upgrade)
+
+A `post-install` + `post-upgrade` Helm hook Job runs the
+`authproxy-demo-seed` image, which calls the AuthProxy admin API to
+create the three demo identities the shell expects:
+
+| External ID  | Role     | Notes                                            |
+|--------------|----------|--------------------------------------------------|
+| `demo-admin` | admin    | Lands in the admin UI                            |
+| `demo-user`  | user     | Lands in the marketplace                         |
+| `fresh-user` | user     | Lands in the marketplace with no connections     |
+
+Idempotent: the seed binary GETs each actor by external_id and skips
+creation when AuthProxy returns 200. Re-running `helm upgrade` is a
+no-op once the state matches. Toggle off with `--set seed.enabled=false`
+or extend via `seed.actors[*]` to seed customer-specific identities
+alongside the defaults.
+
+> **Currently NOT seeded:** per-actor pre-existing connections + the
+> demo connector itself. The connector pattern needs a dedicated
+> connector-management admin API surface that isn't fully there yet;
+> tracked as a follow-up to A11.
+
 ## Sub-path routing
 
 The umbrella Ingress maps host paths to backend services:

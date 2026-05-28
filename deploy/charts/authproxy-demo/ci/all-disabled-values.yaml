@@ -25,6 +25,9 @@ ingress:
 secrets:
   autoGenerate: false
 
+seed:
+  enabled: false
+
 authproxy:
   enabled: false
 
