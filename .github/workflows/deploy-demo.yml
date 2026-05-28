@@ -112,8 +112,15 @@ jobs:
         run: |
           set -euo pipefail
           # Pre-existing revision, or empty when this is the first install.
-          rev=$(helm history "${RELEASE_NAME}" -n "${RELEASE_NS}" -o json 2>/dev/null \
-                | jq -r '[.[] | select(.status=="deployed")] | last | .revision // empty')
+          # `helm history` exits non-zero when the release doesn't exist —
+          # with pipefail that aborts the whole step, so detect the
+          # missing-release case via `helm status` first.
+          if helm status "${RELEASE_NAME}" -n "${RELEASE_NS}" >/dev/null 2>&1; then
+            rev=$(helm history "${RELEASE_NAME}" -n "${RELEASE_NS}" -o json \
+                  | jq -r '[.[] | select(.status=="deployed")] | last | .revision // empty')
+          else
+            rev=""
+          fi
           echo "previous_revision=${rev}" >> "$GITHUB_OUTPUT"
           echo "Previous deployed revision: ${rev:-<none>}"
 
