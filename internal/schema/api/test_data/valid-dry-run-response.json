@@ -1,0 +1,25 @@
+{
+  "request_label_snapshot": {
+    "team": "payments"
+  },
+  "matched": [
+    {
+      "rate_limit_id": "rl_test550e8400abcde",
+      "namespace": "root.acme",
+      "effective_mode": "enforce",
+      "bucket_key": "actor=act_test550e8400abcde|labels/team=payments",
+      "algorithm_summary": "fixed_window window=1m limit=100",
+      "would_allow": true,
+      "remaining": 99,
+      "retry_after_ms": 0,
+      "peek_failed": false
+    }
+  ],
+  "not_matched": [
+    {
+      "rate_limit_id": "rl_other550e8400abcde",
+      "namespace": "root.acme",
+      "reason": "method did not match"
+    }
+  ]
+}

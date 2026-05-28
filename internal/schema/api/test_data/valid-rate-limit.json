@@ -1,0 +1,33 @@
+{
+  "id": "rl_test550e8400abcde",
+  "namespace": "root.acme",
+  "definition": {
+    "mode": "enforce",
+    "selector": {
+      "methods": ["POST"],
+      "request_types": ["proxy"],
+      "label_selector": "team == payments",
+      "path_match": {
+        "kind": "prefix",
+        "value": "/v1/"
+      }
+    },
+    "bucket": {
+      "dimensions": ["actor", "labels/team"]
+    },
+    "algorithm": {
+      "fixed_window": {
+        "window": "1m",
+        "limit": 100
+      }
+    }
+  },
+  "labels": {
+    "team": "payments"
+  },
+  "annotations": {
+    "note": "protect write traffic"
+  },
+  "created_at": "2026-01-02T03:04:05Z",
+  "updated_at": "2026-01-02T03:05:06Z"
+}

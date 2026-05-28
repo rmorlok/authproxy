@@ -29,6 +29,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/httperr"
 	httpf2 "github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
@@ -178,7 +179,7 @@ func TestEncryptionKeys(t *testing.T) {
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Equal(t, created.Id, resp.Id)
 			require.Equal(t, "root", resp.Namespace)
-			require.Equal(t, database.EncryptionKeyStateActive, resp.State)
+			require.Equal(t, schemaapi.EncryptionKeyStateActive, resp.State)
 			require.Equal(t, "test", resp.Labels["env"])
 		})
 
@@ -315,7 +316,7 @@ func TestEncryptionKeys(t *testing.T) {
 			created := createKey(t, tu, "root", map[string]string{"env": "prod", "team": "backend"})
 			require.True(t, created.Id.HasPrefix(apid.PrefixEncryptionKey))
 			require.Equal(t, "root", created.Namespace)
-			require.Equal(t, database.EncryptionKeyStateActive, created.State)
+			require.Equal(t, schemaapi.EncryptionKeyStateActive, created.State)
 			require.Equal(t, "prod", created.Labels["env"])
 			require.Equal(t, "backend", created.Labels["team"])
 		})
@@ -324,7 +325,7 @@ func TestEncryptionKeys(t *testing.T) {
 			created := createKey(t, tu, "root", nil)
 			require.True(t, created.Id.HasPrefix(apid.PrefixEncryptionKey))
 			require.Equal(t, "root", created.Namespace)
-			require.Equal(t, database.EncryptionKeyStateActive, created.State)
+			require.Equal(t, schemaapi.EncryptionKeyStateActive, created.State)
 		})
 	})
 
@@ -432,7 +433,7 @@ func TestEncryptionKeys(t *testing.T) {
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
 			require.Len(t, resp.Items, 3)
 			for _, item := range resp.Items {
-				require.Equal(t, database.EncryptionKeyStateActive, item.State)
+				require.Equal(t, schemaapi.EncryptionKeyStateActive, item.State)
 			}
 		})
 
@@ -608,7 +609,7 @@ func TestEncryptionKeys(t *testing.T) {
 
 			var resp EncryptionKeyJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			require.Equal(t, database.EncryptionKeyStateDisabled, resp.State)
+			require.Equal(t, schemaapi.EncryptionKeyStateDisabled, resp.State)
 
 			// Verify in database
 			got, err := tu.Db.GetEncryptionKey(context.Background(), created.Id)
@@ -677,7 +678,7 @@ func TestEncryptionKeys(t *testing.T) {
 
 			var resp EncryptionKeyJson
 			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
-			require.Equal(t, database.EncryptionKeyStateActive, resp.State)
+			require.Equal(t, schemaapi.EncryptionKeyStateActive, resp.State)
 			respUser, _ := database.SplitUserAndApxyLabels(database.Labels(resp.Labels))
 			require.Equal(t, database.Labels{"new-label": "value"}, respUser)
 		})

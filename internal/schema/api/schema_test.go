@@ -32,9 +32,12 @@ func compileRefSchema(t *testing.T, ref string) *jsonschemav5.Schema {
 	c := jsonschemav5.NewCompiler()
 
 	_ = loadSchema(t, c, "../common/schema.json")
+	_ = loadSchema(t, c, "../auth/schema.json")
+	_ = loadSchema(t, c, "../config/schema.json")
 	_ = loadSchema(t, c, "../resources/namespace/schema.json")
 	_ = loadSchema(t, c, "../resources/connectors/schema-oauth.json")
 	_ = loadSchema(t, c, "../resources/connectors/schema.json")
+	_ = loadSchema(t, c, "../resources/rate_limit/schema.json")
 	sid := loadSchema(t, c, "./schema.json")
 	require.Equal(t, SchemaIdAPI, sid)
 
@@ -81,6 +84,16 @@ func TestSchemaSamples(t *testing.T) {
 		{name: "create connector", ref: "./schema.json#/$defs/CreateConnectorRequest", file: "valid-create-connector.json"},
 		{name: "update connector", ref: "./schema.json#/$defs/UpdateConnectorRequest", file: "valid-update-connector.json"},
 		{name: "create connector version", ref: "./schema.json#/$defs/CreateConnectorVersionRequest", file: "valid-create-connector-version.json"},
+		{name: "rate limit", ref: "./schema.json#/$defs/RateLimit", file: "valid-rate-limit.json"},
+		{name: "list rate limits", ref: "./schema.json#/$defs/ListRateLimitsResponse", file: "valid-list-rate-limits.json"},
+		{name: "create rate limit", ref: "./schema.json#/$defs/CreateRateLimitRequest", file: "valid-create-rate-limit.json"},
+		{name: "update rate limit", ref: "./schema.json#/$defs/UpdateRateLimitRequest", file: "valid-update-rate-limit.json"},
+		{name: "dry-run request", ref: "./schema.json#/$defs/DryRunRequest", file: "valid-dry-run-request.json"},
+		{name: "dry-run response", ref: "./schema.json#/$defs/DryRunResponse", file: "valid-dry-run-response.json"},
+		{name: "encryption key", ref: "./schema.json#/$defs/EncryptionKey", file: "valid-encryption-key.json"},
+		{name: "list encryption keys", ref: "./schema.json#/$defs/ListEncryptionKeysResponse", file: "valid-list-encryption-keys.json"},
+		{name: "create encryption key", ref: "./schema.json#/$defs/CreateEncryptionKeyRequest", file: "valid-create-encryption-key.json"},
+		{name: "update encryption key", ref: "./schema.json#/$defs/UpdateEncryptionKeyRequest", file: "valid-update-encryption-key.json"},
 	}
 
 	for _, tt := range tests {

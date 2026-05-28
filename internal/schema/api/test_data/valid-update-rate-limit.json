@@ -1,0 +1,18 @@
+{
+  "definition": {
+    "mode": "observe",
+    "selector": {
+      "request_types": ["proxy", "probe"]
+    },
+    "bucket": {},
+    "algorithm": {
+      "fixed_window": {
+        "window": "10s",
+        "limit": 10
+      }
+    }
+  },
+  "annotations": {
+    "reason": "temporary observe mode"
+  }
+}

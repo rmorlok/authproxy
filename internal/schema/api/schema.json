@@ -14,6 +14,10 @@
       "type": "string",
       "enum": ["draft", "primary", "active", "archived"]
     },
+    "EncryptionKeyState": {
+      "type": "string",
+      "enum": ["active", "disabled"]
+    },
     "StringMap": {
       "type": "object",
       "additionalProperties": {
@@ -355,6 +359,193 @@
       "type": "object",
       "properties": {
         "definition": { "$ref": "../resources/connectors/schema.json" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" }
+      },
+      "additionalProperties": false
+    },
+    "RateLimit": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "definition": { "$ref": "../resources/rate_limit/schema.json#/$defs/RateLimit" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "namespace", "definition", "created_at", "updated_at"],
+      "additionalProperties": false
+    },
+    "ListRateLimitsResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/RateLimit" }
+        },
+        "cursor": { "type": "string" }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    },
+    "CreateRateLimitRequest": {
+      "type": "object",
+      "properties": {
+        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "definition": { "$ref": "../resources/rate_limit/schema.json#/$defs/RateLimit" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" }
+      },
+      "required": ["namespace", "definition"],
+      "additionalProperties": false
+    },
+    "UpdateRateLimitRequest": {
+      "type": "object",
+      "properties": {
+        "definition": { "$ref": "../resources/rate_limit/schema.json#/$defs/RateLimit" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" }
+      },
+      "additionalProperties": false
+    },
+    "ProxyRequest": {
+      "type": "object",
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri"
+        },
+        "method": { "$ref": "../resources/rate_limit/schema.json#/$defs/HttpMethod" },
+        "headers": { "$ref": "#/$defs/StringMap" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "body_raw": {
+          "type": "string",
+          "contentEncoding": "base64"
+        },
+        "body_json": {}
+      },
+      "required": ["url", "method"],
+      "additionalProperties": false
+    },
+    "DryRunContext": {
+      "type": "object",
+      "properties": {
+        "connection_id": { "type": "string" },
+        "actor_id": { "type": "string" },
+        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" }
+      },
+      "additionalProperties": false
+    },
+    "DryRunRequest": {
+      "type": "object",
+      "properties": {
+        "request": { "$ref": "#/$defs/ProxyRequest" },
+        "request_type": { "$ref": "../common/schema.json#/$defs/RequestType" },
+        "context": { "$ref": "#/$defs/DryRunContext" }
+      },
+      "required": ["request", "request_type", "context"],
+      "additionalProperties": false
+    },
+    "DryRunMatch": {
+      "type": "object",
+      "properties": {
+        "rate_limit_id": { "type": "string" },
+        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "effective_mode": { "$ref": "../resources/rate_limit/schema.json#/$defs/Mode" },
+        "bucket_key": { "type": "string" },
+        "algorithm_summary": { "type": "string" },
+        "would_allow": { "type": "boolean" },
+        "remaining": { "type": "integer" },
+        "retry_after_ms": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "peek_failed": { "type": "boolean" }
+      },
+      "required": ["rate_limit_id", "namespace", "effective_mode", "bucket_key", "algorithm_summary", "would_allow", "remaining", "retry_after_ms", "peek_failed"],
+      "additionalProperties": false
+    },
+    "DryRunNotMatched": {
+      "type": "object",
+      "properties": {
+        "rate_limit_id": { "type": "string" },
+        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "reason": { "type": "string" }
+      },
+      "required": ["rate_limit_id", "namespace", "reason"],
+      "additionalProperties": false
+    },
+    "DryRunResponse": {
+      "type": "object",
+      "properties": {
+        "request_label_snapshot": { "$ref": "#/$defs/StringMap" },
+        "matched": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DryRunMatch" }
+        },
+        "not_matched": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DryRunNotMatched" }
+        }
+      },
+      "required": ["request_label_snapshot", "matched", "not_matched"],
+      "additionalProperties": false
+    },
+    "EncryptionKey": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "state": { "$ref": "#/$defs/EncryptionKeyState" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "namespace", "state", "created_at", "updated_at"],
+      "additionalProperties": false
+    },
+    "ListEncryptionKeysResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/EncryptionKey" }
+        },
+        "cursor": { "type": "string" }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    },
+    "CreateEncryptionKeyRequest": {
+      "type": "object",
+      "properties": {
+        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "key_data": { "$ref": "../config/schema.json#/$defs/KeyData" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" }
+      },
+      "required": ["namespace"],
+      "additionalProperties": false
+    },
+    "UpdateEncryptionKeyRequest": {
+      "type": "object",
+      "properties": {
+        "state": { "$ref": "#/$defs/EncryptionKeyState" },
         "labels": { "$ref": "#/$defs/StringMap" },
         "annotations": { "$ref": "#/$defs/StringMap" }
       },
