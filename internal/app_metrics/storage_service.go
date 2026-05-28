@@ -53,6 +53,22 @@ func (ss *StorageService) QueryRequestEventMetrics(ctx context.Context, queries 
 	return ss.retriever.QueryRequestEventMetrics(ctx, queries)
 }
 
+func (ss *StorageService) StoreConnectionResourceSamples(ctx context.Context, samples []*ConnectionResourceSample) error {
+	return ss.store.(ResourceSampleStore).StoreConnectionResourceSamples(ctx, samples)
+}
+
+func (ss *StorageService) StoreActorResourceSamples(ctx context.Context, samples []*ActorResourceSample) error {
+	return ss.store.(ResourceSampleStore).StoreActorResourceSamples(ctx, samples)
+}
+
+func (ss *StorageService) ListConnectionResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ConnectionResourceSample, error) {
+	return ss.retriever.(ResourceSampleRetriever).ListConnectionResourceSamples(ctx, query)
+}
+
+func (ss *StorageService) ListActorResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ActorResourceSample, error) {
+	return ss.retriever.(ResourceSampleRetriever).ListActorResourceSamples(ctx, query)
+}
+
 func (ss *StorageService) GetFullLog(ctx context.Context, id apid.ID) (*FullLog, error) {
 	log, err := ss.GetRecord(ctx, id)
 	if err != nil {
