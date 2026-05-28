@@ -1,0 +1,17 @@
+{
+  "range": {
+    "start": "2026-05-25T12:00:00Z",
+    "end": "2026-05-25T13:00:00Z",
+    "step": "15m"
+  },
+  "namespace": "root.**",
+  "label_selector": "env=prod",
+  "queries": [
+    {
+      "ref_id": "requests",
+      "metric": "request_events",
+      "aggregation": "count",
+      "group_by": ["method", "response_status_code"]
+    }
+  ]
+}

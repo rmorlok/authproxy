@@ -77,6 +77,7 @@ func TestSchemaSamples(t *testing.T) {
 		{name: "create actor", ref: "./schema.json#/$defs/CreateActorRequest", file: "valid-create-actor.json"},
 		{name: "update actor", ref: "./schema.json#/$defs/UpdateActorRequest", file: "valid-update-actor.json"},
 		{name: "list actors", ref: "./schema.json#/$defs/ListActorsResponse", file: "valid-list-actors.json"},
+		{name: "metrics query", ref: "./schema.json#/$defs/MetricsQueryRequest", file: "valid-metrics-query.json"},
 		{name: "connector", ref: "./schema.json#/$defs/Connector", file: "valid-connector.json"},
 		{name: "list connectors", ref: "./schema.json#/$defs/ListConnectorsResponse", file: "valid-list-connectors.json"},
 		{name: "connector version", ref: "./schema.json#/$defs/ConnectorVersion", file: "valid-connector-version.json"},

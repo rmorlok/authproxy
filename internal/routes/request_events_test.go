@@ -1,6 +1,7 @@
 package routes
 
 import (
+	"bytes"
 	"encoding/json"
 	"errors"
 	"net/http"
@@ -19,6 +20,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	sapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -525,5 +527,160 @@ func TestRequestEventsRoutes(t *testing.T) {
 			_, hasLabels := item["labels"]
 			require.False(t, hasLabels, "labels should be omitted from JSON when nil")
 		})
+	})
+
+	t.Run("query metrics", func(t *testing.T) {
+		tu := setup(t, nil)
+		start := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
+		end := start.Add(time.Hour)
+
+		newMetricsRequest := func(t *testing.T, body string, permissions []aschema.Permission) *http.Request {
+			t.Helper()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/metrics/query",
+				bytes.NewBufferString(body),
+				"root",
+				"some-actor",
+				permissions,
+			)
+			require.NoError(t, err)
+			req.Header.Set("Content-Type", "application/json")
+			return req
+		}
+
+		validBody := func(overrides map[string]any) string {
+			body := map[string]any{
+				"range": map[string]any{
+					"start": start.Format(time.RFC3339),
+					"end":   end.Format(time.RFC3339),
+					"step":  "15m",
+				},
+				"namespace":      "root.tenant.**",
+				"label_selector": "env=prod",
+				"queries": []map[string]any{
+					{
+						"ref_id":      "requests",
+						"metric":      "request_events",
+						"aggregation": "count",
+						"group_by":    []string{"method"},
+					},
+				},
+			}
+			for k, v := range overrides {
+				body[k] = v
+			}
+			data, err := json.Marshal(body)
+			require.NoError(t, err)
+			return string(data)
+		}
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPost, "/metrics/query", bytes.NewBufferString("{}"))
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := newMetricsRequest(t, validBody(nil), aschema.PermissionsSingle("root.**", "connectors", "list"))
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("executes request event query", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := newMetricsRequest(t, validBody(nil), aschema.PermissionsSingle("root.**", "request-events", "list"))
+
+			tu.MockRetriever.EXPECT().
+				QueryRequestEventMetrics(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ interface{}, queries []app_metrics.RequestEventMetricsQuery) ([]app_metrics.RequestEventMetricSeries, error) {
+					require.Len(t, queries, 1)
+					require.Equal(t, "requests", queries[0].RefID)
+					require.Equal(t, app_metrics.RequestEventMetricCount, queries[0].Metric)
+					require.Equal(t, start, queries[0].Start)
+					require.Equal(t, end, queries[0].End)
+					require.Equal(t, 15*time.Minute, queries[0].Step)
+					require.Equal(t, []string{"root.tenant.**"}, queries[0].NamespaceMatchers)
+					require.Equal(t, "env=prod", queries[0].LabelSelector)
+					require.Equal(t, []app_metrics.RequestEventGroupBy{app_metrics.RequestEventGroupByMethod}, queries[0].GroupBy)
+					return []app_metrics.RequestEventMetricSeries{
+						{
+							RefID:  "requests",
+							Labels: map[string]string{"method": "GET"},
+							Points: []app_metrics.RequestEventMetricPoint{{Timestamp: start, Value: 3}},
+						},
+					}, nil
+				})
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp sapi.MetricsQueryResponseJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Len(t, resp.Series, 1)
+			require.Equal(t, "requests", resp.Series[0].RefID)
+			require.Equal(t, "request_events", resp.Series[0].Metric)
+			require.Equal(t, "count", resp.Series[0].Aggregation)
+			require.Equal(t, map[string]string{"method": "GET"}, resp.Series[0].Labels)
+			require.Equal(t, 3.0, resp.Series[0].Points[0].Value)
+		})
+
+		t.Run("namespace is constrained by actor permissions", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := newMetricsRequest(t, validBody(map[string]any{"namespace": "root.**"}), aschema.PermissionsSingle("root.tenant.**", "request-events", "list"))
+
+			tu.MockRetriever.EXPECT().
+				QueryRequestEventMetrics(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ interface{}, queries []app_metrics.RequestEventMetricsQuery) ([]app_metrics.RequestEventMetricSeries, error) {
+					require.Equal(t, []string{"root.tenant.**"}, queries[0].NamespaceMatchers)
+					return nil, nil
+				})
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+		})
+
+		invalidCases := []struct {
+			name string
+			body string
+		}{
+			{
+				name: "invalid range",
+				body: validBody(map[string]any{"range": map[string]any{
+					"start": end.Format(time.RFC3339),
+					"end":   start.Format(time.RFC3339),
+					"step":  "15m",
+				}}),
+			},
+			{
+				name: "invalid step",
+				body: validBody(map[string]any{"range": map[string]any{
+					"start": start.Format(time.RFC3339),
+					"end":   end.Format(time.RFC3339),
+					"step":  "0m",
+				}}),
+			},
+			{name: "invalid namespace", body: validBody(map[string]any{"namespace": "bad"})},
+			{name: "invalid label selector", body: validBody(map[string]any{"label_selector": "bad key=value"})},
+			{name: "invalid metric", body: validBody(map[string]any{"queries": []map[string]any{{"ref_id": "x", "metric": "nope", "aggregation": "count"}}})},
+			{name: "invalid aggregation", body: validBody(map[string]any{"queries": []map[string]any{{"ref_id": "x", "metric": "request_events", "aggregation": "avg"}}})},
+			{name: "invalid group_by", body: validBody(map[string]any{"queries": []map[string]any{{"ref_id": "x", "metric": "request_events", "aggregation": "count", "group_by": []string{"path"}}}})},
+			{name: "empty queries", body: validBody(map[string]any{"queries": []map[string]any{}})},
+		}
+
+		for _, tc := range invalidCases {
+			t.Run(tc.name, func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req := newMetricsRequest(t, tc.body, aschema.PermissionsSingle("root.**", "request-events", "list"))
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusBadRequest, w.Code)
+			})
+		}
 	})
 }
