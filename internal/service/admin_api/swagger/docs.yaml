@@ -354,17 +354,19 @@ definitions:
   routes.InitiateFailureResponse:
     properties:
       redirect_url:
+        example: https://example.com/auth
         type: string
     type: object
   routes.InitiateParams:
     properties:
       return_to_url:
+        example: https://example.com/return
         type: string
     type: object
   routes.InitiateSuccessResponse:
     properties:
       actor_id:
-        description: This should include any configuration the SPA needs
+        example: act_test550e8400abcde
         type: string
     type: object
   routes.ProxyRequest:
@@ -701,14 +703,11 @@ definitions:
         type: string
     type: object
   routes.SwaggerKeyValueJson:
-    description: Key-value pair (label or annotation)
     properties:
       key:
-        description: Key
         example: env
         type: string
       value:
-        description: Value
         example: production
         type: string
     type: object
@@ -770,15 +769,11 @@ definitions:
     description: Paginated list of request events entries
     properties:
       cursor:
-        description: Pagination cursor for next page
         type: string
       items:
-        description: List of request events entries
-        items:
-          $ref: '#/definitions/routes.SwaggerRequestEventsEntry'
+        items: {}
         type: array
       total:
-        description: Total count of matching records (if requested)
         type: integer
     type: object
   routes.SwaggerNamespaceJson:
@@ -807,10 +802,8 @@ definitions:
         type: string
     type: object
   routes.SwaggerPutKeyValueRequest:
-    description: Request to set a label or annotation value
     properties:
       value:
-        description: Value to set
         example: production
         type: string
     type: object
@@ -843,61 +836,72 @@ definitions:
     description: HTTP request events entry
     properties:
       connection_id:
-        description: Connection UUID
         type: string
       connector_id:
-        description: Connector UUID
         type: string
       connector_version:
-        description: Connector version
         type: integer
       correlation_id:
-        description: Correlation ID for tracing
         type: string
       duration:
-        description: Duration in milliseconds
         example: 150
         type: integer
       host:
-        description: Target host
         example: api.example.com
         type: string
       labels:
         additionalProperties:
           type: string
-        description: Labels associated with the request (merged from connection and
-          per-request labels)
         type: object
       method:
-        description: HTTP method
         example: GET
         type: string
       namespace:
-        description: Namespace of the connection
-        example: acme
+        example: root.acme
         type: string
       path:
-        description: Request path
         example: /v1/users
         type: string
+      rate_limit_bucket:
+        additionalProperties:
+          type: string
+        type: object
+      rate_limit_id:
+        type: string
+      rate_limit_matched:
+        items: {}
+        type: array
+      rate_limit_mode:
+        type: string
       request_id:
-        description: Request UUID
         example: req_test550e8400abcde
         type: string
+      response_source:
+        example: upstream
+        type: string
       response_status_code:
-        description: HTTP response status code
         example: 200
         type: integer
       scheme:
-        description: URL scheme
         example: https
         type: string
       timestamp:
-        description: Request timestamp
         type: string
       type:
-        description: Request type (proxy, oauth, probe)
         example: proxy
+        type: string
+    type: object
+  routes.SwaggerTaskInfoJson:
+    description: Background task status
+    properties:
+      id:
+        type: string
+      state:
+        example: completed
+        type: string
+      type:
+        type: string
+      updated_at:
         type: string
     type: object
   routes.SwaggerUpdateConnectionRequest:
@@ -957,25 +961,6 @@ definitions:
           type: string
         type: object
     type: object
-  routes.TaskInfoJson:
-    properties:
-      id:
-        type: string
-      state:
-        $ref: '#/definitions/routes.TaskState'
-      type:
-        type: string
-      updated_at:
-        type: string
-    type: object
-  routes.TaskState:
-    enum:
-    - unknown
-    - active
-    type: string
-    x-enum-varnames:
-    - TaskStateUnknown
-    - TaskStateActive
   routes.UpdateActorRequestJson:
     description: Actor update request
     properties:
@@ -5807,7 +5792,7 @@ paths:
         "200":
           description: OK
           schema:
-            $ref: '#/definitions/routes.TaskInfoJson'
+            $ref: '#/definitions/routes.SwaggerTaskInfoJson'
         "400":
           description: Bad Request
           schema:

@@ -8,12 +8,13 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/apasynq"
-	"github.com/rmorlok/authproxy/internal/apgin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	"github.com/rmorlok/authproxy/internal/httperr"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/tasks"
 )
 
@@ -24,37 +25,18 @@ type TaskRoutes struct {
 	asynqInspector apasynq.Inspector
 }
 
-type TaskState string
+type TaskState = schemaapi.TaskState
+type TaskInfoJson = schemaapi.TaskInfoJson
 
 const (
-	// TaskStateUnknown indicates that the state was unable to be determined.
-	TaskStateUnknown TaskState = "unknown"
-
-	// TaskStateActive indicates that the task is currently being processed by Handler.
-	TaskStateActive TaskState = "active"
-
-	// TaskStatePending indicates that the task is ready to be processed by Handler.
-	TaskStatePending = "pending"
-
-	// TaskStateScheduled indicates that the task is scheduled to be processed some time in the future.
-	TaskStateScheduled = "scheduled"
-
-	// TaskStateRetry indicates that the task has previously failed and scheduled to be processed some time in the future.
-	TaskStateRetry = "retry"
-
-	// TaskStateArchived indicates that the task exhausted retries
-	TaskStateFailed = "failed"
-
-	// TaskStateCompleted indicates that the task is processed successfully and retained until the retention TTL expires.
-	TaskStateCompleted = "completed"
+	TaskStateUnknown   = schemaapi.TaskStateUnknown
+	TaskStateActive    = schemaapi.TaskStateActive
+	TaskStatePending   = schemaapi.TaskStatePending
+	TaskStateScheduled = schemaapi.TaskStateScheduled
+	TaskStateRetry     = schemaapi.TaskStateRetry
+	TaskStateFailed    = schemaapi.TaskStateFailed
+	TaskStateCompleted = schemaapi.TaskStateCompleted
 )
-
-type TaskInfoJson struct {
-	Id        string     `json:"id"`
-	Type      string     `json:"type"`
-	State     TaskState  `json:"state"`
-	UpdatedAt *time.Time `json:"updated_at,omitempty"`
-}
 
 func TaskInfoToJson(encryptedId string, ti *asynq.TaskInfo) *TaskInfoJson {
 	ts := TaskStateUnknown
@@ -105,7 +87,7 @@ func TaskInfoToJson(encryptedId string, ti *asynq.TaskInfo) *TaskInfoJson {
 // @Accept			json
 // @Produce		json
 // @Param			encryptedTaskInfo	path		string	true	"Encrypted task info token"
-// @Success		200					{object}	TaskInfoJson
+// @Success		200					{object}	SwaggerTaskInfoJson
 // @Failure		400					{object}	ErrorResponse
 // @Failure		401					{object}	ErrorResponse
 // @Failure		403					{object}	ErrorResponse

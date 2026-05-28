@@ -98,6 +98,51 @@ type ListEncryptionKeysResponseJson struct {
 	Cursor string                        `json:"cursor,omitempty"`
 }
 
+// ListRequestEventsResponseJson documents the paginated request-events list response.
+//
+//	@Description	Paginated list of request events entries
+type ListRequestEventsResponseJson struct {
+	Items  []interface{} `json:"items"`
+	Cursor string        `json:"cursor,omitempty"`
+	Total  *int64        `json:"total,omitempty"`
+}
+
+// RequestEventJson documents the public request-event record projection.
+//
+//	@Description	HTTP request events entry
+type RequestEventJson struct {
+	Namespace           string            `json:"namespace" example:"root.acme"`
+	Type                string            `json:"type" example:"proxy"`
+	RequestId           string            `json:"request_id" swaggertype:"string" example:"req_test550e8400abcde"`
+	CorrelationId       string            `json:"correlation_id,omitempty"`
+	Timestamp           time.Time         `json:"timestamp"`
+	MillisecondDuration int64             `json:"duration" example:"150"`
+	ConnectionId        string            `json:"connection_id,omitempty" swaggertype:"string"`
+	ConnectorId         string            `json:"connector_id,omitempty" swaggertype:"string"`
+	ConnectorVersion    uint64            `json:"connector_version,omitempty"`
+	Method              string            `json:"method" example:"GET"`
+	Host                string            `json:"host" example:"api.example.com"`
+	Scheme              string            `json:"scheme" example:"https"`
+	Path                string            `json:"path" example:"/v1/users"`
+	ResponseStatusCode  int               `json:"response_status_code,omitempty" example:"200"`
+	Labels              map[string]string `json:"labels,omitempty"`
+	ResponseSource      string            `json:"response_source,omitempty" example:"upstream"`
+	RateLimitId         string            `json:"rate_limit_id,omitempty" swaggertype:"string"`
+	RateLimitMode       string            `json:"rate_limit_mode,omitempty"`
+	RateLimitBucket     map[string]string `json:"rate_limit_bucket,omitempty"`
+	RateLimitMatched    []interface{}     `json:"rate_limit_matched,omitempty"`
+}
+
+// TaskInfoJson documents public background task status.
+//
+//	@Description	Background task status
+type TaskInfoJson struct {
+	Id        string `json:"id"`
+	Type      string `json:"type"`
+	State     string `json:"state" example:"completed"`
+	UpdatedAt string `json:"updated_at,omitempty"`
+}
+
 // UpdateEncryptionKeyRequestJson documents the encryption-key update body.
 //
 //	@Description	Request to update an encryption key

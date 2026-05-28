@@ -1,0 +1,29 @@
+{
+  "namespace": "root.acme",
+  "type": "proxy",
+  "request_id": "req_test550e8400abcde",
+  "correlation_id": "corr-123",
+  "timestamp": "2026-01-02T03:04:05Z",
+  "duration": 150,
+  "connection_id": "cxn_test550e8400abcde",
+  "connector_id": "cxr_test550e8400abcde",
+  "connector_version": 2,
+  "method": "GET",
+  "host": "api.example.com",
+  "scheme": "https",
+  "path": "/v1/users",
+  "response_status_code": 200,
+  "labels": {
+    "team": "api"
+  },
+  "response_source": "upstream",
+  "rate_limit_matched": [
+    {
+      "id": "rl_test550e8400abcde",
+      "mode": "observe",
+      "bucket": {
+        "actor": "act_test550e8400abcde"
+      }
+    }
+  ]
+}

@@ -10,10 +10,11 @@ import (
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/apasynq"
-	"github.com/rmorlok/authproxy/internal/apgin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/httperr"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -40,26 +41,7 @@ func NewTaskMonitoringRoutes(
 
 // JSON response models
 
-type QueueInfoJson struct {
-	Queue          string  `json:"queue"`
-	MemoryUsage    int64   `json:"memory_usage"`
-	Latency        float64 `json:"latency_seconds"`
-	Size           int     `json:"size"`
-	Groups         int     `json:"groups"`
-	Pending        int     `json:"pending"`
-	Active         int     `json:"active"`
-	Scheduled      int     `json:"scheduled"`
-	Retry          int     `json:"retry"`
-	Archived       int     `json:"archived"`
-	Completed      int     `json:"completed"`
-	Aggregating    int     `json:"aggregating"`
-	Processed      int     `json:"processed"`
-	Failed         int     `json:"failed"`
-	ProcessedTotal int     `json:"processed_total"`
-	FailedTotal    int     `json:"failed_total"`
-	Paused         bool    `json:"paused"`
-	Timestamp      string  `json:"timestamp"`
-}
+type QueueInfoJson = schemaapi.QueueInfoJson
 
 func queueInfoToJson(qi *asynq.QueueInfo) *QueueInfoJson {
 	return &QueueInfoJson{
@@ -84,21 +66,7 @@ func queueInfoToJson(qi *asynq.QueueInfo) *QueueInfoJson {
 	}
 }
 
-type MonitoringTaskInfoJson struct {
-	ID            string `json:"id"`
-	Queue         string `json:"queue"`
-	Type          string `json:"type"`
-	Payload       string `json:"payload"`
-	State         string `json:"state"`
-	MaxRetry      int    `json:"max_retry"`
-	Retried       int    `json:"retried"`
-	LastErr       string `json:"last_err,omitempty"`
-	LastFailedAt  string `json:"last_failed_at,omitempty"`
-	NextProcessAt string `json:"next_process_at,omitempty"`
-	CompletedAt   string `json:"completed_at,omitempty"`
-	IsOrphaned    bool   `json:"is_orphaned,omitempty"`
-	Group         string `json:"group,omitempty"`
-}
+type MonitoringTaskInfoJson = schemaapi.MonitoringTaskInfoJson
 
 func taskInfoToJson(ti *asynq.TaskInfo) *MonitoringTaskInfoJson {
 	payload := base64.StdEncoding.EncodeToString(ti.Payload)
@@ -134,12 +102,7 @@ func taskInfoToJson(ti *asynq.TaskInfo) *MonitoringTaskInfoJson {
 	return j
 }
 
-type DailyStatsJson struct {
-	Queue     string `json:"queue"`
-	Processed int    `json:"processed"`
-	Failed    int    `json:"failed"`
-	Date      string `json:"date"`
-}
+type DailyStatsJson = schemaapi.DailyStatsJson
 
 func dailyStatsToJson(ds *asynq.DailyStats) *DailyStatsJson {
 	return &DailyStatsJson{
@@ -150,13 +113,7 @@ func dailyStatsToJson(ds *asynq.DailyStats) *DailyStatsJson {
 	}
 }
 
-type WorkerInfoJson struct {
-	TaskID   string `json:"task_id"`
-	TaskType string `json:"task_type"`
-	Queue    string `json:"queue"`
-	Started  string `json:"started"`
-	Deadline string `json:"deadline"`
-}
+type WorkerInfoJson = schemaapi.WorkerInfoJson
 
 func workerInfoToJson(wi *asynq.WorkerInfo) *WorkerInfoJson {
 	return &WorkerInfoJson{
@@ -168,17 +125,7 @@ func workerInfoToJson(wi *asynq.WorkerInfo) *WorkerInfoJson {
 	}
 }
 
-type ServerInfoJson struct {
-	ID             string            `json:"id"`
-	Host           string            `json:"host"`
-	PID            int               `json:"pid"`
-	Concurrency    int               `json:"concurrency"`
-	Queues         map[string]int    `json:"queues"`
-	StrictPriority bool              `json:"strict_priority"`
-	Started        string            `json:"started"`
-	Status         string            `json:"status"`
-	ActiveWorkers  []*WorkerInfoJson `json:"active_workers"`
-}
+type ServerInfoJson = schemaapi.ServerInfoJson
 
 func serverInfoToJson(si *asynq.ServerInfo) *ServerInfoJson {
 	workers := make([]*WorkerInfoJson, 0, len(si.ActiveWorkers))
@@ -198,13 +145,7 @@ func serverInfoToJson(si *asynq.ServerInfo) *ServerInfoJson {
 	}
 }
 
-type SchedulerEntryJson struct {
-	ID       string `json:"id"`
-	Spec     string `json:"spec"`
-	TaskType string `json:"task_type"`
-	Next     string `json:"next"`
-	Prev     string `json:"prev,omitempty"`
-}
+type SchedulerEntryJson = schemaapi.SchedulerEntryJson
 
 func schedulerEntryToJson(se *asynq.SchedulerEntry) *SchedulerEntryJson {
 	j := &SchedulerEntryJson{
@@ -219,30 +160,17 @@ func schedulerEntryToJson(se *asynq.SchedulerEntry) *SchedulerEntryJson {
 	return j
 }
 
-type BulkActionResponseJson struct {
-	AffectedCount int `json:"affected_count"`
-}
+type BulkActionResponseJson = schemaapi.BulkActionResponseJson
 
-type ListQueuesResponseJson struct {
-	Items []*QueueInfoJson `json:"items"`
-}
+type ListQueuesResponseJson = schemaapi.ListQueuesResponseJson
 
-type ListMonitoringTasksResponseJson struct {
-	Items  []*MonitoringTaskInfoJson `json:"items"`
-	Cursor string                    `json:"cursor,omitempty"`
-}
+type ListMonitoringTasksResponseJson = schemaapi.ListMonitoringTasksResponseJson
 
-type ListServersResponseJson struct {
-	Items []*ServerInfoJson `json:"items"`
-}
+type ListServersResponseJson = schemaapi.ListServersResponseJson
 
-type ListSchedulerEntriesResponseJson struct {
-	Items []*SchedulerEntryJson `json:"items"`
-}
+type ListSchedulerEntriesResponseJson = schemaapi.ListSchedulerEntriesResponseJson
 
-type ListQueueHistoryResponseJson struct {
-	Items []*DailyStatsJson `json:"items"`
-}
+type ListQueueHistoryResponseJson = schemaapi.ListQueueHistoryResponseJson
 
 type taskListCursor struct {
 	Page     int    `json:"page"`

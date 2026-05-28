@@ -7,7 +7,6 @@ import (
 	"github.com/gin-gonic/gin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
 	"github.com/rmorlok/authproxy/internal/apgin"
-	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
@@ -16,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 )
 
 // SessionInitiateUrlGenerator is any object that can generate the URLs to redirect the
@@ -39,18 +39,9 @@ type SessionRoutes struct {
 	logger                      *slog.Logger
 }
 
-type InitiateParams struct {
-	ReturnToUrl string `json:"return_to_url"`
-}
-
-type InitiateFailureResponse struct {
-	RedirectUrl string `json:"redirect_url"`
-}
-
-type InitiateSuccessResponse struct {
-	// This should include any configuration the SPA needs
-	ActorId apid.ID `json:"actor_id" swaggertype:"string"`
-}
+type InitiateParams = schemaapi.InitiateParams
+type InitiateFailureResponse = schemaapi.InitiateFailureResponse
+type InitiateSuccessResponse = schemaapi.InitiateSuccessResponse
 
 //	@Summary		Initiate session
 //	@Description	Initiate or establish a session with the server. If successful, returns actor info. If not authenticated, returns a redirect URL for authentication.

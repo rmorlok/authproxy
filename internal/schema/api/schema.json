@@ -550,6 +550,357 @@
         "annotations": { "$ref": "#/$defs/StringMap" }
       },
       "additionalProperties": false
+    },
+    "InitiateParams": {
+      "type": "object",
+      "properties": {
+        "return_to_url": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "required": ["return_to_url"],
+      "additionalProperties": false
+    },
+    "InitiateFailureResponse": {
+      "type": "object",
+      "properties": {
+        "redirect_url": {
+          "type": "string",
+          "format": "uri"
+        }
+      },
+      "required": ["redirect_url"],
+      "additionalProperties": false
+    },
+    "InitiateSuccessResponse": {
+      "type": "object",
+      "properties": {
+        "actor_id": { "type": "string" }
+      },
+      "required": ["actor_id"],
+      "additionalProperties": false
+    },
+    "KeyValue": {
+      "type": "object",
+      "properties": {
+        "key": { "type": "string" },
+        "value": { "type": "string" }
+      },
+      "required": ["key", "value"],
+      "additionalProperties": false
+    },
+    "PutKeyValueRequest": {
+      "type": "object",
+      "properties": {
+        "value": { "type": "string" }
+      },
+      "required": ["value"],
+      "additionalProperties": false
+    },
+    "RequestEventRateLimit": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "mode": { "$ref": "../resources/rate_limit/schema.json#/$defs/Mode" },
+        "bucket": { "$ref": "#/$defs/StringMap" }
+      },
+      "required": ["id", "mode"],
+      "additionalProperties": false
+    },
+    "RequestEvent": {
+      "type": "object",
+      "properties": {
+        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "type": { "$ref": "../common/schema.json#/$defs/RequestType" },
+        "request_id": { "type": "string" },
+        "correlation_id": { "type": "string" },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "duration": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "connection_id": { "type": "string" },
+        "connector_id": { "type": "string" },
+        "connector_version": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "method": { "$ref": "../resources/rate_limit/schema.json#/$defs/HttpMethod" },
+        "host": { "type": "string" },
+        "scheme": { "type": "string" },
+        "path": { "type": "string" },
+        "request_http_version": { "type": "string" },
+        "request_size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "request_mime_type": { "type": "string" },
+        "request_body_skipped": {
+          "type": "string",
+          "enum": ["streaming", "too_large"]
+        },
+        "response_status_code": {
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 599
+        },
+        "response_error": { "type": "string" },
+        "response_http_version": { "type": "string" },
+        "response_size_bytes": {
+          "type": "integer",
+          "minimum": 0
+        },
+        "response_mime_type": { "type": "string" },
+        "response_body_skipped": {
+          "type": "string",
+          "enum": ["streaming", "too_large"]
+        },
+        "internal_timeout": { "type": "boolean" },
+        "request_cancelled": { "type": "boolean" },
+        "full_request_recorded": { "type": "boolean" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "response_source": {
+          "type": "string",
+          "enum": ["upstream", "connector_rate_limiter", "rate_limit"]
+        },
+        "rate_limit_id": { "type": "string" },
+        "rate_limit_mode": { "$ref": "../resources/rate_limit/schema.json#/$defs/Mode" },
+        "rate_limit_bucket": { "$ref": "#/$defs/StringMap" },
+        "rate_limit_matched": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/RequestEventRateLimit" }
+        }
+      },
+      "required": ["namespace", "type", "request_id", "timestamp", "duration", "method", "host", "scheme", "path"],
+      "additionalProperties": false
+    },
+    "ListRequestEventsResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/RequestEvent" }
+        },
+        "cursor": { "type": "string" },
+        "total": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    },
+    "TaskState": {
+      "type": "string",
+      "enum": ["unknown", "active", "pending", "scheduled", "retry", "failed", "completed"]
+    },
+    "TaskInfo": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "type": { "type": "string" },
+        "state": { "$ref": "#/$defs/TaskState" },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "type", "state"],
+      "additionalProperties": false
+    },
+    "QueueInfo": {
+      "type": "object",
+      "properties": {
+        "queue": { "type": "string" },
+        "memory_usage": { "type": "integer" },
+        "latency_seconds": { "type": "number" },
+        "size": { "type": "integer" },
+        "groups": { "type": "integer" },
+        "pending": { "type": "integer" },
+        "active": { "type": "integer" },
+        "scheduled": { "type": "integer" },
+        "retry": { "type": "integer" },
+        "archived": { "type": "integer" },
+        "completed": { "type": "integer" },
+        "aggregating": { "type": "integer" },
+        "processed": { "type": "integer" },
+        "failed": { "type": "integer" },
+        "processed_total": { "type": "integer" },
+        "failed_total": { "type": "integer" },
+        "paused": { "type": "boolean" },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["queue", "memory_usage", "latency_seconds", "size", "groups", "pending", "active", "scheduled", "retry", "archived", "completed", "aggregating", "processed", "failed", "processed_total", "failed_total", "paused", "timestamp"],
+      "additionalProperties": false
+    },
+    "MonitoringTaskInfo": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "queue": { "type": "string" },
+        "type": { "type": "string" },
+        "payload": { "type": "string" },
+        "state": { "type": "string" },
+        "max_retry": { "type": "integer" },
+        "retried": { "type": "integer" },
+        "last_err": { "type": "string" },
+        "last_failed_at": { "type": "string" },
+        "next_process_at": { "type": "string" },
+        "completed_at": { "type": "string" },
+        "is_orphaned": { "type": "boolean" },
+        "group": { "type": "string" }
+      },
+      "required": ["id", "queue", "type", "payload", "state", "max_retry", "retried"],
+      "additionalProperties": false
+    },
+    "DailyStats": {
+      "type": "object",
+      "properties": {
+        "queue": { "type": "string" },
+        "processed": { "type": "integer" },
+        "failed": { "type": "integer" },
+        "date": {
+          "type": "string",
+          "format": "date"
+        }
+      },
+      "required": ["queue", "processed", "failed", "date"],
+      "additionalProperties": false
+    },
+    "WorkerInfo": {
+      "type": "object",
+      "properties": {
+        "task_id": { "type": "string" },
+        "task_type": { "type": "string" },
+        "queue": { "type": "string" },
+        "started": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "deadline": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["task_id", "task_type", "queue", "started", "deadline"],
+      "additionalProperties": false
+    },
+    "ServerInfo": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "host": { "type": "string" },
+        "pid": { "type": "integer" },
+        "concurrency": { "type": "integer" },
+        "queues": {
+          "type": "object",
+          "additionalProperties": { "type": "integer" }
+        },
+        "strict_priority": { "type": "boolean" },
+        "started": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "status": { "type": "string" },
+        "active_workers": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/WorkerInfo" }
+        }
+      },
+      "required": ["id", "host", "pid", "concurrency", "queues", "strict_priority", "started", "status", "active_workers"],
+      "additionalProperties": false
+    },
+    "SchedulerEntry": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "spec": { "type": "string" },
+        "task_type": { "type": "string" },
+        "next": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "prev": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "spec", "task_type", "next"],
+      "additionalProperties": false
+    },
+    "BulkActionResponse": {
+      "type": "object",
+      "properties": {
+        "affected_count": {
+          "type": "integer",
+          "minimum": 0
+        }
+      },
+      "required": ["affected_count"],
+      "additionalProperties": false
+    },
+    "ListQueuesResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/QueueInfo" }
+        }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    },
+    "ListMonitoringTasksResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/MonitoringTaskInfo" }
+        },
+        "cursor": { "type": "string" }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    },
+    "ListServersResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/ServerInfo" }
+        }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    },
+    "ListSchedulerEntriesResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/SchedulerEntry" }
+        }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    },
+    "ListQueueHistoryResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/DailyStats" }
+        }
+      },
+      "required": ["items"],
+      "additionalProperties": false
     }
   }
 }
