@@ -32,6 +32,15 @@
         "type": "string"
       }
     },
+    "ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "error": { "type": "string" },
+        "stack_trace": { "type": "string" }
+      },
+      "required": ["error"],
+      "additionalProperties": false
+    },
     "InitiateConnectionRequest": {
       "type": "object",
       "properties": {

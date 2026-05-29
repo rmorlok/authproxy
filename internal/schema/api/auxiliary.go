@@ -6,6 +6,16 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 )
 
+// ErrorResponse is the standardized error response format for authproxy API errors.
+//
+//	@Description	Standardized error response
+type ErrorResponse struct {
+	// Error message.
+	Error string `json:"error" yaml:"error" example:"Bad Request"`
+	// Stack trace, only populated in debug mode.
+	StackTrace string `json:"stack_trace,omitempty" yaml:"stack_trace,omitempty"`
+}
+
 // SessionInitiateParams is the request body for POST /session/_initiate.
 // ReturnToUrl is where the browser should land after host authentication.
 type SessionInitiateParams struct {

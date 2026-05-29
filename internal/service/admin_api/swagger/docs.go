@@ -8018,12 +8018,12 @@ const docTemplateadmin_api = `{
             "type": "object",
             "properties": {
                 "error": {
-                    "description": "Error message",
+                    "description": "Error message.",
                     "type": "string",
                     "example": "Bad Request"
                 },
                 "stack_trace": {
-                    "description": "Stack trace (only in debug mode)",
+                    "description": "Stack trace, only populated in debug mode.",
                     "type": "string"
                 }
             }

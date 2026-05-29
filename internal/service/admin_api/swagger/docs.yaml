@@ -375,11 +375,11 @@ definitions:
     description: Standardized error response
     properties:
       error:
-        description: Error message
+        description: Error message.
         example: Bad Request
         type: string
       stack_trace:
-        description: Stack trace (only in debug mode)
+        description: Stack trace, only populated in debug mode.
         type: string
     type: object
   routes.ForceConnectorVersionStateRequestJson:
