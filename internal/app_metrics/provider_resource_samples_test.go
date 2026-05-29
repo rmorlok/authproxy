@@ -151,3 +151,116 @@ func TestResourceSamples_ActorSamples_IdempotentAndQueryable(t *testing.T) {
 	require.NotNil(t, got.ResourceDeletedAt)
 	require.True(t, deletedAt.Equal(*got.ResourceDeletedAt))
 }
+
+func TestResourceSamples_AdditionalSamples_IdempotentAndQueryable(t *testing.T) {
+	store, retriever, _ := MustNewBlankRequestEventsStore(t)
+	resourceStore := store.(ResourceSampleStore)
+	resourceRetriever := retriever.(ResourceSampleRetriever)
+
+	ctx := context.Background()
+	sampledAt := time.Date(2026, 5, 25, 12, 30, 0, 0, time.UTC)
+	connectorID := apid.New(apid.PrefixConnectorVersion)
+	rateLimitID := apid.New(apid.PrefixRateLimit)
+	createdAt := sampledAt.Add(-time.Hour)
+	updatedAt := sampledAt.Add(-time.Minute)
+
+	require.NoError(t, resourceStore.StoreConnectorResourceSamples(ctx, []*ConnectorResourceSample{
+		{
+			SampledAt:         sampledAt,
+			ResourceID:        connectorID,
+			Namespace:         "root.acme",
+			Labels:            database.Labels{"env": "prod", "kind": "connector"},
+			State:             database.ConnectorVersionStateDraft,
+			ConnectorVersion:  1,
+			TotalVersions:     1,
+			ResourceCreatedAt: createdAt,
+			ResourceUpdatedAt: updatedAt,
+		},
+	}))
+	require.NoError(t, resourceStore.StoreConnectorResourceSamples(ctx, []*ConnectorResourceSample{
+		{
+			SampledAt:         sampledAt,
+			ResourceID:        connectorID,
+			Namespace:         "root.acme",
+			Labels:            database.Labels{"env": "prod", "kind": "connector"},
+			State:             database.ConnectorVersionStatePrimary,
+			ConnectorVersion:  2,
+			TotalVersions:     2,
+			ResourceCreatedAt: createdAt,
+			ResourceUpdatedAt: sampledAt,
+		},
+	}))
+
+	connectorSamples, err := resourceRetriever.ListConnectorResourceSamples(ctx, ResourceSampleQuery{
+		NamespaceMatchers: []string{"root.acme"},
+		LabelSelector:     "kind=connector",
+	})
+	require.NoError(t, err)
+	require.Len(t, connectorSamples, 1)
+	require.Equal(t, ResourceTypeConnector, connectorSamples[0].ResourceType)
+	require.Equal(t, database.ConnectorVersionStatePrimary, connectorSamples[0].State)
+	require.Equal(t, uint64(2), connectorSamples[0].ConnectorVersion)
+	require.Equal(t, int64(2), connectorSamples[0].TotalVersions)
+
+	require.NoError(t, resourceStore.StoreConnectorVersionResourceSamples(ctx, []*ConnectorVersionResourceSample{
+		{
+			SampledAt:         sampledAt,
+			ResourceID:        connectorID,
+			Namespace:         "root.acme",
+			Labels:            database.Labels{"env": "prod", "kind": "connector-version"},
+			State:             database.ConnectorVersionStatePrimary,
+			ConnectorVersion:  2,
+			ResourceCreatedAt: createdAt,
+			ResourceUpdatedAt: updatedAt,
+		},
+	}))
+	connectorVersionSamples, err := resourceRetriever.ListConnectorVersionResourceSamples(ctx, ResourceSampleQuery{
+		NamespaceMatchers: []string{"root.acme"},
+		LabelSelector:     "kind=connector-version",
+	})
+	require.NoError(t, err)
+	require.Len(t, connectorVersionSamples, 1)
+	require.Equal(t, ResourceTypeConnectorVersion, connectorVersionSamples[0].ResourceType)
+	require.Equal(t, database.ConnectorVersionStatePrimary, connectorVersionSamples[0].State)
+	require.Equal(t, uint64(2), connectorVersionSamples[0].ConnectorVersion)
+
+	require.NoError(t, resourceStore.StoreNamespaceResourceSamples(ctx, []*NamespaceResourceSample{
+		{
+			SampledAt:         sampledAt,
+			ResourceID:        "root.acme",
+			Namespace:         "root.acme",
+			Labels:            database.Labels{"env": "prod", "kind": "namespace"},
+			State:             database.NamespaceStateDestroying,
+			ResourceCreatedAt: createdAt,
+			ResourceUpdatedAt: updatedAt,
+		},
+	}))
+	namespaceSamples, err := resourceRetriever.ListNamespaceResourceSamples(ctx, ResourceSampleQuery{
+		NamespaceMatchers: []string{"root.acme"},
+		LabelSelector:     "kind=namespace",
+	})
+	require.NoError(t, err)
+	require.Len(t, namespaceSamples, 1)
+	require.Equal(t, ResourceTypeNamespace, namespaceSamples[0].ResourceType)
+	require.Equal(t, database.NamespaceStateDestroying, namespaceSamples[0].State)
+
+	require.NoError(t, resourceStore.StoreRateLimitResourceSamples(ctx, []*RateLimitResourceSample{
+		{
+			SampledAt:         sampledAt,
+			ResourceID:        rateLimitID,
+			Namespace:         "root.acme",
+			Labels:            database.Labels{"env": "prod", "kind": "rate-limit"},
+			Mode:              "observe",
+			ResourceCreatedAt: createdAt,
+			ResourceUpdatedAt: updatedAt,
+		},
+	}))
+	rateLimitSamples, err := resourceRetriever.ListRateLimitResourceSamples(ctx, ResourceSampleQuery{
+		NamespaceMatchers: []string{"root.acme"},
+		LabelSelector:     "kind=rate-limit",
+	})
+	require.NoError(t, err)
+	require.Len(t, rateLimitSamples, 1)
+	require.Equal(t, ResourceTypeRateLimit, rateLimitSamples[0].ResourceType)
+	require.Equal(t, "observe", rateLimitSamples[0].Mode)
+}
