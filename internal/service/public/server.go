@@ -133,6 +133,20 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 	)
 	routesOauth2.Register(server)
 
+	// /public/connections/{id}/setup/{advance,abort} — token-authorized
+	// transitions for the schema-defined redirect-step pattern. The setup
+	// token IS the authorization; no session is required (a 3rd party
+	// might bounce a user back without first ferrying them through our
+	// session flow).
+	routesSetup := common_routes.NewPublicSetupRoutes(
+		dm.GetConfig(),
+		dm.GetCoreService(),
+		dm.GetRedisClient(),
+		dm.GetEncryptService(),
+		logger,
+	)
+	routesSetup.Register(server)
+
 	var api *gin.RouterGroup
 	if service.EnableMarketplaceApis() {
 		if api == nil {

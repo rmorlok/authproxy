@@ -3,11 +3,24 @@ package core
 import (
 	"context"
 	"encoding/json"
+	"fmt"
+	"strings"
+	"time"
 
+	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/aptmpl"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/setup_token"
 )
+
+// setupTokenTTL is how long RETURN_ADVANCE / RETURN_ABORT tokens stay
+// usable after a redirect step is rendered. Long enough to survive a user
+// finishing a 3rd-party off-platform step (often minutes of clicking
+// through provider flows); short enough that a leaked token expires
+// before it can be abused.
+const setupTokenTTL = 15 * time.Minute
 
 // buildManifestSetupFlow assembles the ManifestSetupFlow for a connection.
 // The linear order is preconnect (schema) + auth-method-emitted steps
@@ -36,7 +49,7 @@ func (s *service) buildManifestSetupFlow(c iface.Connection) iface.ManifestSetup
 
 	if connector.SetupFlow != nil && connector.SetupFlow.HasPreconnect() {
 		for i := range connector.SetupFlow.Preconnect.Steps {
-			steps = append(steps, newSchemaFormStep(c, &connector.SetupFlow.Preconnect.Steps[i]))
+			steps = append(steps, s.newSchemaStep(c, &connector.SetupFlow.Preconnect.Steps[i]))
 		}
 	}
 
@@ -53,7 +66,7 @@ func (s *service) buildManifestSetupFlow(c iface.Connection) iface.ManifestSetup
 
 	if connector.SetupFlow != nil && connector.SetupFlow.HasConfigure() {
 		for i := range connector.SetupFlow.Configure.Steps {
-			steps = append(steps, newSchemaFormStep(c, &connector.SetupFlow.Configure.Steps[i]))
+			steps = append(steps, s.newSchemaStep(c, &connector.SetupFlow.Configure.Steps[i]))
 		}
 	}
 
@@ -64,11 +77,20 @@ func (s *service) buildManifestSetupFlow(c iface.Connection) iface.ManifestSetup
 	}
 }
 
-// newSchemaFormStep wraps a connector-YAML SetupFlowStep into a
-// ManifestSetupStep whose OnSubmit merges submitted fields into the
-// connection's EncryptedConfiguration. spec is captured by closure; tests
-// that inspect the produced step compare its JsonSchema / UiSchema against
-// the spec.
+// newSchemaStep wraps a connector-YAML SetupFlowStep into the appropriate
+// ManifestSetupStep — a form step (merges submitted fields into
+// EncryptedConfiguration on submit) or a redirect step (renders the URL
+// template with cfg mustache + freshly-minted RETURN_ADVANCE / RETURN_ABORT
+// tokens).
+func (s *service) newSchemaStep(c iface.Connection, spec *cschema.SetupFlowStep) iface.ManifestSetupStep {
+	if spec.Type.Normalized() == cschema.SetupFlowStepTypeRedirect {
+		return s.newSchemaRedirectStep(c, spec)
+	}
+	return newSchemaFormStep(c, spec)
+}
+
+// newSchemaFormStep wraps a form-kind SetupFlowStep. spec is captured by
+// closure so the OnSubmit closure can re-validate the data on each submit.
 func newSchemaFormStep(c iface.Connection, spec *cschema.SetupFlowStep) iface.ManifestSetupStep {
 	return iface.NewFormStep(iface.FormStepConfig{
 		Id:          spec.Id,
@@ -91,6 +113,84 @@ func newSchemaFormStep(c iface.Connection, spec *cschema.SetupFlowStep) iface.Ma
 			return nil
 		},
 	})
+}
+
+// newSchemaRedirectStep wraps a redirect-kind SetupFlowStep. The closure
+// substitutes the connection's cfg mustache plus two synthetic placeholders
+// at render time: {{RETURN_ADVANCE}} → /public/connections/{id}/setup/advance?token=...
+// and {{RETURN_ABORT}} → the matching /abort URL. Each placeholder is
+// expanded by minting a fresh one-time-use setup_token bound to this
+// connection + step + the caller's marketplace return URL.
+func (s *service) newSchemaRedirectStep(c iface.Connection, spec *cschema.SetupFlowStep) iface.ManifestSetupStep {
+	return iface.NewRedirectStep(iface.RedirectStepConfig{
+		Id:          spec.Id,
+		Title:       spec.Title,
+		Description: spec.Description,
+		Render: func(ctx context.Context, opts iface.RenderRedirectOptions) (iface.RedirectInfo, error) {
+			if spec.Redirect == nil || spec.Redirect.URL == "" {
+				return iface.RedirectInfo{}, fmt.Errorf("redirect step %q has no URL configured", spec.Id)
+			}
+
+			// 1) cfg mustache: render the URL template against the
+			//    connection's mustache context first so cfg-derived
+			//    placeholders are resolved before we inject the synthetic
+			//    return-tokens.
+			mctx, err := c.GetMustacheContext(ctx)
+			if err != nil {
+				return iface.RedirectInfo{}, fmt.Errorf("redirect step %q: get mustache context: %w", spec.Id, err)
+			}
+			rendered, err := aptmpl.RenderMustache(spec.Redirect.URL, mctx)
+			if err != nil {
+				return iface.RedirectInfo{}, fmt.Errorf("redirect step %q: render template: %w", spec.Id, err)
+			}
+
+			// 2) RETURN_ADVANCE / RETURN_ABORT: mint fresh one-time-use
+			//    tokens and substitute the resulting public-endpoint URLs.
+			advanceURL, err := s.mintReturnURL(ctx, c.GetId(), spec.Id, opts.ReturnToUrl, setup_token.IntentAdvance)
+			if err != nil {
+				return iface.RedirectInfo{}, fmt.Errorf("redirect step %q: mint advance token: %w", spec.Id, err)
+			}
+			abortURL, err := s.mintReturnURL(ctx, c.GetId(), spec.Id, opts.ReturnToUrl, setup_token.IntentAbort)
+			if err != nil {
+				return iface.RedirectInfo{}, fmt.Errorf("redirect step %q: mint abort token: %w", spec.Id, err)
+			}
+
+			rendered = strings.ReplaceAll(rendered, "{{RETURN_ADVANCE}}", advanceURL)
+			rendered = strings.ReplaceAll(rendered, "{{RETURN_ABORT}}", abortURL)
+
+			return iface.RedirectInfo{URL: rendered}, nil
+		},
+	})
+}
+
+// mintReturnURL mints a setup_token and returns the public-endpoint URL
+// (/public/connections/{id}/setup/{advance|abort}?token=<jti>) that
+// substitutes for the corresponding placeholder in a redirect step's
+// URL template.
+func (s *service) mintReturnURL(ctx context.Context, connectionId apid.ID, stepId, returnToUrl string, intent setup_token.Intent) (string, error) {
+	tok, err := setup_token.Mint(ctx, s.r, s.encrypt, setup_token.MintInput{
+		ConnectionId: connectionId,
+		StepId:       stepId,
+		Intent:       intent,
+		ReturnToUrl:  returnToUrl,
+	}, setupTokenTTL)
+	if err != nil {
+		return "", err
+	}
+
+	publicBase := s.cfg.GetRoot().Public.GetBaseUrl()
+	endpoint := "advance"
+	if intent == setup_token.IntentAbort {
+		endpoint = "abort"
+	}
+	// Token rides as a query parameter; jti is opaque (apid.ID-shaped) and
+	// URL-safe by construction so we can embed verbatim.
+	return fmt.Sprintf("%s/public/connections/%s/setup/%s?token=%s",
+		strings.TrimRight(publicBase, "/"),
+		connectionId,
+		endpoint,
+		tok,
+	), nil
 }
 
 // manifestFlow is the materialized setup flow for a single connection.
