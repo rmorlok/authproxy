@@ -15,6 +15,7 @@ import (
 	authSync "github.com/rmorlok/authproxy/internal/apauth/tasks"
 	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/aplog"
+	"github.com/rmorlok/authproxy/internal/app_metrics"
 	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/config"
 	dbTasks "github.com/rmorlok/authproxy/internal/database/tasks"
@@ -167,6 +168,14 @@ func Serve(cfg config.C) {
 	)
 	dbTaskHandler.RegisterTasks(mux)
 
+	appMetricsTaskHandler := app_metrics.NewResourceSnapshotTaskHandler(
+		dm.GetDatabase(),
+		dm.GetAppMetricsService(),
+		dm.GetConfigRoot().AppMetrics,
+		logger,
+	)
+	appMetricsTaskHandler.RegisterTasks(mux)
+
 	var wg sync.WaitGroup
 
 	wg.Add(1)
@@ -191,7 +200,8 @@ func Serve(cfg config.C) {
 		addRegistrar(dm.GetCoreService()).
 		addRegistrar(adminSyncTaskHandler).
 		addRegistrar(encryptTaskHandler).
-		addRegistrar(dbTaskHandler)
+		addRegistrar(dbTaskHandler).
+		addRegistrar(appMetricsTaskHandler)
 
 	wg.Add(1)
 	go func() {
