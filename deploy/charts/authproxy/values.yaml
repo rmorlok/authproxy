@@ -200,25 +200,27 @@ actors:
 hostApplication:
   initiateSessionUrl: ""
 
-# -- HTTP request/response logging. The AuthProxy server always wires up a
-# log storage service, so the rendered config must contain an `http_logging`
-# block with a database reference. By default the chart points it at the
-# main `database` block above — fine for small deploys, override for
-# production data-warehouse setups (e.g. a separate ClickHouse).
-httpLogging:
+# -- Application metrics + HTTP request-event capture. The AuthProxy
+# server always wires up a metrics storage service, so the rendered
+# config must contain an `app_metrics` block with a database
+# reference. By default the chart points it at the main `database`
+# block above — fine for small deploys, override for production
+# data-warehouse setups (e.g. a separate ClickHouse). Was named
+# `httpLogging` in earlier chart versions; renamed to mirror the
+# server's config schema.
+appMetrics:
   # -- Reuse the main `database` block. When true, the chart copies the
-  # main database section into `http_logging.database`. Set to false to
+  # main database section into `app_metrics.database`. Set to false to
   # configure a dedicated `database:` block below.
   shareMainDatabase: true
-  # -- Run http_logging schema migrations at startup. Defaults to true on
-  # the server side; surfaced here so customers can disable it when a
-  # separate process owns the http-log schema.
+  # -- Run app_metrics schema migrations at startup.
   autoMigrate: true
-  # -- Dedicated database block for http_logging metadata. Only consulted
-  # when `shareMainDatabase` is false. Same field shape as the top-level
+  # -- Dedicated database block for app_metrics. Only consulted when
+  # `shareMainDatabase` is false. Same field shape as the top-level
   # `database` block (provider, host, port, etc.).
   database: {}
   # -- Full request/response recording mode (`never` or `always`).
+  # Lives under `request_events` in the rendered server config.
   fullRequestRecording: never
 
 # -- Connector registry. AuthProxy refuses to start without the connectors

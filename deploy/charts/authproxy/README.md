@@ -70,7 +70,7 @@ The chart exposes typed values for the common connectivity blocks. See
 | `actors`         | Secret mount + ACL permissions for admin actor keypairs               |
 | `hostApplication`| URL the marketplace UI redirects to for login                         |
 | `connectors`     | Inline connector definitions + identifying labels                     |
-| `httpLogging`    | HTTP request/response log storage (defaults to shared main DB)        |
+| `appMetrics`     | App metrics + request-event storage (defaults to shared main DB)      |
 | `config`         | Free-form overlay merged into the rendered AuthProxy YAML             |
 
 ### Secrets the chart expects you to create
