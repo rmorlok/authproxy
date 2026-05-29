@@ -15,5 +15,7 @@ This directory owns AuthProxy's public and internal data contracts. Keep schema 
 - Every schema package with Go contract types should have a `schema.go`, `schema.json`, tests that compile/validate the JSON schema, and a README explaining what belongs there.
 - Go structs that represent serialized contracts should carry both `json` and `yaml` tags unless a field is deliberately not serialized.
 - Prefer moving shared/resource contract types into `resources/...` or `common` instead of defining route-local DTOs in `internal/routes`.
+- Public API request/response DTOs named `*RequestJson` or `*ResponseJson` must live in `internal/schema/api`; route packages may convert to/from runtime models but should not own the serialized contract.
+- Swagger-only adapter models belong in `internal/schema/api/openapi`, not in `internal/routes`.
 - Keep JSON schema `$id` values aligned with the package path under `schema/...`.
 - When moving a contract package, update JSON-schema `$ref` paths, schema tests, `internal/schema/reexport.go`, and any package README/AGENTS guidance in the same change.

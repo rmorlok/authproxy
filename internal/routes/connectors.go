@@ -17,6 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
+	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/util"
@@ -24,12 +25,21 @@ import (
 )
 
 type ConnectorJson = schemaapi.ConnectorJson
+type ConnectorVersionState = schemaapi.ConnectorVersionState
 type ListConnectorsResponseJson = schemaapi.ListConnectorsResponseJson
 type ConnectorVersionJson = schemaapi.ConnectorVersionJson
 type ListConnectorVersionsResponseJson = schemaapi.ListConnectorVersionsResponseJson
 type CreateConnectorRequestJson = schemaapi.CreateConnectorRequestJson
 type UpdateConnectorRequestJson = schemaapi.UpdateConnectorRequestJson
 type CreateConnectorVersionRequestJson = schemaapi.CreateConnectorVersionRequestJson
+type ForceConnectorVersionStateRequestJson = schemaapi.ForceConnectorVersionStateRequestJson
+
+type OpenAPIListConnectorsResponseJson = schemaapiopenapi.ListConnectorsResponseJson
+type OpenAPIConnectorVersionJson = schemaapiopenapi.ConnectorVersionJson
+type OpenAPIListConnectorVersionsResponseJson = schemaapiopenapi.ListConnectorVersionsResponseJson
+type OpenAPICreateConnectorRequestJson = schemaapiopenapi.CreateConnectorRequestJson
+type OpenAPIUpdateConnectorRequestJson = schemaapiopenapi.UpdateConnectorRequestJson
+type OpenAPICreateConnectorVersionRequestJson = schemaapiopenapi.CreateConnectorVersionRequestJson
 
 func ConnectorToJson(c connIface.Connector) ConnectorJson {
 	result := ConnectorVersionToConnectorJson(c)
@@ -131,7 +141,7 @@ func connectorVersionStatesToAPI(states database.ConnectorVersionStates) schemaa
 // @Accept			json
 // @Produce		json
 // @Param			id	path		string	true	"Connector UUID"
-// @Success		200	{object}	SwaggerConnectorJson
+// @Success		200	{object}	ConnectorJson
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
@@ -201,7 +211,7 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			label_selector	query		string	false	"Filter by label selector"
 // @Param			order_by		query		string	false	"Order by field (e.g., 'created_at:asc')"
-// @Success		200				{object}	SwaggerListConnectorsResponse
+// @Success		200				{object}	OpenAPIListConnectorsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
 // @Failure		500				{object}	ErrorResponse
@@ -286,7 +296,7 @@ func (r *ConnectorsRoutes) list(gctx *gin.Context) {
 // @Produce		json
 // @Param			id		path		string	true	"Connector UUID"
 // @Param			version	path		integer	true	"Version number"
-// @Success		200		{object}	SwaggerConnectorVersionJson
+// @Success		200		{object}	OpenAPIConnectorVersionJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -377,7 +387,7 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			label_selector	query		string	false	"Filter by label selector"
 // @Param			order_by		query		string	false	"Order by field (e.g., 'version:desc')"
-// @Success		200				{object}	SwaggerListConnectorVersionsResponse
+// @Success		200				{object}	OpenAPIListConnectorVersionsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
 // @Failure		500				{object}	ErrorResponse
@@ -497,8 +507,8 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 // @Tags			connectors
 // @Accept			json
 // @Produce		json
-// @Param			request	body		SwaggerCreateConnectorRequest	true	"Connector creation request"
-// @Success		201		{object}	SwaggerConnectorVersionJson
+// @Param			request	body		OpenAPICreateConnectorRequestJson	true	"Connector creation request"
+// @Success		201		{object}	OpenAPIConnectorVersionJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -561,8 +571,8 @@ func (r *ConnectorsRoutes) createConnector(gctx *gin.Context) {
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string							true	"Connector UUID"
-// @Param			request	body		SwaggerUpdateConnectorRequest	true	"Connector update request"
-// @Success		200		{object}	SwaggerConnectorVersionJson
+// @Param			request	body		OpenAPIUpdateConnectorRequestJson	true	"Connector update request"
+// @Success		200		{object}	OpenAPIConnectorVersionJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -677,8 +687,8 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string									true	"Connector UUID"
-// @Param			request	body		SwaggerCreateConnectorVersionRequest	false	"Version creation request"
-// @Success		201		{object}	SwaggerConnectorVersionJson
+// @Param			request	body		OpenAPICreateConnectorVersionRequestJson	false	"Version creation request"
+// @Success		201		{object}	OpenAPIConnectorVersionJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -801,8 +811,8 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 // @Produce		json
 // @Param			id		path		string							true	"Connector UUID"
 // @Param			version	path		integer							true	"Version number"
-// @Param			request	body		SwaggerUpdateConnectorRequest	true	"Version update request"
-// @Success		200		{object}	SwaggerConnectorVersionJson
+// @Param			request	body		OpenAPIUpdateConnectorRequestJson	true	"Version update request"
+// @Success		200		{object}	OpenAPIConnectorVersionJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -959,7 +969,7 @@ func (r *ConnectorsRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.Handle
 // @Produce		json
 // @Param			id		path		string	true	"Connector UUID"
 // @Param			label	path		string	true	"Label key"
-// @Success		200		{object}	SwaggerKeyValueJson
+// @Success		200		{object}	KeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -975,8 +985,8 @@ func (r *ConnectorsRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.HandleG
 // @Produce		json
 // @Param			id		path		string						true	"Connector UUID"
 // @Param			label	path		string						true	"Label key"
-// @Param			request	body		SwaggerPutKeyValueRequest	true	"Label value"
-// @Success		200		{object}	SwaggerKeyValueJson
+// @Param			request	body		PutKeyValueRequestJson	true	"Label value"
+// @Success		200		{object}	KeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -1028,7 +1038,7 @@ func (r *ConnectorsRoutes) getVersionLabels(gctx *gin.Context) {
 // @Param			id		path		string	true	"Connector UUID"
 // @Param			version	path		integer	true	"Version number"
 // @Param			label	path		string	true	"Label key"
-// @Success		200		{object}	SwaggerKeyValueJson
+// @Success		200		{object}	KeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -1045,8 +1055,8 @@ func (r *ConnectorsRoutes) getVersionLabel(gctx *gin.Context) { r.versionLabelsA
 // @Param			id		path		string						true	"Connector UUID"
 // @Param			version	path		integer						true	"Version number"
 // @Param			label	path		string						true	"Label key"
-// @Param			request	body		SwaggerPutKeyValueRequest	true	"Label value"
-// @Success		200		{object}	SwaggerKeyValueJson
+// @Param			request	body		PutKeyValueRequestJson	true	"Label value"
+// @Success		200		{object}	KeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -1077,10 +1087,6 @@ func (r *ConnectorsRoutes) deleteVersionLabel(gctx *gin.Context) {
 	r.versionLabelsAdapter.HandleDelete(gctx)
 }
 
-type ForceConnectorVersionStateRequestJson struct {
-	State database.ConnectorVersionState `json:"state"`
-}
-
 // @Summary		Force connector version state
 // @Description	Force a connector version to a specific state (admin operation)
 // @Tags			connectors
@@ -1088,8 +1094,8 @@ type ForceConnectorVersionStateRequestJson struct {
 // @Produce		json
 // @Param			id		path		string								true	"Connector UUID"
 // @Param			version	path		integer								true	"Version number"
-// @Param			request	body		SwaggerForceConnectorVersionStateRequest	true	"New state"
-// @Success		200		{object}	SwaggerConnectorVersionJson
+// @Param			request	body		ForceConnectorVersionStateRequestJson	true	"New state"
+// @Success		200		{object}	OpenAPIConnectorVersionJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -1149,7 +1155,8 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 		return
 	}
 
-	if !database.IsValidConnectorVersionState(req.State) {
+	state := database.ConnectorVersionState(req.State)
+	if !database.IsValidConnectorVersionState(state) {
 		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid connector version state '%s'", req.State))
 		val.MarkErrorReturn()
 		return
@@ -1173,12 +1180,12 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 		return
 	}
 
-	if cv.GetState() == req.State {
+	if cv.GetState() == state {
 		gctx.PureJSON(http.StatusOK, ConnectorVersionToJson(cv))
 		return
 	}
 
-	err = cv.SetState(ctx, req.State)
+	err = cv.SetState(ctx, state)
 	if err != nil {
 		apgin.WriteError(gctx, nil, httperr.FromError(err))
 		val.MarkErrorReturn()
@@ -1210,7 +1217,7 @@ func (r *ConnectorsRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapter.H
 // @Produce		json
 // @Param			id			path		string	true	"Connector UUID"
 // @Param			annotation	path		string	true	"Annotation key"
-// @Success		200			{object}	SwaggerKeyValueJson
+// @Success		200			{object}	KeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		404			{object}	ErrorResponse
@@ -1226,8 +1233,8 @@ func (r *ConnectorsRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapter.Ha
 // @Produce		json
 // @Param			id			path		string						true	"Connector UUID"
 // @Param			annotation	path		string						true	"Annotation key"
-// @Param			request		body		SwaggerPutKeyValueRequest	true	"Annotation value"
-// @Success		200			{object}	SwaggerKeyValueJson
+// @Param			request		body		PutKeyValueRequestJson	true	"Annotation value"
+// @Success		200			{object}	KeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		403			{object}	ErrorResponse
@@ -1279,7 +1286,7 @@ func (r *ConnectorsRoutes) getVersionAnnotations(gctx *gin.Context) {
 // @Param			id			path		string	true	"Connector UUID"
 // @Param			version		path		integer	true	"Version number"
 // @Param			annotation	path		string	true	"Annotation key"
-// @Success		200			{object}	SwaggerKeyValueJson
+// @Success		200			{object}	KeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		404			{object}	ErrorResponse
@@ -1298,8 +1305,8 @@ func (r *ConnectorsRoutes) getVersionAnnotation(gctx *gin.Context) {
 // @Param			id			path		string						true	"Connector UUID"
 // @Param			version		path		integer						true	"Version number"
 // @Param			annotation	path		string						true	"Annotation key"
-// @Param			request		body		SwaggerPutKeyValueRequest	true	"Annotation value"
-// @Success		200			{object}	SwaggerKeyValueJson
+// @Param			request		body		PutKeyValueRequestJson	true	"Annotation value"
+// @Success		200			{object}	KeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		403			{object}	ErrorResponse

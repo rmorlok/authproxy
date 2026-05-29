@@ -75,7 +75,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api_openapi.ListActorsResponseJson"
+                            "$ref": "#/definitions/routes.OpenAPIListActorsResponseJson"
                         }
                     },
                     "400": {
@@ -662,7 +662,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -729,7 +729,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
+                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
                         }
                     }
                 ],
@@ -737,7 +737,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -926,7 +926,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -993,7 +993,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
+                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
                         }
                     }
                 ],
@@ -1001,7 +1001,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -1154,7 +1154,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerListConnectionResponse"
+                            "$ref": "#/definitions/routes.OpenAPIListConnectionResponseJson"
                         }
                     },
                     "400": {
@@ -1266,7 +1266,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerConnectionJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionJson"
                         }
                     },
                     "400": {
@@ -1326,7 +1326,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerUpdateConnectionRequest"
+                            "$ref": "#/definitions/routes.UpdateConnectionRequestJson"
                         }
                     }
                 ],
@@ -1334,7 +1334,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerConnectionJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionJson"
                         }
                     },
                     "400": {
@@ -1561,7 +1561,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerDisconnectResponse"
+                            "$ref": "#/definitions/routes.OpenAPIDisconnectResponseJson"
                         }
                     },
                     "400": {
@@ -1623,7 +1623,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerForceStateRequest"
+                            "$ref": "#/definitions/routes.ForceStateRequestJson"
                         }
                     }
                 ],
@@ -1631,7 +1631,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerConnectionJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectionJson"
                         }
                     },
                     "400": {
@@ -1707,7 +1707,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.ProxyResponse"
+                            "$ref": "#/definitions/routes.OpenAPIProxyResponseJson"
                         }
                     },
                     "400": {
@@ -2135,7 +2135,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -2202,7 +2202,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
+                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
                         }
                     }
                 ],
@@ -2210,7 +2210,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -2399,7 +2399,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -2466,7 +2466,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
+                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
                         }
                     }
                 ],
@@ -2474,7 +2474,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -2691,7 +2691,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerListConnectorsResponse"
+                            "$ref": "#/definitions/routes.OpenAPIListConnectorsResponseJson"
                         }
                     },
                     "400": {
@@ -2738,7 +2738,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerCreateConnectorRequest"
+                            "$ref": "#/definitions/routes.OpenAPICreateConnectorRequestJson"
                         }
                     }
                 ],
@@ -2746,7 +2746,7 @@ const docTemplateApi = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerConnectorVersionJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorVersionJson"
                         }
                     },
                     "400": {
@@ -2807,7 +2807,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerConnectorJson"
+                            "$ref": "#/definitions/routes.ConnectorJson"
                         }
                     },
                     "400": {
@@ -2867,7 +2867,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerUpdateConnectorRequest"
+                            "$ref": "#/definitions/routes.OpenAPIUpdateConnectorRequestJson"
                         }
                     }
                 ],
@@ -2875,7 +2875,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerConnectorVersionJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorVersionJson"
                         }
                     },
                     "400": {
@@ -3013,7 +3013,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -3080,7 +3080,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
+                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
                         }
                     }
                 ],
@@ -3088,7 +3088,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -3289,7 +3289,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -3356,7 +3356,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
+                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
                         }
                     }
                 ],
@@ -3364,7 +3364,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -3530,7 +3530,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerListConnectorVersionsResponse"
+                            "$ref": "#/definitions/routes.OpenAPIListConnectorVersionsResponseJson"
                         }
                     },
                     "400": {
@@ -3583,7 +3583,7 @@ const docTemplateApi = `{
                         "name": "request",
                         "in": "body",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerCreateConnectorVersionRequest"
+                            "$ref": "#/definitions/routes.OpenAPICreateConnectorVersionRequestJson"
                         }
                     }
                 ],
@@ -3591,7 +3591,7 @@ const docTemplateApi = `{
                     "201": {
                         "description": "Created",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerConnectorVersionJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorVersionJson"
                         }
                     },
                     "400": {
@@ -3671,7 +3671,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerConnectorVersionJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorVersionJson"
                         }
                     },
                     "400": {
@@ -3738,7 +3738,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerUpdateConnectorRequest"
+                            "$ref": "#/definitions/routes.OpenAPIUpdateConnectorRequestJson"
                         }
                     }
                 ],
@@ -3746,7 +3746,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerConnectorVersionJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorVersionJson"
                         }
                     },
                     "400": {
@@ -3827,7 +3827,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerForceConnectorVersionStateRequest"
+                            "$ref": "#/definitions/routes.ForceConnectorVersionStateRequestJson"
                         }
                     }
                 ],
@@ -3835,7 +3835,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerConnectorVersionJson"
+                            "$ref": "#/definitions/routes.OpenAPIConnectorVersionJson"
                         }
                     },
                     "400": {
@@ -3987,7 +3987,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -4061,7 +4061,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
+                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
                         }
                     }
                 ],
@@ -4069,7 +4069,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -4303,7 +4303,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -4377,7 +4377,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
+                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
                         }
                     }
                 ],
@@ -4385,7 +4385,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -4563,7 +4563,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerListEncryptionKeysResponse"
+                            "$ref": "#/definitions/routes.OpenAPIListEncryptionKeysResponseJson"
                         }
                     },
                     "400": {
@@ -4618,7 +4618,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerEncryptionKeyJson"
+                            "$ref": "#/definitions/routes.EncryptionKeyJson"
                         }
                     },
                     "400": {
@@ -4673,7 +4673,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerEncryptionKeyJson"
+                            "$ref": "#/definitions/routes.EncryptionKeyJson"
                         }
                     },
                     "400": {
@@ -4783,7 +4783,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerUpdateEncryptionKeyRequest"
+                            "$ref": "#/definitions/routes.OpenAPIUpdateEncryptionKeyRequestJson"
                         }
                     }
                 ],
@@ -4791,7 +4791,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerEncryptionKeyJson"
+                            "$ref": "#/definitions/routes.EncryptionKeyJson"
                         }
                     },
                     "400": {
@@ -4917,7 +4917,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -4984,7 +4984,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
+                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
                         }
                     }
                 ],
@@ -4992,7 +4992,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -5181,7 +5181,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -5248,7 +5248,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
+                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
                         }
                     }
                 ],
@@ -5256,7 +5256,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -5538,7 +5538,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerListRequestEventsResponse"
+                            "$ref": "#/definitions/routes.OpenAPIListRequestEventsResponse"
                         }
                     },
                     "400": {
@@ -5593,7 +5593,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerRequestEventsEntry"
+                            "$ref": "#/definitions/routes.OpenAPIRequestEventsEntry"
                         }
                     },
                     "400": {
@@ -5689,7 +5689,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api_openapi.ListNamespacesResponseJson"
+                            "$ref": "#/definitions/routes.OpenAPIListNamespacesResponseJson"
                         }
                     },
                     "400": {
@@ -5744,7 +5744,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerNamespaceJson"
+                            "$ref": "#/definitions/routes.NamespaceJson"
                         }
                     },
                     "400": {
@@ -5805,7 +5805,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerNamespaceJson"
+                            "$ref": "#/definitions/routes.NamespaceJson"
                         }
                     },
                     "400": {
@@ -5873,7 +5873,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerNamespaceJson"
+                            "$ref": "#/definitions/routes.NamespaceJson"
                         }
                     },
                     "400": {
@@ -5999,7 +5999,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -6066,7 +6066,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
+                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
                         }
                     }
                 ],
@@ -6074,7 +6074,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -6263,7 +6263,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -6330,7 +6330,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
+                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
                         }
                     }
                 ],
@@ -6338,7 +6338,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -6485,7 +6485,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerListRateLimitsResponse"
+                            "$ref": "#/definitions/routes.OpenAPIListRateLimitsResponseJson"
                         }
                     },
                     "400": {
@@ -6532,7 +6532,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerCreateRateLimitRequest"
+                            "$ref": "#/definitions/routes.OpenAPICreateRateLimitRequestJson"
                         }
                     }
                 ],
@@ -6540,7 +6540,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerRateLimitJson"
+                            "$ref": "#/definitions/routes.OpenAPIRateLimitJson"
                         }
                     },
                     "400": {
@@ -6589,7 +6589,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerDryRunRequest"
+                            "$ref": "#/definitions/routes.OpenAPIDryRunRequestJson"
                         }
                     }
                 ],
@@ -6597,7 +6597,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerDryRunResponse"
+                            "$ref": "#/definitions/routes.OpenAPIDryRunResponseJson"
                         }
                     },
                     "400": {
@@ -6664,7 +6664,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerRateLimitJson"
+                            "$ref": "#/definitions/routes.OpenAPIRateLimitJson"
                         }
                     },
                     "400": {
@@ -6774,7 +6774,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerUpdateRateLimitRequest"
+                            "$ref": "#/definitions/routes.OpenAPIUpdateRateLimitRequestJson"
                         }
                     }
                 ],
@@ -6782,7 +6782,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerRateLimitJson"
+                            "$ref": "#/definitions/routes.OpenAPIRateLimitJson"
                         }
                     },
                     "400": {
@@ -6908,7 +6908,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -6975,7 +6975,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
+                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
                         }
                     }
                 ],
@@ -6983,7 +6983,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -7172,7 +7172,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -7239,7 +7239,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerPutKeyValueRequest"
+                            "$ref": "#/definitions/routes.PutKeyValueRequestJson"
                         }
                     }
                 ],
@@ -7247,7 +7247,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerKeyValueJson"
+                            "$ref": "#/definitions/routes.KeyValueJson"
                         }
                     },
                     "400": {
@@ -7453,7 +7453,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.SwaggerTaskInfoJson"
+                            "$ref": "#/definitions/routes.OpenAPITaskInfoJson"
                         }
                     },
                     "400": {
@@ -7673,40 +7673,6 @@ const docTemplateApi = `{
                 }
             }
         },
-        "github_com_rmorlok_authproxy_internal_schema_api_openapi.ListActorsResponseJson": {
-            "description": "Paginated list of actors",
-            "type": "object",
-            "properties": {
-                "cursor": {
-                    "description": "Pagination cursor for next page.",
-                    "type": "string"
-                },
-                "items": {
-                    "description": "List of actors.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ActorJson"
-                    }
-                }
-            }
-        },
-        "github_com_rmorlok_authproxy_internal_schema_api_openapi.ListNamespacesResponseJson": {
-            "description": "Paginated list of namespaces",
-            "type": "object",
-            "properties": {
-                "cursor": {
-                    "description": "Pagination cursor for next page.",
-                    "type": "string"
-                },
-                "items": {
-                    "description": "List of namespaces.",
-                    "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson"
-                    }
-                }
-            }
-        },
         "github_com_rmorlok_authproxy_internal_schema_config.KeyData": {
             "type": "object"
         },
@@ -7848,6 +7814,80 @@ const docTemplateApi = `{
                 }
             }
         },
+        "routes.ConnectorJson": {
+            "description": "Connector API summary response",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "description": {
+                    "type": "string",
+                    "example": "Salesforce CRM integration"
+                },
+                "display_name": {
+                    "type": "string",
+                    "example": "Salesforce"
+                },
+                "has_configure": {
+                    "type": "boolean",
+                    "example": false
+                },
+                "highlight": {
+                    "type": "string",
+                    "example": "CRM platform"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "cxr_test550e8400abcde"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "logo": {
+                    "type": "string",
+                    "example": "https://example.com/logo.png"
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "primary"
+                },
+                "states": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    }
+                },
+                "status_page_url": {
+                    "type": "string",
+                    "example": "https://status.salesforce.com"
+                },
+                "updated_at": {
+                    "type": "string"
+                },
+                "version": {
+                    "type": "integer",
+                    "example": 1
+                },
+                "versions": {
+                    "type": "integer",
+                    "example": 2
+                }
+            }
+        },
         "routes.CreateActorRequestJson": {
             "description": "Actor creation request",
             "type": "object",
@@ -7937,18 +7977,74 @@ const docTemplateApi = `{
                 }
             }
         },
+        "routes.EncryptionKeyJson": {
+            "description": "Encryption key API response",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "created_at": {
+                    "type": "string"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "ek_test550e8400abcde"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "active"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
         "routes.ErrorResponse": {
             "description": "Standardized error response",
             "type": "object",
             "properties": {
                 "error": {
-                    "description": "Error message",
+                    "description": "Error message.",
                     "type": "string",
                     "example": "Bad Request"
                 },
                 "stack_trace": {
-                    "description": "Stack trace (only in debug mode)",
+                    "description": "Stack trace, only populated in debug mode.",
                     "type": "string"
+                }
+            }
+        },
+        "routes.ForceConnectorVersionStateRequestJson": {
+            "description": "Request to force a connector version state",
+            "type": "object",
+            "properties": {
+                "state": {
+                    "type": "string",
+                    "example": "primary"
+                }
+            }
+        },
+        "routes.ForceStateRequestJson": {
+            "description": "Request to force a connection state",
+            "type": "object",
+            "properties": {
+                "state": {
+                    "type": "string",
+                    "example": "configured"
                 }
             }
         },
@@ -7978,200 +8074,21 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.ProxyRequest": {
-            "description": "Request to proxy an HTTP request through a connection",
+        "routes.KeyValueJson": {
             "type": "object",
             "properties": {
-                "body_json": {
-                    "description": "JSON body (alternative to body_raw)"
-                },
-                "body_raw": {
-                    "description": "Raw body bytes (base64 encoded if binary)",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "headers": {
-                    "description": "HTTP headers",
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "labels": {
-                    "description": "Optional labels to attach to this request's log entry (merged with connection labels; request labels override)",
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "method": {
-                    "description": "HTTP method",
+                "key": {
                     "type": "string",
-                    "example": "GET"
+                    "example": "env"
                 },
-                "url": {
-                    "description": "Target URL to proxy to",
+                "value": {
                     "type": "string",
-                    "example": "https://api.example.com/v1/users"
+                    "example": "production"
                 }
             }
         },
-        "routes.ProxyResponse": {
-            "description": "Response from a proxied HTTP request",
-            "type": "object",
-            "properties": {
-                "body_json": {
-                    "description": "JSON response body (if content-type is application/json)"
-                },
-                "body_raw": {
-                    "description": "Raw response body bytes",
-                    "type": "array",
-                    "items": {
-                        "type": "integer"
-                    }
-                },
-                "headers": {
-                    "description": "Response headers",
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "status_code": {
-                    "description": "HTTP status code",
-                    "type": "integer",
-                    "example": 200
-                }
-            }
-        },
-        "routes.ReauthConnectionRequest": {
-            "type": "object",
-            "properties": {
-                "return_to_url": {
-                    "type": "string"
-                }
-            }
-        },
-        "routes.RetryConnectionRequest": {
-            "type": "object",
-            "properties": {
-                "return_to_url": {
-                    "type": "string"
-                }
-            }
-        },
-        "routes.SessionInitiateFailureResponse": {
-            "type": "object",
-            "properties": {
-                "redirect_url": {
-                    "type": "string",
-                    "example": "https://example.com/auth"
-                }
-            }
-        },
-        "routes.SessionInitiateParams": {
-            "type": "object",
-            "properties": {
-                "return_to_url": {
-                    "type": "string",
-                    "example": "https://example.com/return"
-                }
-            }
-        },
-        "routes.SessionInitiateSuccessResponse": {
-            "type": "object",
-            "properties": {
-                "actor_id": {
-                    "type": "string",
-                    "example": "act_test550e8400abcde"
-                }
-            }
-        },
-        "routes.SubmitConnectionRequest": {
-            "description": "Form submission data",
-            "type": "object",
-            "properties": {
-                "data": {
-                    "description": "Data is the form data submitted by the user for the current step.",
-                    "type": "object"
-                },
-                "return_to_url": {
-                    "description": "ReturnToUrl is required when the next step after form submission is an auth redirect.\nThe client should provide this so the OAuth callback knows where to return.",
-                    "type": "string",
-                    "example": "https://example.com/callback"
-                },
-                "step_id": {
-                    "description": "StepId is the id of the step being submitted. Must match the current setup step's id.",
-                    "type": "string",
-                    "example": "preconnect:0"
-                }
-            }
-        },
-        "routes.SwaggerConnectionJson": {
-            "description": "Connection to an external service",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "description": "Annotations assigned to the connection",
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "connector": {
-                    "description": "Connector information",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/routes.SwaggerConnectorJson"
-                        }
-                    ]
-                },
-                "created_at": {
-                    "description": "Creation timestamp",
-                    "type": "string"
-                },
-                "health_state": {
-                    "description": "Operational health signal (healthy, unhealthy). Distinct from State: a Ready connection\nwhose credentials have stopped working flips to unhealthy without changing State.",
-                    "type": "string",
-                    "example": "healthy"
-                },
-                "id": {
-                    "description": "Connection UUID",
-                    "type": "string",
-                    "example": "req_test550e8400abcde"
-                },
-                "labels": {
-                    "description": "Labels assigned to the connection",
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "namespace": {
-                    "description": "Namespace path",
-                    "type": "string",
-                    "example": "acme"
-                },
-                "setup_step_id": {
-                    "description": "Current setup step if connection setup is in progress. Either a user-authored step id from\nthe connector definition or an apxy:* pseudo-step (e.g. apxy:verify, apxy:auth_failed).",
-                    "type": "string",
-                    "example": "tenant"
-                },
-                "state": {
-                    "description": "Connection state (pending, connected, disconnecting, disconnected, error)",
-                    "type": "string",
-                    "example": "connected"
-                },
-                "updated_at": {
-                    "description": "Last update timestamp",
-                    "type": "string"
-                }
-            }
-        },
-        "routes.SwaggerConnectorJson": {
-            "description": "Connector API summary response",
+        "routes.NamespaceJson": {
+            "description": "Namespace for organizing resources",
             "type": "object",
             "properties": {
                 "annotations": {
@@ -8183,25 +8100,9 @@ const docTemplateApi = `{
                 "created_at": {
                     "type": "string"
                 },
-                "description": {
+                "encryption_key_id": {
                     "type": "string",
-                    "example": "Salesforce CRM integration"
-                },
-                "display_name": {
-                    "type": "string",
-                    "example": "Salesforce"
-                },
-                "has_configure": {
-                    "type": "boolean",
-                    "example": false
-                },
-                "highlight": {
-                    "type": "string",
-                    "example": "CRM platform"
-                },
-                "id": {
-                    "type": "string",
-                    "example": "cxr_test550e8400abcde"
+                    "example": "ek_test550e8400abcde"
                 },
                 "labels": {
                     "type": "object",
@@ -8209,42 +8110,68 @@ const docTemplateApi = `{
                         "type": "string"
                     }
                 },
-                "logo": {
-                    "type": "string",
-                    "example": "https://example.com/logo.png"
-                },
-                "namespace": {
+                "path": {
                     "type": "string",
                     "example": "root.acme"
                 },
                 "state": {
                     "type": "string",
-                    "example": "primary"
-                },
-                "states": {
-                    "type": "array",
-                    "items": {
-                        "type": "string"
-                    }
-                },
-                "status_page_url": {
-                    "type": "string",
-                    "example": "https://status.salesforce.com"
+                    "example": "active"
                 },
                 "updated_at": {
                     "type": "string"
-                },
-                "version": {
-                    "type": "integer",
-                    "example": 1
-                },
-                "versions": {
-                    "type": "integer",
-                    "example": 2
                 }
             }
         },
-        "routes.SwaggerConnectorVersionJson": {
+        "routes.OpenAPIConnectionJson": {
+            "description": "Connection to an external service",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "connector": {},
+                "created_at": {
+                    "type": "string"
+                },
+                "health_state": {
+                    "type": "string",
+                    "example": "healthy"
+                },
+                "id": {
+                    "type": "string",
+                    "example": "cxn_test550e8400abcde"
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "namespace": {
+                    "type": "string",
+                    "example": "root.acme"
+                },
+                "setup_error": {
+                    "type": "string"
+                },
+                "setup_step_id": {
+                    "type": "string",
+                    "example": "tenant"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "configured"
+                },
+                "updated_at": {
+                    "type": "string"
+                }
+            }
+        },
+        "routes.OpenAPIConnectorVersionJson": {
             "description": "Detailed connector version information",
             "type": "object",
             "properties": {
@@ -8285,7 +8212,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerCreateConnectorRequest": {
+        "routes.OpenAPICreateConnectorRequestJson": {
             "description": "Request to create a new connector",
             "type": "object",
             "properties": {
@@ -8308,7 +8235,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerCreateConnectorVersionRequest": {
+        "routes.OpenAPICreateConnectorVersionRequestJson": {
             "description": "Request to create a new draft connector version",
             "type": "object",
             "properties": {
@@ -8327,7 +8254,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerCreateRateLimitRequest": {
+        "routes.OpenAPICreateRateLimitRequestJson": {
             "description": "Request to create a rate limit",
             "type": "object",
             "properties": {
@@ -8353,25 +8280,17 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerDisconnectResponse": {
+        "routes.OpenAPIDisconnectResponseJson": {
             "description": "Response for disconnect operation",
             "type": "object",
             "properties": {
-                "connection": {
-                    "description": "Connection being disconnected",
-                    "allOf": [
-                        {
-                            "$ref": "#/definitions/routes.SwaggerConnectionJson"
-                        }
-                    ]
-                },
+                "connection": {},
                 "task_id": {
-                    "description": "Task ID for tracking the disconnect operation",
                     "type": "string"
                 }
             }
         },
-        "routes.SwaggerDryRunRequest": {
+        "routes.OpenAPIDryRunRequestJson": {
             "description": "Dry-run input: a proxy-shaped request + request type + the identity it runs under",
             "type": "object",
             "properties": {
@@ -8383,7 +8302,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerDryRunResponse": {
+        "routes.OpenAPIDryRunResponseJson": {
             "description": "Per-rule match + peek-driven would-allow result",
             "type": "object",
             "properties": {
@@ -8403,95 +8322,37 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerEncryptionKeyJson": {
-            "description": "Encryption key API response",
+        "routes.OpenAPIListActorsResponseJson": {
+            "description": "Paginated list of actors",
             "type": "object",
             "properties": {
-                "annotations": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "created_at": {
+                "cursor": {
+                    "description": "Pagination cursor for next page.",
                     "type": "string"
                 },
-                "id": {
-                    "type": "string",
-                    "example": "ek_test550e8400abcde"
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
+                "items": {
+                    "description": "List of actors.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.ActorJson"
                     }
-                },
-                "namespace": {
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "state": {
-                    "type": "string",
-                    "example": "active"
-                },
-                "updated_at": {
-                    "type": "string"
                 }
             }
         },
-        "routes.SwaggerForceConnectorVersionStateRequest": {
-            "description": "Request to force a connector version state",
-            "type": "object",
-            "properties": {
-                "state": {
-                    "description": "Target state (draft, primary, active, archived)",
-                    "type": "string",
-                    "example": "primary"
-                }
-            }
-        },
-        "routes.SwaggerForceStateRequest": {
-            "description": "Request to force a connection state",
-            "type": "object",
-            "properties": {
-                "state": {
-                    "description": "Target state (pending, connected, disconnecting, disconnected, error)",
-                    "type": "string",
-                    "example": "connected"
-                }
-            }
-        },
-        "routes.SwaggerKeyValueJson": {
-            "type": "object",
-            "properties": {
-                "key": {
-                    "type": "string",
-                    "example": "env"
-                },
-                "value": {
-                    "type": "string",
-                    "example": "production"
-                }
-            }
-        },
-        "routes.SwaggerListConnectionResponse": {
+        "routes.OpenAPIListConnectionResponseJson": {
             "description": "Paginated list of connections",
             "type": "object",
             "properties": {
                 "cursor": {
-                    "description": "Pagination cursor for next page",
                     "type": "string"
                 },
                 "items": {
-                    "description": "List of connections",
                     "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/routes.SwaggerConnectionJson"
-                    }
+                    "items": {}
                 }
             }
         },
-        "routes.SwaggerListConnectorVersionsResponse": {
+        "routes.OpenAPIListConnectorVersionsResponseJson": {
             "description": "Paginated list of connector versions",
             "type": "object",
             "properties": {
@@ -8506,7 +8367,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerListConnectorsResponse": {
+        "routes.OpenAPIListConnectorsResponseJson": {
             "description": "Paginated list of connectors",
             "type": "object",
             "properties": {
@@ -8523,7 +8384,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerListEncryptionKeysResponse": {
+        "routes.OpenAPIListEncryptionKeysResponseJson": {
             "description": "Paginated list of encryption keys",
             "type": "object",
             "properties": {
@@ -8538,7 +8399,24 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerListRateLimitsResponse": {
+        "routes.OpenAPIListNamespacesResponseJson": {
+            "description": "Paginated list of namespaces",
+            "type": "object",
+            "properties": {
+                "cursor": {
+                    "description": "Pagination cursor for next page.",
+                    "type": "string"
+                },
+                "items": {
+                    "description": "List of namespaces.",
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson"
+                    }
+                }
+            }
+        },
+        "routes.OpenAPIListRateLimitsResponseJson": {
             "description": "Paginated list of rate limits",
             "type": "object",
             "properties": {
@@ -8551,7 +8429,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerListRequestEventsResponse": {
+        "routes.OpenAPIListRequestEventsResponse": {
             "description": "Paginated list of request events entries",
             "type": "object",
             "properties": {
@@ -8567,52 +8445,30 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerNamespaceJson": {
-            "description": "Namespace for organizing resources",
+        "routes.OpenAPIProxyResponseJson": {
+            "description": "Response from a proxied HTTP request",
             "type": "object",
             "properties": {
-                "annotations": {
+                "body_json": {},
+                "body_raw": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "headers": {
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
-                "created_at": {
-                    "type": "string"
-                },
-                "encryption_key_id": {
-                    "type": "string",
-                    "example": "ek_test550e8400abcde"
-                },
-                "labels": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "path": {
-                    "type": "string",
-                    "example": "root.acme"
-                },
-                "state": {
-                    "type": "string",
-                    "example": "active"
-                },
-                "updated_at": {
-                    "type": "string"
+                "status_code": {
+                    "type": "integer",
+                    "example": 200
                 }
             }
         },
-        "routes.SwaggerPutKeyValueRequest": {
-            "type": "object",
-            "properties": {
-                "value": {
-                    "type": "string",
-                    "example": "production"
-                }
-            }
-        },
-        "routes.SwaggerRateLimitJson": {
+        "routes.OpenAPIRateLimitJson": {
             "description": "Rate-limit API response",
             "type": "object",
             "properties": {
@@ -8648,7 +8504,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerRequestEventsEntry": {
+        "routes.OpenAPIRequestEventsEntry": {
             "description": "HTTP request events entry",
             "type": "object",
             "properties": {
@@ -8731,7 +8587,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerTaskInfoJson": {
+        "routes.OpenAPITaskInfoJson": {
             "description": "Background task status",
             "type": "object",
             "properties": {
@@ -8750,27 +8606,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerUpdateConnectionRequest": {
-            "description": "Request to update a connection's labels",
-            "type": "object",
-            "properties": {
-                "annotations": {
-                    "description": "Annotations to set on the connection (replaces all existing annotations)",
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                },
-                "labels": {
-                    "description": "Labels to set on the connection (replaces all existing labels)",
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
-                }
-            }
-        },
-        "routes.SwaggerUpdateConnectorRequest": {
+        "routes.OpenAPIUpdateConnectorRequestJson": {
             "description": "Request to update a connector or connector version",
             "type": "object",
             "properties": {
@@ -8789,7 +8625,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerUpdateEncryptionKeyRequest": {
+        "routes.OpenAPIUpdateEncryptionKeyRequestJson": {
             "description": "Request to update an encryption key",
             "type": "object",
             "properties": {
@@ -8811,7 +8647,7 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.SwaggerUpdateRateLimitRequest": {
+        "routes.OpenAPIUpdateRateLimitRequestJson": {
             "description": "Request to update a rate limit",
             "type": "object",
             "properties": {
@@ -8833,8 +8669,131 @@ const docTemplateApi = `{
                 }
             }
         },
+        "routes.ProxyRequest": {
+            "description": "Request to proxy or simulate an HTTP request",
+            "type": "object",
+            "properties": {
+                "body_json": {},
+                "body_raw": {
+                    "type": "array",
+                    "items": {
+                        "type": "integer"
+                    }
+                },
+                "headers": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "method": {
+                    "type": "string",
+                    "example": "GET"
+                },
+                "url": {
+                    "type": "string",
+                    "example": "https://api.example.com/v1/users"
+                }
+            }
+        },
+        "routes.PutKeyValueRequestJson": {
+            "type": "object",
+            "properties": {
+                "value": {
+                    "type": "string",
+                    "example": "production"
+                }
+            }
+        },
+        "routes.ReauthConnectionRequest": {
+            "type": "object",
+            "properties": {
+                "return_to_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "routes.RetryConnectionRequest": {
+            "type": "object",
+            "properties": {
+                "return_to_url": {
+                    "type": "string"
+                }
+            }
+        },
+        "routes.SessionInitiateFailureResponse": {
+            "type": "object",
+            "properties": {
+                "redirect_url": {
+                    "type": "string",
+                    "example": "https://example.com/auth"
+                }
+            }
+        },
+        "routes.SessionInitiateParams": {
+            "type": "object",
+            "properties": {
+                "return_to_url": {
+                    "type": "string",
+                    "example": "https://example.com/return"
+                }
+            }
+        },
+        "routes.SessionInitiateSuccessResponse": {
+            "type": "object",
+            "properties": {
+                "actor_id": {
+                    "type": "string",
+                    "example": "act_test550e8400abcde"
+                }
+            }
+        },
+        "routes.SubmitConnectionRequest": {
+            "description": "Form submission data",
+            "type": "object",
+            "properties": {
+                "data": {
+                    "description": "Data is the form data submitted by the user for the current step.",
+                    "type": "object"
+                },
+                "return_to_url": {
+                    "description": "ReturnToUrl is required when the next step after form submission is an auth redirect.\nThe client should provide this so the OAuth callback knows where to return.",
+                    "type": "string",
+                    "example": "https://example.com/callback"
+                },
+                "step_id": {
+                    "description": "StepId is the id of the step being submitted. Must match the current setup step's id.",
+                    "type": "string",
+                    "example": "preconnect:0"
+                }
+            }
+        },
         "routes.UpdateActorRequestJson": {
             "description": "Actor update request",
+            "type": "object",
+            "properties": {
+                "annotations": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "labels": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                }
+            }
+        },
+        "routes.UpdateConnectionRequestJson": {
+            "description": "Request to update a connection's labels and annotations",
             "type": "object",
             "properties": {
                 "annotations": {

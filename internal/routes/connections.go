@@ -17,13 +17,14 @@ import (
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
+	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 
 	"log/slog"
 	"net/http"
-	"time"
 )
 
 type ConnectionsRoutes struct {
@@ -38,6 +39,27 @@ type ConnectionsRoutes struct {
 	labelsAdapter key_value.Adapter[apid.ID]
 	annotsAdapter key_value.Adapter[apid.ID]
 }
+
+type InitiateConnectionRequest = schemaapi.InitiateConnectionRequest
+type ConnectionSetupRedirect = schemaapi.ConnectionSetupRedirect
+type ConnectionSetupForm = schemaapi.ConnectionSetupForm
+type ConnectionSetupComplete = schemaapi.ConnectionSetupComplete
+type SubmitConnectionRequest = schemaapi.SubmitConnectionRequest
+type DataSourceOptionJson = schemaapi.DataSourceOptionJson
+type ConnectionState = schemaapi.ConnectionState
+type ConnectionHealthState = schemaapi.ConnectionHealthState
+type ConnectionJson = schemaapi.ConnectionJson
+type ListConnectionResponseJson = schemaapi.ListConnectionResponseJson
+type DisconnectResponseJson = schemaapi.DisconnectResponseJson
+type ForceStateRequestJson = schemaapi.ForceConnectionStateRequestJson
+type UpdateConnectionRequestJson = schemaapi.UpdateConnectionRequestJson
+type ProxyRequest = schemaapi.ProxyRequestJson
+type ProxyResponse = schemaapi.ProxyResponseJson
+
+type OpenAPIConnectionJson = schemaapiopenapi.ConnectionJson
+type OpenAPIListConnectionResponseJson = schemaapiopenapi.ListConnectionResponseJson
+type OpenAPIDisconnectResponseJson = schemaapiopenapi.DisconnectResponseJson
+type OpenAPIProxyResponseJson = schemaapiopenapi.ProxyResponseJson
 
 // @Summary		Initiate connection
 // @Description	Initiate a new connection to an external service through a connector
@@ -248,20 +270,6 @@ func (r *ConnectionsRoutes) getDataSource(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, options)
 }
 
-type ConnectionJson struct {
-	Id          apid.ID                        `json:"id" swaggertype:"string"`
-	Namespace   string                         `json:"namespace"`
-	Labels      map[string]string              `json:"labels,omitempty"`
-	Annotations map[string]string              `json:"annotations,omitempty"`
-	State       database.ConnectionState       `json:"state"`
-	HealthState database.ConnectionHealthState `json:"health_state"`
-	SetupStep   *cschema.SetupStep             `json:"setup_step_id,omitempty" swaggertype:"string"`
-	SetupError  *string                        `json:"setup_error,omitempty"`
-	Connector   ConnectorJson                  `json:"connector"`
-	CreatedAt   time.Time                      `json:"created_at"`
-	UpdatedAt   time.Time                      `json:"updated_at"`
-}
-
 func ConnectionToJson(conn coreIface.Connection) ConnectionJson {
 	connector := ConnectorVersionToConnectorJson(conn.GetConnectorVersionEntity())
 
@@ -270,8 +278,8 @@ func ConnectionToJson(conn coreIface.Connection) ConnectionJson {
 		Namespace:   conn.GetNamespace(),
 		Labels:      conn.GetLabels(),
 		Annotations: conn.GetAnnotations(),
-		State:       conn.GetState(),
-		HealthState: conn.GetHealthState(),
+		State:       schemaapi.ConnectionState(conn.GetState()),
+		HealthState: schemaapi.ConnectionHealthState(conn.GetHealthState()),
 		SetupStep:   conn.GetSetupStep(),
 		SetupError:  conn.GetSetupError(),
 		Connector:   connector,
@@ -289,11 +297,6 @@ type ListConnectionRequestQuery struct {
 	OrderByVal    *string                   `form:"order_by"`
 }
 
-type ListConnectionResponseJson struct {
-	Items  []ConnectionJson `json:"items"`
-	Cursor string           `json:"cursor,omitempty"`
-}
-
 // @Summary		List connections
 // @Description	List connections with optional filtering and pagination
 // @Tags			connections
@@ -305,7 +308,7 @@ type ListConnectionResponseJson struct {
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			label_selector	query		string	false	"Filter by label selector"
 // @Param			order_by		query		string	false	"Order by field (e.g., 'created_at:asc')"
-// @Success		200				{object}	SwaggerListConnectionResponse
+// @Success		200				{object}	OpenAPIListConnectionResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
 // @Failure		500				{object}	ErrorResponse
@@ -392,7 +395,7 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 // @Accept			json
 // @Produce		json
 // @Param			id	path		string	true	"Connection UUID"
-// @Success		200	{object}	SwaggerConnectionJson
+// @Success		200	{object}	OpenAPIConnectionJson
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
@@ -443,18 +446,13 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, ConnectionToJson(c))
 }
 
-type DisconnectResponseJson struct {
-	TaskId     string         `json:"task_id"`
-	Connection ConnectionJson `json:"connection"`
-}
-
 // @Summary		Disconnect connection
 // @Description	Disconnect an existing connection and revoke its credentials
 // @Tags			connections
 // @Accept			json
 // @Produce		json
 // @Param			id	path		string	true	"Connection UUID"
-// @Success		200	{object}	SwaggerDisconnectResponse
+// @Success		200	{object}	OpenAPIDisconnectResponseJson
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		403	{object}	ErrorResponse
@@ -510,7 +508,7 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 
 	// Hard code the disconnecting state to avoid race condictions with task workers
 	connJson := ConnectionToJson(c)
-	connJson.State = database.ConnectionStateDisconnecting
+	connJson.State = schemaapi.ConnectionState(database.ConnectionStateDisconnecting)
 
 	response := DisconnectResponseJson{
 		TaskId:     taskId,
@@ -809,18 +807,14 @@ func (r *ConnectionsRoutes) reauth(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, resp)
 }
 
-type ForceStateRequestJson struct {
-	State database.ConnectionState `json:"state"`
-}
-
 // @Summary		Force connection state
 // @Description	Force a connection to a specific state (admin operation)
 // @Tags			connections
 // @Accept			json
 // @Produce		json
-// @Param			id		path		string					true	"Connection UUID"
-// @Param			request	body		SwaggerForceStateRequest	true	"New state"
-// @Success		200		{object}	SwaggerConnectionJson
+// @Param			id		path		string				true	"Connection UUID"
+// @Param			request	body		ForceStateRequestJson	true	"New state"
+// @Success		200		{object}	OpenAPIConnectionJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -877,12 +871,13 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 		return
 	}
 
-	if c.GetState() == req.State {
+	state := database.ConnectionState(req.State)
+	if c.GetState() == state {
 		gctx.PureJSON(http.StatusOK, ConnectionToJson(c))
 		return
 	}
 
-	err = c.SetState(ctx, req.State)
+	err = c.SetState(ctx, state)
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
@@ -892,19 +887,14 @@ func (r *ConnectionsRoutes) forceState(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, ConnectionToJson(c))
 }
 
-type UpdateConnectionRequestJson struct {
-	Labels      map[string]string `json:"labels"`
-	Annotations map[string]string `json:"annotations"`
-}
-
 // @Summary		Update connection
 // @Description	Update a connection's labels
 // @Tags			connections
 // @Accept			json
 // @Produce		json
-// @Param			id		path		string							true	"Connection UUID"
-// @Param			request	body		SwaggerUpdateConnectionRequest	true	"Connection update request"
-// @Success		200		{object}	SwaggerConnectionJson
+// @Param			id		path		string						true	"Connection UUID"
+// @Param			request	body		UpdateConnectionRequestJson	true	"Connection update request"
+// @Success		200		{object}	OpenAPIConnectionJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -1006,7 +996,7 @@ func (r *ConnectionsRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.Handl
 // @Produce		json
 // @Param			id		path		string	true	"Connection UUID"
 // @Param			label	path		string	true	"Label key"
-// @Success		200		{object}	SwaggerKeyValueJson
+// @Success		200		{object}	KeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -1022,8 +1012,8 @@ func (r *ConnectionsRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.Handle
 // @Produce		json
 // @Param			id		path		string						true	"Connection UUID"
 // @Param			label	path		string						true	"Label key"
-// @Param			request	body		SwaggerPutKeyValueRequest	true	"Label value"
-// @Success		200		{object}	SwaggerKeyValueJson
+// @Param			request	body		PutKeyValueRequestJson	true	"Label value"
+// @Success		200		{object}	KeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -1067,7 +1057,7 @@ func (r *ConnectionsRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapter.
 // @Produce		json
 // @Param			id			path		string	true	"Connection UUID"
 // @Param			annotation	path		string	true	"Annotation key"
-// @Success		200			{object}	SwaggerKeyValueJson
+// @Success		200			{object}	KeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		404			{object}	ErrorResponse
@@ -1083,8 +1073,8 @@ func (r *ConnectionsRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapter.H
 // @Produce		json
 // @Param			id			path		string						true	"Connection UUID"
 // @Param			annotation	path		string						true	"Annotation key"
-// @Param			request		body		SwaggerPutKeyValueRequest	true	"Annotation value"
-// @Success		200			{object}	SwaggerKeyValueJson
+// @Param			request		body		PutKeyValueRequestJson	true	"Annotation value"
+// @Success		200			{object}	KeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		403			{object}	ErrorResponse

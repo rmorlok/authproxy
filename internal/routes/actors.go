@@ -41,8 +41,7 @@ type ActorJson = schemaapi.ActorJson
 type CreateActorRequestJson = schemaapi.CreateActorRequestJson
 type UpdateActorRequestJson = schemaapi.UpdateActorRequestJson
 type ListActorsResponseJson = schemaapi.ListActorsResponseJson
-
-var _ = schemaapiopenapi.ListActorsResponseJson{}
+type OpenAPIListActorsResponseJson = schemaapiopenapi.ListActorsResponseJson
 
 func DatabaseActorToJson(a *database.Actor) ActorJson {
 	return ActorJson{
@@ -76,7 +75,7 @@ type ListActorsRequestQuery struct {
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			label_selector	query		string	false	"Filter by label selector"
 // @Param			order_by		query		string	false	"Order by field (e.g., 'created_at:asc')"
-// @Success		200				{object}	schemaapiopenapi.ListActorsResponseJson
+// @Success		200				{object}	OpenAPIListActorsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
 // @Failure		500				{object}	ErrorResponse
@@ -751,7 +750,7 @@ func (r *ActorsRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.HandleList
 // @Produce		json
 // @Param			id		path		string	true	"Actor UUID"
 // @Param			label	path		string	true	"Label key"
-// @Success		200		{object}	SwaggerKeyValueJson
+// @Success		200		{object}	KeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -767,8 +766,8 @@ func (r *ActorsRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.HandleGet(g
 // @Produce		json
 // @Param			id		path		string						true	"Actor UUID"
 // @Param			label	path		string						true	"Label key"
-// @Param			request	body		SwaggerPutKeyValueRequest	true	"Label value"
-// @Success		200		{object}	SwaggerKeyValueJson
+// @Param			request	body		PutKeyValueRequestJson	true	"Label value"
+// @Success		200		{object}	KeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -812,7 +811,7 @@ func (r *ActorsRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapter.Handl
 // @Produce		json
 // @Param			id			path		string	true	"Actor UUID"
 // @Param			annotation	path		string	true	"Annotation key"
-// @Success		200			{object}	SwaggerKeyValueJson
+// @Success		200			{object}	KeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		404			{object}	ErrorResponse
@@ -828,8 +827,8 @@ func (r *ActorsRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapter.Handle
 // @Produce		json
 // @Param			id			path		string						true	"Actor UUID"
 // @Param			annotation	path		string						true	"Annotation key"
-// @Param			request		body		SwaggerPutKeyValueRequest	true	"Annotation value"
-// @Success		200			{object}	SwaggerKeyValueJson
+// @Param			request		body		PutKeyValueRequestJson	true	"Annotation value"
+// @Success		200			{object}	KeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		403			{object}	ErrorResponse

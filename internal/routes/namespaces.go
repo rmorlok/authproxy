@@ -29,8 +29,7 @@ type UpdateNamespaceRequestJson = schemaapi.UpdateNamespaceRequestJson
 type ListNamespacesResponseJson = schemaapi.ListNamespacesResponseJson
 type SetNamespaceEncryptionKeyRequestJson = schemaapi.SetNamespaceEncryptionKeyRequestJson
 type NamespaceEncryptionKeyJson = schemaapi.NamespaceEncryptionKeyJson
-
-var _ = schemaapiopenapi.ListNamespacesResponseJson{}
+type OpenAPIListNamespacesResponseJson = schemaapiopenapi.ListNamespacesResponseJson
 
 func NamespaceToJson(ns coreIface.Namespace) NamespaceJson {
 	var ekId *string
@@ -74,7 +73,7 @@ type NamespacesRoutes struct {
 // @Accept			json
 // @Produce		json
 // @Param			path	path		string	true	"Namespace path"
-// @Success		200		{object}	SwaggerNamespaceJson
+// @Success		200		{object}	NamespaceJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -120,7 +119,7 @@ func (r *NamespacesRoutes) get(gctx *gin.Context) {
 // @Accept			json
 // @Produce		json
 // @Param			request	body		CreateNamespaceRequestJson	true	"Namespace creation request"
-// @Success		200		{object}	SwaggerNamespaceJson
+// @Success		200		{object}	NamespaceJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		409		{object}	ErrorResponse
@@ -210,7 +209,7 @@ func (r *NamespacesRoutes) create(gctx *gin.Context) {
 // @Param			namespace		query		string	false	"Filter by namespace path pattern"
 // @Param			label_selector	query		string	false	"Filter by label selector"
 // @Param			order_by		query		string	false	"Order by field (e.g., 'path:asc')"
-// @Success		200				{object}	schemaapiopenapi.ListNamespacesResponseJson
+// @Success		200				{object}	OpenAPIListNamespacesResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
 // @Failure		500				{object}	ErrorResponse
@@ -299,7 +298,7 @@ func (r *NamespacesRoutes) list(gctx *gin.Context) {
 // @Produce		json
 // @Param			path	path		string						true	"Namespace path"
 // @Param			request	body		UpdateNamespaceRequestJson	true	"Namespace update request"
-// @Success		200		{object}	SwaggerNamespaceJson
+// @Success		200		{object}	NamespaceJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -421,7 +420,7 @@ func (r *NamespacesRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.Handle
 // @Produce		json
 // @Param			path	path		string	true	"Namespace path"
 // @Param			label	path		string	true	"Label key"
-// @Success		200		{object}	SwaggerKeyValueJson
+// @Success		200		{object}	KeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -437,8 +436,8 @@ func (r *NamespacesRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.HandleG
 // @Produce		json
 // @Param			path	path		string						true	"Namespace path"
 // @Param			label	path		string						true	"Label key"
-// @Param			request	body		SwaggerPutKeyValueRequest	true	"Label value"
-// @Success		200		{object}	SwaggerKeyValueJson
+// @Param			request	body		PutKeyValueRequestJson	true	"Label value"
+// @Success		200		{object}	KeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -482,7 +481,7 @@ func (r *NamespacesRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapter.H
 // @Produce		json
 // @Param			path		path		string	true	"Namespace path"
 // @Param			annotation	path		string	true	"Annotation key"
-// @Success		200			{object}	SwaggerKeyValueJson
+// @Success		200			{object}	KeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		404			{object}	ErrorResponse
@@ -498,8 +497,8 @@ func (r *NamespacesRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapter.Ha
 // @Produce		json
 // @Param			path		path		string						true	"Namespace path"
 // @Param			annotation	path		string						true	"Annotation key"
-// @Param			request		body		SwaggerPutKeyValueRequest	true	"Annotation value"
-// @Success		200			{object}	SwaggerKeyValueJson
+// @Param			request		body		PutKeyValueRequestJson	true	"Annotation value"
+// @Success		200			{object}	KeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		403			{object}	ErrorResponse

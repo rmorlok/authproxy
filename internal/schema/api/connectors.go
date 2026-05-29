@@ -93,3 +93,11 @@ type CreateConnectorVersionRequestJson struct {
 	Labels      *map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
 	Annotations *map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
+
+// ForceConnectorVersionStateRequestJson is the request body for
+// PUT /connectors/:id/versions/:version/_force_state.
+//
+//	@Description	Request to force a connector version state
+type ForceConnectorVersionStateRequestJson struct {
+	State string `json:"state" yaml:"state" example:"primary"`
+}

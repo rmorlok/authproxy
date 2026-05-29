@@ -153,7 +153,7 @@ func TestConnections(t *testing.T) {
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, u, resp.Id)
-			require.Equal(t, database.ConnectionStateSetup, resp.State)
+			require.Equal(t, ConnectionState(database.ConnectionStateSetup), resp.State)
 		})
 
 		t.Run("allowed with matching resource id permission", func(t *testing.T) {
@@ -635,7 +635,7 @@ func TestConnections(t *testing.T) {
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, u, resp.Id)
-			require.Equal(t, database.ConnectionStateSetup, resp.State)
+			require.Equal(t, ConnectionState(database.ConnectionStateSetup), resp.State)
 		})
 	})
 
@@ -1190,7 +1190,7 @@ func TestConnections(t *testing.T) {
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req, err := http.NewRequest(http.MethodPut, "/connections/"+u.String()+"/_force_state", util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}))
+			req, err := http.NewRequest(http.MethodPut, "/connections/"+u.String()+"/_force_state", util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateDisconnected)}))
 			require.NoError(t, err)
 
 			tu.Gin.ServeHTTP(w, req)
@@ -1202,7 +1202,7 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				"/connections/"+apid.New(apid.PrefixConnection).String()+"/_force_state",
-				util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}),
+				util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateDisconnected)}),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connections", "get"), // Wrong verb
@@ -1218,7 +1218,7 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				"/connections/"+apid.New(apid.PrefixConnection).String()+"/_force_state",
-				util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}),
+				util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateDisconnected)}),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -1234,7 +1234,7 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				"/connections/"+u.String()+"/_force_state",
-				util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}),
+				util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateDisconnected)}),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connections", "force_state"),
@@ -1248,7 +1248,7 @@ func TestConnections(t *testing.T) {
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, u, resp.Id)
-			require.Equal(t, database.ConnectionStateDisconnected, resp.State)
+			require.Equal(t, ConnectionState(database.ConnectionStateDisconnected), resp.State)
 		})
 
 		t.Run("allowed with matching resource id permission", func(t *testing.T) {
@@ -1260,7 +1260,7 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				"/connections/"+u.String()+"/_force_state",
-				util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateDisconnected}),
+				util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateDisconnected)}),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "force_state", u.String()),
@@ -1274,7 +1274,7 @@ func TestConnections(t *testing.T) {
 			err = json.Unmarshal(w.Body.Bytes(), &resp)
 			require.NoError(t, err)
 			require.Equal(t, u, resp.Id)
-			require.Equal(t, database.ConnectionStateDisconnected, resp.State)
+			require.Equal(t, ConnectionState(database.ConnectionStateDisconnected), resp.State)
 		})
 
 		t.Run("forbidden with non-matching resource id permission", func(t *testing.T) {
@@ -1283,7 +1283,7 @@ func TestConnections(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				"/connections/"+u.String()+"/_force_state",
-				util.JsonToReader(ForceStateRequestJson{State: database.ConnectionStateConfigured}),
+				util.JsonToReader(ForceStateRequestJson{State: string(database.ConnectionStateConfigured)}),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingleWithResourceIds("root.**", "connections", "force_state", otherResourceId.String()),

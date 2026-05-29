@@ -1633,7 +1633,7 @@ func TestConnectors(t *testing.T) {
 			req, err := http.NewRequest(
 				http.MethodPut,
 				fmt.Sprintf("/connectors/%s/versions/1/_force_state", connectorId),
-				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: database.ConnectorVersionStateArchived}),
+				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorVersionStateArchived)}),
 			)
 			require.NoError(t, err)
 			tu.Gin.ServeHTTP(w, req)
@@ -1646,7 +1646,7 @@ func TestConnectors(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				"/connectors/bad-uuid/versions/1/_force_state",
-				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: database.ConnectorVersionStateArchived}),
+				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorVersionStateArchived)}),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -1662,7 +1662,7 @@ func TestConnectors(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				fmt.Sprintf("/connectors/%s/versions/99/_force_state", connectorId),
-				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: database.ConnectorVersionStateArchived}),
+				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorVersionStateArchived)}),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -1678,7 +1678,7 @@ func TestConnectors(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				fmt.Sprintf("/connectors/%s/versions/1/_force_state", connectorId),
-				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: database.ConnectorVersionStateArchived}),
+				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorVersionStateArchived)}),
 				"root",
 				"some-actor",
 				aschema.PermissionsSingle("root.**", "connectors", "force_state"),
@@ -1700,7 +1700,7 @@ func TestConnectors(t *testing.T) {
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
 				http.MethodPut,
 				fmt.Sprintf("/connectors/%s/versions/1/_force_state", connectorId),
-				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: database.ConnectorVersionStatePrimary}),
+				util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorVersionStatePrimary)}),
 				"root",
 				"some-actor",
 				aschema.AllPermissions(),
@@ -1803,7 +1803,7 @@ func TestConnectors(t *testing.T) {
 				req, err = tu.AuthUtil.NewSignedRequestForActorExternalId(
 					http.MethodPut,
 					fmt.Sprintf("/connectors/%s/versions/%d/_force_state", created.Id, created.Version),
-					util.JsonToReader(ForceConnectorVersionStateRequestJson{State: database.ConnectorVersionStatePrimary}),
+					util.JsonToReader(ForceConnectorVersionStateRequestJson{State: string(database.ConnectorVersionStatePrimary)}),
 					"root",
 					"some-actor",
 					aschema.AllPermissions(),

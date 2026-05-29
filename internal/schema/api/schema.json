@@ -14,6 +14,14 @@
       "type": "string",
       "enum": ["draft", "primary", "active", "archived"]
     },
+    "ConnectionState": {
+      "type": "string",
+      "enum": ["setup", "configured", "disabled", "disconnecting", "disconnected"]
+    },
+    "ConnectionHealthState": {
+      "type": "string",
+      "enum": ["healthy", "unhealthy"]
+    },
     "EncryptionKeyState": {
       "type": "string",
       "enum": ["active", "disabled"]
@@ -23,6 +31,15 @@
       "additionalProperties": {
         "type": "string"
       }
+    },
+    "ErrorResponse": {
+      "type": "object",
+      "properties": {
+        "error": { "type": "string" },
+        "stack_trace": { "type": "string" }
+      },
+      "required": ["error"],
+      "additionalProperties": false
     },
     "InitiateConnectionRequest": {
       "type": "object",
@@ -125,6 +142,81 @@
         "label": { "type": "string" }
       },
       "required": ["value", "label"],
+      "additionalProperties": false
+    },
+    "Connection": {
+      "type": "object",
+      "properties": {
+        "id": { "type": "string" },
+        "namespace": { "$ref": "../resources/namespace/schema.json#/$defs/NamespacePath" },
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" },
+        "state": { "$ref": "#/$defs/ConnectionState" },
+        "health_state": { "$ref": "#/$defs/ConnectionHealthState" },
+        "setup_step_id": { "type": "string" },
+        "setup_error": { "type": "string" },
+        "connector": { "$ref": "#/$defs/Connector" },
+        "created_at": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updated_at": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["id", "namespace", "state", "health_state", "connector", "created_at", "updated_at"],
+      "additionalProperties": false
+    },
+    "ListConnectionResponse": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Connection" }
+        },
+        "cursor": { "type": "string" }
+      },
+      "required": ["items"],
+      "additionalProperties": false
+    },
+    "DisconnectResponse": {
+      "type": "object",
+      "properties": {
+        "task_id": { "type": "string" },
+        "connection": { "$ref": "#/$defs/Connection" }
+      },
+      "required": ["task_id", "connection"],
+      "additionalProperties": false
+    },
+    "ForceConnectionStateRequest": {
+      "type": "object",
+      "properties": {
+        "state": { "$ref": "#/$defs/ConnectionState" }
+      },
+      "required": ["state"],
+      "additionalProperties": false
+    },
+    "UpdateConnectionRequest": {
+      "type": "object",
+      "properties": {
+        "labels": { "$ref": "#/$defs/StringMap" },
+        "annotations": { "$ref": "#/$defs/StringMap" }
+      },
+      "additionalProperties": false
+    },
+    "ProxyResponse": {
+      "type": "object",
+      "properties": {
+        "status_code": { "type": "integer" },
+        "headers": { "$ref": "#/$defs/StringMap" },
+        "body_raw": {
+          "type": "string",
+          "contentEncoding": "base64"
+        },
+        "body_json": {}
+      },
+      "required": ["status_code"],
       "additionalProperties": false
     },
     "Namespace": {
@@ -454,6 +546,14 @@
         "labels": { "$ref": "#/$defs/StringMap" },
         "annotations": { "$ref": "#/$defs/StringMap" }
       },
+      "additionalProperties": false
+    },
+    "ForceConnectorVersionStateRequest": {
+      "type": "object",
+      "properties": {
+        "state": { "$ref": "#/$defs/ConnectorVersionState" }
+      },
+      "required": ["state"],
       "additionalProperties": false
     },
     "RateLimit": {

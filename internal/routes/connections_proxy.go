@@ -6,15 +6,15 @@ import (
 	"log/slog"
 
 	"github.com/gin-gonic/gin"
-	"github.com/rmorlok/authproxy/internal/apgin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
+	"github.com/rmorlok/authproxy/internal/apgin"
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
 )
 
@@ -36,7 +36,7 @@ type ConnectionsProxyRoutes struct {
 // @Produce		json
 // @Param			id		path		string			true	"Connection UUID"
 // @Param			request	body		ProxyRequest	true	"Proxy request payload"
-// @Success		200		{object}	ProxyResponse
+// @Success		200		{object}	OpenAPIProxyResponseJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse

@@ -15,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
+	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	"github.com/rmorlok/authproxy/internal/tasks"
 )
 
@@ -27,6 +28,7 @@ type TaskRoutes struct {
 
 type TaskState = schemaapi.TaskState
 type TaskInfoJson = schemaapi.TaskInfoJson
+type OpenAPITaskInfoJson = schemaapiopenapi.TaskInfoJson
 
 const (
 	TaskStateUnknown   = schemaapi.TaskStateUnknown
@@ -87,7 +89,7 @@ func TaskInfoToJson(encryptedId string, ti *asynq.TaskInfo) *TaskInfoJson {
 // @Accept			json
 // @Produce		json
 // @Param			encryptedTaskInfo	path		string	true	"Encrypted task info token"
-// @Success		200					{object}	SwaggerTaskInfoJson
+// @Success		200					{object}	OpenAPITaskInfoJson
 // @Failure		400					{object}	ErrorResponse
 // @Failure		401					{object}	ErrorResponse
 // @Failure		403					{object}	ErrorResponse
