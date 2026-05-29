@@ -13,6 +13,7 @@ import (
 
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
@@ -124,15 +125,19 @@ func (r *callbackStateSecurityRig) requireNoToken(t *testing.T, connectionID str
 	require.Nil(t, r.env.GetOAuth2Token(t, connectionID), "no oauth2_token row should exist when callback was rejected")
 }
 
-// requireConnectionUnchanged asserts the connection sat in `created`
-// with no setup_step transition — proves the rejection short-circuited
-// before HandleAuthFailed/HandleCredentialsEstablished ran.
+// requireConnectionUnchanged asserts the rejection short-circuited before
+// any state-machine transition: the connection still sits in the Setup
+// state on the OAuth2 authorize redirect step (where _initiate parked it),
+// and no setup_error was recorded — proving the rejection ran before
+// HandleAuthFailed / HandleCredentialsEstablished would have advanced it.
 func (r *callbackStateSecurityRig) requireConnectionUnchanged(t *testing.T, connectionID string) {
 	t.Helper()
 	conn := r.env.GetConnection(t, connectionID)
 	assert.Equal(t, database.ConnectionStateSetup, conn.State,
-		"connection state should remain `created` after a rejected callback")
-	assert.Nil(t, conn.SetupStep, "no setup_step should be recorded on a rejected callback")
+		"connection state should remain Setup after a rejected callback")
+	require.NotNil(t, conn.SetupStep, "_initiate should have set setup_step to the OAuth2 authorize step")
+	assert.Equal(t, oauth2.OAuth2AuthorizeStepId, conn.SetupStep.Id(),
+		"setup_step should remain on the OAuth2 authorize step (no transition due to rejection)")
 	assert.Nil(t, conn.SetupError, "no setup_error should be recorded on a rejected callback")
 }
 

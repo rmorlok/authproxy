@@ -2,19 +2,14 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 
-	"github.com/rmorlok/authproxy/internal/apauth/core"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
-	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
-	"github.com/rmorlok/authproxy/internal/schema/config"
-	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 /*
@@ -77,82 +72,26 @@ func (s *service) InitiateConnection(ctx context.Context, req iface.InitiateConn
 		return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
 	}
 
-	connection, err := s.CreateConnection(ctx, targetNamespace, cv)
+	connectionIface, err := s.CreateConnection(ctx, targetNamespace, cv)
 	if err != nil {
 		val.MarkErrorReturn()
 		return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
 	}
-
-	connector := cv.GetDefinition()
-
-	// If the connector has preconnect steps, return the first form before
-	// touching the auth phase or the credentials phase.
-	if connector.SetupFlow.HasPreconnect() {
-		firstStep := connector.SetupFlow.Preconnect.Steps[0]
-		first := cschema.MustNewSetupStep(firstStep.Id)
-		if err := connection.SetSetupStep(ctx, &first); err != nil {
-			val.MarkErrorReturn()
-			return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
-		}
-
-		return &iface.ConnectionSetupForm{
-			Id:              connection.GetId(),
-			Type:            iface.ConnectionSetupResponseTypeForm,
-			StepId:          firstStep.Id,
-			StepTitle:       firstStep.Title,
-			StepDescription: firstStep.Description,
-			CurrentStep:     0,
-			TotalSteps:      connector.SetupFlow.TotalSteps(),
-			JsonSchema:      json.RawMessage(firstStep.JsonSchema),
-			UiSchema:        json.RawMessage(firstStep.UiSchema),
-		}, nil
+	// CreateConnection returns the concrete *connection typed as iface; we
+	// need the concrete to invoke the dispatch helpers.
+	connection, ok := connectionIface.(*connection)
+	if !ok {
+		val.MarkErrorReturn()
+		return nil, httperr.InternalServerErrorMsg("created connection is not a *connection")
 	}
 
-	// Otherwise, if the auth method declared a credentials phase (api-key after
-	// Normalize), return its first form. The submit handler routes credential
-	// data to the auth method instead of merging it into the connection config.
-	if connector.SetupFlow.HasCredentials() {
-		firstStep := connector.SetupFlow.Credentials.Steps[0]
-		first := cschema.MustNewSetupStep(firstStep.Id)
-		if err := connection.SetSetupStep(ctx, &first); err != nil {
-			val.MarkErrorReturn()
-			return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
-		}
-
-		return &iface.ConnectionSetupForm{
-			Id:              connection.GetId(),
-			Type:            iface.ConnectionSetupResponseTypeForm,
-			StepId:          firstStep.Id,
-			StepTitle:       firstStep.Title,
-			StepDescription: firstStep.Description,
-			CurrentStep:     0,
-			TotalSteps:      connector.SetupFlow.TotalSteps(),
-			JsonSchema:      json.RawMessage(firstStep.JsonSchema),
-			UiSchema:        json.RawMessage(firstStep.UiSchema),
-		}, nil
+	flow := s.buildManifestSetupFlow(connection)
+	first := flow.FirstStep()
+	if first == nil {
+		// No setup steps to walk through — the connection is immediately
+		// considered configured.
+		return connection.completeFlow(ctx)
 	}
 
-	if _, ok := connector.Auth.Inner().(*config.AuthOAuth2); ok {
-		if req.ReturnToUrl == "" {
-			val.MarkErrorReturn()
-			return nil, httperr.BadRequest("must specify return_to_url")
-		}
-
-		ra := core.GetAuthFromContext(ctx)
-		o2 := s.getAuthMethodFactory(connector).(oauth2.Factory).NewOAuth2(connection)
-		url, err := o2.SetStateAndGeneratePublicUrl(ctx, ra.MustGetActor(), req.ReturnToUrl)
-		if err != nil {
-			val.MarkErrorReturn()
-			return nil, httperr.InternalServerError(httperr.WithInternalErr(err))
-		}
-
-		return &iface.ConnectionSetupRedirect{
-			Id:          connection.GetId(),
-			Type:        iface.ConnectionSetupResponseTypeRedirect,
-			RedirectUrl: url,
-		}, nil
-	}
-
-	val.MarkErrorReturn()
-	return nil, httperr.InternalServerErrorMsg("unsupported connector auth type")
+	return connection.advanceToStep(ctx, first, flow, req.ReturnToUrl)
 }

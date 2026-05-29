@@ -24,6 +24,8 @@ func TestOnVerifyPassed(t *testing.T) {
 				},
 			},
 		})
+		verify := cschema.SetupStepVerify
+		conn.SetupStep = &verify
 
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, ptrStep(cschema.MustNewSetupStep("workspace"))).Return(nil)
 
@@ -38,6 +40,10 @@ func TestOnVerifyPassed(t *testing.T) {
 		defer ctrl.Finish()
 
 		conn, db := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
+		// onVerifyPassed is invoked by the verify task handler only when the
+		// connection is on apxy:verify. Reflect that in the fixture.
+		verify := cschema.SetupStepVerify
+		conn.SetupStep = &verify
 
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
 		db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
@@ -54,6 +60,8 @@ func TestOnVerifyPassed(t *testing.T) {
 
 		conn, db := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
 		conn.HealthState = database.ConnectionHealthStateUnhealthy
+		verify := cschema.SetupStepVerify
+		conn.SetupStep = &verify
 
 		db.EXPECT().SetConnectionHealthState(gomock.Any(), conn.Id, database.ConnectionHealthStateHealthy).Return(nil)
 		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)

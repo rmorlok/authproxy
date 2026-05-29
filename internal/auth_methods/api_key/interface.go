@@ -17,6 +17,7 @@ import (
 // across all api-key connections.
 type Factory interface {
 	NewAuthenticator(connection coreIface.Connection) auth_methods.Authenticator
+	ManifestSetupSteps(connection coreIface.Connection, connector *cschema.Connector) []coreIface.ManifestSetupStep
 
 	// PersistCredentials extracts the api-key credential field values from
 	// credData (the validated form payload from a credentials-phase submit),

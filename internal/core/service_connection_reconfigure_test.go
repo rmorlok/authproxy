@@ -28,7 +28,7 @@ func TestReconfigure(t *testing.T) {
 
 		_, err := conn.Reconfigure(context.Background())
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "ready state")
+		assert.Contains(t, err.Error(), "must be configured")
 	})
 
 	t.Run("returns error when connector has no configure steps", func(t *testing.T) {

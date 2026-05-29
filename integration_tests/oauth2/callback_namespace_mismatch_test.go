@@ -10,6 +10,7 @@ import (
 
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/assert"
@@ -228,8 +229,10 @@ func TestCallbackRejection_NamespaceMismatchConnection(t *testing.T) {
 		"bob's connection must not have a token attached after a rejected forgery")
 	bobConnAfter := env.GetConnection(t, bobConnID)
 	assert.Equal(t, database.ConnectionStateSetup, bobConnAfter.State,
-		"bob's connection state should remain `created`")
-	assert.Nil(t, bobConnAfter.SetupStep)
+		"bob's connection state should remain Setup")
+	require.NotNil(t, bobConnAfter.SetupStep)
+	assert.Equal(t, oauth2.OAuth2AuthorizeStepId, bobConnAfter.SetupStep.Id(),
+		"bob's setup_step should remain on the OAuth2 authorize step")
 	assert.Nil(t, bobConnAfter.SetupError)
 
 	tokenReqs := provider.Requests(helpers.RequestsFilter{

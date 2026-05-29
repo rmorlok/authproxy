@@ -17,6 +17,11 @@ type ManifestStepType string
 const (
 	ManifestStepTypeForm     ManifestStepType = "form"
 	ManifestStepTypeRedirect ManifestStepType = "redirect"
+	// ManifestStepTypeVerify is the type tag for the synthetic apxy:verify
+	// pseudo-step: the connection is waiting for the verify task to finish.
+	// The user sees a "verifying" response and polls; OnSubmit /
+	// RenderRedirect both return the matching sentinel errors.
+	ManifestStepTypeVerify ManifestStepType = "verify"
 )
 
 // Sentinel errors returned when a method is invoked on a step that doesn't
@@ -163,6 +168,14 @@ func NewRedirectStep(cfg RedirectStepConfig) ManifestSetupStep {
 	return &redirectStep{cfg: cfg}
 }
 
+// NewVerifyStep returns the synthetic apxy:verify pseudo-step that
+// ManifestSetupFlow uses to mark "credentials established, probes running."
+// The id and title are fixed; OnSubmit / RenderRedirect both return the
+// matching sentinel.
+func NewVerifyStep() ManifestSetupStep {
+	return &verifyStep{}
+}
+
 type formStep struct {
 	cfg FormStepConfig
 }
@@ -205,4 +218,24 @@ func (s *redirectStep) RenderRedirect(ctx context.Context, opts RenderRedirectOp
 		return RedirectInfo{}, ErrRedirectNotSupported
 	}
 	return s.cfg.Render(ctx, opts)
+}
+
+// verifyStep is the synthetic apxy:verify pseudo-step. Stateless — no
+// configuration is needed since its sole purpose is to mark "probes are
+// running; the UI should display Verifying."
+type verifyStep struct{}
+
+func (s *verifyStep) Id() string                  { return "apxy:verify" }
+func (s *verifyStep) Title() string               { return "Verifying connection" }
+func (s *verifyStep) Description() string         { return "" }
+func (s *verifyStep) Type() ManifestStepType      { return ManifestStepTypeVerify }
+func (s *verifyStep) JsonSchema() json.RawMessage { return nil }
+func (s *verifyStep) UiSchema() json.RawMessage   { return nil }
+
+func (s *verifyStep) OnSubmit(_ context.Context, _ json.RawMessage) error {
+	return ErrSubmitNotSupported
+}
+
+func (s *verifyStep) RenderRedirect(_ context.Context, _ RenderRedirectOptions) (RedirectInfo, error) {
+	return RedirectInfo{}, ErrRedirectNotSupported
 }

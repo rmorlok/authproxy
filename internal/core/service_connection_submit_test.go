@@ -8,6 +8,7 @@ import (
 	"github.com/golang/mock/gomock"
 	mockAsynq "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	"github.com/rmorlok/authproxy/internal/aplog"
+	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
@@ -93,7 +94,10 @@ func TestSubmitForm(t *testing.T) {
 		assert.Contains(t, err.Error(), "no active setup step")
 	})
 
-	t.Run("returns error when connector has no setup flow", func(t *testing.T) {
+	t.Run("returns error when current step is not in the manifest", func(t *testing.T) {
+		// Connector has no setup flow at all; a request that names a step id
+		// that isn't materialized in the manifest is a 500 (manifest /
+		// connection state disagreement).
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -106,7 +110,7 @@ func TestSubmitForm(t *testing.T) {
 			Data:   json.RawMessage(`{"key":"value"}`),
 		})
 		require.Error(t, err)
-		assert.Contains(t, err.Error(), "no setup flow")
+		assert.Contains(t, err.Error(), "not addressable in manifest")
 	})
 
 	t.Run("advances preconnect:0 to preconnect:1", func(t *testing.T) {
@@ -144,7 +148,7 @@ func TestSubmitForm(t *testing.T) {
 		assert.Equal(t, 2, form.TotalSteps)
 	})
 
-	t.Run("last preconnect step transitions to auth requires return_to_url", func(t *testing.T) {
+	t.Run("last preconnect step transitions to OAuth2 redirect requires return_to_url", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -157,9 +161,20 @@ func TestSubmitForm(t *testing.T) {
 		}
 
 		conn, db := newTestConnectionWithSetupFlow(t, ctrl, sf)
+		// Promote the no-auth connector to OAuth2 so the manifest emits the
+		// authorize redirect step after the last preconnect step.
+		conn.cv = NewTestConnectorVersion(cschema.Connector{
+			Auth:      &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
+			SetupFlow: sf,
+		})
+		conn.ConnectorId = conn.cv.GetId()
+		conn.ConnectorVersion = conn.cv.GetVersion()
 		step := cschema.MustNewSetupStep("tenant")
 		conn.SetupStep = &step
 
+		// OnSubmit will merge config, then advanceToStep will render the
+		// redirect — which rejects (return_to_url empty) before SetSetupStep
+		// is called. So the only DB write we expect is the config merge.
 		db.EXPECT().SetConnectionEncryptedConfiguration(gomock.Any(), conn.Id, gomock.Any()).Return(nil)
 
 		_, err := conn.SubmitForm(context.Background(), iface.SubmitConnectionRequest{
@@ -274,6 +289,7 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 	})
 
 	t.Run("returns form for preconnect step", func(t *testing.T) {
+		// Resume path is read-only — no setup_step writes.
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -284,11 +300,9 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 				},
 			},
 		}
-		conn, db := newTestConnectionWithSetupFlow(t, ctrl, sf)
+		conn, _ := newTestConnectionWithSetupFlow(t, ctrl, sf)
 		step := cschema.MustNewSetupStep("tenant")
 		conn.SetupStep = &step
-
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &step).Return(nil)
 
 		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
 		require.NoError(t, err)
@@ -301,7 +315,10 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 		assert.Equal(t, 1, form.TotalSteps)
 	})
 
-	t.Run("returns redirect for auth step", func(t *testing.T) {
+	t.Run("returns redirect for OAuth2 authorize step", func(t *testing.T) {
+		// Resume path returns the redirect response type with an empty URL —
+		// the user has been redirected already and the UI knows to wait on
+		// the callback rather than render a fresh URL.
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
@@ -312,12 +329,24 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 				},
 			},
 		})
-		step := cschema.SetupStepAuth
+		conn.cv = NewTestConnectorVersion(cschema.Connector{
+			Auth: &cschema.Auth{InnerVal: &cschema.AuthOAuth2{Type: cschema.AuthTypeOAuth2}},
+			SetupFlow: &cschema.SetupFlow{
+				Preconnect: &cschema.SetupFlowPhase{
+					Steps: []cschema.SetupFlowStep{{Id: "tenant", JsonSchema: tenantSchema}},
+				},
+			},
+		})
+		conn.ConnectorId = conn.cv.GetId()
+		conn.ConnectorVersion = conn.cv.GetVersion()
+		step := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
 		conn.SetupStep = &step
 
 		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
 		require.NoError(t, err)
 		assert.Equal(t, iface.ConnectionSetupResponseTypeRedirect, resp.GetType())
+		// Resume mode: URL is intentionally empty.
+		assert.Empty(t, resp.(*iface.ConnectionSetupRedirect).RedirectUrl)
 	})
 
 	t.Run("returns form for configure step", func(t *testing.T) {
@@ -331,11 +360,9 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 				},
 			},
 		}
-		conn, db := newTestConnectionWithSetupFlow(t, ctrl, sf)
+		conn, _ := newTestConnectionWithSetupFlow(t, ctrl, sf)
 		step := cschema.MustNewSetupStep("workspace")
 		conn.SetupStep = &step
-
-		db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &step).Return(nil)
 
 		resp, err := conn.GetCurrentSetupStepResponse(context.Background())
 		require.NoError(t, err)
@@ -347,10 +374,13 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 	})
 
 	t.Run("returns verifying for verify step", func(t *testing.T) {
+		// apxy:verify is only addressable in the manifest when the connector
+		// has probes — that's the only way the connection ends up there.
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
 		conn, _ := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
+		conn.cv.GetDefinition().Probes = []cschema.Probe{{Id: "ping"}}
 		step := cschema.SetupStepVerify
 		conn.SetupStep = &step
 

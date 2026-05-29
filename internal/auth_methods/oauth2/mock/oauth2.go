@@ -15,6 +15,7 @@ import (
 	oauth2 "github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	iface "github.com/rmorlok/authproxy/internal/core/iface"
 	auth "github.com/rmorlok/authproxy/internal/schema/auth"
+	connectors "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 // MockIActorData is a mock of IActorData interface.
@@ -146,6 +147,20 @@ func (m *MockFactory) GetOAuth2State(ctx context.Context, actor oauth2.IActorDat
 func (mr *MockFactoryMockRecorder) GetOAuth2State(ctx, actor, stateId interface{}) *gomock.Call {
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetOAuth2State", reflect.TypeOf((*MockFactory)(nil).GetOAuth2State), ctx, actor, stateId)
+}
+
+// ManifestSetupSteps mocks base method.
+func (m *MockFactory) ManifestSetupSteps(connection iface.Connection, connector *connectors.Connector) []iface.ManifestSetupStep {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ManifestSetupSteps", connection, connector)
+	ret0, _ := ret[0].([]iface.ManifestSetupStep)
+	return ret0
+}
+
+// ManifestSetupSteps indicates an expected call of ManifestSetupSteps.
+func (mr *MockFactoryMockRecorder) ManifestSetupSteps(connection, connector interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ManifestSetupSteps", reflect.TypeOf((*MockFactory)(nil).ManifestSetupSteps), connection, connector)
 }
 
 // NewAuthenticator mocks base method.
