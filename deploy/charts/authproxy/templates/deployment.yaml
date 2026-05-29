@@ -59,17 +59,23 @@ spec:
           {{- end }}
           {{- if or .Values.database.existingSecret .Values.redis.existingSecret .Values.s3.existingSecret }}
           envFrom:
+            {{- /*
+              `tpl` re-renders the value as a template using the root
+              context — lets an umbrella chart pass `"{{ .Release.Name }}-db"`
+              and have it expand here. Customers passing a plain
+              literal Secret name see no behavior change.
+            */}}
             {{- with .Values.database.existingSecret }}
             - secretRef:
-                name: {{ . }}
+                name: {{ tpl . $ }}
             {{- end }}
             {{- with .Values.redis.existingSecret }}
             - secretRef:
-                name: {{ . }}
+                name: {{ tpl . $ }}
             {{- end }}
             {{- with .Values.s3.existingSecret }}
             - secretRef:
-                name: {{ . }}
+                name: {{ tpl . $ }}
             {{- end }}
           {{- end }}
           {{- if .Values.services.public.enabled }}
@@ -114,20 +120,21 @@ spec:
         - name: config
           configMap:
             name: {{ include "authproxy.fullname" . }}-config
+        {{- /* See note above re: tpl on existingSecret values. */}}
         {{- with .Values.jwt.existingSecret }}
         - name: jwt-keys
           secret:
-            secretName: {{ . }}
+            secretName: {{ tpl . $ }}
         {{- end }}
         {{- with .Values.encryptionKeys.existingSecret }}
         - name: encryption-keys
           secret:
-            secretName: {{ . }}
+            secretName: {{ tpl . $ }}
         {{- end }}
         {{- with .Values.actors.existingSecret }}
         - name: actors-keys
           secret:
-            secretName: {{ . }}
+            secretName: {{ tpl . $ }}
         {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

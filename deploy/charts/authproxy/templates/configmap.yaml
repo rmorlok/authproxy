@@ -20,13 +20,21 @@ Secrets, not in this ConfigMap.
 {{- $_ := set $cfg "worker" (dict "health_check_port" .Values.ports.workerHealth) -}}
 {{- end -}}
 
+{{/*
+String fields below run through `tpl` so an umbrella chart can pass
+values like `"{{ .Release.Name }}-postgresql"` and have them expand
+at this chart's render time. Customers passing plain literal values
+see no behavior change — tpl is a no-op on strings with no
+template syntax.
+*/}}
+
 {{/* --- database --- */}}
 {{- $db := dict "provider" .Values.database.provider "auto_migrate" .Values.database.autoMigrate -}}
 {{- if eq .Values.database.provider "postgres" -}}
-{{-   $_ := set $db "host" .Values.database.host -}}
+{{-   $_ := set $db "host" (tpl .Values.database.host $) -}}
 {{-   $_ := set $db "port" .Values.database.port -}}
-{{-   $_ := set $db "user" .Values.database.user -}}
-{{-   $_ := set $db "database" .Values.database.database -}}
+{{-   $_ := set $db "user" (tpl .Values.database.user $) -}}
+{{-   $_ := set $db "database" (tpl .Values.database.database $) -}}
 {{-   $_ := set $db "sslmode" .Values.database.sslmode -}}
 {{-   if .Values.database.existingSecret -}}
 {{-     $_ := set $db "password" (dict "env_var" "AUTHPROXY_DB_PASSWORD") -}}
@@ -37,9 +45,9 @@ Secrets, not in this ConfigMap.
 {{- $_ := set $cfg "database" $db -}}
 
 {{/* --- redis --- */}}
-{{- $redis := dict "provider" "redis" "address" .Values.redis.address "db" .Values.redis.db -}}
+{{- $redis := dict "provider" "redis" "address" (tpl .Values.redis.address $) "db" .Values.redis.db -}}
 {{- if .Values.redis.username -}}
-{{-   $_ := set $redis "username" .Values.redis.username -}}
+{{-   $_ := set $redis "username" (tpl .Values.redis.username $) -}}
 {{- end -}}
 {{- if .Values.redis.existingSecret -}}
 {{-   $_ := set $redis "password" (dict "env_var" "AUTHPROXY_REDIS_PASSWORD") -}}
@@ -48,7 +56,7 @@ Secrets, not in this ConfigMap.
 
 {{/* --- host application (required by validator) --- */}}
 {{- if .Values.hostApplication.initiateSessionUrl -}}
-{{-   $_ := set $cfg "host_application" (dict "initiate_session_url" .Values.hostApplication.initiateSessionUrl) -}}
+{{-   $_ := set $cfg "host_application" (dict "initiate_session_url" (tpl .Values.hostApplication.initiateSessionUrl $)) -}}
 {{- end -}}
 
 {{/* --- connectors block (required by validator; empty list is acceptable) --- */}}
