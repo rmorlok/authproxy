@@ -1,4 +1,4 @@
-ALTER TABLE http_log_entry_records
+ALTER TABLE app_metrics_request_events
     ADD COLUMN IF NOT EXISTS response_source String DEFAULT 'upstream',
     ADD COLUMN IF NOT EXISTS rate_limit_id String DEFAULT '',
     ADD COLUMN IF NOT EXISTS rate_limit_mode String DEFAULT '',

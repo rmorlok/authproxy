@@ -126,12 +126,12 @@ func (s *clickhouseRecordStore) StoreRecord(ctx context.Context, record *LogReco
 }
 
 func (s *clickhouseRecordStore) Migrate(ctx context.Context) error {
-	s.logger.Info("running clickhouse http log migrations")
-	defer s.logger.Info("clickhouse http log migrations complete")
+	s.logger.Info("running clickhouse app metrics migrations")
+	defer s.logger.Info("clickhouse app metrics migrations complete")
 
-	src, err := iofs.New(httpLogMigrationsFs, "migrations/clickhouse")
+	src, err := iofs.New(appMetricsMigrationsFs, "migrations/clickhouse")
 	if err != nil {
-		return fmt.Errorf("failed to load clickhouse http log migrations: %w", err)
+		return fmt.Errorf("failed to load clickhouse app metrics migrations: %w", err)
 	}
 
 	var dbName string
@@ -157,13 +157,13 @@ func (s *clickhouseRecordStore) Migrate(ctx context.Context) error {
 	})
 	if err != nil {
 		_ = migrationConn.Close()
-		return fmt.Errorf("failed to setup clickhouse http log migration driver: %w", err)
+		return fmt.Errorf("failed to setup clickhouse app metrics migration driver: %w", err)
 	}
 
 	m, err := migrate.NewWithInstance("iofs", src, "clickhouse", driver)
 	if err != nil {
 		_ = migrationConn.Close()
-		return fmt.Errorf("failed to setup clickhouse http log migrator: %w", err)
+		return fmt.Errorf("failed to setup clickhouse app metrics migrator: %w", err)
 	}
 	defer func() {
 		sourceErr, dbErr := m.Close()
@@ -174,10 +174,10 @@ func (s *clickhouseRecordStore) Migrate(ctx context.Context) error {
 
 	if err := m.Up(); err != nil {
 		if errors.Is(err, migrate.ErrNoChange) {
-			s.logger.Info("no clickhouse http log migrations required")
+			s.logger.Info("no clickhouse app metrics migrations required")
 			return nil
 		}
-		return fmt.Errorf("failed to migrate clickhouse http log database: %w", err)
+		return fmt.Errorf("failed to migrate clickhouse app metrics database: %w", err)
 	}
 
 	return nil
@@ -201,7 +201,7 @@ type clickhouseRecordRetriever struct {
 func NewClickhouseRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorEncryptor, logger *slog.Logger, dbOpts ...database.Option) RecordRetriever {
 	chCfg, ok := cfg.InnerVal.(*config.DatabaseClickhouse)
 	if !ok {
-		panic(fmt.Sprintf("expected *config.HttpLoggingDatabaseClickhouse, got %T", cfg))
+		panic(fmt.Sprintf("expected *config.DatabaseClickhouse, got %T", cfg))
 	}
 
 	options, err := chCfg.ToClickhouseOptions()

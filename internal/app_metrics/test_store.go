@@ -27,7 +27,7 @@ import (
 // app_metrics test harness should use. The selector is independent of the
 // main database's AUTH_PROXY_TEST_DATABASE_PROVIDER so callers can mix the
 // two (e.g. main DB on sqlite, app_metrics on clickhouse).
-const TestProviderEnvVar = "AUTH_PROXY_REQUEST_LOG_TEST_DATABASE_PROVIDER"
+const TestProviderEnvVar = "AUTH_PROXY_APP_METRICS_TEST_DATABASE_PROVIDER"
 
 var (
 	postgresRequestEventsTestLimiter   = make(chan struct{}, getEnvIntDefault("POSTGRES_TEST_MAX_PARALLEL", 4))
@@ -35,7 +35,7 @@ var (
 )
 
 // MustNewBlankRequestEventsStore returns a fresh, migrated RecordStore +
-// RecordRetriever backed by whichever provider AUTH_PROXY_REQUEST_LOG_TEST_DATABASE_PROVIDER
+// RecordRetriever backed by whichever provider AUTH_PROXY_APP_METRICS_TEST_DATABASE_PROVIDER
 // names (sqlite|postgres|clickhouse; default sqlite). The raw *sql.DB is also
 // returned so tests can issue direct queries when convenient. Cleanup is
 // registered with t.
@@ -118,7 +118,7 @@ func mustNewBlankPostgresRequestEventsStore(t testing.TB) (RecordStore, RecordRe
 
 	migrator := golangmigrator.New(
 		"migrations/postgres",
-		golangmigrator.WithFS(httpLogMigrationsFs),
+		golangmigrator.WithFS(appMetricsMigrationsFs),
 	)
 
 	testDbConfig := pgtestdb.Custom(t, adminConfig, migrator)

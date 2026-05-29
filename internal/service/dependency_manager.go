@@ -257,7 +257,7 @@ func (dm *DependencyManager) GetAppMetricsService() *app_metrics.StorageService 
 	if dm.appMetricsService == nil {
 		dm.appMetricsService, err = app_metrics.NewStorageService(
 			ctx,
-			dm.GetConfigRoot().HttpLogging,
+			dm.GetConfigRoot().AppMetrics,
 			pagination.NewRandomCursorEncryptor(),
 			dm.GetEncryptService(),
 			dm.GetLogger(),
@@ -333,7 +333,7 @@ func (dm *DependencyManager) GetHttpf() httpf.F {
 }
 
 func (dm *DependencyManager) AutoMigrateAppMetricsService() {
-	if dm.GetConfigRoot().HttpLogging.GetAutoMigrate() {
+	if dm.GetConfigRoot().AppMetrics.GetAutoMigrate() {
 		store := dm.GetAppMetricsService()
 		err := store.Migrate(context.Background())
 		if err != nil {

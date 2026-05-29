@@ -58,8 +58,10 @@ logging:
   type: tint
   level: warn
 
-http_logging:
-  full_request_recording: always
+app_metrics:
+  resource_snapshot_interval: 15m
+  request_events:
+    full_request_recording: always
   database:
     provider: clickhouse
     auto_migrate: true

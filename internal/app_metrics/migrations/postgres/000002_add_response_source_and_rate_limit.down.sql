@@ -1,7 +1,7 @@
-DROP INDEX IF EXISTS idx_entry_records_rate_limit_id;
-DROP INDEX IF EXISTS idx_entry_records_response_source;
+DROP INDEX IF EXISTS idx_app_metrics_request_events_rate_limit_id;
+DROP INDEX IF EXISTS idx_app_metrics_request_events_response_source;
 
-ALTER TABLE http_log_entry_records
+ALTER TABLE app_metrics_request_events
     DROP COLUMN IF EXISTS rate_limit_matched,
     DROP COLUMN IF EXISTS rate_limit_bucket,
     DROP COLUMN IF EXISTS rate_limit_mode,

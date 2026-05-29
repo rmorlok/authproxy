@@ -16,7 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/util"
 )
 
-// DatabaseClickhouse holds configuration for using ClickHouse as the HTTP logging database.
+// DatabaseClickhouse holds configuration for using ClickHouse as a database.
 type DatabaseClickhouse struct {
 	Provider                  DatabaseProvider `json:"provider" yaml:"provider"`
 	Addresses                 []string         `json:"addresses,omitempty" yaml:"addresses,omitempty"`
