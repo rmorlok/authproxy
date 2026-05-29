@@ -54,6 +54,11 @@ func (ss *StorageService) QueryRequestEventMetrics(ctx context.Context, queries 
 	return ss.retriever.QueryRequestEventMetrics(ctx, queries)
 }
 
+// QueryResourceMetrics executes time-series metric queries over resource samples.
+func (ss *StorageService) QueryResourceMetrics(ctx context.Context, queries []ResourceMetricsQuery) ([]ResourceMetricSeries, error) {
+	return ss.retriever.QueryResourceMetrics(ctx, queries)
+}
+
 func (ss *StorageService) StoreConnectionResourceSamples(ctx context.Context, samples []*ConnectionResourceSample) error {
 	return ss.store.(ResourceSampleStore).StoreConnectionResourceSamples(ctx, samples)
 }

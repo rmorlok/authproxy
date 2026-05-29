@@ -630,6 +630,51 @@ func TestRequestEventsRoutes(t *testing.T) {
 			require.Equal(t, 3.0, resp.Series[0].Points[0].Value)
 		})
 
+		t.Run("executes resource query", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := newMetricsRequest(t, validBody(map[string]any{"queries": []map[string]any{
+				{
+					"ref_id":      "connections",
+					"metric":      "resources.connections",
+					"aggregation": "count",
+					"group_by":    []string{"state", "health_state"},
+				},
+			}}), aschema.PermissionsSingle("root.**", "request-events", "list"))
+
+			tu.MockRetriever.EXPECT().
+				QueryResourceMetrics(gomock.Any(), gomock.Any()).
+				DoAndReturn(func(_ interface{}, queries []app_metrics.ResourceMetricsQuery) ([]app_metrics.ResourceMetricSeries, error) {
+					require.Len(t, queries, 1)
+					require.Equal(t, "connections", queries[0].RefID)
+					require.Equal(t, app_metrics.ResourceMetricConnectionsCount, queries[0].Metric)
+					require.Equal(t, start, queries[0].Start)
+					require.Equal(t, end, queries[0].End)
+					require.Equal(t, 15*time.Minute, queries[0].Step)
+					require.Equal(t, []string{"root.tenant.**"}, queries[0].NamespaceMatchers)
+					require.Equal(t, "env=prod", queries[0].LabelSelector)
+					require.Equal(t, []app_metrics.ResourceGroupBy{app_metrics.ResourceGroupByState, app_metrics.ResourceGroupByHealthState}, queries[0].GroupBy)
+					return []app_metrics.ResourceMetricSeries{
+						{
+							RefID:  "connections",
+							Labels: map[string]string{"state": "configured", "health_state": "healthy"},
+							Points: []app_metrics.ResourceMetricPoint{{Timestamp: start, Value: 2}},
+						},
+					}, nil
+				})
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp sapi.MetricsQueryResponseJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Len(t, resp.Series, 1)
+			require.Equal(t, "connections", resp.Series[0].RefID)
+			require.Equal(t, "resources.connections", resp.Series[0].Metric)
+			require.Equal(t, "count", resp.Series[0].Aggregation)
+			require.Equal(t, map[string]string{"state": "configured", "health_state": "healthy"}, resp.Series[0].Labels)
+			require.Equal(t, 2.0, resp.Series[0].Points[0].Value)
+		})
+
 		t.Run("namespace is constrained by actor permissions", func(t *testing.T) {
 			w := httptest.NewRecorder()
 			req := newMetricsRequest(t, validBody(map[string]any{"namespace": "root.**"}), aschema.PermissionsSingle("root.tenant.**", "request-events", "list"))
@@ -670,6 +715,7 @@ func TestRequestEventsRoutes(t *testing.T) {
 			{name: "invalid metric", body: validBody(map[string]any{"queries": []map[string]any{{"ref_id": "x", "metric": "nope", "aggregation": "count"}}})},
 			{name: "invalid aggregation", body: validBody(map[string]any{"queries": []map[string]any{{"ref_id": "x", "metric": "request_events", "aggregation": "avg"}}})},
 			{name: "invalid group_by", body: validBody(map[string]any{"queries": []map[string]any{{"ref_id": "x", "metric": "request_events", "aggregation": "count", "group_by": []string{"path"}}}})},
+			{name: "invalid resource group_by", body: validBody(map[string]any{"queries": []map[string]any{{"ref_id": "x", "metric": "resources.actors", "aggregation": "count", "group_by": []string{"state"}}}})},
 			{name: "empty queries", body: validBody(map[string]any{"queries": []map[string]any{}})},
 		}
 

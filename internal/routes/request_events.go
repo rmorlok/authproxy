@@ -3,6 +3,7 @@ package routes
 import (
 	"errors"
 	"net/http"
+	"sort"
 	"time"
 
 	"github.com/gin-gonic/gin"
@@ -264,17 +265,64 @@ func requestEventMetricFromAPI(metric, aggregation string) (app_metrics.RequestE
 	return "", httperr.BadRequestf("unsupported metric aggregation %q/%q", metric, aggregation)
 }
 
-func metricsResponseFromAPIRequest(req sapi.MetricsQueryRequestJson, series []app_metrics.RequestEventMetricSeries) sapi.MetricsQueryResponseJson {
-	refsByID := make(map[string]sapi.MetricsQueryRefJson, len(req.Queries))
-	for _, ref := range req.Queries {
-		refsByID[ref.RefID] = ref
+func metricsQueryToResourceQuery(
+	req sapi.MetricsQueryRequestJson,
+	ref sapi.MetricsQueryRefJson,
+	effectiveNamespaceMatchers []string,
+	step time.Duration,
+) (app_metrics.ResourceMetricsQuery, error) {
+	metric, err := resourceMetricFromAPI(ref.Metric, ref.Aggregation)
+	if err != nil {
+		return app_metrics.ResourceMetricsQuery{}, err
 	}
 
-	out := sapi.MetricsQueryResponseJson{
-		Series: make([]sapi.MetricsSeriesJson, 0, len(series)),
+	groupBy := make([]app_metrics.ResourceGroupBy, 0, len(ref.GroupBy))
+	for _, raw := range ref.GroupBy {
+		gb := app_metrics.ResourceGroupBy(raw)
+		if !app_metrics.IsValidResourceGroupBy(metric, gb) {
+			return app_metrics.ResourceMetricsQuery{}, httperr.BadRequestf("invalid group_by %q", raw)
+		}
+		groupBy = append(groupBy, gb)
 	}
+
+	query := app_metrics.ResourceMetricsQuery{
+		RefID:             ref.RefID,
+		Metric:            metric,
+		Start:             req.Range.Start,
+		End:               req.Range.End,
+		Step:              step,
+		NamespaceMatchers: effectiveNamespaceMatchers,
+		GroupBy:           groupBy,
+	}
+	if req.LabelSelector != nil {
+		query.LabelSelector = *req.LabelSelector
+	}
+	return query, nil
+}
+
+func resourceMetricFromAPI(metric, aggregation string) (app_metrics.ResourceMetric, error) {
+	switch metric {
+	case "resources.connections":
+		if aggregation == "count" {
+			return app_metrics.ResourceMetricConnectionsCount, nil
+		}
+	case "resources.actors":
+		if aggregation == "count" {
+			return app_metrics.ResourceMetricActorsCount, nil
+		}
+	}
+	return "", httperr.BadRequestf("unsupported metric aggregation %q/%q", metric, aggregation)
+}
+
+type metricsResponseSeries struct {
+	RefID  string
+	Labels map[string]string
+	Points []sapi.MetricsPointJson
+}
+
+func requestEventMetricsResponseSeries(series []app_metrics.RequestEventMetricSeries) []metricsResponseSeries {
+	out := make([]metricsResponseSeries, 0, len(series))
 	for _, s := range series {
-		ref := refsByID[s.RefID]
 		points := make([]sapi.MetricsPointJson, 0, len(s.Points))
 		for _, p := range s.Points {
 			points = append(points, sapi.MetricsPointJson{
@@ -282,13 +330,79 @@ func metricsResponseFromAPIRequest(req sapi.MetricsQueryRequestJson, series []ap
 				Value:     p.Value,
 			})
 		}
+		out = append(out, metricsResponseSeries{
+			RefID:  s.RefID,
+			Labels: s.Labels,
+			Points: points,
+		})
+	}
+	return out
+}
+
+func resourceMetricsResponseSeries(series []app_metrics.ResourceMetricSeries) []metricsResponseSeries {
+	out := make([]metricsResponseSeries, 0, len(series))
+	for _, s := range series {
+		points := make([]sapi.MetricsPointJson, 0, len(s.Points))
+		for _, p := range s.Points {
+			points = append(points, sapi.MetricsPointJson{
+				Timestamp: p.Timestamp,
+				Value:     p.Value,
+			})
+		}
+		out = append(out, metricsResponseSeries{
+			RefID:  s.RefID,
+			Labels: s.Labels,
+			Points: points,
+		})
+	}
+	return out
+}
+
+func metricsResponseFromAPIRequest(req sapi.MetricsQueryRequestJson, series []metricsResponseSeries) sapi.MetricsQueryResponseJson {
+	refsByID := make(map[string]sapi.MetricsQueryRefJson, len(req.Queries))
+	refOrder := make(map[string]int, len(req.Queries))
+	for i, ref := range req.Queries {
+		refsByID[ref.RefID] = ref
+		refOrder[ref.RefID] = i
+	}
+	sort.SliceStable(series, func(i, j int) bool {
+		leftOrder := refOrder[series[i].RefID]
+		rightOrder := refOrder[series[j].RefID]
+		if leftOrder != rightOrder {
+			return leftOrder < rightOrder
+		}
+		return metricsSeriesGroupKey(series[i].Labels) < metricsSeriesGroupKey(series[j].Labels)
+	})
+
+	out := sapi.MetricsQueryResponseJson{
+		Series: make([]sapi.MetricsSeriesJson, 0, len(series)),
+	}
+	for _, s := range series {
+		ref := refsByID[s.RefID]
 		out.Series = append(out.Series, sapi.MetricsSeriesJson{
 			RefID:       s.RefID,
 			Metric:      ref.Metric,
 			Aggregation: ref.Aggregation,
 			Labels:      s.Labels,
-			Points:      points,
+			Points:      s.Points,
 		})
+	}
+	return out
+}
+
+func metricsSeriesGroupKey(labels map[string]string) string {
+	if len(labels) == 0 {
+		return ""
+	}
+	keys := make([]string, 0, len(labels))
+	for key := range labels {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+
+	out := ""
+	for _, key := range keys {
+		out += key + "=" + labels[key] + "\x00"
 	}
 	return out
 }
@@ -520,24 +634,56 @@ func (r *RequestEventsRoutes) queryMetrics(gctx *gin.Context) {
 
 	effectiveNamespaceMatchers := val.GetEffectiveNamespaceMatchers(req.Namespace)
 	requestEventQueries := make([]app_metrics.RequestEventMetricsQuery, 0, len(req.Queries))
+	resourceQueries := make([]app_metrics.ResourceMetricsQuery, 0, len(req.Queries))
 	for _, ref := range req.Queries {
-		q, err := metricsQueryToRequestEventQuery(req, ref, effectiveNamespaceMatchers, step)
-		if err != nil {
-			apgin.WriteErr(gctx, nil, err)
-			val.MarkErrorReturn()
-			return
+		if _, err := requestEventMetricFromAPI(ref.Metric, ref.Aggregation); err == nil {
+			q, err := metricsQueryToRequestEventQuery(req, ref, effectiveNamespaceMatchers, step)
+			if err != nil {
+				apgin.WriteErr(gctx, nil, err)
+				val.MarkErrorReturn()
+				return
+			}
+			requestEventQueries = append(requestEventQueries, q)
+			continue
 		}
-		requestEventQueries = append(requestEventQueries, q)
-	}
 
-	series, err := r.rl.QueryRequestEventMetrics(ctx, requestEventQueries)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid metrics query", httperr.WithInternalErr(err)))
+		if _, err := resourceMetricFromAPI(ref.Metric, ref.Aggregation); err == nil {
+			q, err := metricsQueryToResourceQuery(req, ref, effectiveNamespaceMatchers, step)
+			if err != nil {
+				apgin.WriteErr(gctx, nil, err)
+				val.MarkErrorReturn()
+				return
+			}
+			resourceQueries = append(resourceQueries, q)
+			continue
+		}
+
+		apgin.WriteError(gctx, nil, httperr.BadRequestf("unsupported metric aggregation %q/%q", ref.Metric, ref.Aggregation))
 		val.MarkErrorReturn()
 		return
 	}
 
-	gctx.PureJSON(http.StatusOK, metricsResponseFromAPIRequest(req, series))
+	responseSeries := make([]metricsResponseSeries, 0)
+	if len(requestEventQueries) > 0 {
+		series, err := r.rl.QueryRequestEventMetrics(ctx, requestEventQueries)
+		if err != nil {
+			apgin.WriteError(gctx, nil, httperr.BadRequest("invalid metrics query", httperr.WithInternalErr(err)))
+			val.MarkErrorReturn()
+			return
+		}
+		responseSeries = append(responseSeries, requestEventMetricsResponseSeries(series)...)
+	}
+	if len(resourceQueries) > 0 {
+		series, err := r.rl.QueryResourceMetrics(ctx, resourceQueries)
+		if err != nil {
+			apgin.WriteError(gctx, nil, httperr.BadRequest("invalid metrics query", httperr.WithInternalErr(err)))
+			val.MarkErrorReturn()
+			return
+		}
+		responseSeries = append(responseSeries, resourceMetricsResponseSeries(series)...)
+	}
+
+	gctx.PureJSON(http.StatusOK, metricsResponseFromAPIRequest(req, responseSeries))
 }
 
 func (r *RequestEventsRoutes) Register(g gin.IRouter) {
