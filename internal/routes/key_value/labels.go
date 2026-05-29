@@ -13,6 +13,7 @@ package key_value
 
 import (
 	"github.com/rmorlok/authproxy/internal/database"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 )
 
 // Resource is the minimal contract a fetched resource must satisfy so the
@@ -68,13 +69,8 @@ var Annotation = Kind{
 
 // KeyValueJson is a single key/value pair returned by the get-one and
 // put endpoints for both labels and annotations.
-type KeyValueJson struct {
-	Key   string `json:"key"`
-	Value string `json:"value"`
-}
+type KeyValueJson = schemaapi.KeyValueJson
 
 // PutKeyValueRequestJson is the request body for PUT
 // /<resource>/<id>/labels/<key> and the annotation equivalent.
-type PutKeyValueRequestJson struct {
-	Value string `json:"value"`
-}
+type PutKeyValueRequestJson = schemaapi.PutKeyValueRequestJson

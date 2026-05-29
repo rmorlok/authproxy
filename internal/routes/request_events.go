@@ -16,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/httpf"
 	sapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -145,10 +146,56 @@ func (q *ListRequestEventsQuery) ApplyToBuilder(
 	return b, nil
 }
 
-type ListRequestEventsResponseJson struct {
-	Items  []*app_metrics.LogRecord `json:"items"`
-	Cursor string                   `json:"cursor,omitempty"`
-	Total  *int64                   `json:"total,omitempty"`
+type ListRequestEventsResponseJson = sapi.ListRequestEventsResponseJson
+
+func requestEventToJson(r *app_metrics.LogRecord) *sapi.RequestEventJson {
+	if r == nil {
+		return nil
+	}
+
+	matches := make([]sapi.RequestEventRateLimit, len(r.RateLimitMatched))
+	for i, m := range r.RateLimitMatched {
+		matches[i] = sapi.RequestEventRateLimit{
+			Id:     m.Id,
+			Mode:   m.Mode,
+			Bucket: m.Bucket,
+		}
+	}
+
+	return &sapi.RequestEventJson{
+		Namespace:           r.Namespace,
+		Type:                string(r.Type),
+		RequestId:           r.RequestId,
+		CorrelationId:       r.CorrelationId,
+		Timestamp:           r.Timestamp,
+		MillisecondDuration: int64(r.MillisecondDuration.Duration() / time.Millisecond),
+		ConnectionId:        r.ConnectionId,
+		ConnectorId:         r.ConnectorId,
+		ConnectorVersion:    r.ConnectorVersion,
+		Method:              r.Method,
+		Host:                r.Host,
+		Scheme:              r.Scheme,
+		Path:                r.Path,
+		RequestHttpVersion:  r.RequestHttpVersion,
+		RequestSizeBytes:    r.RequestSizeBytes,
+		RequestMimeType:     r.RequestMimeType,
+		RequestBodySkipped:  string(r.RequestBodySkipped),
+		ResponseStatusCode:  r.ResponseStatusCode,
+		ResponseError:       r.ResponseError,
+		ResponseHttpVersion: r.ResponseHttpVersion,
+		ResponseSizeBytes:   r.ResponseSizeBytes,
+		ResponseMimeType:    r.ResponseMimeType,
+		ResponseBodySkipped: string(r.ResponseBodySkipped),
+		InternalTimeout:     r.InternalTimeout,
+		RequestCancelled:    r.RequestCancelled,
+		FullRequestRecorded: r.FullRequestRecorded,
+		Labels:              r.Labels,
+		ResponseSource:      string(r.ResponseSource),
+		RateLimitId:         r.RateLimitId,
+		RateLimitMode:       r.RateLimitMode,
+		RateLimitBucket:     r.RateLimitBucket,
+		RateLimitMatched:    matches,
+	}
 }
 
 func metricsQueryToRequestEventQuery(
@@ -396,7 +443,7 @@ func (r *RequestEventsRoutes) list(gctx *gin.Context) {
 	}
 
 	gctx.PureJSON(200, &ListRequestEventsResponseJson{
-		Items:  auth.FilterForValidatedResources(val, result.Results),
+		Items:  util.Map(auth.FilterForValidatedResources(val, result.Results), requestEventToJson),
 		Cursor: result.Cursor,
 		Total:  result.Total,
 	})

@@ -95,6 +95,20 @@ func TestSchemaSamples(t *testing.T) {
 		{name: "list encryption keys", ref: "./schema.json#/$defs/ListEncryptionKeysResponse", file: "valid-list-encryption-keys.json"},
 		{name: "create encryption key", ref: "./schema.json#/$defs/CreateEncryptionKeyRequest", file: "valid-create-encryption-key.json"},
 		{name: "update encryption key", ref: "./schema.json#/$defs/UpdateEncryptionKeyRequest", file: "valid-update-encryption-key.json"},
+		{name: "session initiate params", ref: "./schema.json#/$defs/SessionInitiateParams", file: "valid-session-initiate-params.json"},
+		{name: "session initiate failure", ref: "./schema.json#/$defs/SessionInitiateFailureResponse", file: "valid-session-initiate-failure-response.json"},
+		{name: "session initiate success", ref: "./schema.json#/$defs/SessionInitiateSuccessResponse", file: "valid-session-initiate-success-response.json"},
+		{name: "key value", ref: "./schema.json#/$defs/KeyValue", file: "valid-key-value.json"},
+		{name: "put key value", ref: "./schema.json#/$defs/PutKeyValueRequest", file: "valid-put-key-value.json"},
+		{name: "request event", ref: "./schema.json#/$defs/RequestEvent", file: "valid-request-event.json"},
+		{name: "list request events", ref: "./schema.json#/$defs/ListRequestEventsResponse", file: "valid-list-request-events.json"},
+		{name: "task info", ref: "./schema.json#/$defs/TaskInfo", file: "valid-task-info.json"},
+		{name: "list queues", ref: "./schema.json#/$defs/ListQueuesResponse", file: "valid-list-queues.json"},
+		{name: "list monitoring tasks", ref: "./schema.json#/$defs/ListMonitoringTasksResponse", file: "valid-list-monitoring-tasks.json"},
+		{name: "list servers", ref: "./schema.json#/$defs/ListServersResponse", file: "valid-list-servers.json"},
+		{name: "list scheduler entries", ref: "./schema.json#/$defs/ListSchedulerEntriesResponse", file: "valid-list-scheduler-entries.json"},
+		{name: "list queue history", ref: "./schema.json#/$defs/ListQueueHistoryResponse", file: "valid-list-queue-history.json"},
+		{name: "bulk action", ref: "./schema.json#/$defs/BulkActionResponse", file: "valid-bulk-action-response.json"},
 	}
 
 	for _, tt := range tests {

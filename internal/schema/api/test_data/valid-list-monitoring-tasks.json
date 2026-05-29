@@ -1,0 +1,14 @@
+{
+  "items": [
+    {
+      "id": "task-1",
+      "queue": "default",
+      "type": "sync",
+      "payload": "{\"id\":\"1\"}",
+      "state": "pending",
+      "max_retry": 5,
+      "retried": 1
+    }
+  ],
+  "cursor": "next"
+}

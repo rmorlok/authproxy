@@ -1,0 +1,10 @@
+{
+  "items": [
+    {
+      "id": "entry-1",
+      "spec": "@every 1m",
+      "task_type": "sync",
+      "next": "2026-01-02T03:04:05Z"
+    }
+  ]
+}

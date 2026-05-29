@@ -41,6 +41,11 @@ type SwaggerCreateRateLimitRequest = schemaapiopenapi.CreateRateLimitRequestJson
 type SwaggerUpdateRateLimitRequest = schemaapiopenapi.UpdateRateLimitRequestJson
 type SwaggerDryRunRequest = schemaapiopenapi.DryRunRequestJson
 type SwaggerDryRunResponse = schemaapiopenapi.DryRunResponseJson
+type SwaggerRequestEventsEntry = schemaapiopenapi.RequestEventJson
+type SwaggerListRequestEventsResponse = schemaapiopenapi.ListRequestEventsResponseJson
+type SwaggerKeyValueJson = schemaapi.KeyValueJson
+type SwaggerPutKeyValueRequest = schemaapi.PutKeyValueRequestJson
+type SwaggerTaskInfoJson = schemaapiopenapi.TaskInfoJson
 
 // ProxyRequest represents a request to proxy through a connection.
 //
@@ -102,42 +107,6 @@ type SwaggerConnectionJson struct {
 	UpdatedAt time.Time `json:"updated_at"`
 }
 
-// SwaggerRequestEventsEntry is a simplified request events entry for swagger documentation
-//
-//	@Description	HTTP request events entry
-type SwaggerRequestEventsEntry struct {
-	// Namespace of the connection
-	Namespace string `json:"namespace" example:"acme"`
-	// Request type (proxy, oauth, probe)
-	Type string `json:"type" example:"proxy"`
-	// Request UUID
-	RequestId apid.ID `swaggertype:"string" json:"request_id" example:"req_test550e8400abcde"`
-	// Correlation ID for tracing
-	CorrelationId string `json:"correlation_id,omitempty"`
-	// Request timestamp
-	Timestamp time.Time `json:"timestamp"`
-	// Duration in milliseconds
-	Duration int64 `json:"duration" example:"150"`
-	// Connection UUID
-	ConnectionId apid.ID `swaggertype:"string" json:"connection_id,omitempty"`
-	// Connector UUID
-	ConnectorId apid.ID `swaggertype:"string" json:"connector_id,omitempty"`
-	// Connector version
-	ConnectorVersion uint64 `json:"connector_version,omitempty"`
-	// HTTP method
-	Method string `json:"method" example:"GET"`
-	// Target host
-	Host string `json:"host" example:"api.example.com"`
-	// URL scheme
-	Scheme string `json:"scheme" example:"https"`
-	// Request path
-	Path string `json:"path" example:"/v1/users"`
-	// HTTP response status code
-	ResponseStatusCode int `json:"response_status_code" example:"200"`
-	// Labels associated with the request (merged from connection and per-request labels)
-	Labels map[string]string `json:"labels,omitempty"`
-}
-
 // SwaggerListConnectionResponse is the response for list connections
 //
 //	@Description	Paginated list of connections
@@ -156,18 +125,6 @@ type SwaggerDisconnectResponse struct {
 	TaskId string `json:"task_id"`
 	// Connection being disconnected
 	Connection SwaggerConnectionJson `json:"connection"`
-}
-
-// SwaggerListRequestEventsResponse is the response for listing request events
-//
-//	@Description	Paginated list of request events entries
-type SwaggerListRequestEventsResponse struct {
-	// List of request events entries
-	Items []SwaggerRequestEventsEntry `json:"items"`
-	// Pagination cursor for next page
-	Cursor string `json:"cursor,omitempty"`
-	// Total count of matching records (if requested)
-	Total *int64 `json:"total,omitempty"`
 }
 
 // SwaggerForceStateRequest is the request to force a connection state
@@ -194,24 +151,4 @@ type SwaggerUpdateConnectionRequest struct {
 	Labels map[string]string `json:"labels,omitempty"`
 	// Annotations to set on the connection (replaces all existing annotations)
 	Annotations map[string]string `json:"annotations,omitempty"`
-}
-
-// SwaggerKeyValueJson is a single key-value pair, used by both label
-// and annotation endpoints across all resource types.
-//
-//	@Description	Key-value pair (label or annotation)
-type SwaggerKeyValueJson struct {
-	// Key
-	Key string `json:"key" example:"env"`
-	// Value
-	Value string `json:"value" example:"production"`
-}
-
-// SwaggerPutKeyValueRequest is the body for PUT label/annotation
-// endpoints across all resource types.
-//
-//	@Description	Request to set a label or annotation value
-type SwaggerPutKeyValueRequest struct {
-	// Value to set
-	Value string `json:"value" example:"production"`
 }

@@ -7360,7 +7360,7 @@ const docTemplateApi = `{
                         "in": "body",
                         "required": true,
                         "schema": {
-                            "$ref": "#/definitions/routes.InitiateParams"
+                            "$ref": "#/definitions/routes.SessionInitiateParams"
                         }
                     }
                 ],
@@ -7368,7 +7368,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.InitiateSuccessResponse"
+                            "$ref": "#/definitions/routes.SessionInitiateSuccessResponse"
                         }
                     },
                     "400": {
@@ -7380,7 +7380,7 @@ const docTemplateApi = `{
                     "401": {
                         "description": "Unauthorized",
                         "schema": {
-                            "$ref": "#/definitions/routes.InitiateFailureResponse"
+                            "$ref": "#/definitions/routes.SessionInitiateFailureResponse"
                         }
                     },
                     "500": {
@@ -7453,7 +7453,7 @@ const docTemplateApi = `{
                     "200": {
                         "description": "OK",
                         "schema": {
-                            "$ref": "#/definitions/routes.TaskInfoJson"
+                            "$ref": "#/definitions/routes.SwaggerTaskInfoJson"
                         }
                     },
                     "400": {
@@ -7978,31 +7978,6 @@ const docTemplateApi = `{
                 }
             }
         },
-        "routes.InitiateFailureResponse": {
-            "type": "object",
-            "properties": {
-                "redirect_url": {
-                    "type": "string"
-                }
-            }
-        },
-        "routes.InitiateParams": {
-            "type": "object",
-            "properties": {
-                "return_to_url": {
-                    "type": "string"
-                }
-            }
-        },
-        "routes.InitiateSuccessResponse": {
-            "type": "object",
-            "properties": {
-                "actor_id": {
-                    "description": "This should include any configuration the SPA needs",
-                    "type": "string"
-                }
-            }
-        },
         "routes.ProxyRequest": {
             "description": "Request to proxy an HTTP request through a connection",
             "type": "object",
@@ -8084,6 +8059,33 @@ const docTemplateApi = `{
             "properties": {
                 "return_to_url": {
                     "type": "string"
+                }
+            }
+        },
+        "routes.SessionInitiateFailureResponse": {
+            "type": "object",
+            "properties": {
+                "redirect_url": {
+                    "type": "string",
+                    "example": "https://example.com/auth"
+                }
+            }
+        },
+        "routes.SessionInitiateParams": {
+            "type": "object",
+            "properties": {
+                "return_to_url": {
+                    "type": "string",
+                    "example": "https://example.com/return"
+                }
+            }
+        },
+        "routes.SessionInitiateSuccessResponse": {
+            "type": "object",
+            "properties": {
+                "actor_id": {
+                    "type": "string",
+                    "example": "act_test550e8400abcde"
                 }
             }
         },
@@ -8460,16 +8462,13 @@ const docTemplateApi = `{
             }
         },
         "routes.SwaggerKeyValueJson": {
-            "description": "Key-value pair (label or annotation)",
             "type": "object",
             "properties": {
                 "key": {
-                    "description": "Key",
                     "type": "string",
                     "example": "env"
                 },
                 "value": {
-                    "description": "Value",
                     "type": "string",
                     "example": "production"
                 }
@@ -8557,18 +8556,13 @@ const docTemplateApi = `{
             "type": "object",
             "properties": {
                 "cursor": {
-                    "description": "Pagination cursor for next page",
                     "type": "string"
                 },
                 "items": {
-                    "description": "List of request events entries",
                     "type": "array",
-                    "items": {
-                        "$ref": "#/definitions/routes.SwaggerRequestEventsEntry"
-                    }
+                    "items": {}
                 },
                 "total": {
-                    "description": "Total count of matching records (if requested)",
                     "type": "integer"
                 }
             }
@@ -8610,11 +8604,9 @@ const docTemplateApi = `{
             }
         },
         "routes.SwaggerPutKeyValueRequest": {
-            "description": "Request to set a label or annotation value",
             "type": "object",
             "properties": {
                 "value": {
-                    "description": "Value to set",
                     "type": "string",
                     "example": "production"
                 }
@@ -8661,76 +8653,100 @@ const docTemplateApi = `{
             "type": "object",
             "properties": {
                 "connection_id": {
-                    "description": "Connection UUID",
                     "type": "string"
                 },
                 "connector_id": {
-                    "description": "Connector UUID",
                     "type": "string"
                 },
                 "connector_version": {
-                    "description": "Connector version",
                     "type": "integer"
                 },
                 "correlation_id": {
-                    "description": "Correlation ID for tracing",
                     "type": "string"
                 },
                 "duration": {
-                    "description": "Duration in milliseconds",
                     "type": "integer",
                     "example": 150
                 },
                 "host": {
-                    "description": "Target host",
                     "type": "string",
                     "example": "api.example.com"
                 },
                 "labels": {
-                    "description": "Labels associated with the request (merged from connection and per-request labels)",
                     "type": "object",
                     "additionalProperties": {
                         "type": "string"
                     }
                 },
                 "method": {
-                    "description": "HTTP method",
                     "type": "string",
                     "example": "GET"
                 },
                 "namespace": {
-                    "description": "Namespace of the connection",
                     "type": "string",
-                    "example": "acme"
+                    "example": "root.acme"
                 },
                 "path": {
-                    "description": "Request path",
                     "type": "string",
                     "example": "/v1/users"
                 },
+                "rate_limit_bucket": {
+                    "type": "object",
+                    "additionalProperties": {
+                        "type": "string"
+                    }
+                },
+                "rate_limit_id": {
+                    "type": "string"
+                },
+                "rate_limit_matched": {
+                    "type": "array",
+                    "items": {}
+                },
+                "rate_limit_mode": {
+                    "type": "string"
+                },
                 "request_id": {
-                    "description": "Request UUID",
                     "type": "string",
                     "example": "req_test550e8400abcde"
                 },
+                "response_source": {
+                    "type": "string",
+                    "example": "upstream"
+                },
                 "response_status_code": {
-                    "description": "HTTP response status code",
                     "type": "integer",
                     "example": 200
                 },
                 "scheme": {
-                    "description": "URL scheme",
                     "type": "string",
                     "example": "https"
                 },
                 "timestamp": {
-                    "description": "Request timestamp",
                     "type": "string"
                 },
                 "type": {
-                    "description": "Request type (proxy, oauth, probe)",
                     "type": "string",
                     "example": "proxy"
+                }
+            }
+        },
+        "routes.SwaggerTaskInfoJson": {
+            "description": "Background task status",
+            "type": "object",
+            "properties": {
+                "id": {
+                    "type": "string"
+                },
+                "state": {
+                    "type": "string",
+                    "example": "completed"
+                },
+                "type": {
+                    "type": "string"
+                },
+                "updated_at": {
+                    "type": "string"
                 }
             }
         },
@@ -8816,34 +8832,6 @@ const docTemplateApi = `{
                     }
                 }
             }
-        },
-        "routes.TaskInfoJson": {
-            "type": "object",
-            "properties": {
-                "id": {
-                    "type": "string"
-                },
-                "state": {
-                    "$ref": "#/definitions/routes.TaskState"
-                },
-                "type": {
-                    "type": "string"
-                },
-                "updated_at": {
-                    "type": "string"
-                }
-            }
-        },
-        "routes.TaskState": {
-            "type": "string",
-            "enum": [
-                "unknown",
-                "active"
-            ],
-            "x-enum-varnames": [
-                "TaskStateUnknown",
-                "TaskStateActive"
-            ]
         },
         "routes.UpdateActorRequestJson": {
             "description": "Actor update request",

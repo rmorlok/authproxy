@@ -1,0 +1,25 @@
+{
+  "items": [
+    {
+      "id": "srv-1",
+      "host": "worker.local",
+      "pid": 1234,
+      "concurrency": 10,
+      "queues": {
+        "default": 1
+      },
+      "strict_priority": false,
+      "started": "2026-01-02T03:04:05Z",
+      "status": "active",
+      "active_workers": [
+        {
+          "task_id": "task-1",
+          "task_type": "sync",
+          "queue": "default",
+          "started": "2026-01-02T03:04:05Z",
+          "deadline": "2026-01-02T03:05:05Z"
+        }
+      ]
+    }
+  ]
+}

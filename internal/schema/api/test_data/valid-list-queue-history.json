@@ -1,0 +1,10 @@
+{
+  "items": [
+    {
+      "queue": "default",
+      "processed": 10,
+      "failed": 1,
+      "date": "2026-01-02"
+    }
+  ]
+}
