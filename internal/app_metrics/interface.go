@@ -14,4 +14,5 @@ type LogRetriever interface {
 	NewListRequestsBuilder() ListRequestBuilder
 	ListRequestsFromCursor(ctx context.Context, cursor string) (ListRequestExecutor, error)
 	QueryRequestEventMetrics(ctx context.Context, queries []RequestEventMetricsQuery) ([]RequestEventMetricSeries, error)
+	QueryResourceMetrics(ctx context.Context, queries []ResourceMetricsQuery) ([]ResourceMetricSeries, error)
 }

@@ -44,6 +44,9 @@ type RecordRetriever interface {
 
 	// QueryRequestEventMetrics executes time-series metric queries over request events.
 	QueryRequestEventMetrics(ctx context.Context, queries []RequestEventMetricsQuery) ([]RequestEventMetricSeries, error)
+
+	// QueryResourceMetrics executes time-series metric queries over resource samples.
+	QueryResourceMetrics(ctx context.Context, queries []ResourceMetricsQuery) ([]ResourceMetricSeries, error)
 }
 
 // ResourceSampleRetriever queries point-in-time resource samples for app metrics.

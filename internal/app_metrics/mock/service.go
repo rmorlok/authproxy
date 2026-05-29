@@ -94,3 +94,18 @@ func (mr *MockLogRetrieverMockRecorder) QueryRequestEventMetrics(ctx, queries in
 	mr.mock.ctrl.T.Helper()
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryRequestEventMetrics", reflect.TypeOf((*MockLogRetriever)(nil).QueryRequestEventMetrics), ctx, queries)
 }
+
+// QueryResourceMetrics mocks base method.
+func (m *MockLogRetriever) QueryResourceMetrics(ctx context.Context, queries []app_metrics.ResourceMetricsQuery) ([]app_metrics.ResourceMetricSeries, error) {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "QueryResourceMetrics", ctx, queries)
+	ret0, _ := ret[0].([]app_metrics.ResourceMetricSeries)
+	ret1, _ := ret[1].(error)
+	return ret0, ret1
+}
+
+// QueryResourceMetrics indicates an expected call of QueryResourceMetrics.
+func (mr *MockLogRetrieverMockRecorder) QueryResourceMetrics(ctx, queries interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "QueryResourceMetrics", reflect.TypeOf((*MockLogRetriever)(nil).QueryResourceMetrics), ctx, queries)
+}

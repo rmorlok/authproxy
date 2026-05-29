@@ -248,12 +248,34 @@ func (r *sqlRecordRetriever) ListActorResourceSamples(ctx context.Context, query
 	return fetchActorResourceSamples(ctx, r.db, r.placeholderFormat, r.provider, query)
 }
 
+func (r *sqlRecordRetriever) QueryResourceMetrics(ctx context.Context, queries []ResourceMetricsQuery) ([]ResourceMetricSeries, error) {
+	return executeResourceMetricsQueries(ctx, queries,
+		func(ctx context.Context, query ResourceMetricsQuery) ([]*ConnectionResourceSample, error) {
+			return fetchConnectionResourceSamples(ctx, r.db, r.placeholderFormat, r.provider, resourceMetricsSampleQuery(query))
+		},
+		func(ctx context.Context, query ResourceMetricsQuery) ([]*ActorResourceSample, error) {
+			return fetchActorResourceSamples(ctx, r.db, r.placeholderFormat, r.provider, resourceMetricsSampleQuery(query))
+		},
+	)
+}
+
 func (r *clickhouseRecordRetriever) ListConnectionResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ConnectionResourceSample, error) {
 	return fetchConnectionResourceSamples(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, query)
 }
 
 func (r *clickhouseRecordRetriever) ListActorResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ActorResourceSample, error) {
 	return fetchActorResourceSamples(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, query)
+}
+
+func (r *clickhouseRecordRetriever) QueryResourceMetrics(ctx context.Context, queries []ResourceMetricsQuery) ([]ResourceMetricSeries, error) {
+	return executeResourceMetricsQueries(ctx, queries,
+		func(ctx context.Context, query ResourceMetricsQuery) ([]*ConnectionResourceSample, error) {
+			return fetchConnectionResourceSamples(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, resourceMetricsSampleQuery(query))
+		},
+		func(ctx context.Context, query ResourceMetricsQuery) ([]*ActorResourceSample, error) {
+			return fetchActorResourceSamples(ctx, r.db, sq.Question, config.DatabaseProviderClickhouse, resourceMetricsSampleQuery(query))
+		},
+	)
 }
 
 func fetchConnectionResourceSamples(
