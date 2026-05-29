@@ -26,7 +26,6 @@ name: Deploy Demo
 #       AWS_REGION    : e.g. us-east-1
 #       EKS_CLUSTER   : e.g. authproxy-eks
 #       DEMO_HOSTNAME : e.g. demo.authproxy.net
-#       ACME_EMAIL    : LE registration email
 
 on:
   push:
@@ -132,7 +131,6 @@ jobs:
             --namespace "${RELEASE_NS}" --create-namespace \
             --wait --timeout 10m \
             --set "global.hostname=${{ vars.DEMO_HOSTNAME }}" \
-            --set "global.acmeEmail=${{ vars.ACME_EMAIL }}" \
             --set "authproxy.image.tag=${{ steps.tag.outputs.tag }}" \
             --set "demoShell.image.tag=${{ steps.tag.outputs.tag }}" \
             --set "seed.image.tag=${{ steps.tag.outputs.tag }}"

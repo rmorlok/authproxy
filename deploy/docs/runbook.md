@@ -183,7 +183,10 @@ image tag pinned to that commit's `sha-<short>`. One-time setup:
    | `AWS_REGION`    | `us-east-1`      |
    | `EKS_CLUSTER`   | `authproxy-eks`  |
    | `DEMO_HOSTNAME` | `demo.authproxy.net` |
-   | `ACME_EMAIL`    | `you@example.com`|
+
+   (The Let's Encrypt email is configured on the bootstrap chart's
+   ClusterIssuer at install time — see Section 1.8 — and isn't
+   re-passed per deploy.)
 
    `AWS_ROLE_ARN` should already be set as a Secret from Section 1.6.
 
