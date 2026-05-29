@@ -17,6 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
+	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -30,6 +31,13 @@ type DryRunContextJson = schemaapi.DryRunContextJson
 type DryRunResponseJson = schemaapi.DryRunResponseJson
 type DryRunMatchJson = schemaapi.DryRunMatchJson
 type DryRunNotMatchedJson = schemaapi.DryRunNotMatchedJson
+
+type OpenAPIRateLimitJson = schemaapiopenapi.RateLimitJson
+type OpenAPIListRateLimitsResponseJson = schemaapiopenapi.ListRateLimitsResponseJson
+type OpenAPICreateRateLimitRequestJson = schemaapiopenapi.CreateRateLimitRequestJson
+type OpenAPIUpdateRateLimitRequestJson = schemaapiopenapi.UpdateRateLimitRequestJson
+type OpenAPIDryRunRequestJson = schemaapiopenapi.DryRunRequestJson
+type OpenAPIDryRunResponseJson = schemaapiopenapi.DryRunResponseJson
 
 type ListRateLimitsRequestQueryParams struct {
 	Cursor        *string `form:"cursor"`
@@ -116,7 +124,7 @@ func dryRunResponseFromCore(res coreIface.DryRunRateLimitResult) DryRunResponseJ
 // @Accept			json
 // @Produce		json
 // @Param			id	path		string	true	"Rate limit ID"
-// @Success		200		{object}	SwaggerRateLimitJson
+// @Success		200		{object}	OpenAPIRateLimitJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -159,8 +167,8 @@ func (r *RateLimitsRoutes) get(gctx *gin.Context) {
 // @Tags			rate_limits
 // @Accept			json
 // @Produce		json
-// @Param			request	body		SwaggerCreateRateLimitRequest	true	"Rate limit creation request"
-// @Success		200		{object}	SwaggerRateLimitJson
+// @Param			request	body		OpenAPICreateRateLimitRequestJson	true	"Rate limit creation request"
+// @Success		200		{object}	OpenAPIRateLimitJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
@@ -231,7 +239,7 @@ func (r *RateLimitsRoutes) create(gctx *gin.Context) {
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			label_selector	query		string	false	"Filter by label selector"
 // @Param			order_by		query		string	false	"Order by field (e.g., 'created_at:desc')"
-// @Success		200				{object}	SwaggerListRateLimitsResponse
+// @Success		200				{object}	OpenAPIListRateLimitsResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
 // @Failure		500				{object}	ErrorResponse
@@ -310,8 +318,8 @@ func (r *RateLimitsRoutes) list(gctx *gin.Context) {
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string							true	"Rate limit ID"
-// @Param			request	body		SwaggerUpdateRateLimitRequest		true	"Update request"
-// @Success		200		{object}	SwaggerRateLimitJson
+// @Param			request	body		OpenAPIUpdateRateLimitRequestJson		true	"Update request"
+// @Success		200		{object}	OpenAPIRateLimitJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -481,8 +489,8 @@ func (r *RateLimitsRoutes) delete(gctx *gin.Context) {
 // @Tags			rate_limits
 // @Accept			json
 // @Produce		json
-// @Param			request	body		SwaggerDryRunRequest	true	"Dry-run input"
-// @Success		200		{object}	SwaggerDryRunResponse
+// @Param			request	body		OpenAPIDryRunRequestJson	true	"Dry-run input"
+// @Success		200		{object}	OpenAPIDryRunResponseJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -549,7 +557,7 @@ func (r *RateLimitsRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.Handle
 // @Produce		json
 // @Param			id		path		string	true	"Rate limit ID"
 // @Param			label	path		string	true	"Label key"
-// @Success		200		{object}	SwaggerKeyValueJson
+// @Success		200		{object}	KeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -565,8 +573,8 @@ func (r *RateLimitsRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.HandleG
 // @Produce		json
 // @Param			id		path		string						true	"Rate limit ID"
 // @Param			label	path		string						true	"Label key"
-// @Param			request	body		SwaggerPutKeyValueRequest	true	"Label value"
-// @Success		200		{object}	SwaggerKeyValueJson
+// @Param			request	body		PutKeyValueRequestJson	true	"Label value"
+// @Success		200		{object}	KeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -610,7 +618,7 @@ func (r *RateLimitsRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapter.H
 // @Produce		json
 // @Param			id			path		string	true	"Rate limit ID"
 // @Param			annotation	path		string	true	"Annotation key"
-// @Success		200			{object}	SwaggerKeyValueJson
+// @Success		200			{object}	KeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		404			{object}	ErrorResponse
@@ -626,8 +634,8 @@ func (r *RateLimitsRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapter.Ha
 // @Produce		json
 // @Param			id			path		string						true	"Rate limit ID"
 // @Param			annotation	path		string						true	"Annotation key"
-// @Param			request		body		SwaggerPutKeyValueRequest	true	"Annotation value"
-// @Success		200			{object}	SwaggerKeyValueJson
+// @Param			request		body		PutKeyValueRequestJson	true	"Annotation value"
+// @Success		200			{object}	KeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		403			{object}	ErrorResponse

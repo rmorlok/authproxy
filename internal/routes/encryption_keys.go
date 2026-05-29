@@ -17,6 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
+	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -25,6 +26,9 @@ type EncryptionKeyJson = schemaapi.EncryptionKeyJson
 type CreateEncryptionKeyRequestJson = schemaapi.CreateEncryptionKeyRequestJson
 type UpdateEncryptionKeyRequestJson = schemaapi.UpdateEncryptionKeyRequestJson
 type ListEncryptionKeysResponseJson = schemaapi.ListEncryptionKeysResponseJson
+
+type OpenAPIListEncryptionKeysResponseJson = schemaapiopenapi.ListEncryptionKeysResponseJson
+type OpenAPIUpdateEncryptionKeyRequestJson = schemaapiopenapi.UpdateEncryptionKeyRequestJson
 
 type ListEncryptionKeysRequestQueryParams struct {
 	Cursor        *string                      `form:"cursor"`
@@ -61,7 +65,7 @@ type EncryptionKeysRoutes struct {
 // @Accept			json
 // @Produce		json
 // @Param			id	path		string	true	"Encryption key ID"
-// @Success		200		{object}	SwaggerEncryptionKeyJson
+// @Success		200		{object}	EncryptionKeyJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -107,7 +111,7 @@ func (r *EncryptionKeysRoutes) get(gctx *gin.Context) {
 // @Accept			json
 // @Produce		json
 // @Param			request	body		CreateEncryptionKeyRequestJson	true	"Encryption key creation request"
-// @Success		200		{object}	SwaggerEncryptionKeyJson
+// @Success		200		{object}	EncryptionKeyJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		500		{object}	ErrorResponse
@@ -181,7 +185,7 @@ func (r *EncryptionKeysRoutes) create(gctx *gin.Context) {
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			label_selector	query		string	false	"Filter by label selector"
 // @Param			order_by		query		string	false	"Order by field (e.g., 'state:asc')"
-// @Success		200				{object}	SwaggerListEncryptionKeysResponse
+// @Success		200				{object}	OpenAPIListEncryptionKeysResponseJson
 // @Failure		400				{object}	ErrorResponse
 // @Failure		401				{object}	ErrorResponse
 // @Failure		500				{object}	ErrorResponse
@@ -265,8 +269,8 @@ func (r *EncryptionKeysRoutes) list(gctx *gin.Context) {
 // @Accept			json
 // @Produce		json
 // @Param			id		path		string								true	"Encryption key ID"
-// @Param			request	body		SwaggerUpdateEncryptionKeyRequest		true	"Update request"
-// @Success		200		{object}	SwaggerEncryptionKeyJson
+// @Param			request	body		OpenAPIUpdateEncryptionKeyRequestJson		true	"Update request"
+// @Success		200		{object}	EncryptionKeyJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -482,7 +486,7 @@ func (r *EncryptionKeysRoutes) getLabels(gctx *gin.Context) { r.labelsAdapter.Ha
 // @Produce		json
 // @Param			id		path		string	true	"Encryption key ID"
 // @Param			label	path		string	true	"Label key"
-// @Success		200		{object}	SwaggerKeyValueJson
+// @Success		200		{object}	KeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		404		{object}	ErrorResponse
@@ -498,8 +502,8 @@ func (r *EncryptionKeysRoutes) getLabel(gctx *gin.Context) { r.labelsAdapter.Han
 // @Produce		json
 // @Param			id		path		string						true	"Encryption key ID"
 // @Param			label	path		string						true	"Label key"
-// @Param			request	body		SwaggerPutKeyValueRequest	true	"Label value"
-// @Success		200		{object}	SwaggerKeyValueJson
+// @Param			request	body		PutKeyValueRequestJson	true	"Label value"
+// @Success		200		{object}	KeyValueJson
 // @Failure		400		{object}	ErrorResponse
 // @Failure		401		{object}	ErrorResponse
 // @Failure		403		{object}	ErrorResponse
@@ -543,7 +547,7 @@ func (r *EncryptionKeysRoutes) getAnnotations(gctx *gin.Context) { r.annotsAdapt
 // @Produce		json
 // @Param			id			path		string	true	"Encryption key ID"
 // @Param			annotation	path		string	true	"Annotation key"
-// @Success		200			{object}	SwaggerKeyValueJson
+// @Success		200			{object}	KeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		404			{object}	ErrorResponse
@@ -559,8 +563,8 @@ func (r *EncryptionKeysRoutes) getAnnotation(gctx *gin.Context) { r.annotsAdapte
 // @Produce		json
 // @Param			id			path		string						true	"Encryption key ID"
 // @Param			annotation	path		string						true	"Annotation key"
-// @Param			request		body		SwaggerPutKeyValueRequest	true	"Annotation value"
-// @Success		200			{object}	SwaggerKeyValueJson
+// @Param			request		body		PutKeyValueRequestJson	true	"Annotation value"
+// @Success		200			{object}	KeyValueJson
 // @Failure		400			{object}	ErrorResponse
 // @Failure		401			{object}	ErrorResponse
 // @Failure		403			{object}	ErrorResponse

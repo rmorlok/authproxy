@@ -9,3 +9,5 @@
 - `api`: API request/response DTOs.
 
 Resource packages are intentionally separate from API DTOs. API models can compose resources, but resources must not depend on API-specific request or response wrappers.
+
+`./scripts/check-schema-layout.sh` enforces the highest-risk boundaries in preflight: resource packages cannot import `internal/schema/api`, route-local public API request/response DTOs are rejected, and Swagger-only route models must stay in `internal/schema/api/openapi`.

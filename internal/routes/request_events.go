@@ -15,10 +15,14 @@ import (
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	sapi "github.com/rmorlok/authproxy/internal/schema/api"
+	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
+
+type OpenAPIRequestEventsEntry = schemaapiopenapi.RequestEventJson
+type OpenAPIListRequestEventsResponse = schemaapiopenapi.ListRequestEventsResponseJson
 
 type RequestEventsRoutes struct {
 	cfg  config.C
@@ -295,7 +299,7 @@ func metricsResponseFromAPIRequest(req sapi.MetricsQueryRequestJson, series []ap
 // @Accept			json
 // @Produce		json
 // @Param			id	path		string	true	"Request events entry UUID"
-// @Success		200	{object}	SwaggerRequestEventsEntry
+// @Success		200	{object}	OpenAPIRequestEventsEntry
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
 // @Failure		404	{object}	ErrorResponse
@@ -371,7 +375,7 @@ func (r *RequestEventsRoutes) get(gctx *gin.Context) {
 // @Param			path				query		string	false	"Filter by exact path"
 // @Param			path_regex			query		string	false	"Filter by path regex"
 // @Param			label_selector		query		string	false	"Filter by label selector (e.g., 'env=prod,team=api')"
-// @Success		200					{object}	SwaggerListRequestEventsResponse
+// @Success		200					{object}	OpenAPIListRequestEventsResponse
 // @Failure		400					{object}	ErrorResponse
 // @Failure		401					{object}	ErrorResponse
 // @Failure		500					{object}	ErrorResponse

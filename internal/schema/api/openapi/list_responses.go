@@ -62,6 +62,40 @@ type ListConnectorVersionsResponseJson struct {
 	Cursor string `json:"cursor,omitempty"`
 }
 
+// ConnectionJson documents a connection response while keeping nested
+// connector/setup definitions opaque for swaggo.
+//
+//	@Description	Connection to an external service
+type ConnectionJson struct {
+	Id          apid.ID           `json:"id" swaggertype:"string" example:"cxn_test550e8400abcde"`
+	Namespace   string            `json:"namespace" example:"root.acme"`
+	Labels      map[string]string `json:"labels,omitempty"`
+	Annotations map[string]string `json:"annotations,omitempty"`
+	State       string            `json:"state" example:"configured"`
+	HealthState string            `json:"health_state" example:"healthy"`
+	SetupStep   string            `json:"setup_step_id,omitempty" example:"tenant"`
+	SetupError  string            `json:"setup_error,omitempty"`
+	Connector   interface{}       `json:"connector"`
+	CreatedAt   time.Time         `json:"created_at"`
+	UpdatedAt   time.Time         `json:"updated_at"`
+}
+
+// ListConnectionResponseJson documents the paginated connection list response.
+//
+//	@Description	Paginated list of connections
+type ListConnectionResponseJson struct {
+	Items  []interface{} `json:"items"`
+	Cursor string        `json:"cursor,omitempty"`
+}
+
+// DisconnectResponseJson documents the connection disconnect response.
+//
+//	@Description	Response for disconnect operation
+type DisconnectResponseJson struct {
+	TaskId     string      `json:"task_id"`
+	Connection interface{} `json:"connection"`
+}
+
 // CreateConnectorRequestJson documents the connector creation body.
 //
 //	@Description	Request to create a new connector
@@ -248,4 +282,14 @@ type DryRunNotMatchedJson struct {
 	RateLimitId string `json:"rate_limit_id" swaggertype:"string" example:"rl_test550e8400abcde"`
 	Namespace   string `json:"namespace" example:"root.acme"`
 	Reason      string `json:"reason"`
+}
+
+// ProxyResponseJson documents the response from a proxied request.
+//
+//	@Description	Response from a proxied HTTP request
+type ProxyResponseJson struct {
+	StatusCode int               `json:"status_code" example:"200"`
+	Headers    map[string]string `json:"headers,omitempty"`
+	BodyRaw    []byte            `json:"body_raw,omitempty"`
+	BodyJson   interface{}       `json:"body_json,omitempty"`
 }

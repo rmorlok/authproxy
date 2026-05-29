@@ -38,4 +38,7 @@ say "Checking integration_tests module (go list -mod=readonly)"
   go list -mod=readonly ./... >/dev/null
 )
 
+say "Checking schema package layout"
+"$ROOT_DIR/scripts/check-schema-layout.sh" >/dev/null
+
 say "Preflight passed"

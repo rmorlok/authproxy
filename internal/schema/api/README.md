@@ -9,3 +9,5 @@ Rate-limit API envelopes, pagination responses, and dry-run DTOs live here while
 Auxiliary route DTOs also belong here: session initiation, request-events list envelopes, task status and monitoring responses, and shared label/annotation key-value bodies. Keep route packages focused on binding, validation, authorization, and conversion to/from service-layer types.
 
 OpenAPI-only generator adapters live under `internal/schema/api/openapi`. Keep those adapters thin: they may compose API DTOs for documentation, but runtime route request/response contracts should remain in this package.
+
+Route handlers should import these DTOs directly or convert between these DTOs and runtime/core/database models. Do not add new public `*RequestJson` or `*ResponseJson` structs under `internal/routes`; preflight rejects that so the API contract stays centralized.
