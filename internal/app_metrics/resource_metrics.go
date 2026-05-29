@@ -97,6 +97,10 @@ func isValidResourceMetric(metric ResourceMetric) bool {
 }
 
 func isValidResourceGroupBy(metric ResourceMetric, groupBy ResourceGroupBy) bool {
+	return IsValidResourceGroupBy(metric, groupBy)
+}
+
+func IsValidResourceGroupBy(metric ResourceMetric, groupBy ResourceGroupBy) bool {
 	switch metric {
 	case ResourceMetricConnectionsCount:
 		switch groupBy {

@@ -275,23 +275,10 @@ func metricsQueryToResourceQuery(
 	groupBy := make([]app_metrics.ResourceGroupBy, 0, len(ref.GroupBy))
 	for _, raw := range ref.GroupBy {
 		gb := app_metrics.ResourceGroupBy(raw)
-		switch metric {
-		case app_metrics.ResourceMetricConnectionsCount:
-			switch gb {
-			case app_metrics.ResourceGroupByState,
-				app_metrics.ResourceGroupByHealthState,
-				app_metrics.ResourceGroupByConnectorID,
-				app_metrics.ResourceGroupByConnectorVersion:
-				groupBy = append(groupBy, gb)
-			default:
-				return app_metrics.ResourceMetricsQuery{}, httperr.BadRequestf("invalid group_by %q", raw)
-			}
-		case app_metrics.ResourceMetricActorsCount:
-			if gb != app_metrics.ResourceGroupByNamespace {
-				return app_metrics.ResourceMetricsQuery{}, httperr.BadRequestf("invalid group_by %q", raw)
-			}
-			groupBy = append(groupBy, gb)
+		if !app_metrics.IsValidResourceGroupBy(metric, gb) {
+			return app_metrics.ResourceMetricsQuery{}, httperr.BadRequestf("invalid group_by %q", raw)
 		}
+		groupBy = append(groupBy, gb)
 	}
 
 	query := app_metrics.ResourceMetricsQuery{
