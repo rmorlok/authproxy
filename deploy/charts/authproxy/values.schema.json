@@ -50,8 +50,8 @@
       "additionalProperties": false,
       "properties": {
         "api":      { "$ref": "#/definitions/serviceToggle" },
-        "adminApi": { "$ref": "#/definitions/serviceToggle" },
-        "public":   { "$ref": "#/definitions/serviceToggle" },
+        "adminApi": { "$ref": "#/definitions/adminApiService" },
+        "public":   { "$ref": "#/definitions/publicService" },
         "worker":   { "$ref": "#/definitions/serviceToggle" }
       }
     },
@@ -250,6 +250,40 @@
       "additionalProperties": false,
       "properties": {
         "enabled": { "type": "boolean" }
+      }
+    },
+    "publicService": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "static": { "$ref": "#/definitions/staticContent" }
+      }
+    },
+    "adminApiService": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "ui": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled":            { "type": "boolean" },
+            "baseUrl":            { "type": "string" },
+            "initiateSessionUrl": { "type": "string" }
+          }
+        },
+        "static": { "$ref": "#/definitions/staticContent" }
+      }
+    },
+    "staticContent": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled":   { "type": "boolean" },
+        "mountAt":   { "type": "string" },
+        "serveFrom": { "type": "string" }
       }
     },
     "portNumber": {

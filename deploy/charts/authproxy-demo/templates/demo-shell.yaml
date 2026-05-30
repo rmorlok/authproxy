@@ -36,13 +36,14 @@ spec:
             # a sibling Secret (see actors-keys mount on the authproxy pod).
             - name: ADMIN_PRIVATE_KEY_PATH
               value: "/etc/authproxy/demo-shell/private"
-            # External URLs the BROWSER reaches — same hostname, sub-paths.
+            # External URLs the BROWSER reaches. Sub-domain layout —
+            # see templates/ingress.yaml for why this isn't sub-paths.
             - name: AUTHPROXY_AUTH_URL
-              value: "https://{{ .Values.global.hostname }}/public"
+              value: "https://marketplace.{{ .Values.global.hostname }}"
             - name: AUTHPROXY_MARKETPLACE_URL
-              value: "https://{{ .Values.global.hostname }}/marketplace"
+              value: "https://marketplace.{{ .Values.global.hostname }}"
             - name: AUTHPROXY_ADMIN_UI_URL
-              value: "https://{{ .Values.global.hostname }}/admin"
+              value: "https://admin.{{ .Values.global.hostname }}"
           volumeMounts:
             - name: admin-key
               mountPath: /etc/authproxy/demo-shell

@@ -8,13 +8,45 @@ Secrets, not in this ConfigMap.
 
 {{/* --- service ports --- */}}
 {{- if .Values.services.public.enabled -}}
-{{- $_ := set $cfg "public" (dict "port" .Values.ports.public) -}}
+{{- $public := dict "port" .Values.ports.public -}}
+{{- if .Values.services.public.static.enabled -}}
+{{-   $static := dict -}}
+{{-   if .Values.services.public.static.mountAt -}}
+{{-     $_ := set $static "mount_at" .Values.services.public.static.mountAt -}}
+{{-   end -}}
+{{-   if .Values.services.public.static.serveFrom -}}
+{{-     $_ := set $static "serve_from" (tpl .Values.services.public.static.serveFrom $) -}}
+{{-   end -}}
+{{-   $_ := set $public "static" $static -}}
+{{- end -}}
+{{- $_ := set $cfg "public" $public -}}
 {{- end -}}
 {{- if .Values.services.api.enabled -}}
 {{- $_ := set $cfg "api" (dict "port" .Values.ports.api) -}}
 {{- end -}}
 {{- if .Values.services.adminApi.enabled -}}
-{{- $_ := set $cfg "admin_api" (dict "port" .Values.ports.adminApi) -}}
+{{- $adminApi := dict "port" .Values.ports.adminApi -}}
+{{- if .Values.services.adminApi.ui.enabled -}}
+{{-   $ui := dict "enabled" true -}}
+{{-   if .Values.services.adminApi.ui.baseUrl -}}
+{{-     $_ := set $ui "base_url" (tpl .Values.services.adminApi.ui.baseUrl $) -}}
+{{-   end -}}
+{{-   if .Values.services.adminApi.ui.initiateSessionUrl -}}
+{{-     $_ := set $ui "initiate_session_url" (tpl .Values.services.adminApi.ui.initiateSessionUrl $) -}}
+{{-   end -}}
+{{-   $_ := set $adminApi "ui" $ui -}}
+{{- end -}}
+{{- if .Values.services.adminApi.static.enabled -}}
+{{-   $static := dict -}}
+{{-   if .Values.services.adminApi.static.mountAt -}}
+{{-     $_ := set $static "mount_at" .Values.services.adminApi.static.mountAt -}}
+{{-   end -}}
+{{-   if .Values.services.adminApi.static.serveFrom -}}
+{{-     $_ := set $static "serve_from" (tpl .Values.services.adminApi.static.serveFrom $) -}}
+{{-   end -}}
+{{-   $_ := set $adminApi "static" $static -}}
+{{- end -}}
+{{- $_ := set $cfg "admin_api" $adminApi -}}
 {{- end -}}
 {{- if .Values.services.worker.enabled -}}
 {{- $_ := set $cfg "worker" (dict "health_check_port" .Values.ports.workerHealth) -}}

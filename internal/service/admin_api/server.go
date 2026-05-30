@@ -2,6 +2,7 @@ package admin_api
 
 import (
 	"context"
+	"io/fs"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -71,13 +72,12 @@ func GetGinServer(
 		// Static content: prefer the compiled-in admin UI; fall back to an
 		// on-disk directory when ServeFromPath is set (local iteration,
 		// custom builds).
-		var sfs static.ServeFileSystem
 		if service.StaticVal.IsEmbedded() {
-			sfs = apgin.NewEmbedServeFileSystem(adminembed.FS())
+			server.Use(apgin.ServeEmbeddedStatic(service.StaticVal.MountAtPath, adminembed.FS()))
 		} else {
-			sfs = static.LocalFile(service.StaticVal.ServeFromPath, true)
+			sfs := static.LocalFile(service.StaticVal.ServeFromPath, true)
+			server.Use(static.Serve(service.StaticVal.MountAtPath, sfs))
 		}
-		server.Use(static.Serve(service.StaticVal.MountAtPath, sfs))
 	}
 
 	// Swagger documentation endpoint
@@ -217,9 +217,13 @@ func GetGinServer(
 		mountPrefix := strings.TrimSuffix(service.StaticVal.MountAtPath, "/")
 		var serveIndex func(c *gin.Context)
 		if service.StaticVal.IsEmbedded() {
-			embedHTTPFS := http.FS(adminembed.FS())
+			indexHTML, readErr := fs.ReadFile(adminembed.FS(), "index.html")
 			serveIndex = func(c *gin.Context) {
-				c.FileFromFS("index.html", embedHTTPFS)
+				if readErr != nil {
+					c.Status(http.StatusNotFound)
+					return
+				}
+				c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
 			}
 		} else {
 			indexPath := filepath.Join(service.StaticVal.ServeFromPath, "index.html")

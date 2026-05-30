@@ -1,22 +1,25 @@
 {{- if and .Values.ingress.enabled .Values.global.hostname -}}
 {{/*
-  Single Ingress that fronts the entire demo stack. Sub-path routing:
+  Sub-domain routing under the demo hostname:
 
-    /                 → demo-shell (the SSO landing page)
-    /admin            → AuthProxy admin-api (which serves the admin UI)
-    /admin-api        → AuthProxy admin-api (the JSON API)
-    /marketplace      → AuthProxy public (which serves the marketplace UI)
-    /api              → AuthProxy api
-    /public           → AuthProxy public (OAuth callbacks etc.)
-    /oauth2           → go-oauth2-server (demo connector target)
-    /grafana          → Grafana demo dashboards
+    <hostname>             → demo-shell           (the SSO landing page)
+    <hostname>/grafana     → Grafana demo dashboards
+    marketplace.<hostname> → AuthProxy public      (marketplace UI + /api/v1 + OAuth callbacks)
+    admin.<hostname>       → AuthProxy admin-api   (admin UI + /api/v1 admin endpoints)
 
-  AuthProxy's single Service carries all four ports (named `api`,
-  `admin-api`, `public`, `worker-health`); per-path entries target the
-  named port matching the role.
+  Why subdomains and not subpaths: AuthProxy's embedded SPAs are built
+  with VITE_BASE_URL=/ and reference their assets relative to root
+  (e.g. /assets/index-xxx.js). Sub-path routing would 404 those
+  assets because the Ingress only forwards the prefix-matched path
+  and the SPA's <script src=> doesn't know about the prefix. Sub-
+  domain routing lets each SPA keep `base: /` while still landing
+  on the right backend service.
 
-  cert-manager.io/cluster-issuer annotation triggers cert issuance on
-  the host listed under tls.hosts.
+  external-dns reads `spec.rules[*].host` and creates A records for
+  each — no extra Route53 wiring needed. cert-manager mints a single
+  multi-SAN cert covering all three hostnames listed under tls.hosts.
+
+  go-oauth2-server (when enabled) lives on `oauth2.<hostname>`.
 */}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -35,56 +38,18 @@ spec:
   tls:
     - hosts:
         - {{ .Values.global.hostname | quote }}
+        - {{ printf "marketplace.%s" .Values.global.hostname | quote }}
+        - {{ printf "admin.%s" .Values.global.hostname | quote }}
+        {{- if .Values.goOauth2Server.enabled }}
+        - {{ printf "oauth2.%s" .Values.global.hostname | quote }}
+        {{- end }}
       secretName: {{ printf "%s-tls" (include "authproxy-demo.fullname" .) | quote }}
   {{- end }}
   rules:
+    {{- /* Apex hostname → demo-shell. */}}
     - host: {{ .Values.global.hostname | quote }}
       http:
         paths:
-          - path: /admin-api
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ include "authproxy-demo.authproxy.serviceName" . }}
-                port:
-                  name: admin-api
-          - path: /admin
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ include "authproxy-demo.authproxy.serviceName" . }}
-                port:
-                  name: admin-api
-          - path: /marketplace
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ include "authproxy-demo.authproxy.serviceName" . }}
-                port:
-                  name: public
-          - path: /api
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ include "authproxy-demo.authproxy.serviceName" . }}
-                port:
-                  name: api
-          - path: /public
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ include "authproxy-demo.authproxy.serviceName" . }}
-                port:
-                  name: public
-          {{- if .Values.goOauth2Server.enabled }}
-          - path: /oauth2
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ include "authproxy-demo.goOauth2Server.name" . }}
-                port:
-                  number: 80
-          {{- end }}
           {{- if .Values.grafana.enabled }}
           - path: /grafana
             pathType: Prefix
@@ -94,7 +59,6 @@ spec:
                 port:
                   number: 80
           {{- end }}
-          # Demo-shell catches everything else (it's the landing page).
           - path: /
             pathType: Prefix
             backend:
@@ -102,4 +66,38 @@ spec:
                 name: {{ include "authproxy-demo.demoShell.name" . }}
                 port:
                   number: 80
+    {{- /* Marketplace subdomain → AuthProxy public service (port `public`). */}}
+    - host: {{ printf "marketplace.%s" .Values.global.hostname | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "authproxy-demo.authproxy.serviceName" . }}
+                port:
+                  name: public
+    {{- /* Admin subdomain → AuthProxy admin-api service (port `admin-api`). */}}
+    - host: {{ printf "admin.%s" .Values.global.hostname | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "authproxy-demo.authproxy.serviceName" . }}
+                port:
+                  name: admin-api
+    {{- if .Values.goOauth2Server.enabled }}
+    - host: {{ printf "oauth2.%s" .Values.global.hostname | quote }}
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "authproxy-demo.goOauth2Server.name" . }}
+                port:
+                  number: 80
+    {{- end }}
 {{- end -}}
