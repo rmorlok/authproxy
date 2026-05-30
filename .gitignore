@@ -33,6 +33,7 @@ tmp
 .junie
 .yarn
 node_modules
+plugins/grafana/*/dist/
 
 # Built UI artifacts — embedded at compile time via //go:embed.
 # Only .gitkeep is tracked so a fresh checkout still compiles before

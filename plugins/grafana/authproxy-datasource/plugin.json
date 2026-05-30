@@ -1,0 +1,31 @@
+{
+  "$schema": "https://raw.githubusercontent.com/grafana/grafana/main/docs/sources/developers/plugins/plugin.schema.json",
+  "type": "datasource",
+  "name": "AuthProxy App Metrics",
+  "id": "rmorlok-authproxy-datasource",
+  "backend": true,
+  "executable": "gpx_authproxy_datasource",
+  "metrics": true,
+  "logs": true,
+  "alerting": false,
+  "annotations": false,
+  "info": {
+    "description": "Query AuthProxy application metrics and request-event metadata.",
+    "author": {
+      "name": "AuthProxy"
+    },
+    "keywords": ["authproxy", "metrics", "request-events"],
+    "logos": {
+      "small": "img/logo.svg",
+      "large": "img/logo.svg"
+    },
+    "links": [],
+    "screenshots": [],
+    "version": "0.1.0",
+    "updated": "2026-05-30"
+  },
+  "dependencies": {
+    "grafanaDependency": ">=10.4.0",
+    "plugins": []
+  }
+}

@@ -1,0 +1,22 @@
+{
+  "name": "@authproxy/grafana-datasource",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Grafana datasource plugin for AuthProxy app metrics",
+  "scripts": {
+    "backend": "npm run backend:test && npm run backend:build",
+    "backend:build": "go build -o dist/gpx_authproxy_datasource ./pkg",
+    "backend:test": "go test ./pkg/...",
+    "typecheck": "tsc --noEmit",
+    "validate": "npm run backend && npm run typecheck"
+  },
+  "dependencies": {
+    "@grafana/data": "^11.5.0",
+    "@grafana/runtime": "^11.5.0",
+    "@grafana/ui": "^11.5.0",
+    "react": "^18.3.1"
+  },
+  "devDependencies": {
+    "typescript": "^5.8.3"
+  }
+}
