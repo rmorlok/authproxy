@@ -7,6 +7,7 @@ This directory holds long-form documentation that supplements the [main repo REA
 - **[CLI (`ap`)](cli.md)** — config file shape (`~/.authproxy.yaml`), RS256 vs HS256 signing keys, every command (list, sign-jwt / verify-jwt, signing-proxy, the connection-scoped streaming `proxy` with `curl`/`wget` modes, marketplace helpers).
 - **[Rate limits](rate-limits.md)** — define rate-limit resources, configure connector-level reactive 429 handling, understand the request log attribution fields.
 - **[Labels and annotations](labels.md)** — the Kubernetes-style label system, system labels under `apxy/`, carry-forward through the namespace → connector → connection hierarchy, label selectors, per-request label snapshots.
+- **[Application metrics](app_metrics.md)** — configure the app metrics store, query request-event and resource metrics, and understand supported aggregations and dimensions.
 
 ## Operational guides
 

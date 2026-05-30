@@ -92,7 +92,7 @@ app_metrics:
   #  database:
   #    provider: sqlite
   #    auto_migrate: true
-  #    path: ./dev_config/http_log.db
+  #    path: ./dev_config/app_metrics.db
   database:
     provider: clickhouse
     auto_migrate: true
