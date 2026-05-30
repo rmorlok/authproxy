@@ -1133,6 +1133,12 @@ const docTemplateApi = `{
                     },
                     {
                         "type": "string",
+                        "description": "Filter by connector ID",
+                        "name": "connector_id",
+                        "in": "query"
+                    },
+                    {
+                        "type": "string",
                         "description": "Filter by namespace",
                         "name": "namespace",
                         "in": "query"

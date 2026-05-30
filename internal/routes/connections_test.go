@@ -343,6 +343,65 @@ func TestConnections(t *testing.T) {
 			require.Len(t, resp.Items, 3)
 		})
 
+		t.Run("permission constrained namespace dropdown", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/connections?limit=50&order=created_at%20asc",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.child.**", "connections", "list"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ListConnectionResponseJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Len(t, resp.Items, 3)
+			for _, item := range resp.Items {
+				require.Contains(t, item.Namespace, "root.child")
+			}
+		})
+
+		t.Run("filter to connector id", func(t *testing.T) {
+			oauthConnectionId := apid.New(apid.PrefixConnection)
+			err := tu.Db.CreateConnection(ctx, &database.Connection{
+				Id:               oauthConnectionId,
+				Namespace:        "root",
+				ConnectorId:      oauthConnectorId,
+				ConnectorVersion: oauthConnectorVersion,
+				State:            database.ConnectionStateSetup,
+			})
+			require.NoError(t, err)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections?connector_id="+oauthConnectorId.String(), nil, "root", "some-actor", aschema.PermissionsSingle("root.**", "connections", "list"))
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ListConnectionResponseJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Len(t, resp.Items, 1)
+			require.Equal(t, oauthConnectionId, resp.Items[0].Id)
+			require.Equal(t, oauthConnectorId, resp.Items[0].Connector.Id)
+		})
+
+		t.Run("invalid connector id filter", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/connections?connector_id=not-an-id", nil, "root", "some-actor", aschema.PermissionsSingle("root.**", "connections", "list"))
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
 		t.Run("filter with label_selector", func(t *testing.T) {
 			connId := apid.New(apid.PrefixConnection)
 			err := tu.Db.CreateConnection(ctx, &database.Connection{

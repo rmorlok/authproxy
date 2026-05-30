@@ -294,6 +294,28 @@ func TestConnectors(t *testing.T) {
 				require.Equal(t, "Test ConnectorJson 2", resp.Items[0].DisplayName)
 			})
 
+			t.Run("permission constrained namespace dropdown", func(t *testing.T) {
+				w := httptest.NewRecorder()
+				req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+					http.MethodGet,
+					"/connectors?order=id%20asc",
+					nil,
+					"root",
+					"some-actor",
+					aschema.PermissionsSingle("root.child.**", "connectors", "list"),
+				)
+				require.NoError(t, err)
+
+				tu.Gin.ServeHTTP(w, req)
+				require.Equal(t, http.StatusOK, w.Code)
+
+				var resp ListConnectorsResponseJson
+				err = json.Unmarshal(w.Body.Bytes(), &resp)
+				require.NoError(t, err)
+				require.Len(t, resp.Items, 1)
+				require.Equal(t, apid.MustParse("cxr_test2000000000002"), resp.Items[0].Id)
+			})
+
 			t.Run("label filter", func(t *testing.T) {
 				connectorId := apid.MustParse("cxr_test0000000000001")
 				cfg := config.FromRoot(&sconfig.Root{

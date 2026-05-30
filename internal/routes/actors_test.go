@@ -212,6 +212,30 @@ func TestActorsRoutes(t *testing.T) {
 			require.Equal(t, "user/l1", resp.Items[0].ExternalId)
 			require.Equal(t, "test-app", resp.Items[0].Labels["app"])
 		})
+
+		t.Run("permission constrained namespace dropdown", func(t *testing.T) {
+			createActor(t, tu.Db, "user/child", "root.child")
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/actors",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.child.**", "actors", "list"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ListActorsResponseJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Len(t, resp.Items, 1)
+			require.Equal(t, "user/child", resp.Items[0].ExternalId)
+			require.Equal(t, "root.child", resp.Items[0].Namespace)
+		})
 	})
 
 	t.Run("get by id", func(t *testing.T) {

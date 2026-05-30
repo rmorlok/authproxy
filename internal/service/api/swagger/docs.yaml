@@ -1702,6 +1702,10 @@ paths:
         in: query
         name: state
         type: string
+      - description: Filter by connector ID
+        in: query
+        name: connector_id
+        type: string
       - description: Filter by namespace
         in: query
         name: namespace

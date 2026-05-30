@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 
+	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -99,6 +100,10 @@ func (l *listConnectionsWrapper) ForState(s database.ConnectionState) iface.List
 
 func (l *listConnectionsWrapper) ForStates(states []database.ConnectionState) iface.ListConnectionsBuilder {
 	return l.cloneWithBuilder(l.l.ForStates(states))
+}
+
+func (l *listConnectionsWrapper) ForConnectorId(id apid.ID) iface.ListConnectionsBuilder {
+	return l.cloneWithBuilder(l.l.ForConnectorId(id))
 }
 
 func (l *listConnectionsWrapper) ForNamespaceMatcher(m string) iface.ListConnectionsBuilder {
