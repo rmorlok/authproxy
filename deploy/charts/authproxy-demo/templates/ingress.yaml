@@ -11,7 +11,7 @@
     /oauth2           → go-oauth2-server (demo connector target)
 
   AuthProxy's single Service carries all four ports (named `api`,
-  `adminApi`, `public`, `workerHealth`); per-path entries target the
+  `admin-api`, `public`, `worker-health`); per-path entries target the
   named port matching the role.
 
   cert-manager.io/cluster-issuer annotation triggers cert issuance on
@@ -46,14 +46,14 @@ spec:
               service:
                 name: {{ include "authproxy-demo.authproxy.serviceName" . }}
                 port:
-                  name: adminApi
+                  name: admin-api
           - path: /admin
             pathType: Prefix
             backend:
               service:
                 name: {{ include "authproxy-demo.authproxy.serviceName" . }}
                 port:
-                  name: adminApi
+                  name: admin-api
           - path: /marketplace
             pathType: Prefix
             backend:
