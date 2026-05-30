@@ -7,6 +7,7 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -53,5 +54,25 @@ func TestJwtTokenClaims(t *testing.T) {
 			}
 			assert.True(t, tc.IsExpired(context.Background()), "expired token should be expired")
 		})
+	})
+	t.Run("Validate top-level permissions", func(t *testing.T) {
+		tc := AuthProxyClaims{
+			RegisteredClaims: jwt.RegisteredClaims{
+				Subject: "bobdole",
+			},
+			Permissions: []aschema.Permission{
+				{
+					Namespace: "root.**",
+					Resources: []string{"connections"},
+					Verbs:     []string{"list"},
+				},
+			},
+		}
+		assert.NoError(t, tc.Validate(jwt.NewValidator()))
+
+		tc.Permissions = []aschema.Permission{{Namespace: "root.**"}}
+		err := tc.Validate(jwt.NewValidator())
+		assert.Error(t, err)
+		assert.ErrorIs(t, err, ErrInvalidClaims)
 	})
 }

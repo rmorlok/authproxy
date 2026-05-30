@@ -15,6 +15,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/mitchellh/go-homedir"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 	"golang.org/x/crypto/ssh"
@@ -41,6 +42,7 @@ type TokenBuilder interface {
 	WithActorExternalId(id string) TokenBuilder
 	WithNamespace(namespace string) TokenBuilder
 	WithActor(actor core.IActorData) TokenBuilder
+	WithPermissions(permissions []aschema.Permission) TokenBuilder
 	WithLabels(labels map[string]string) TokenBuilder
 	WithLabel(key, value string) TokenBuilder
 	WithNonce() TokenBuilder
@@ -137,6 +139,11 @@ func (tb *tokenBuilder) WithNamespace(namespace string) TokenBuilder {
 
 func (tb *tokenBuilder) WithActor(actor core.IActorData) TokenBuilder {
 	tb.jwtBuilder.WithActor(actor)
+	return tb
+}
+
+func (tb *tokenBuilder) WithPermissions(permissions []aschema.Permission) TokenBuilder {
+	tb.jwtBuilder.WithPermissions(permissions)
 	return tb
 }
 

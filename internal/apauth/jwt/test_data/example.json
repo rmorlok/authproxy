@@ -15,5 +15,12 @@
       "root.prod.actor-1234#/connections/_initiate",
       "root.prod.**#/connections/_list"
     ]
-  }
+  },
+  "permissions": [
+    {
+      "namespace": "root.prod.**",
+      "resources": ["connections"],
+      "verbs": ["list"]
+    }
+  ]
 }
