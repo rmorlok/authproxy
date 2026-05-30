@@ -1,0 +1,8 @@
+{
+  "extends": "@grafana/tsconfig",
+  "compilerOptions": {
+    "rootDir": "src",
+    "strict": true
+  },
+  "include": ["src/**/*"]
+}
