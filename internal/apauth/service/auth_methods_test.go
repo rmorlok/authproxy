@@ -885,6 +885,58 @@ func TestAuth_ActorCacheReducesDbCalls(t *testing.T) {
 	require.Equal(t, actorId, ra.MustGetActor().Id)
 }
 
+func TestAuth_TopLevelPermissionsRestrictRequest(t *testing.T) {
+	t.Parallel()
+
+	cfg := config.FromRoot(&testConfigPublicPrivateKey)
+	_, authService, _ := TestAuthService(t, sconfig.ServiceIdAdminApi, cfg)
+	raw := authService.(*service)
+
+	actorPermissions := []aschema.Permission{
+		{
+			Namespace: "root.**",
+			Resources: []string{"connections"},
+			Verbs:     []string{"list", "get"},
+		},
+	}
+	tokenPermissions := []aschema.Permission{
+		{
+			Namespace: "root.**",
+			Resources: []string{"connections"},
+			Verbs:     []string{"list"},
+		},
+		{
+			Namespace: "root.**",
+			Resources: []string{"actors"},
+			Verbs:     []string{"list"},
+		},
+	}
+
+	claims := *testClaims()
+	claims.Actor = &core.Actor{
+		ExternalId:  "grafana-token",
+		Namespace:   "root",
+		Permissions: actorPermissions,
+	}
+	claims.Subject = "grafana-token"
+	claims.Permissions = tokenPermissions
+
+	tok, err := authService.Token(testContext, &claims)
+	require.NoError(t, err)
+
+	req := httptest.NewRequest("GET", "/", nil)
+	req.Header.Add(JwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
+	w := httptest.NewRecorder()
+	ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
+	require.NoError(t, err)
+	require.True(t, ra.IsAuthenticated())
+	require.Equal(t, tokenPermissions, ra.GetPermissions())
+
+	require.True(t, ra.Allows("root.prod", "connections", "list", ""))
+	require.False(t, ra.Allows("root.prod", "connections", "get", ""))
+	require.False(t, ra.Allows("root.prod", "actors", "list", ""))
+}
+
 func TestAuth_Nonce(t *testing.T) {
 	now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
 	ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()

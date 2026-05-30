@@ -38,7 +38,11 @@
       "type": "string",
       "description": "JWT ID. Optional. Not used by Auth Proxy."
     },
-    "actor": { "$ref": "schema-actor.json" }
+    "actor": { "$ref": "schema-actor.json" },
+    "permissions": {
+      "type": "array",
+      "description": "Optional request-level permission restrictions. These are intersected with the authenticated actor's permissions and cannot grant additional access."
+    }
   },
   "additionalProperties": true
 }

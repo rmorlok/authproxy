@@ -9,6 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 )
@@ -29,6 +30,7 @@ type ClaimsBuilder interface {
 	WithActorExternalId(id string) ClaimsBuilder
 	WithNamespace(namespace string) ClaimsBuilder
 	WithActor(actor core.IActorData) ClaimsBuilder
+	WithPermissions(permissions []aschema.Permission) ClaimsBuilder
 	WithLabels(labels map[string]string) ClaimsBuilder
 	WithLabel(key, value string) ClaimsBuilder
 	WithNonce() ClaimsBuilder
@@ -46,6 +48,7 @@ type claimsBuilder struct {
 	externalId   *string
 	namespace    *string
 	actor        *core.Actor
+	permissions  []aschema.Permission
 	labels       map[string]string
 	systemSigned bool
 	actorSigned  bool
@@ -113,6 +116,11 @@ func (b *claimsBuilder) WithNamespace(namespace string) ClaimsBuilder {
 
 func (b *claimsBuilder) WithActor(actor core.IActorData) ClaimsBuilder {
 	b.actor = core.CreateActor(actor)
+	return b
+}
+
+func (b *claimsBuilder) WithPermissions(permissions []aschema.Permission) ClaimsBuilder {
+	b.permissions = permissions
 	return b
 }
 
@@ -184,6 +192,7 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 			ID:       apctx.GetIdGenerator(ctx).NewString(apid.PrefixJwtId),
 		},
 		Actor:        b.actor,
+		Permissions:  b.permissions,
 		SystemSigned: b.systemSigned,
 		ActorSigned:  b.actorSigned,
 	}

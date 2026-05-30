@@ -117,6 +117,31 @@ func TestClaimsBuilder(t *testing.T) {
 		require.Equal(t, "root.child", claims.Namespace)
 		require.Equal(t, apctx.GetClock(ctx).Now().Add(10*time.Minute), claims.ExpiresAt.Time)
 	})
+	t.Run("valid with top-level permissions", func(t *testing.T) {
+		now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+		ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+		permissions := []aschema.Permission{
+			{
+				Namespace: "root.child.**",
+				Resources: []string{"connections"},
+				Verbs:     []string{"list"},
+			},
+		}
+
+		claims, err := NewClaimsBuilder().
+			WithServiceId(config.ServiceIdPublic).
+			WithActorExternalId("bob-dole").
+			WithNamespace("root.child").
+			WithPermissions(permissions).
+			BuildCtx(ctx)
+		require.NoError(t, err)
+
+		require.Equal(t, permissions, claims.Permissions)
+		require.Nil(t, claims.Actor)
+		require.Equal(t, "bob-dole", claims.Subject)
+		require.Equal(t, "root.child", claims.Namespace)
+	})
 	t.Run("nonce", func(t *testing.T) {
 		t.Run("valid", func(t *testing.T) {
 			now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)

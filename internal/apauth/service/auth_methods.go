@@ -373,7 +373,11 @@ func (s *service) establishAuthFromRequest(ctx context.Context, requireSessionXs
 			cache.Put(actor)
 		}
 
-		ra = core.NewAuthenticatedRequestAuth(actor)
+		if len(claims.Permissions) > 0 {
+			ra = core.NewAuthenticatedRequestAuthWithPermissions(actor, claims.Permissions)
+		} else {
+			ra = core.NewAuthenticatedRequestAuth(actor)
+		}
 	}
 
 	// Extend auth with session, or establish the user authed from session if not authenticated yet

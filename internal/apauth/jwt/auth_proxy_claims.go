@@ -11,6 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
+	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
 var ErrInvalidClaims = errors.New("invalid jwt claims")
@@ -31,6 +32,11 @@ type AuthProxyClaims struct {
 	// actor configured in the system. If Actor is specified, the value of ExternalId must be the same as sub in the
 	// base claims.
 	Actor *core.Actor `json:"actor,omitempty"`
+
+	// Permissions optionally restrict what this specific token can do. These
+	// permissions are intersected with the authenticated actor's permissions and
+	// cannot grant access the actor does not already have.
+	Permissions []aschema.Permission `json:"permissions,omitempty"`
 
 	// SystemSigned indicates this token was signed by an AuthProxy service using the GlobalAESKey (HMAC).
 	// This is used for internal auth transfer between services, OAuth redirects, etc.
@@ -80,6 +86,12 @@ func (tc *AuthProxyClaims) Validate(v *jwt.Validator) error {
 
 		if tc.GetNamespace() != tc.Actor.GetNamespace() {
 			result = multierror.Append(result, errors.New("token namespace and actor namespace do not match"))
+		}
+	}
+
+	for _, permission := range tc.Permissions {
+		if err := permission.Validate(); err != nil {
+			result = multierror.Append(result, err)
 		}
 	}
 
