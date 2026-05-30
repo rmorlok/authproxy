@@ -45,6 +45,7 @@ on:
 permissions:
   contents: read
   id-token: write    # OIDC token mint
+  packages: read     # Poll GHCR until the image tag from Build Image exists.
 
 concurrency:
   # One deploy at a time per branch — protects against racing pushes
@@ -59,12 +60,13 @@ jobs:
     runs-on: ubuntu-latest
     # Required by the IAM role's trust policy — see header.
     environment: gha-eks
-    timeout-minutes: 15
+    timeout-minutes: 45
 
     env:
       RELEASE_NAME: demo
       RELEASE_NS:   demo
       CHART_PATH:   deploy/charts/authproxy-demo
+      REGISTRY:     ghcr.io
 
     steps:
       - uses: actions/checkout@v4
@@ -93,6 +95,47 @@ jobs:
           fi
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "Deploying image tag: ${tag}"
+
+      - name: Wait for image tag in GHCR
+        run: |
+          set -euo pipefail
+          tag="${{ steps.tag.outputs.tag }}"
+          owner="$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          images=(
+            authproxy
+            authproxy-demo-shell
+            authproxy-demo-seed
+          )
+
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | docker login "${REGISTRY}" -u "${{ github.actor }}" --password-stdin >/dev/null
+
+          deadline=$((SECONDS + 30 * 60))
+          while true; do
+            missing=()
+            for image in "${images[@]}"; do
+              ref="${REGISTRY}/${owner}/${image}:${tag}"
+              if docker manifest inspect "${ref}" >/dev/null 2>&1; then
+                echo "Found ${ref}"
+              else
+                missing+=("${ref}")
+              fi
+            done
+
+            if [ "${#missing[@]}" -eq 0 ]; then
+              exit 0
+            fi
+
+            if [ "${SECONDS}" -ge "${deadline}" ]; then
+              echo "Timed out waiting for image tag ${tag}. Missing:" >&2
+              printf '  %s\n' "${missing[@]}" >&2
+              exit 1
+            fi
+
+            echo "Waiting for Build Image to publish ${tag}:"
+            printf '  %s\n' "${missing[@]}"
+            sleep 30
+          done
 
       - name: Assume GH Actions role via OIDC
         uses: aws-actions/configure-aws-credentials@v4
