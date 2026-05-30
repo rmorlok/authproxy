@@ -51,6 +51,32 @@
         "tls":         { "type": "boolean" }
       }
     },
+    "grafanaAuthProxy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": { "type": "boolean" },
+        "datasource": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled":          { "type": "boolean" },
+            "name":             { "type": "string", "minLength": 1 },
+            "uid":              { "type": "string", "minLength": 1 },
+            "authproxyApiPort": { "type": "integer", "minimum": 1, "maximum": 65535 },
+            "authproxyBaseUrl": { "type": "string" },
+            "jwtEnvVar":        { "type": "string", "minLength": 1 }
+          }
+        },
+        "dashboards": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": { "type": "boolean" }
+          }
+        }
+      }
+    },
     "secrets": {
       "type": "object",
       "additionalProperties": false,

@@ -1,0 +1,22 @@
+{{- if and .Values.grafana.enabled .Values.grafanaAuthProxy.enabled .Values.grafanaAuthProxy.datasource.enabled -}}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ printf "%s-grafana-datasource" (include "authproxy-demo.fullname" .) | trunc 63 | trimSuffix "-" }}
+  labels:
+    {{- include "authproxy-demo.labels" . | nindent 4 }}
+    grafana_datasource: "1"
+data:
+  authproxy-datasource.yaml: |-
+    apiVersion: 1
+    datasources:
+      - name: {{ include "authproxy-demo.grafanaAuthProxy.datasourceName" . | quote }}
+        uid: {{ include "authproxy-demo.grafanaAuthProxy.datasourceUid" . | quote }}
+        type: rmorlok-authproxy-datasource
+        access: proxy
+        editable: true
+        jsonData:
+          baseUrl: {{ include "authproxy-demo.grafanaAuthProxy.baseUrl" . | quote }}
+        secureJsonData:
+          jwt: {{ printf "${%s}" .Values.grafanaAuthProxy.datasource.jwtEnvVar | quote }}
+{{- end -}}

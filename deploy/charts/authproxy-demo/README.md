@@ -8,6 +8,7 @@ Umbrella chart for the AuthProxy demo environment. Composes:
 | `postgresql` (bitnami)  | Backing DB                                                  |
 | `redis` (bitnami)       | Sessions + tasks + rate-limit                               |
 | `minio` (bitnami)       | Request-log blob storage                                    |
+| `grafana` (upstream)    | App-metrics datasource, variables, and sample dashboards    |
 | `demo-shell` (inline)   | SSO stand-in host (signs JWTs for demo actors)              |
 | `go-oauth2-server` (inline) | Connector target for the demo OAuth flow                |
 
@@ -69,6 +70,7 @@ key, so these need real openssl). Create them in the release namespace
 | `<release>-encryption`     | `global_aes.key` (32 raw bytes)                |
 | `<release>-demo-shell-key` | `private` (RSA private), `demo-shell.pub`      |
 | `<release>-actors`         | `demo-shell.pub` (matching the above)          |
+| `authproxy-grafana-jwt`    | `jwt` (Grafana datasource bearer token)        |
 
 A reference one-shot generator:
 
@@ -93,6 +95,13 @@ kubectl -n "$NS" create secret generic "$RELEASE-demo-shell-key" \
   --from-file=demo-shell.pub="$work/demo-shell.pub"
 kubectl -n "$NS" create secret generic "$RELEASE-actors" \
   --from-file=demo-shell.pub="$work/demo-shell.pub"
+
+# Metrics plus request-event metadata tables. The actor identified in
+# the token must have matching normal AuthProxy permissions; the
+# Grafana preset only restricts the token further.
+ap sign-jwt --actorId grafana --apis api,admin-api --grafana-preset logs > "$work/grafana.jwt"
+kubectl -n "$NS" create secret generic authproxy-grafana-jwt \
+  --from-file=jwt="$work/grafana.jwt"
 ```
 
 A Helm pre-install hook Job that generates the keypair Secrets is a
@@ -110,6 +119,7 @@ create the three demo identities the shell expects:
 | `demo-admin` | admin    | Lands in the admin UI                            |
 | `demo-user`  | user     | Lands in the marketplace                         |
 | `fresh-user` | user     | Lands in the marketplace with no connections     |
+| `grafana`    | datasource | Identity used by the provisioned Grafana datasource token |
 
 Idempotent: the seed binary GETs each actor by external_id and skips
 creation when AuthProxy returns 200. Re-running `helm upgrade` is a
@@ -135,6 +145,7 @@ The umbrella Ingress maps host paths to backend services:
 | `/api`         | AuthProxy api                               |
 | `/public`      | AuthProxy public (OAuth callbacks, etc.)    |
 | `/oauth2`      | go-oauth2-server                            |
+| `/grafana`     | Grafana dashboards                          |
 
 (Paths are `pathType: Prefix`; order in the Ingress is significant only
 for `pathType: Exact` matches.)
@@ -145,6 +156,26 @@ After install, open `https://<hostname>` — the demo-shell page loads.
 Pick **demo-admin** + **Admin UI** → submit → you should land in the
 admin UI as `demo-admin`. Pick **fresh-user** + **Marketplace UI** →
 empty marketplace, no connections.
+
+Grafana is available at `https://<hostname>/grafana` when
+`grafana.enabled=true` (the default). The chart provisions:
+
+- `AuthProxy` datasource (`uid: authproxy-app-metrics`) pointed at the
+  in-cluster AuthProxy API service.
+- `AuthProxy App Metrics` dashboard with resource counts, connection
+  states, request volume/errors/duration, rate-limit attribution, and
+  request-event metadata.
+- Dashboard variables for namespaces, connectors, and connections.
+
+The datasource JWT comes from the `authproxy-grafana-jwt` Secret and is
+injected into Grafana as `AUTHPROXY_GRAFANA_JWT`; override
+`grafana.envValueFrom` if you use a differently named Secret.
+
+By default the chart asks Grafana to install the
+`rmorlok-authproxy-datasource` plugin by id. If you are testing a plugin
+release artifact before it is available in the Grafana catalog, override
+`grafana.plugins[0]` with Grafana's URL install format:
+`https://.../rmorlok-authproxy-datasource.zip;rmorlok-authproxy-datasource`.
 
 ## Uninstall
 

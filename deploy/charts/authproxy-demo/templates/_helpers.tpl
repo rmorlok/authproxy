@@ -26,6 +26,27 @@ have their own helpers and aren't affected by these.
 {{- printf "%s-authproxy" .Release.Name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{- define "authproxy-demo.grafana.serviceName" -}}
+{{/* Matches the grafana subchart's fullname helper default. */}}
+{{- printf "%s-grafana" .Release.Name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{- define "authproxy-demo.grafanaAuthProxy.datasourceName" -}}
+{{- default "AuthProxy" .Values.grafanaAuthProxy.datasource.name -}}
+{{- end -}}
+
+{{- define "authproxy-demo.grafanaAuthProxy.datasourceUid" -}}
+{{- default "authproxy-app-metrics" .Values.grafanaAuthProxy.datasource.uid -}}
+{{- end -}}
+
+{{- define "authproxy-demo.grafanaAuthProxy.baseUrl" -}}
+{{- if .Values.grafanaAuthProxy.datasource.authproxyBaseUrl -}}
+{{- .Values.grafanaAuthProxy.datasource.authproxyBaseUrl -}}
+{{- else -}}
+{{- printf "http://%s:%v" (include "authproxy-demo.authproxy.serviceName" .) .Values.grafanaAuthProxy.datasource.authproxyApiPort -}}
+{{- end -}}
+{{- end -}}
+
 {{- define "authproxy-demo.labels" -}}
 helm.sh/chart: {{ printf "%s-%s" .Chart.Name .Chart.Version | quote }}
 app.kubernetes.io/instance: {{ .Release.Name }}
