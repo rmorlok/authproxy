@@ -449,6 +449,68 @@
       "required": ["series"],
       "additionalProperties": false
     },
+    "MetricsSchemaMetric": {
+      "type": "object",
+      "properties": {
+        "metric": {
+          "type": "string",
+          "enum": [
+            "request_events",
+            "request_events.errors",
+            "request_events.duration_ms",
+            "resources.connections",
+            "resources.actors",
+            "resources.connectors",
+            "resources.connector_versions",
+            "resources.namespaces",
+            "resources.rate_limits"
+          ]
+        },
+        "kind": {
+          "type": "string",
+          "enum": ["counter", "gauge"]
+        },
+        "aggregations": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": ["count", "avg", "p95"]
+          },
+          "minItems": 1
+        },
+        "group_by": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "type",
+              "method",
+              "response_status_code",
+              "response_source",
+              "connector_id",
+              "state",
+              "health_state",
+              "connector_version",
+              "namespace",
+              "mode"
+            ]
+          }
+        }
+      },
+      "required": ["metric", "kind", "aggregations", "group_by"],
+      "additionalProperties": false
+    },
+    "MetricsSchemaResponse": {
+      "type": "object",
+      "properties": {
+        "metrics": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/MetricsSchemaMetric" }
+        }
+      },
+      "required": ["metrics"],
+      "additionalProperties": false
+    },
     "Connector": {
       "description": "API summary projection of a connector version. This intentionally differs from the resource connector definition schema: fields such as logo are flattened for responses, while runtime fields such as state, has_configure, timestamps, version counts, and state summaries are added by the API. Request bodies and version detail responses reference the canonical resource schema under their definition fields.",
       "type": "object",

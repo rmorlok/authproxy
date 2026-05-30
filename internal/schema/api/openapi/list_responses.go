@@ -141,6 +141,13 @@ type ListRequestEventsResponseJson struct {
 	Total  *int64        `json:"total,omitempty"`
 }
 
+// MetricsSchemaResponseJson documents the metrics schema response.
+//
+//	@Description	Application metrics schema response
+type MetricsSchemaResponseJson struct {
+	Metrics []schemaapi.MetricsSchemaMetricJson `json:"metrics"`
+}
+
 // RequestEventJson documents the public request-event record projection.
 //
 //	@Description	HTTP request events entry

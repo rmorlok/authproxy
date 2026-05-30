@@ -5623,6 +5623,43 @@ const docTemplateApi = `{
                 }
             }
         },
+        "/metrics/schema": {
+            "get": {
+                "security": [
+                    {
+                        "BearerAuth": []
+                    }
+                ],
+                "description": "Get supported application metrics, aggregations, group-by dimensions, and metric kinds",
+                "produces": [
+                    "application/json"
+                ],
+                "tags": [
+                    "metrics"
+                ],
+                "summary": "Get application metrics schema",
+                "responses": {
+                    "200": {
+                        "description": "OK",
+                        "schema": {
+                            "$ref": "#/definitions/routes.OpenAPIMetricsSchemaResponse"
+                        }
+                    },
+                    "401": {
+                        "description": "Unauthorized",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    },
+                    "403": {
+                        "description": "Forbidden",
+                        "schema": {
+                            "$ref": "#/definitions/routes.ErrorResponse"
+                        }
+                    }
+                }
+            }
+        },
         "/namespaces": {
             "get": {
                 "security": [
@@ -7637,6 +7674,39 @@ const docTemplateApi = `{
                 }
             }
         },
+        "github_com_rmorlok_authproxy_internal_schema_api.MetricsSchemaMetricJson": {
+            "description": "Supported metric definition",
+            "type": "object",
+            "properties": {
+                "aggregations": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "count"
+                    ]
+                },
+                "group_by": {
+                    "type": "array",
+                    "items": {
+                        "type": "string"
+                    },
+                    "example": [
+                        "method",
+                        "response_status_code"
+                    ]
+                },
+                "kind": {
+                    "type": "string",
+                    "example": "counter"
+                },
+                "metric": {
+                    "type": "string",
+                    "example": "request_events"
+                }
+            }
+        },
         "github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson": {
             "description": "Namespace for organizing resources",
             "type": "object",
@@ -8442,6 +8512,18 @@ const docTemplateApi = `{
                 },
                 "total": {
                     "type": "integer"
+                }
+            }
+        },
+        "routes.OpenAPIMetricsSchemaResponse": {
+            "description": "Application metrics schema response",
+            "type": "object",
+            "properties": {
+                "metrics": {
+                    "type": "array",
+                    "items": {
+                        "$ref": "#/definitions/github_com_rmorlok_authproxy_internal_schema_api.MetricsSchemaMetricJson"
+                    }
                 }
             }
         },
