@@ -15,9 +15,27 @@ import (
 type ManifestStepType string
 
 const (
-	ManifestStepTypeForm      ManifestStepType = "form"
-	ManifestStepTypeRedirect  ManifestStepType = "redirect"
+	// ManifestStepTypeForm is a UI-rendered data-entry step. The setup API
+	// returns JSON Schema / UI Schema for the client to render, and the user
+	// submits values back through SubmitForm. Schema-defined preconnect /
+	// configure steps use this, and auth methods can use it for credential
+	// collection (for example API-key connectors).
+	ManifestStepTypeForm ManifestStepType = "form"
+
+	// ManifestStepTypeRedirect is a UI-visible off-platform handoff. The
+	// setup API returns a URL and the client sends the user there; completion
+	// happens later through a callback or signed return URL. OAuth2
+	// authorization-code setup uses this for the provider authorize URL, and
+	// connector-authored redirect steps can use it for external setup tasks.
+	ManifestStepTypeRedirect ManifestStepType = "redirect"
+
+	// ManifestStepTypeImmediate is a server-side step that runs as soon as
+	// the setup flow enters it. There is no form or redirect for the UI to
+	// render; the handler performs work and advances the connection to the
+	// next visible state. OAuth2 client_credentials uses this to exchange at
+	// the token endpoint without involving an end user.
 	ManifestStepTypeImmediate ManifestStepType = "immediate"
+
 	// ManifestStepTypeVerify is the type tag for the synthetic apxy:verify
 	// pseudo-step: the connection is waiting for the verify task to finish.
 	// The user sees a "verifying" response and polls; OnSubmit /
