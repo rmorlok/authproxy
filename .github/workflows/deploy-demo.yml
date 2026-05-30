@@ -20,12 +20,17 @@ name: Deploy Demo
 #   - `demo` namespace exists, with the four keypair Secrets created
 #     manually (jwt, encryption, demo-shell-key, actors) — A10 README's
 #     openssl one-shot covers this
+#   - The workflow derives/refreshes authproxy-grafana-jwt from the
+#     existing encryption Secret before every deploy.
 #   - Repo secrets:
 #       AWS_ROLE_ARN  : the role from `terraform output gh_actions_role_arn`
 #   - Repo variables (Settings → Variables):
 #       AWS_REGION    : e.g. us-east-1
 #       EKS_CLUSTER   : e.g. authproxy-eks
 #       DEMO_HOSTNAME : e.g. demo.authproxy.net
+#       GRAFANA_AUTHPROXY_PLUGIN_INSTALL : GF_INSTALL_PLUGINS override
+#         required to enable Grafana until the plugin is catalog-published,
+#         e.g. https://.../plugin.zip;rmorlok-authproxy-datasource
 
 on:
   push:
@@ -71,6 +76,11 @@ jobs:
         with:
           version: v3.16.4
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
       - name: Resolve image tag
         id: tag
         run: |
@@ -101,10 +111,38 @@ jobs:
         run: |
           # Same set the helm-chart-ci lint/install jobs use.
           helm repo add bitnami        https://charts.bitnami.com/bitnami
+          helm repo add grafana        https://grafana.github.io/helm-charts
           helm repo update
 
       - name: helm dependency update
         run: helm dependency update "${CHART_PATH}"
+
+      - name: Provision Grafana datasource JWT
+        run: |
+          set -euo pipefail
+          workdir="$(mktemp -d)"
+          trap 'rm -rf "${workdir}"' EXIT
+
+          # Database-backed actors without a self-signing key fall back to
+          # verifying actor-signed JWTs with the global AES key. The seeded
+          # `grafana` actor uses that path, and the token itself further
+          # restricts permissions via the Grafana logs preset.
+          kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-encryption" \
+            -o jsonpath='{.data.global_aes\.key}' \
+            | base64 -d > "${workdir}/global_aes.key"
+          chmod 600 "${workdir}/global_aes.key"
+
+          go run ./cmd/cli sign-jwt \
+            --actorId grafana \
+            --apis api,admin-api \
+            --grafana-preset logs \
+            --secretKeyPath "${workdir}/global_aes.key" \
+            > "${workdir}/grafana.jwt"
+
+          kubectl -n "${RELEASE_NS}" create secret generic authproxy-grafana-jwt \
+            --from-file=jwt="${workdir}/grafana.jwt" \
+            --dry-run=client -o yaml \
+            | kubectl apply -f -
 
       - name: Capture pre-deploy revision (for rollback)
         id: pre
@@ -125,29 +163,47 @@ jobs:
 
       - name: helm upgrade --install
         id: upgrade
+        env:
+          GRAFANA_PLUGIN_INSTALL: ${{ vars.GRAFANA_AUTHPROXY_PLUGIN_INSTALL }}
         run: |
           set -euo pipefail
-          helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \
-            --namespace "${RELEASE_NS}" --create-namespace \
-            --wait --timeout 10m \
-            --set "global.hostname=${{ vars.DEMO_HOSTNAME }}" \
-            --set "authproxy.image.tag=${{ steps.tag.outputs.tag }}" \
-            --set "demoShell.image.tag=${{ steps.tag.outputs.tag }}" \
+          helm_args=(
+            --namespace "${RELEASE_NS}" --create-namespace
+            --wait --timeout 10m
+            --set "global.hostname=${{ vars.DEMO_HOSTNAME }}"
+            --set "authproxy.image.tag=${{ steps.tag.outputs.tag }}"
+            --set "demoShell.image.tag=${{ steps.tag.outputs.tag }}"
             --set "seed.image.tag=${{ steps.tag.outputs.tag }}"
+          )
+
+          if [ -n "${GRAFANA_PLUGIN_INSTALL}" ]; then
+            helm_args+=(--set-string "grafana.plugins[0]=${GRAFANA_PLUGIN_INSTALL}")
+          else
+            echo "::warning::GRAFANA_AUTHPROXY_PLUGIN_INSTALL is unset; disabling Grafana for this demo deploy."
+            helm_args+=(--set "grafana.enabled=false" --set "grafanaAuthProxy.enabled=false")
+          fi
+
+          helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \
+            "${helm_args[@]}"
 
       - name: Wait for workload rollouts
         # `helm --wait` already blocks on the main release, but the
-        # umbrella's inline Deployments (demo-shell, go-oauth2-server)
-        # may need additional time. Cap at 5 min — past that, fall
-        # through to rollback.
+        # subchart + inline Deployments may need additional time. Skip
+        # disabled optional deployments so default-off workloads don't
+        # fail the deploy.
         timeout-minutes: 5
         run: |
           set -euo pipefail
           for d in \
             "${RELEASE_NAME}-authproxy" \
             "${RELEASE_NAME}-demo-shell" \
+            "${RELEASE_NAME}-grafana" \
             "${RELEASE_NAME}-go-oauth2-server" \
           ; do
+            if ! kubectl -n "${RELEASE_NS}" get "deployment/$d" >/dev/null 2>&1; then
+              echo "Skipping $d; deployment is not rendered."
+              continue
+            fi
             echo "Waiting for $d..."
             kubectl -n "${RELEASE_NS}" rollout status "deployment/$d" --timeout=5m
           done
@@ -191,5 +247,10 @@ jobs:
             echo "- Result:      ${{ job.status }}"
             echo "- Image tag:   \`${{ steps.tag.outputs.tag }}\`"
             echo "- Hostname:    \`https://${{ vars.DEMO_HOSTNAME }}/\`"
+            if kubectl -n "${RELEASE_NS}" get deployment "${RELEASE_NAME}-grafana" >/dev/null 2>&1; then
+              echo "- Grafana:     \`https://${{ vars.DEMO_HOSTNAME }}/grafana\`"
+            else
+              echo "- Grafana:     disabled for this deploy"
+            fi
             echo "- Helm rev:    \`$(helm history "${RELEASE_NAME}" -n "${RELEASE_NS}" -o json 2>/dev/null | jq -r '[.[] | select(.status=="deployed")] | last | .revision // "?"')\`"
           } >> "$GITHUB_STEP_SUMMARY"
