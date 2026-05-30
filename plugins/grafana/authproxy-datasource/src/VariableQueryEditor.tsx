@@ -1,11 +1,13 @@
 import React from 'react';
-import { SelectableValue, VariableQueryEditorProps } from '@grafana/data';
+import { SelectableValue } from '@grafana/data';
 import { InlineField, Input, Select } from '@grafana/ui';
 
-import { DataSource } from './DataSource';
-import { AuthProxyDataSourceOptions, AuthProxyVariableQuery, AuthProxyVariableType } from './types';
+import { AuthProxyVariableQuery, AuthProxyVariableType } from './types';
 
-type Props = VariableQueryEditorProps<DataSource, AuthProxyVariableQuery, AuthProxyDataSourceOptions>;
+interface Props {
+  query: AuthProxyVariableQuery;
+  onChange: (query: AuthProxyVariableQuery) => void;
+}
 
 const variableTypes: Array<SelectableValue<AuthProxyVariableType>> = [
   { label: 'Namespaces', value: 'namespaces' },

@@ -6,21 +6,17 @@ import {
   MetricFindValue,
   toDataFrame,
 } from '@grafana/data';
-import { DataSourceWithBackend } from '@grafana/runtime';
-import { lastValueFrom } from 'rxjs';
+import { DataSourceWithBackend, getTemplateSrv } from '@grafana/runtime';
 
 import { AuthProxyDataSourceOptions, AuthProxyQuery, AuthProxyVariableQuery } from './types';
 
 export class DataSource extends DataSourceWithBackend<AuthProxyQuery, AuthProxyDataSourceOptions> {
-  constructor(
-    instanceSettings: DataSourceInstanceSettings<AuthProxyDataSourceOptions>,
-    private readonly templateSrv?: { replace(value?: string): string }
-  ) {
+  constructor(instanceSettings: DataSourceInstanceSettings<AuthProxyDataSourceOptions>) {
     super(instanceSettings);
   }
 
   applyTemplateVariables(query: AuthProxyQuery): AuthProxyQuery {
-    const replace = this.templateSrv?.replace.bind(this.templateSrv) ?? ((value?: string) => value ?? '');
+    const replace = (value?: string) => getTemplateSrv().replace(value ?? '');
     return {
       ...query,
       namespace: replace(query.namespace),
@@ -62,7 +58,13 @@ export class DataSource extends DataSourceWithBackend<AuthProxyQuery, AuthProxyD
       timezone: 'browser',
     } as DataQueryRequest<AuthProxyQuery>;
 
-    const response = (await lastValueFrom(this.query(request))) as DataQueryResponse;
+    const response = await new Promise<DataQueryResponse>((resolve, reject) => {
+      const subscription = this.query(request).subscribe({
+        next: resolve,
+        error: reject,
+      });
+      return () => subscription.unsubscribe();
+    });
     const frame = response.data?.[0] ? toDataFrame(response.data[0]) : undefined;
     if (!frame) {
       return [];

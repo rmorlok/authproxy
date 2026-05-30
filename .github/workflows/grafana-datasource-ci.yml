@@ -1,0 +1,43 @@
+# schema: https://json.schemastore.org/github-workflow.json
+name: Grafana Datasource CI
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - 'plugins/grafana/authproxy-datasource/**'
+      - '.github/workflows/grafana-datasource-ci.yml'
+  pull_request:
+    branches: ['**']
+    paths:
+      - 'plugins/grafana/authproxy-datasource/**'
+      - '.github/workflows/grafana-datasource-ci.yml'
+
+jobs:
+  validate:
+    name: Build and typecheck Grafana datasource
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: plugins/grafana/authproxy-datasource
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version-file: plugins/grafana/authproxy-datasource/go.mod
+
+      - name: Use Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 22.x
+          cache: npm
+          cache-dependency-path: plugins/grafana/authproxy-datasource/package-lock.json
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Validate plugin
+        run: npm run validate
