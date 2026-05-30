@@ -355,9 +355,9 @@ func TestParseSetupStep(t *testing.T) {
 	})
 
 	t.Run("apxy-emitted pseudo-step", func(t *testing.T) {
-		s, err := ParseSetupStep("apxy:auth")
+		s, err := ParseSetupStep("apxy:verify")
 		require.NoError(t, err)
-		assert.True(t, s.Equals(SetupStepAuth))
+		assert.True(t, s.Equals(SetupStepVerify))
 		assert.True(t, s.IsApxyEmitted())
 	})
 
@@ -434,9 +434,9 @@ func TestSetupStepJSONMarshal(t *testing.T) {
 	})
 
 	t.Run("apxy-emitted id marshals as JSON string", func(t *testing.T) {
-		b, err := json.Marshal(SetupStepAuth)
+		b, err := json.Marshal(SetupStepVerify)
 		require.NoError(t, err)
-		assert.Equal(t, `"apxy:auth"`, string(b))
+		assert.Equal(t, `"apxy:verify"`, string(b))
 	})
 
 	t.Run("zero value marshals as null", func(t *testing.T) {
@@ -501,7 +501,7 @@ func TestSetupStepJSONUnmarshal(t *testing.T) {
 }
 
 func TestSetupStepYAMLRoundTrip(t *testing.T) {
-	cases := []string{"tenant", "apxy:auth", "apxy:verify_failed"}
+	cases := []string{"tenant", "apxy:verify", "apxy:verify_failed"}
 	for _, c := range cases {
 		t.Run(c, func(t *testing.T) {
 			parsed, err := ParseSetupStep(c)
@@ -530,18 +530,20 @@ func TestSetupStepYAMLRoundTrip(t *testing.T) {
 }
 
 func TestSetupStepIsApxyEmitted(t *testing.T) {
-	assert.True(t, SetupStepAuth.IsApxyEmitted())
 	assert.True(t, SetupStepVerify.IsApxyEmitted())
 	assert.True(t, SetupStepVerifyFailed.IsApxyEmitted())
 	assert.True(t, SetupStepAuthFailed.IsApxyEmitted())
+	// Auth-method-emitted steps (constructed in their own packages) also
+	// carry the prefix; the schema only knows the convention.
+	assert.True(t, MustNewSetupStep("apxy:auth:oauth2_authorize").IsApxyEmitted())
 	assert.False(t, MustNewSetupStep("tenant").IsApxyEmitted())
 }
 
 func TestSetupStepIsTerminalFailure(t *testing.T) {
 	assert.True(t, SetupStepVerifyFailed.IsTerminalFailure())
 	assert.True(t, SetupStepAuthFailed.IsTerminalFailure())
-	assert.False(t, SetupStepAuth.IsTerminalFailure())
 	assert.False(t, SetupStepVerify.IsTerminalFailure())
+	assert.False(t, MustNewSetupStep("apxy:auth:oauth2_authorize").IsTerminalFailure())
 	assert.False(t, MustNewSetupStep("tenant").IsTerminalFailure())
 }
 
@@ -616,7 +618,7 @@ func TestSetupFlow_IsConfigureStep(t *testing.T) {
 
 	assert.False(t, sf.IsConfigureStep(MustNewSetupStep("tenant")))
 	assert.True(t, sf.IsConfigureStep(MustNewSetupStep("workspace")))
-	assert.False(t, sf.IsConfigureStep(SetupStepAuth))
+	assert.False(t, sf.IsConfigureStep(SetupStepVerify))
 	assert.False(t, sf.IsConfigureStep(SetupStep{}))
 }
 

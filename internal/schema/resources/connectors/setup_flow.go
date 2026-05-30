@@ -84,11 +84,10 @@ func (sf *SetupFlow) TotalSteps() int {
 }
 
 // ApxyStepPrefix is the reserved prefix for system-emitted step ids. User-
-// authored step ids must not start with this prefix. The auth-method-emitted
-// steps that #366 introduces use "apxy:auth:<val>"; terminal pseudo-steps use
-// "apxy:verify_failed" / "apxy:auth_failed"; the verify pseudo-step is
-// "apxy:verify". The placeholder "apxy:auth" is the OAuth2-only wait state
-// until #366 replaces it with the auth-method-emitted redirect step.
+// authored step ids must not start with this prefix. Auth-method-emitted
+// steps use "apxy:auth:<val>" (e.g. "apxy:auth:oauth2_authorize");
+// terminal pseudo-steps use "apxy:verify_failed" / "apxy:auth_failed";
+// the verify pseudo-step is "apxy:verify".
 const ApxyStepPrefix = "apxy:"
 
 // SetupStep is the typed identifier for a step within a connection's setup
@@ -118,16 +117,17 @@ func MustNewSetupStep(id string) SetupStep {
 	return step
 }
 
-// Predefined SetupSteps for the system-emitted pseudo-steps.
+// Predefined SetupSteps for the system-emitted pseudo-steps the schema
+// itself owns.
 //
-//   - SetupStepAuth is the OAuth2-only "waiting for callback" placeholder.
-//     #366 replaces direct use of this with auth-method-emitted redirect
-//     steps whose ids are method-specific (e.g. apxy:auth:oauth2_authorize).
 //   - SetupStepVerify is the post-auth "probes running" pseudo-step.
 //   - SetupStepVerifyFailed and SetupStepAuthFailed are terminal failure
 //     pseudo-steps; connections in these are retryable via the retry endpoint.
+//
+// Auth-method-emitted steps (e.g. apxy:auth:oauth2_authorize) are not
+// predefined here — they're constructed in the respective auth_methods/*
+// packages and exposed as package-level constants there.
 var (
-	SetupStepAuth         = MustNewSetupStep(ApxyStepPrefix + "auth")
 	SetupStepVerify       = MustNewSetupStep(ApxyStepPrefix + "verify")
 	SetupStepVerifyFailed = MustNewSetupStep(ApxyStepPrefix + "verify_failed")
 	SetupStepAuthFailed   = MustNewSetupStep(ApxyStepPrefix + "auth_failed")
