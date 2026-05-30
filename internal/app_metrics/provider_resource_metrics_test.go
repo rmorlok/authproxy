@@ -175,6 +175,131 @@ func TestResourceMetrics_ActorCountsByNamespace(t *testing.T) {
 	}, series[1].Points)
 }
 
+func TestResourceMetrics_AdditionalResourceCounts(t *testing.T) {
+	store, retriever, _ := MustNewBlankRequestEventsStore(t)
+	resourceStore := store.(ResourceSampleStore)
+
+	ctx := context.Background()
+	start := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)
+	connectorID := apid.New(apid.PrefixConnectorVersion)
+	rateLimitID := apid.New(apid.PrefixRateLimit)
+
+	require.NoError(t, resourceStore.StoreConnectorResourceSamples(ctx, []*ConnectorResourceSample{
+		{
+			SampledAt:         start,
+			ResourceID:        connectorID,
+			Namespace:         "root.acme",
+			Labels:            database.Labels{"env": "prod"},
+			State:             database.ConnectorVersionStatePrimary,
+			ConnectorVersion:  2,
+			TotalVersions:     2,
+			ResourceCreatedAt: start.Add(-time.Hour),
+			ResourceUpdatedAt: start,
+		},
+	}))
+	require.NoError(t, resourceStore.StoreConnectorVersionResourceSamples(ctx, []*ConnectorVersionResourceSample{
+		{
+			SampledAt:         start,
+			ResourceID:        connectorID,
+			Namespace:         "root.acme",
+			Labels:            database.Labels{"env": "prod"},
+			State:             database.ConnectorVersionStatePrimary,
+			ConnectorVersion:  2,
+			ResourceCreatedAt: start.Add(-time.Hour),
+			ResourceUpdatedAt: start,
+		},
+	}))
+	require.NoError(t, resourceStore.StoreNamespaceResourceSamples(ctx, []*NamespaceResourceSample{
+		{
+			SampledAt:         start,
+			ResourceID:        "root.acme",
+			Namespace:         "root.acme",
+			Labels:            database.Labels{"env": "prod"},
+			State:             database.NamespaceStateActive,
+			ResourceCreatedAt: start.Add(-time.Hour),
+			ResourceUpdatedAt: start,
+		},
+	}))
+	require.NoError(t, resourceStore.StoreRateLimitResourceSamples(ctx, []*RateLimitResourceSample{
+		{
+			SampledAt:         start,
+			ResourceID:        rateLimitID,
+			Namespace:         "root.acme",
+			Labels:            database.Labels{"env": "prod"},
+			Mode:              "observe",
+			ResourceCreatedAt: start.Add(-time.Hour),
+			ResourceUpdatedAt: start,
+		},
+	}))
+
+	series, err := retriever.QueryResourceMetrics(ctx, []ResourceMetricsQuery{
+		{
+			RefID:             "connectors",
+			Metric:            ResourceMetricConnectorsCount,
+			Start:             start,
+			End:               start.Add(30 * time.Minute),
+			Step:              15 * time.Minute,
+			NamespaceMatchers: []string{"root.acme"},
+			LabelSelector:     "env=prod",
+			GroupBy:           []ResourceGroupBy{ResourceGroupByState, ResourceGroupByConnectorVersion},
+		},
+		{
+			RefID:             "namespaces",
+			Metric:            ResourceMetricNamespacesCount,
+			Start:             start,
+			End:               start.Add(30 * time.Minute),
+			Step:              15 * time.Minute,
+			NamespaceMatchers: []string{"root.acme"},
+			LabelSelector:     "env=prod",
+			GroupBy:           []ResourceGroupBy{ResourceGroupByState},
+		},
+		{
+			RefID:             "connector-versions",
+			Metric:            ResourceMetricConnectorVersionsCount,
+			Start:             start,
+			End:               start.Add(30 * time.Minute),
+			Step:              15 * time.Minute,
+			NamespaceMatchers: []string{"root.acme"},
+			LabelSelector:     "env=prod",
+			GroupBy:           []ResourceGroupBy{ResourceGroupByConnectorID, ResourceGroupByConnectorVersion},
+		},
+		{
+			RefID:             "rate-limits",
+			Metric:            ResourceMetricRateLimitsCount,
+			Start:             start,
+			End:               start.Add(30 * time.Minute),
+			Step:              15 * time.Minute,
+			NamespaceMatchers: []string{"root.acme"},
+			LabelSelector:     "env=prod",
+			GroupBy:           []ResourceGroupBy{ResourceGroupByMode},
+		},
+	})
+	require.NoError(t, err)
+	require.Len(t, series, 4)
+
+	require.Equal(t, "connectors", series[0].RefID)
+	require.Equal(t, map[string]string{
+		"connector_version": "2",
+		"state":             string(database.ConnectorVersionStatePrimary),
+	}, series[0].Labels)
+	require.Equal(t, []ResourceMetricPoint{{Timestamp: start, Value: 1}, {Timestamp: start.Add(15 * time.Minute), Value: 0}}, series[0].Points)
+
+	require.Equal(t, "namespaces", series[1].RefID)
+	require.Equal(t, map[string]string{"state": string(database.NamespaceStateActive)}, series[1].Labels)
+	require.Equal(t, []ResourceMetricPoint{{Timestamp: start, Value: 1}, {Timestamp: start.Add(15 * time.Minute), Value: 0}}, series[1].Points)
+
+	require.Equal(t, "connector-versions", series[2].RefID)
+	require.Equal(t, map[string]string{
+		"connector_id":      connectorID.String(),
+		"connector_version": "2",
+	}, series[2].Labels)
+	require.Equal(t, []ResourceMetricPoint{{Timestamp: start, Value: 1}, {Timestamp: start.Add(15 * time.Minute), Value: 0}}, series[2].Points)
+
+	require.Equal(t, "rate-limits", series[3].RefID)
+	require.Equal(t, map[string]string{"mode": "observe"}, series[3].Labels)
+	require.Equal(t, []ResourceMetricPoint{{Timestamp: start, Value: 1}, {Timestamp: start.Add(15 * time.Minute), Value: 0}}, series[3].Points)
+}
+
 func TestResourceMetrics_InvalidGroupBy(t *testing.T) {
 	_, retriever, _ := MustNewBlankRequestEventsStore(t)
 	start := time.Date(2026, 5, 25, 12, 0, 0, 0, time.UTC)

@@ -19,6 +19,10 @@ type RecordStore interface {
 type ResourceSampleStore interface {
 	StoreConnectionResourceSamples(ctx context.Context, samples []*ConnectionResourceSample) error
 	StoreActorResourceSamples(ctx context.Context, samples []*ActorResourceSample) error
+	StoreConnectorResourceSamples(ctx context.Context, samples []*ConnectorResourceSample) error
+	StoreConnectorVersionResourceSamples(ctx context.Context, samples []*ConnectorVersionResourceSample) error
+	StoreNamespaceResourceSamples(ctx context.Context, samples []*NamespaceResourceSample) error
+	StoreRateLimitResourceSamples(ctx context.Context, samples []*RateLimitResourceSample) error
 }
 
 type migratable interface {
@@ -53,4 +57,8 @@ type RecordRetriever interface {
 type ResourceSampleRetriever interface {
 	ListConnectionResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ConnectionResourceSample, error)
 	ListActorResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ActorResourceSample, error)
+	ListConnectorResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ConnectorResourceSample, error)
+	ListConnectorVersionResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ConnectorVersionResourceSample, error)
+	ListNamespaceResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*NamespaceResourceSample, error)
+	ListRateLimitResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*RateLimitResourceSample, error)
 }

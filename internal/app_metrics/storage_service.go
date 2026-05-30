@@ -67,12 +67,44 @@ func (ss *StorageService) StoreActorResourceSamples(ctx context.Context, samples
 	return ss.store.(ResourceSampleStore).StoreActorResourceSamples(ctx, samples)
 }
 
+func (ss *StorageService) StoreConnectorResourceSamples(ctx context.Context, samples []*ConnectorResourceSample) error {
+	return ss.store.(ResourceSampleStore).StoreConnectorResourceSamples(ctx, samples)
+}
+
+func (ss *StorageService) StoreConnectorVersionResourceSamples(ctx context.Context, samples []*ConnectorVersionResourceSample) error {
+	return ss.store.(ResourceSampleStore).StoreConnectorVersionResourceSamples(ctx, samples)
+}
+
+func (ss *StorageService) StoreNamespaceResourceSamples(ctx context.Context, samples []*NamespaceResourceSample) error {
+	return ss.store.(ResourceSampleStore).StoreNamespaceResourceSamples(ctx, samples)
+}
+
+func (ss *StorageService) StoreRateLimitResourceSamples(ctx context.Context, samples []*RateLimitResourceSample) error {
+	return ss.store.(ResourceSampleStore).StoreRateLimitResourceSamples(ctx, samples)
+}
+
 func (ss *StorageService) ListConnectionResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ConnectionResourceSample, error) {
 	return ss.retriever.(ResourceSampleRetriever).ListConnectionResourceSamples(ctx, query)
 }
 
 func (ss *StorageService) ListActorResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ActorResourceSample, error) {
 	return ss.retriever.(ResourceSampleRetriever).ListActorResourceSamples(ctx, query)
+}
+
+func (ss *StorageService) ListConnectorResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ConnectorResourceSample, error) {
+	return ss.retriever.(ResourceSampleRetriever).ListConnectorResourceSamples(ctx, query)
+}
+
+func (ss *StorageService) ListConnectorVersionResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*ConnectorVersionResourceSample, error) {
+	return ss.retriever.(ResourceSampleRetriever).ListConnectorVersionResourceSamples(ctx, query)
+}
+
+func (ss *StorageService) ListNamespaceResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*NamespaceResourceSample, error) {
+	return ss.retriever.(ResourceSampleRetriever).ListNamespaceResourceSamples(ctx, query)
+}
+
+func (ss *StorageService) ListRateLimitResourceSamples(ctx context.Context, query ResourceSampleQuery) ([]*RateLimitResourceSample, error) {
+	return ss.retriever.(ResourceSampleRetriever).ListRateLimitResourceSamples(ctx, query)
 }
 
 func (ss *StorageService) GetFullLog(ctx context.Context, id apid.ID) (*FullLog, error) {

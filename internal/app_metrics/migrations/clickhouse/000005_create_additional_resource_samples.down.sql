@@ -1,0 +1,4 @@
+DROP TABLE IF EXISTS app_metrics_rate_limit_resource_samples;
+DROP TABLE IF EXISTS app_metrics_namespace_resource_samples;
+DROP TABLE IF EXISTS app_metrics_connector_version_resource_samples;
+DROP TABLE IF EXISTS app_metrics_connector_resource_samples;

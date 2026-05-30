@@ -310,6 +310,22 @@ func resourceMetricFromAPI(metric, aggregation string) (app_metrics.ResourceMetr
 		if aggregation == "count" {
 			return app_metrics.ResourceMetricActorsCount, nil
 		}
+	case "resources.connectors":
+		if aggregation == "count" {
+			return app_metrics.ResourceMetricConnectorsCount, nil
+		}
+	case "resources.connector_versions":
+		if aggregation == "count" {
+			return app_metrics.ResourceMetricConnectorVersionsCount, nil
+		}
+	case "resources.namespaces":
+		if aggregation == "count" {
+			return app_metrics.ResourceMetricNamespacesCount, nil
+		}
+	case "resources.rate_limits":
+		if aggregation == "count" {
+			return app_metrics.ResourceMetricRateLimitsCount, nil
+		}
 	}
 	return "", httperr.BadRequestf("unsupported metric aggregation %q/%q", metric, aggregation)
 }
