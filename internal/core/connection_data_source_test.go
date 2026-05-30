@@ -71,7 +71,8 @@ func TestGetDataSource(t *testing.T) {
 				},
 			},
 		})
-		step := cschema.SetupStepAuth
+		// A pseudo-step (or any non-configure step) gates data-source access.
+		step := cschema.SetupStepVerify
 		conn.SetupStep = &step
 
 		_, err := conn.GetDataSource(context.Background(), "some_source")

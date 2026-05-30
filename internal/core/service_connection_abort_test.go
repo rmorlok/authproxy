@@ -5,6 +5,7 @@ import (
 	"testing"
 
 	"github.com/golang/mock/gomock"
+	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/database"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
 	"github.com/rmorlok/authproxy/internal/encrypt"
@@ -70,7 +71,7 @@ func TestAbortConnection(t *testing.T) {
 		ctrl := gomock.NewController(t)
 		defer ctrl.Finish()
 
-		step := cschema.SetupStepAuth
+		step := cschema.MustNewSetupStep(oauth2.OAuth2AuthorizeStepId)
 		conn, db := setupAbortTest(t, ctrl, &cschema.SetupFlow{
 			Preconnect: &cschema.SetupFlowPhase{
 				Steps: []cschema.SetupFlowStep{
