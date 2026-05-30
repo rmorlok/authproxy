@@ -1,0 +1,325 @@
+# schema: https://json.schemastore.org/github-workflow.json
+name: Deploy Dev
+
+# Deploys one isolated authproxy-demo environment per pull request.
+# The namespace is derived from the PR branch name and the image tag is
+# the Build Image workflow's PR tag: `pr-<number>`.
+#
+# Fork PRs are skipped deliberately: the image workflow does not push
+# GHCR tags for forks, and deploying untrusted fork code with AWS OIDC
+# would be the wrong trust boundary.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [opened, synchronize, reopened]
+
+permissions:
+  actions: read
+  contents: read
+  id-token: write
+  packages: read
+
+concurrency:
+  group: deploy-dev-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  deploy:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: gha-eks
+    timeout-minutes: 45
+
+    env:
+      RELEASE_NAME: dev
+      CHART_PATH: deploy/charts/authproxy-demo
+      DEV_DOMAIN: ${{ vars.DEV_DOMAIN || 'dev.authproxy.net' }}
+      REGISTRY: ghcr.io
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+      PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Resolve environment names
+        id: env
+        run: |
+          set -euo pipefail
+
+          # DNS-1123 label: lowercase alnum + "-", max 63 chars, no edge "-".
+          label="$(printf '%s' "${BRANCH_NAME}" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-+/-/g')"
+          if [ -z "${label}" ]; then
+            label="pr-${PR_NUMBER}"
+          fi
+
+          # Keep room for the namespace's "dev-" prefix.
+          label="${label:0:59}"
+          label="$(printf '%s' "${label}" | sed -E 's/-+$//')"
+          if [ -z "${label}" ]; then
+            label="pr-${PR_NUMBER}"
+          fi
+
+          namespace="dev-${label}"
+          hostname="${label}.${DEV_DOMAIN}"
+          image_tag="pr-${PR_NUMBER}"
+
+          {
+            echo "label=${label}"
+            echo "namespace=${namespace}"
+            echo "hostname=${hostname}"
+            echo "image_tag=${image_tag}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Namespace: ${namespace}"
+          echo "Hostname:  https://${hostname}/"
+          echo "Image tag: ${image_tag}"
+
+      - name: Wait for Build Image workflow
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          deadline=$((SECONDS + 30 * 60))
+          while true; do
+            run_json="$(gh run list \
+              --workflow "Build Image" \
+              --commit "${PR_HEAD_SHA}" \
+              --event pull_request \
+              --json databaseId,status,conclusion \
+              --limit 1 \
+              --jq '.[0] // empty')"
+
+            if [ -n "${run_json}" ]; then
+              status="$(jq -r '.status' <<<"${run_json}")"
+              conclusion="$(jq -r '.conclusion // ""' <<<"${run_json}")"
+              run_id="$(jq -r '.databaseId' <<<"${run_json}")"
+              echo "Build Image run ${run_id}: ${status} ${conclusion}"
+
+              if [ "${status}" = "completed" ]; then
+                if [ "${conclusion}" = "success" ]; then
+                  exit 0
+                fi
+                echo "Build Image run ${run_id} finished with ${conclusion}" >&2
+                exit 1
+              fi
+            else
+              echo "Build Image run for ${PR_HEAD_SHA} has not appeared yet."
+            fi
+
+            if [ "${SECONDS}" -ge "${deadline}" ]; then
+              echo "Timed out waiting for Build Image on ${PR_HEAD_SHA}" >&2
+              exit 1
+            fi
+
+            sleep 15
+          done
+
+      - name: Wait for PR image tag in GHCR
+        run: |
+          set -euo pipefail
+
+          tag="${{ steps.env.outputs.image_tag }}"
+          owner="$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          images=(
+            authproxy
+            authproxy-demo-shell
+            authproxy-demo-seed
+          )
+
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | docker login "${REGISTRY}" -u "${{ github.actor }}" --password-stdin >/dev/null
+
+          deadline=$((SECONDS + 30 * 60))
+          while true; do
+            missing=()
+            for image in "${images[@]}"; do
+              ref="${REGISTRY}/${owner}/${image}:${tag}"
+              if docker manifest inspect "${ref}" >/dev/null 2>&1; then
+                echo "Found ${ref}"
+              else
+                missing+=("${ref}")
+              fi
+            done
+
+            if [ "${#missing[@]}" -eq 0 ]; then
+              exit 0
+            fi
+
+            if [ "${SECONDS}" -ge "${deadline}" ]; then
+              echo "Timed out waiting for image tag ${tag}. Missing:" >&2
+              printf '  %s\n' "${missing[@]}" >&2
+              exit 1
+            fi
+
+            echo "Waiting for Build Image to publish ${tag}:"
+            printf '  %s\n' "${missing[@]}"
+            sleep 30
+          done
+
+      - name: Assume GH Actions role via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Wire kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name "${{ vars.EKS_CLUSTER }}" \
+            --region "${{ vars.AWS_REGION }}"
+          kubectl get nodes -o wide
+
+      - name: Register Helm repos for subcharts
+        run: |
+          helm repo add bitnami https://charts.bitnami.com/bitnami
+          helm repo add grafana https://grafana.github.io/helm-charts
+          helm repo update
+
+      - name: helm dependency update
+        run: helm dependency update "${CHART_PATH}"
+
+      - name: Provision dev namespace secrets
+        env:
+          RELEASE_NS: ${{ steps.env.outputs.namespace }}
+        run: |
+          set -euo pipefail
+
+          workdir="$(mktemp -d)"
+          trap 'rm -rf "${workdir}"' EXIT
+
+          kubectl create ns "${RELEASE_NS}" --dry-run=client -o yaml | kubectl apply -f -
+
+          if ! kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-jwt" >/dev/null 2>&1; then
+            openssl genrsa -out "${workdir}/system" 2048
+            openssl rsa -in "${workdir}/system" -pubout -out "${workdir}/system.pub"
+            kubectl -n "${RELEASE_NS}" create secret generic "${RELEASE_NAME}-jwt" \
+              --from-file=system="${workdir}/system" \
+              --from-file=system.pub="${workdir}/system.pub"
+          else
+            echo "Reusing ${RELEASE_NAME}-jwt"
+          fi
+
+          if ! kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-encryption" >/dev/null 2>&1; then
+            openssl rand -out "${workdir}/global_aes.key" 32
+            kubectl -n "${RELEASE_NS}" create secret generic "${RELEASE_NAME}-encryption" \
+              --from-file=global_aes.key="${workdir}/global_aes.key"
+          else
+            echo "Reusing ${RELEASE_NAME}-encryption"
+          fi
+
+          if ! kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-demo-shell-key" >/dev/null 2>&1; then
+            openssl genrsa -out "${workdir}/demo-shell" 2048
+            openssl rsa -in "${workdir}/demo-shell" -pubout -out "${workdir}/demo-shell.pub"
+            kubectl -n "${RELEASE_NS}" create secret generic "${RELEASE_NAME}-demo-shell-key" \
+              --from-file=private="${workdir}/demo-shell" \
+              --from-file=demo-shell.pub="${workdir}/demo-shell.pub"
+          else
+            kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-demo-shell-key" \
+              -o jsonpath='{.data.demo-shell\.pub}' \
+              | base64 -d > "${workdir}/demo-shell.pub"
+            echo "Reusing ${RELEASE_NAME}-demo-shell-key"
+          fi
+
+          if ! kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-actors" >/dev/null 2>&1; then
+            kubectl -n "${RELEASE_NS}" create secret generic "${RELEASE_NAME}-actors" \
+              --from-file=demo-shell.pub="${workdir}/demo-shell.pub" \
+              --from-file=demo-admin.pub="${workdir}/demo-shell.pub" \
+              --from-file=demo-user.pub="${workdir}/demo-shell.pub" \
+              --from-file=fresh-user.pub="${workdir}/demo-shell.pub" \
+              --from-file=grafana.pub="${workdir}/demo-shell.pub"
+          else
+            echo "Reusing ${RELEASE_NAME}-actors"
+          fi
+
+      - name: helm upgrade --install
+        env:
+          RELEASE_NS: ${{ steps.env.outputs.namespace }}
+        run: |
+          set -euo pipefail
+          helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \
+            --namespace "${RELEASE_NS}" \
+            --wait --timeout 10m \
+            --set "global.hostname=${{ steps.env.outputs.hostname }}" \
+            --set "authproxy.image.tag=${{ steps.env.outputs.image_tag }}" \
+            --set "demoShell.image.tag=${{ steps.env.outputs.image_tag }}" \
+            --set "seed.image.tag=${{ steps.env.outputs.image_tag }}" \
+            --set "grafana.enabled=false" \
+            --set "grafanaAuthProxy.enabled=false"
+
+      - name: Wait for workload rollouts
+        timeout-minutes: 5
+        env:
+          RELEASE_NS: ${{ steps.env.outputs.namespace }}
+        run: |
+          set -euo pipefail
+          for d in \
+            "${RELEASE_NAME}-authproxy" \
+            "${RELEASE_NAME}-demo-shell" \
+            "${RELEASE_NAME}-grafana" \
+            "${RELEASE_NAME}-go-oauth2-server"
+          do
+            if ! kubectl -n "${RELEASE_NS}" get "deployment/$d" >/dev/null 2>&1; then
+              echo "Skipping $d; deployment is not rendered."
+              continue
+            fi
+            kubectl -n "${RELEASE_NS}" rollout status "deployment/$d" --timeout=5m
+          done
+
+      - name: Wait for TLS certificate
+        timeout-minutes: 20
+        env:
+          RELEASE_NS: ${{ steps.env.outputs.namespace }}
+        run: |
+          set -euo pipefail
+          cert_name="${RELEASE_NAME}-demo-tls"
+          if kubectl -n "${RELEASE_NS}" wait \
+            --for=condition=Ready \
+            "certificate/${cert_name}" \
+            --timeout=18m; then
+            exit 0
+          fi
+
+          kubectl -n "${RELEASE_NS}" describe "certificate/${cert_name}" || true
+          kubectl -n "${RELEASE_NS}" get certificate,order,challenge || true
+          exit 1
+
+      - name: Smoke test
+        timeout-minutes: 5
+        run: |
+          set -euo pipefail
+          url="https://${{ steps.env.outputs.hostname }}/"
+          echo "Smoke-testing ${url}"
+          for i in $(seq 1 12); do
+            if curl -fsS --max-time 10 -o /dev/null "${url}"; then
+              echo "OK"
+              exit 0
+            fi
+            echo "attempt ${i}: not ready yet, sleeping 5s"
+            sleep 5
+          done
+          echo "Smoke test failed after 60s" >&2
+          exit 1
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Dev deploy"
+            echo ""
+            echo "- Result:    ${{ job.status }}"
+            echo "- Namespace: \`${{ steps.env.outputs.namespace }}\`"
+            echo "- Hostname:  \`https://${{ steps.env.outputs.hostname }}/\`"
+            echo "- Image tag: \`${{ steps.env.outputs.image_tag }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
