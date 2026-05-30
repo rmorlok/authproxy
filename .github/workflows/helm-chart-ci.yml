@@ -68,6 +68,7 @@ jobs:
           helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
           # authproxy-demo umbrella chart
           helm repo add bitnami        https://charts.bitnami.com/bitnami
+          helm repo add grafana        https://grafana.github.io/helm-charts
           helm repo update
 
       - name: ct lint
@@ -111,6 +112,7 @@ jobs:
           helm repo add external-dns   https://kubernetes-sigs.github.io/external-dns/
           helm repo add metrics-server https://kubernetes-sigs.github.io/metrics-server/
           helm repo add bitnami        https://charts.bitnami.com/bitnami
+          helm repo add grafana        https://grafana.github.io/helm-charts
           helm repo update
 
       - name: Set up Docker Buildx

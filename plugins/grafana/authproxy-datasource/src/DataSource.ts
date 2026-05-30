@@ -36,6 +36,13 @@ export class DataSource extends DataSourceWithBackend<AuthProxyQuery, AuthProxyD
 
   async metricFindQuery(query: AuthProxyVariableQuery): Promise<MetricFindValue[]> {
     const now = dateTime();
+    const replace = (value?: string) => getTemplateSrv().replace(value ?? '');
+    const variableQuery: AuthProxyVariableQuery = {
+      ...query,
+      namespace: replace(query.namespace),
+      labelSelector: replace(query.labelSelector),
+      connectorId: replace(query.connectorId),
+    };
     const request = {
       app: 'dashboard',
       requestId: 'authproxy-variable-query',
@@ -52,7 +59,7 @@ export class DataSource extends DataSourceWithBackend<AuthProxyQuery, AuthProxyD
         {
           refId: 'VariableQuery',
           queryType: 'variable',
-          variable: query,
+          variable: variableQuery,
         },
       ],
       timezone: 'browser',

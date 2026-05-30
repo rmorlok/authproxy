@@ -58,3 +58,8 @@ dependencies:
     version: "14.7.16"
     repository: https://charts.bitnami.com/bitnami
     condition: minio.enabled
+
+  - name: grafana
+    version: "8.10.1"
+    repository: https://grafana.github.io/helm-charts
+    condition: grafana.enabled

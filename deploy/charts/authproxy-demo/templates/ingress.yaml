@@ -9,6 +9,7 @@
     /api              → AuthProxy api
     /public           → AuthProxy public (OAuth callbacks etc.)
     /oauth2           → go-oauth2-server (demo connector target)
+    /grafana          → Grafana demo dashboards
 
   AuthProxy's single Service carries all four ports (named `api`,
   `admin-api`, `public`, `worker-health`); per-path entries target the
@@ -81,6 +82,15 @@ spec:
             backend:
               service:
                 name: {{ include "authproxy-demo.goOauth2Server.name" . }}
+                port:
+                  number: 80
+          {{- end }}
+          {{- if .Values.grafana.enabled }}
+          - path: /grafana
+            pathType: Prefix
+            backend:
+              service:
+                name: {{ include "authproxy-demo.grafana.serviceName" . }}
                 port:
                   number: 80
           {{- end }}

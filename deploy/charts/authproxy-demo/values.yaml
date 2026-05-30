@@ -5,6 +5,7 @@
 #   demoShell        — inline Deployment for the SSO stand-in host
 #   goOauth2Server   — inline Deployment for the demo connector target
 #   ingress          — single Ingress, sub-path routing
+#   grafana          — optional Grafana subchart + app-metrics dashboards
 #   secrets          — auto-generation toggles for keys + passwords
 #   authproxy / postgresql / redis / minio — subchart passthroughs
 
@@ -75,6 +76,58 @@ ingress:
   # -- TLS handled by cert-manager via the cluster-issuer annotation.
   tls: true
 
+grafanaAuthProxy:
+  # -- Render the AuthProxy datasource and dashboard provisioning ConfigMaps
+  # consumed by the Grafana chart sidecars.
+  enabled: true
+  datasource:
+    enabled: true
+    # -- Datasource name shown in Grafana.
+    name: AuthProxy
+    # -- Stable UID used by the sample dashboards.
+    uid: authproxy-app-metrics
+    # -- Internal AuthProxy API port. Matches deploy/charts/authproxy
+    # `ports.api` default; override if the inner chart port is customized.
+    authproxyApiPort: 8081
+    # -- Override the full AuthProxy base URL used by the datasource.
+    # Defaults to http://<release>-authproxy:<authproxyApiPort>.
+    authproxyBaseUrl: ""
+    # -- Grafana reads this environment variable when provisioning the
+    # datasource. The grafana.envValueFrom block below wires it from a Secret.
+    jwtEnvVar: AUTHPROXY_GRAFANA_JWT
+  dashboards:
+    enabled: true
+
+grafana:
+  enabled: true
+  # -- Install the AuthProxy datasource plugin. If installing from a
+  # release artifact URL instead of the Grafana catalog, override this with
+  # the GF_INSTALL_PLUGINS entry format: https://.../plugin.zip;plugin-folder.
+  plugins:
+    - rmorlok-authproxy-datasource
+  # -- The demo Ingress serves Grafana under /grafana.
+  grafana.ini:
+    plugins:
+      allow_loading_unsigned_plugins: rmorlok-authproxy-datasource
+    server:
+      root_url: "%(protocol)s://%(domain)s/grafana/"
+      serve_from_sub_path: true
+  sidecar:
+    dashboards:
+      enabled: true
+      label: grafana_dashboard
+      provider:
+        allowUiUpdates: true
+    datasources:
+      enabled: true
+      label: grafana_datasource
+  envValueFrom:
+    AUTHPROXY_GRAFANA_JWT:
+      secretKeyRef:
+        # Create this Secret before install/upgrade; see README.
+        name: authproxy-grafana-jwt
+        key: jwt
+
 secrets:
   # -- When true, the chart auto-generates DB / Redis / MinIO passwords
   # on first install via sprig random helpers. Subsequent upgrades
@@ -121,6 +174,11 @@ seed:
       labels:
         demo: "true"
         role: user
+    - external_id: grafana
+      namespace: root
+      labels:
+        demo: "true"
+        role: datasource
 
 # ---------------------------------------------------------------------------
 # Subchart passthroughs — see each upstream's values.yaml for the full

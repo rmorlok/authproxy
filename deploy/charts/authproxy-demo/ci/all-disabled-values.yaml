@@ -28,6 +28,12 @@ secrets:
 seed:
   enabled: false
 
+grafanaAuthProxy:
+  enabled: false
+
+grafana:
+  enabled: false
+
 authproxy:
   enabled: false
 
