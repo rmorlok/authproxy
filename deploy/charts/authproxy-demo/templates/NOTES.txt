@@ -12,6 +12,13 @@ Next steps
      kubectl -n {{ .Release.Namespace }} get pods -l app.kubernetes.io/instance={{ .Release.Name }}
 
 3. Open https://{{ .Values.global.hostname }} — pick a demo actor + destination, click sign-in.
+{{- if .Values.grafana.enabled }}
+
+4. Open https://{{ .Values.global.hostname }}/grafana for the provisioned
+   app-metrics dashboards. Grafana needs Secret `authproxy-grafana-jwt`
+   in namespace `{{ .Release.Namespace }}` so the AuthProxy datasource
+   can authenticate.
+{{- end }}
 
 The shell signs a JWT using the auto-generated demo-shell admin keypair
 (stored in Secret `{{ .Release.Name }}-demo-shell-key`) and redirects you

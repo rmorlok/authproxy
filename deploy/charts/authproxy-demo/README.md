@@ -32,7 +32,7 @@ production install path is `deploy/charts/authproxy` directly.
 
 ```bash
 cd deploy/charts/authproxy-demo
-helm dependency update      # pulls authproxy/* and the bitnami charts
+helm dependency update      # pulls authproxy/*, Grafana, and the bitnami charts
 
 helm upgrade --install demo . \
   --namespace demo --create-namespace \
@@ -70,7 +70,7 @@ key, so these need real openssl). Create them in the release namespace
 | `<release>-encryption`     | `global_aes.key` (32 raw bytes)                |
 | `<release>-demo-shell-key` | `private` (RSA private), `demo-shell.pub`      |
 | `<release>-actors`         | `demo-shell.pub` (matching the above)          |
-| `authproxy-grafana-jwt`    | `jwt` (Grafana datasource bearer token)        |
+| `authproxy-grafana-jwt`    | `jwt` (Grafana datasource bearer token, can be generated after `<release>-encryption`) |
 
 A reference one-shot generator:
 
@@ -96,10 +96,17 @@ kubectl -n "$NS" create secret generic "$RELEASE-demo-shell-key" \
 kubectl -n "$NS" create secret generic "$RELEASE-actors" \
   --from-file=demo-shell.pub="$work/demo-shell.pub"
 
-# Metrics plus request-event metadata tables. The actor identified in
-# the token must have matching normal AuthProxy permissions; the
-# Grafana preset only restricts the token further.
-ap sign-jwt --actorId grafana --apis api,admin-api --grafana-preset logs > "$work/grafana.jwt"
+# Metrics plus request-event metadata tables. Database-backed actors
+# without their own self-signing key are verified with the global AES
+# key, and the Grafana preset only restricts the token further. The
+# actor identified in the token must still have matching normal
+# AuthProxy permissions.
+ap sign-jwt \
+  --actorId grafana \
+  --apis api,admin-api \
+  --grafana-preset logs \
+  --secretKeyPath "$work/global_aes.key" \
+  > "$work/grafana.jwt"
 kubectl -n "$NS" create secret generic authproxy-grafana-jwt \
   --from-file=jwt="$work/grafana.jwt"
 ```
@@ -176,6 +183,11 @@ By default the chart asks Grafana to install the
 release artifact before it is available in the Grafana catalog, override
 `grafana.plugins[0]` with Grafana's URL install format:
 `https://.../rmorlok-authproxy-datasource.zip;rmorlok-authproxy-datasource`.
+The `deploy-demo.yml` workflow reads the same override from the optional
+`GRAFANA_AUTHPROXY_PLUGIN_INSTALL` repository variable. Until the plugin
+is available from the Grafana catalog, the workflow disables Grafana when
+that variable is unset so the main demo rollout is not blocked by plugin
+installation.
 
 ## Uninstall
 
