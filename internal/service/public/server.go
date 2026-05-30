@@ -2,6 +2,7 @@ package admin_api
 
 import (
 	"context"
+	"io/fs"
 	"net/http"
 	"path/filepath"
 	"strings"
@@ -221,9 +222,13 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		mountPrefix := strings.TrimSuffix(service.StaticVal.MountAtPath, "/")
 		var serveIndex func(c *gin.Context)
 		if service.StaticVal.IsEmbedded() {
-			embedHTTPFS := http.FS(marketplaceembed.FS())
+			indexHTML, readErr := fs.ReadFile(marketplaceembed.FS(), "index.html")
 			serveIndex = func(c *gin.Context) {
-				c.FileFromFS("index.html", embedHTTPFS)
+				if readErr != nil {
+					c.Status(http.StatusNotFound)
+					return
+				}
+				c.Data(http.StatusOK, "text/html; charset=utf-8", indexHTML)
 			}
 		} else {
 			indexPath := filepath.Join(service.StaticVal.ServeFromPath, "index.html")
