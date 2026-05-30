@@ -1,8 +1,31 @@
+import {AxiosRequestConfig} from 'axios';
 import {client} from './client';
 
 export type MetricsAggregation = 'count' | 'avg' | 'p95';
-export type MetricsMetric = 'request_events' | 'request_events.errors' | 'request_events.duration_ms';
-export type MetricsGroupBy = 'type' | 'method' | 'response_status_code' | 'response_source' | 'connector_id';
+export type RequestEventMetricsMetric = 'request_events' | 'request_events.errors' | 'request_events.duration_ms';
+export type ResourceMetricsMetric =
+    | 'resources.connections'
+    | 'resources.actors'
+    | 'resources.connectors'
+    | 'resources.connector_versions'
+    | 'resources.namespaces'
+    | 'resources.rate_limits';
+export type MetricsMetric = RequestEventMetricsMetric | ResourceMetricsMetric;
+
+export type RequestEventMetricsGroupBy =
+    | 'type'
+    | 'method'
+    | 'response_status_code'
+    | 'response_source'
+    | 'connector_id';
+export type ResourceMetricsGroupBy =
+    | 'state'
+    | 'health_state'
+    | 'connector_id'
+    | 'connector_version'
+    | 'namespace'
+    | 'mode';
+export type MetricsGroupBy = RequestEventMetricsGroupBy | ResourceMetricsGroupBy;
 
 export interface MetricsRange {
     start: string;
@@ -41,8 +64,8 @@ export interface MetricsQueryResponse {
     series: MetricsSeries[];
 }
 
-export const queryMetrics = (request: MetricsQueryRequest) => {
-    return client.post<MetricsQueryResponse>('/api/v1/metrics/query', request);
+export const queryMetrics = (request: MetricsQueryRequest, config?: AxiosRequestConfig) => {
+    return client.post<MetricsQueryResponse>('/api/v1/metrics/query', request, config);
 };
 
 export const metrics = {
