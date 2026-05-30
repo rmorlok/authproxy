@@ -292,6 +292,7 @@ type ListConnectionRequestQuery struct {
 	Cursor        *string                   `form:"cursor"`
 	LimitVal      *int32                    `form:"limit"`
 	StateVal      *database.ConnectionState `form:"state"`
+	ConnectorId   *string                   `form:"connector_id"`
 	NamespaceVal  *string                   `form:"namespace"`
 	LabelSelector *string                   `form:"label_selector"`
 	OrderByVal    *string                   `form:"order_by"`
@@ -305,6 +306,7 @@ type ListConnectionRequestQuery struct {
 // @Param			cursor			query		string	false	"Pagination cursor"
 // @Param			limit			query		integer	false	"Maximum number of results to return"
 // @Param			state			query		string	false	"Filter by connection state"
+// @Param			connector_id	query		string	false	"Filter by connector ID"
 // @Param			namespace		query		string	false	"Filter by namespace"
 // @Param			label_selector	query		string	false	"Filter by label selector"
 // @Param			order_by		query		string	false	"Order by field (e.g., 'created_at:asc')"
@@ -345,6 +347,21 @@ func (r *ConnectionsRoutes) list(gctx *gin.Context) {
 
 		if req.StateVal != nil {
 			b = b.ForState(*req.StateVal)
+		}
+
+		if req.ConnectorId != nil {
+			connectorId, err := apid.Parse(*req.ConnectorId)
+			if err != nil {
+				apgin.WriteError(gctx, nil, httperr.BadRequest("invalid connector_id format", httperr.WithInternalErr(err)))
+				val.MarkErrorReturn()
+				return
+			}
+			if err := connectorId.ValidatePrefix(apid.PrefixConnectorVersion); err != nil {
+				apgin.WriteError(gctx, nil, httperr.BadRequest("invalid connector_id prefix", httperr.WithInternalErr(err)))
+				val.MarkErrorReturn()
+				return
+			}
+			b = b.ForConnectorId(connectorId)
 		}
 
 		b = b.ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.NamespaceVal))

@@ -467,6 +467,29 @@ func TestNamespaces(t *testing.T) {
 			require.Len(t, resp.Items, 4)
 		})
 
+		t.Run("permission constrained namespace dropdown", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/namespaces?limit=50&order=created_at%20asc",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.dev.**", "namespaces", "list"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ListNamespacesResponseJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Len(t, resp.Items, 2)
+			require.Equal(t, "root.dev", resp.Items[0].Path)
+			require.Equal(t, "root.dev.old", resp.Items[1].Path)
+		})
+
 		t.Run("filter to namespace", func(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/namespaces?limit=50&order=created_at%20asc&namespace=root.dev", nil, "root", "some-actor", aschema.AllPermissions())

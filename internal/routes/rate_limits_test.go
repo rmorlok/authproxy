@@ -524,6 +524,24 @@ func TestRateLimits(t *testing.T) {
 			require.Equal(t, "alpha", resp.Items[0].Labels["team"])
 		})
 
+		t.Run("permission constrained namespace dropdown", func(t *testing.T) {
+			_ = createRateLimit(t, tu, "root.child", map[string]string{"team": "child"})
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet, "/rate-limits", nil,
+				"root", "some-actor", aschema.PermissionsSingle("root.child.**", "rate_limits", "list"))
+			require.NoError(t, err)
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code, w.Body.String())
+
+			var resp ListRateLimitsResponseJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Len(t, resp.Items, 1)
+			require.Equal(t, "root.child", resp.Items[0].Namespace)
+			require.Equal(t, "child", resp.Items[0].Labels["team"])
+		})
+
 		t.Run("invalid order_by", func(t *testing.T) {
 			w := httptest.NewRecorder()
 			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(

@@ -301,7 +301,7 @@ func grafanaAggregatePermissions() []aschema.Permission {
 		},
 		{
 			Namespace: "root.**",
-			Resources: []string{"namespaces", "connectors", "connections", "actors", "rate-limits"},
+			Resources: []string{"namespaces", "connectors", "connections", "actors", "rate_limits"},
 			Verbs:     []string{"list"},
 		},
 		{
