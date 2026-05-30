@@ -68,8 +68,29 @@ services:
     enabled: true
   adminApi:
     enabled: true
+    ui:
+      # -- Enable AuthProxy's browser admin UI/session endpoints.
+      enabled: false
+      # -- Public base URL for the admin UI.
+      baseUrl: ""
+      # -- Host-app login URL used when the admin UI needs a session.
+      initiateSessionUrl: ""
+    static:
+      # -- Serve the embedded admin UI from this service.
+      enabled: false
+      # -- URL path where the UI is mounted. Empty mounts at the service root.
+      mountAt: ""
+      # -- Optional on-disk UI build path. Empty uses embedded assets.
+      serveFrom: ""
   public:
     enabled: true
+    static:
+      # -- Serve the embedded marketplace UI from this service.
+      enabled: false
+      # -- URL path where the UI is mounted. Empty mounts at the service root.
+      mountAt: ""
+      # -- Optional on-disk UI build path. Empty uses embedded assets.
+      serveFrom: ""
   worker:
     enabled: true
 

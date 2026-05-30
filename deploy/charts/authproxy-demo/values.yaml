@@ -211,6 +211,17 @@ authproxy:
     existingSecret: "{{ .Release.Name }}-encryption"
   actors:
     existingSecret: "{{ .Release.Name }}-actors"
+  services:
+    public:
+      static:
+        enabled: true
+    adminApi:
+      ui:
+        enabled: true
+        baseUrl: "https://admin.{{ .Values.global.hostname }}"
+        initiateSessionUrl: "https://{{ .Values.global.hostname }}/"
+      static:
+        enabled: true
   hostApplication:
     initiateSessionUrl: "https://{{ .Values.global.hostname }}/"
   connectors:

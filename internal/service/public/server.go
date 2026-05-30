@@ -79,13 +79,12 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		// Static content: prefer the compiled-in marketplace UI; fall back to
 		// an on-disk directory when ServeFromPath is set (local iteration,
 		// custom builds).
-		var sfs static.ServeFileSystem
 		if service.StaticVal.IsEmbedded() {
-			sfs = apgin.NewEmbedServeFileSystem(marketplaceembed.FS())
+			server.Use(apgin.ServeEmbeddedStatic(service.StaticVal.MountAtPath, marketplaceembed.FS()))
 		} else {
-			sfs = static.LocalFile(service.StaticVal.ServeFromPath, true)
+			sfs := static.LocalFile(service.StaticVal.ServeFromPath, true)
+			server.Use(static.Serve(service.StaticVal.MountAtPath, sfs))
 		}
-		server.Use(static.Serve(service.StaticVal.MountAtPath, sfs))
 	}
 
 	healthChecker.GET("/ping", func(c *gin.Context) {

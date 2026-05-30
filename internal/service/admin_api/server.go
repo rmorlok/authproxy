@@ -71,13 +71,12 @@ func GetGinServer(
 		// Static content: prefer the compiled-in admin UI; fall back to an
 		// on-disk directory when ServeFromPath is set (local iteration,
 		// custom builds).
-		var sfs static.ServeFileSystem
 		if service.StaticVal.IsEmbedded() {
-			sfs = apgin.NewEmbedServeFileSystem(adminembed.FS())
+			server.Use(apgin.ServeEmbeddedStatic(service.StaticVal.MountAtPath, adminembed.FS()))
 		} else {
-			sfs = static.LocalFile(service.StaticVal.ServeFromPath, true)
+			sfs := static.LocalFile(service.StaticVal.ServeFromPath, true)
+			server.Use(static.Serve(service.StaticVal.MountAtPath, sfs))
 		}
-		server.Use(static.Serve(service.StaticVal.MountAtPath, sfs))
 	}
 
 	// Swagger documentation endpoint
