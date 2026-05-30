@@ -12,6 +12,12 @@
       "metric": "request_events",
       "aggregation": "count",
       "group_by": ["method", "response_status_code"]
+    },
+    {
+      "ref_id": "connections",
+      "metric": "resources.connections",
+      "aggregation": "count",
+      "group_by": ["state", "health_state"]
     }
   ]
 }

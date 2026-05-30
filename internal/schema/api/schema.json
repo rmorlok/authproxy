@@ -358,7 +358,17 @@
         "ref_id": { "type": "string" },
         "metric": {
           "type": "string",
-          "enum": ["request_events", "request_events.errors", "request_events.duration_ms"]
+          "enum": [
+            "request_events",
+            "request_events.errors",
+            "request_events.duration_ms",
+            "resources.connections",
+            "resources.actors",
+            "resources.connectors",
+            "resources.connector_versions",
+            "resources.namespaces",
+            "resources.rate_limits"
+          ]
         },
         "aggregation": {
           "type": "string",
@@ -368,7 +378,18 @@
           "type": "array",
           "items": {
             "type": "string",
-            "enum": ["type", "method", "response_status_code", "response_source", "connector_id"]
+            "enum": [
+              "type",
+              "method",
+              "response_status_code",
+              "response_source",
+              "connector_id",
+              "state",
+              "health_state",
+              "connector_version",
+              "namespace",
+              "mode"
+            ]
           }
         }
       },
