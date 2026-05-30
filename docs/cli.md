@@ -93,6 +93,31 @@ ap sign-jwt --admin                   # sign as the current OS user, all service
 ap sign-jwt --actorId alice --apis api
 ```
 
+Useful scoping flags:
+
+| Flag | Purpose |
+|---|---|
+| `--expires-in 24h` | Adds an expiration relative to now. Durations accept Go units plus `d` for days. |
+| `--no-expiry` | Leaves the token without an expiration. Mutually exclusive with `--expires-in`. |
+| `--permissions-file perms.yaml` | Adds top-level JWT permission restrictions from a YAML/JSON array or `{permissions: [...]}` object. |
+| `--grafana-preset aggregate` | Adds least-privilege permissions for Grafana app-metrics time-series dashboards and live dropdown variables. Defaults expiration to 90 days. |
+| `--grafana-preset logs` | Includes the aggregate preset plus `request-events:list` for request-log metadata tables. Defaults expiration to 90 days. |
+
+Grafana datasource token examples:
+
+```bash
+# Metrics dashboards only.
+ap sign-jwt --actorId grafana --apis api,admin-api --grafana-preset aggregate
+
+# Metrics plus request-event metadata tables.
+ap sign-jwt --actorId grafana --apis api,admin-api --grafana-preset logs
+
+# Provisioned datasource token with no expiry.
+ap sign-jwt --actorId grafana --apis api,admin-api --grafana-preset logs --no-expiry
+```
+
+Grafana presets use top-level JWT permissions. Those permissions only restrict the token; the backing actor still needs matching normal permissions.
+
 ### `ap verify-jwt`
 
 Reads a JWT on stdin and verifies it against the supplied public/secret key.
