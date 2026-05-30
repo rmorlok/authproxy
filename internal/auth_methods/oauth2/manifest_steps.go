@@ -32,10 +32,19 @@ func (f *factory) ManifestSetupSteps(connection coreIface.Connection, connector 
 	}
 	if auth.GetGrantTypeOrDefault() == cschema.OAuth2GrantClientCredentials {
 		return []coreIface.ManifestSetupStep{
-			coreIface.NewFormStep(coreIface.FormStepConfig{
+			coreIface.NewImmediateStep(coreIface.ImmediateStepConfig{
 				Id:          OAuth2ClientCredentialsStepId,
 				Title:       "Authorize",
 				Description: "Authorizing this connection.",
+				OnEnter: func(ctx context.Context) error {
+					o2 := f.NewOAuth2(connection)
+					if err := o2.ExchangeClientCredentials(ctx); err != nil {
+						if recordErr := connection.HandleAuthFailed(ctx, err); recordErr != nil {
+							return fmt.Errorf("failed to record auth failure (%v) after: %w", recordErr, err)
+						}
+					}
+					return nil
+				},
 			}),
 		}
 	}

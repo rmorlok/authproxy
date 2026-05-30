@@ -5,7 +5,6 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
@@ -35,24 +34,6 @@ func (c *connection) advanceToStep(
 		return c.completeFlow(ctx)
 	}
 
-	if next.Id() == oauth2.OAuth2ClientCredentialsStepId {
-		nextStep := cschema.MustNewSetupStep(next.Id())
-		if err := c.SetSetupStep(ctx, &nextStep); err != nil {
-			return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to update setup step: %w", err))
-		}
-		factory, ok := c.s.getAuthMethodFactory(c.GetConnectorVersionEntity().GetDefinition()).(oauth2.Factory)
-		if !ok || factory == nil {
-			return nil, httperr.InternalServerErrorMsg("oauth2 factory unavailable for client-credentials exchange")
-		}
-		if err := factory.NewOAuth2(c).ExchangeClientCredentials(ctx); err != nil {
-			if recordErr := c.HandleAuthFailed(ctx, err); recordErr != nil {
-				return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to record auth failure (%v) after: %w", recordErr, err))
-			}
-			return c.GetCurrentSetupStepResponse(ctx)
-		}
-		return c.GetCurrentSetupStepResponse(ctx)
-	}
-
 	// For redirect steps, render the URL FIRST. The closure may reject
 	// invalid inputs (missing return_to_url) — surfacing those before any
 	// DB write keeps the connection's setup_step consistent on rejection.
@@ -68,6 +49,13 @@ func (c *connection) advanceToStep(
 	nextStep := cschema.MustNewSetupStep(next.Id())
 	if err := c.SetSetupStep(ctx, &nextStep); err != nil {
 		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to update setup step: %w", err))
+	}
+
+	if next.Type() == iface.ManifestStepTypeImmediate {
+		if err := next.OnEnter(ctx); err != nil {
+			return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to enter setup step %q: %w", next.Id(), err))
+		}
+		return c.GetCurrentSetupStepResponse(ctx)
 	}
 
 	if next.Type() == iface.ManifestStepTypeVerify {
@@ -156,6 +144,9 @@ func (c *connection) renderStepResponse(
 			Id:   c.GetId(),
 			Type: iface.ConnectionSetupResponseTypeVerifying,
 		}, nil
+
+	case iface.ManifestStepTypeImmediate:
+		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("immediate setup step %q cannot be rendered", step.Id()))
 	}
 	return nil, httperr.InternalServerError(httperr.WithInternalErrorf("unsupported manifest step type %q", step.Type()))
 }

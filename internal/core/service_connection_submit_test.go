@@ -276,6 +276,30 @@ func TestSubmitForm(t *testing.T) {
 	})
 }
 
+func TestAdvanceToStepImmediateRunsGenericStep(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	conn, db := newTestConnectionWithSetupFlow(t, ctrl, &cschema.SetupFlow{})
+	immediateStep := iface.NewImmediateStep(iface.ImmediateStepConfig{
+		Id: "apxy:auth:test_immediate",
+		OnEnter: func(ctx context.Context) error {
+			_, err := conn.completeFlow(ctx)
+			return err
+		},
+	})
+	active := cschema.MustNewSetupStep("apxy:auth:test_immediate")
+
+	db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, &active).Return(nil)
+	db.EXPECT().SetConnectionSetupStep(gomock.Any(), conn.Id, (*cschema.SetupStep)(nil)).Return(nil)
+	db.EXPECT().SetConnectionState(gomock.Any(), conn.Id, database.ConnectionStateConfigured).Return(nil)
+
+	resp, err := conn.advanceToStep(context.Background(), immediateStep, &manifestFlow{}, "")
+	require.NoError(t, err)
+	require.IsType(t, &iface.ConnectionSetupComplete{}, resp)
+	assert.Equal(t, iface.ConnectionSetupResponseTypeComplete, resp.GetType())
+}
+
 func TestGetCurrentSetupStepResponse(t *testing.T) {
 	t.Run("returns complete when no setup step", func(t *testing.T) {
 		ctrl := gomock.NewController(t)
