@@ -10,7 +10,14 @@
       "properties": {
         "hostname":         { "type": "string" },
         "clusterIssuer":    { "type": "string", "minLength": 1 },
-        "ingressClassName": { "type": "string", "minLength": 1 }
+        "ingressClassName": { "type": "string", "minLength": 1 },
+        "security": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "allowInsecureImages": { "type": "boolean" }
+          }
+        }
       }
     },
     "demoShell": {
