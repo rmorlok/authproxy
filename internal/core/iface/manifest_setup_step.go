@@ -10,8 +10,8 @@ import (
 // distinguishes user-authored kinds (form vs. redirect) — those carry through
 // to the manifest unchanged, plus the auth-method-emitted steps that get one
 // or the other depending on what the method needs at that point in the flow
-// (api-key emits form steps for credential collection; OAuth2 emits redirect
-// or immediate steps depending on grant type).
+// (api-key and OAuth2 client_credentials emit form steps for credential
+// collection; OAuth2 authorization_code emits a redirect step).
 type ManifestStepType string
 
 const (
@@ -19,7 +19,7 @@ const (
 	// returns JSON Schema / UI Schema for the client to render, and the user
 	// submits values back through SubmitForm. Schema-defined preconnect /
 	// configure steps use this, and auth methods can use it for credential
-	// collection (for example API-key connectors).
+	// collection (for example API-key connectors or OAuth2 client_credentials).
 	ManifestStepTypeForm ManifestStepType = "form"
 
 	// ManifestStepTypeRedirect is a UI-visible off-platform handoff. The
@@ -28,13 +28,6 @@ const (
 	// authorization-code setup uses this for the provider authorize URL, and
 	// connector-authored redirect steps can use it for external setup tasks.
 	ManifestStepTypeRedirect ManifestStepType = "redirect"
-
-	// ManifestStepTypeImmediate is a server-side step that runs as soon as
-	// the setup flow enters it. There is no form or redirect for the UI to
-	// render; the handler performs work and advances the connection to the
-	// next visible state. OAuth2 client_credentials uses this to exchange at
-	// the token endpoint without involving an end user.
-	ManifestStepTypeImmediate ManifestStepType = "immediate"
 
 	// ManifestStepTypeVerify is the type tag for the synthetic apxy:verify
 	// pseudo-step: the connection is waiting for the verify task to finish.
@@ -50,7 +43,6 @@ const (
 var (
 	ErrSubmitNotSupported   = errors.New("step does not accept form submissions")
 	ErrRedirectNotSupported = errors.New("step is not a redirect step")
-	ErrEnterNotSupported    = errors.New("step does not support immediate entry")
 )
 
 // RedirectInfo is the resolved redirect for a redirect-type step. The setup
@@ -85,8 +77,8 @@ type RenderRedirectOptions struct {
 // they came from.
 //
 // All steps expose presentation metadata (Id, Title, Description, Type). Type
-// determines which of OnSubmit / RenderRedirect / OnEnter is meaningful —
-// calling another returns the matching sentinel error.
+// determines which of OnSubmit / RenderRedirect is meaningful — calling the
+// other returns the matching sentinel error.
 type ManifestSetupStep interface {
 	// Id is the step identifier. User-authored steps carry the id from the
 	// connector YAML; system-emitted steps use the apxy: prefix (e.g.
@@ -99,7 +91,7 @@ type ManifestSetupStep interface {
 	Description() string
 
 	// Type selects the dispatch branch — form steps receive OnSubmit, redirect
-	// steps receive RenderRedirect, and immediate steps receive OnEnter.
+	// steps receive RenderRedirect.
 	Type() ManifestStepType
 
 	// JsonSchema and UiSchema are the JSONForms-shaped payloads for form
@@ -121,12 +113,6 @@ type ManifestSetupStep interface {
 	// carries request-scoped values (ReturnToUrl) the step may need to mint
 	// the URL.
 	RenderRedirect(ctx context.Context, opts RenderRedirectOptions) (RedirectInfo, error)
-
-	// OnEnter runs when core advances into an immediate step. Implementations
-	// are expected to perform their side effect and transition the connection
-	// onward (for example by calling HandleCredentialsEstablished or
-	// HandleAuthFailed). Non-immediate steps return ErrEnterNotSupported.
-	OnEnter(ctx context.Context) error
 }
 
 // ManifestSetupFlow is the ordered, fully-materialized setup flow for a
@@ -194,17 +180,6 @@ func NewRedirectStep(cfg RedirectStepConfig) ManifestSetupStep {
 	return &redirectStep{cfg: cfg}
 }
 
-type ImmediateStepConfig struct {
-	Id          string
-	Title       string
-	Description string
-	OnEnter     func(ctx context.Context) error
-}
-
-func NewImmediateStep(cfg ImmediateStepConfig) ManifestSetupStep {
-	return &immediateStep{cfg: cfg}
-}
-
 // NewVerifyStep returns the synthetic apxy:verify pseudo-step that
 // ManifestSetupFlow uses to mark "credentials established, probes running."
 // The id and title are fixed; OnSubmit / RenderRedirect both return the
@@ -235,10 +210,6 @@ func (s *formStep) RenderRedirect(_ context.Context, _ RenderRedirectOptions) (R
 	return RedirectInfo{}, ErrRedirectNotSupported
 }
 
-func (s *formStep) OnEnter(_ context.Context) error {
-	return ErrEnterNotSupported
-}
-
 type redirectStep struct {
 	cfg RedirectStepConfig
 }
@@ -261,36 +232,6 @@ func (s *redirectStep) RenderRedirect(ctx context.Context, opts RenderRedirectOp
 	return s.cfg.Render(ctx, opts)
 }
 
-func (s *redirectStep) OnEnter(_ context.Context) error {
-	return ErrEnterNotSupported
-}
-
-type immediateStep struct {
-	cfg ImmediateStepConfig
-}
-
-func (s *immediateStep) Id() string                  { return s.cfg.Id }
-func (s *immediateStep) Title() string               { return s.cfg.Title }
-func (s *immediateStep) Description() string         { return s.cfg.Description }
-func (s *immediateStep) Type() ManifestStepType      { return ManifestStepTypeImmediate }
-func (s *immediateStep) JsonSchema() json.RawMessage { return nil }
-func (s *immediateStep) UiSchema() json.RawMessage   { return nil }
-
-func (s *immediateStep) OnSubmit(_ context.Context, _ json.RawMessage) error {
-	return ErrSubmitNotSupported
-}
-
-func (s *immediateStep) RenderRedirect(_ context.Context, _ RenderRedirectOptions) (RedirectInfo, error) {
-	return RedirectInfo{}, ErrRedirectNotSupported
-}
-
-func (s *immediateStep) OnEnter(ctx context.Context) error {
-	if s.cfg.OnEnter == nil {
-		return ErrEnterNotSupported
-	}
-	return s.cfg.OnEnter(ctx)
-}
-
 // verifyStep is the synthetic apxy:verify pseudo-step. Stateless — no
 // configuration is needed since its sole purpose is to mark "probes are
 // running; the UI should display Verifying."
@@ -309,8 +250,4 @@ func (s *verifyStep) OnSubmit(_ context.Context, _ json.RawMessage) error {
 
 func (s *verifyStep) RenderRedirect(_ context.Context, _ RenderRedirectOptions) (RedirectInfo, error) {
 	return RedirectInfo{}, ErrRedirectNotSupported
-}
-
-func (s *verifyStep) OnEnter(_ context.Context) error {
-	return ErrEnterNotSupported
 }

@@ -2,10 +2,12 @@ package oauth2
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 
 	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
@@ -14,14 +16,14 @@ import (
 // the callback transition.
 const OAuth2AuthorizeStepId = "apxy:auth:oauth2_authorize"
 
-// OAuth2ClientCredentialsStepId is the manifest id for OAuth2's synchronous
-// client-credentials exchange step. Core recognizes this id as an immediate
-// auth step.
+// OAuth2ClientCredentialsStepId is the manifest id for OAuth2's synthesized
+// client-credentials collection form.
 const OAuth2ClientCredentialsStepId = "apxy:auth:oauth2_client_credentials"
 
 // ManifestSetupSteps returns the OAuth2-emitted setup steps for this
 // connection. authorization_code emits a redirect step; client_credentials
-// emits an immediate step that core executes synchronously.
+// emits a credential form that stores the submitted client id / secret and
+// performs the token endpoint exchange on submit.
 func (f *factory) ManifestSetupSteps(connection coreIface.Connection, connector *cschema.Connector) []coreIface.ManifestSetupStep {
 	if connector == nil || connector.Auth == nil {
 		return nil
@@ -31,19 +33,24 @@ func (f *factory) ManifestSetupSteps(connection coreIface.Connection, connector 
 		return nil
 	}
 	if auth.GetGrantTypeOrDefault() == cschema.OAuth2GrantClientCredentials {
+		spec := synthesizeClientCredentialsStep(auth.GetTokenEndpointAuthMethodOrDefault())
 		return []coreIface.ManifestSetupStep{
-			coreIface.NewImmediateStep(coreIface.ImmediateStepConfig{
-				Id:          OAuth2ClientCredentialsStepId,
-				Title:       "Authorize",
-				Description: "Authorizing this connection.",
-				OnEnter: func(ctx context.Context) error {
-					o2 := f.NewOAuth2(connection)
-					if err := o2.ExchangeClientCredentials(ctx); err != nil {
-						if recordErr := connection.HandleAuthFailed(ctx, err); recordErr != nil {
-							return fmt.Errorf("failed to record auth failure (%v) after: %w", recordErr, err)
-						}
+			coreIface.NewFormStep(coreIface.FormStepConfig{
+				Id:          spec.Id,
+				Title:       spec.Title,
+				Description: spec.Description,
+				JsonSchema:  json.RawMessage(spec.JsonSchema),
+				UiSchema:    json.RawMessage(spec.UiSchema),
+				OnSubmit: func(ctx context.Context, data json.RawMessage) error {
+					credData, err := spec.ValidateAndMergeData(spec.Id, data, nil)
+					if err != nil {
+						return httperr.BadRequest(err.Error())
 					}
-					return nil
+					if err := f.PersistClientCredentials(ctx, connection, auth, credData); err != nil {
+						return err
+					}
+					o2 := f.NewOAuth2(connection)
+					return o2.ExchangeClientCredentials(ctx)
 				},
 			}),
 		}

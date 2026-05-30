@@ -199,6 +199,18 @@ func (a *AuthOAuth2) Validate(vc *common.ValidationContext) error {
 				"must be omitted when grant_type is %q", OAuth2GrantClientCredentials,
 			))
 		}
+		if a.ClientId != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("client_id",
+				"must be omitted when grant_type is %q; client credentials are collected during connection setup",
+				OAuth2GrantClientCredentials,
+			))
+		}
+		if a.ClientSecret != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("client_secret",
+				"must be omitted when grant_type is %q; client credentials are collected during connection setup",
+				OAuth2GrantClientCredentials,
+			))
+		}
 	} else if a.Authorization.Endpoint == "" {
 		result = multierror.Append(result, vc.PushField("authorization").NewErrorfForField("endpoint",
 			"is required when grant_type is %q", OAuth2GrantAuthorizationCode,
@@ -233,14 +245,14 @@ func (a *AuthOAuth2) Validate(vc *common.ValidationContext) error {
 
 	hasClientId := a.ClientId != nil && a.ClientId.InnerVal != nil
 	hasSecret := a.ClientSecret != nil && a.ClientSecret.InnerVal != nil
-	if !hasClientId {
+	if grantType == OAuth2GrantAuthorizationCode && !hasClientId {
 		result = multierror.Append(result, vc.NewErrorfForField("client_id", "is required"))
 	}
 
 	method := a.GetTokenEndpointAuthMethodOrDefault()
 	switch method {
 	case TokenEndpointAuthClientSecretPost, TokenEndpointAuthClientSecretBasic:
-		if !hasSecret {
+		if grantType == OAuth2GrantAuthorizationCode && !hasSecret {
 			result = multierror.Append(result, vc.NewErrorfForField("client_secret",
 				"is required when token_endpoint_auth_method is %q", method,
 			))

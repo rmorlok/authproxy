@@ -51,13 +51,6 @@ func (c *connection) advanceToStep(
 		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to update setup step: %w", err))
 	}
 
-	if next.Type() == iface.ManifestStepTypeImmediate {
-		if err := next.OnEnter(ctx); err != nil {
-			return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to enter setup step %q: %w", next.Id(), err))
-		}
-		return c.GetCurrentSetupStepResponse(ctx)
-	}
-
 	if next.Type() == iface.ManifestStepTypeVerify {
 		if err := c.s.EnqueueVerifyConnection(ctx, c.GetId()); err != nil {
 			return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to enqueue verify connection task: %w", err))
@@ -145,8 +138,6 @@ func (c *connection) renderStepResponse(
 			Type: iface.ConnectionSetupResponseTypeVerifying,
 		}, nil
 
-	case iface.ManifestStepTypeImmediate:
-		return nil, httperr.InternalServerError(httperr.WithInternalErrorf("immediate setup step %q cannot be rendered", step.Id()))
 	}
 	return nil, httperr.InternalServerError(httperr.WithInternalErrorf("unsupported manifest step type %q", step.Type()))
 }

@@ -42,6 +42,11 @@ type ApiKeyCredentialPlaintext struct {
 	Username string `json:"username,omitempty"`
 }
 
+type OAuth2ClientCredentialsPlaintext struct {
+	ClientId     string `json:"client_id"`
+	ClientSecret string `json:"client_secret,omitempty"`
+}
+
 // ApiKeyCredential is one row in the api_key_credentials table — the encrypted
 // credential blob (api key and, for basic placement, username) submitted by a
 // user for a connection. The encrypted_credentials column stores a single

@@ -85,11 +85,15 @@ func (o *oAuth2Connection) CallbackFrom3rdParty(ctx context.Context, query url.V
 // dashboards and alerts can key off `category` rather than parsing error strings.
 func (o *oAuth2Connection) exchangeCodeAndAdvance(ctx context.Context, query url.Values) (string, error) {
 	var returnURL string
-	err := o.tel.withSpan(ctx, "token_exchange", o.connectorIDForTelemetry(), func(ctx context.Context) error {
-		var err error
-		returnURL, err = o.exchangeCodeAndAdvanceInner(ctx, query)
-		return err
-	})
+	err := o.tel.withSpan(
+		ctx,
+		"token_exchange",
+		o.connectorIDForTelemetry(),
+		func(ctx context.Context) error {
+			var err error
+			returnURL, err = o.exchangeCodeAndAdvanceInner(ctx, query)
+			return err
+		})
 	return returnURL, err
 }
 
@@ -97,7 +101,11 @@ func (o *oAuth2Connection) exchangeCodeAndAdvance(ctx context.Context, query url
 // failure-counter bump for token-exchange failures. Mirrors the refresh-side
 // classifyAndRecordRefreshFailure: every callsite uses the same shape so the
 // "category" string lands consistently on logs, metrics, and span errors.
-func (o *oAuth2Connection) emitAndRecordExchangeFailure(ctx context.Context, category tokenExchangeCategory, attrs tokenExchangeAttrs) {
+func (o *oAuth2Connection) emitAndRecordExchangeFailure(
+	ctx context.Context,
+	category tokenExchangeCategory,
+	attrs tokenExchangeAttrs,
+) {
 	emitTokenExchangeFailure(ctx, o.logger, category, attrs)
 	o.tel.recordTokenExchangeFailure(ctx, string(category), o.connectionLabelsForTelemetry())
 }
@@ -231,9 +239,13 @@ func (o *oAuth2Connection) exchangeCodeAndAdvanceInner(ctx context.Context, quer
 // endpoint exchange for service-to-service connectors. There is no authorize
 // redirect or callback; the client credentials are the grant.
 func (o *oAuth2Connection) ExchangeClientCredentials(ctx context.Context) error {
-	return o.tel.withSpan(ctx, "token_exchange", o.connectorIDForTelemetry(), func(ctx context.Context) error {
-		return o.exchangeClientCredentialsInner(ctx)
-	})
+	return o.tel.withSpan(
+		ctx,
+		"token_exchange",
+		o.connectorIDForTelemetry(),
+		func(ctx context.Context) error {
+			return o.exchangeClientCredentialsInner(ctx)
+		})
 }
 
 func (o *oAuth2Connection) exchangeClientCredentialsInner(ctx context.Context) error {
@@ -299,12 +311,6 @@ func (o *oAuth2Connection) exchangeClientCredentialsInner(ctx context.Context) e
 	if err != nil {
 		err = fmt.Errorf("failed to create db token from response: %w", err)
 		o.emitAndRecordExchangeFailure(ctx, tokenExchangeMalformedResponse, o.tokenExchangeAttrsFromConn(err))
-		return err
-	}
-
-	if _, err := o.connection.HandleCredentialsEstablished(ctx); err != nil {
-		err = fmt.Errorf("failed to handle post-auth state transition: %w", err)
-		o.emitAndRecordExchangeFailure(ctx, tokenExchangeInternalError, o.tokenExchangeAttrsFromConn(err))
 		return err
 	}
 

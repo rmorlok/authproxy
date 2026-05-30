@@ -3,9 +3,11 @@ package oauth2
 import (
 	"context"
 	"encoding/base64"
+	"encoding/json"
 	"fmt"
 	"net/url"
 
+	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
 
@@ -14,6 +16,10 @@ import (
 // optional — public clients have no secret to send — so its absence is not
 // an error.
 func (o *oAuth2Connection) resolveClientCredentials(ctx context.Context) (string, string, error) {
+	if o.auth.GetGrantTypeOrDefault() == sconfig.OAuth2GrantClientCredentials {
+		return o.resolveStoredClientCredentials(ctx)
+	}
+
 	clientId, err := o.auth.ClientId.GetValue(ctx)
 	if err != nil {
 		return "", "", fmt.Errorf("failed to get client id for connector: %w", err)
@@ -28,6 +34,32 @@ func (o *oAuth2Connection) resolveClientCredentials(ctx context.Context) (string
 		return "", "", fmt.Errorf("failed to get client secret for connector: %w", err)
 	}
 	return clientId, clientSecret, nil
+}
+
+func (o *oAuth2Connection) resolveStoredClientCredentials(ctx context.Context) (string, string, error) {
+	cred, err := o.db.GetActiveApiKeyCredential(ctx, o.connection.GetId())
+	if err != nil {
+		return "", "", fmt.Errorf("failed to load OAuth2 client credentials: %w", err)
+	}
+
+	plaintextJSON, err := o.encrypt.DecryptString(ctx, cred.EncryptedCredentials)
+	if err != nil {
+		return "", "", fmt.Errorf("failed to decrypt OAuth2 client credentials: %w", err)
+	}
+
+	var plaintext database.OAuth2ClientCredentialsPlaintext
+	if err := json.Unmarshal([]byte(plaintextJSON), &plaintext); err != nil {
+		return "", "", fmt.Errorf("failed to parse OAuth2 client credentials: %w", err)
+	}
+	if plaintext.ClientId == "" {
+		return "", "", fmt.Errorf("OAuth2 client credentials missing client_id")
+	}
+	if o.auth.GetTokenEndpointAuthMethodOrDefault() != sconfig.TokenEndpointAuthNone &&
+		plaintext.ClientSecret == "" {
+		return "", "", fmt.Errorf("OAuth2 client credentials missing client_secret")
+	}
+
+	return plaintext.ClientId, plaintext.ClientSecret, nil
 }
 
 // applyTokenEndpointClientAuth attaches client credentials to the
