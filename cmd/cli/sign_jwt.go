@@ -28,6 +28,7 @@ func cmdSignJwt() *cobra.Command {
 	}
 
 	resolver = config.WithConfigParams(cmd)
+	resolver.AddTokenScopeParams(cmd)
 
 	return cmd
 }
