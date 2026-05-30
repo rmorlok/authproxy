@@ -69,7 +69,7 @@ key, so these need real openssl). Create them in the release namespace
 | `<release>-jwt`            | `system` (RSA private), `system.pub`           |
 | `<release>-encryption`     | `global_aes.key` (32 raw bytes)                |
 | `<release>-demo-shell-key` | `private` (RSA private), `demo-shell.pub`      |
-| `<release>-actors`         | `demo-shell.pub` (matching the above)          |
+| `<release>-actors`         | `demo-shell.pub` plus one `<actor>.pub` entry for each demo actor, all matching the demo shell public key |
 | `authproxy-grafana-jwt`    | `jwt` (Grafana datasource bearer token, can be generated after `<release>-encryption`) |
 
 A reference one-shot generator:
@@ -94,7 +94,11 @@ kubectl -n "$NS" create secret generic "$RELEASE-demo-shell-key" \
   --from-file=private="$work/demo-shell" \
   --from-file=demo-shell.pub="$work/demo-shell.pub"
 kubectl -n "$NS" create secret generic "$RELEASE-actors" \
-  --from-file=demo-shell.pub="$work/demo-shell.pub"
+  --from-file=demo-shell.pub="$work/demo-shell.pub" \
+  --from-file=demo-admin.pub="$work/demo-shell.pub" \
+  --from-file=demo-user.pub="$work/demo-shell.pub" \
+  --from-file=fresh-user.pub="$work/demo-shell.pub" \
+  --from-file=grafana.pub="$work/demo-shell.pub"
 
 # Metrics plus request-event metadata tables. Database-backed actors
 # without their own self-signing key are verified with the global AES
