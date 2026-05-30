@@ -592,9 +592,17 @@ func TestRequestEventsRoutes(t *testing.T) {
 			require.Equal(t, http.StatusForbidden, w.Code)
 		})
 
-		t.Run("executes request event query", func(t *testing.T) {
+		t.Run("request event list permission cannot query metrics", func(t *testing.T) {
 			w := httptest.NewRecorder()
 			req := newMetricsRequest(t, validBody(nil), aschema.PermissionsSingle("root.**", "request-events", "list"))
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("executes request event query", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := newMetricsRequest(t, validBody(nil), aschema.PermissionsSingle("root.**", "app-metrics", "query"))
 
 			tu.MockRetriever.EXPECT().
 				QueryRequestEventMetrics(gomock.Any(), gomock.Any()).
@@ -639,7 +647,7 @@ func TestRequestEventsRoutes(t *testing.T) {
 					"aggregation": "count",
 					"group_by":    []string{"state", "health_state"},
 				},
-			}}), aschema.PermissionsSingle("root.**", "request-events", "list"))
+			}}), aschema.PermissionsSingle("root.**", "app-metrics", "query"))
 
 			tu.MockRetriever.EXPECT().
 				QueryResourceMetrics(gomock.Any(), gomock.Any()).
@@ -677,7 +685,7 @@ func TestRequestEventsRoutes(t *testing.T) {
 
 		t.Run("namespace is constrained by actor permissions", func(t *testing.T) {
 			w := httptest.NewRecorder()
-			req := newMetricsRequest(t, validBody(map[string]any{"namespace": "root.**"}), aschema.PermissionsSingle("root.tenant.**", "request-events", "list"))
+			req := newMetricsRequest(t, validBody(map[string]any{"namespace": "root.**"}), aschema.PermissionsSingle("root.tenant.**", "app-metrics", "query"))
 
 			tu.MockRetriever.EXPECT().
 				QueryRequestEventMetrics(gomock.Any(), gomock.Any()).
@@ -722,11 +730,87 @@ func TestRequestEventsRoutes(t *testing.T) {
 		for _, tc := range invalidCases {
 			t.Run(tc.name, func(t *testing.T) {
 				w := httptest.NewRecorder()
-				req := newMetricsRequest(t, tc.body, aschema.PermissionsSingle("root.**", "request-events", "list"))
+				req := newMetricsRequest(t, tc.body, aschema.PermissionsSingle("root.**", "app-metrics", "query"))
 
 				tu.Gin.ServeHTTP(w, req)
 				require.Equal(t, http.StatusBadRequest, w.Code)
 			})
 		}
+	})
+
+	t.Run("metrics schema", func(t *testing.T) {
+		tu := setup(t, nil)
+
+		newSchemaRequest := func(t *testing.T, permissions []aschema.Permission) *http.Request {
+			t.Helper()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/metrics/schema",
+				nil,
+				"root",
+				"some-actor",
+				permissions,
+			)
+			require.NoError(t, err)
+			return req
+		}
+
+		t.Run("unauthorized", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodGet, "/metrics/schema", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("forbidden without schema permission", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := newSchemaRequest(t, aschema.PermissionsSingle("root.**", "app-metrics", "query"))
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("returns supported metrics", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req := newSchemaRequest(t, aschema.PermissionsSingle("root.**", "app-metrics", "schema"))
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp sapi.MetricsSchemaResponseJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.Contains(t, resp.Metrics, sapi.MetricsSchemaMetricJson{
+				Metric:       "request_events.duration_ms",
+				Kind:         "gauge",
+				Aggregations: []string{"avg", "p95"},
+				GroupBy:      []string{"type", "method", "response_status_code", "response_source", "connector_id"},
+			})
+			require.Contains(t, resp.Metrics, sapi.MetricsSchemaMetricJson{
+				Metric:       "resources.connections",
+				Kind:         "gauge",
+				Aggregations: []string{"count"},
+				GroupBy:      []string{"state", "health_state", "connector_id", "connector_version"},
+			})
+		})
+
+		t.Run("aggregate-only permissions cannot list request events", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodGet,
+				"/metrics/request-events",
+				nil,
+				"root",
+				"some-actor",
+				[]aschema.Permission{
+					{Namespace: "root.**", Resources: []string{"app-metrics"}, Verbs: []string{"schema", "query"}},
+				},
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
 	})
 }

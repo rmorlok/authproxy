@@ -56,3 +56,20 @@ type MetricsSeriesJson struct {
 type MetricsQueryResponseJson struct {
 	Series []MetricsSeriesJson `json:"series" yaml:"series"`
 }
+
+// MetricsSchemaMetricJson describes one metric supported by the metrics query API.
+//
+//	@Description	Supported metric definition
+type MetricsSchemaMetricJson struct {
+	Metric       string   `json:"metric" yaml:"metric" example:"request_events"`
+	Kind         string   `json:"kind" yaml:"kind" example:"counter"`
+	Aggregations []string `json:"aggregations" yaml:"aggregations" example:"count"`
+	GroupBy      []string `json:"group_by" yaml:"group_by" example:"method,response_status_code"`
+}
+
+// MetricsSchemaResponseJson is the response for the metrics schema endpoint.
+//
+//	@Description	Application metrics schema response
+type MetricsSchemaResponseJson struct {
+	Metrics []MetricsSchemaMetricJson `json:"metrics" yaml:"metrics"`
+}

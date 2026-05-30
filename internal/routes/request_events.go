@@ -24,6 +24,7 @@ import (
 
 type OpenAPIRequestEventsEntry = schemaapiopenapi.RequestEventJson
 type OpenAPIListRequestEventsResponse = schemaapiopenapi.ListRequestEventsResponseJson
+type OpenAPIMetricsSchemaResponse = schemaapiopenapi.MetricsSchemaResponseJson
 
 type RequestEventsRoutes struct {
 	cfg  config.C
@@ -328,6 +329,97 @@ func resourceMetricFromAPI(metric, aggregation string) (app_metrics.ResourceMetr
 		}
 	}
 	return "", httperr.BadRequestf("unsupported metric aggregation %q/%q", metric, aggregation)
+}
+
+func metricsSchemaResponse() sapi.MetricsSchemaResponseJson {
+	requestEventGroupBy := []string{
+		string(app_metrics.RequestEventGroupByType),
+		string(app_metrics.RequestEventGroupByMethod),
+		string(app_metrics.RequestEventGroupByResponseStatusCode),
+		string(app_metrics.RequestEventGroupByResponseSource),
+		string(app_metrics.RequestEventGroupByConnectorID),
+	}
+
+	return sapi.MetricsSchemaResponseJson{
+		Metrics: []sapi.MetricsSchemaMetricJson{
+			{
+				Metric:       "request_events",
+				Kind:         "counter",
+				Aggregations: []string{"count"},
+				GroupBy:      requestEventGroupBy,
+			},
+			{
+				Metric:       "request_events.errors",
+				Kind:         "counter",
+				Aggregations: []string{"count"},
+				GroupBy:      requestEventGroupBy,
+			},
+			{
+				Metric:       "request_events.duration_ms",
+				Kind:         "gauge",
+				Aggregations: []string{"avg", "p95"},
+				GroupBy:      requestEventGroupBy,
+			},
+			{
+				Metric:       "resources.connections",
+				Kind:         "gauge",
+				Aggregations: []string{"count"},
+				GroupBy: []string{
+					string(app_metrics.ResourceGroupByState),
+					string(app_metrics.ResourceGroupByHealthState),
+					string(app_metrics.ResourceGroupByConnectorID),
+					string(app_metrics.ResourceGroupByConnectorVersion),
+				},
+			},
+			{
+				Metric:       "resources.actors",
+				Kind:         "gauge",
+				Aggregations: []string{"count"},
+				GroupBy: []string{
+					string(app_metrics.ResourceGroupByNamespace),
+				},
+			},
+			{
+				Metric:       "resources.connectors",
+				Kind:         "gauge",
+				Aggregations: []string{"count"},
+				GroupBy: []string{
+					string(app_metrics.ResourceGroupByState),
+					string(app_metrics.ResourceGroupByConnectorVersion),
+					string(app_metrics.ResourceGroupByNamespace),
+				},
+			},
+			{
+				Metric:       "resources.connector_versions",
+				Kind:         "gauge",
+				Aggregations: []string{"count"},
+				GroupBy: []string{
+					string(app_metrics.ResourceGroupByState),
+					string(app_metrics.ResourceGroupByConnectorID),
+					string(app_metrics.ResourceGroupByConnectorVersion),
+					string(app_metrics.ResourceGroupByNamespace),
+				},
+			},
+			{
+				Metric:       "resources.namespaces",
+				Kind:         "gauge",
+				Aggregations: []string{"count"},
+				GroupBy: []string{
+					string(app_metrics.ResourceGroupByState),
+					string(app_metrics.ResourceGroupByNamespace),
+				},
+			},
+			{
+				Metric:       "resources.rate_limits",
+				Kind:         "gauge",
+				Aggregations: []string{"count"},
+				GroupBy: []string{
+					string(app_metrics.ResourceGroupByMode),
+					string(app_metrics.ResourceGroupByNamespace),
+				},
+			},
+		},
+	}
 }
 
 type metricsResponseSeries struct {
@@ -702,6 +794,19 @@ func (r *RequestEventsRoutes) queryMetrics(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, metricsResponseFromAPIRequest(req, responseSeries))
 }
 
+// @Summary		Get application metrics schema
+// @Description	Get supported application metrics, aggregations, group-by dimensions, and metric kinds
+// @Tags			metrics
+// @Produce		json
+// @Success		200	{object}	OpenAPIMetricsSchemaResponse
+// @Failure		401	{object}	ErrorResponse
+// @Failure		403	{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/metrics/schema [get]
+func (r *RequestEventsRoutes) schema(gctx *gin.Context) {
+	gctx.PureJSON(http.StatusOK, metricsSchemaResponse())
+}
+
 func (r *RequestEventsRoutes) Register(g gin.IRouter) {
 	g.GET(
 		"/metrics/request-events/:id",
@@ -723,10 +828,18 @@ func (r *RequestEventsRoutes) Register(g gin.IRouter) {
 	g.POST(
 		"/metrics/query",
 		r.auth.NewRequiredBuilder().
-			ForResource("request-events").
-			ForVerb("list").
+			ForResource("app-metrics").
+			ForVerb("query").
 			Build(),
 		r.queryMetrics,
+	)
+	g.GET(
+		"/metrics/schema",
+		r.auth.NewRequiredBuilder().
+			ForResource("app-metrics").
+			ForVerb("schema").
+			Build(),
+		r.schema,
 	)
 }
 

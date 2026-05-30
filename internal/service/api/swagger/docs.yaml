@@ -103,6 +103,29 @@ definitions:
       updated_at:
         type: string
     type: object
+  github_com_rmorlok_authproxy_internal_schema_api.MetricsSchemaMetricJson:
+    description: Supported metric definition
+    properties:
+      aggregations:
+        example:
+        - count
+        items:
+          type: string
+        type: array
+      group_by:
+        example:
+        - method
+        - response_status_code
+        items:
+          type: string
+        type: array
+      kind:
+        example: counter
+        type: string
+      metric:
+        example: request_events
+        type: string
+    type: object
   github_com_rmorlok_authproxy_internal_schema_api.NamespaceJson:
     description: Namespace for organizing resources
     properties:
@@ -679,6 +702,14 @@ definitions:
         type: array
       total:
         type: integer
+    type: object
+  routes.OpenAPIMetricsSchemaResponse:
+    description: Application metrics schema response
+    properties:
+      metrics:
+        items:
+          $ref: '#/definitions/github_com_rmorlok_authproxy_internal_schema_api.MetricsSchemaMetricJson'
+        type: array
     type: object
   routes.OpenAPIProxyResponseJson:
     description: Response from a proxied HTTP request
@@ -4610,6 +4641,30 @@ paths:
       summary: Get request events entry
       tags:
       - request-events
+  /metrics/schema:
+    get:
+      description: Get supported application metrics, aggregations, group-by dimensions,
+        and metric kinds
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.OpenAPIMetricsSchemaResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Get application metrics schema
+      tags:
+      - metrics
   /namespaces:
     get:
       consumes:
