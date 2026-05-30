@@ -118,7 +118,7 @@ func newSchemaFormStep(c iface.Connection, spec *cschema.SetupFlowStep) iface.Ma
 
 // newSchemaRedirectStep wraps a redirect-kind SetupFlowStep. The closure
 // substitutes the connection's cfg mustache plus two synthetic placeholders
-// at render time: {{RETURN_ADVANCE}} → /public/connections/{id}/setup/advance?token=...
+// at render time: {{RETURN_ADVANCE}} → /setup/connections/{id}/advance?token=...
 // and {{RETURN_ABORT}} → the matching /abort URL. Each placeholder is
 // expanded by minting a fresh one-time-use setup_token bound to this
 // connection + step + the caller's marketplace return URL.
@@ -168,9 +168,8 @@ func (s *service) newSchemaRedirectStep(c iface.Connection, spec *cschema.SetupF
 }
 
 // mintReturnURL mints a setup_token and returns the public-endpoint URL
-// (/public/connections/{id}/setup/{advance|abort}?token=<jti>) that
-// substitutes for the corresponding placeholder in a redirect step's
-// URL template.
+// (/setup/connections/{id}/{advance|abort}?token=<jti>) that substitutes
+// for the corresponding placeholder in a redirect step's URL template.
 func (s *service) mintReturnURL(ctx context.Context, connectionId apid.ID, stepId string, actorId apid.ID, returnToUrl string, intent setup_token.Intent) (string, error) {
 	tok, err := setup_token.Mint(ctx, s.r, s.encrypt, setup_token.MintInput{
 		ConnectionId: connectionId,
@@ -190,7 +189,7 @@ func (s *service) mintReturnURL(ctx context.Context, connectionId apid.ID, stepI
 	}
 	// Token rides as a query parameter; jti is opaque (apid.ID-shaped) and
 	// URL-safe by construction so we can embed verbatim.
-	return fmt.Sprintf("%s/public/connections/%s/setup/%s?token=%s",
+	return fmt.Sprintf("%s/setup/connections/%s/%s?token=%s",
 		strings.TrimRight(publicBase, "/"),
 		connectionId,
 		endpoint,

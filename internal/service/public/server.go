@@ -133,7 +133,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 	)
 	routesOauth2.Register(server)
 
-	// /public/connections/{id}/setup/{advance,abort} — token-authorized
+	// /setup/connections/{id}/{advance,abort} — token-authorized
 	// transitions for the schema-defined redirect-step pattern. Requires
 	// session + token: session establishes the actor; token binds that
 	// actor to a specific connection / step / intent at mint time. A

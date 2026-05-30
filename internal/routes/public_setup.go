@@ -19,13 +19,13 @@ import (
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
 
-// PublicSetupRoutes exposes the /public/connections/{id}/setup/advance and
-// .../abort endpoints. The endpoints require a session AND a valid setup
-// token — both gates are necessary: the session establishes who the
-// caller is, and the token binds that identity to a specific connection /
-// step / intent at mint time. A leaked token cannot be replayed by a
-// different actor; an authenticated user without the token cannot
-// short-circuit the redirect flow.
+// PublicSetupRoutes exposes the /setup/connections/{id}/advance and
+// /setup/connections/{id}/abort endpoints. The endpoints require a
+// session AND a valid setup token — both gates are necessary: the session
+// establishes who the caller is, and the token binds that identity to a
+// specific connection / step / intent at mint time. A leaked token cannot
+// be replayed by a different actor; an authenticated user without the
+// token cannot short-circuit the redirect flow.
 //
 // Flow: a connector YAML declares a redirect step whose URL template
 // includes {{RETURN_ADVANCE}} / {{RETURN_ABORT}}. At redirect-step render
@@ -82,10 +82,10 @@ func (h *PublicSetupRoutes) Register(g *gin.Engine) {
 		WithRedirectOnUnauthenticated(h.sessionInitiateUrlGenerator).
 		Build()
 
-	g.GET("/public/connections/:id/setup/advance", mw, h.advance)
-	g.POST("/public/connections/:id/setup/advance", mw, h.advance)
-	g.GET("/public/connections/:id/setup/abort", mw, h.abort)
-	g.POST("/public/connections/:id/setup/abort", mw, h.abort)
+	g.GET("/setup/connections/:id/advance", mw, h.advance)
+	g.POST("/setup/connections/:id/advance", mw, h.advance)
+	g.GET("/setup/connections/:id/abort", mw, h.abort)
+	g.POST("/setup/connections/:id/abort", mw, h.abort)
 }
 
 func (h *PublicSetupRoutes) advance(gctx *gin.Context) {

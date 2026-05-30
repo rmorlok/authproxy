@@ -1,7 +1,7 @@
 // Package setup_token implements signed, one-time-use redirect tokens used
 // by the schema-defined redirect-step machinery. A token represents an
 // authorization for a 3rd party to bounce a user back through one of the
-// /public/connections/{id}/setup/{advance,abort} endpoints to transition a
+// /setup/connections/{id}/{advance,abort} endpoints to transition a
 // connection's setup_step.
 //
 // Wire format: opaque base64-encoded UUID (the jti). The claim payload is
