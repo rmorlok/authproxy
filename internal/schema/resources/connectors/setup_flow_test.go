@@ -620,6 +620,101 @@ func TestSetupFlow_IsConfigureStep(t *testing.T) {
 	assert.False(t, sf.IsConfigureStep(SetupStep{}))
 }
 
+// TestSetupFlowStep_RedirectValidation covers the per-type required/forbidden
+// field rules. Form steps must declare json_schema; redirect steps must
+// declare redirect.url and must not declare form-only fields.
+func TestSetupFlowStep_RedirectValidation(t *testing.T) {
+	vc := &common.ValidationContext{Path: "setup_flow"}
+
+	t.Run("valid redirect step", func(t *testing.T) {
+		sf := &SetupFlow{
+			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{
+				Id:       "bounce_to_partner",
+				Type:     SetupFlowStepTypeRedirect,
+				Redirect: &SetupFlowStepRedirect{URL: "https://partner.example.com/auth?return={{RETURN_ADVANCE}}"},
+			}}},
+		}
+		assert.NoError(t, sf.Validate(vc))
+	})
+
+	t.Run("redirect step missing redirect block", func(t *testing.T) {
+		sf := &SetupFlow{
+			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{
+				Id:   "bounce",
+				Type: SetupFlowStepTypeRedirect,
+			}}},
+		}
+		err := sf.Validate(vc)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "redirect is required")
+	})
+
+	t.Run("redirect step missing url", func(t *testing.T) {
+		sf := &SetupFlow{
+			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{
+				Id:       "bounce",
+				Type:     SetupFlowStepTypeRedirect,
+				Redirect: &SetupFlowStepRedirect{},
+			}}},
+		}
+		err := sf.Validate(vc)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "url is required")
+	})
+
+	t.Run("redirect step rejects form-only fields", func(t *testing.T) {
+		sf := &SetupFlow{
+			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{
+				Id:         "bounce",
+				Type:       SetupFlowStepTypeRedirect,
+				Redirect:   &SetupFlowStepRedirect{URL: "https://x.example.com"},
+				JsonSchema: common.RawJSON(`{"type":"object"}`),
+				UiSchema:   common.RawJSON(`{"type":"VerticalLayout"}`),
+			}}},
+		}
+		err := sf.Validate(vc)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "json_schema must be absent for redirect steps")
+		assert.Contains(t, err.Error(), "ui_schema must be absent for redirect steps")
+	})
+
+	t.Run("form step rejects redirect block", func(t *testing.T) {
+		sf := &SetupFlow{
+			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{
+				Id:         "tenant",
+				Type:       SetupFlowStepTypeForm,
+				JsonSchema: common.RawJSON(`{"type":"object"}`),
+				Redirect:   &SetupFlowStepRedirect{URL: "https://x"},
+			}}},
+		}
+		err := sf.Validate(vc)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), "redirect must be absent for form steps")
+	})
+
+	t.Run("unknown type rejected", func(t *testing.T) {
+		sf := &SetupFlow{
+			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{
+				Id:   "x",
+				Type: "broken",
+			}}},
+		}
+		err := sf.Validate(vc)
+		require.Error(t, err)
+		assert.Contains(t, err.Error(), `type must be`)
+	})
+
+	t.Run("empty type defaults to form", func(t *testing.T) {
+		sf := &SetupFlow{
+			Preconnect: &SetupFlowPhase{Steps: []SetupFlowStep{{
+				Id:         "tenant",
+				JsonSchema: common.RawJSON(`{"type":"object"}`),
+			}}},
+		}
+		assert.NoError(t, sf.Validate(vc))
+	})
+}
+
 func TestSetupFlowYAMLRoundtrip(t *testing.T) {
 	t.Run("parse connector with setup_flow from YAML", func(t *testing.T) {
 		data, err := os.ReadFile("test_data/valid-oauth-connector-with-setup-flow.yaml")

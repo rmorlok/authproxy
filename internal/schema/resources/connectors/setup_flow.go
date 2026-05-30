@@ -319,28 +319,101 @@ func (p *SetupFlowPhase) Validate(vc *common.ValidationContext, seenIds map[stri
 	return result.ErrorOrNil()
 }
 
-// SetupFlowStep defines a single form step in the setup flow.
+// SetupFlowStepType identifies the runtime kind of a user-authored setup step.
+// Defaults to form when empty.
+type SetupFlowStepType string
+
+const (
+	// SetupFlowStepTypeForm is a JSONForms-rendered form the user fills out.
+	// JsonSchema is required; Redirect must be absent.
+	SetupFlowStepTypeForm SetupFlowStepType = "form"
+
+	// SetupFlowStepTypeRedirect sends the user off-platform to a 3rd party,
+	// optionally with a templated URL that includes signed RETURN_ADVANCE /
+	// RETURN_ABORT tokens for the 3rd party to bounce the user back through.
+	// Redirect is required; JsonSchema / UiSchema / DataSources must be absent.
+	SetupFlowStepTypeRedirect SetupFlowStepType = "redirect"
+)
+
+// IsValid reports whether t is one of the recognized step kinds. The zero
+// value ("") is treated as valid by callers that default to form.
+func (t SetupFlowStepType) IsValid() bool {
+	return t == "" || t == SetupFlowStepTypeForm || t == SetupFlowStepTypeRedirect
+}
+
+// Normalized returns the effective type — form if empty, otherwise t.
+func (t SetupFlowStepType) Normalized() SetupFlowStepType {
+	if t == "" {
+		return SetupFlowStepTypeForm
+	}
+	return t
+}
+
+// SetupFlowStep defines a single step in the setup flow. The Type field
+// selects which of the per-kind sub-structs (currently just Redirect) is
+// honored; form-kind steps populate JsonSchema/UiSchema/DataSources
+// directly on the parent.
 type SetupFlowStep struct {
 	// Id is a unique identifier for this step within the connector's setup flow.
 	// Must not start with the apxy: prefix, which is reserved for system-emitted
 	// steps.
 	Id string `json:"id" yaml:"id"`
 
-	// Title is the human-readable title shown above the form.
+	// Type selects the step kind. Defaults to form when empty.
+	Type SetupFlowStepType `json:"type,omitempty" yaml:"type,omitempty"`
+
+	// Title is the human-readable title shown above the form / redirect notice.
 	Title string `json:"title,omitempty" yaml:"title,omitempty"`
 
-	// Description is additional explanatory text shown with the form.
+	// Description is additional explanatory text shown with the step.
 	Description string `json:"description,omitempty" yaml:"description,omitempty"`
 
-	// JsonSchema is the JSON Schema defining the form's data model and validation rules.
-	JsonSchema common.RawJSON `json:"json_schema" yaml:"json_schema"`
+	// JsonSchema is the JSON Schema defining the form's data model and
+	// validation rules. Required for form-kind steps; must be absent for
+	// redirect-kind steps.
+	JsonSchema common.RawJSON `json:"json_schema,omitempty" yaml:"json_schema,omitempty"`
 
-	// UiSchema is the JSONForms UI Schema defining the form's layout and rendering.
+	// UiSchema is the JSONForms UI Schema defining the form's layout and
+	// rendering. Optional for form steps; must be absent for redirect steps.
 	UiSchema common.RawJSON `json:"ui_schema,omitempty" yaml:"ui_schema,omitempty"`
 
 	// DataSources defines dynamic data endpoints that can be referenced by form fields
-	// using the x-data-source property in the JSON Schema. Only allowed in configure steps.
+	// using the x-data-source property in the JSON Schema. Only allowed in configure
+	// form steps.
 	DataSources map[string]DataSourceDef `json:"data_sources,omitempty" yaml:"data_sources,omitempty"`
+
+	// Redirect carries the redirect-step-specific configuration. Required
+	// when Type == redirect; must be absent otherwise.
+	Redirect *SetupFlowStepRedirect `json:"redirect,omitempty" yaml:"redirect,omitempty"`
+}
+
+// SetupFlowStepRedirect describes a redirect-kind step's destination. The
+// URL is a mustache template that supports the connection's cfg fields
+// (e.g. {{cfg.tenant}}) plus two synthetic placeholders the runtime
+// substitutes at render time:
+//
+//   - {{RETURN_ADVANCE}}: a signed one-time-use URL the 3rd party redirects
+//     the user back to after the off-platform step succeeds; consuming it
+//     advances the connection to the next setup step.
+//   - {{RETURN_ABORT}}: same shape, used when the user cancels; consuming
+//     it aborts the in-flight setup.
+//
+// Tokens are signed with the AuthProxy instance's system signing key and
+// tracked in Redis for one-time-use enforcement.
+type SetupFlowStepRedirect struct {
+	// URL is the redirect destination. Mustache-templated; required.
+	URL string `json:"url" yaml:"url"`
+}
+
+// Validate the redirect block in isolation. Cross-field validation
+// (Redirect must be absent for form steps, present for redirect steps)
+// happens at the SetupFlowStep level.
+func (r *SetupFlowStepRedirect) Validate(vc *common.ValidationContext) error {
+	result := &multierror.Error{}
+	if r.URL == "" {
+		result = multierror.Append(result, vc.NewErrorfForField("url", "url is required"))
+	}
+	return result.ErrorOrNil()
 }
 
 func (s *SetupFlowStep) Validate(vc *common.ValidationContext, seenIds map[string]bool, allowDataSources bool) error {
@@ -356,23 +429,48 @@ func (s *SetupFlowStep) Validate(vc *common.ValidationContext, seenIds map[strin
 		seenIds[s.Id] = true
 	}
 
-	if s.JsonSchema.IsEmpty() {
-		result = multierror.Append(result, vc.NewErrorfForField("json_schema", "json_schema is required"))
-	} else if !json.Valid(s.JsonSchema) {
-		result = multierror.Append(result, vc.NewErrorfForField("json_schema", "json_schema is not valid JSON"))
+	if !s.Type.IsValid() {
+		result = multierror.Append(result, vc.NewErrorfForField("type", "type must be %q or %q (got %q)", SetupFlowStepTypeForm, SetupFlowStepTypeRedirect, s.Type))
 	}
 
-	if !s.UiSchema.IsEmpty() && !json.Valid(s.UiSchema) {
-		result = multierror.Append(result, vc.NewErrorfForField("ui_schema", "ui_schema is not valid JSON"))
-	}
+	switch s.Type.Normalized() {
+	case SetupFlowStepTypeForm:
+		if s.Redirect != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("redirect", "redirect must be absent for form steps"))
+		}
+		if s.JsonSchema.IsEmpty() {
+			result = multierror.Append(result, vc.NewErrorfForField("json_schema", "json_schema is required for form steps"))
+		} else if !json.Valid(s.JsonSchema) {
+			result = multierror.Append(result, vc.NewErrorfForField("json_schema", "json_schema is not valid JSON"))
+		}
+		if !s.UiSchema.IsEmpty() && !json.Valid(s.UiSchema) {
+			result = multierror.Append(result, vc.NewErrorfForField("ui_schema", "ui_schema is not valid JSON"))
+		}
+		if !allowDataSources && len(s.DataSources) > 0 {
+			result = multierror.Append(result, vc.NewErrorfForField("data_sources", "data_sources are not allowed in preconnect steps (no credentials available yet)"))
+		}
+		for name, ds := range s.DataSources {
+			if err := ds.Validate(vc.PushField("data_sources").PushField(name)); err != nil {
+				result = multierror.Append(result, err)
+			}
+		}
 
-	if !allowDataSources && len(s.DataSources) > 0 {
-		result = multierror.Append(result, vc.NewErrorfForField("data_sources", "data_sources are not allowed in preconnect steps (no credentials available yet)"))
-	}
-
-	for name, ds := range s.DataSources {
-		if err := ds.Validate(vc.PushField("data_sources").PushField(name)); err != nil {
-			result = multierror.Append(result, err)
+	case SetupFlowStepTypeRedirect:
+		if !s.JsonSchema.IsEmpty() {
+			result = multierror.Append(result, vc.NewErrorfForField("json_schema", "json_schema must be absent for redirect steps"))
+		}
+		if !s.UiSchema.IsEmpty() {
+			result = multierror.Append(result, vc.NewErrorfForField("ui_schema", "ui_schema must be absent for redirect steps"))
+		}
+		if len(s.DataSources) > 0 {
+			result = multierror.Append(result, vc.NewErrorfForField("data_sources", "data_sources must be absent for redirect steps"))
+		}
+		if s.Redirect == nil {
+			result = multierror.Append(result, vc.NewErrorfForField("redirect", "redirect is required for redirect steps"))
+		} else {
+			if err := s.Redirect.Validate(vc.PushField("redirect")); err != nil {
+				result = multierror.Append(result, err)
+			}
 		}
 	}
 
