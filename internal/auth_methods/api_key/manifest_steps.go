@@ -43,7 +43,7 @@ func (f *factory) ManifestSetupSteps(connection coreIface.Connection, connector 
 				// ValidateAndMergeData with nil config returns a fresh map of
 				// the validated fields; we hand it to PersistCredentials and
 				// discard the map (the plaintext is then encrypted into the
-				// api_key_credentials row).
+				// connection_credentials row).
 				credData, err := spec.ValidateAndMergeData(spec.Id, data, nil)
 				if err != nil {
 					return httperr.BadRequest(err.Error())

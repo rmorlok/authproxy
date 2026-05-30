@@ -14,7 +14,7 @@ import (
 // PersistCredentials extracts the api-key credential field values from
 // credData (validated by the schema-step's JSON Schema upstream), encrypts
 // the resulting plaintext as a single JSON blob, and inserts a fresh row
-// into api_key_credentials. InsertApiKeyCredential soft-deletes any active
+// into connection_credentials. InsertApiKeyCredential soft-deletes any active
 // row in the same transaction, so this is the rotation path as well as the
 // initial-set path.
 //

@@ -20,7 +20,7 @@ import (
 
 func init() {
 	RegisterEncryptedField(EncryptedFieldRegistration{
-		Table:            ApiKeyCredentialsTable,
+		Table:            ConnectionCredentialsTable,
 		PrimaryKeyCols:   []string{"id"},
 		EncryptedCols:    []string{"encrypted_credentials"},
 		JoinTable:        ConnectionsTable,
@@ -30,7 +30,7 @@ func init() {
 	})
 }
 
-const ApiKeyCredentialsTable = "api_key_credentials"
+const ConnectionCredentialsTable = "connection_credentials"
 
 // ApiKeyCredentialPlaintext is the canonical plaintext shape stored, encrypted,
 // inside ApiKeyCredential.EncryptedCredentials. Defined here so callers that
@@ -47,12 +47,13 @@ type OAuth2ClientCredentialsPlaintext struct {
 	ClientSecret string `json:"client_secret,omitempty"`
 }
 
-// ApiKeyCredential is one row in the api_key_credentials table — the encrypted
-// credential blob (api key and, for basic placement, username) submitted by a
-// user for a connection. The encrypted_credentials column stores a single
-// opaque encrypted blob; the substructure inside (e.g. {"api_key": "...",
-// "username": "..."}) is decided by the encrypt/decrypt layer that owns the
-// plaintext shape — the database is agnostic to it.
+// ApiKeyCredential is one row in the connection_credentials table — an
+// encrypted credential blob submitted by a user for a connection. API-key
+// connections store api key material here; OAuth2 client_credentials
+// connections store client id / secret material here. The encrypted_credentials
+// column stores a single opaque encrypted blob; the substructure inside is
+// decided by the encrypt/decrypt layer that owns the plaintext shape — the
+// database is agnostic to it.
 //
 // Rotation produces a new row and soft-deletes the prior, so the history of
 // credentials is preserved. At most one row per connection has
@@ -60,8 +61,8 @@ type OAuth2ClientCredentialsPlaintext struct {
 type ApiKeyCredential struct {
 	Id                   apid.ID
 	ConnectionId         apid.ID                  // FK to Connection; not enforced by DB
-	EncryptedCredentials encfield.EncryptedField  // Opaque encrypted blob (api key + optional username)
-	PlacementSnapshot    *cschema.ApiKeyPlacement // Placement config at submission time
+	EncryptedCredentials encfield.EncryptedField  // Opaque encrypted credential blob
+	PlacementSnapshot    *cschema.ApiKeyPlacement // API-key placement config at submission time
 	CreatedByActorId     *apid.ID                 // Actor who submitted (or rotated to) this credential
 	LastValidatedAt      *time.Time               // Most recent successful probe against this credential
 	CreatedAt            time.Time
@@ -188,7 +189,7 @@ func (s *service) GetActiveApiKeyCredential(
 	var result ApiKeyCredential
 	err := s.sq.
 		Select(result.cols()...).
-		From(ApiKeyCredentialsTable).
+		From(ConnectionCredentialsTable).
 		Where(sq.Eq{
 			"connection_id": connectionId,
 			"deleted_at":    nil,
@@ -233,7 +234,7 @@ func (s *service) InsertApiKeyCredential(
 	var newCred *ApiKeyCredential
 
 	err := s.transaction(func(tx *sql.Tx) error {
-		dbResult, err := s.sq.Update(ApiKeyCredentialsTable).
+		dbResult, err := s.sq.Update(ConnectionCredentialsTable).
 			Set("deleted_at", now).
 			Where(sq.Eq{
 				"connection_id": connectionId,
@@ -269,7 +270,7 @@ func (s *service) InsertApiKeyCredential(
 		}
 
 		insertResult, err := s.sq.
-			Insert(ApiKeyCredentialsTable).
+			Insert(ConnectionCredentialsTable).
 			Columns(newCred.cols()...).
 			Values(newCred.values()...).
 			RunWith(tx).
@@ -303,7 +304,7 @@ func (s *service) UpdateApiKeyCredentialLastValidated(
 	at time.Time,
 ) error {
 	dbResult, err := s.sq.
-		Update(ApiKeyCredentialsTable).
+		Update(ConnectionCredentialsTable).
 		Set("last_validated_at", at).
 		Where(sq.Eq{"id": credentialId}).
 		RunWith(s.db).
@@ -338,7 +339,7 @@ func (s *service) DeleteAllApiKeyCredentialsForConnection(
 
 	now := apctx.GetClock(ctx).Now()
 	dbResult, err := s.sq.
-		Update(ApiKeyCredentialsTable).
+		Update(ConnectionCredentialsTable).
 		Set("deleted_at", now).
 		Where(sq.Eq{
 			"connection_id": connectionId,

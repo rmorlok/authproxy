@@ -50,7 +50,7 @@ func (p *ApiKeyPlacement) Clone() *ApiKeyPlacement {
 
 // CredentialFieldNames returns the field names that carry secret values in the
 // connection-initiate form for this placement. These fields are extracted from
-// submitted form data, encrypted, and stored in api_key_credentials — they do
+// submitted form data, encrypted, and stored in connection_credentials — they do
 // NOT merge into the connection's EncryptedConfiguration.
 //
 // For bearer / header / query placements this is just "api_key". For basic, it

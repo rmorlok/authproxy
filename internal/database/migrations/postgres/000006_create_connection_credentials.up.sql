@@ -1,4 +1,4 @@
-create table api_key_credentials
+create table connection_credentials
 (
     id                    text primary key,
     connection_id         text not null,
@@ -11,8 +11,8 @@ create table api_key_credentials
     deleted_at            timestamptz
 );
 
-create index idx_api_key_credentials_deleted_at
-    on api_key_credentials (deleted_at);
+create index idx_connection_credentials_deleted_at
+    on connection_credentials (deleted_at);
 
-create index idx_api_key_credentials_connection_active
-    on api_key_credentials (connection_id, deleted_at);
+create index idx_connection_credentials_connection_active
+    on connection_credentials (connection_id, deleted_at);
