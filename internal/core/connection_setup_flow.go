@@ -7,12 +7,13 @@ import (
 	"strings"
 	"time"
 
+	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aptmpl"
 	"github.com/rmorlok/authproxy/internal/core/iface"
+	"github.com/rmorlok/authproxy/internal/core/setup_token"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
-	"github.com/rmorlok/authproxy/internal/setup_token"
 )
 
 // setupTokenTTL is how long RETURN_ADVANCE / RETURN_ABORT tokens stay
@@ -145,12 +146,15 @@ func (s *service) newSchemaRedirectStep(c iface.Connection, spec *cschema.SetupF
 			}
 
 			// 2) RETURN_ADVANCE / RETURN_ABORT: mint fresh one-time-use
-			//    tokens and substitute the resulting public-endpoint URLs.
-			advanceURL, err := s.mintReturnURL(ctx, c.GetId(), spec.Id, opts.ReturnToUrl, setup_token.IntentAdvance)
+			//    tokens bound to the initiating actor, and substitute
+			//    the resulting public-endpoint URLs.
+			ra := apauthcore.GetAuthFromContext(ctx)
+			actor := ra.MustGetActor()
+			advanceURL, err := s.mintReturnURL(ctx, c.GetId(), spec.Id, actor.GetId(), opts.ReturnToUrl, setup_token.IntentAdvance)
 			if err != nil {
 				return iface.RedirectInfo{}, fmt.Errorf("redirect step %q: mint advance token: %w", spec.Id, err)
 			}
-			abortURL, err := s.mintReturnURL(ctx, c.GetId(), spec.Id, opts.ReturnToUrl, setup_token.IntentAbort)
+			abortURL, err := s.mintReturnURL(ctx, c.GetId(), spec.Id, actor.GetId(), opts.ReturnToUrl, setup_token.IntentAbort)
 			if err != nil {
 				return iface.RedirectInfo{}, fmt.Errorf("redirect step %q: mint abort token: %w", spec.Id, err)
 			}
@@ -167,10 +171,11 @@ func (s *service) newSchemaRedirectStep(c iface.Connection, spec *cschema.SetupF
 // (/public/connections/{id}/setup/{advance|abort}?token=<jti>) that
 // substitutes for the corresponding placeholder in a redirect step's
 // URL template.
-func (s *service) mintReturnURL(ctx context.Context, connectionId apid.ID, stepId, returnToUrl string, intent setup_token.Intent) (string, error) {
+func (s *service) mintReturnURL(ctx context.Context, connectionId apid.ID, stepId string, actorId apid.ID, returnToUrl string, intent setup_token.Intent) (string, error) {
 	tok, err := setup_token.Mint(ctx, s.r, s.encrypt, setup_token.MintInput{
 		ConnectionId: connectionId,
 		StepId:       stepId,
+		ActorId:      actorId,
 		Intent:       intent,
 		ReturnToUrl:  returnToUrl,
 	}, setupTokenTTL)

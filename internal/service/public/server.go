@@ -134,12 +134,16 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 	routesOauth2.Register(server)
 
 	// /public/connections/{id}/setup/{advance,abort} — token-authorized
-	// transitions for the schema-defined redirect-step pattern. The setup
-	// token IS the authorization; no session is required (a 3rd party
-	// might bounce a user back without first ferrying them through our
-	// session flow).
+	// transitions for the schema-defined redirect-step pattern. Requires
+	// session + token: session establishes the actor; token binds that
+	// actor to a specific connection / step / intent at mint time. A
+	// leaked token used by a different signed-in user fails the actor
+	// check. Unauthenticated browsers bounce through session-initiate
+	// then return here (matches the OAuth2 callback shape).
 	routesSetup := common_routes.NewPublicSetupRoutes(
 		dm.GetConfig(),
+		authService,
+		&root.HostApplication,
 		dm.GetCoreService(),
 		dm.GetRedisClient(),
 		dm.GetEncryptService(),

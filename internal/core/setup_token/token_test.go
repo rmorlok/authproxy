@@ -13,7 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/encrypt"
-	"github.com/rmorlok/authproxy/internal/setup_token"
+	"github.com/rmorlok/authproxy/internal/core/setup_token"
 )
 
 // testEnv wires an in-memory redis (via apredis test helper) + fake encrypt
@@ -32,6 +32,7 @@ func validInput() setup_token.MintInput {
 	return setup_token.MintInput{
 		ConnectionId: apid.New(apid.PrefixConnection),
 		StepId:       "preconnect_redirect",
+		ActorId:      apid.New(apid.PrefixActor),
 		Intent:       setup_token.IntentAdvance,
 		ReturnToUrl:  "https://marketplace.example.com/return",
 	}
@@ -52,6 +53,7 @@ func TestMintAndConsume_RoundTrip(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, in.ConnectionId, claims.ConnectionId)
 	assert.Equal(t, in.StepId, claims.StepId)
+	assert.Equal(t, in.ActorId, claims.ActorId)
 	assert.Equal(t, in.Intent, claims.Intent)
 	assert.Equal(t, in.ReturnToUrl, claims.ReturnToUrl)
 	assert.Equal(t, tok, claims.Jti)
@@ -73,17 +75,22 @@ func TestMint_RejectsInvalidInputs(t *testing.T) {
 	}{
 		{
 			name: "empty connection_id",
-			in:   setup_token.MintInput{StepId: "x", Intent: setup_token.IntentAdvance},
+			in:   setup_token.MintInput{StepId: "x", ActorId: apid.New(apid.PrefixActor), Intent: setup_token.IntentAdvance},
 			ttl:  time.Minute,
 		},
 		{
 			name: "empty step_id",
-			in:   setup_token.MintInput{ConnectionId: apid.New(apid.PrefixConnection), Intent: setup_token.IntentAdvance},
+			in:   setup_token.MintInput{ConnectionId: apid.New(apid.PrefixConnection), ActorId: apid.New(apid.PrefixActor), Intent: setup_token.IntentAdvance},
+			ttl:  time.Minute,
+		},
+		{
+			name: "empty actor_id",
+			in:   setup_token.MintInput{ConnectionId: apid.New(apid.PrefixConnection), StepId: "x", Intent: setup_token.IntentAdvance},
 			ttl:  time.Minute,
 		},
 		{
 			name: "invalid intent",
-			in:   setup_token.MintInput{ConnectionId: apid.New(apid.PrefixConnection), StepId: "x", Intent: "noop"},
+			in:   setup_token.MintInput{ConnectionId: apid.New(apid.PrefixConnection), StepId: "x", ActorId: apid.New(apid.PrefixActor), Intent: "noop"},
 			ttl:  time.Minute,
 		},
 		{

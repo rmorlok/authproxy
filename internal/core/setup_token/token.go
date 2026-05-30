@@ -41,10 +41,11 @@ const (
 func (i Intent) IsValid() bool { return i == IntentAdvance || i == IntentAbort }
 
 // Claims is the verified payload a /setup/advance or /setup/abort handler
-// reads after VerifyAndConsume succeeds. ConnectionId + StepId are pinned
-// at mint time so a token can only act on the specific connection/step
-// pair it was issued for; ReturnToUrl carries the marketplace's eventual
-// destination through the off-platform bounce.
+// reads after VerifyAndConsume succeeds. ConnectionId + StepId + ActorId
+// are all pinned at mint time so a token can only act on the specific
+// connection/step pair it was issued for and only when consumed by the
+// same actor that initiated the flow; ReturnToUrl carries the
+// marketplace's eventual destination through the off-platform bounce.
 type Claims struct {
 	// ConnectionId is the connection the token authorizes a transition on.
 	ConnectionId apid.ID `json:"connection_id"`
@@ -54,6 +55,13 @@ type Claims struct {
 	// from this id between mint and consume, defending against a stale
 	// token unexpectedly advancing past an unrelated step.
 	StepId string `json:"step_id"`
+
+	// ActorId is the actor that initiated the redirect step. The /advance
+	// and /abort endpoints require a session and reject when the
+	// session's actor doesn't match this claim — defends against a
+	// leaked token being used by a different user even before its TTL
+	// expires.
+	ActorId apid.ID `json:"actor_id"`
 
 	// Intent gates which endpoint can consume the token.
 	Intent Intent `json:"intent"`
@@ -83,6 +91,7 @@ var ErrTampered = errors.New("setup_token: tampered payload")
 type MintInput struct {
 	ConnectionId apid.ID
 	StepId       string
+	ActorId      apid.ID
 	Intent       Intent
 	ReturnToUrl  string
 }
@@ -94,6 +103,9 @@ func (m MintInput) Validate() error {
 	}
 	if m.StepId == "" {
 		return errors.New("setup_token: step_id is required")
+	}
+	if m.ActorId == apid.Nil {
+		return errors.New("setup_token: actor_id is required")
 	}
 	if !m.Intent.IsValid() {
 		return fmt.Errorf("setup_token: invalid intent %q", m.Intent)
@@ -118,6 +130,7 @@ func Mint(ctx context.Context, r apredis.Client, e encrypt.E, in MintInput, ttl 
 	claims := Claims{
 		ConnectionId: in.ConnectionId,
 		StepId:       in.StepId,
+		ActorId:      in.ActorId,
 		Intent:       in.Intent,
 		ReturnToUrl:  in.ReturnToUrl,
 		Jti:          jti,
