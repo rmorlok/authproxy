@@ -221,7 +221,7 @@
       }
     },
 
-    "httpLogging": {
+    "appMetrics": {
       "type": "object",
       "additionalProperties": false,
       "properties": {

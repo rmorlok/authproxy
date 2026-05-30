@@ -20,13 +20,21 @@ Secrets, not in this ConfigMap.
 {{- $_ := set $cfg "worker" (dict "health_check_port" .Values.ports.workerHealth) -}}
 {{- end -}}
 
+{{/*
+String fields below run through `tpl` so an umbrella chart can pass
+values like `"{{ .Release.Name }}-postgresql"` and have them expand
+at this chart's render time. Customers passing plain literal values
+see no behavior change — tpl is a no-op on strings with no
+template syntax.
+*/}}
+
 {{/* --- database --- */}}
 {{- $db := dict "provider" .Values.database.provider "auto_migrate" .Values.database.autoMigrate -}}
 {{- if eq .Values.database.provider "postgres" -}}
-{{-   $_ := set $db "host" .Values.database.host -}}
+{{-   $_ := set $db "host" (tpl .Values.database.host $) -}}
 {{-   $_ := set $db "port" .Values.database.port -}}
-{{-   $_ := set $db "user" .Values.database.user -}}
-{{-   $_ := set $db "database" .Values.database.database -}}
+{{-   $_ := set $db "user" (tpl .Values.database.user $) -}}
+{{-   $_ := set $db "database" (tpl .Values.database.database $) -}}
 {{-   $_ := set $db "sslmode" .Values.database.sslmode -}}
 {{-   if .Values.database.existingSecret -}}
 {{-     $_ := set $db "password" (dict "env_var" "AUTHPROXY_DB_PASSWORD") -}}
@@ -37,9 +45,9 @@ Secrets, not in this ConfigMap.
 {{- $_ := set $cfg "database" $db -}}
 
 {{/* --- redis --- */}}
-{{- $redis := dict "provider" "redis" "address" .Values.redis.address "db" .Values.redis.db -}}
+{{- $redis := dict "provider" "redis" "address" (tpl .Values.redis.address $) "db" .Values.redis.db -}}
 {{- if .Values.redis.username -}}
-{{-   $_ := set $redis "username" .Values.redis.username -}}
+{{-   $_ := set $redis "username" (tpl .Values.redis.username $) -}}
 {{- end -}}
 {{- if .Values.redis.existingSecret -}}
 {{-   $_ := set $redis "password" (dict "env_var" "AUTHPROXY_REDIS_PASSWORD") -}}
@@ -48,7 +56,7 @@ Secrets, not in this ConfigMap.
 
 {{/* --- host application (required by validator) --- */}}
 {{- if .Values.hostApplication.initiateSessionUrl -}}
-{{-   $_ := set $cfg "host_application" (dict "initiate_session_url" .Values.hostApplication.initiateSessionUrl) -}}
+{{-   $_ := set $cfg "host_application" (dict "initiate_session_url" (tpl .Values.hostApplication.initiateSessionUrl $)) -}}
 {{- end -}}
 
 {{/* --- connectors block (required by validator; empty list is acceptable) --- */}}
@@ -58,30 +66,35 @@ Secrets, not in this ConfigMap.
 {{- end -}}
 {{- $_ := set $cfg "connectors" $connectors -}}
 
-{{/* --- http_logging (server unconditionally wires up the log storage) --- */}}
+{{/* --- app_metrics (server unconditionally wires up the metrics store) --- */}}
 {{/*
-  The http_log migrator + the main DB migrator share golang-migrate's
+  The app_metrics migrator + the main DB migrator share golang-migrate's
   default `schema_migrations` table, so they can't run against the same
-  schema. For SQLite that means a sibling file (default path with a
-  `.http-log` suffix); for Postgres, http_log uses tables prefixed inside
-  the same DB and conflicts are not observed in practice.
+  schema. For SQLite that means a sibling file (default path with an
+  `.app-metrics` suffix); for Postgres, app_metrics uses tables prefixed
+  inside the same DB and conflicts are not observed in practice.
+
+  Server-side this used to be `http_logging`; renamed to `app_metrics`
+  with the request-event capture moved under a `request_events`
+  sub-block. See internal/schema/config/app_metrics.go.
 */}}
-{{- $httpDb := dict -}}
-{{- if .Values.httpLogging.shareMainDatabase -}}
+{{- $metricsDb := dict -}}
+{{- if .Values.appMetrics.shareMainDatabase -}}
 {{-   if eq .Values.database.provider "sqlite" -}}
-{{-     $sharedPath := printf "%s.http-log" .Values.database.path -}}
-{{-     $httpDb = dict "provider" "sqlite" "path" $sharedPath -}}
+{{-     $sharedPath := printf "%s.app-metrics" .Values.database.path -}}
+{{-     $metricsDb = dict "provider" "sqlite" "path" $sharedPath -}}
 {{-   else -}}
-{{-     $httpDb = $db -}}
+{{-     $metricsDb = $db -}}
 {{-   end -}}
 {{- else -}}
-{{-   $httpDb = .Values.httpLogging.database -}}
+{{-   $metricsDb = .Values.appMetrics.database -}}
 {{- end -}}
-{{- $httpLogging := dict
-      "auto_migrate" .Values.httpLogging.autoMigrate
-      "full_request_recording" .Values.httpLogging.fullRequestRecording
-      "database" $httpDb -}}
-{{- $_ := set $cfg "http_logging" $httpLogging -}}
+{{- $appMetrics := dict
+      "auto_migrate" .Values.appMetrics.autoMigrate
+      "database" $metricsDb
+      "request_events" (dict
+        "full_request_recording" .Values.appMetrics.fullRequestRecording) -}}
+{{- $_ := set $cfg "app_metrics" $appMetrics -}}
 
 {{/* --- s3 (request-log blob storage) --- */}}
 {{- if .Values.s3.enabled -}}
