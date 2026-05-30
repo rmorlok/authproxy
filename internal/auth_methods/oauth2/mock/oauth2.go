@@ -243,6 +243,20 @@ func (mr *MockOAuth2ConnectionMockRecorder) CancelSessionAfterAuth() *gomock.Cal
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "CancelSessionAfterAuth", reflect.TypeOf((*MockOAuth2Connection)(nil).CancelSessionAfterAuth))
 }
 
+// ExchangeClientCredentials mocks base method.
+func (m *MockOAuth2Connection) ExchangeClientCredentials(ctx context.Context) error {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "ExchangeClientCredentials", ctx)
+	ret0, _ := ret[0].(error)
+	return ret0
+}
+
+// ExchangeClientCredentials indicates an expected call of ExchangeClientCredentials.
+func (mr *MockOAuth2ConnectionMockRecorder) ExchangeClientCredentials(ctx interface{}) *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "ExchangeClientCredentials", reflect.TypeOf((*MockOAuth2Connection)(nil).ExchangeClientCredentials), ctx)
+}
+
 // GenerateAuthUrl mocks base method.
 func (m *MockOAuth2Connection) GenerateAuthUrl(ctx context.Context, actor oauth2.IActorData) (string, error) {
 	m.ctrl.T.Helper()

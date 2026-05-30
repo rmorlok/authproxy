@@ -15,6 +15,8 @@ import (
 	encrypt_mock "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/test_utils"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 	"gopkg.in/h2non/gock.v1"
 )
 
@@ -126,4 +128,63 @@ func TestCreateDbTokenFromResponse(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestCreateDbTokenFromResponse_ClientCredentialsDiscardsRefreshToken(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	mockDB := database_mock.NewMockDB(ctrl)
+	mockEncrypt := encrypt_mock.NewMockE(ctrl)
+
+	mockEncrypt.EXPECT().
+		EncryptStringForEntity(gomock.Any(), gomock.Any(), "valid_access_token").
+		Return(encfield.EncryptedField{ID: "ekv_test", Data: "encrypted_access_token"}, nil)
+	mockDB.EXPECT().
+		InsertOAuth2Token(
+			gomock.Any(),
+			gomock.Any(),
+			nil,
+			encfield.EncryptedField{},
+			encfield.EncryptedField{ID: "ekv_test", Data: "encrypted_access_token"},
+			gomock.Any(),
+			"read",
+			"read",
+			gomock.Any(),
+		).
+		Return(&database.OAuth2Token{}, nil)
+
+	logger, read := bufLogger(t)
+	grantType := sconfig.OAuth2GrantClientCredentials
+	oauth := &oAuth2Connection{
+		db:      mockDB,
+		encrypt: mockEncrypt,
+		logger:  logger,
+		auth: &sconfig.AuthOAuth2{
+			GrantType: &grantType,
+			Scopes:    []sconfig.Scope{{Id: "read"}},
+		},
+		connection: &mockCore.Connection{
+			Id: apid.MustParse("cxn_test1234567890ab"),
+		},
+	}
+
+	resp := test_utils.MockGentlemenGetResponse("https://example.com", "example", func(m *gock.Request) {
+		m.
+			Reply(200).
+			AddHeader("Content-Type", "application/json").
+			BodyString(`{"access_token":"valid_access_token","refresh_token":"must_not_persist","scope":"read","expires_in":3600}`)
+	})
+
+	_, err := oauth.createDbTokenFromResponseWithOptions(
+		context.Background(),
+		resp,
+		nil,
+		tokenPersistOptions{PersistRefreshToken: false},
+	)
+	require.NoError(t, err)
+
+	records := read()
+	require.Len(t, records, 1)
+	assert.Contains(t, records[0]["msg"], "discarding")
 }

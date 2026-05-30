@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 
+	"github.com/rmorlok/authproxy/internal/auth_methods/oauth2"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
@@ -32,6 +33,24 @@ func (c *connection) advanceToStep(
 ) (iface.ConnectionSetupResponse, error) {
 	if next == nil {
 		return c.completeFlow(ctx)
+	}
+
+	if next.Id() == oauth2.OAuth2ClientCredentialsStepId {
+		nextStep := cschema.MustNewSetupStep(next.Id())
+		if err := c.SetSetupStep(ctx, &nextStep); err != nil {
+			return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to update setup step: %w", err))
+		}
+		factory, ok := c.s.getAuthMethodFactory(c.GetConnectorVersionEntity().GetDefinition()).(oauth2.Factory)
+		if !ok || factory == nil {
+			return nil, httperr.InternalServerErrorMsg("oauth2 factory unavailable for client-credentials exchange")
+		}
+		if err := factory.NewOAuth2(c).ExchangeClientCredentials(ctx); err != nil {
+			if recordErr := c.HandleAuthFailed(ctx, err); recordErr != nil {
+				return nil, httperr.InternalServerError(httperr.WithInternalErrorf("failed to record auth failure (%v) after: %w", recordErr, err))
+			}
+			return c.GetCurrentSetupStepResponse(ctx)
+		}
+		return c.GetCurrentSetupStepResponse(ctx)
 	}
 
 	// For redirect steps, render the URL FIRST. The closure may reject

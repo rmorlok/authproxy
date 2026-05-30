@@ -386,6 +386,47 @@ func TestAuthOAuth2_Validate_NilMethodAcceptedAsDefault(t *testing.T) {
 	assert.Equal(t, cschema.TokenEndpointAuthClientSecretPost, a.GetTokenEndpointAuthMethodOrDefault())
 }
 
+func TestAuthOAuth2_Validate_ClientCredentialsRejectsAuthorizationBlock(t *testing.T) {
+	a := &cschema.AuthOAuth2{
+		Type:         cschema.AuthTypeOAuth2,
+		GrantType:    cschema.NewOAuth2GrantType(cschema.OAuth2GrantClientCredentials),
+		ClientId:     common.NewStringValueDirect("client-id"),
+		ClientSecret: common.NewStringValueDirect("client-secret"),
+		Authorization: cschema.AuthOauth2Authorization{
+			Endpoint: "https://example.com/oauth/authorize",
+		},
+	}
+	err := a.Validate(&common.ValidationContext{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "authorization")
+}
+
+func TestAuthOAuth2_Validate_ClientCredentialsRequiresSecretUnlessNone(t *testing.T) {
+	a := &cschema.AuthOAuth2{
+		Type:      cschema.AuthTypeOAuth2,
+		GrantType: cschema.NewOAuth2GrantType(cschema.OAuth2GrantClientCredentials),
+		ClientId:  common.NewStringValueDirect("client-id"),
+	}
+	err := a.Validate(&common.ValidationContext{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "client_secret")
+
+	a.TokenEndpointAuthMethod = cschema.NewTokenEndpointAuthMethod(cschema.TokenEndpointAuthNone)
+	require.NoError(t, a.Validate(&common.ValidationContext{}))
+}
+
+func TestAuthOAuth2_Validate_RejectsUnknownGrantType(t *testing.T) {
+	a := &cschema.AuthOAuth2{
+		Type:         cschema.AuthTypeOAuth2,
+		GrantType:    cschema.NewOAuth2GrantType(cschema.OAuth2GrantType("implicit")),
+		ClientId:     common.NewStringValueDirect("client-id"),
+		ClientSecret: common.NewStringValueDirect("client-secret"),
+	}
+	err := a.Validate(&common.ValidationContext{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "grant_type")
+}
+
 // TestAuthOAuth2_Validate_RejectsUnknownTokenEndpointAuthMethod guards
 // the validator against typos / unsupported RFC 7591 methods (client_secret_jwt
 // etc., out of scope).

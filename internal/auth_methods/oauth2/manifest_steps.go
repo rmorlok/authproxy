@@ -11,20 +11,33 @@ import (
 
 // OAuth2AuthorizeStepId is the manifest id for OAuth2's authorize-redirect
 // step. Constant so core's dispatcher can compare against it when handling
-// the callback transition. #352 (client_credentials grant) will introduce a
-// second id for the synchronous token-exchange path.
+// the callback transition.
 const OAuth2AuthorizeStepId = "apxy:auth:oauth2_authorize"
 
+// OAuth2ClientCredentialsStepId is the manifest id for OAuth2's synchronous
+// client-credentials exchange step. Core recognizes this id as an immediate
+// auth step.
+const OAuth2ClientCredentialsStepId = "apxy:auth:oauth2_client_credentials"
+
 // ManifestSetupSteps returns the OAuth2-emitted setup steps for this
-// connection. The authorization_code grant (today's only supported grant)
-// emits a single redirect step whose RenderRedirect resolves to the
-// freshly-minted authorize URL (state + PKCE already persisted to redis).
+// connection. authorization_code emits a redirect step; client_credentials
+// emits an immediate step that core executes synchronously.
 func (f *factory) ManifestSetupSteps(connection coreIface.Connection, connector *cschema.Connector) []coreIface.ManifestSetupStep {
 	if connector == nil || connector.Auth == nil {
 		return nil
 	}
-	if _, ok := connector.Auth.Inner().(*cschema.AuthOAuth2); !ok {
+	auth, ok := connector.Auth.Inner().(*cschema.AuthOAuth2)
+	if !ok {
 		return nil
+	}
+	if auth.GetGrantTypeOrDefault() == cschema.OAuth2GrantClientCredentials {
+		return []coreIface.ManifestSetupStep{
+			coreIface.NewFormStep(coreIface.FormStepConfig{
+				Id:          OAuth2ClientCredentialsStepId,
+				Title:       "Authorize",
+				Description: "Authorizing this connection.",
+			}),
+		}
 	}
 	return []coreIface.ManifestSetupStep{
 		coreIface.NewRedirectStep(coreIface.RedirectStepConfig{

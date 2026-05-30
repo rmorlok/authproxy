@@ -55,6 +55,7 @@ type (
 	Connector               = connectors.Connector
 	Connectors              = connectors.Connectors
 	PKCEMethod              = connectors.PKCEMethod
+	OAuth2GrantType         = connectors.OAuth2GrantType
 	Scope                   = connectors.Scope
 	TokenEndpointAuthMethod = connectors.TokenEndpointAuthMethod
 )
@@ -71,6 +72,9 @@ const (
 
 	PKCEMethodS256  = connectors.PKCEMethodS256
 	PKCEMethodPlain = connectors.PKCEMethodPlain
+
+	OAuth2GrantAuthorizationCode = connectors.OAuth2GrantAuthorizationCode
+	OAuth2GrantClientCredentials = connectors.OAuth2GrantClientCredentials
 
 	TokenEndpointAuthClientSecretPost  = connectors.TokenEndpointAuthClientSecretPost
 	TokenEndpointAuthClientSecretBasic = connectors.TokenEndpointAuthClientSecretBasic
