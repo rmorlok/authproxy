@@ -4,6 +4,7 @@ import (
 	"time"
 
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 )
 
@@ -49,12 +50,12 @@ type UpdateRateLimitRequestJson struct {
 //
 //	@Description	Request to proxy or simulate an HTTP request
 type ProxyRequestJson struct {
-	URL      string            `json:"url" yaml:"url" example:"https://api.example.com/v1/users"`
-	Method   string            `json:"method" yaml:"method" example:"GET"`
-	Headers  map[string]string `json:"headers,omitempty" yaml:"headers,omitempty"`
-	Labels   map[string]string `json:"labels,omitempty" yaml:"labels,omitempty"`
-	BodyRaw  []byte            `json:"body_raw,omitempty" yaml:"body_raw,omitempty"`
-	BodyJson interface{}       `json:"body_json,omitempty" yaml:"body_json,omitempty"`
+	URL      string                       `json:"url" yaml:"url" example:"https://api.example.com/v1/users"`
+	Method   string                       `json:"method" yaml:"method" example:"GET"`
+	Headers  map[string]common.HeadersVal `json:"headers,omitempty" yaml:"headers,omitempty" swaggertype:"object"`
+	Labels   map[string]string            `json:"labels,omitempty" yaml:"labels,omitempty"`
+	BodyRaw  []byte                       `json:"body_raw,omitempty" yaml:"body_raw,omitempty"`
+	BodyJson interface{}                  `json:"body_json,omitempty" yaml:"body_json,omitempty"`
 }
 
 // DryRunRequestJson is the request body for POST /rate-limits/_dry_run.

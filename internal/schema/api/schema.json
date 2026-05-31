@@ -32,6 +32,19 @@
         "type": "string"
       }
     },
+    "HeadersVal": {
+      "oneOf": [
+        { "type": "string" },
+        {
+          "type": "array",
+          "items": { "type": "string" }
+        }
+      ]
+    },
+    "HeadersMap": {
+      "type": "object",
+      "additionalProperties": { "$ref": "#/$defs/HeadersVal" }
+    },
     "ErrorResponse": {
       "type": "object",
       "properties": {
@@ -691,7 +704,7 @@
           "format": "uri"
         },
         "method": { "$ref": "../resources/rate_limit/schema.json#/$defs/HttpMethod" },
-        "headers": { "$ref": "#/$defs/StringMap" },
+        "headers": { "$ref": "#/$defs/HeadersMap" },
         "labels": { "$ref": "#/$defs/StringMap" },
         "body_raw": {
           "type": "string",

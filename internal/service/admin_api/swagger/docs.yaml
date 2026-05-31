@@ -868,15 +868,13 @@ definitions:
           type: integer
         type: array
       headers:
-        additionalProperties:
-          type: string
         type: object
       labels:
         additionalProperties:
           type: string
         type: object
       method:
-        example: GET
+        example: POST
         type: string
       url:
         example: https://api.example.com/v1/users

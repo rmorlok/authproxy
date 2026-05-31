@@ -7,6 +7,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
 type probeHttp struct {
@@ -32,7 +33,7 @@ func (p *probeHttp) Invoke(ctx context.Context) (string, error) {
 			req := iface.ProxyRequest{
 				Method:   h.Method,
 				URL:      h.URL,
-				Headers:  h.Headers,
+				Headers:  common.HeadersValMapFromStrings(h.Headers),
 				BodyRaw:  h.BodyRaw,
 				BodyJson: h.BodyJson,
 			}

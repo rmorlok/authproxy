@@ -3,7 +3,8 @@
     "url": "https://api.example.com/v1/users",
     "method": "POST",
     "headers": {
-      "content-type": "application/json"
+      "content-type": "application/json",
+      "x-trace": ["one", "two"]
     },
     "labels": {
       "team": "payments"

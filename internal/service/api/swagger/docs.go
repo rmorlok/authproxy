@@ -8759,10 +8759,7 @@ const docTemplateApi = `{
                     }
                 },
                 "headers": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
+                    "type": "object"
                 },
                 "labels": {
                     "type": "object",
@@ -8772,7 +8769,7 @@ const docTemplateApi = `{
                 },
                 "method": {
                     "type": "string",
-                    "example": "GET"
+                    "example": "POST"
                 },
                 "url": {
                     "type": "string",

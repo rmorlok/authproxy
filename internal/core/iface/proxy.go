@@ -9,16 +9,19 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"gopkg.in/h2non/gentleman.v2"
 )
 
+type HeadersVal = common.HeadersVal
+
 type ProxyRequest struct {
-	URL      string            `json:"url"`
-	Method   string            `json:"method"`
-	Headers  map[string]string `json:"headers"`
-	Labels   map[string]string `json:"labels,omitempty"`
-	BodyRaw  []byte            `json:"body_raw,omitempty"`
-	BodyJson interface{}       `json:"body_json,omitempty"`
+	URL      string                `json:"url"`
+	Method   string                `json:"method"`
+	Headers  map[string]HeadersVal `json:"headers"`
+	Labels   map[string]string     `json:"labels,omitempty"`
+	BodyRaw  []byte                `json:"body_raw,omitempty"`
+	BodyJson interface{}           `json:"body_json,omitempty"`
 }
 
 func (r *ProxyRequest) Apply(req *gentleman.Request) {
@@ -26,7 +29,9 @@ func (r *ProxyRequest) Apply(req *gentleman.Request) {
 	req.Method(r.Method)
 
 	for h, v := range r.Headers {
-		req.AddHeader(h, v)
+		for _, hv := range v.Values() {
+			req.AddHeader(h, hv)
+		}
 	}
 
 	if r.BodyJson != nil {
