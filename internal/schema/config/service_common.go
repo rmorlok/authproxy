@@ -5,6 +5,7 @@ import (
 	"crypto/tls"
 	"fmt"
 	"net/http"
+	"strings"
 
 	"gopkg.in/yaml.v3"
 )
@@ -29,6 +30,7 @@ func (s *ServiceCommon) healthCheckPort() *uint64 {
 type ServiceHttp struct {
 	ServiceCommon `json:",inline" yaml:",inline"`
 	PortVal       *IntegerValue `json:"port" yaml:"port"`
+	BaseUrl       *StringValue  `json:"base_url,omitempty" yaml:"base_url,omitempty"`
 	DomainVal     string        `json:"domain" yaml:"domain"`
 	IsHttpsVal    bool          `json:"https" yaml:"https"`
 	CorsVal       *CorsConfig   `json:"cors,omitempty" yaml:"cors,omitempty"`
@@ -112,6 +114,14 @@ func (s *ServiceHttp) Domain() string {
 }
 
 func (s *ServiceHttp) GetBaseUrl() string {
+	ctx := context.Background()
+	if s.BaseUrl != nil && s.BaseUrl.HasValue(ctx) {
+		baseUrl, err := s.BaseUrl.GetValue(ctx)
+		if err == nil && baseUrl != "" {
+			return strings.TrimRight(baseUrl, "/")
+		}
+	}
+
 	proto := "http"
 	if s.IsHttps() {
 		proto = "https"

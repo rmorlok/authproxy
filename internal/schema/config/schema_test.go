@@ -1053,6 +1053,11 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": {"port": 8080, "health_check_port": 8081}}`,
 				},
 				{
+					Name:  "base_url as string",
+					Valid: true,
+					Data:  `{"test": {"port": 8080, "base_url": "https://api.example.com"}}`,
+				},
+				{
 					Name:  "port as string is invalid for IntegerValue",
 					Valid: false,
 					Data:  `{"test": {"port": "bad"}}`,

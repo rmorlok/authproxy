@@ -28,15 +28,16 @@ spec:
         - name: go-oauth2-server
           image: "{{ .Values.goOauth2Server.image.repository }}:{{ .Values.goOauth2Server.image.tag }}"
           imagePullPolicy: {{ .Values.goOauth2Server.image.pullPolicy }}
-          # go-oauth2-server's entrypoint is a CLI; without a subcommand
-          # it prints --help and exits 0.
-          args: ["runserver"]
+          command: ["go-oauth2-server"]
+          # go-oauth2-server's entrypoint is a CLI; test mode uses an
+          # embedded store and exposes /test/* endpoints for smoke tests.
+          args: ["runserver", "--test-mode", "--test-port", {{ .Values.goOauth2Server.port | quote }}]
           ports:
             - name: http
               containerPort: {{ .Values.goOauth2Server.port }}
           readinessProbe:
             httpGet:
-              path: /
+              path: /test/health
               port: http
             initialDelaySeconds: 2
             periodSeconds: 5
