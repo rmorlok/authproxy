@@ -113,7 +113,7 @@ const ConnectorList: React.FC = () => {
     );
   } else {
     content = (
-      <Grid container spacing={4} columnSpacing={20}>
+      <Grid container spacing={4}>
         {connectors.map((connector) => (
           <Grid key={connector.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
             <ConnectorCard

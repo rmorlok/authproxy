@@ -181,7 +181,7 @@ const ConnectionList: React.FC = () => {
     );
   } else {
     content = (
-      <Grid container spacing={4} columnSpacing={20}>
+      <Grid container spacing={4}>
         {connections.map((connection) => (
           <Grid key={connection.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
             <ConnectionCard connection={connection} />
