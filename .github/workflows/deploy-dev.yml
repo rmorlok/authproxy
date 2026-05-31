@@ -249,6 +249,27 @@ jobs:
         run: |
           set -euo pipefail
 
+          # Helm hook Jobs can outlive an atomic uninstall / failed install.
+          # Dev environments are disposable, so clear stale hook resources
+          # before each install to avoid waiting on an old Job's pods.
+          kubectl -n "${RELEASE_NS}" delete job "${RELEASE_NAME}-seed" \
+            --ignore-not-found --wait=false
+          kubectl -n "${RELEASE_NS}" delete configmap "${RELEASE_NAME}-seed-config" \
+            --ignore-not-found
+
+          for _ in $(seq 1 24); do
+            if ! kubectl -n "${RELEASE_NS}" get job "${RELEASE_NAME}-seed" >/dev/null 2>&1; then
+              break
+            fi
+            echo "Waiting for stale ${RELEASE_NAME}-seed Job to be deleted..."
+            sleep 5
+          done
+
+          if kubectl -n "${RELEASE_NS}" get job "${RELEASE_NAME}-seed" >/dev/null 2>&1; then
+            echo "Timed out waiting for stale ${RELEASE_NAME}-seed Job to delete." >&2
+            exit 1
+          fi
+
           if ! helm status "${RELEASE_NAME}" -n "${RELEASE_NS}" >/dev/null 2>&1; then
             echo "No existing ${RELEASE_NAME} release in ${RELEASE_NS}."
             exit 0
