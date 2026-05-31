@@ -1,9 +1,9 @@
 # schema: https://json.schemastore.org/github-workflow.json
 name: Deploy Demo
 
-# Auto-deploys the authproxy-demo umbrella chart on every push to main.
-# Image tag is pinned to `sha-<short>` so the deploy targets the exact
-# build produced by the Build Image workflow for this commit.
+# Auto-deploys the authproxy-demo umbrella chart after Build Image
+# publishes the main-branch images. Image tag is pinned to `sha-<short>`
+# so the deploy targets the exact build produced for that commit.
 #
 # Trust + auth: this workflow assumes the `authproxy-eks-gh-actions`
 # IAM role via OIDC. The role's trust policy (from
@@ -33,8 +33,10 @@ name: Deploy Demo
 #         e.g. https://.../plugin.zip;rmorlok-authproxy-datasource
 
 on:
-  push:
+  workflow_run:
+    workflows: ["Build Image"]
     branches: [main]
+    types: [completed]
   workflow_dispatch:
     inputs:
       image_tag:
@@ -45,7 +47,7 @@ on:
 permissions:
   contents: read
   id-token: write    # OIDC token mint
-  packages: read     # Poll GHCR until the image tag from Build Image exists.
+  packages: read     # Verify the image tag from Build Image exists in GHCR.
 
 concurrency:
   # One deploy at a time per branch — protects against racing pushes
@@ -57,6 +59,7 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
     # Required by the IAM role's trust policy — see header.
     environment: gha-eks
@@ -72,6 +75,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0      # helm relies on the .git context for some chart hooks
+          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
       - name: Set up Helm
         uses: azure/setup-helm@v4
@@ -89,6 +93,9 @@ jobs:
           set -euo pipefail
           if [ -n "${{ inputs.image_tag }}" ]; then
             tag="${{ inputs.image_tag }}"
+          elif [ "${{ github.event_name }}" = "workflow_run" ]; then
+            # Deploy the exact commit whose Build Image run just completed.
+            tag="sha-$(printf '%s' "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)"
           else
             # Match docker/metadata-action's `type=sha,prefix=sha-,format=short`
             tag="sha-$(git rev-parse --short HEAD)"
@@ -96,7 +103,7 @@ jobs:
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "Deploying image tag: ${tag}"
 
-      - name: Wait for image tag in GHCR
+      - name: Verify image tag in GHCR
         run: |
           set -euo pipefail
           tag="${{ steps.tag.outputs.tag }}"
@@ -110,7 +117,7 @@ jobs:
           echo "${{ secrets.GITHUB_TOKEN }}" \
             | docker login "${REGISTRY}" -u "${{ github.actor }}" --password-stdin >/dev/null
 
-          deadline=$((SECONDS + 30 * 60))
+          deadline=$((SECONDS + 5 * 60))
           while true; do
             missing=()
             for image in "${images[@]}"; do
@@ -127,12 +134,12 @@ jobs:
             fi
 
             if [ "${SECONDS}" -ge "${deadline}" ]; then
-              echo "Timed out waiting for image tag ${tag}. Missing:" >&2
+              echo "Timed out verifying image tag ${tag}. Missing:" >&2
               printf '  %s\n' "${missing[@]}" >&2
               exit 1
             fi
 
-            echo "Waiting for Build Image to publish ${tag}:"
+            echo "Waiting for GHCR to expose ${tag}:"
             printf '  %s\n' "${missing[@]}"
             sleep 30
           done
