@@ -344,9 +344,10 @@ export const cancelSetupConnection = (id: string) => {
 };
 
 /**
- * Retry a connection that failed during probe verification. For connectors with preconnect steps,
- * returns to preconnect:0 so the user can correct inputs. For connectors without preconnect steps,
- * re-initiates OAuth (return_to_url is required in that case).
+ * Retry a connection that failed during setup, including auth-phase failures and probe
+ * verification failures. For connectors with preconnect steps, returns to preconnect:0 so the
+ * user can correct inputs. For connectors without preconnect steps, re-initiates OAuth
+ * (return_to_url is required in that case).
  */
 export const retryConnection = (id: string, returnToUrl?: string) => {
     const request: RetryConnectionRequest = { return_to_url: returnToUrl };
