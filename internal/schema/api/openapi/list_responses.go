@@ -240,7 +240,7 @@ type UpdateRateLimitRequestJson struct {
 type ProxyRequestJson struct {
 	URL      string            `json:"url" example:"https://api.example.com/v1/users"`
 	Method   string            `json:"method" example:"POST"`
-	Headers  map[string]string `json:"headers,omitempty"`
+	Headers  map[string]any    `json:"headers,omitempty" swaggertype:"object"`
 	Labels   map[string]string `json:"labels,omitempty"`
 	BodyRaw  []byte            `json:"body_raw,omitempty"`
 	BodyJson interface{}       `json:"body_json,omitempty"`

@@ -9,6 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 )
 
 // GetDataSource fetches data from an external API through the connection's authenticated proxy,
@@ -68,7 +69,7 @@ func (c *connection) GetDataSource(ctx context.Context, sourceId string) ([]apjs
 	proxyReq := &iface.ProxyRequest{
 		URL:     renderedUrl,
 		Method:  ds.ProxyRequest.Method,
-		Headers: renderedHeaders,
+		Headers: common.HeadersValMapFromStrings(renderedHeaders),
 	}
 
 	proxyResp, err := c.ProxyRequest(ctx, httpf.RequestTypeProxy, proxyReq)

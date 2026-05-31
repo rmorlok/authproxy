@@ -8758,7 +8758,7 @@ const docTemplateApi = `{
             }
         },
         "routes.ProxyRequest": {
-            "description": "Request to proxy or simulate an HTTP request",
+            "description": "Request to simulate an HTTP request",
             "type": "object",
             "properties": {
                 "body_json": {},
@@ -8769,10 +8769,7 @@ const docTemplateApi = `{
                     }
                 },
                 "headers": {
-                    "type": "object",
-                    "additionalProperties": {
-                        "type": "string"
-                    }
+                    "type": "object"
                 },
                 "labels": {
                     "type": "object",
@@ -8782,7 +8779,7 @@ const docTemplateApi = `{
                 },
                 "method": {
                     "type": "string",
-                    "example": "GET"
+                    "example": "POST"
                 },
                 "url": {
                     "type": "string",

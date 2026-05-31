@@ -3,13 +3,16 @@ package iface
 import (
 	"fmt"
 	"net/http"
+	"net/http/httptest"
 	"testing"
 
 	mock "gopkg.in/h2non/gentleman-mock.v2"
 	"gopkg.in/h2non/gentleman.v2"
 	"gopkg.in/h2non/gock.v1"
 
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestProxyRequest_Validate(t *testing.T) {
@@ -23,9 +26,9 @@ func TestProxyRequest_Validate(t *testing.T) {
 			proxyRequest: ProxyRequest{
 				URL:    "http://example.com",
 				Method: http.MethodGet,
-				Headers: map[string]string{
+				Headers: common.HeadersValMapFromStrings(map[string]string{
 					"Content-Type": "application/json",
-				},
+				}),
 			},
 			expectedError: "",
 		},
@@ -33,9 +36,9 @@ func TestProxyRequest_Validate(t *testing.T) {
 			name: "missing URL",
 			proxyRequest: ProxyRequest{
 				Method: http.MethodGet,
-				Headers: map[string]string{
+				Headers: common.HeadersValMapFromStrings(map[string]string{
 					"Content-Type": "application/json",
-				},
+				}),
 			},
 			expectedError: "url is required",
 		},
@@ -43,9 +46,9 @@ func TestProxyRequest_Validate(t *testing.T) {
 			name: "missing Method",
 			proxyRequest: ProxyRequest{
 				URL: "http://example.com",
-				Headers: map[string]string{
+				Headers: common.HeadersValMapFromStrings(map[string]string{
 					"Content-Type": "application/json",
-				},
+				}),
 			},
 			expectedError: "method is required",
 		},
@@ -54,9 +57,9 @@ func TestProxyRequest_Validate(t *testing.T) {
 			proxyRequest: ProxyRequest{
 				URL:    "http://example.com",
 				Method: "INVALID",
-				Headers: map[string]string{
+				Headers: common.HeadersValMapFromStrings(map[string]string{
 					"Content-Type": "application/json",
-				},
+				}),
 			},
 			expectedError: "invalid HTTP method",
 		},
@@ -65,9 +68,9 @@ func TestProxyRequest_Validate(t *testing.T) {
 			proxyRequest: ProxyRequest{
 				URL:    "http://example.com",
 				Method: http.MethodPost,
-				Headers: map[string]string{
+				Headers: common.HeadersValMapFromStrings(map[string]string{
 					"Content-Type": "application/json",
-				},
+				}),
 			},
 			expectedError: "either body_raw or body_json is must be specified",
 		},
@@ -102,6 +105,30 @@ func TestProxyRequest_Validate(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestProxyRequestApply_AddsRepeatedHeaderValues(t *testing.T) {
+	seen := make(chan []string, 1)
+	srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen <- r.Header.Values("X-Trace")
+		w.WriteHeader(http.StatusNoContent)
+	}))
+	defer srv.Close()
+
+	req := ProxyRequest{
+		URL:    srv.URL,
+		Method: http.MethodGet,
+		Headers: map[string]HeadersVal{
+			"X-Trace": common.NewHeadersValSlice([]string{"one", "two"}),
+		},
+	}
+
+	greq := gentleman.New().Request()
+	req.Apply(greq)
+	resp, err := greq.Send()
+	require.NoError(t, err)
+	require.Equal(t, http.StatusNoContent, resp.StatusCode)
+	require.Equal(t, []string{"one", "two"}, <-seen)
 }
 
 func TestProxyResponseFromGentlemen(t *testing.T) {

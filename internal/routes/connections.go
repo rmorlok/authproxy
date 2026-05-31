@@ -53,12 +53,12 @@ type ListConnectionResponseJson = schemaapi.ListConnectionResponseJson
 type DisconnectResponseJson = schemaapi.DisconnectResponseJson
 type ForceStateRequestJson = schemaapi.ForceConnectionStateRequestJson
 type UpdateConnectionRequestJson = schemaapi.UpdateConnectionRequestJson
-type ProxyRequest = schemaapi.ProxyRequestJson
 type ProxyResponse = schemaapi.ProxyResponseJson
 
 type OpenAPIConnectionJson = schemaapiopenapi.ConnectionJson
 type OpenAPIListConnectionResponseJson = schemaapiopenapi.ListConnectionResponseJson
 type OpenAPIDisconnectResponseJson = schemaapiopenapi.DisconnectResponseJson
+type ProxyRequest = schemaapiopenapi.ProxyRequestJson
 type OpenAPIProxyResponseJson = schemaapiopenapi.ProxyResponseJson
 
 // @Summary		Initiate connection

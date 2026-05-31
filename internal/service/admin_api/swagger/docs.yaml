@@ -868,7 +868,7 @@ definitions:
         type: object
     type: object
   routes.ProxyRequest:
-    description: Request to proxy or simulate an HTTP request
+    description: Request to simulate an HTTP request
     properties:
       body_json: {}
       body_raw:
@@ -876,15 +876,13 @@ definitions:
           type: integer
         type: array
       headers:
-        additionalProperties:
-          type: string
         type: object
       labels:
         additionalProperties:
           type: string
         type: object
       method:
-        example: GET
+        example: POST
         type: string
       url:
         example: https://api.example.com/v1/users

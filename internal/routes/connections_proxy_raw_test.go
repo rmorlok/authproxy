@@ -152,3 +152,14 @@ func TestCopyInboundHeadersForRawProxy(t *testing.T) {
 	assert.Empty(t, dst.Get("Host"), "Host set by http.NewRequest from outbound URL")
 	assert.Empty(t, dst.Get("Content-Length"), "Content-Length set separately from inbound ContentLength")
 }
+
+func TestCopyInboundHeadersForRawProxy_PreservesRepeatedValues(t *testing.T) {
+	src := http.Header{}
+	src.Add("X-Multi", "one")
+	src.Add("X-Multi", "two")
+
+	dst := http.Header{}
+	copyInboundHeadersForRawProxy(dst, src)
+
+	assert.Equal(t, []string{"one", "two"}, dst.Values("X-Multi"))
+}
