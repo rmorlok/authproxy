@@ -386,66 +386,66 @@ func (l *sqlListRequestsBuilder) OrderBy(field RequestOrderByField, by paginatio
 	return l
 }
 
-func (l *sqlListRequestsBuilder) WithNamespaceMatcher(matcher string) ListRequestBuilder {
+func (l *sqlListRequestsBuilder) ForNamespaceMatcher(matcher string) ListRequestBuilder {
 	if err := l.ListFilters.SetNamespaceMatcher(matcher); err != nil {
 		return l.addError(err)
 	}
 	return l
 }
 
-func (l *sqlListRequestsBuilder) WithNamespaceMatchers(matchers []string) ListRequestBuilder {
+func (l *sqlListRequestsBuilder) ForNamespaceMatchers(matchers []string) ListRequestBuilder {
 	if err := l.ListFilters.SetNamespaceMatchers(matchers); err != nil {
 		return l.addError(err)
 	}
 	return l
 }
 
-func (l *sqlListRequestsBuilder) WithRequestType(requestType httpf.RequestType) ListRequestBuilder {
+func (l *sqlListRequestsBuilder) ForRequestType(requestType httpf.RequestType) ListRequestBuilder {
 	l.ListFilters.SetRequestType(requestType)
 	return l
 }
 
-func (l *sqlListRequestsBuilder) WithCorrelationId(correlationId string) ListRequestBuilder {
+func (l *sqlListRequestsBuilder) ForCorrelationId(correlationId string) ListRequestBuilder {
 	l.ListFilters.SetCorrelationId(correlationId)
 	return l
 }
 
-func (l *sqlListRequestsBuilder) WithConnectionId(u apid.ID) ListRequestBuilder {
+func (l *sqlListRequestsBuilder) ForConnectionId(u apid.ID) ListRequestBuilder {
 	l.ListFilters.SetConnectionId(u)
 	return l
 }
 
-func (l *sqlListRequestsBuilder) WithConnectorType(t string) ListRequestBuilder {
+func (l *sqlListRequestsBuilder) ForConnectorType(t string) ListRequestBuilder {
 	l.ListFilters.SetConnectorType(t)
 	return l
 }
 
-func (l *sqlListRequestsBuilder) WithConnectorId(u apid.ID) ListRequestBuilder {
+func (l *sqlListRequestsBuilder) ForConnectorId(u apid.ID) ListRequestBuilder {
 	l.ListFilters.SetConnectorId(u)
 	return l
 }
 
-func (l *sqlListRequestsBuilder) WithConnectorVersion(v uint64) ListRequestBuilder {
+func (l *sqlListRequestsBuilder) ForConnectorVersion(v uint64) ListRequestBuilder {
 	l.ListFilters.SetConnectorVersion(v)
 	return l
 }
 
-func (l *sqlListRequestsBuilder) WithMethod(method string) ListRequestBuilder {
+func (l *sqlListRequestsBuilder) ForMethod(method string) ListRequestBuilder {
 	l.ListFilters.SetMethod(method)
 	return l
 }
 
-func (l *sqlListRequestsBuilder) WithStatusCode(s int) ListRequestBuilder {
+func (l *sqlListRequestsBuilder) ForStatusCode(s int) ListRequestBuilder {
 	l.ListFilters.SetStatusCode(s)
 	return l
 }
 
-func (l *sqlListRequestsBuilder) WithStatusCodeRangeInclusive(start, end int) ListRequestBuilder {
+func (l *sqlListRequestsBuilder) ForStatusCodeRangeInclusive(start, end int) ListRequestBuilder {
 	l.ListFilters.SetStatusCodeRangeInclusive(start, end)
 	return l
 }
 
-func (l *sqlListRequestsBuilder) WithParsedStatusCodeRange(r string) (ListRequestBuilder, error) {
+func (l *sqlListRequestsBuilder) ForParsedStatusCodeRange(r string) (ListRequestBuilder, error) {
 	start, end, err := util.ParseIntegerRange(r, 100, 999)
 	if err != nil {
 		return nil, err
@@ -454,24 +454,24 @@ func (l *sqlListRequestsBuilder) WithParsedStatusCodeRange(r string) (ListReques
 	return l, nil
 }
 
-func (l *sqlListRequestsBuilder) WithPath(path string) ListRequestBuilder {
+func (l *sqlListRequestsBuilder) ForPath(path string) ListRequestBuilder {
 	l.ListFilters.SetPath(path)
 	return l
 }
 
-func (l *sqlListRequestsBuilder) WithPathRegex(r string) (ListRequestBuilder, error) {
+func (l *sqlListRequestsBuilder) ForPathRegex(r string) (ListRequestBuilder, error) {
 	if err := l.ListFilters.SetPathRegex(r); err != nil {
 		return nil, err
 	}
 	return l, nil
 }
 
-func (l *sqlListRequestsBuilder) WithTimestampRange(start, end time.Time) ListRequestBuilder {
+func (l *sqlListRequestsBuilder) ForTimestampRange(start, end time.Time) ListRequestBuilder {
 	l.ListFilters.SetTimestampRange(start, end)
 	return l
 }
 
-func (l *sqlListRequestsBuilder) WithParsedTimestampRange(r string) (ListRequestBuilder, error) {
+func (l *sqlListRequestsBuilder) ForParsedTimestampRange(r string) (ListRequestBuilder, error) {
 	start, end, err := util.ParseTimestampRange(r)
 	if err != nil {
 		return nil, err
@@ -480,7 +480,7 @@ func (l *sqlListRequestsBuilder) WithParsedTimestampRange(r string) (ListRequest
 	return l, nil
 }
 
-func (l *sqlListRequestsBuilder) WithLabelSelector(selector string) (ListRequestBuilder, error) {
+func (l *sqlListRequestsBuilder) ForLabelSelector(selector string) (ListRequestBuilder, error) {
 	_, err := database.ParseLabelSelector(selector)
 	if err != nil {
 		return nil, err
@@ -489,12 +489,12 @@ func (l *sqlListRequestsBuilder) WithLabelSelector(selector string) (ListRequest
 	return l, nil
 }
 
-func (l *sqlListRequestsBuilder) WithResponseSource(s ResponseSource) ListRequestBuilder {
+func (l *sqlListRequestsBuilder) ForResponseSource(s ResponseSource) ListRequestBuilder {
 	l.ListFilters.SetResponseSource(s)
 	return l
 }
 
-func (l *sqlListRequestsBuilder) WithRateLimitId(id apid.ID) ListRequestBuilder {
+func (l *sqlListRequestsBuilder) ForRateLimitId(id apid.ID) ListRequestBuilder {
 	l.ListFilters.SetRateLimitId(id)
 	return l
 }

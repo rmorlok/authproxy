@@ -327,110 +327,110 @@ func (l *clickhouseListRequestsBuilder) OrderBy(field RequestOrderByField, by pa
 	return l
 }
 
-func (l *clickhouseListRequestsBuilder) WithNamespaceMatcher(matcher string) ListRequestBuilder {
-	l.sqlListRequestsBuilder.WithNamespaceMatcher(matcher)
+func (l *clickhouseListRequestsBuilder) ForNamespaceMatcher(matcher string) ListRequestBuilder {
+	l.sqlListRequestsBuilder.ForNamespaceMatcher(matcher)
 	return l
 }
 
-func (l *clickhouseListRequestsBuilder) WithNamespaceMatchers(matchers []string) ListRequestBuilder {
-	l.sqlListRequestsBuilder.WithNamespaceMatchers(matchers)
+func (l *clickhouseListRequestsBuilder) ForNamespaceMatchers(matchers []string) ListRequestBuilder {
+	l.sqlListRequestsBuilder.ForNamespaceMatchers(matchers)
 	return l
 }
 
-func (l *clickhouseListRequestsBuilder) WithRequestType(requestType httpf.RequestType) ListRequestBuilder {
-	l.sqlListRequestsBuilder.WithRequestType(requestType)
+func (l *clickhouseListRequestsBuilder) ForRequestType(requestType httpf.RequestType) ListRequestBuilder {
+	l.sqlListRequestsBuilder.ForRequestType(requestType)
 	return l
 }
 
-func (l *clickhouseListRequestsBuilder) WithCorrelationId(correlationId string) ListRequestBuilder {
-	l.sqlListRequestsBuilder.WithCorrelationId(correlationId)
+func (l *clickhouseListRequestsBuilder) ForCorrelationId(correlationId string) ListRequestBuilder {
+	l.sqlListRequestsBuilder.ForCorrelationId(correlationId)
 	return l
 }
 
-func (l *clickhouseListRequestsBuilder) WithConnectionId(u apid.ID) ListRequestBuilder {
-	l.sqlListRequestsBuilder.WithConnectionId(u)
+func (l *clickhouseListRequestsBuilder) ForConnectionId(u apid.ID) ListRequestBuilder {
+	l.sqlListRequestsBuilder.ForConnectionId(u)
 	return l
 }
 
-func (l *clickhouseListRequestsBuilder) WithConnectorType(t string) ListRequestBuilder {
-	l.sqlListRequestsBuilder.WithConnectorType(t)
+func (l *clickhouseListRequestsBuilder) ForConnectorType(t string) ListRequestBuilder {
+	l.sqlListRequestsBuilder.ForConnectorType(t)
 	return l
 }
 
-func (l *clickhouseListRequestsBuilder) WithConnectorId(u apid.ID) ListRequestBuilder {
-	l.sqlListRequestsBuilder.WithConnectorId(u)
+func (l *clickhouseListRequestsBuilder) ForConnectorId(u apid.ID) ListRequestBuilder {
+	l.sqlListRequestsBuilder.ForConnectorId(u)
 	return l
 }
 
-func (l *clickhouseListRequestsBuilder) WithConnectorVersion(v uint64) ListRequestBuilder {
-	l.sqlListRequestsBuilder.WithConnectorVersion(v)
+func (l *clickhouseListRequestsBuilder) ForConnectorVersion(v uint64) ListRequestBuilder {
+	l.sqlListRequestsBuilder.ForConnectorVersion(v)
 	return l
 }
 
-func (l *clickhouseListRequestsBuilder) WithMethod(method string) ListRequestBuilder {
-	l.sqlListRequestsBuilder.WithMethod(method)
+func (l *clickhouseListRequestsBuilder) ForMethod(method string) ListRequestBuilder {
+	l.sqlListRequestsBuilder.ForMethod(method)
 	return l
 }
 
-func (l *clickhouseListRequestsBuilder) WithStatusCode(s int) ListRequestBuilder {
-	l.sqlListRequestsBuilder.WithStatusCode(s)
+func (l *clickhouseListRequestsBuilder) ForStatusCode(s int) ListRequestBuilder {
+	l.sqlListRequestsBuilder.ForStatusCode(s)
 	return l
 }
 
-func (l *clickhouseListRequestsBuilder) WithStatusCodeRangeInclusive(start, end int) ListRequestBuilder {
-	l.sqlListRequestsBuilder.WithStatusCodeRangeInclusive(start, end)
+func (l *clickhouseListRequestsBuilder) ForStatusCodeRangeInclusive(start, end int) ListRequestBuilder {
+	l.sqlListRequestsBuilder.ForStatusCodeRangeInclusive(start, end)
 	return l
 }
 
-func (l *clickhouseListRequestsBuilder) WithParsedStatusCodeRange(r string) (ListRequestBuilder, error) {
-	_, err := l.sqlListRequestsBuilder.WithParsedStatusCodeRange(r)
+func (l *clickhouseListRequestsBuilder) ForParsedStatusCodeRange(r string) (ListRequestBuilder, error) {
+	_, err := l.sqlListRequestsBuilder.ForParsedStatusCodeRange(r)
 	if err != nil {
 		return nil, err
 	}
 	return l, nil
 }
 
-func (l *clickhouseListRequestsBuilder) WithPath(path string) ListRequestBuilder {
-	l.sqlListRequestsBuilder.WithPath(path)
+func (l *clickhouseListRequestsBuilder) ForPath(path string) ListRequestBuilder {
+	l.sqlListRequestsBuilder.ForPath(path)
 	return l
 }
 
-func (l *clickhouseListRequestsBuilder) WithPathRegex(r string) (ListRequestBuilder, error) {
-	_, err := l.sqlListRequestsBuilder.WithPathRegex(r)
+func (l *clickhouseListRequestsBuilder) ForPathRegex(r string) (ListRequestBuilder, error) {
+	_, err := l.sqlListRequestsBuilder.ForPathRegex(r)
 	if err != nil {
 		return nil, err
 	}
 	return l, nil
 }
 
-func (l *clickhouseListRequestsBuilder) WithTimestampRange(start, end time.Time) ListRequestBuilder {
-	l.sqlListRequestsBuilder.WithTimestampRange(start, end)
+func (l *clickhouseListRequestsBuilder) ForTimestampRange(start, end time.Time) ListRequestBuilder {
+	l.sqlListRequestsBuilder.ForTimestampRange(start, end)
 	return l
 }
 
-func (l *clickhouseListRequestsBuilder) WithParsedTimestampRange(r string) (ListRequestBuilder, error) {
-	_, err := l.sqlListRequestsBuilder.WithParsedTimestampRange(r)
+func (l *clickhouseListRequestsBuilder) ForParsedTimestampRange(r string) (ListRequestBuilder, error) {
+	_, err := l.sqlListRequestsBuilder.ForParsedTimestampRange(r)
 	if err != nil {
 		return nil, err
 	}
 	return l, nil
 }
 
-func (l *clickhouseListRequestsBuilder) WithLabelSelector(selector string) (ListRequestBuilder, error) {
-	_, err := l.sqlListRequestsBuilder.WithLabelSelector(selector)
+func (l *clickhouseListRequestsBuilder) ForLabelSelector(selector string) (ListRequestBuilder, error) {
+	_, err := l.sqlListRequestsBuilder.ForLabelSelector(selector)
 	if err != nil {
 		return nil, err
 	}
 	return l, nil
 }
 
-func (l *clickhouseListRequestsBuilder) WithResponseSource(s ResponseSource) ListRequestBuilder {
-	l.sqlListRequestsBuilder.WithResponseSource(s)
+func (l *clickhouseListRequestsBuilder) ForResponseSource(s ResponseSource) ListRequestBuilder {
+	l.sqlListRequestsBuilder.ForResponseSource(s)
 	return l
 }
 
-func (l *clickhouseListRequestsBuilder) WithRateLimitId(id apid.ID) ListRequestBuilder {
-	l.sqlListRequestsBuilder.WithRateLimitId(id)
+func (l *clickhouseListRequestsBuilder) ForRateLimitId(id apid.ID) ListRequestBuilder {
+	l.sqlListRequestsBuilder.ForRateLimitId(id)
 	return l
 }
 

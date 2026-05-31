@@ -64,25 +64,25 @@ type ListRequestBuilder interface {
 	 * Filters
 	 */
 
-	WithNamespaceMatcher(matcher string) ListRequestBuilder
-	WithNamespaceMatchers(matchers []string) ListRequestBuilder
-	WithRequestType(requestType httpf.RequestType) ListRequestBuilder
-	WithCorrelationId(correlationId string) ListRequestBuilder
-	WithConnectionId(u apid.ID) ListRequestBuilder
-	WithConnectorType(t string) ListRequestBuilder
-	WithConnectorId(u apid.ID) ListRequestBuilder
-	WithConnectorVersion(v uint64) ListRequestBuilder
-	WithMethod(method string) ListRequestBuilder
-	WithStatusCode(s int) ListRequestBuilder
-	WithStatusCodeRangeInclusive(start, end int) ListRequestBuilder
-	WithParsedStatusCodeRange(r string) (ListRequestBuilder, error)
-	WithPath(path string) ListRequestBuilder
-	WithPathRegex(r string) (ListRequestBuilder, error)
-	WithTimestampRange(start, end time.Time) ListRequestBuilder
-	WithParsedTimestampRange(r string) (ListRequestBuilder, error)
-	WithLabelSelector(selector string) (ListRequestBuilder, error)
-	WithResponseSource(s ResponseSource) ListRequestBuilder
-	WithRateLimitId(id apid.ID) ListRequestBuilder
+	ForNamespaceMatcher(matcher string) ListRequestBuilder
+	ForNamespaceMatchers(matchers []string) ListRequestBuilder
+	ForRequestType(requestType httpf.RequestType) ListRequestBuilder
+	ForCorrelationId(correlationId string) ListRequestBuilder
+	ForConnectionId(u apid.ID) ListRequestBuilder
+	ForConnectorType(t string) ListRequestBuilder
+	ForConnectorId(u apid.ID) ListRequestBuilder
+	ForConnectorVersion(v uint64) ListRequestBuilder
+	ForMethod(method string) ListRequestBuilder
+	ForStatusCode(s int) ListRequestBuilder
+	ForStatusCodeRangeInclusive(start, end int) ListRequestBuilder
+	ForParsedStatusCodeRange(r string) (ListRequestBuilder, error)
+	ForPath(path string) ListRequestBuilder
+	ForPathRegex(r string) (ListRequestBuilder, error)
+	ForTimestampRange(start, end time.Time) ListRequestBuilder
+	ForParsedTimestampRange(r string) (ListRequestBuilder, error)
+	ForLabelSelector(selector string) (ListRequestBuilder, error)
+	ForResponseSource(s ResponseSource) ListRequestBuilder
+	ForRateLimitId(id apid.ID) ListRequestBuilder
 }
 
 // ListFilters holds the filter, pagination, and ordering data for list requests.

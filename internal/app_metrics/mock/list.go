@@ -38,99 +38,99 @@ type MockListRequestBuilderExecutor struct {
 	RateLimitId              *apid.ID    `json:"rate_limit_id,omitempty"`
 }
 
-func (l *MockListRequestBuilderExecutor) WithNamespaceMatcher(matcher string) app_metrics.ListRequestBuilder {
+func (l *MockListRequestBuilderExecutor) ForNamespaceMatcher(matcher string) app_metrics.ListRequestBuilder {
 	l.Namespace = util.ToPtr(matcher)
 	return l
 }
 
-func (l *MockListRequestBuilderExecutor) WithNamespaceMatchers(matchers []string) app_metrics.ListRequestBuilder {
+func (l *MockListRequestBuilderExecutor) ForNamespaceMatchers(matchers []string) app_metrics.ListRequestBuilder {
 	l.Namespaces = matchers
 	return l
 }
 
-func (l *MockListRequestBuilderExecutor) WithRequestType(requestType httpf.RequestType) app_metrics.ListRequestBuilder {
+func (l *MockListRequestBuilderExecutor) ForRequestType(requestType httpf.RequestType) app_metrics.ListRequestBuilder {
 	l.RequestType = util.ToPtr(string(requestType))
 	return l
 }
 
-func (l *MockListRequestBuilderExecutor) WithCorrelationId(correlationId string) app_metrics.ListRequestBuilder {
+func (l *MockListRequestBuilderExecutor) ForCorrelationId(correlationId string) app_metrics.ListRequestBuilder {
 	l.CorrelationId = util.ToPtr(correlationId)
 	return l
 }
 
-func (l *MockListRequestBuilderExecutor) WithConnectionId(u apid.ID) app_metrics.ListRequestBuilder {
+func (l *MockListRequestBuilderExecutor) ForConnectionId(u apid.ID) app_metrics.ListRequestBuilder {
 	l.ConnectionId = util.ToPtr(u)
 	return l
 }
 
-// WithConnectorType sets the filter to match a specific connector type. The connector type
+// ForConnectorType sets the filter to match a specific connector type. The connector type
 // may include wildcards * and %.
-func (l *MockListRequestBuilderExecutor) WithConnectorType(t string) app_metrics.ListRequestBuilder {
+func (l *MockListRequestBuilderExecutor) ForConnectorType(t string) app_metrics.ListRequestBuilder {
 	l.ConnectorType = util.ToPtr(t)
 	return l
 }
 
-func (l *MockListRequestBuilderExecutor) WithConnectorId(u apid.ID) app_metrics.ListRequestBuilder {
+func (l *MockListRequestBuilderExecutor) ForConnectorId(u apid.ID) app_metrics.ListRequestBuilder {
 	l.ConnectorId = util.ToPtr(u)
 	return l
 }
 
-func (l *MockListRequestBuilderExecutor) WithConnectorVersion(v uint64) app_metrics.ListRequestBuilder {
+func (l *MockListRequestBuilderExecutor) ForConnectorVersion(v uint64) app_metrics.ListRequestBuilder {
 	l.ConnectorVersion = util.ToPtr(v)
 	return l
 }
 
-func (l *MockListRequestBuilderExecutor) WithMethod(method string) app_metrics.ListRequestBuilder {
+func (l *MockListRequestBuilderExecutor) ForMethod(method string) app_metrics.ListRequestBuilder {
 	l.Method = util.ToPtr(method)
 	return l
 }
 
-func (l *MockListRequestBuilderExecutor) WithStatusCode(s int) app_metrics.ListRequestBuilder {
+func (l *MockListRequestBuilderExecutor) ForStatusCode(s int) app_metrics.ListRequestBuilder {
 	l.StatusCodeRangeInclusive = []int{s, s}
 	return l
 }
 
-func (l *MockListRequestBuilderExecutor) WithStatusCodeRangeInclusive(start, end int) app_metrics.ListRequestBuilder {
+func (l *MockListRequestBuilderExecutor) ForStatusCodeRangeInclusive(start, end int) app_metrics.ListRequestBuilder {
 	l.StatusCodeRangeInclusive = []int{start, end}
 	return l
 }
 
-func (l *MockListRequestBuilderExecutor) WithParsedStatusCodeRange(r string) (app_metrics.ListRequestBuilder, error) {
+func (l *MockListRequestBuilderExecutor) ForParsedStatusCodeRange(r string) (app_metrics.ListRequestBuilder, error) {
 	// No op
 	return l, nil
 }
 
-// WithPath sets the filter to match a specific path. The path can include wildcards * and %.
-func (l *MockListRequestBuilderExecutor) WithPath(path string) app_metrics.ListRequestBuilder {
+// ForPath sets the filter to match a specific path. The path can include wildcards * and %.
+func (l *MockListRequestBuilderExecutor) ForPath(path string) app_metrics.ListRequestBuilder {
 	l.Path = util.ToPtr(path)
 	return l
 }
 
-func (l *MockListRequestBuilderExecutor) WithPathRegex(r string) (app_metrics.ListRequestBuilder, error) {
+func (l *MockListRequestBuilderExecutor) ForPathRegex(r string) (app_metrics.ListRequestBuilder, error) {
 	l.PathRegex = util.ToPtr(r)
 	return l, nil
 }
 
-func (l *MockListRequestBuilderExecutor) WithTimestampRange(start, end time.Time) app_metrics.ListRequestBuilder {
+func (l *MockListRequestBuilderExecutor) ForTimestampRange(start, end time.Time) app_metrics.ListRequestBuilder {
 	l.TimestampRange = []time.Time{start, end}
 	return l
 }
 
-func (l *MockListRequestBuilderExecutor) WithParsedTimestampRange(r string) (app_metrics.ListRequestBuilder, error) {
+func (l *MockListRequestBuilderExecutor) ForParsedTimestampRange(r string) (app_metrics.ListRequestBuilder, error) {
 	return l, nil
 }
 
-func (l *MockListRequestBuilderExecutor) WithLabelSelector(selector string) (app_metrics.ListRequestBuilder, error) {
+func (l *MockListRequestBuilderExecutor) ForLabelSelector(selector string) (app_metrics.ListRequestBuilder, error) {
 	l.LabelSelector = util.ToPtr(selector)
 	return l, nil
 }
 
-func (l *MockListRequestBuilderExecutor) WithResponseSource(s app_metrics.ResponseSource) app_metrics.ListRequestBuilder {
+func (l *MockListRequestBuilderExecutor) ForResponseSource(s app_metrics.ResponseSource) app_metrics.ListRequestBuilder {
 	l.ResponseSource = util.ToPtr(string(s))
 	return l
 }
 
-func (l *MockListRequestBuilderExecutor) WithRateLimitId(id apid.ID) app_metrics.ListRequestBuilder {
+func (l *MockListRequestBuilderExecutor) ForRateLimitId(id apid.ID) app_metrics.ListRequestBuilder {
 	l.RateLimitId = util.ToPtr(id)
 	return l
 }
