@@ -3,6 +3,7 @@ package oauth2
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 
 	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	coreIface "github.com/rmorlok/authproxy/internal/core/iface"
@@ -14,35 +15,39 @@ import (
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
+const attrClientId = "client_id"
+const attrClientSecret = "client_secret"
+
 func synthesizeClientCredentialsStep(method cschema.TokenEndpointAuthMethod) *cschema.SetupFlowStep {
+
 	js := json_schema.Schema{
 		Type:                 "object",
-		Required:             []string{"client_id"},
+		Required:             []string{attrClientId},
 		Properties:           map[string]json_schema.Property{},
 		AdditionalProperties: false,
 	}
 	ui := ui_schema.Schema{Type: "VerticalLayout", Elements: []ui_schema.Control{}}
 
-	js.Properties["client_id"] = json_schema.Property{
+	js.Properties[attrClientId] = json_schema.Property{
 		Type:      "string",
 		Title:     "Client ID",
 		MinLength: 1,
 	}
 	ui.Elements = append(ui.Elements, ui_schema.Control{
 		Type:  "Control",
-		Scope: "#/properties/client_id",
+		Scope: fmt.Sprintf("#/properties/%s", attrClientId),
 	})
 
 	if method != cschema.TokenEndpointAuthNone {
-		js.Required = append(js.Required, "client_secret")
-		js.Properties["client_secret"] = json_schema.Property{
+		js.Required = append(js.Required, attrClientSecret)
+		js.Properties[attrClientSecret] = json_schema.Property{
 			Type:      "string",
 			Title:     "Client Secret",
 			MinLength: 1,
 		}
 		ui.Elements = append(ui.Elements, ui_schema.Control{
 			Type:    "Control",
-			Scope:   "#/properties/client_secret",
+			Scope:   fmt.Sprintf("#/properties/%s", attrClientSecret),
 			Options: map[string]string{"format": "password"},
 		})
 	}
@@ -72,18 +77,18 @@ func (f *factory) PersistClientCredentials(
 	credData map[string]any,
 ) error {
 	plaintext := database.OAuth2ClientCredentialsPlaintext{}
-	if v, ok := credData["client_id"].(string); ok {
+	if v, ok := credData[attrClientId].(string); ok {
 		plaintext.ClientId = v
 	}
 	if plaintext.ClientId == "" {
-		return httperr.BadRequest("client_id is required")
+		return httperr.BadRequest(fmt.Sprintf("%s is required", attrClientId))
 	}
 
-	if v, ok := credData["client_secret"].(string); ok {
+	if v, ok := credData[attrClientSecret].(string); ok {
 		plaintext.ClientSecret = v
 	}
 	if auth.GetTokenEndpointAuthMethodOrDefault() != cschema.TokenEndpointAuthNone && plaintext.ClientSecret == "" {
-		return httperr.BadRequest("client_secret is required")
+		return httperr.BadRequest(fmt.Sprintf("%s is required", attrClientSecret))
 	}
 
 	blobJSON, err := json.Marshal(plaintext)
