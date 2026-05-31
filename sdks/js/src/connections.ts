@@ -98,8 +98,6 @@ export interface ConnectionSetupFormResponse extends ConnectionSetupResponse {
     step_id: string;
     step_title?: string;
     step_description?: string;
-    current_step: number;
-    total_steps: number;
     json_schema: Record<string, unknown>;
     ui_schema: Record<string, unknown>;
 }

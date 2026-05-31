@@ -204,10 +204,6 @@ definitions:
   routes.ConnectionSetupForm:
     description: Form response for connection setup
     properties:
-      current_step:
-        description: Current step number in the setup phase.
-        example: 1
-        type: integer
       id:
         description: Connection UUID.
         example: cxn_test550e8400abcde
@@ -226,10 +222,6 @@ definitions:
         description: Step title.
         example: Choose workspace
         type: string
-      total_steps:
-        description: Total number of steps in the setup phase.
-        example: 2
-        type: integer
       type:
         description: Response type.
         example: form

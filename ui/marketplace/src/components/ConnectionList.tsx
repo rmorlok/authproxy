@@ -227,8 +227,6 @@ const ConnectionList: React.FC = () => {
               connectionId={currentFormStep.connectionId}
               stepTitle={currentFormStep.stepTitle}
               stepDescription={currentFormStep.stepDescription}
-              currentStep={currentFormStep.currentStep}
-              totalSteps={currentFormStep.totalSteps}
               jsonSchema={currentFormStep.jsonSchema}
               uiSchema={currentFormStep.uiSchema}
               onSubmit={handleFormSubmit}

@@ -101,15 +101,12 @@ func (c *connection) renderStepResponse(
 ) (iface.ConnectionSetupResponse, error) {
 	switch step.Type() {
 	case iface.ManifestStepTypeForm:
-		currentIdx, total := stepIndex(flow, step.Id())
 		return &iface.ConnectionSetupForm{
 			Id:              c.GetId(),
 			Type:            iface.ConnectionSetupResponseTypeForm,
 			StepId:          step.Id(),
 			StepTitle:       step.Title(),
 			StepDescription: step.Description(),
-			CurrentStep:     currentIdx,
-			TotalSteps:      total,
 			JsonSchema:      json.RawMessage(step.JsonSchema()),
 			UiSchema:        json.RawMessage(step.UiSchema()),
 		}, nil
@@ -140,21 +137,6 @@ func (c *connection) renderStepResponse(
 
 	}
 	return nil, httperr.InternalServerError(httperr.WithInternalErrorf("unsupported manifest step type %q", step.Type()))
-}
-
-// stepIndex returns the 0-based position of stepId in the flow's linear
-// Steps() slice plus the total count. Used for the UI's "step N of M"
-// display. Pseudo-steps (verify / terminal failures) are not in Steps(),
-// so they return -1 for the index — callers shouldn't reach those for
-// form-step rendering.
-func stepIndex(flow iface.ManifestSetupFlow, stepId string) (int, int) {
-	steps := flow.Steps()
-	for i, s := range steps {
-		if s.Id() == stepId {
-			return i, len(steps)
-		}
-	}
-	return -1, len(steps)
 }
 
 // renderResumeResponse returns the response shape for the connection's
