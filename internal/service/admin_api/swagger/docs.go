@@ -7825,11 +7825,6 @@ const docTemplateadmin_api = `{
             "description": "Form response for connection setup",
             "type": "object",
             "properties": {
-                "current_step": {
-                    "description": "Current step number in the setup phase.",
-                    "type": "integer",
-                    "example": 1
-                },
                 "id": {
                     "description": "Connection UUID.",
                     "type": "string",
@@ -7852,11 +7847,6 @@ const docTemplateadmin_api = `{
                     "description": "Step title.",
                     "type": "string",
                     "example": "Choose workspace"
-                },
-                "total_steps": {
-                    "description": "Total number of steps in the setup phase.",
-                    "type": "integer",
-                    "example": 2
                 },
                 "type": {
                     "description": "Response type.",

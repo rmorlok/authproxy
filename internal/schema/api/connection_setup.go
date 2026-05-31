@@ -107,12 +107,6 @@ type ConnectionSetupForm struct {
 	// Step description.
 	StepDescription string `json:"step_description,omitempty" yaml:"step_description,omitempty"`
 
-	// Current step number in the setup phase.
-	CurrentStep int `json:"current_step" yaml:"current_step" example:"1"`
-
-	// Total number of steps in the setup phase.
-	TotalSteps int `json:"total_steps" yaml:"total_steps" example:"2"`
-
 	// JSON Schema defining the form fields.
 	JsonSchema json.RawMessage `json:"json_schema" yaml:"json_schema" swaggertype:"object"`
 

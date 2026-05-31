@@ -3,15 +3,13 @@ import { JsonForms } from '@jsonforms/react';
 import { materialCells, materialRenderers } from '@jsonforms/material-renderers';
 import type { JsonFormsCore, UISchemaElement } from '@jsonforms/core';
 import type { JsonSchema } from '@jsonforms/core';
-import { Box, Button, CircularProgress, Typography, LinearProgress } from '@mui/material';
+import { Box, Button, CircularProgress, Typography } from '@mui/material';
 import { connections, DataSourceOption } from '@authproxy/api';
 
 export interface ConnectionFormStepProps {
     connectionId: string;
     stepTitle?: string;
     stepDescription?: string;
-    currentStep: number;
-    totalSteps: number;
     jsonSchema: Record<string, unknown>;
     uiSchema: Record<string, unknown>;
     onSubmit: (connectionId: string, data: unknown) => void;
@@ -76,8 +74,6 @@ const ConnectionFormStep: React.FC<ConnectionFormStepProps> = ({
     connectionId,
     stepTitle,
     stepDescription,
-    currentStep,
-    totalSteps,
     jsonSchema,
     uiSchema,
     onSubmit,
@@ -127,20 +123,8 @@ const ConnectionFormStep: React.FC<ConnectionFormStepProps> = ({
         onSubmit(connectionId, data);
     }, [connectionId, data, onSubmit]);
 
-    const progress = totalSteps > 0 ? ((currentStep + 1) / totalSteps) * 100 : 0;
-
     return (
         <Box sx={{ p: 2 }}>
-            {totalSteps > 1 && (
-                <Box sx={{ mb: 2 }}>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 0.5 }}>
-                        <Typography variant="caption" color="text.secondary">
-                            Step {currentStep + 1} of {totalSteps}
-                        </Typography>
-                    </Box>
-                    <LinearProgress variant="determinate" value={progress} />
-                </Box>
-            )}
             {stepTitle && (
                 <Typography variant="h6" gutterBottom>
                     {stepTitle}

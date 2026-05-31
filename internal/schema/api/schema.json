@@ -79,18 +79,10 @@
         "step_id": { "type": "string" },
         "step_title": { "type": "string" },
         "step_description": { "type": "string" },
-        "current_step": {
-          "type": "integer",
-          "minimum": 0
-        },
-        "total_steps": {
-          "type": "integer",
-          "minimum": 0
-        },
         "json_schema": { "type": "object" },
         "ui_schema": { "type": "object" }
       },
-      "required": ["id", "type", "step_id", "current_step", "total_steps", "json_schema", "ui_schema"],
+      "required": ["id", "type", "step_id", "json_schema", "ui_schema"],
       "additionalProperties": false
     },
     "ConnectionSetupComplete": {
