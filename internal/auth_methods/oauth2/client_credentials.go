@@ -9,57 +9,38 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/schema/common/json_schema"
+	"github.com/rmorlok/authproxy/internal/schema/common/ui_schema"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 )
 
 func synthesizeClientCredentialsStep(method cschema.TokenEndpointAuthMethod) *cschema.SetupFlowStep {
-	type schemaProp struct {
-		Type      string `json:"type"`
-		Title     string `json:"title,omitempty"`
-		MinLength int    `json:"minLength,omitempty"`
-	}
-	type schema struct {
-		Type                 string                `json:"type"`
-		Required             []string              `json:"required"`
-		Properties           map[string]schemaProp `json:"properties"`
-		AdditionalProperties bool                  `json:"additionalProperties"`
-	}
-	type uiControl struct {
-		Type    string            `json:"type"`
-		Scope   string            `json:"scope"`
-		Options map[string]string `json:"options,omitempty"`
-	}
-	type uiSchema struct {
-		Type     string      `json:"type"`
-		Elements []uiControl `json:"elements"`
-	}
-
-	js := schema{
+	js := json_schema.Schema{
 		Type:                 "object",
 		Required:             []string{"client_id"},
-		Properties:           map[string]schemaProp{},
+		Properties:           map[string]json_schema.Property{},
 		AdditionalProperties: false,
 	}
-	ui := uiSchema{Type: "VerticalLayout", Elements: []uiControl{}}
+	ui := ui_schema.Schema{Type: "VerticalLayout", Elements: []ui_schema.Control{}}
 
-	js.Properties["client_id"] = schemaProp{
+	js.Properties["client_id"] = json_schema.Property{
 		Type:      "string",
 		Title:     "Client ID",
 		MinLength: 1,
 	}
-	ui.Elements = append(ui.Elements, uiControl{
+	ui.Elements = append(ui.Elements, ui_schema.Control{
 		Type:  "Control",
 		Scope: "#/properties/client_id",
 	})
 
 	if method != cschema.TokenEndpointAuthNone {
 		js.Required = append(js.Required, "client_secret")
-		js.Properties["client_secret"] = schemaProp{
+		js.Properties["client_secret"] = json_schema.Property{
 			Type:      "string",
 			Title:     "Client Secret",
 			MinLength: 1,
 		}
-		ui.Elements = append(ui.Elements, uiControl{
+		ui.Elements = append(ui.Elements, ui_schema.Control{
 			Type:    "Control",
 			Scope:   "#/properties/client_secret",
 			Options: map[string]string{"format": "password"},

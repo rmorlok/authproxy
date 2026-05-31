@@ -1,0 +1,33 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/common/json_schema/schema.json",
+  "$defs": {
+    "Property": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type"],
+      "properties": {
+        "type": { "type": "string" },
+        "title": { "type": "string" },
+        "minLength": { "type": "integer", "minimum": 0 }
+      }
+    },
+    "Schema": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["type", "required", "properties", "additionalProperties"],
+      "properties": {
+        "type": { "type": "string" },
+        "required": {
+          "type": "array",
+          "items": { "type": "string" }
+        },
+        "properties": {
+          "type": "object",
+          "additionalProperties": { "$ref": "#/$defs/Property" }
+        },
+        "additionalProperties": { "type": "boolean" }
+      }
+    }
+  }
+}
