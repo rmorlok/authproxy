@@ -66,6 +66,10 @@ func WithActor(externalID, namespace string) OAuth2Option {
 type OAuth2ConnectorOptions struct {
 	ClientID     string
 	ClientSecret string
+	// TokenEndpointAuthMethod selects how the proxy authenticates to the
+	// provider's token endpoint. Empty means "omit the field" so the
+	// production default applies.
+	TokenEndpointAuthMethod connectors.TokenEndpointAuthMethod
 	// Scopes lists scope IDs that are required (Scope.Required defaults to
 	// true via IsRequired when unspecified).
 	Scopes []string
@@ -117,10 +121,9 @@ func NewOAuth2Connector(connectorID apid.ID, displayName string, provider *OAuth
 	}
 
 	auth := &connectors.AuthOAuth2{
-		Type:         connectors.AuthTypeOAuth2,
-		ClientId:     &common.StringValue{InnerVal: &common.StringValueDirect{Value: opts.ClientID}},
-		ClientSecret: &common.StringValue{InnerVal: &common.StringValueDirect{Value: opts.ClientSecret}},
-		Scopes:       scopes,
+		Type:     connectors.AuthTypeOAuth2,
+		ClientId: &common.StringValue{InnerVal: &common.StringValueDirect{Value: opts.ClientID}},
+		Scopes:   scopes,
 		Authorization: connectors.AuthOauth2Authorization{
 			Endpoint: authEndpoint,
 			PKCE:     opts.PKCE,
@@ -128,6 +131,12 @@ func NewOAuth2Connector(connectorID apid.ID, displayName string, provider *OAuth
 		Token: connectors.AuthOauth2Token{
 			Endpoint: tokenEndpoint,
 		},
+	}
+	if opts.TokenEndpointAuthMethod != "" {
+		auth.TokenEndpointAuthMethod = connectors.NewTokenEndpointAuthMethod(opts.TokenEndpointAuthMethod)
+	}
+	if opts.TokenEndpointAuthMethod != connectors.TokenEndpointAuthNone || opts.ClientSecret != "" {
+		auth.ClientSecret = &common.StringValue{InnerVal: &common.StringValueDirect{Value: opts.ClientSecret}}
 	}
 
 	if opts.IncludeRevocation {
