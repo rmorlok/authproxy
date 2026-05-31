@@ -47,6 +47,11 @@ type settings struct {
 	configPath          string
 }
 
+const (
+	actorRetryTimeout  = 5 * time.Minute
+	actorRetryInterval = 5 * time.Second
+)
+
 func mustGetenv(key string) string {
 	v := os.Getenv(key)
 	if v == "" {
@@ -153,9 +158,23 @@ func run(logger *slog.Logger) error {
 	}
 
 	for _, a := range cfg.Actors {
-		created, err := upsertActor(client, s.adminApiUrl, a)
-		if err != nil {
-			return err
+		deadline := time.Now().Add(actorRetryTimeout)
+		var created bool
+		for attempt := 1; ; attempt++ {
+			created, err = upsertActor(client, s.adminApiUrl, a)
+			if err == nil {
+				break
+			}
+			if time.Now().After(deadline) {
+				return fmt.Errorf("upsert actor %q after %s: %w", a.ExternalId, actorRetryTimeout, err)
+			}
+			logger.Warn("actor seed attempt failed; retrying",
+				"external_id", a.ExternalId,
+				"namespace", a.Namespace,
+				"attempt", attempt,
+				"err", err,
+			)
+			time.Sleep(actorRetryInterval)
 		}
 		if created {
 			logger.Info("actor created", "external_id", a.ExternalId, "namespace", a.Namespace)

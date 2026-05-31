@@ -20,6 +20,7 @@ permissions:
   id-token: write
   issues: write
   packages: read
+  pull-requests: write
 
 concurrency:
   group: deploy-dev-pr-${{ github.event.pull_request.number }}
@@ -244,6 +245,51 @@ jobs:
             echo "Reusing ${RELEASE_NAME}-actors"
           fi
 
+      - name: Recover stuck Helm release
+        env:
+          RELEASE_NS: ${{ steps.env.outputs.namespace }}
+        run: |
+          set -euo pipefail
+
+          # Helm hook Jobs can outlive an atomic uninstall / failed install.
+          # Dev environments are disposable, so clear stale hook resources
+          # before each install to avoid waiting on an old Job's pods.
+          kubectl -n "${RELEASE_NS}" delete job "${RELEASE_NAME}-seed" \
+            --ignore-not-found --wait=false
+          kubectl -n "${RELEASE_NS}" delete configmap "${RELEASE_NAME}-seed-config" \
+            --ignore-not-found
+
+          for _ in $(seq 1 24); do
+            if ! kubectl -n "${RELEASE_NS}" get job "${RELEASE_NAME}-seed" >/dev/null 2>&1; then
+              break
+            fi
+            echo "Waiting for stale ${RELEASE_NAME}-seed Job to be deleted..."
+            sleep 5
+          done
+
+          if kubectl -n "${RELEASE_NS}" get job "${RELEASE_NAME}-seed" >/dev/null 2>&1; then
+            echo "Timed out waiting for stale ${RELEASE_NAME}-seed Job to delete." >&2
+            exit 1
+          fi
+
+          if ! helm status "${RELEASE_NAME}" -n "${RELEASE_NS}" >/dev/null 2>&1; then
+            echo "No existing ${RELEASE_NAME} release in ${RELEASE_NS}."
+            exit 0
+          fi
+
+          status="$(helm status "${RELEASE_NAME}" -n "${RELEASE_NS}" -o json | jq -r '.info.status // ""')"
+          echo "Existing ${RELEASE_NAME} release status: ${status}"
+
+          case "${status}" in
+            deployed)
+              echo "Release is deployed; normal upgrade can proceed."
+              ;;
+            *)
+              echo "Resetting disposable dev release stuck in ${status:-unknown} state."
+              helm uninstall "${RELEASE_NAME}" -n "${RELEASE_NS}" --wait --timeout 5m || true
+              ;;
+          esac
+
       - name: helm upgrade --install
         env:
           RELEASE_NS: ${{ steps.env.outputs.namespace }}
@@ -251,6 +297,7 @@ jobs:
           set -euo pipefail
           helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \
             --namespace "${RELEASE_NS}" \
+            --atomic \
             --wait --timeout 10m \
             --set "global.hostname=${{ steps.env.outputs.hostname }}" \
             --set "authproxy.image.tag=${{ steps.env.outputs.image_tag }}" \
@@ -363,6 +410,40 @@ jobs:
                 body,
               });
             }
+
+      - name: Dump debug info
+        if: failure()
+        env:
+          RELEASE_NS: ${{ steps.env.outputs.namespace }}
+        run: |
+          set +e
+          echo "::group::Helm status"
+          helm status "${RELEASE_NAME}" -n "${RELEASE_NS}"
+          helm history "${RELEASE_NAME}" -n "${RELEASE_NS}"
+          echo "::endgroup::"
+
+          echo "::group::Kubernetes resources"
+          kubectl -n "${RELEASE_NS}" get all,certificate,order,challenge -o wide
+          echo "::endgroup::"
+
+          echo "::group::Pods"
+          kubectl -n "${RELEASE_NS}" describe pods
+          echo "::endgroup::"
+
+          echo "::group::Jobs"
+          kubectl -n "${RELEASE_NS}" describe jobs
+          echo "::endgroup::"
+
+          echo "::group::Events"
+          kubectl -n "${RELEASE_NS}" get events --sort-by=.lastTimestamp
+          echo "::endgroup::"
+
+          for pod in $(kubectl -n "${RELEASE_NS}" get pods -o name); do
+            echo "::group::Logs ${pod}"
+            kubectl -n "${RELEASE_NS}" logs "${pod}" --all-containers --tail=200
+            kubectl -n "${RELEASE_NS}" logs "${pod}" --all-containers --previous --tail=200
+            echo "::endgroup::"
+          done
 
       - name: Summary
         if: always()
