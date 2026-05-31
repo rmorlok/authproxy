@@ -12,7 +12,9 @@ import (
 	"context"
 	"errors"
 	"io"
+	"log/slog"
 	"net/http"
+	"strconv"
 
 	apauthcore "github.com/rmorlok/authproxy/internal/apauth/core"
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -36,6 +38,7 @@ type proxy struct {
 	conn        iface.Connection
 	auth        auth_methods.Authenticator
 	accelerator ProbeAccelerator
+	logger      *slog.Logger
 }
 
 // New constructs an iface.Proxy that orchestrates calls for a single
@@ -45,7 +48,20 @@ type proxy struct {
 // without waiting for the next scheduled probe tick. One instance per
 // connection — held inside the connection's lazy proxy-impl cache.
 func New(h httpf.F, conn iface.Connection, auth auth_methods.Authenticator, accelerator ProbeAccelerator) iface.Proxy {
-	return &proxy{httpf: h, conn: conn, auth: auth, accelerator: accelerator}
+	return &proxy{httpf: h, conn: conn, auth: auth, accelerator: accelerator, logger: proxyLogger(conn)}
+}
+
+type loggedConnection interface {
+	Logger() *slog.Logger
+}
+
+func proxyLogger(conn iface.Connection) *slog.Logger {
+	if connWithLogger, ok := conn.(loggedConnection); ok {
+		if logger := connWithLogger.Logger(); logger != nil {
+			return logger
+		}
+	}
+	return slog.Default()
 }
 
 // maybeAccelerateProbes fires a best-effort probe-now enqueue when the
@@ -90,6 +106,7 @@ func (p *proxy) ProxyRequest(ctx context.Context, reqType httpf.RequestType, req
 	if resp.StatusCode == http.StatusUnauthorized {
 		recoverErr := p.auth.RecoverFrom401(ctx)
 		if recoverErr == nil {
+			p.logUpstreamRetryAttempted(ctx, reqType, resp.StatusCode)
 			retried, retryErr := p.send(ctx, reqType, req)
 			if retryErr == nil {
 				resp = retried
@@ -107,6 +124,7 @@ func (p *proxy) ProxyRequest(ctx context.Context, reqType httpf.RequestType, req
 	// so the probe-driven health signal flips without waiting for the
 	// next scheduled probe interval.
 	p.maybeAccelerateProbes(ctx, reqType, resp.StatusCode)
+	p.logFinalUpstreamStatus(ctx, reqType, resp)
 
 	return iface.ProxyResponseFromGentlemen(resp)
 }
@@ -150,6 +168,7 @@ func (p *proxy) ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, 
 	if resp.StatusCode == http.StatusUnauthorized && canRetryRawAfter401(originalBody) {
 		recoverErr := p.auth.RecoverFrom401(ctx)
 		if recoverErr == nil {
+			p.logUpstreamRetryAttempted(ctx, reqType, resp.StatusCode)
 			drainAndClose(resp.Body)
 			retried, retryErr := p.sendRaw(ctx, client, req.Outbound.WithContext(ctx))
 			if retryErr == nil {
@@ -163,8 +182,56 @@ func (p *proxy) ProxyRequestRaw(ctx context.Context, reqType httpf.RequestType, 
 	// Same 401/403 acceleration as the wrapped path. See ProxyRequest's
 	// comment for the rationale.
 	p.maybeAccelerateProbes(ctx, reqType, resp.StatusCode)
+	p.logFinalRawUpstreamStatus(ctx, reqType, resp)
 
 	return streamResponse(w, resp)
+}
+
+func (p *proxy) logUpstreamRetryAttempted(ctx context.Context, reqType httpf.RequestType, statusCode int) {
+	p.logger.InfoContext(ctx, "proxy upstream retry attempted",
+		"connection_id", p.conn.GetId().String(),
+		"request_type", reqType.String(),
+		"provider_status_code", statusCode,
+		"reason", "upstream_401",
+	)
+}
+
+func (p *proxy) logFinalUpstreamStatus(ctx context.Context, reqType httpf.RequestType, resp *gentleman.Response) {
+	if resp == nil {
+		return
+	}
+	p.logFinalStatus(ctx, reqType, resp.StatusCode, resp.Header.Get("Retry-After"))
+}
+
+func (p *proxy) logFinalRawUpstreamStatus(ctx context.Context, reqType httpf.RequestType, resp *http.Response) {
+	if resp == nil {
+		return
+	}
+	p.logFinalStatus(ctx, reqType, resp.StatusCode, resp.Header.Get("Retry-After"))
+}
+
+func (p *proxy) logFinalStatus(ctx context.Context, reqType httpf.RequestType, statusCode int, retryAfter string) {
+	switch {
+	case statusCode == http.StatusUnauthorized || statusCode == http.StatusForbidden:
+		p.logger.WarnContext(ctx, "proxy upstream auth failure",
+			"connection_id", p.conn.GetId().String(),
+			"request_type", reqType.String(),
+			"provider_status_code", statusCode,
+		)
+	case statusCode == http.StatusTooManyRequests:
+		args := []any{
+			"connection_id", p.conn.GetId().String(),
+			"request_type", reqType.String(),
+			"provider_status_code", statusCode,
+		}
+		if retryAfter != "" {
+			args = append(args, "retry_after", retryAfter)
+			if seconds, err := strconv.Atoi(retryAfter); err == nil {
+				args = append(args, "retry_after_seconds", seconds)
+			}
+		}
+		p.logger.WarnContext(ctx, "proxy upstream rate limited", args...)
+	}
 }
 
 // canRetryRawAfter401 reports whether the inbound body is in a state
