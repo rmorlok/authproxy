@@ -120,6 +120,46 @@ func TestApplyTokenEndpointClientAuth_UnknownMethod(t *testing.T) {
 	assert.Contains(t, err.Error(), "bogus")
 }
 
+func TestResolveClientCredentials_ClientCredentialsUsesStoredSetupCredential(t *testing.T) {
+	ctrl := gomock.NewController(t)
+	defer ctrl.Finish()
+
+	connectionId := apid.New(apid.PrefixConnection)
+	grantType := sconfig.OAuth2GrantClientCredentials
+	auth := &cschema.AuthOAuth2{
+		Type:      cschema.AuthTypeOAuth2,
+		GrantType: &grantType,
+	}
+
+	db := mockDb.NewMockDB(ctrl)
+	encrypt := mockEncrypt.NewMockE(ctrl)
+	encrypted := encfield.EncryptedField{ID: "ekv_test", Data: "encrypted"}
+	db.EXPECT().
+		GetActiveApiKeyCredential(gomock.Any(), connectionId).
+		Return(&database.ApiKeyCredential{
+			Id:                   apid.New(apid.PrefixApiKeyCredential),
+			ConnectionId:         connectionId,
+			EncryptedCredentials: encrypted,
+		}, nil)
+	encrypt.EXPECT().
+		DecryptString(gomock.Any(), encrypted).
+		Return(`{"client_id":"stored-client","client_secret":"stored-secret"}`, nil)
+
+	o := &oAuth2Connection{
+		db:      db,
+		encrypt: encrypt,
+		auth:    auth,
+		connection: &mockCore.Connection{
+			Id: connectionId,
+		},
+	}
+
+	clientId, clientSecret, err := o.resolveClientCredentials(context.Background())
+	require.NoError(t, err)
+	assert.Equal(t, "stored-client", clientId)
+	assert.Equal(t, "stored-secret", clientSecret)
+}
+
 // captureHeader is a gock matcher that records the value of a specific
 // header from the incoming request. Pairs with captureBody (defined in
 // pkce_test.go) when a test needs both.
@@ -384,6 +424,54 @@ func TestAuthOAuth2_Validate_NilMethodAcceptedAsDefault(t *testing.T) {
 	}
 	require.NoError(t, a.Validate(&common.ValidationContext{}))
 	assert.Equal(t, cschema.TokenEndpointAuthClientSecretPost, a.GetTokenEndpointAuthMethodOrDefault())
+}
+
+func TestAuthOAuth2_Validate_ClientCredentialsRejectsAuthorizationBlock(t *testing.T) {
+	a := &cschema.AuthOAuth2{
+		Type:         cschema.AuthTypeOAuth2,
+		GrantType:    cschema.NewOAuth2GrantType(cschema.OAuth2GrantClientCredentials),
+		ClientId:     common.NewStringValueDirect("client-id"),
+		ClientSecret: common.NewStringValueDirect("client-secret"),
+		Authorization: cschema.AuthOauth2Authorization{
+			Endpoint: "https://example.com/oauth/authorize",
+		},
+	}
+	err := a.Validate(&common.ValidationContext{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "authorization")
+}
+
+func TestAuthOAuth2_Validate_ClientCredentialsRejectsConnectorCredentials(t *testing.T) {
+	a := &cschema.AuthOAuth2{
+		Type:         cschema.AuthTypeOAuth2,
+		GrantType:    cschema.NewOAuth2GrantType(cschema.OAuth2GrantClientCredentials),
+		ClientId:     common.NewStringValueDirect("client-id"),
+		ClientSecret: common.NewStringValueDirect("client-secret"),
+	}
+	err := a.Validate(&common.ValidationContext{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "client_id")
+	assert.Contains(t, err.Error(), "client_secret")
+}
+
+func TestAuthOAuth2_Validate_ClientCredentialsCollectsCredentialsDuringSetup(t *testing.T) {
+	a := &cschema.AuthOAuth2{
+		Type:      cschema.AuthTypeOAuth2,
+		GrantType: cschema.NewOAuth2GrantType(cschema.OAuth2GrantClientCredentials),
+	}
+	require.NoError(t, a.Validate(&common.ValidationContext{}))
+}
+
+func TestAuthOAuth2_Validate_RejectsUnknownGrantType(t *testing.T) {
+	a := &cschema.AuthOAuth2{
+		Type:         cschema.AuthTypeOAuth2,
+		GrantType:    cschema.NewOAuth2GrantType(cschema.OAuth2GrantType("implicit")),
+		ClientId:     common.NewStringValueDirect("client-id"),
+		ClientSecret: common.NewStringValueDirect("client-secret"),
+	}
+	err := a.Validate(&common.ValidationContext{})
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "grant_type")
 }
 
 // TestAuthOAuth2_Validate_RejectsUnknownTokenEndpointAuthMethod guards

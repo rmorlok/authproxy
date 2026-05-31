@@ -30,8 +30,18 @@ const (
 	TokenEndpointAuthNone = TokenEndpointAuthMethod("none")
 )
 
+type OAuth2GrantType string
+
+const (
+	OAuth2GrantAuthorizationCode = OAuth2GrantType("authorization_code")
+	OAuth2GrantClientCredentials = OAuth2GrantType("client_credentials")
+)
+
 type AuthOAuth2 struct {
 	Type AuthType `json:"type" yaml:"type"`
+	// GrantType selects the OAuth2 grant flow. nil preserves the historical
+	// authorization-code behavior.
+	GrantType *OAuth2GrantType `json:"grant_type,omitempty" yaml:"grant_type,omitempty"`
 	// TokenEndpointAuthMethod selects how client credentials are presented
 	// to the token endpoint. nil signals "use the default" and resolves to
 	// client_secret_post via GetTokenEndpointAuthMethodOrDefault, matching
@@ -55,6 +65,10 @@ func NewTokenEndpointAuthMethod(m TokenEndpointAuthMethod) *TokenEndpointAuthMet
 	return &m
 }
 
+func NewOAuth2GrantType(g OAuth2GrantType) *OAuth2GrantType {
+	return &g
+}
+
 // GetTokenEndpointAuthMethodOrDefault returns the configured method, defaulting
 // to client_secret_post only when the field was omitted (nil). This is the
 // single place where the nil → post collapse happens; callers that already
@@ -66,6 +80,17 @@ func (a *AuthOAuth2) GetTokenEndpointAuthMethodOrDefault() TokenEndpointAuthMeth
 		return TokenEndpointAuthClientSecretPost
 	}
 	return *a.TokenEndpointAuthMethod
+}
+
+func (a *AuthOAuth2) GetGrantTypeOrDefault() OAuth2GrantType {
+	if a == nil || a.GrantType == nil {
+		return OAuth2GrantAuthorizationCode
+	}
+	return *a.GrantType
+}
+
+func (a *AuthOAuth2) SupportsRefreshToken() bool {
+	return a.GetGrantTypeOrDefault() == OAuth2GrantAuthorizationCode
 }
 
 func (a *AuthOAuth2) GetType() AuthType {
@@ -85,9 +110,11 @@ func (a *AuthOAuth2) ValidateMustacheReferences(vc *common.ValidationContext, mc
 	preconnectFields := mctx.PreconnectFields
 	allConfigFields := mctx.AllConfigFields
 
-	checkMustacheTemplate(vc.PushField("authorization").PushField("endpoint"), a.Authorization.Endpoint, preconnectFields, "preconnect", result)
-	for k, v := range a.Authorization.QueryOverrides {
-		checkMustacheTemplate(vc.PushField("authorization").PushField("query_overrides").PushField(k), v, preconnectFields, "preconnect", result)
+	if a.GetGrantTypeOrDefault() == OAuth2GrantAuthorizationCode {
+		checkMustacheTemplate(vc.PushField("authorization").PushField("endpoint"), a.Authorization.Endpoint, preconnectFields, "preconnect", result)
+		for k, v := range a.Authorization.QueryOverrides {
+			checkMustacheTemplate(vc.PushField("authorization").PushField("query_overrides").PushField(k), v, preconnectFields, "preconnect", result)
+		}
 	}
 
 	checkMustacheTemplate(vc.PushField("token").PushField("endpoint"), a.Token.Endpoint, preconnectFields, "preconnect", result)
@@ -148,8 +175,49 @@ func (a *AuthOAuth2) Validate(vc *common.ValidationContext) error {
 	}
 
 	result := &multierror.Error{}
+	grantType := a.GetGrantTypeOrDefault()
+	switch grantType {
+	case OAuth2GrantAuthorizationCode, OAuth2GrantClientCredentials:
+	case "":
+		result = multierror.Append(result, vc.NewErrorfForField("grant_type",
+			"must not be empty; omit the field to use the default (%q), or set one of %q, %q",
+			OAuth2GrantAuthorizationCode,
+			OAuth2GrantAuthorizationCode, OAuth2GrantClientCredentials,
+		))
+		return result.ErrorOrNil()
+	default:
+		result = multierror.Append(result, vc.NewErrorfForField("grant_type",
+			"%q is not a valid grant type; must be %q or %q",
+			grantType,
+			OAuth2GrantAuthorizationCode, OAuth2GrantClientCredentials,
+		))
+	}
 
-	if a.Authorization.PKCE != nil {
+	if grantType == OAuth2GrantClientCredentials {
+		if a.Authorization.Endpoint != "" || len(a.Authorization.QueryOverrides) > 0 || a.Authorization.PKCE != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("authorization",
+				"must be omitted when grant_type is %q", OAuth2GrantClientCredentials,
+			))
+		}
+		if a.ClientId != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("client_id",
+				"must be omitted when grant_type is %q; client credentials are collected during connection setup",
+				OAuth2GrantClientCredentials,
+			))
+		}
+		if a.ClientSecret != nil {
+			result = multierror.Append(result, vc.NewErrorfForField("client_secret",
+				"must be omitted when grant_type is %q; client credentials are collected during connection setup",
+				OAuth2GrantClientCredentials,
+			))
+		}
+	} else if a.Authorization.Endpoint == "" {
+		result = multierror.Append(result, vc.PushField("authorization").NewErrorfForField("endpoint",
+			"is required when grant_type is %q", OAuth2GrantAuthorizationCode,
+		))
+	}
+
+	if grantType == OAuth2GrantAuthorizationCode && a.Authorization.PKCE != nil {
 		pkceVC := vc.PushField("authorization").PushField("pkce")
 		switch a.Authorization.PKCE.Method {
 		case "", PKCEMethodS256, PKCEMethodPlain:
@@ -175,11 +243,16 @@ func (a *AuthOAuth2) Validate(vc *common.ValidationContext) error {
 		return result.ErrorOrNil()
 	}
 
+	hasClientId := a.ClientId != nil && a.ClientId.InnerVal != nil
 	hasSecret := a.ClientSecret != nil && a.ClientSecret.InnerVal != nil
+	if grantType == OAuth2GrantAuthorizationCode && !hasClientId {
+		result = multierror.Append(result, vc.NewErrorfForField("client_id", "is required"))
+	}
+
 	method := a.GetTokenEndpointAuthMethodOrDefault()
 	switch method {
 	case TokenEndpointAuthClientSecretPost, TokenEndpointAuthClientSecretBasic:
-		if !hasSecret {
+		if grantType == OAuth2GrantAuthorizationCode && !hasSecret {
 			result = multierror.Append(result, vc.NewErrorfForField("client_secret",
 				"is required when token_endpoint_auth_method is %q", method,
 			))
@@ -191,7 +264,7 @@ func (a *AuthOAuth2) Validate(vc *common.ValidationContext) error {
 				TokenEndpointAuthNone,
 			))
 		}
-		if a.Authorization.PKCE == nil {
+		if grantType == OAuth2GrantAuthorizationCode && a.Authorization.PKCE == nil {
 			result = multierror.Append(result, vc.PushField("authorization").NewErrorfForField("pkce",
 				"is required when token_endpoint_auth_method is %q (public clients have no proof-of-possession without PKCE)",
 				TokenEndpointAuthNone,

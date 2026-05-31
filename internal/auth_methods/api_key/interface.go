@@ -22,7 +22,7 @@ type Factory interface {
 	// PersistCredentials extracts the api-key credential field values from
 	// credData (the validated form payload from a credentials-phase submit),
 	// encrypts them as a single JSON blob, and inserts the row into
-	// api_key_credentials. The actor on the request context is recorded as
+	// connection_credentials. The actor on the request context is recorded as
 	// the credential's creator. Validation of which fields are present is
 	// placement-specific (e.g. basic placement requires the username field).
 	//

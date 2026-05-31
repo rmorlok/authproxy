@@ -137,6 +137,7 @@ func (c *connection) renderStepResponse(
 			Id:   c.GetId(),
 			Type: iface.ConnectionSetupResponseTypeVerifying,
 		}, nil
+
 	}
 	return nil, httperr.InternalServerError(httperr.WithInternalErrorf("unsupported manifest step type %q", step.Type()))
 }

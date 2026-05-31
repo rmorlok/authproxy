@@ -98,7 +98,7 @@ func (o *oAuth2Connection) refreshAccessTokenInner(ctx context.Context, token *d
 		return token, nil
 	}
 
-	if token.EncryptedRefreshToken.IsZero() {
+	if token.EncryptedRefreshToken.IsZero() && o.auth.SupportsRefreshToken() {
 		// Permanent — there is no way to obtain a new access token without
 		// user interaction. Flip the connection unhealthy so the unified
 		// reauth UX surfaces the prompt.
@@ -106,11 +106,6 @@ func (o *oAuth2Connection) refreshAccessTokenInner(ctx context.Context, token *d
 	}
 
 	clientId, clientSecret, err := o.resolveClientCredentials(ctx)
-	if err != nil {
-		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, err)
-	}
-
-	refreshToken, err := o.encrypt.DecryptString(ctx, token.EncryptedRefreshToken)
 	if err != nil {
 		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, err)
 	}
@@ -125,9 +120,21 @@ func (o *oAuth2Connection) refreshAccessTokenInner(ctx context.Context, token *d
 			fmt.Errorf("failed to render token endpoint template: %w", err))
 	}
 
-	values := url.Values{
-		"grant_type":    {"refresh_token"},
-		"refresh_token": {refreshToken},
+	values := url.Values{}
+	persistOptions := tokenPersistOptions{PersistRefreshToken: true}
+	if o.auth.SupportsRefreshToken() {
+		refreshToken, err := o.encrypt.DecryptString(ctx, token.EncryptedRefreshToken)
+		if err != nil {
+			return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshInternalError, 0, "", 0, err)
+		}
+		values.Set("grant_type", "refresh_token")
+		values.Set("refresh_token", refreshToken)
+	} else {
+		values.Set("grant_type", "client_credentials")
+		if scopes := JoinScopes(o.auth.Scopes); scopes != "" {
+			values.Set("scope", scopes)
+		}
+		persistOptions.PersistRefreshToken = false
 	}
 
 	values, authHeader, err := applyTokenEndpointClientAuth(
@@ -150,7 +157,7 @@ func (o *oAuth2Connection) refreshAccessTokenInner(ctx context.Context, token *d
 		return nil, o.classifyAndRecordRefreshFailure(ctx, category, refreshResp.StatusCode, providerErr, attempts, err)
 	}
 
-	newToken, err := o.createDbTokenFromResponse(ctx, refreshResp, token)
+	newToken, err := o.createDbTokenFromResponseWithOptions(ctx, refreshResp, token, persistOptions)
 	if err != nil {
 		return nil, o.classifyAndRecordRefreshFailure(ctx, tokenRefreshMalformedResponse, refreshResp.StatusCode, "", attempts,
 			fmt.Errorf("failed to refresh token: %w", err))

@@ -85,11 +85,15 @@ func (o *oAuth2Connection) CallbackFrom3rdParty(ctx context.Context, query url.V
 // dashboards and alerts can key off `category` rather than parsing error strings.
 func (o *oAuth2Connection) exchangeCodeAndAdvance(ctx context.Context, query url.Values) (string, error) {
 	var returnURL string
-	err := o.tel.withSpan(ctx, "token_exchange", o.connectorIDForTelemetry(), func(ctx context.Context) error {
-		var err error
-		returnURL, err = o.exchangeCodeAndAdvanceInner(ctx, query)
-		return err
-	})
+	err := o.tel.withSpan(
+		ctx,
+		"token_exchange",
+		o.connectorIDForTelemetry(),
+		func(ctx context.Context) error {
+			var err error
+			returnURL, err = o.exchangeCodeAndAdvanceInner(ctx, query)
+			return err
+		})
 	return returnURL, err
 }
 
@@ -97,7 +101,11 @@ func (o *oAuth2Connection) exchangeCodeAndAdvance(ctx context.Context, query url
 // failure-counter bump for token-exchange failures. Mirrors the refresh-side
 // classifyAndRecordRefreshFailure: every callsite uses the same shape so the
 // "category" string lands consistently on logs, metrics, and span errors.
-func (o *oAuth2Connection) emitAndRecordExchangeFailure(ctx context.Context, category tokenExchangeCategory, attrs tokenExchangeAttrs) {
+func (o *oAuth2Connection) emitAndRecordExchangeFailure(
+	ctx context.Context,
+	category tokenExchangeCategory,
+	attrs tokenExchangeAttrs,
+) {
 	emitTokenExchangeFailure(ctx, o.logger, category, attrs)
 	o.tel.recordTokenExchangeFailure(ctx, string(category), o.connectionLabelsForTelemetry())
 }
@@ -225,6 +233,89 @@ func (o *oAuth2Connection) exchangeCodeAndAdvanceInner(ctx context.Context, quer
 		return o.appendSetupPendingToReturnUrl(o.state.ReturnToUrl), nil
 	}
 	return o.state.ReturnToUrl, nil
+}
+
+// ExchangeClientCredentials performs RFC 6749 §4.4's synchronous token
+// endpoint exchange for service-to-service connectors. There is no authorize
+// redirect or callback; the client credentials are the grant.
+func (o *oAuth2Connection) ExchangeClientCredentials(ctx context.Context) error {
+	return o.tel.withSpan(
+		ctx,
+		"token_exchange",
+		o.connectorIDForTelemetry(),
+		func(ctx context.Context) error {
+			return o.exchangeClientCredentialsInner(ctx)
+		})
+}
+
+func (o *oAuth2Connection) exchangeClientCredentialsInner(ctx context.Context) error {
+	c := o.httpf.
+		ForRequestType(httpf.RequestTypeOAuth).
+		ForConnection(o.connection).
+		New().
+		UseContext(ctx)
+
+	clientId, clientSecret, err := o.resolveClientCredentials(ctx)
+	if err != nil {
+		o.emitAndRecordExchangeFailure(ctx, tokenExchangeInternalError, o.tokenExchangeAttrsFromConn(err))
+		return err
+	}
+
+	tokenEndpoint, err := o.renderMustache(ctx, o.auth.Token.Endpoint)
+	if err != nil {
+		err = fmt.Errorf("failed to render token endpoint template: %w", err)
+		o.emitAndRecordExchangeFailure(ctx, tokenExchangeInternalError, o.tokenExchangeAttrsFromConn(err))
+		return err
+	}
+
+	values := url.Values{
+		"grant_type": {"client_credentials"},
+	}
+	if scopes := JoinScopes(o.auth.Scopes); scopes != "" {
+		values.Set("scope", scopes)
+	}
+
+	values, authHeader, err := applyTokenEndpointClientAuth(
+		o.auth.GetTokenEndpointAuthMethodOrDefault(), clientId, clientSecret, values,
+	)
+	if err != nil {
+		o.emitAndRecordExchangeFailure(ctx, tokenExchangeInternalError, o.tokenExchangeAttrsFromConn(err))
+		return err
+	}
+
+	for k, v := range o.auth.Token.FormOverrides {
+		values.Set(k, v)
+	}
+
+	resp, attempts, err := o.postTokenExchangeWithRetry(ctx, c, tokenEndpoint, values, authHeader)
+	if err != nil {
+		err = fmt.Errorf("failed to post client credentials token exchange: %w", err)
+		attrs := o.tokenExchangeAttrsFromConn(err)
+		attrs.Attempts = attempts
+		o.emitAndRecordExchangeFailure(ctx, tokenExchangeNetworkError, attrs)
+		return err
+	}
+
+	if resp.StatusCode != 200 {
+		category, providerErr := classifyTokenEndpointStatus(resp.StatusCode, resp.Bytes())
+		err := fmt.Errorf("received status code %d from client credentials token exchange", resp.StatusCode)
+		attrs := o.tokenExchangeAttrsFromConn(err)
+		attrs.ProviderStatusCode = resp.StatusCode
+		attrs.ProviderError = providerErr
+		attrs.Attempts = attempts
+		o.emitAndRecordExchangeFailure(ctx, category, attrs)
+		return err
+	}
+
+	_, err = o.createDbTokenFromResponseWithOptions(ctx, resp, nil, tokenPersistOptions{PersistRefreshToken: false})
+	if err != nil {
+		err = fmt.Errorf("failed to create db token from response: %w", err)
+		o.emitAndRecordExchangeFailure(ctx, tokenExchangeMalformedResponse, o.tokenExchangeAttrsFromConn(err))
+		return err
+	}
+
+	o.tel.recordTokenExchangeSuccess(ctx, o.connectionLabelsForTelemetry())
+	return nil
 }
 
 // postTokenExchangeWithRetry POSTs the token-exchange form to the provider's

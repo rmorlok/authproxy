@@ -103,6 +103,9 @@
     "client_secret": {
       "$ref": "../../common/schema.json#/$defs/StringValue"
     },
+    "grant_type": {
+      "enum": ["authorization_code", "client_credentials"]
+    },
     "token_endpoint_auth_method": {
       "enum": ["client_secret_post", "client_secret_basic", "none"]
     },

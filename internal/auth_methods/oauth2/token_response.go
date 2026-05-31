@@ -23,12 +23,25 @@ type tokenResponse struct {
 	Scope        string `json:"scope"`
 }
 
+type tokenPersistOptions struct {
+	PersistRefreshToken bool
+}
+
 // createDbTokenFromResponse deserializes an oauth token from a refresh or authorization code response. It deserializes
 // the response and then inserts a token into the database. It returns the newly created token.
 func (o *oAuth2Connection) createDbTokenFromResponse(
 	ctx context.Context,
 	resp *gentleman.Response,
 	refreshFrom *database.OAuth2Token,
+) (*database.OAuth2Token, error) {
+	return o.createDbTokenFromResponseWithOptions(ctx, resp, refreshFrom, tokenPersistOptions{PersistRefreshToken: true})
+}
+
+func (o *oAuth2Connection) createDbTokenFromResponseWithOptions(
+	ctx context.Context,
+	resp *gentleman.Response,
+	refreshFrom *database.OAuth2Token,
+	opts tokenPersistOptions,
 ) (*database.OAuth2Token, error) {
 	jsonResp := tokenResponse{}
 	err := resp.JSON(&jsonResp)
@@ -48,13 +61,15 @@ func (o *oAuth2Connection) createDbTokenFromResponse(
 	var encryptedRefreshToken encfield.EncryptedField
 
 	// Not all OAuth has refresh tokens
-	if jsonResp.RefreshToken != "" {
+	if jsonResp.RefreshToken != "" && opts.PersistRefreshToken {
 		encryptedRefreshToken, err = o.encrypt.EncryptStringForEntity(ctx, o.connection, jsonResp.RefreshToken)
 		if err != nil {
 			return nil, fmt.Errorf("failed to encrypt refresh token: %w", err)
 		}
-	} else if refreshFrom != nil {
+	} else if opts.PersistRefreshToken && refreshFrom != nil {
 		encryptedRefreshToken = refreshFrom.EncryptedRefreshToken
+	} else if jsonResp.RefreshToken != "" && o.logger != nil {
+		o.logger.WarnContext(ctx, "oauth token response included refresh_token for client_credentials grant; discarding")
 	}
 
 	requestedScopes := JoinScopes(o.auth.Scopes)

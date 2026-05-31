@@ -10,13 +10,25 @@ import (
 // distinguishes user-authored kinds (form vs. redirect) — those carry through
 // to the manifest unchanged, plus the auth-method-emitted steps that get one
 // or the other depending on what the method needs at that point in the flow
-// (api-key emits form steps for credential collection; OAuth2 emits a redirect
-// step for the authorize URL).
+// (api-key and OAuth2 client_credentials emit form steps for credential
+// collection; OAuth2 authorization_code emits a redirect step).
 type ManifestStepType string
 
 const (
-	ManifestStepTypeForm     ManifestStepType = "form"
+	// ManifestStepTypeForm is a UI-rendered data-entry step. The setup API
+	// returns JSON Schema / UI Schema for the client to render, and the user
+	// submits values back through SubmitForm. Schema-defined preconnect /
+	// configure steps use this, and auth methods can use it for credential
+	// collection (for example API-key connectors or OAuth2 client_credentials).
+	ManifestStepTypeForm ManifestStepType = "form"
+
+	// ManifestStepTypeRedirect is a UI-visible off-platform handoff. The
+	// setup API returns a URL and the client sends the user there; completion
+	// happens later through a callback or signed return URL. OAuth2
+	// authorization-code setup uses this for the provider authorize URL, and
+	// connector-authored redirect steps can use it for external setup tasks.
 	ManifestStepTypeRedirect ManifestStepType = "redirect"
+
 	// ManifestStepTypeVerify is the type tag for the synthetic apxy:verify
 	// pseudo-step: the connection is waiting for the verify task to finish.
 	// The user sees a "verifying" response and polls; OnSubmit /
@@ -180,12 +192,12 @@ type formStep struct {
 	cfg FormStepConfig
 }
 
-func (s *formStep) Id() string                       { return s.cfg.Id }
-func (s *formStep) Title() string                    { return s.cfg.Title }
-func (s *formStep) Description() string              { return s.cfg.Description }
-func (s *formStep) Type() ManifestStepType           { return ManifestStepTypeForm }
-func (s *formStep) JsonSchema() json.RawMessage      { return s.cfg.JsonSchema }
-func (s *formStep) UiSchema() json.RawMessage        { return s.cfg.UiSchema }
+func (s *formStep) Id() string                  { return s.cfg.Id }
+func (s *formStep) Title() string               { return s.cfg.Title }
+func (s *formStep) Description() string         { return s.cfg.Description }
+func (s *formStep) Type() ManifestStepType      { return ManifestStepTypeForm }
+func (s *formStep) JsonSchema() json.RawMessage { return s.cfg.JsonSchema }
+func (s *formStep) UiSchema() json.RawMessage   { return s.cfg.UiSchema }
 
 func (s *formStep) OnSubmit(ctx context.Context, data json.RawMessage) error {
 	if s.cfg.OnSubmit == nil {

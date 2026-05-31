@@ -89,8 +89,8 @@ func TestApiKeyCredentials_RoundTrip(t *testing.T) {
 	require.Equal(t, blob, got.EncryptedCredentials)
 	require.Equal(t, placement, got.PlacementSnapshot)
 
-	require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM api_key_credentials"))
-	require.Equal(t, 0, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM api_key_credentials WHERE deleted_at IS NOT NULL"))
+	require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connection_credentials"))
+	require.Equal(t, 0, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connection_credentials WHERE deleted_at IS NOT NULL"))
 }
 
 func TestApiKeyCredentials_GetActive_NoneFound(t *testing.T) {
@@ -131,8 +131,8 @@ func TestApiKeyCredentials_InsertSoftDeletesPrior(t *testing.T) {
 	require.NotEqual(t, first.Id, second.Id)
 
 	// Exactly one active row remains.
-	require.Equal(t, 2, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM api_key_credentials"))
-	require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM api_key_credentials WHERE deleted_at IS NULL"))
+	require.Equal(t, 2, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connection_credentials"))
+	require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connection_credentials WHERE deleted_at IS NULL"))
 
 	got, err := db.GetActiveApiKeyCredential(ctx, connectionId)
 	require.NoError(t, err)
@@ -201,7 +201,7 @@ func TestApiKeyCredentials_UpdateLastValidated(t *testing.T) {
 	require.ErrorIs(t, err, ErrNotFound)
 
 	// Ensure we didn't mutate row count.
-	require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM api_key_credentials"))
+	require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connection_credentials"))
 }
 
 func TestApiKeyCredentials_DeleteAllForConnection(t *testing.T) {
@@ -236,20 +236,20 @@ func TestApiKeyCredentials_DeleteAllForConnection(t *testing.T) {
 	require.Equal(t, siblingCred.Id, siblingGot.Id)
 
 	// Total rows: 2 for connectionId (both soft-deleted) + 1 for sibling (active).
-	require.Equal(t, 3, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM api_key_credentials"))
-	require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM api_key_credentials WHERE deleted_at IS NULL"))
+	require.Equal(t, 3, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connection_credentials"))
+	require.Equal(t, 1, sqlh.MustCount(rawDb, "SELECT COUNT(*) FROM connection_credentials WHERE deleted_at IS NULL"))
 }
 
 func TestApiKeyCredentials_EncryptedFieldRegistration(t *testing.T) {
 	regs := GetEncryptedFieldRegistrations()
 	var found *EncryptedFieldRegistration
 	for i := range regs {
-		if regs[i].Table == ApiKeyCredentialsTable {
+		if regs[i].Table == ConnectionCredentialsTable {
 			found = &regs[i]
 			break
 		}
 	}
-	require.NotNil(t, found, "api_key_credentials must register its encrypted column with the re-encryption registry")
+	require.NotNil(t, found, "connection_credentials must register its encrypted column with the re-encryption registry")
 	require.ElementsMatch(t, []string{"encrypted_credentials"}, found.EncryptedCols,
 		"a single encrypted_credentials column simplifies re-encryption jobs")
 	require.Equal(t, ConnectionsTable, found.JoinTable, "namespace should resolve via JOIN to connections")
