@@ -69,13 +69,6 @@ At its core, AuthProxy is an HTTP proxy that sits between your application and e
 
 If an OAuth2 access token has expired, AuthProxy automatically refreshes it using the stored refresh token before forwarding the request. Your application never needs to handle token lifecycle management.
 
-The JSON proxy endpoint (`POST /connections/{id}/_proxy`) accepts request
-headers as either a single string value or an array of string values:
-`{"Accept": "application/json", "X-Trace": ["one", "two"]}`. Arrays are
-forwarded as repeated HTTP header values in order. The streaming raw proxy
-endpoint (`/_proxy_raw`) uses normal HTTP headers directly and preserves
-repeated values after stripping hop-by-hop and AuthProxy envelope headers.
-
 ```mermaid
 sequenceDiagram
     participant App as Your Application

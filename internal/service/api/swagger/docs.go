@@ -8758,7 +8758,7 @@ const docTemplateApi = `{
             }
         },
         "routes.ProxyRequest": {
-            "description": "Request to simulate an HTTP request",
+            "description": "Request to proxy or simulate an HTTP request",
             "type": "object",
             "properties": {
                 "body_json": {},

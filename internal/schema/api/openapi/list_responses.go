@@ -236,7 +236,7 @@ type UpdateRateLimitRequestJson struct {
 
 // ProxyRequestJson documents the proxy-shaped request used by dry-run.
 //
-//	@Description	Request to simulate an HTTP request
+//	@Description	Request to proxy or simulate an HTTP request
 type ProxyRequestJson struct {
 	URL      string            `json:"url" example:"https://api.example.com/v1/users"`
 	Method   string            `json:"method" example:"POST"`
