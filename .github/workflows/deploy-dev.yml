@@ -243,6 +243,30 @@ jobs:
             echo "Reusing ${RELEASE_NAME}-actors"
           fi
 
+      - name: Recover stuck Helm release
+        env:
+          RELEASE_NS: ${{ steps.env.outputs.namespace }}
+        run: |
+          set -euo pipefail
+
+          if ! helm status "${RELEASE_NAME}" -n "${RELEASE_NS}" >/dev/null 2>&1; then
+            echo "No existing ${RELEASE_NAME} release in ${RELEASE_NS}."
+            exit 0
+          fi
+
+          status="$(helm status "${RELEASE_NAME}" -n "${RELEASE_NS}" -o json | jq -r '.info.status // ""')"
+          echo "Existing ${RELEASE_NAME} release status: ${status}"
+
+          case "${status}" in
+            deployed)
+              echo "Release is deployed; normal upgrade can proceed."
+              ;;
+            *)
+              echo "Resetting disposable dev release stuck in ${status:-unknown} state."
+              helm uninstall "${RELEASE_NAME}" -n "${RELEASE_NS}" --wait --timeout 5m || true
+              ;;
+          esac
+
       - name: helm upgrade --install
         env:
           RELEASE_NS: ${{ steps.env.outputs.namespace }}
@@ -250,6 +274,7 @@ jobs:
           set -euo pipefail
           helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \
             --namespace "${RELEASE_NS}" \
+            --atomic \
             --wait --timeout 10m \
             --set "global.hostname=${{ steps.env.outputs.hostname }}" \
             --set "authproxy.image.tag=${{ steps.env.outputs.image_tag }}" \
@@ -311,6 +336,40 @@ jobs:
           done
           echo "Smoke test failed after 60s" >&2
           exit 1
+
+      - name: Dump debug info
+        if: failure()
+        env:
+          RELEASE_NS: ${{ steps.env.outputs.namespace }}
+        run: |
+          set +e
+          echo "::group::Helm status"
+          helm status "${RELEASE_NAME}" -n "${RELEASE_NS}"
+          helm history "${RELEASE_NAME}" -n "${RELEASE_NS}"
+          echo "::endgroup::"
+
+          echo "::group::Kubernetes resources"
+          kubectl -n "${RELEASE_NS}" get all,certificate,order,challenge -o wide
+          echo "::endgroup::"
+
+          echo "::group::Pods"
+          kubectl -n "${RELEASE_NS}" describe pods
+          echo "::endgroup::"
+
+          echo "::group::Jobs"
+          kubectl -n "${RELEASE_NS}" describe jobs
+          echo "::endgroup::"
+
+          echo "::group::Events"
+          kubectl -n "${RELEASE_NS}" get events --sort-by=.lastTimestamp
+          echo "::endgroup::"
+
+          for pod in $(kubectl -n "${RELEASE_NS}" get pods -o name); do
+            echo "::group::Logs ${pod}"
+            kubectl -n "${RELEASE_NS}" logs "${pod}" --all-containers --tail=200
+            kubectl -n "${RELEASE_NS}" logs "${pod}" --all-containers --previous --tail=200
+            echo "::endgroup::"
+          done
 
       - name: Summary
         if: always()
