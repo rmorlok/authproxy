@@ -1,0 +1,109 @@
+# schema: https://json.schemastore.org/github-workflow.json
+name: Teardown Dev
+
+# Deletes the isolated authproxy-demo environment created for a pull
+# request once that PR closes. Missing namespaces/releases are treated
+# as success so repeated cleanup attempts stay safe.
+
+on:
+  pull_request:
+    branches: [main]
+    types: [closed]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  # Same group as Deploy Dev: closing a PR should cancel any in-flight
+  # deploy for that PR before removing the namespace.
+  group: deploy-dev-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  teardown:
+    if: github.event.pull_request.head.repo.full_name == github.repository
+    runs-on: ubuntu-latest
+    environment: gha-eks
+    timeout-minutes: 15
+
+    env:
+      RELEASE_NAME: dev
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+
+    steps:
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Resolve environment names
+        id: env
+        run: |
+          set -euo pipefail
+
+          # Must match Deploy Dev's sanitizer exactly.
+          label="$(printf '%s' "${BRANCH_NAME}" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-+/-/g')"
+          if [ -z "${label}" ]; then
+            label="pr-${PR_NUMBER}"
+          fi
+
+          label="${label:0:59}"
+          label="$(printf '%s' "${label}" | sed -E 's/-+$//')"
+          if [ -z "${label}" ]; then
+            label="pr-${PR_NUMBER}"
+          fi
+
+          namespace="dev-${label}"
+          echo "namespace=${namespace}" >> "$GITHUB_OUTPUT"
+          echo "Namespace: ${namespace}"
+
+      - name: Assume GH Actions role via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Wire kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name "${{ vars.EKS_CLUSTER }}" \
+            --region "${{ vars.AWS_REGION }}"
+          kubectl get nodes -o wide
+
+      - name: Uninstall Helm release
+        env:
+          RELEASE_NS: ${{ steps.env.outputs.namespace }}
+        run: |
+          set -euo pipefail
+
+          if ! kubectl get namespace "${RELEASE_NS}" >/dev/null 2>&1; then
+            echo "Namespace ${RELEASE_NS} is already absent."
+            exit 0
+          fi
+
+          if helm status "${RELEASE_NAME}" -n "${RELEASE_NS}" >/dev/null 2>&1; then
+            helm uninstall "${RELEASE_NAME}" -n "${RELEASE_NS}" --wait --timeout 5m
+          else
+            echo "Release ${RELEASE_NAME} is already absent in ${RELEASE_NS}."
+          fi
+
+      - name: Delete namespace
+        env:
+          RELEASE_NS: ${{ steps.env.outputs.namespace }}
+        run: |
+          set -euo pipefail
+          kubectl delete namespace "${RELEASE_NS}" --wait=false --ignore-not-found
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Dev teardown"
+            echo ""
+            echo "- Result:    ${{ job.status }}"
+            echo "- Namespace: \`${{ steps.env.outputs.namespace }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
