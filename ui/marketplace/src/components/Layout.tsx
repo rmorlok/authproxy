@@ -1,17 +1,16 @@
 import React from 'react';
 import {
-  AppBar,
-  Toolbar,
-  Typography,
   Container,
   Box,
   Button,
-  IconButton,
   Menu,
   MenuItem,
-  Avatar, Snackbar, Alert
+  Avatar,
+  Snackbar,
+  Alert,
+  Typography,
 } from '@mui/material';
-import { Link, Outlet } from 'react-router-dom';
+import { Outlet } from 'react-router-dom';
 import { useDispatch, useSelector } from 'react-redux';
 import {terminate, selectActorId, selectToasts, closeToast} from '../store';
 import { useState } from 'react';
@@ -55,79 +54,56 @@ const Layout: React.FC = () => {
   );
 
   return (
-    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh' }}>
-      <AppBar position="static">
-        <Toolbar>
-          <Typography variant="h6" component="div" sx={{ flexGrow: 1 }}>
-            <Link to="/" style={{ color: 'inherit', textDecoration: 'none' }}>
-              AuthProxy
-            </Link>
-          </Typography>
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <Button 
-              color="inherit" 
-              component={Link} 
-              to="/connectors"
-              sx={{ mr: 2 }}
-            >
-              Connectors
-            </Button>
-            <Button 
-              color="inherit" 
-              component={Link} 
-              to="/connections"
-              sx={{ mr: 2 }}
-            >
-              Connections
-            </Button>
-            {actor_id && (
-              <>
-                <IconButton
-                  onClick={handleMenu}
-                  color="inherit"
-                  size="small"
-                  sx={{ ml: 2 }}
-                  aria-controls={open ? 'account-menu' : undefined}
-                  aria-haspopup="true"
-                  aria-expanded={open ? 'true' : undefined}
-                >
-                  <Avatar 
-                    alt={actor_id}
-                    src="/assets/avatar.png"
-                    sx={{ width: 32, height: 32 }}
-                  />
-                </IconButton>
-                <Menu
-                  id="account-menu"
-                  anchorEl={anchorEl}
-                  open={open}
-                  onClose={handleClose}
-                  MenuListProps={{
-                    'aria-labelledby': 'account-button',
-                  }}
-                >
-                  <MenuItem disabled>
-                    <Typography variant="body2">
-                      {actor_id}
-                    </Typography>
-                  </MenuItem>
-                  <MenuItem onClick={handleLogout}>Logout</MenuItem>
-                </Menu>
-              </>
+    <Box sx={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', bgcolor: 'background.default' }}>
+      {actor_id && (
+        <Container maxWidth="lg" sx={{ display: 'flex', justifyContent: 'flex-end', pt: { xs: 1, sm: 2 } }}>
+          <Button
+            id="account-button"
+            onClick={handleMenu}
+            color="inherit"
+            size="small"
+            endIcon={(
+              <Avatar
+                alt={actor_id}
+                src="/assets/avatar.png"
+                sx={{ width: 28, height: 28, fontSize: 14 }}
+              />
             )}
-          </Box>
-        </Toolbar>
-      </AppBar>
+            aria-controls={open ? 'account-menu' : undefined}
+            aria-haspopup="true"
+            aria-expanded={open ? 'true' : undefined}
+            sx={{ color: 'text.secondary', minWidth: 0, textTransform: 'none' }}
+          >
+            <Typography
+              variant="body2"
+              component="span"
+              noWrap
+              sx={{ display: { xs: 'none', sm: 'inline' }, maxWidth: 260 }}
+            >
+              {actor_id}
+            </Typography>
+          </Button>
+          <Menu
+            id="account-menu"
+            anchorEl={anchorEl}
+            open={open}
+            onClose={handleClose}
+            MenuListProps={{
+              'aria-labelledby': 'account-button',
+            }}
+          >
+            <MenuItem disabled>
+              <Typography variant="body2">
+                {actor_id}
+              </Typography>
+            </MenuItem>
+            <MenuItem onClick={handleLogout}>Logout</MenuItem>
+          </Menu>
+        </Container>
+      )}
       <Box component="main" sx={{ flexGrow: 1 }}>
         <Outlet />
         {toastsContent}
-      </Box>
-      <Box component="footer" sx={{ py: 3, bgcolor: 'background.paper', mt: 'auto' }}>
-        <Container maxWidth="lg">
-          <Typography variant="body2" color="text.secondary" align="center">
-            AuthProxy &copy; {new Date().getFullYear()}
-          </Typography>
-        </Container>
       </Box>
     </Box>
   );

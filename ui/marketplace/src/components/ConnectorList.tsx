@@ -10,6 +10,7 @@ import {
   Dialog,
   DialogTitle,
   DialogContent,
+  Button,
 } from '@mui/material';
 import { isRedirectResponse } from '@authproxy/api';
 import {
@@ -29,6 +30,8 @@ import ConnectorCard, { ConnectorCardSkeleton } from './ConnectorCard';
 import ConnectionFormStep from './ConnectionFormStep';
 import { AppDispatch } from '../store';
 import { initiateConnectionAsync } from '../store';
+import { Link } from 'react-router-dom';
+import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 
 /**
  * Component to display a list of available connectors
@@ -129,18 +132,37 @@ const ConnectorList: React.FC = () => {
 
   return (
     <Container sx={{ py: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: { xs: 'flex-start', sm: 'center' },
+          flexDirection: { xs: 'column', sm: 'row' },
+          gap: 2,
+          mb: 4,
+        }}
+      >
         <Typography variant="h4" component="h1">
           Available Connectors
         </Typography>
-        {isConnecting && (
-          <Box sx={{ display: 'flex', alignItems: 'center' }}>
-            <CircularProgress size={24} sx={{ mr: 1 }} />
-            <Typography variant="body2" color="text.secondary">
-              Connecting...
-            </Typography>
-          </Box>
-        )}
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+          {isConnecting && (
+            <Box sx={{ display: 'flex', alignItems: 'center' }}>
+              <CircularProgress size={24} sx={{ mr: 1 }} />
+              <Typography variant="body2" color="text.secondary">
+                Connecting...
+              </Typography>
+            </Box>
+          )}
+          <Button
+            component={Link}
+            to="/connections"
+            startIcon={<ArrowBackIcon />}
+            sx={{ alignSelf: { xs: 'flex-start', sm: 'center' } }}
+          >
+            Back to Connections
+          </Button>
+        </Box>
       </Box>
       {content}
 

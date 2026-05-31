@@ -158,6 +158,18 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
   return (
     <Card sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <CardHeader
+        sx={{
+          alignItems: 'flex-start',
+          flexWrap: { xs: 'wrap', sm: 'nowrap' },
+          '& .MuiCardHeader-content': {
+            minWidth: 0,
+          },
+          '& .MuiCardHeader-action': {
+            ml: { xs: 7, sm: 1 },
+            mt: { xs: 1, sm: 0 },
+            width: { xs: 'calc(100% - 56px)', sm: 'auto' },
+          },
+        }}
         avatar={
           connector ? (
             <Avatar 
@@ -216,7 +228,17 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
       </CardContent>
 
       {canBeDisconnected(connection) && (
-        <CardActions sx={{ alignItems: 'flex-start', flexWrap: 'wrap', gap: 0.5 }}>
+        <CardActions
+          sx={{
+            alignItems: 'flex-start',
+            flexDirection: 'column',
+            flexWrap: 'wrap',
+            gap: 0.5,
+            '& .MuiButton-root': {
+              ml: '0 !important',
+            },
+          }}
+        >
           {canReauth && (
             <Button
               size="small"
@@ -224,7 +246,6 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
               onClick={handleReauthClick}
               color={isUnhealthy ? 'warning' : 'primary'}
               variant={isUnhealthy ? 'contained' : 'text'}
-              sx={{ ml: 0 }}
             >
               Re-authenticate
             </Button>
@@ -234,7 +255,6 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
               size="small"
               startIcon={<SettingsIcon />}
               onClick={handleReconfigureClick}
-              sx={{ ml: 0 }}
             >
               Reconfigure
             </Button>
@@ -244,7 +264,6 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
             color="error"
             onClick={handleDisconnectClick}
             disabled={connection.state === ConnectionState.DISCONNECTING}
-            sx={{ ml: 0 }}
           >
             {connection.state === ConnectionState.DISCONNECTING ? 'Disconnecting...' : 'Disconnect'}
           </Button>

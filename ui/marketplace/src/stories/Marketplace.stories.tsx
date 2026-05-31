@@ -247,10 +247,32 @@ export const ConnectionsPopulated: Story = {
   },
 };
 
+export const ConnectionsPopulatedMobile: Story = {
+  args: {
+    route: '/connections',
+  },
+  parameters: {
+    viewport: {
+      defaultViewport: 'mobile1',
+    },
+  },
+};
+
 export const ConnectionsEmpty: Story = {
   args: {
     route: '/connections',
     connectionsState: { ...baseConnectionsState, items: [] },
+  },
+};
+
+export const AvailableConnectorsMobile: Story = {
+  args: {
+    route: '/connectors',
+  },
+  parameters: {
+    viewport: {
+      defaultViewport: 'mobile1',
+    },
   },
 };
 
