@@ -144,8 +144,6 @@ func TestSubmitForm(t *testing.T) {
 		form := resp.(*iface.ConnectionSetupForm)
 		assert.Equal(t, "region", form.StepId)
 		assert.Equal(t, "Region", form.StepTitle)
-		assert.Equal(t, 1, form.CurrentStep)
-		assert.Equal(t, 2, form.TotalSteps)
 	})
 
 	t.Run("last preconnect step transitions to OAuth2 redirect requires return_to_url", func(t *testing.T) {
@@ -311,8 +309,6 @@ func TestGetCurrentSetupStepResponse(t *testing.T) {
 		form := resp.(*iface.ConnectionSetupForm)
 		assert.Equal(t, "tenant", form.StepId)
 		assert.Equal(t, "Enter Tenant", form.StepTitle)
-		assert.Equal(t, 0, form.CurrentStep)
-		assert.Equal(t, 1, form.TotalSteps)
 	})
 
 	t.Run("returns redirect for OAuth2 authorize step", func(t *testing.T) {

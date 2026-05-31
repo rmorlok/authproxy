@@ -156,7 +156,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
   };
 
   return (
-    <Card sx={{ width: 300, height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Card sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
       <CardHeader
         avatar={
           connector ? (
@@ -216,7 +216,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
       </CardContent>
 
       {canBeDisconnected(connection) && (
-        <CardActions>
+        <CardActions sx={{ alignItems: 'flex-start', flexWrap: 'wrap', gap: 0.5 }}>
           {canReauth && (
             <Button
               size="small"
@@ -224,6 +224,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
               onClick={handleReauthClick}
               color={isUnhealthy ? 'warning' : 'primary'}
               variant={isUnhealthy ? 'contained' : 'text'}
+              sx={{ ml: 0 }}
             >
               Re-authenticate
             </Button>
@@ -233,6 +234,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
               size="small"
               startIcon={<SettingsIcon />}
               onClick={handleReconfigureClick}
+              sx={{ ml: 0 }}
             >
               Reconfigure
             </Button>
@@ -242,6 +244,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
             color="error"
             onClick={handleDisconnectClick}
             disabled={connection.state === ConnectionState.DISCONNECTING}
+            sx={{ ml: 0 }}
           >
             {connection.state === ConnectionState.DISCONNECTING ? 'Disconnecting...' : 'Disconnect'}
           </Button>

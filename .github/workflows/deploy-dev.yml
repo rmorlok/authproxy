@@ -18,6 +18,7 @@ permissions:
   actions: read
   contents: read
   id-token: write
+  issues: write
   packages: read
 
 concurrency:
@@ -357,6 +358,57 @@ jobs:
           done
           echo "Smoke test failed after 60s" >&2
           exit 1
+
+      - name: Post dev environment comment
+        uses: actions/github-script@v7
+        env:
+          DEV_URL: https://${{ steps.env.outputs.hostname }}/
+          RELEASE_NS: ${{ steps.env.outputs.namespace }}
+          IMAGE_TAG: ${{ steps.env.outputs.image_tag }}
+        with:
+          script: |
+            const marker = '<!-- authproxy-dev-environment -->';
+            const issue_number = context.payload.pull_request.number;
+            const { owner, repo } = context.repo;
+            const body = [
+              marker,
+              '## Dev environment is ready',
+              '',
+              '| Item | Value |',
+              '| --- | --- |',
+              `| URL | ${process.env.DEV_URL} |`,
+              `| Namespace | \`${process.env.RELEASE_NS}\` |`,
+              `| Image tag | \`${process.env.IMAGE_TAG}\` |`,
+              '',
+              'This comment is updated after each successful deploy.',
+            ].join('\n');
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+
+            const existing = comments.find((comment) =>
+              comment.user?.type === 'Bot' && comment.body?.includes(marker)
+            );
+
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }
 
       - name: Dump debug info
         if: failure()

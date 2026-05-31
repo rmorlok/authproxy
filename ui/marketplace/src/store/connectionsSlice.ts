@@ -18,8 +18,6 @@ interface FormStep {
     stepId: string;
     stepTitle?: string;
     stepDescription?: string;
-    currentStep: number;
-    totalSteps: number;
     jsonSchema: Record<string, unknown>;
     uiSchema: Record<string, unknown>;
 }
@@ -30,8 +28,6 @@ function formStepFromResponse(response: ConnectionSetupFormResponse): FormStep {
         stepId: response.step_id,
         stepTitle: response.step_title,
         stepDescription: response.step_description,
-        currentStep: response.current_step,
-        totalSteps: response.total_steps,
         jsonSchema: response.json_schema,
         uiSchema: response.ui_schema,
     };
