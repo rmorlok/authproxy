@@ -20,7 +20,9 @@ import {
   selectConnectionsError,
   fetchConnectionsAsync,
   fetchConnectorsAsync,
+  selectConnectors,
   selectConnectorsStatus,
+  selectConnectorsError,
   selectCurrentFormStep,
   selectSubmittingForm,
   selectFormSubmitError,
@@ -34,8 +36,11 @@ import {
   abortConnectionAsync,
   cancelSetupConnectionAsync,
   clearVerifyState,
+  selectInitiatingConnection,
+  initiateConnectionAsync,
 } from '../store';
 import ConnectionCard, { ConnectionCardSkeleton } from './ConnectionCard';
+import ConnectorCard, { ConnectorCardSkeleton } from './ConnectorCard';
 import ConnectionFormStep from './ConnectionFormStep';
 import { AppDispatch } from '../store';
 import { Link, useSearchParams } from 'react-router-dom';
@@ -50,7 +55,10 @@ const ConnectionList: React.FC = () => {
   const connections = useSelector(selectConnections);
   const status = useSelector(selectConnectionsStatus);
   const error = useSelector(selectConnectionsError);
+  const connectors = useSelector(selectConnectors);
   const connectorsStatus = useSelector(selectConnectorsStatus);
+  const connectorsError = useSelector(selectConnectorsError);
+  const isConnecting = useSelector(selectInitiatingConnection);
   const currentFormStep = useSelector(selectCurrentFormStep);
   const isSubmittingForm = useSelector(selectSubmittingForm);
   const formSubmitError = useSelector(selectFormSubmitError);
@@ -147,6 +155,62 @@ const ConnectionList: React.FC = () => {
     });
   }, [dispatch, verifyError]);
 
+  const handleConnect = useCallback((connectorId: string) => {
+    dispatch(initiateConnectionAsync({
+      connectorId,
+      returnToUrl: `${window.location.origin}/connections`,
+    })).then((action) => {
+      if (action.meta.requestStatus === 'fulfilled') {
+        const response = action.payload as any;
+        if (isRedirectResponse(response)) {
+          window.location.href = response.redirect_url;
+        }
+      }
+    });
+  }, [dispatch]);
+
+  const renderConnectorDiscovery = () => {
+    if (connectorsStatus === 'loading' || connectorsStatus === 'idle') {
+      return (
+        <Grid container spacing={4}>
+          {[1, 2, 3, 4].map((i) => (
+            <Grid key={`connector-skeleton-${i}`} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+              <ConnectorCardSkeleton />
+            </Grid>
+          ))}
+        </Grid>
+      );
+    }
+
+    if (connectorsStatus === 'failed') {
+      return <Alert severity="error">{connectorsError}</Alert>;
+    }
+
+    if (connectors.length === 0) {
+      return (
+        <Box sx={{ py: 3 }}>
+          <Typography color="text.secondary">
+            No connectors are available right now.
+          </Typography>
+        </Box>
+      );
+    }
+
+    return (
+      <Grid container spacing={4}>
+        {connectors.map((connector) => (
+          <Grid key={connector.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
+            <ConnectorCard
+              connector={connector}
+              onConnect={handleConnect}
+              isConnecting={isConnecting}
+            />
+          </Grid>
+        ))}
+      </Grid>
+    );
+  };
+
   let content;
 
   if (status === 'loading') {
@@ -163,21 +227,40 @@ const ConnectionList: React.FC = () => {
     content = <Alert severity="error">{error}</Alert>;
   } else if (connections.length === 0) {
     content = (
-      <Box sx={{ textAlign: 'center', py: 4 }}>
-        <Typography variant="h6" color="text.secondary" gutterBottom>
-          No connections yet
-        </Typography>
-        <Button
-          variant="contained"
-          color="primary"
-          startIcon={<AddIcon />}
-          component={Link}
-          to="/connectors"
-          sx={{ mt: 2 }}
+      <>
+        <Box
+          sx={{
+            border: 1,
+            borderColor: 'divider',
+            borderRadius: 2,
+            bgcolor: 'background.paper',
+            mb: 4,
+            p: { xs: 3, sm: 4 },
+          }}
         >
-          Connect an Application
-        </Button>
-      </Box>
+          <Typography variant="h5" component="h2" gutterBottom>
+            Connect your first application
+          </Typography>
+          <Typography color="text.secondary" sx={{ maxWidth: 680 }}>
+            Choose a connector below to create a connection. Once connected, it will appear
+            here for ongoing setup, health, and management.
+          </Typography>
+          {isConnecting && (
+            <Box sx={{ display: 'flex', alignItems: 'center', mt: 3 }}>
+              <CircularProgress size={24} sx={{ mr: 1 }} />
+              <Typography variant="body2" color="text.secondary">
+                Starting connection...
+              </Typography>
+            </Box>
+          )}
+        </Box>
+        <Box>
+          <Typography variant="h6" component="h2" sx={{ mb: 2 }}>
+            Available connectors
+          </Typography>
+          {renderConnectorDiscovery()}
+        </Box>
+      </>
     );
   } else {
     content = (

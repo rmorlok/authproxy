@@ -265,6 +265,26 @@ export const ConnectionsEmpty: Story = {
   },
 };
 
+export const ConnectionsEmptyMobile: Story = {
+  args: {
+    route: '/connections',
+    connectionsState: { ...baseConnectionsState, items: [] },
+  },
+  parameters: {
+    viewport: {
+      defaultViewport: 'mobile1',
+    },
+  },
+};
+
+export const ConnectionsEmptyLoadingConnectors: Story = {
+  args: {
+    route: '/connections',
+    connectorsState: { items: [], status: 'loading', error: null },
+    connectionsState: { ...baseConnectionsState, items: [] },
+  },
+};
+
 export const AvailableConnectorsMobile: Story = {
   args: {
     route: '/connectors',
