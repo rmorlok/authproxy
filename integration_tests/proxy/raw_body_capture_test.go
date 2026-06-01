@@ -57,7 +57,7 @@ func waitForLog(t *testing.T, env *helpers.IntegrationTestEnv, connectionID stri
 	end := time.Now().Add(deadline)
 	for time.Now().Before(end) {
 		page := store.NewListRequestsBuilder().
-			WithConnectionId(connID).
+			ForConnectionId(connID).
 			Limit(5).
 			FetchPage(context.Background())
 		if page.Error == nil && len(page.Results) > 0 {

@@ -186,14 +186,14 @@ func TestRequestEvents_List_FilterByNamespace(t *testing.T) {
 	require.NoError(t, store.StoreRecords(ctx, []*LogRecord{rRoot, rRootA, rRootAB, rRootC}))
 
 	t.Run("exact namespace match", func(t *testing.T) {
-		result := retriever.NewListRequestsBuilder().WithNamespaceMatcher("root.a").FetchPage(ctx)
+		result := retriever.NewListRequestsBuilder().ForNamespaceMatcher("root.a").FetchPage(ctx)
 		require.NoError(t, result.Error)
 		ids := collectIDs(result.Results)
 		require.Equal(t, map[apid.ID]bool{rRootA.RequestId: true}, ids)
 	})
 
 	t.Run("recursive namespace match with .**", func(t *testing.T) {
-		result := retriever.NewListRequestsBuilder().WithNamespaceMatcher("root.**").FetchPage(ctx)
+		result := retriever.NewListRequestsBuilder().ForNamespaceMatcher("root.**").FetchPage(ctx)
 		require.NoError(t, result.Error)
 		ids := collectIDs(result.Results)
 		require.True(t, ids[rRoot.RequestId])
@@ -240,19 +240,19 @@ func TestRequestEvents_List_FilterByScalarFields(t *testing.T) {
 		name  string
 		apply func(b ListRequestBuilder) ListRequestBuilder
 	}{
-		{"correlation_id", func(b ListRequestBuilder) ListRequestBuilder { return b.WithCorrelationId("match") }},
-		{"connection_id", func(b ListRequestBuilder) ListRequestBuilder { return b.WithConnectionId(connId) }},
-		{"connector_id", func(b ListRequestBuilder) ListRequestBuilder { return b.WithConnectorId(connectorId) }},
-		{"connector_version", func(b ListRequestBuilder) ListRequestBuilder { return b.WithConnectorVersion(42) }},
-		{"method", func(b ListRequestBuilder) ListRequestBuilder { return b.WithMethod("POST") }},
-		{"status_code single", func(b ListRequestBuilder) ListRequestBuilder { return b.WithStatusCode(404) }},
-		{"status_code range", func(b ListRequestBuilder) ListRequestBuilder { return b.WithStatusCodeRangeInclusive(400, 499) }},
-		{"path exact", func(b ListRequestBuilder) ListRequestBuilder { return b.WithPath("/wanted") }},
-		{"request_type", func(b ListRequestBuilder) ListRequestBuilder { return b.WithRequestType(httpf.RequestTypeOAuth) }},
+		{"correlation_id", func(b ListRequestBuilder) ListRequestBuilder { return b.ForCorrelationId("match") }},
+		{"connection_id", func(b ListRequestBuilder) ListRequestBuilder { return b.ForConnectionId(connId) }},
+		{"connector_id", func(b ListRequestBuilder) ListRequestBuilder { return b.ForConnectorId(connectorId) }},
+		{"connector_version", func(b ListRequestBuilder) ListRequestBuilder { return b.ForConnectorVersion(42) }},
+		{"method", func(b ListRequestBuilder) ListRequestBuilder { return b.ForMethod("POST") }},
+		{"status_code single", func(b ListRequestBuilder) ListRequestBuilder { return b.ForStatusCode(404) }},
+		{"status_code range", func(b ListRequestBuilder) ListRequestBuilder { return b.ForStatusCodeRangeInclusive(400, 499) }},
+		{"path exact", func(b ListRequestBuilder) ListRequestBuilder { return b.ForPath("/wanted") }},
+		{"request_type", func(b ListRequestBuilder) ListRequestBuilder { return b.ForRequestType(httpf.RequestTypeOAuth) }},
 		{"response_source", func(b ListRequestBuilder) ListRequestBuilder {
-			return b.WithResponseSource(ResponseSourceConnectorRateLimiter)
+			return b.ForResponseSource(ResponseSourceConnectorRateLimiter)
 		}},
-		{"rate_limit_id", func(b ListRequestBuilder) ListRequestBuilder { return b.WithRateLimitId(rateLimitId) }},
+		{"rate_limit_id", func(b ListRequestBuilder) ListRequestBuilder { return b.ForRateLimitId(rateLimitId) }},
 	}
 
 	for _, tc := range cases {
@@ -278,7 +278,7 @@ func TestRequestEvents_List_FilterByTimestampRange(t *testing.T) {
 
 	rangeStart := base.Add(-90 * time.Minute)
 	rangeEnd := base.Add(-30 * time.Minute)
-	result := retriever.NewListRequestsBuilder().WithTimestampRange(rangeStart, rangeEnd).FetchPage(ctx)
+	result := retriever.NewListRequestsBuilder().ForTimestampRange(rangeStart, rangeEnd).FetchPage(ctx)
 	require.NoError(t, result.Error)
 	require.Equal(t, map[apid.ID]bool{mid.RequestId: true}, collectIDs(result.Results))
 }
@@ -295,42 +295,42 @@ func TestRequestEvents_List_LabelSelector(t *testing.T) {
 	require.NoError(t, store.StoreRecords(ctx, []*LogRecord{r1, r2, r3, r4, r5}))
 
 	t.Run("equality", func(t *testing.T) {
-		b, err := retriever.NewListRequestsBuilder().WithLabelSelector("env=prod")
+		b, err := retriever.NewListRequestsBuilder().ForLabelSelector("env=prod")
 		require.NoError(t, err)
 		ids := collectIDs(b.FetchPage(ctx).Results)
 		require.Equal(t, map[apid.ID]bool{r1.RequestId: true, r3.RequestId: true}, ids)
 	})
 
 	t.Run("multiple equalities", func(t *testing.T) {
-		b, err := retriever.NewListRequestsBuilder().WithLabelSelector("env=prod,team=api")
+		b, err := retriever.NewListRequestsBuilder().ForLabelSelector("env=prod,team=api")
 		require.NoError(t, err)
 		ids := collectIDs(b.FetchPage(ctx).Results)
 		require.Equal(t, map[apid.ID]bool{r1.RequestId: true}, ids)
 	})
 
 	t.Run("exists", func(t *testing.T) {
-		b, err := retriever.NewListRequestsBuilder().WithLabelSelector("env")
+		b, err := retriever.NewListRequestsBuilder().ForLabelSelector("env")
 		require.NoError(t, err)
 		ids := collectIDs(b.FetchPage(ctx).Results)
 		require.Equal(t, map[apid.ID]bool{r1.RequestId: true, r2.RequestId: true, r3.RequestId: true}, ids)
 	})
 
 	t.Run("not exists", func(t *testing.T) {
-		b, err := retriever.NewListRequestsBuilder().WithLabelSelector("!env")
+		b, err := retriever.NewListRequestsBuilder().ForLabelSelector("!env")
 		require.NoError(t, err)
 		ids := collectIDs(b.FetchPage(ctx).Results)
 		require.Equal(t, map[apid.ID]bool{r4.RequestId: true, r5.RequestId: true}, ids)
 	})
 
 	t.Run("not equal", func(t *testing.T) {
-		b, err := retriever.NewListRequestsBuilder().WithLabelSelector("env!=prod")
+		b, err := retriever.NewListRequestsBuilder().ForLabelSelector("env!=prod")
 		require.NoError(t, err)
 		ids := collectIDs(b.FetchPage(ctx).Results)
 		require.Equal(t, map[apid.ID]bool{r2.RequestId: true, r4.RequestId: true, r5.RequestId: true}, ids)
 	})
 
 	t.Run("invalid selector", func(t *testing.T) {
-		_, err := retriever.NewListRequestsBuilder().WithLabelSelector("invalid key with spaces=value")
+		_, err := retriever.NewListRequestsBuilder().ForLabelSelector("invalid key with spaces=value")
 		require.Error(t, err)
 	})
 }
@@ -389,7 +389,7 @@ func TestRequestEvents_List_Pagination_CursorRoundTrip(t *testing.T) {
 		}
 	}
 
-	page1 := retriever.NewListRequestsBuilder().Limit(2).WithPath("/page").FetchPage(ctx)
+	page1 := retriever.NewListRequestsBuilder().Limit(2).ForPath("/page").FetchPage(ctx)
 	require.NoError(t, page1.Error)
 	require.True(t, page1.HasMore)
 	require.NotEmpty(t, page1.Cursor)

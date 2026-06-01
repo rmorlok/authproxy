@@ -62,35 +62,35 @@ func (q *ListRequestEventsQuery) ApplyToBuilder(
 	b app_metrics.ListRequestBuilder,
 ) (_ app_metrics.ListRequestBuilder, err error) {
 	if q.Namespace != nil {
-		b = b.WithNamespaceMatcher(*q.Namespace)
+		b = b.ForNamespaceMatcher(*q.Namespace)
 	}
 
 	if q.RequestType != nil {
-		b = b.WithRequestType(httpf.RequestType(*q.RequestType))
+		b = b.ForRequestType(httpf.RequestType(*q.RequestType))
 	}
 
 	if q.CorrelationId != nil {
-		b = b.WithCorrelationId(*q.CorrelationId)
+		b = b.ForCorrelationId(*q.CorrelationId)
 	}
 
 	if q.ConnectionId != nil {
-		b = b.WithConnectionId(*q.ConnectionId)
+		b = b.ForConnectionId(*q.ConnectionId)
 	}
 
 	if q.ConnectorType != nil {
-		b = b.WithConnectorType(*q.ConnectorType)
+		b = b.ForConnectorType(*q.ConnectorType)
 	}
 
 	if q.ConnectorId != nil {
-		b = b.WithConnectorId(*q.ConnectorId)
+		b = b.ForConnectorId(*q.ConnectorId)
 	}
 
 	if q.ConnectorVersion != nil {
-		b = b.WithConnectorVersion(*q.ConnectorVersion)
+		b = b.ForConnectorVersion(*q.ConnectorVersion)
 	}
 
 	if q.Method != nil {
-		b = b.WithMethod(*q.Method)
+		b = b.ForMethod(*q.Method)
 	}
 
 	if q.StatusCode != nil && q.StatusCodeRangeInclusive != nil {
@@ -98,18 +98,18 @@ func (q *ListRequestEventsQuery) ApplyToBuilder(
 	}
 
 	if q.StatusCode != nil {
-		b = b.WithStatusCode(*q.StatusCode)
+		b = b.ForStatusCode(*q.StatusCode)
 	}
 
 	if q.StatusCodeRangeInclusive != nil {
-		b, err = b.WithParsedStatusCodeRange(*q.StatusCodeRangeInclusive)
+		b, err = b.ForParsedStatusCodeRange(*q.StatusCodeRangeInclusive)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	if q.TimestampRange != nil {
-		b, err = b.WithParsedTimestampRange(*q.TimestampRange)
+		b, err = b.ForParsedTimestampRange(*q.TimestampRange)
 		if err != nil {
 			return nil, err
 		}
@@ -120,18 +120,18 @@ func (q *ListRequestEventsQuery) ApplyToBuilder(
 	}
 
 	if q.Path != nil {
-		b = b.WithPath(*q.Path)
+		b = b.ForPath(*q.Path)
 	}
 
 	if q.PathRegex != nil {
-		b, err = b.WithPathRegex(*q.PathRegex)
+		b, err = b.ForPathRegex(*q.PathRegex)
 		if err != nil {
 			return nil, err
 		}
 	}
 
 	if q.LabelSelector != nil {
-		b, err = b.WithLabelSelector(*q.LabelSelector)
+		b, err = b.ForLabelSelector(*q.LabelSelector)
 		if err != nil {
 			return nil, err
 		}
@@ -142,11 +142,11 @@ func (q *ListRequestEventsQuery) ApplyToBuilder(
 		if !app_metrics.IsValidResponseSource(src) {
 			return nil, httperr.BadRequestf("invalid response_source %q", *q.ResponseSource)
 		}
-		b = b.WithResponseSource(src)
+		b = b.ForResponseSource(src)
 	}
 
 	if q.RateLimitId != nil {
-		b = b.WithRateLimitId(*q.RateLimitId)
+		b = b.ForRateLimitId(*q.RateLimitId)
 	}
 
 	return b, nil
@@ -628,7 +628,7 @@ func (r *RequestEventsRoutes) list(gctx *gin.Context) {
 	} else {
 		b := r.rl.NewListRequestsBuilder()
 
-		b = b.WithNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.Namespace))
+		b = b.ForNamespaceMatchers(val.GetEffectiveNamespaceMatchers(req.Namespace))
 
 		b, err = req.ApplyToBuilder(b)
 		if err != nil {
