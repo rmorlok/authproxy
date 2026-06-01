@@ -193,7 +193,16 @@ const ConnectionList: React.FC = () => {
 
   return (
     <Container sx={{ py: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+      <Box
+        sx={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: { xs: 'flex-start', sm: 'center' },
+          flexDirection: { xs: 'column', sm: 'row' },
+          gap: 2,
+          mb: 4,
+        }}
+      >
         <Typography variant="h4" component="h1">
           Your Connections
         </Typography>
