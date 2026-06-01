@@ -70,7 +70,7 @@ func NewRemoteAuthProxy(t *testing.T, opts RemoteAuthProxyOptions) *RemoteAuthPr
 	}
 	providerURL := opts.ProviderURL
 	if providerURL == "" {
-		providerURL = mustDeriveSubdomainURL(t, opts.BaseURL, "oauth2")
+		providerURL = mustDerivePathURL(t, opts.BaseURL, "/oauth2")
 	}
 
 	adminActor := opts.AdminActorExternalID
@@ -259,6 +259,13 @@ func mustDeriveSubdomainURL(t *testing.T, baseURL, subdomain string) string {
 	return derived
 }
 
+func mustDerivePathURL(t *testing.T, baseURL, path string) string {
+	t.Helper()
+	derived, err := derivePathURL(baseURL, path)
+	require.NoError(t, err)
+	return derived
+}
+
 func deriveSubdomainURL(baseURL, subdomain string) (string, error) {
 	u, err := url.Parse(baseURL)
 	if err != nil {
@@ -282,6 +289,22 @@ func deriveSubdomainURL(baseURL, subdomain string) (string, error) {
 		u.Host = host
 	}
 	u.Path = ""
+	u.RawPath = ""
+	u.RawQuery = ""
+	u.Fragment = ""
+	return strings.TrimRight(u.String(), "/"), nil
+}
+
+func derivePathURL(baseURL, path string) (string, error) {
+	u, err := url.Parse(baseURL)
+	if err != nil {
+		return "", err
+	}
+	if u.Scheme == "" || u.Host == "" {
+		return "", fmt.Errorf("base URL must include scheme and host: %q", baseURL)
+	}
+
+	u.Path = "/" + strings.Trim(path, "/")
 	u.RawPath = ""
 	u.RawQuery = ""
 	u.Fragment = ""

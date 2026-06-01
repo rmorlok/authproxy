@@ -1,0 +1,33 @@
+{{- if and .Values.ingress.enabled .Values.global.hostname .Values.goOauth2Server.enabled -}}
+{{/*
+  go-oauth2-server is reachable at https://<hostname>/oauth2 for
+  end-to-end smoke tests. Keep this on the apex host so cert-manager
+  only needs to solve the demo/admin/marketplace hostnames.
+*/}}
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: {{ printf "%s-go-oauth2-server" (include "authproxy-demo.fullname" .) | trunc 63 | trimSuffix "-" }}
+  labels:
+    {{- include "authproxy-demo.labels" . | nindent 4 }}
+    app.kubernetes.io/component: go-oauth2-server
+  annotations:
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    {{- with .Values.ingress.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  ingressClassName: {{ .Values.global.ingressClassName | quote }}
+  rules:
+    - host: {{ .Values.global.hostname | quote }}
+      http:
+        paths:
+          - path: /oauth2(/|$)(.*)
+            pathType: ImplementationSpecific
+            backend:
+              service:
+                name: {{ include "authproxy-demo.goOauth2Server.name" . }}
+                port:
+                  number: 80
+{{- end -}}
