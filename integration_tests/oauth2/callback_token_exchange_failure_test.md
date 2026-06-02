@@ -1,15 +1,16 @@
 # OAuth2 Callback Token-Exchange Rejection Cases
 
 Companion specification for `callback_token_exchange_failure_test.go`.
-Covers the non-retryable token-exchange failure cases of issue #168 — the
-proxy POSTs to the provider's `/token` endpoint, the provider responds
-with a 4xx error or a malformed body, and the proxy must classify the
-failure into a stable category, record `auth_failed` on the connection,
-and emit a single `oauth token exchange failed` event.
+Covers non-retryable token-exchange failures: the proxy POSTs to the
+provider's `/token` endpoint, the provider responds with a 4xx error or
+a malformed body, and the proxy must classify the failure into a stable
+category, record `auth_failed` on the connection, and emit a single
+`oauth token exchange failed` event.
 
-The transient retry/5xx cases are PR C (issue #168 part 3). The state /
-actor / namespace validation cases (which short-circuit *before* the
-token exchange ever runs) live in `callback_state_security_test.go`,
+The transient retry/5xx cases live in
+`callback_token_exchange_retry_test.go`. The state / actor / namespace
+validation cases (which short-circuit *before* the token exchange ever
+runs) live in `callback_state_security_test.go`,
 `callback_actor_mismatch_test.go`, and `callback_namespace_mismatch_test.go`.
 
 ## Threat model
@@ -64,11 +65,11 @@ resp.StatusCode != 200 → classifyTokenEndpointStatus(status, body)
 The classifier (`internal/auth_methods/oauth2/token_exchange_failure.go:136-162`)
 runs the body through a small JSON parse looking for the RFC 6749 §5.2
 `error` field. 5xx is always `provider_5xx` regardless of body (covered
-in PR C). 4xx with a recognized error code dispatches to one of the
+in the transient retry tests). 4xx with a recognized error code dispatches to one of the
 named categories; 4xx with no recognized code becomes
 `provider_4xx_other`.
 
-| Test | Scripted token endpoint response | Expected category | Issue #168 case(s) covered |
+| Test | Scripted token endpoint response | Expected category | Provider condition covered |
 | ---- | -------------------------------- | ----------------- | -------------------------- |
 | `TestTokenExchangeRejection_InvalidGrant` | `400 {"error":"invalid_grant"}` | `invalid_grant` | 1 (code expired), 2 (code reused), 3 (invalid code), 6 (redirect_uri mismatch), 7 (provider invalid_grant) |
 | `TestTokenExchangeRejection_InvalidClient` | `401 {"error":"invalid_client"}` | `invalid_client` | 4 (invalid client_id), 5 (invalid client_secret), 8 (provider invalid_client) |
@@ -90,9 +91,9 @@ failure modes into the single `invalid_grant` error code:
 > or was issued to another client.
 
 Because the proxy classifies on `error=invalid_grant` from the body —
-not on which underlying condition produced it — issue #168's separate
-"code expired", "code reused", "invalid code", and "redirect_uri
-mismatch" cases are observably indistinguishable on the proxy side.
+not on which underlying condition produced it — the separate "code
+expired", "code reused", "invalid code", and "redirect_uri mismatch"
+provider conditions are observably indistinguishable on the proxy side.
 A single scripted test exercises the classification path; reproducing
 each underlying condition against the real test provider would not
 strengthen the assertion (the proxy would see the same body either way)
@@ -106,9 +107,9 @@ into the single `invalid_client` test.
 
 The user-flow leg (Connect → login → consent) is irrelevant to these
 cases — the failure mode is purely server-side at the token endpoint.
-Per the saved guidance on issue #168 ("use the go-oauth2-server
-`/test/*` control plane and short-circuit the authorize step"), each
-test:
+Each test uses the go-oauth2-server `/test/*` control plane to
+materialize a real state, authorization code, and scripted token
+response without booting a browser:
 
 1. Calls `env.InitiateOAuth2Connection(t, …)` to materialize a real
    state envelope in Redis and a real connection row.
@@ -171,7 +172,7 @@ sequenceDiagram
 ## What is *not* covered here
 
 - **5xx / transient failures.** `provider_5xx` is bounded-retry territory
-  and is exercised in PR C (the retry policy + a 5xx-then-success script).
+  and is exercised by the retry policy tests with a 5xx-then-success script.
 - **State validation failures.** Missing/unknown/tampered/replayed state
   is `callback_state_security_test.go`. Cross-actor / cross-namespace
   is `callback_actor_mismatch_test.go` and

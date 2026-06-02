@@ -1,9 +1,9 @@
-# OAuth2 Malformed Callbacks (scenarios 15, 16)
+# OAuth2 Malformed Callbacks
 
-Companion specification for `callback_malformed_test.go`. Covers
-issue #175 — the callback handler must reject callback URLs whose
-query-param shape violates RFC 6749 §4.1.2 (the `code` xor `error`
-contract).
+Companion specification for `callback_malformed_test.go`. The callback
+handler must reject callback URLs whose query-param shape violates RFC
+6749 §4.1.2: an authorization response should contain either `code`
+or `error`, not both, and a successful response must include `code`.
 
 ## Scope
 
@@ -106,11 +106,11 @@ primary alerting axis stable.
 
 ## Property: "code is not exchanged"
 
-Issue #175 names "Authorization code is not exchanged unless
-explicitly allowed" as a verify item. Operationally that property is
+Malformed callbacks must not exchange an authorization code unless the
+callback shape is explicitly allowed. Operationally that property is
 visible as a single observable: **zero POSTs to the provider's
-`/token` endpoint** when the callback is malformed. Both tests pin
-this directly with `provider.Requests(RequestsFilter{Endpoint:
+`/token` endpoint** when the callback is malformed. Both tests pin this
+directly with `provider.Requests(RequestsFilter{Endpoint:
 EndpointToken, ClientID: rig.clientKey})`.
 
 The filter uses `ClientID = rig.clientKey` rather than `Since =
@@ -131,12 +131,12 @@ the same provider container do not appear in the filter result.
 - **Replayed / cross-tenant / unknown state.** Those callback-state
   shapes are covered by `callback_state_security_test.go`,
   `callback_actor_mismatch_test.go`, and
-  `callback_cross_namespace_test.go`. Scenarios 15 and 16 are
-  specifically about the `code`/`error` query-param shape with an
-  otherwise-valid state row.
-- **PKCE on the callback.** PKCE isn't implemented in the proxy yet
-  (issue #174 / scenario 14). When it lands, a separate file should
-  cover missing/wrong `code_verifier` shapes.
+  `callback_cross_namespace_test.go`. This file is specifically about
+  the `code`/`error` query-param shape with an otherwise-valid state
+  row.
+- **PKCE on the callback.** PKCE callback behavior is covered by
+  `pkce_test.go`, which verifies missing and mismatched
+  `code_verifier` shapes through the provider's real PKCE validator.
 - **HTML / non-redirect responses from the authorize endpoint.** Not
   reachable through the proxy — the user's browser interacts with the
   authorize endpoint directly. A hung authorize page is also out of
@@ -148,7 +148,7 @@ the same provider container do not appear in the filter result.
 | --- | --- |
 | User denial via `error=access_denied` (callback carries error, no code) | `user_denial_test.go` — end-to-end through the browser UI. Same category (`provider_denied`), but the trigger is a real user click rather than a forged callback. |
 | Token-endpoint rejection of an exchanged code | `callback_token_exchange_failure_test.go` — covers `invalid_grant`, `invalid_client`, and the rest of RFC 6749 §5.2. Those tests exercise the path *after* the callback shape is accepted; this file exercises rejection *before* the token endpoint is reached. |
-| Malformed *response* from the token endpoint | `callback_token_exchange_malformed_test.go` (scenario 17). Distinct from this file: that one tests broken bodies in the provider's response to a successful POST. This file tests malformed callbacks *to* the proxy, before any POST happens. |
+| Malformed *response* from the token endpoint | `callback_token_exchange_malformed_test.go`. Distinct from this file: that one tests broken bodies in the provider's response to a successful POST. This file tests malformed callbacks *to* the proxy, before any POST happens. |
 | Callback state security (CSRF, replay, cross-tenant) | `callback_state_security_test.go` and friends. Orthogonal — those tests vary the `state` row; this file varies the `code`/`error` query params with a valid state. |
 
 ## Components
@@ -159,5 +159,5 @@ the same provider container do not appear in the filter result.
 | `env.ForgeOAuth2CallbackURL(state, "")` | Builds the missing-code callback URL. Existing helper; passing `code=""` already produces `?state=<id>` with no code parameter. |
 | `forgeCallbackURLWithErrorAndCode(env, state, code, errCode, errDescription)` | New helper local to this file — covers the code-plus-error shape that `ForgeOAuth2CallbackURL` can't emit. |
 | `env.DeliverOAuth2Callback(t, url)` | Drives the in-process callback delivery; reused unchanged. |
-| `provider.Requests(RequestsFilter{Endpoint: EndpointToken, ClientID: rig.clientKey})` | Counts `/token` POSTs scoped to this rig's client key. The zero-length assertion is the property `#175` is fundamentally about. |
+| `provider.Requests(RequestsFilter{Endpoint: EndpointToken, ClientID: rig.clientKey})` | Counts `/token` POSTs scoped to this rig's client key. The zero-length assertion proves malformed callbacks are rejected before token exchange. |
 | `tokenExchangeProviderDenied = "provider_denied"`, `tokenExchangeMissingCode = "missing_code"` | Category strings pinned by the tests. Defined in `internal/auth_methods/oauth2/token_exchange_failure.go:22, 25`. |

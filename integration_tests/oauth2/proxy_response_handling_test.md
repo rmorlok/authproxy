@@ -1,7 +1,7 @@
 # Proxy API Response Handling
 
 Companion notes for `proxy_response_handling_test.go`.
-Covers issue #179 / scenarios 20-24 from #159.
+Covers proxied upstream response handling for successful responses, auth failures, permission failures, rate limits, and server errors.
 
 ## Scope
 
@@ -32,8 +32,8 @@ resource requests authenticate with Bearer tokens, not client credentials.
 
 ## Observability
 
-The proxy orchestrator emits stable structured events for the classifications
-called out in #179:
+The proxy orchestrator emits stable structured events for the upstream response
+classifications:
 
 - `proxy upstream retry attempted`
 - `proxy upstream auth failure`

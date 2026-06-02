@@ -1,15 +1,16 @@
 # OAuth2 Callback State Security — Direct-HTTP Cases
 
 Companion specification for `callback_state_security_test.go`. Covers
-the four direct-HTTP rejection scenarios from #167:
+the direct-HTTP callback rejection cases:
 
 1. Missing `state`.
 2. Unknown `state`.
 3. Tampered `state` (Redis value mutated outside the proxy).
 4. Replayed `state` (state already consumed by a prior successful callback).
 
-The cross-actor case (5) lives in a separate chromedp-driven test
-(#PR 4); the cross-tenant + cross-connection cases (6–7) are PR 5.
+The cross-actor case lives in `callback_actor_mismatch_test.go`. The
+cross-tenant and cross-connection cases live in
+`callback_cross_namespace_test.go`.
 
 ## Why direct HTTP, not chromedp
 
@@ -42,8 +43,9 @@ For every case:
 - **Suspicious callback is logged.** A single `oauth callback rejected`
   slog event is emitted with the expected `category` and no sensitive
   values (no raw `state` parameter for the malformed cases, no
-  ciphertext for the tampered case). The category comes from PR 1
-  (#214).
+  ciphertext for the tampered case). The category is emitted by the
+  callback rejection classifier and is the stable operator-facing
+  signal.
 - **No /token call.** The OAuth provider's `/token` endpoint observes
   zero requests during the rejection — proves the token exchange path
   was short-circuited.
@@ -120,4 +122,4 @@ reason — go-oauth2-server persists clients/users across runs.
 
 PKCE and provider-side `error=...` codes belong to the auth-failure
 path (`HandleAuthFailed`), not to state validation. Those are covered
-by `user_denial_test.go` and the future PKCE test, not here.
+by `user_denial_test.go` and `pkce_test.go`, not here.

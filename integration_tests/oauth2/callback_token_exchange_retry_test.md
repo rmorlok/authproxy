@@ -1,11 +1,11 @@
 # OAuth2 Callback Token-Exchange Retry / 5xx Cases
 
 Companion specification for `callback_token_exchange_retry_test.go`.
-Covers the transient retry leg of issue #168 — the proxy POSTs to the
+Covers transient token-exchange retry behavior: the proxy POSTs to the
 provider's `/token` endpoint, the provider responds with a 5xx, and the
 proxy retries up to a small bounded budget before either succeeding or
 giving up. The non-retryable rejection cases (4xx + malformed 200) live
-in `callback_token_exchange_failure_test.go` (PR B).
+in `callback_token_exchange_failure_test.go`.
 
 ## What the retry policy is, and why
 
@@ -61,17 +61,17 @@ For every retry case:
 - **`attempts` field on the failure event records exhaustion.** Set to
   `tokenExchangeMaxAttempts` on the exhausted-retry path so dashboards
   can distinguish "we tried 3 times and gave up" from a single
-  non-retryable failure. The PR B 4xx tests don't pin the field — it's
-  populated there too, but the assertion belongs in PR C where the
-  value is the point of the test.
+  non-retryable failure. The non-retryable 4xx tests do not pin the
+  field — it is populated there too, but the assertion belongs here
+  where the exhausted retry budget is the point of the test.
 - **302 to `return_to_url?setup=pending&connection_id=<id>` even on
-  exhaustion.** Same as the PR B failure path — the user must land
+  exhaustion.** Same as the permanent failure path — the user must land
   somewhere recoverable, the marketplace UI re-renders the connection
   in `auth_failed`, and the user can retry/cancel.
 
 ## Test plan
 
-| Test | Scripted token endpoint response | Expected outcome | Issue #168 case(s) covered |
+| Test | Scripted token endpoint response | Expected outcome | Retry behavior covered |
 | ---- | -------------------------------- | ---------------- | -------------------------- |
 | `TestTokenExchange_TransientRetrySucceeds` | `503 {"error":"temporarily_unavailable"}` × 2, then default success | `state=ready`, token persisted, **3** `/token` calls, **no** failure event | Transient outage that resolves within budget |
 | `TestTokenExchange_TransientRetryExhausted` | `503 {"error":"temporarily_unavailable"}` × 10 (only first 3 consumed) | `state=created`, `setup_step=auth_failed`, **3** `/token` calls, single failure event with `category=provider_5xx`, `attempts=3`, `provider_status_code=503` | Sustained 5xx outage exceeding budget |
@@ -95,9 +95,10 @@ confusing error.
 
 ## Why direct HTTP, not chromedp
 
-Same rationale as PR B: the user-flow leg (Connect → login → consent)
-is irrelevant to these cases — the failure mode is purely server-side
-at the token endpoint. Each test:
+Same rationale as the non-retryable token-exchange tests: the
+user-flow leg (Connect → login → consent) is irrelevant to these cases
+— the failure mode is purely server-side at the token endpoint. Each
+test:
 
 1. Calls `env.InitiateOAuth2Connection(t, …)` to materialize a real
    state envelope in Redis and a real connection row.
@@ -124,8 +125,8 @@ at the token endpoint. Each test:
   reproducing a cancellation between two specific attempts from the
   integration boundary requires a pre-orchestrated race; the helper's
   behavior is asserted by unit tests instead.
-- **Non-retryable 4xx and malformed 200 responses.** PR B
-  (`callback_token_exchange_failure_test.go`).
+- **Non-retryable 4xx and malformed 200 responses.**
+  `callback_token_exchange_failure_test.go`.
 
 ## Components
 

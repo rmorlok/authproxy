@@ -1,8 +1,8 @@
-# PKCE validation (issue #174, scenario 14)
+# PKCE Validation
 
 ## What this verifies
 
-The OAuth2 PKCE machinery added in #335 wires three pieces together:
+The OAuth2 PKCE machinery wires three pieces together:
 
 1. The authorize URL builder (`internal/auth_methods/oauth2/auth_url.go:96-113`)
    emits `code_challenge` and `code_challenge_method` when the connector
@@ -25,19 +25,19 @@ proxy persists hashes to, that the persisted verifier actually rides on
 the token exchange POST, and that the proxy fails the connection cleanly
 when the provider rejects PKCE.
 
-## Issue spec mapping
+## Coverage matrix
 
-Issue #174 lists four cases and three verifies. The mapping to this file's
-tests:
+The PKCE integration coverage maps the important success and failure
+cases to concrete tests:
 
-| #174 case                          | Covered by                                              |
+| PKCE case                           | Covered by                                              |
 |------------------------------------|---------------------------------------------------------|
 | Valid `code_verifier`              | `TestPKCE_HappyPath_S256`                               |
 | Missing `code_verifier`            | `TestPKCE_TokenExchangeRejected/MissingVerifier`        |
 | Invalid `code_verifier`            | `TestPKCE_TokenExchangeRejected/MismatchedVerifier`     |
 | Unsupported `code_challenge_method` | Unit tests in `internal/auth_methods/oauth2/pkce_test.go` (`TestAuthOAuth2_Validate_RejectsUnknownPKCEMethod`) — schema validator rejects at config load, so the bad value never reaches an integration test. Calling it out here so the audit trail is complete. |
 
-| #174 verify                          | Covered by                                              |
+| Verification point                   | Covered by                                              |
 |--------------------------------------|---------------------------------------------------------|
 | Valid PKCE succeeds                  | `TestPKCE_HappyPath_S256`                               |
 | Invalid PKCE fails token exchange    | Both `TestPKCE_TokenExchangeRejected` subtests          |
@@ -54,8 +54,8 @@ would experience it.
   refuses any authorize that arrives without `code_challenge`, so a green
   flow is a positive signal that the proxy is emitting the challenge.
 - Connector with `pkce: {method: S256}`.
-- chromedp + marketplace + provider UI (per the issue's "test approach"
-  comment and the `feedback_oauth_flow_tests_use_real_ui` memory).
+- chromedp + marketplace + provider UI for the user-facing
+  authorization leg.
 
 **Assertions:**
 1. Connection landed in `ready`. Token row persisted with non-empty
@@ -75,9 +75,10 @@ would experience it.
    is pinned end to end in Test 2 (see "Pre-callback PKCE assertion"
    below).
 
-**Why chromedp over the in-process driver:** the issue explicitly calls
-for it, and #174's #scenario-comment notes that the `/test/authorize`
-shortcut would skip the user-driven leg under test. The happy-path
+**Why chromedp over the in-process driver:** the happy path is the
+user-driven authorization leg under test. The `/test/authorize`
+shortcut would mint a code without exercising the marketplace redirect,
+provider login, consent, and browser callback chain. The happy-path
 verification depends on the same code that runs in production redirect
 chains, not a hand-rolled callback delivery.
 
@@ -128,7 +129,7 @@ and state persistence would surface here.
 
 **Per-subtest assertions:**
 1. Callback redirects to `return_to_url?connection_id=<id>&setup=pending`.
-   This matches the scenario 7 (`callback_token_exchange_failure_test.go`)
+   This matches the token-exchange failure path in `callback_token_exchange_failure_test.go`
    shape: a token-exchange failure during setup is a setup failure, and
    the marketplace UI's reconnect prompt fires on the `setup=pending`
    annotation. It does *not* redirect to `error_pages.internal_error`
@@ -156,8 +157,8 @@ and state persistence would surface here.
    provider would have accepted it, and all the failure-path
    assertions above would have failed differently.
 
-**Why not just script `invalid_grant`:** scenario 7
-(`callback_token_exchange_failure_test.go`) already covers "provider
+**Why not just script `invalid_grant`:**
+`callback_token_exchange_failure_test.go` already covers "provider
 returns invalid_grant → connection lands in auth_failed". Pointing the
 PKCE test at a scripted response would duplicate that coverage without
 exercising any PKCE-specific code. The state-mutation approach forces

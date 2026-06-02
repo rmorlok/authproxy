@@ -21,7 +21,7 @@ The proxy must:
 3. Treat **missing optional** scopes as a soft failure: the connection
    goes ready and the divergence is exposed via the `/scopes` endpoint
    so callers can decide which features to expose. (A future
-   capabilities system, #209, will surface this to downstream systems
+   capabilities system will surface this to downstream systems
    directly.)
 4. Treat **extra granted** scopes as informational: log them, store the
    granted set verbatim, no blocking.
@@ -48,9 +48,9 @@ The file contains five flow tests (one per scope-shape case):
 The connector declarations use scope names like `write` and `admin`
 that are not in the provider's default seeded scopes table. The
 `provider.CreateClient(Scope: …)` call in the test setup registers
-each requested scope with the provider's `oauth_scopes` table (added
-in go-oauth2-server #44), so the provider's login handler accepts the
-authorize request and renders the consent page.
+each requested scope with the provider's `oauth_scopes` table, so the
+provider's login handler accepts the authorize request and renders the
+consent page.
 
 For the success cases, each test additionally hits
 `GET /api/v1/connections/{id}/scopes` over the real HTTP server and
@@ -123,10 +123,8 @@ sequenceDiagram
 
 ## Why chromedp + provider scripts
 
-This is an OAuth flow scenario, so per the
-[chromedp vs `/test/*` convention](https://github.com/rmorlok/authproxy/issues/159#issuecomment-4361428298)
-adopted across the test suite, we drive the consent leg through the real
-marketplace + provider UI. The user-facing interaction (click Allow) is
+This is an OAuth flow scenario, so we drive the consent leg through the
+real marketplace + provider UI. The user-facing interaction (click Allow) is
 identical to the happy path in `standard_flow_test.go`; what varies is
 purely server-side — what the token endpoint returns. We control that
 via `provider.Script(EndpointToken, ScriptAction{ScopeOverride: …})`,

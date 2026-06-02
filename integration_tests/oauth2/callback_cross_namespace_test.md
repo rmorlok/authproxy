@@ -1,13 +1,14 @@
 # OAuth2 Callback State Security — Cross-Namespace Cases
 
 Companion specification for `callback_cross_namespace_test.go` and
-`callback_namespace_mismatch_test.go`. Together they cover cases 6–7 of
-issue #167 — state validation when the calling actor and the state
-envelope disagree on namespace, and when the state envelope and the
-referenced connection disagree on namespace.
+`callback_namespace_mismatch_test.go`. Together they cover namespace-bound
+state validation: rejecting callbacks when the calling actor and the state
+envelope disagree on namespace, and rejecting callbacks when the state
+envelope and the referenced connection disagree on namespace.
 
-The four direct-HTTP cases (1–4) live in `callback_state_security_test.go`.
-The cross-actor case (5) lives in `callback_actor_mismatch_test.go`.
+The direct-HTTP callback-shape and state-envelope rejection cases live
+in `callback_state_security_test.go`. The cross-actor defense lives in
+`callback_actor_mismatch_test.go`.
 
 ## Threat model
 

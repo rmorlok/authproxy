@@ -1,8 +1,8 @@
-# OAuth2 Malformed Token Responses (scenario 17)
+# OAuth2 Malformed Token Responses
 
 Companion specification for `callback_token_exchange_malformed_test.go`.
-Covers issue #176 scenario 17 — the provider returns 200 with a
-malformed or incomplete token-response body and the proxy must:
+Covers the case where the provider returns 200 with a malformed or
+semantically incomplete token-response body and the proxy must:
 
 1. Fail safely (no partial credentials persisted).
 2. Not overwrite existing valid credentials.
@@ -14,12 +14,13 @@ The same shape of bug applies to the refresh leg (which reuses
 `createDbTokenFromResponse`); refresh-side coverage lives in
 `proxy_refresh_failure_test.go` and is cross-referenced below.
 
-## The twelve sub-cases
+## Malformed-response matrix
 
-Issue #176 lists twelve malformed shapes. Three are currently rejected
-by the proxy; nine are currently accepted. Both groups are tested in
-this file — the accepted group as a regression guard so that a future
-shift in validation (in either direction) is observable.
+The matrix includes twelve malformed or edge-case token-response
+shapes. Three are currently rejected by the proxy; nine are currently
+accepted. Both groups are tested in this file — the accepted group as a
+regression guard so that a future shift in validation (in either
+direction) is observable.
 
 ### Rejected as `malformed_response` (3)
 
@@ -65,18 +66,17 @@ For the spec-violating rows (every row except `MissingScope`), the
 assertion `GetOAuth2Token != nil` is the **regression guard**: when
 validation is added later, that assertion fails and the case moves into
 `TestTokenExchangeMalformed_FailsSafely`. Each row carries a `note`
-explaining why the proxy accepts it today so a reviewer of a future
-validation PR knows what the gap was.
+explaining why the proxy accepts it today so a reviewer of future
+validation work knows what the gap was.
 
-## Why a separate "currently accepted" test instead of follow-up bugs
+## Why a separate "currently accepted" test
 
-Splitting the gap cases off into separate follow-up issues without a
-test would leave the failure mode silent — the proxy's behaviour would
-remain undocumented until someone exercises one of the shapes in a
-production incident. Documenting the gaps as passing tests captures the
-observed behaviour at the time of writing, makes the gap visible in the
-test suite, and turns "we now validate `token_type`" into a single
-diff-able assertion update.
+Leaving the gap cases outside this file would make the failure mode
+silent — the proxy's behaviour would remain undocumented until someone
+exercises one of the shapes in a production incident. Documenting the
+gaps as passing tests captures the observed behaviour at the time of
+writing, makes the gap visible in the test suite, and turns "we now
+validate `token_type`" into a single diff-able assertion update.
 
 When the proxy's validation surface is expanded, the workflow is:
 
@@ -88,17 +88,18 @@ When the proxy's validation surface is expanded, the workflow is:
    `malformed_response`.
 
 This is the same pattern `proxy_refresh_failure_test.go` uses for
-`NoAccessTokenInResponse` (folded into `malformed_response` despite the
-RFC arguably wanting a distinct category) — see issue #189 for the
-related discussion.
+`NoAccessTokenInResponse`: a success response without a usable access
+token is folded into `malformed_response` because the proxy has no
+credential it can safely use, and the refresh path must mark the
+connection unhealthy instead of entering a reconnect loop.
 
 ## Property 2: "existing valid credentials are not overwritten"
 
-Issue #176 lists this as a separate verify item. The exchange path
-runs at initial connect — there is no prior token row to overwrite, so
-the property is vacuously satisfied here. The load-bearing version of
-this property lives on the **refresh** path, where a prior token row
-exists when the failing refresh occurs.
+Malformed responses must not overwrite existing valid credentials. The
+exchange path runs at initial connect — there is no prior token row to
+overwrite, so the property is vacuously satisfied here. The
+load-bearing version of this property lives on the **refresh** path,
+where a prior token row exists when the failing refresh occurs.
 
 That refresh-side property is already covered by
 `proxy_refresh_failure_test.go`'s `MalformedResponse` and
@@ -125,13 +126,13 @@ coverage; the cross-reference here is the documentation.
   surface in either suite.
 - **Bytes-on-the-wire integrity.** This test scripts the response
   body; it does not exercise the connection-drop / partial-write
-  surface. Transport-level failure modes are scenario 18's territory
-  (`#177`).
+  surface. Transport-level failure modes are covered in the provider
+  timeout tests.
 - **Provider returning 4xx with malformed JSON body.** Already covered
   by `TestTokenExchangeRejection_Provider4xxOther` — when the status
   is 4xx the body shape is irrelevant to classification, the category
   is the status-bucket.
-- **Time-overflow expires_in.** Issue #176 calls out "extremely long
+- **Time-overflow expires_in.** The matrix calls out "extremely long
   expiry" but does not specify a numeric extreme. `LongExpiry` uses 50
   years (well within `time.Duration` range); the int64-overflow case
   would produce non-deterministic wraparound and is left for a

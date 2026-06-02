@@ -1,18 +1,17 @@
-# OAuth2 Refresh Transient Retry (scenario 8)
+# OAuth2 Refresh Transient Retry
 
 Companion specification for `proxy_refresh_retry_test.go`. Covers
-issue #170 scenario 8 — the *transient* refresh failure cases that
-exercise the bounded retry policy in `postRefreshWithRetry` (#276).
+the *transient* refresh failure cases that exercise the bounded retry
+policy in `postRefreshWithRetry`.
 
-The permanent failure cases (scenario 7) are PR B and live in
-`proxy_refresh_failure_test.go`. The retry policy itself (constants and
+The permanent failure cases live in `proxy_refresh_failure_test.go`. The retry policy itself (constants and
 loop shape) lives in `internal/auth_methods/oauth2/proxy.go` and is
 unit-tested in `proxy_test.go`; this file pins the end-to-end observable
 shape via real provider scripts.
 
 ## Retry policy under test
 
-Mirrors the token-exchange retry policy in PR A (#276):
+Mirrors the token-exchange retry policy:
 
 | Setting                       | Value (production)                |
 | ----------------------------- | --------------------------------- |
@@ -59,13 +58,13 @@ For every case:
   single non-retryable failures and is the central reason this file
   exists.
 
-### Health-flip asymmetry with scenario 7
+### Health-Flip Asymmetry With Permanent Failures
 
 `provider_5xx` is *transient* — `IsPermanent()` returns false for it —
 so retry-budget exhaustion must NOT flip the connection unhealthy. The
 next proxy call gets another chance.
 
-This is the load-bearing asymmetry with scenario 7, where every
+This is the load-bearing asymmetry with permanent refresh failures, where every
 permanent category (`invalid_grant`, `invalid_client`,
 `provider_4xx_other`, `malformed_response`, `no_refresh_token`) flips
 health on the first failure. A regression that reclassified 5xx as
@@ -88,7 +87,7 @@ the next refresh attempt's input state — this catches it.
 
 ## Why direct DB forge + scripts, not real TTLs
 
-Same reasoning as scenario 7 (`proxy_refresh_failure_test.md`): the
+Same reasoning as the permanent refresh-failure tests (`proxy_refresh_failure_test.md`): the
 failure point under test is purely at the refresh endpoint. The
 go-oauth2-server test provider's `/test/scripts` queue mints arbitrary
 refresh-endpoint responses without booting a browser, and
@@ -153,7 +152,7 @@ sequenceDiagram
 
 - **Permanent failure categories** (`invalid_grant`, `invalid_client`,
   `provider_4xx_other`, `malformed_response`, `no_refresh_token`).
-  Scenario 7 — see `proxy_refresh_failure_test.md`.
+  See `proxy_refresh_failure_test.md`.
 - **Per-attempt log line schema.** The retry-warn line carries
   `attempt`, `max_attempts`, and `provider_status_code` / `error` fields;
   the field-level shape is pinned by the unit tests in
@@ -174,7 +173,7 @@ sequenceDiagram
 
 | Lever                                                       | What it controls |
 | ----------------------------------------------------------- | ---------------- |
-| `proxyRefreshRig` + `completeAuthFlow` / `forceTokenExpired` | Same fixture used by scenarios 6, 7, and 13. Drives the standard auth flow to Ready, then advances the access-token expiry into the past via a DB-level forge so the proxy's expiry check fires immediately. |
+| `proxyRefreshRig` + `completeAuthFlow` / `forceTokenExpired` | Shared refresh fixture. Drives the standard auth flow to Ready, then advances the access-token expiry into the past via a DB-level forge so the proxy's expiry check fires immediately. |
 | `provider.Script(clientKey, EndpointRefresh, ScriptAction{Status:5xx, FailCount:N})` | Enqueue N scripted 5xx responses; subsequent calls fall through to the provider's default refresh-token grant. `FailCount=10` outlasts the retry budget for the exhaustion case. |
 | `env.DoProxyRequest(...)`                                   | Triggers the expired-token → refresh path in-process. The retry loop is driven entirely server-side; the test never has to wait for real TTLs. |
 | `rig.refreshCallCount()`                                    | Counts `grant_type=refresh_token` POSTs the provider has observed for this client. Filtered to exclude the authorization-code POSTs from the auth-flow leg. |

@@ -1,14 +1,12 @@
-# OAuth2 Concurrent Refresh Safety (scenario 10)
+# OAuth2 Concurrent Refresh Safety
 
 Companion specification for `proxy_refresh_concurrent_test.go`. Covers
-issue #171 scenario 10 — the serialization property that protects the
-refresh path when N proxy requests detect an expired access token at
-the same time.
+the serialization property that protects the refresh path when N proxy
+requests detect an expired access token at the same time.
 
-Scenario 9 (rotation) is PR A and lives in `proxy_refresh_rotation_test.go`
-/ `proxy_refresh_rotation_test.md`. The two scenarios are paired in
-issue #171 because rotation correctness is the property the
-concurrency test exercises end-to-end: the test provider's default
+Refresh-token rotation lives in `proxy_refresh_rotation_test.go` /
+`proxy_refresh_rotation_test.md`. Rotation correctness is the property
+the concurrency test exercises end-to-end: the test provider's default
 revocation-on-rotation behavior turns "loser POSTed a stale RT" into
 an observable 400 invalid_grant failure event.
 
@@ -74,8 +72,8 @@ the *real* refresh handler. This gives us two properties at once:
   access_token is a valid bearer credential at `/echo`. A scripted
   body would mint a synthetic access_token that `/echo` would 401,
   triggering the proxy's `retry-once-after-refresh` path in
-  `ProxyRequest` and double-counting refresh POSTs. PR A documented
-  that trap for the rotation tests; the same reasoning applies here.
+  `ProxyRequest` and double-counting refresh POSTs. The rotation tests
+  avoid synthetic access tokens for the same reason.
 
 The script action is consumed only by the *first* request that reaches
 the script middleware (the queue is FIFO and `Pop` is mutex-protected).
@@ -173,7 +171,7 @@ sequenceDiagram
 
 | Lever                                                              | What it controls |
 | ------------------------------------------------------------------ | ---------------- |
-| `proxyRefreshRig` + `completeAuthFlow` / `forceTokenExpired`       | Same fixture used by scenarios 6, 7, 8, 9, 13. Drives the standard auth flow to Ready, then advances the access-token expiry into the past via a DB-level forge. |
+| `proxyRefreshRig` + `completeAuthFlow` / `forceTokenExpired`       | Shared refresh fixture. Drives the standard auth flow to Ready, then advances the access-token expiry into the past via a DB-level forge. |
 | `provider.Script(clientKey, EndpointRefresh, ScriptAction{DelayMs: 500})` | Delay-only action. The script middleware sleeps the configured duration and then falls through to the real refresh handler, preserving real-grant semantics (so the new access_token is a valid bearer at `/echo`). |
 | `close(start)` barrier + `sync.WaitGroup`                          | Releases all N goroutines simultaneously so they hit the expired-token check inside `getValidToken` in a single tight window. |
 | `env.DoProxyRequest(...)` × N                                      | Concurrent proxy calls that all observe the same expired token and contend for the same redis mutex. |
