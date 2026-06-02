@@ -6,7 +6,7 @@ in-cluster components every downstream workload depends on:
 | Component       | Role                                                        |
 |-----------------|-------------------------------------------------------------|
 | ingress-nginx   | HTTP/HTTPS entry point, fronted by an AWS NLB               |
-| cert-manager    | Automatic TLS issuance (Let's Encrypt prod, HTTP-01)        |
+| cert-manager    | Automatic TLS issuance (Let's Encrypt prod, HTTP-01 or DNS-01) |
 | external-dns    | Reconciles Ingress hosts → Route53 A records                |
 | metrics-server  | Resource metrics for HPA + `kubectl top`                    |
 | ClusterIssuer   | Let's Encrypt prod issuer named `letsencrypt-prod`          |
@@ -68,6 +68,32 @@ install until the main release's pods are Ready. Without it, the first
 install commonly trips a "no endpoints available for service
 …cert-manager-webhook" race.
 
+### Route53 DNS-01 issuer for wildcard TLS
+
+Wildcard certificates require DNS-01. To make `*.branch.dev.authproxy.net`
+work without HTTP-01 challenge pods, upgrade the bootstrap release with a
+Route53-backed issuer:
+
+```bash
+helm upgrade authproxy-bootstrap . \
+  --namespace kube-system \
+  --wait --timeout 5m \
+  --reuse-values \
+  --set "clusterIssuer.name=letsencrypt-prod-dns01" \
+  --set "clusterIssuer.solver=route53" \
+  --set "clusterIssuer.route53.region=us-east-1" \
+  --set "clusterIssuer.route53.hostedZoneId=$(cd ../../terraform/eks && terraform output -raw route53_zone_id)" \
+  --set "clusterIssuer.route53.dnsZones[0]=$(cd ../../terraform/eks && terraform output -raw domain_name)"
+```
+
+cert-manager also needs Route53 change permissions. The simplest path is
+to annotate the cert-manager controller ServiceAccount with an IRSA role
+that can call `route53:GetChange`, `route53:ChangeResourceRecordSets`,
+and `route53:ListResourceRecordSets` on the hosted zone, plus
+`route53:ListHostedZonesByName`. If you do not wire IRSA, cert-manager
+will create Certificate resources but DNS-01 challenges will stay
+pending.
+
 The post-install NOTES print a verification checklist; follow them in
 order.
 
@@ -86,6 +112,12 @@ kubectl get clusterissuer letsencrypt-prod -o wide
 
 `READY=True` once cert-manager has registered with Let's Encrypt (~10-30s
 after the post-install hook fires).
+
+For the DNS-01 issuer, use:
+
+```bash
+kubectl get clusterissuer letsencrypt-prod-dns01 -o wide
+```
 
 ## Smoke test — DNS + TLS round-trip
 

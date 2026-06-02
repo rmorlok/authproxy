@@ -73,6 +73,10 @@ ingress:
   annotations: {}
   # -- TLS handled by cert-manager via the cluster-issuer annotation.
   tls: true
+  # -- Request `<hostname>` plus `*.<hostname>` in the TLS secret instead
+  # of listing each subdomain. Requires a DNS-01 issuer; HTTP-01 cannot
+  # issue wildcard certificates.
+  wildcardSubdomains: false
 
 grafanaAuthProxy:
   # -- Render the AuthProxy datasource and dashboard provisioning ConfigMaps
