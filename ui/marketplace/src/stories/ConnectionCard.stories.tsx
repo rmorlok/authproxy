@@ -83,6 +83,18 @@ export const Connected: Story = {
   },
 };
 
+export const ConnectedConfigurable: Story = {
+  args: {
+    connection: {
+      ...mockConnection,
+      connector: {
+        ...mockConnection.connector,
+        has_configure: true,
+      },
+    },
+  },
+};
+
 export const Unhealthy: Story = {
   args: {
     connection: {

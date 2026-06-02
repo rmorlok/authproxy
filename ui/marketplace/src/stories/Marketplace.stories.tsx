@@ -272,6 +272,19 @@ export const ConnectionsNeedsAttention: Story = {
   },
 };
 
+export const ConnectionsHealthyActions: Story = {
+  args: {
+    route: '/connections',
+    connectionsState: {
+      ...baseConnectionsState,
+      items: [
+        connectionFor(connectors[2]),
+        connectionFor(connectors[0]),
+      ],
+    },
+  },
+};
+
 export const ConnectionsEmpty: Story = {
   args: {
     route: '/connections',

@@ -15,6 +15,10 @@ import {
   DialogContent,
   DialogContentText,
   DialogTitle,
+  IconButton,
+  ListItemIcon,
+  Menu,
+  MenuItem,
 } from '@mui/material';
 import { alpha } from '@mui/material/styles';
 import {tasks, Connection, ConnectionState, ConnectionHealthState, canBeDisconnected, isRedirectResponse, PollForTaskResult, DisconnectResponseJson} from '@authproxy/api';
@@ -28,6 +32,8 @@ import {
 import SettingsIcon from '@mui/icons-material/Settings';
 import RefreshIcon from '@mui/icons-material/Refresh';
 import WarningAmberIcon from '@mui/icons-material/WarningAmber';
+import MoreVertIcon from '@mui/icons-material/MoreVert';
+import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 interface ConnectionCardProps {
@@ -54,6 +60,8 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
 
   // State for confirmation dialog
   const [openDialog, setOpenDialog] = useState(false);
+  const [actionsAnchorEl, setActionsAnchorEl] = useState<null | HTMLElement>(null);
+  const actionsMenuOpen = Boolean(actionsAnchorEl);
 
   // Format the date
   const createdDate = new Date(connection.created_at).toLocaleDateString();
@@ -86,6 +94,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
   // (form or redirect) — the store's setup-flow handling renders the form
   // dialog; OAuth2 redirects are followed in-page.
   const handleReauthClick = () => {
+    handleActionsMenuClose();
     dispatch(reauthConnectionAsync({
       connectionId: connection.id,
       returnToUrl: window.location.href,
@@ -106,9 +115,22 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
   const isUnhealthy =
     connection.state === ConnectionState.CONFIGURED &&
     connection.health_state === ConnectionHealthState.UNHEALTHY;
+  const isHealthyConfigured =
+    connection.state === ConnectionState.CONFIGURED &&
+    !isUnhealthy;
+  const canReconfigure = connection.state === ConnectionState.CONFIGURED && connector?.has_configure;
+
+  const handleActionsMenuOpen = (event: React.MouseEvent<HTMLElement>) => {
+    setActionsAnchorEl(event.currentTarget);
+  };
+
+  const handleActionsMenuClose = () => {
+    setActionsAnchorEl(null);
+  };
 
   // Handle disconnect button click
   const handleDisconnectClick = () => {
+    handleActionsMenuClose();
     setOpenDialog(true);
   };
 
@@ -271,28 +293,16 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
         <CardActions
           sx={{
             alignItems: 'flex-start',
-            flexDirection: 'column',
+            flexDirection: isHealthyConfigured ? 'row' : 'column',
             flexWrap: 'wrap',
+            justifyContent: isHealthyConfigured ? 'space-between' : 'flex-start',
             gap: 0.5,
             '& .MuiButton-root': {
               ml: '0 !important',
             },
           }}
         >
-          {canReauth && (
-            <Button
-              size={isUnhealthy ? 'medium' : 'small'}
-              startIcon={<RefreshIcon />}
-              onClick={handleReauthClick}
-              color={isUnhealthy ? 'warning' : 'primary'}
-              variant={isUnhealthy ? 'contained' : 'text'}
-              fullWidth={isUnhealthy}
-              sx={{ justifyContent: isUnhealthy ? 'flex-start' : 'center' }}
-            >
-              Re-authenticate
-            </Button>
-          )}
-          {connection.state === ConnectionState.CONFIGURED && connector?.has_configure && (
+          {canReconfigure && (
             <Button
               size="small"
               startIcon={<SettingsIcon />}
@@ -301,14 +311,69 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
               Reconfigure
             </Button>
           )}
-          <Button
-            size="small"
-            color="error"
-            onClick={handleDisconnectClick}
-            disabled={connection.state === ConnectionState.DISCONNECTING}
-          >
-            {connection.state === ConnectionState.DISCONNECTING ? 'Disconnecting...' : 'Disconnect'}
-          </Button>
+          {isHealthyConfigured ? (
+            <Box sx={{ ml: canReconfigure ? 'auto' : 0 }}>
+              <IconButton
+                aria-label="Connection actions"
+                aria-controls={actionsMenuOpen ? `connection-actions-${connection.id}` : undefined}
+                aria-haspopup="menu"
+                aria-expanded={actionsMenuOpen ? 'true' : undefined}
+                size="small"
+                onClick={handleActionsMenuOpen}
+              >
+                <MoreVertIcon />
+              </IconButton>
+              <Menu
+                id={`connection-actions-${connection.id}`}
+                anchorEl={actionsAnchorEl}
+                open={actionsMenuOpen}
+                onClose={handleActionsMenuClose}
+              >
+                {canReauth && (
+                  <MenuItem onClick={handleReauthClick}>
+                    <ListItemIcon>
+                      <RefreshIcon fontSize="small" />
+                    </ListItemIcon>
+                    Re-authenticate
+                  </MenuItem>
+                )}
+                <MenuItem
+                  onClick={handleDisconnectClick}
+                  disabled={connection.state === ConnectionState.DISCONNECTING}
+                  sx={{ color: 'error.main' }}
+                >
+                  <ListItemIcon sx={{ color: 'error.main' }}>
+                    <DeleteOutlineIcon fontSize="small" />
+                  </ListItemIcon>
+                  {connection.state === ConnectionState.DISCONNECTING ? 'Disconnecting...' : 'Disconnect'}
+                </MenuItem>
+              </Menu>
+            </Box>
+          ) : (
+            <>
+              {canReauth && (
+                <Button
+                  size={isUnhealthy ? 'medium' : 'small'}
+                  startIcon={<RefreshIcon />}
+                  onClick={handleReauthClick}
+                  color={isUnhealthy ? 'warning' : 'primary'}
+                  variant={isUnhealthy ? 'contained' : 'text'}
+                  fullWidth={isUnhealthy}
+                  sx={{ justifyContent: isUnhealthy ? 'flex-start' : 'center' }}
+                >
+                  Re-authenticate
+                </Button>
+              )}
+              <Button
+                size="small"
+                color="error"
+                onClick={handleDisconnectClick}
+                disabled={connection.state === ConnectionState.DISCONNECTING}
+              >
+                {connection.state === ConnectionState.DISCONNECTING ? 'Disconnecting...' : 'Disconnect'}
+              </Button>
+            </>
+          )}
         </CardActions>
       )}
 

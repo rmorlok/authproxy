@@ -12,6 +12,8 @@ import {
     Connector,
     ConnectorVersionState,
     connections,
+    tasks,
+    PollForTaskResult,
 } from '@authproxy/api';
 import authReducer from '../store/sessionSlice';
 import connectorsReducer from '../store/connectorsSlice';
@@ -25,7 +27,13 @@ vi.mock('@authproxy/api', async () => {
         ...actual,
         connections: {
             ...actual.connections,
+            disconnect: vi.fn(),
+            list: vi.fn(),
             reauth: vi.fn(),
+        },
+        tasks: {
+            ...actual.tasks,
+            pollForTaskFinalized: vi.fn(),
         },
     };
 });
@@ -87,8 +95,27 @@ describe('ConnectionCard', () => {
     };
 
     beforeEach(() => {
+        vi.mocked(connections.disconnect).mockReset();
+        vi.mocked(connections.list).mockReset();
         vi.mocked(connections.reauth).mockReset();
+        vi.mocked(tasks.pollForTaskFinalized).mockReset();
+        vi.mocked(connections.disconnect).mockResolvedValue({
+            data: {
+                task_id: 'task-123',
+                connection: {
+                    ...baseConnection,
+                    state: ConnectionState.DISCONNECTING,
+                },
+            },
+        } as any);
+        vi.mocked(connections.list).mockResolvedValue({
+            status: 200,
+            data: {items: [], cursor: ''},
+        } as any);
         vi.mocked(connections.reauth).mockResolvedValue({data: {type: 'complete'}} as any);
+        vi.mocked(tasks.pollForTaskFinalized).mockResolvedValue({
+            result: PollForTaskResult.FINALIZED,
+        } as any);
     });
 
     test('renders connection information correctly with connector details', () => {
@@ -181,6 +208,63 @@ describe('ConnectionCard', () => {
                 unhealthyConnection.id,
                 window.location.href,
             );
+        });
+    });
+
+    test('keeps healthy connection secondary actions in the menu', async () => {
+        const store = createMockStore(rootInitialState());
+        const user = userEvent.setup();
+        const healthyConnection: Connection = {
+            ...baseConnection,
+            connector: {
+                ...mockConnector,
+                has_configure: true,
+            },
+        };
+
+        render(
+            <Provider store={store}>
+                <ConnectionCard connection={healthyConnection}/>
+            </Provider>
+        );
+
+        expect(screen.getByRole('button', {name: /Reconfigure/i})).toBeInTheDocument();
+        expect(screen.queryByRole('button', {name: /Re-authenticate/i})).not.toBeInTheDocument();
+        expect(screen.queryByRole('button', {name: /^Disconnect$/i})).not.toBeInTheDocument();
+
+        await user.click(screen.getByRole('button', {name: /Connection actions/i}));
+
+        expect(screen.getByRole('menuitem', {name: /Re-authenticate/i})).toBeInTheDocument();
+        expect(screen.getByRole('menuitem', {name: /^Disconnect$/i})).toBeInTheDocument();
+
+        await user.click(screen.getByRole('menuitem', {name: /Re-authenticate/i}));
+
+        await waitFor(() => {
+            expect(connections.reauth).toHaveBeenCalledWith(
+                healthyConnection.id,
+                window.location.href,
+            );
+        });
+    });
+
+    test('opens disconnect confirmation from healthy connection action menu', async () => {
+        const store = createMockStore(rootInitialState());
+        const user = userEvent.setup();
+
+        render(
+            <Provider store={store}>
+                <ConnectionCard connection={baseConnection}/>
+            </Provider>
+        );
+
+        await user.click(screen.getByRole('button', {name: /Connection actions/i}));
+        await user.click(screen.getByRole('menuitem', {name: /^Disconnect$/i}));
+
+        expect(screen.getByRole('heading', {name: /Disconnect Confirmation/i})).toBeInTheDocument();
+        await user.click(screen.getByRole('button', {name: /^Disconnect$/i}));
+
+        await waitFor(() => {
+            expect(connections.disconnect).toHaveBeenCalledWith(baseConnection.id);
         });
     });
 
