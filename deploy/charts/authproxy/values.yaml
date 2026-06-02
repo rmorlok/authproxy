@@ -84,6 +84,12 @@ services:
       serveFrom: ""
   public:
     enabled: true
+    # -- External base URL for the public service. Used for OAuth redirect and
+    # callback URLs when AuthProxy is behind an Ingress or proxy.
+    baseUrl: ""
+    # -- Expose /api/v1/connections/:id/_proxy on the public service.
+    # Keep disabled unless browser/session clients need direct proxy calls.
+    enableProxy: false
     static:
       # -- Serve the embedded marketplace UI from this service.
       enabled: false

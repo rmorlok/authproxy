@@ -19,7 +19,9 @@
   each — no extra Route53 wiring needed. cert-manager mints a single
   multi-SAN cert covering all three hostnames listed under tls.hosts.
 
-  go-oauth2-server (when enabled) lives on `oauth2.<hostname>`.
+  go-oauth2-server (when enabled) lives on the apex `/oauth2` path via
+  a separate rewrite Ingress, because it is not a SPA and does not need
+  a dedicated hostname.
 */}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -40,9 +42,6 @@ spec:
         - {{ .Values.global.hostname | quote }}
         - {{ printf "marketplace.%s" .Values.global.hostname | quote }}
         - {{ printf "admin.%s" .Values.global.hostname | quote }}
-        {{- if .Values.goOauth2Server.enabled }}
-        - {{ printf "oauth2.%s" .Values.global.hostname | quote }}
-        {{- end }}
       secretName: {{ printf "%s-tls" (include "authproxy-demo.fullname" .) | quote }}
   {{- end }}
   rules:
@@ -88,16 +87,4 @@ spec:
                 name: {{ include "authproxy-demo.authproxy.serviceName" . }}
                 port:
                   name: admin-api
-    {{- if .Values.goOauth2Server.enabled }}
-    - host: {{ printf "oauth2.%s" .Values.global.hostname | quote }}
-      http:
-        paths:
-          - path: /
-            pathType: Prefix
-            backend:
-              service:
-                name: {{ include "authproxy-demo.goOauth2Server.name" . }}
-                port:
-                  number: 80
-    {{- end }}
 {{- end -}}

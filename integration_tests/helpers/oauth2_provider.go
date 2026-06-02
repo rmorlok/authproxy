@@ -47,6 +47,15 @@ func NewOAuth2TestProvider(t *testing.T) *OAuth2TestProvider {
 		base = defaultOAuth2TestProviderURL
 	}
 
+	return NewOAuth2TestProviderAt(t, base)
+}
+
+// NewOAuth2TestProviderAt connects to a specific test-mode OAuth2 server URL.
+// It is useful for smoke tests that target an already-running environment
+// instead of the docker-compose provider on localhost.
+func NewOAuth2TestProviderAt(t *testing.T, base string) *OAuth2TestProvider {
+	t.Helper()
+
 	p := &OAuth2TestProvider{
 		t:       t,
 		BaseURL: base,

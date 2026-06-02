@@ -9,6 +9,12 @@ Secrets, not in this ConfigMap.
 {{/* --- service ports --- */}}
 {{- if .Values.services.public.enabled -}}
 {{- $public := dict "port" .Values.ports.public -}}
+{{- if .Values.services.public.baseUrl -}}
+{{-   $_ := set $public "base_url" (tpl .Values.services.public.baseUrl $) -}}
+{{- end -}}
+{{- if .Values.services.public.enableProxy -}}
+{{-   $_ := set $public "enable_proxy" true -}}
+{{- end -}}
 {{- if .Values.services.public.static.enabled -}}
 {{-   $static := dict -}}
 {{-   if .Values.services.public.static.mountAt -}}

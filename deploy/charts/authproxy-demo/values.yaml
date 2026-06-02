@@ -4,7 +4,7 @@
 #   global           — shared inputs (hostname, ACME issuer, image tags)
 #   demoShell        — inline Deployment for the SSO stand-in host
 #   goOauth2Server   — inline Deployment for the demo connector target
-#   ingress          — single Ingress, sub-path routing
+#   ingress          — public Ingresses for demo shell, UIs, and test OAuth
 #   grafana          — optional Grafana subchart + app-metrics dashboards
 #   secrets          — auto-generation toggles for keys + passwords
 #   authproxy / postgresql / redis / minio — subchart passthroughs
@@ -45,12 +45,10 @@ demoShell:
   port: 8888
 
 goOauth2Server:
-  # -- Disabled by default. The upstream image expects etcd at
-  # localhost:2379 + a Postgres connection and won't come up without
-  # them — adding those subcharts is tracked as a follow-up to A11.
-  # Set to true once the chart is wired with an etcd + the right
-  # config to bring go-oauth2-server up cleanly.
-  enabled: false
+  # -- Enable the OAuth2 test provider used by demo smoke tests. It runs in
+  # upstream test mode, which uses an embedded store and exposes /test/* control
+  # endpoints for client/user setup and request inspection.
+  enabled: true
   image:
     # go-oauth2-server image — see https://github.com/rmorlok/go-oauth2-server.
     # Upstream's default branch is `master`, so that's the tag the Build
@@ -65,7 +63,7 @@ goOauth2Server:
       memory: 32Mi
     limits:
       memory: 128Mi
-  # -- Container port the upstream image listens on.
+  # -- Container port the upstream test-mode server listens on.
   port: 8080
 
 ingress:
@@ -213,6 +211,8 @@ authproxy:
     existingSecret: "{{ .Release.Name }}-actors"
   services:
     public:
+      baseUrl: "https://marketplace.{{ .Values.global.hostname }}"
+      enableProxy: true
       static:
         enabled: true
     adminApi:

@@ -12,8 +12,9 @@ Umbrella chart for the AuthProxy demo environment. Composes:
 | `demo-shell` (inline)   | SSO stand-in host (signs JWTs for demo actors)              |
 | `go-oauth2-server` (inline) | Connector target for the demo OAuth flow                |
 
-Single Ingress with sub-path routing fronts everything behind one
-hostname. TLS via cert-manager.
+Ingress fronts the demo shell and test OAuth provider on the apex host,
+with dedicated subdomains for the embedded marketplace and admin SPAs.
+TLS is issued by cert-manager.
 
 This is the **demo** chart — never install it for a customer. The
 production install path is `deploy/charts/authproxy` directly.
@@ -143,23 +144,21 @@ alongside the defaults.
 > connector-management admin API surface that isn't fully there yet;
 > tracked as a follow-up to A11.
 
-## Sub-path routing
+## Routing
 
-The umbrella Ingress maps host paths to backend services:
+The umbrella Ingress maps public hosts and paths to backend services:
 
-| Path           | Backend                                     |
-|----------------|---------------------------------------------|
-| `/`            | demo-shell                                  |
-| `/admin`       | AuthProxy admin-api (serves admin UI)       |
-| `/admin-api`   | AuthProxy admin-api (JSON API)              |
-| `/marketplace` | AuthProxy public (serves marketplace UI)    |
-| `/api`         | AuthProxy api                               |
-| `/public`      | AuthProxy public (OAuth callbacks, etc.)    |
-| `/oauth2`      | go-oauth2-server                            |
-| `/grafana`     | Grafana dashboards                          |
+| Host / path                | Backend                                  |
+|----------------------------|------------------------------------------|
+| `<hostname>/`              | demo-shell                               |
+| `<hostname>/oauth2`        | go-oauth2-server                         |
+| `<hostname>/grafana`       | Grafana dashboards                       |
+| `marketplace.<hostname>/`  | AuthProxy public (marketplace UI + API)  |
+| `admin.<hostname>/`        | AuthProxy admin-api (admin UI + API)     |
 
-(Paths are `pathType: Prefix`; order in the Ingress is significant only
-for `pathType: Exact` matches.)
+The OAuth test provider is path-routed because it is not a SPA. The
+marketplace and admin UIs use subdomains so their root-relative Vite
+assets resolve correctly.
 
 ## Smoke test
 

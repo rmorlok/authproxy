@@ -599,6 +599,9 @@
         "port": {
           "$ref": "../common/schema.json#/$defs/IntegerValue"
         },
+        "base_url": {
+          "$ref": "../common/schema.json#/$defs/StringValue"
+        },
         "domain": {
           "type": "string"
         },
@@ -653,6 +656,9 @@
         "port": {
           "$ref": "../common/schema.json#/$defs/IntegerValue"
         },
+        "base_url": {
+          "$ref": "../common/schema.json#/$defs/StringValue"
+        },
         "domain": {
           "type": "string"
         },
@@ -676,6 +682,9 @@
         },
         "port": {
           "$ref": "../common/schema.json#/$defs/IntegerValue"
+        },
+        "base_url": {
+          "$ref": "../common/schema.json#/$defs/StringValue"
         },
         "domain": {
           "type": "string"

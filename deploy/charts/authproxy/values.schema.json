@@ -257,6 +257,8 @@
       "additionalProperties": false,
       "properties": {
         "enabled": { "type": "boolean" },
+        "baseUrl": { "type": "string" },
+        "enableProxy": { "type": "boolean" },
         "static": { "$ref": "#/definitions/staticContent" }
       }
     },
