@@ -36,6 +36,7 @@ import MoreVertIcon from '@mui/icons-material/MoreVert';
 import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
+import { marketplaceTokens } from '../theme';
 interface ConnectionCardProps {
   connection: Connection;
 }
@@ -67,22 +68,22 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
   const createdDate = new Date(connection.created_at).toLocaleDateString();
 
   // Determine the status color
-  let statusColor: 'success' | 'error' | 'warning' | 'default' = 'default';
+  let statusColor: 'success' | 'error' | 'warning' | 'default' = marketplaceTokens.status.neutral;
   switch (connection.state) {
     case ConnectionState.CONFIGURED:
-      statusColor = 'success';
+      statusColor = marketplaceTokens.status.healthy;
       break;
     case ConnectionState.DISABLED:
-      statusColor = 'error';
+      statusColor = marketplaceTokens.status.disabled;
       break;
     case ConnectionState.SETUP:
-      statusColor = 'warning';
+      statusColor = marketplaceTokens.status.setup;
       break;
     case ConnectionState.DISCONNECTING:
-      statusColor = 'warning';
+      statusColor = marketplaceTokens.status.setup;
       break;
     default:
-      statusColor = 'default';
+      statusColor = marketplaceTokens.status.neutral;
   }
 
   // Handle reconfigure button click
@@ -228,11 +229,12 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
         display: 'flex',
         flexDirection: 'column',
         border: 1,
-        borderColor: isUnhealthy ? 'warning.main' : 'divider',
+        borderColor: isUnhealthy ? 'warning.main' : marketplaceTokens.card.borderColor,
+        borderRadius: marketplaceTokens.radius.card,
         bgcolor: (theme) => (
           isUnhealthy ? alpha(theme.palette.warning.main, 0.08) : theme.palette.background.paper
         ),
-        boxShadow: isUnhealthy ? 4 : 1,
+        boxShadow: isUnhealthy ? marketplaceTokens.card.attentionShadow : marketplaceTokens.card.shadow,
       }}
     >
       <CardHeader
@@ -263,7 +265,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
             <Chip
               label={isUnhealthy ? 'Needs attention' : connection.state}
-              color={isUnhealthy ? 'warning' : statusColor}
+              color={isUnhealthy ? marketplaceTokens.status.attention : statusColor}
               size="small"
               variant={isUnhealthy ? 'filled' : 'outlined'}
               icon={isUnhealthy ? <WarningAmberIcon /> : undefined}
@@ -282,7 +284,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
               gap: 1,
               mb: 2,
               p: 1.5,
-              borderRadius: 1,
+              borderRadius: marketplaceTokens.radius.control,
               bgcolor: (theme) => alpha(theme.palette.warning.main, 0.14),
               color: 'warning.dark',
             }}
@@ -299,14 +301,14 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
           </Box>
         )}
         <Box sx={{
-          '& p': { margin: 0, fontSize: '0.875rem', color: 'text.secondary' },
+          '& p': { margin: 0, fontSize: marketplaceTokens.markdown.bodyFontSize, color: 'text.secondary' },
           '& strong': { color: 'text.primary' },
           '& em': { color: 'text.secondary' },
           '& code': {
             backgroundColor: 'action.hover',
-            padding: '2px 4px',
-            borderRadius: '4px',
-            fontSize: '0.8rem'
+            padding: marketplaceTokens.markdown.codePadding,
+            borderRadius: marketplaceTokens.radius.control,
+            fontSize: marketplaceTokens.markdown.codeFontSize
           }
         }}>
           <ReactMarkdown
@@ -321,9 +323,9 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
                 // Override code to use custom styling
                 code: ({ children }) => <Typography component="code" sx={{
                   backgroundColor: 'action.hover',
-                  padding: '2px 4px',
-                  borderRadius: '4px',
-                  fontSize: '0.8rem',
+                  padding: marketplaceTokens.markdown.codePadding,
+                  borderRadius: marketplaceTokens.radius.control,
+                  fontSize: marketplaceTokens.markdown.codeFontSize,
                   fontFamily: 'monospace'
                 }}>{children}</Typography>
               }}
@@ -340,7 +342,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
             flexDirection: isHealthyConfigured ? 'row' : 'column',
             flexWrap: 'wrap',
             justifyContent: isHealthyConfigured ? 'space-between' : 'flex-start',
-            gap: 0.5,
+            gap: marketplaceTokens.spacing.cardActionGap,
             '& .MuiButton-root': {
               ml: '0 !important',
             },
@@ -362,7 +364,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
                   size={isUnhealthy ? 'medium' : 'small'}
                   startIcon={<RefreshIcon />}
                   onClick={handleReauthClick}
-                  color={isUnhealthy ? 'warning' : 'primary'}
+                  color={isUnhealthy ? marketplaceTokens.status.attention : 'primary'}
                   variant={isUnhealthy ? 'contained' : 'text'}
                   fullWidth={isUnhealthy}
                   sx={{ justifyContent: isUnhealthy ? 'flex-start' : 'center' }}
