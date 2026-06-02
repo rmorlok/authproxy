@@ -53,6 +53,11 @@ output "external_dns_role_arn" {
   value       = aws_iam_role.external_dns.arn
 }
 
+output "cert_manager_route53_role_arn" {
+  description = "ARN of the IRSA role cert-manager assumes for Route53 DNS-01 challenges."
+  value       = aws_iam_role.cert_manager_route53.arn
+}
+
 output "oidc_provider_arn" {
   description = "ARN of the cluster's OIDC provider. Future IRSA roles bind their trust policy to this."
   value       = module.eks.oidc_provider_arn

@@ -79,6 +79,7 @@ helm upgrade authproxy-bootstrap . \
   --namespace kube-system \
   --wait --timeout 5m \
   --reuse-values \
+  --set "cert-manager.serviceAccount.annotations.eks\.amazonaws\.com/role-arn=$(cd ../../terraform/eks && terraform output -raw cert_manager_route53_role_arn)" \
   --set "clusterIssuer.name=letsencrypt-prod-dns01" \
   --set "clusterIssuer.solver=route53" \
   --set "clusterIssuer.route53.region=us-east-1" \
