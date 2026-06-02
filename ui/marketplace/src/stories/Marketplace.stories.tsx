@@ -325,10 +325,21 @@ export const AvailableConnectorsMobile: Story = {
 
 export const ConnectionSetupDialog: Story = {
   args: {
-    route: '/connectors',
+    route: '/connections',
     connectionsState: {
       ...baseConnectionsState,
       currentFormStep: setupStep,
+    },
+  },
+};
+
+export const ConnectionSetupSubmitting: Story = {
+  args: {
+    route: '/connections',
+    connectionsState: {
+      ...baseConnectionsState,
+      currentFormStep: setupStep,
+      submittingForm: true,
     },
   },
 };
@@ -352,6 +363,35 @@ export const VerificationFailedDialog: Story = {
         connectionId: 'cxn_google-calendar',
         message: 'Calendar API rejected the saved credentials.',
         canRetry: true,
+      },
+    },
+  },
+};
+
+export const VerificationRetryingDialog: Story = {
+  args: {
+    route: '/connections',
+    connectionsState: {
+      ...baseConnectionsState,
+      verifyError: {
+        connectionId: 'cxn_google-calendar',
+        message: 'Calendar API rejected the saved credentials.',
+        canRetry: true,
+      },
+      retryingConnection: true,
+    },
+  },
+};
+
+export const VerificationFailedNoRetryDialog: Story = {
+  args: {
+    route: '/connections',
+    connectionsState: {
+      ...baseConnectionsState,
+      verifyError: {
+        connectionId: 'cxn_google-calendar',
+        message: 'The provider rejected this setup and it cannot be retried.',
+        canRetry: false,
       },
     },
   },
