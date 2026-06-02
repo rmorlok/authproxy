@@ -90,7 +90,7 @@ func TestOAuth2ProbeHealth_FailureAndRecovery(t *testing.T) {
 	// proxyRefreshRig uses — /test/authorize for the consent step
 	// (#169) — since we're testing health transitions, not the user-
 	// facing consent leg.
-	returnToURL := "https://example.com/return"
+	returnToURL := env.Cfg.GetRoot().Public.GetBaseUrl() + "/connections"
 	connID, redirectURL := env.InitiateOAuth2Connection(t, connectorID, returnToURL)
 	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)

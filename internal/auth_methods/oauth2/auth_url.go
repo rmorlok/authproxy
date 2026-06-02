@@ -135,7 +135,7 @@ func (o *oAuth2Connection) SetStateAndGeneratePublicUrl(
 ) (string, error) {
 	stateId := apid.New(apid.PrefixOauth2State)
 
-	if err := o.saveStateToRedis(ctx, actor, stateId, returnToUrl); err != nil {
+	if err := o.saveStateToRedis(ctx, actor, stateId, o.safeReturnToUrl(returnToUrl)); err != nil {
 		return "", err
 	}
 

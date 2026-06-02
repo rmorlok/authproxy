@@ -359,7 +359,7 @@ func TestCallbackFrom3rdParty_TemplatedEndpoint(t *testing.T) {
 			},
 			state: &state{
 				Id:          apid.New(apid.PrefixOauth2State),
-				ReturnToUrl: "https://app.example.com/callback",
+				ReturnToUrl: "http://localhost:8080/callback",
 			},
 		}, db, encrypt, ctrl
 	}
@@ -387,7 +387,7 @@ func TestCallbackFrom3rdParty_TemplatedEndpoint(t *testing.T) {
 		query := url.Values{"code": {"auth-code-123"}}
 		returnUrl, err := o2.CallbackFrom3rdParty(context.Background(), query)
 		require.NoError(t, err)
-		assert.Equal(t, "https://app.example.com/callback", returnUrl)
+		assert.Equal(t, "http://localhost:8080/callback", returnUrl)
 	})
 
 	t.Run("static token endpoint works without configuration", func(t *testing.T) {
@@ -412,7 +412,7 @@ func TestCallbackFrom3rdParty_TemplatedEndpoint(t *testing.T) {
 		query := url.Values{"code": {"auth-code-456"}}
 		returnUrl, err := o2.CallbackFrom3rdParty(context.Background(), query)
 		require.NoError(t, err)
-		assert.Equal(t, "https://app.example.com/callback", returnUrl)
+		assert.Equal(t, "http://localhost:8080/callback", returnUrl)
 	})
 }
 

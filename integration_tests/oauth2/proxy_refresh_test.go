@@ -98,7 +98,7 @@ func newProxyRefreshRig(t *testing.T, name string) *proxyRefreshRig {
 		userID:      user.ID,
 		connectorID: connectorID,
 		scopes:      []string{"read"},
-		returnToURL: "https://example.com/return",
+		returnToURL: env.Cfg.GetRoot().Public.GetBaseUrl() + "/connections",
 	}
 }
 

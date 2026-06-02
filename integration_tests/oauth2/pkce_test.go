@@ -295,7 +295,6 @@ func TestPKCE_TokenExchangeRejected(t *testing.T) {
 			clientKey := "pkce-rej-" + strings.ToLower(sub.name) + "-" + suffix
 			clientSecret := "pkce-rej-secret-" + suffix
 			userEmail := "alice-pkce-rej-" + suffix + "@example.com"
-			returnToURL := "https://example.com/return"
 
 			connectorID := apid.New(apid.PrefixConnectorVersion)
 			connector := helpers.NewOAuth2Connector(connectorID, "pkce-rejected", provider, helpers.OAuth2ConnectorOptions{
@@ -313,6 +312,7 @@ func TestPKCE_TokenExchangeRejected(t *testing.T) {
 				LogCapture:    logCapture,
 			})
 			defer env.Cleanup()
+			returnToURL := env.Cfg.GetRoot().Public.GetBaseUrl() + "/connections"
 
 			provider.CreateClient(helpers.CreateClientRequest{
 				Key:                     clientKey,

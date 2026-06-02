@@ -101,7 +101,7 @@ func newAuthMethodCompatibilityRig(
 		clientSecret: clientSecret,
 		userID:       user.ID,
 		connectorID:  connectorID,
-		returnToURL:  "https://example.com/oauth-auth-method-return",
+		returnToURL:  env.Cfg.GetRoot().Public.GetBaseUrl() + "/connections",
 	}
 }
 
