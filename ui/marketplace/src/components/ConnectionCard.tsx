@@ -180,6 +180,46 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
     await dispatch(fetchConnectionsAsync());
   };
 
+  const actionMenu = isHealthyConfigured ? (
+    <>
+      <IconButton
+        aria-label="Connection actions"
+        aria-controls={actionsMenuOpen ? `connection-actions-${connection.id}` : undefined}
+        aria-haspopup="menu"
+        aria-expanded={actionsMenuOpen ? 'true' : undefined}
+        size="small"
+        onClick={handleActionsMenuOpen}
+      >
+        <MoreVertIcon />
+      </IconButton>
+      <Menu
+        id={`connection-actions-${connection.id}`}
+        anchorEl={actionsAnchorEl}
+        open={actionsMenuOpen}
+        onClose={handleActionsMenuClose}
+      >
+        {canReauth && (
+          <MenuItem onClick={handleReauthClick}>
+            <ListItemIcon>
+              <RefreshIcon fontSize="small" />
+            </ListItemIcon>
+            Re-authenticate
+          </MenuItem>
+        )}
+        <MenuItem
+          onClick={handleDisconnectClick}
+          disabled={connection.state === ConnectionState.DISCONNECTING}
+          sx={{ color: 'error.main' }}
+        >
+          <ListItemIcon sx={{ color: 'error.main' }}>
+            <DeleteOutlineIcon fontSize="small" />
+          </ListItemIcon>
+          {connection.state === ConnectionState.DISCONNECTING ? 'Disconnecting...' : 'Disconnect'}
+        </MenuItem>
+      </Menu>
+    </>
+  ) : null;
+
   return (
     <Card
       sx={{
@@ -203,9 +243,8 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
             minWidth: 0,
           },
           '& .MuiCardHeader-action': {
-            ml: { xs: 7, sm: 1 },
-            mt: { xs: 1, sm: 0 },
-            width: { xs: 'calc(100% - 56px)', sm: 'auto' },
+            ml: 1,
+            mt: 0,
           },
         }}
         avatar={
@@ -220,13 +259,18 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
           )
         }
         title={connector ? connector.display_name : 'Unknown Connector'}
-        action={(<Chip
-            label={isUnhealthy ? 'Needs attention' : connection.state}
-            color={isUnhealthy ? 'warning' : statusColor}
-            size="small"
-            variant={isUnhealthy ? 'filled' : 'outlined'}
-            icon={isUnhealthy ? <WarningAmberIcon /> : undefined}
-        />)}
+        action={(
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+            <Chip
+              label={isUnhealthy ? 'Needs attention' : connection.state}
+              color={isUnhealthy ? 'warning' : statusColor}
+              size="small"
+              variant={isUnhealthy ? 'filled' : 'outlined'}
+              icon={isUnhealthy ? <WarningAmberIcon /> : undefined}
+            />
+            {actionMenu}
+          </Box>
+        )}
         subheader={`Connected on ${createdDate}`}
       />
       <CardContent sx={{ flexGrow: 1 }}>
@@ -289,7 +333,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
         </Box>
       </CardContent>
 
-      {canBeDisconnected(connection) && (
+      {canBeDisconnected(connection) && (canReconfigure || !isHealthyConfigured) && (
         <CardActions
           sx={{
             alignItems: 'flex-start',
@@ -311,45 +355,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
               Reconfigure
             </Button>
           )}
-          {isHealthyConfigured ? (
-            <Box sx={{ ml: canReconfigure ? 'auto' : 0 }}>
-              <IconButton
-                aria-label="Connection actions"
-                aria-controls={actionsMenuOpen ? `connection-actions-${connection.id}` : undefined}
-                aria-haspopup="menu"
-                aria-expanded={actionsMenuOpen ? 'true' : undefined}
-                size="small"
-                onClick={handleActionsMenuOpen}
-              >
-                <MoreVertIcon />
-              </IconButton>
-              <Menu
-                id={`connection-actions-${connection.id}`}
-                anchorEl={actionsAnchorEl}
-                open={actionsMenuOpen}
-                onClose={handleActionsMenuClose}
-              >
-                {canReauth && (
-                  <MenuItem onClick={handleReauthClick}>
-                    <ListItemIcon>
-                      <RefreshIcon fontSize="small" />
-                    </ListItemIcon>
-                    Re-authenticate
-                  </MenuItem>
-                )}
-                <MenuItem
-                  onClick={handleDisconnectClick}
-                  disabled={connection.state === ConnectionState.DISCONNECTING}
-                  sx={{ color: 'error.main' }}
-                >
-                  <ListItemIcon sx={{ color: 'error.main' }}>
-                    <DeleteOutlineIcon fontSize="small" />
-                  </ListItemIcon>
-                  {connection.state === ConnectionState.DISCONNECTING ? 'Disconnecting...' : 'Disconnect'}
-                </MenuItem>
-              </Menu>
-            </Box>
-          ) : (
+          {!isHealthyConfigured && (
             <>
               {canReauth && (
                 <Button
