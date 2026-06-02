@@ -75,7 +75,7 @@ func (o *oAuth2Connection) CallbackFrom3rdParty(ctx context.Context, query url.V
 	if recordErr := o.connection.HandleAuthFailed(ctx, err); recordErr != nil {
 		return errorRedirectPage, fmt.Errorf("failed to record auth failure (%v) after: %w", recordErr, err)
 	}
-	return o.appendSetupPendingToReturnUrl(o.state.ReturnToUrl), nil
+	return o.appendSetupPendingToReturnUrl(o.safeReturnToUrl(o.state.ReturnToUrl)), nil
 }
 
 // exchangeCodeAndAdvance performs the OAuth token exchange and post-auth state transition.
@@ -229,10 +229,11 @@ func (o *oAuth2Connection) exchangeCodeAndAdvanceInner(ctx context.Context, quer
 
 	o.tel.recordTokenExchangeSuccess(ctx, o.connectionLabelsForTelemetry())
 
+	returnToUrl := o.safeReturnToUrl(o.state.ReturnToUrl)
 	if outcome.SetupPending {
-		return o.appendSetupPendingToReturnUrl(o.state.ReturnToUrl), nil
+		return o.appendSetupPendingToReturnUrl(returnToUrl), nil
 	}
-	return o.state.ReturnToUrl, nil
+	return returnToUrl, nil
 }
 
 // ExchangeClientCredentials performs RFC 6749 §4.4's synchronous token

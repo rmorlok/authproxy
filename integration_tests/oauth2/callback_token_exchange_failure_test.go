@@ -95,7 +95,7 @@ func newTokenExchangeFailureRig(t *testing.T, name string) *tokenExchangeFailure
 		userID:       user.ID,
 		connectorID:  connectorID,
 		scopes:       []string{"read"},
-		returnToURL:  "https://example.com/return",
+		returnToURL:  env.Cfg.GetRoot().Public.GetBaseUrl() + "/connections",
 		errorPageURL: env.Cfg.GetRoot().ErrorPages.InternalError,
 	}
 }

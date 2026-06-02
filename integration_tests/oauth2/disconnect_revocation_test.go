@@ -88,7 +88,7 @@ func newDisconnectRevocationRig(t *testing.T, name string) *disconnectRevocation
 		clientKey:   clientKey,
 		userID:      user.ID,
 		connectorID: connectorID,
-		returnToURL: "https://example.com/return",
+		returnToURL: env.Cfg.GetRoot().Public.GetBaseUrl() + "/connections",
 	}
 }
 

@@ -99,7 +99,7 @@ func newCallbackStateSecurityRig(t *testing.T, name string) *callbackStateSecuri
 		connectorID:  connectorID,
 		connector:    connector,
 		scopes:       []string{"read"},
-		returnToURL:  "https://example.com/return",
+		returnToURL:  env.Cfg.GetRoot().Public.GetBaseUrl() + "/connections",
 		errorPageURL: env.Cfg.GetRoot().ErrorPages.InternalError,
 	}
 }
