@@ -1,15 +1,34 @@
 import * as React from 'react';
-import {render, screen} from '@testing-library/react';
+import {render, screen, waitFor} from '@testing-library/react';
 import '@testing-library/jest-dom';
+import userEvent from '@testing-library/user-event';
 import {Provider} from 'react-redux';
 import {combineReducers, configureStore} from '@reduxjs/toolkit';
 import ConnectionCard, {ConnectionCardSkeleton} from '../components/ConnectionCard';
-import {Connection, ConnectionState, ConnectionHealthState, Connector, ConnectorVersionState} from '@authproxy/api';
+import {
+    Connection,
+    ConnectionState,
+    ConnectionHealthState,
+    Connector,
+    ConnectorVersionState,
+    connections,
+} from '@authproxy/api';
 import authReducer from '../store/sessionSlice';
 import connectorsReducer from '../store/connectorsSlice';
 import connectionsReducer from '../store/connectionsSlice';
 import toastsReducer from '../store/toastsSlice';
-import {describe, expect, test} from 'vitest';
+import {beforeEach, describe, expect, test, vi} from 'vitest';
+
+vi.mock('@authproxy/api', async () => {
+    const actual = await vi.importActual<typeof import('@authproxy/api')>('@authproxy/api');
+    return {
+        ...actual,
+        connections: {
+            ...actual.connections,
+            reauth: vi.fn(),
+        },
+    };
+});
 
 // Create a mock store with required reducers
 const createMockStore = (preloaded?: Partial<ReturnType<typeof rootInitialState>>) => {
@@ -67,6 +86,11 @@ describe('ConnectionCard', () => {
         updated_at: '2023-04-01T12:00:00Z',
     };
 
+    beforeEach(() => {
+        vi.mocked(connections.reauth).mockReset();
+        vi.mocked(connections.reauth).mockResolvedValue({data: {type: 'complete'}} as any);
+    });
+
     test('renders connection information correctly with connector details', () => {
         const store = createMockStore(rootInitialState());
 
@@ -122,6 +146,41 @@ describe('ConnectionCard', () => {
             expect(screen.getByText(label)).toBeInTheDocument();
 
             unmount();
+        });
+    });
+
+    test('promotes reauthentication for unhealthy configured connections', async () => {
+        const store = createMockStore(rootInitialState());
+        const user = userEvent.setup();
+        const unhealthyConnection: Connection = {
+            ...baseConnection,
+            connector: {
+                ...mockConnector,
+                has_configure: true,
+            },
+            health_state: ConnectionHealthState.UNHEALTHY,
+        };
+
+        render(
+            <Provider store={store}>
+                <ConnectionCard connection={unhealthyConnection}/>
+            </Provider>
+        );
+
+        expect(screen.getByText('Needs attention')).toBeInTheDocument();
+        expect(screen.getByText('Reauthentication required')).toBeInTheDocument();
+        expect(screen.getByText(/Re-authenticate to restore access/i)).toBeInTheDocument();
+        expect(screen.getByRole('button', {name: /Re-authenticate/i})).toBeInTheDocument();
+        expect(screen.getByRole('button', {name: /Reconfigure/i})).toBeInTheDocument();
+        expect(screen.getByRole('button', {name: /Disconnect/i})).toBeInTheDocument();
+
+        await user.click(screen.getByRole('button', {name: /Re-authenticate/i}));
+
+        await waitFor(() => {
+            expect(connections.reauth).toHaveBeenCalledWith(
+                unhealthyConnection.id,
+                window.location.href,
+            );
         });
     });
 

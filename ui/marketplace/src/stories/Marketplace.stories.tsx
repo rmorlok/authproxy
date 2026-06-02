@@ -258,6 +258,20 @@ export const ConnectionsPopulatedMobile: Story = {
   },
 };
 
+export const ConnectionsNeedsAttention: Story = {
+  args: {
+    route: '/connections',
+    connectionsState: {
+      ...baseConnectionsState,
+      items: [
+        connectionFor(connectors[2], {
+          health_state: ConnectionHealthState.UNHEALTHY,
+        }),
+      ],
+    },
+  },
+};
+
 export const ConnectionsEmpty: Story = {
   args: {
     route: '/connections',

@@ -87,6 +87,10 @@ export const Unhealthy: Story = {
   args: {
     connection: {
       ...mockConnection,
+      connector: {
+        ...mockConnection.connector,
+        has_configure: true,
+      },
       health_state: ConnectionHealthState.UNHEALTHY,
     },
   },
