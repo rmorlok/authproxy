@@ -32,6 +32,8 @@ func init() {
 
 const OAuth2TokensTable = "oauth2_tokens"
 
+const OAuth2AccessTokenExpiryBuffer = 30 * time.Second
+
 type OAuth2Token struct {
 	Id                    apid.ID
 	ConnectionId          apid.ID // Foreign key to Connection; not enforced by database
@@ -103,7 +105,7 @@ func (t *OAuth2Token) IsAccessTokenExpired(ctx context.Context) bool {
 		return false
 	}
 
-	return t.AccessTokenExpiresAt.Before(apctx.GetClock(ctx).Now())
+	return !t.AccessTokenExpiresAt.After(apctx.GetClock(ctx).Now().Add(OAuth2AccessTokenExpiryBuffer))
 }
 
 func (t *OAuth2Token) Validate() error {

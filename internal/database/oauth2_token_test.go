@@ -41,6 +41,21 @@ func TestOAuth2Token_IsAccessTokenExpired(t *testing.T) {
 				accessTokenExpires: util.ToPtr(now.Add(1 * time.Hour)),
 				expected:           false,
 			},
+			{
+				name:               "expires inside buffer",
+				accessTokenExpires: util.ToPtr(now.Add(OAuth2AccessTokenExpiryBuffer - time.Second)),
+				expected:           true,
+			},
+			{
+				name:               "expires exactly at buffer",
+				accessTokenExpires: util.ToPtr(now.Add(OAuth2AccessTokenExpiryBuffer)),
+				expected:           true,
+			},
+			{
+				name:               "expires outside buffer",
+				accessTokenExpires: util.ToPtr(now.Add(OAuth2AccessTokenExpiryBuffer + time.Second)),
+				expected:           false,
+			},
 		}
 
 		for _, tc := range testCases {

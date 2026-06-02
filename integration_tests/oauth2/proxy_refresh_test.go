@@ -142,15 +142,18 @@ func (r *proxyRefreshRig) completeAuthFlow(t *testing.T) string {
 // underlying provider-issued refresh_token is still valid.
 func (r *proxyRefreshRig) forceTokenExpired(t *testing.T, connectionID string, clearRefreshToken bool) {
 	t.Helper()
-	ctx := context.Background()
+	r.forceTokenExpiresAt(t, connectionID, time.Now().Add(-1*time.Hour), clearRefreshToken)
+}
 
+func (r *proxyRefreshRig) forceTokenExpiresAt(t *testing.T, connectionID string, expiresAt time.Time, clearRefreshToken bool) {
+	t.Helper()
+	ctx := context.Background()
 	existing := r.env.GetOAuth2Token(t, connectionID)
 	require.NotNil(t, existing, "auth flow must have persisted a token")
 	require.False(t, existing.EncryptedRefreshToken.IsZero(),
 		"fixture invariant: provider must have issued a refresh_token in the initial grant")
 	require.False(t, existing.EncryptedAccessToken.IsZero(), "fixture invariant: access_token present")
 
-	pastExpiry := time.Now().Add(-1 * time.Hour)
 	refreshToken := existing.EncryptedRefreshToken
 	if clearRefreshToken {
 		refreshToken = encfield.EncryptedField{}
@@ -164,19 +167,18 @@ func (r *proxyRefreshRig) forceTokenExpired(t *testing.T, connectionID string, c
 		nil,
 		refreshToken,
 		existing.EncryptedAccessToken,
-		&pastExpiry,
+		&expiresAt,
 		existing.Scopes,
 		existing.RequestedScopes,
 		existing.CreatedByActorId,
 	)
-	require.NoError(t, err, "force-expire: insert replacement token row")
+	require.NoError(t, err, "force-expiry: insert replacement token row")
 
-	// Sanity: GetOAuth2Token now returns the expired row.
+	// Sanity: GetOAuth2Token now returns the forged row.
 	current := r.env.GetOAuth2Token(t, connectionID)
 	require.NotNil(t, current)
 	require.NotNil(t, current.AccessTokenExpiresAt)
-	require.True(t, current.AccessTokenExpiresAt.Before(time.Now()),
-		"forge-expire: replacement token should be expired (expires_at=%s)", current.AccessTokenExpiresAt)
+	require.WithinDuration(t, expiresAt, *current.AccessTokenExpiresAt, time.Second)
 }
 
 // TestProxyRefresh_ExpiredAccessTokenRefreshes covers scenario 6 from #169:
@@ -242,6 +244,42 @@ func TestProxyRefresh_ExpiredAccessTokenRefreshes(t *testing.T) {
 	assert.Equal(t, database.ConnectionHealthStateHealthy, conn.HealthState)
 	assert.Empty(t, rig.logCapture.RecordsWithMessage(t, connectionHealthStateChangedMessage),
 		"idempotent healthy→healthy must not emit a transition event")
+}
+
+func TestProxyRefresh_NearlyExpiredAccessTokenRefreshesWithinBuffer(t *testing.T) {
+	rig := newProxyRefreshRig(t, "proxy-refresh-near-expiry")
+	connID := rig.completeAuthFlow(t)
+
+	rig.forceTokenExpiresAt(t, connID, time.Now().Add(database.OAuth2AccessTokenExpiryBuffer-time.Second), false)
+	forged := rig.env.GetOAuth2Token(t, connID)
+	require.NotNil(t, forged)
+
+	w := rig.env.DoProxyRequest(t, connID, rig.provider.ResourceURL("/echo"), "GET")
+	require.Equalf(t, 200, w.Code,
+		"proxy must refresh a token inside the expiry buffer; got %d body=%s", w.Code, w.Body.String())
+
+	refreshed := rig.env.GetOAuth2Token(t, connID)
+	require.NotNil(t, refreshed)
+	assert.NotEqual(t, forged.Id, refreshed.Id, "near-expiry token should be replaced by refresh")
+	require.Len(t, refreshGrantRequests(rig), 1, "token inside expiry buffer should refresh exactly once")
+}
+
+func TestProxyRefresh_TokenOutsideExpiryBufferDoesNotRefreshAggressively(t *testing.T) {
+	rig := newProxyRefreshRig(t, "proxy-refresh-outside-buffer")
+	connID := rig.completeAuthFlow(t)
+
+	rig.forceTokenExpiresAt(t, connID, time.Now().Add(database.OAuth2AccessTokenExpiryBuffer+10*time.Second), false)
+	forged := rig.env.GetOAuth2Token(t, connID)
+	require.NotNil(t, forged)
+
+	w := rig.env.DoProxyRequest(t, connID, rig.provider.ResourceURL("/echo"), "GET")
+	require.Equalf(t, 200, w.Code,
+		"proxy should use token outside the expiry buffer; got %d body=%s", w.Code, w.Body.String())
+
+	current := rig.env.GetOAuth2Token(t, connID)
+	require.NotNil(t, current)
+	assert.Equal(t, forged.Id, current.Id, "token outside expiry buffer should not be refreshed")
+	require.Empty(t, refreshGrantRequests(rig), "token outside expiry buffer should not trigger refresh")
 }
 
 // TestProxyRefresh_NoRefreshTokenFlipsUnhealthy covers scenario 13:
