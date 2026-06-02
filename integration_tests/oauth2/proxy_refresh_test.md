@@ -1,12 +1,13 @@
 # OAuth2 Proxy-Time Refresh Cases
 
 Companion specification for `proxy_refresh_test.go`. Covers the
-proxy-time refresh leg of issue #169 — at request time the proxy
-detects that the persisted access token has expired, and either
-exchanges the persisted `refresh_token` for a new access token
-(scenario 6) or, if no `refresh_token` was issued, flips the
-connection's `health_state` to unhealthy without making any HTTP
-call (scenario 13).
+proxy-time refresh leg of issue #169 and the clock-skew buffer case
+from issue #185. At request time the proxy detects that the persisted
+access token is expired or inside the configured expiry buffer, and
+either exchanges the persisted `refresh_token` for a new access token
+(scenario 6 / #185) or, if no `refresh_token` was issued, flips the
+connection's `health_state` to unhealthy without making any HTTP call
+(scenario 13).
 
 The initial code → token exchange leg lives in
 `callback_token_exchange_failure_test.go` / `callback_token_exchange_retry_test.go`
@@ -20,7 +21,8 @@ retry-once-after-401 path are deliberately not included here — see
 Source: `internal/auth_methods/oauth2/proxy.go:31-132, 166-189`.
 
 - `getValidToken` is called for every proxied request. If the
-  persisted `AccessTokenExpiresAt` is in the past, it calls
+  persisted `AccessTokenExpiresAt` is in the past or within the
+  `database.OAuth2AccessTokenExpiryBuffer`, it calls
   `refreshAccessToken(ctx, token, refreshModeOnlyExpired)` before
   letting the request proceed.
 - `refreshAccessToken` acquires a per-connection mutex, re-reads the
@@ -71,6 +73,19 @@ over-eager flip on a transient blip would spam reconnect prompts.
   healthy → healthy would render the dashboard's "unhealthy →
   healthy recovery" alert useless.
 
+### Scenario 30 — clock skew / expiry buffer
+
+- **Inside the buffer refreshes.** `TestProxyRefresh_NearlyExpiredAccessTokenRefreshesWithinBuffer`
+  forges an active token whose expiry is one second inside
+  `OAuth2AccessTokenExpiryBuffer`. The next proxy request must refresh
+  before forwarding, persist a replacement token row, and make exactly
+  one refresh-token grant.
+- **Outside the buffer does not refresh aggressively.**
+  `TestProxyRefresh_TokenOutsideExpiryBufferDoesNotRefreshAggressively`
+  forges an active token whose expiry is safely beyond the buffer. The
+  proxy request should succeed using the existing token row and should
+  not call the refresh endpoint.
+
 ### Scenario 13 — no refresh token flips unhealthy
 
 - **Non-200 from the proxy.** The proxy cannot obtain a new access
@@ -101,9 +116,11 @@ over-eager flip on a transient blip would spam reconnect prompts.
 
 ## Test plan
 
-| Test | Pre-expiry refresh_token? | Expected proxy response | Expected health state | Issue #169 case(s) covered |
+| Test | Pre-expiry refresh_token? | Expected proxy response | Expected health state | Issue case(s) covered |
 | ---- | ------------------------- | ----------------------- | --------------------- | -------------------------- |
 | `TestProxyRefresh_ExpiredAccessTokenRefreshes` | yes | 200 (request succeeds) | healthy (no transition) | 6 — expired access token, valid refresh_token |
+| `TestProxyRefresh_NearlyExpiredAccessTokenRefreshesWithinBuffer` | yes | 200 (request succeeds after refresh) | healthy | #185 — token inside expiry buffer |
+| `TestProxyRefresh_TokenOutsideExpiryBufferDoesNotRefreshAggressively` | yes | 200 (request succeeds without refresh) | healthy | #185 — token outside expiry buffer |
 | `TestProxyRefresh_NoRefreshTokenFlipsUnhealthy` | no (cleared) | non-200 (refresh impossible) | unhealthy (transition emitted) | 13 — expired access token, no refresh_token |
 
 ## Why direct HTTP + DB-level expiry forge, not chromedp
@@ -120,9 +137,10 @@ Each test:
    `DeliverOAuth2Callback`) once via the `completeAuthFlow` helper to
    mint a real provider-issued token (with refresh_token). This is
    the same shortcut pattern the token-exchange tests use.
-2. Calls `forceTokenExpired(t, connID, clearRefreshToken)` to insert a
-   replacement `oauth2_tokens` row with `AccessTokenExpiresAt` in the
-   past, optionally clearing the refresh_token.
+2. Calls `forceTokenExpired(t, connID, clearRefreshToken)` or
+   `forceTokenExpiresAt(t, connID, expiresAt, clearRefreshToken)` to
+   insert a replacement `oauth2_tokens` row with a deterministic
+   `AccessTokenExpiresAt`, optionally clearing the refresh_token.
 3. Calls `env.DoProxyRequest(t, connID, …)` to exercise the proxy
    path with the now-expired token.
 
