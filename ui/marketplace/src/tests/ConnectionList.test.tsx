@@ -112,9 +112,9 @@ describe('ConnectionList', () => {
         expect(screen.getByText('Failed to fetch connections')).toBeInTheDocument();
     });
 
-    test('shows empty state with call to action when there are no connections', () => {
+    test('shows first-connection guidance and connector discovery when there are no connections', () => {
         const store = createStore({
-            connectors: {items: [], status: 'succeeded', error: null},
+            connectors: {items: [connector], status: 'succeeded', error: null},
             connections: {
                 ...baseConnectionsState,
                 items: [],
@@ -132,8 +132,10 @@ describe('ConnectionList', () => {
             </MemoryRouter>
         );
 
-        expect(screen.getByText('No connections yet')).toBeInTheDocument();
-        expect(screen.getByRole('link', {name: /Connect an Application/i})).toBeInTheDocument();
+        expect(screen.getByText('Connect your first application')).toBeInTheDocument();
+        expect(screen.getByText('Available connectors')).toBeInTheDocument();
+        expect(screen.getByText('Google Calendar')).toBeInTheDocument();
+        expect(screen.getByRole('button', {name: /Connect/i})).toBeInTheDocument();
     });
 
     test('renders list of connections when present', () => {
