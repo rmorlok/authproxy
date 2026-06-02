@@ -5,6 +5,7 @@ import {
   Typography,
   Container,
   Alert,
+  AlertTitle,
   Box,
   Button,
   CircularProgress,
@@ -12,6 +13,7 @@ import {
   DialogActions,
   DialogTitle,
   DialogContent,
+  LinearProgress,
 } from '@mui/material';
 import { ConnectionState, isRedirectResponse } from '@authproxy/api';
 import {
@@ -45,6 +47,8 @@ import ConnectionFormStep from './ConnectionFormStep';
 import { AppDispatch } from '../store';
 import { Link, useSearchParams } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
+import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
+import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
 
 /**
  * Component to display a list of connections
@@ -309,10 +313,22 @@ const ConnectionList: React.FC = () => {
         maxWidth="sm"
         fullWidth
       >
-        <DialogTitle>Connection Setup</DialogTitle>
-        <DialogContent>
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
+            <Typography variant="h6" component="span">
+              Complete setup
+            </Typography>
+            <Typography variant="body2" color="text.secondary">
+              {currentFormStep?.stepTitle ?? 'Provide the details needed to finish this connection.'}
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
           {formSubmitError && (
-            <Alert severity="error" sx={{ mb: 2 }}>{formSubmitError}</Alert>
+            <Alert severity="error" sx={{ mb: 2 }}>
+              <AlertTitle>Setup could not be saved</AlertTitle>
+              {formSubmitError}
+            </Alert>
           )}
           {currentFormStep && (
             <ConnectionFormStep
@@ -330,36 +346,55 @@ const ConnectionList: React.FC = () => {
       </Dialog>
 
       <Dialog open={verifyingConnectionId !== null} maxWidth="xs" fullWidth>
-        <DialogTitle>Verifying connection</DialogTitle>
-        <DialogContent>
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, py: 2 }}>
-            <CircularProgress size={24} />
-            <Typography variant="body1">
-              Checking that your credentials work with the provider…
-            </Typography>
+        <DialogTitle sx={{ pb: 1 }}>Verifying connection</DialogTitle>
+        <DialogContent dividers>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, py: 3 }}>
+            <HourglassEmptyIcon color="primary" sx={{ fontSize: 40 }} />
+            <Box sx={{ textAlign: 'center' }}>
+              <Typography variant="subtitle1" component="p">
+                Checking credentials
+              </Typography>
+              <Typography variant="body2" color="text.secondary">
+                AuthProxy is confirming that this connection can reach the provider.
+              </Typography>
+            </Box>
+            <LinearProgress sx={{ width: '100%' }} />
           </Box>
         </DialogContent>
       </Dialog>
 
       <Dialog open={verifyError !== null} onClose={handleCancelVerifyError} maxWidth="sm" fullWidth>
-        <DialogTitle>Connection verification failed</DialogTitle>
-        <DialogContent>
+        <DialogTitle sx={{ pb: 1 }}>
+          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
+            <ErrorOutlineIcon color="error" />
+            <Typography variant="h6" component="span">
+              Connection verification failed
+            </Typography>
+          </Box>
+        </DialogTitle>
+        <DialogContent dividers>
           <Alert severity="error" sx={{ mb: 2 }}>
+            <AlertTitle>Provider check failed</AlertTitle>
             {verifyError?.message ?? 'Verification failed'}
           </Alert>
           <Typography variant="body2" color="text.secondary">
             {verifyError?.canRetry
-              ? 'You can retry the setup or cancel to delete this connection.'
-              : 'Please cancel and try again from scratch.'}
+              ? 'Retry setup to run verification again. Cancel setup deletes this unfinished connection.'
+              : 'Cancel setup to delete this unfinished connection, then start again from the connector.'}
           </Typography>
         </DialogContent>
         <DialogActions>
           <Button onClick={handleCancelVerifyError} disabled={isRetrying}>
-            Cancel
+            Cancel setup
           </Button>
           {verifyError?.canRetry && (
-            <Button onClick={handleRetryVerify} disabled={isRetrying} variant="contained">
-              {isRetrying ? 'Retrying…' : 'Retry'}
+            <Button
+              onClick={handleRetryVerify}
+              disabled={isRetrying}
+              variant="contained"
+              startIcon={isRetrying ? <CircularProgress size={16} /> : undefined}
+            >
+              {isRetrying ? 'Retrying setup...' : 'Retry setup'}
             </Button>
           )}
         </DialogActions>

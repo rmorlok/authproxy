@@ -124,9 +124,9 @@ const ConnectionFormStep: React.FC<ConnectionFormStepProps> = ({
     }, [connectionId, data, onSubmit]);
 
     return (
-        <Box sx={{ p: 2 }}>
+        <Box sx={{ pt: 1 }}>
             {stepTitle && (
-                <Typography variant="h6" gutterBottom>
+                <Typography variant="subtitle1" gutterBottom>
                     {stepTitle}
                 </Typography>
             )}
@@ -136,8 +136,19 @@ const ConnectionFormStep: React.FC<ConnectionFormStepProps> = ({
                 </Typography>
             )}
             {loadingDataSources ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', py: 4 }}>
+                <Box
+                    sx={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: 1.5,
+                        py: 4,
+                    }}
+                >
                     <CircularProgress />
+                    <Typography variant="body2" color="text.secondary">
+                        Loading setup options...
+                    </Typography>
                 </Box>
             ) : (
                 <JsonForms
@@ -151,11 +162,11 @@ const ConnectionFormStep: React.FC<ConnectionFormStepProps> = ({
             )}
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 3 }}>
                 <Button
-                    variant="outlined"
+                    variant="text"
                     onClick={onCancel}
                     disabled={isSubmitting}
                 >
-                    Cancel
+                    Cancel setup
                 </Button>
                 <Button
                     variant="contained"
@@ -163,7 +174,7 @@ const ConnectionFormStep: React.FC<ConnectionFormStepProps> = ({
                     disabled={isSubmitting || hasErrors || loadingDataSources}
                     startIcon={isSubmitting ? <CircularProgress size={16} /> : undefined}
                 >
-                    {isSubmitting ? 'Submitting...' : 'Submit'}
+                    {isSubmitting ? 'Saving setup...' : 'Save and verify'}
                 </Button>
             </Box>
         </Box>
