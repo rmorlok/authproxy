@@ -16,6 +16,7 @@ import {
   DialogContentText,
   DialogTitle,
 } from '@mui/material';
+import { alpha } from '@mui/material/styles';
 import {tasks, Connection, ConnectionState, ConnectionHealthState, canBeDisconnected, isRedirectResponse, PollForTaskResult, DisconnectResponseJson} from '@authproxy/api';
 import { useDispatch } from 'react-redux';
 import {
@@ -102,7 +103,9 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
   // in initial setup; later states are tearing down). Visibility itself is the
   // signal — when health is unhealthy the button is emphasized.
   const canReauth = connection.state === ConnectionState.CONFIGURED;
-  const isUnhealthy = connection.health_state === ConnectionHealthState.UNHEALTHY;
+  const isUnhealthy =
+    connection.state === ConnectionState.CONFIGURED &&
+    connection.health_state === ConnectionHealthState.UNHEALTHY;
 
   // Handle disconnect button click
   const handleDisconnectClick = () => {
@@ -156,7 +159,20 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
   };
 
   return (
-    <Card sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Card
+      sx={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        border: 1,
+        borderColor: isUnhealthy ? 'warning.main' : 'divider',
+        bgcolor: (theme) => (
+          isUnhealthy ? alpha(theme.palette.warning.main, 0.08) : theme.palette.background.paper
+        ),
+        boxShadow: isUnhealthy ? 4 : 1,
+      }}
+    >
       <CardHeader
         sx={{
           alignItems: 'flex-start',
@@ -183,7 +199,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
         }
         title={connector ? connector.display_name : 'Unknown Connector'}
         action={(<Chip
-            label={connection.state}
+            label={isUnhealthy ? 'Needs attention' : connection.state}
             color={isUnhealthy ? 'warning' : statusColor}
             size="small"
             variant={isUnhealthy ? 'filled' : 'outlined'}
@@ -192,6 +208,30 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
         subheader={`Connected on ${createdDate}`}
       />
       <CardContent sx={{ flexGrow: 1 }}>
+        {isUnhealthy && (
+          <Box
+            sx={{
+              display: 'flex',
+              alignItems: 'flex-start',
+              gap: 1,
+              mb: 2,
+              p: 1.5,
+              borderRadius: 1,
+              bgcolor: (theme) => alpha(theme.palette.warning.main, 0.14),
+              color: 'warning.dark',
+            }}
+          >
+            <WarningAmberIcon fontSize="small" sx={{ mt: 0.25 }} />
+            <Box>
+              <Typography variant="subtitle2" component="p">
+                Reauthentication required
+              </Typography>
+              <Typography variant="body2">
+                This connection needs attention. Re-authenticate to restore access.
+              </Typography>
+            </Box>
+          </Box>
+        )}
         <Box sx={{
           '& p': { margin: 0, fontSize: '0.875rem', color: 'text.secondary' },
           '& strong': { color: 'text.primary' },
@@ -241,11 +281,13 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
         >
           {canReauth && (
             <Button
-              size="small"
+              size={isUnhealthy ? 'medium' : 'small'}
               startIcon={<RefreshIcon />}
               onClick={handleReauthClick}
               color={isUnhealthy ? 'warning' : 'primary'}
               variant={isUnhealthy ? 'contained' : 'text'}
+              fullWidth={isUnhealthy}
+              sx={{ justifyContent: isUnhealthy ? 'flex-start' : 'center' }}
             >
               Re-authenticate
             </Button>
