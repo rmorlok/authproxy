@@ -107,6 +107,4 @@ flow would produce, but it bypasses the very leg under test: the user
 clicking the "Deny" button on a real consent form. The primary goal of
 this scenario is to verify that the marketplace + provider UI + proxy
 callback behave correctly when a real user denies, so we drive the full
-browser flow (matching the
-[chromedp vs `/test/*` convention](https://github.com/rmorlok/authproxy/issues/159#issuecomment-4361428298)
-adopted across the test suite).
+browser flow.

@@ -1,6 +1,6 @@
 # OAuth incremental authorization
 
-Scenario for issue #180. The test drives re-authentication through the marketplace UI and the provider's login/consent pages with chromedp, rather than short-circuiting through the provider test API.
+This test verifies incremental authorization during OAuth re-authentication. It drives re-authentication through the marketplace UI and the provider's login/consent pages with chromedp, rather than short-circuiting through the provider test API.
 
 The provider fixture currently accepts single scope identifiers in the browser flow, so this scenario uses `read_write` as the optional upgraded scope. The first token response is scripted to grant only `read`, which leaves the connection configured with a missing optional scope. Re-authentication then either returns `read_write` or fails at token exchange.
 

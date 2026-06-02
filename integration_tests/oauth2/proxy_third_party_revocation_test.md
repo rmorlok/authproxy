@@ -1,8 +1,8 @@
-# OAuth2 Third-Party Revocation Detection (scenario 11)
+# OAuth2 Third-Party Revocation Detection
 
 Companion specification for `proxy_third_party_revocation_test.go`.
-Covers issue #172 scenario 11 — when a user revokes access at the
-provider, the proxy must detect the dead credential on its next
+Covers third-party revocation detection: when a user revokes access at
+the provider, the proxy must detect the dead credential on its next
 request, surface it as a reconnect-required failure (unhealthy), and
 stop using the dead refresh token.
 
@@ -16,12 +16,12 @@ Three tests cover the full surface:
 3. `TestProxyRevocation_AccessTokenRevokeDoesNotCascadeToRefresh` —
    sanity guard against a future test-provider change.
 
-Scenario 7 (`proxy_refresh_test.go`'s InvalidGrant case) is the
-related spec: it scripts an RFC-compliant `invalid_grant` response on
-the refresh endpoint and pins the proxy's reaction in isolation.
-Scenario 11 is the causal-chain version — the provider's natural
-revocation state machine produces the failure end-to-end, exercising
-the same proxy code path through a real-world cause.
+`proxy_refresh_failure_test.go` covers the related isolated behavior:
+it scripts an RFC-compliant `invalid_grant` response on the refresh
+endpoint and pins the proxy's reaction in isolation. This file is the
+causal-chain version — the provider's natural revocation state machine
+produces the failure end-to-end, exercising the same proxy code path
+through a real-world cause.
 
 ## What is asserted
 
@@ -63,7 +63,7 @@ the same proxy code path through a real-world cause.
   and the replay succeeds — no further refresh.
 - **Token row rotated forward.** New row id, new refresh_token
   plaintext (test provider default rotation policy is on). This
-  re-exercises scenario 9's rotation guarantee under the 401-retry
+  re-exercises the rotation guarantee under the 401-retry
   path.
 - **Second proxy request also 200, no additional refresh.** Pins that
   the self-heal stuck — the new access token works at `/echo` on its
@@ -110,8 +110,8 @@ repo). The proxy's classifier sees a string it does not recognize and
 labels the failure `provider_4xx_other` with reason
 `refresh_provider_4xx_other`.
 
-Scenario 7's InvalidGrant test covers the RFC-compliant mapping
-(scripted response). Scenario 11 covers the causal chain end-to-end;
+The scripted InvalidGrant refresh-failure test covers the
+RFC-compliant mapping. This file covers the causal chain end-to-end;
 its assertions reflect what the fixture actually emits. If the test
 provider is ever updated to return RFC-compliant `invalid_grant` for
 revoked tokens, this test should be updated to assert
@@ -182,30 +182,29 @@ sequenceDiagram
 
 ## What is *not* covered here
 
-- **Scripted invalid_grant.** Scenario 7's existing test covers the
-  RFC-compliant response (`{"error":"invalid_grant"}`) and the
+- **Scripted invalid_grant.** `proxy_refresh_failure_test.go` covers
+  the RFC-compliant response (`{"error":"invalid_grant"}`) and the
   `category=invalid_grant` / `reason=refresh_invalid_grant` mapping.
 - **Revocation discovered by the introspection endpoint.** The proxy
   detects revocation via 401-at-resource and 400-at-token, not via
   RFC 7662 introspection. If introspection-based detection is added,
   it would warrant its own scenario.
 - **Concurrent proxy requests against a revoked credential.**
-  Scenario 10 (`proxy_refresh_concurrent_test.go`) covers concurrent
-  refresh safety. Concurrent requests against a revoked credential
-  would all fail individually but the redis mutex behavior is
-  unchanged — adding that combinatorial case would add little
-  signal.
+  `proxy_refresh_concurrent_test.go` covers concurrent refresh safety.
+  Concurrent requests against a revoked credential would all fail
+  individually but the redis mutex behavior is unchanged — adding that
+  combinatorial case would add little signal.
 - **Recovery via a fresh OAuth flow after revocation.** Re-running
   `completeAuthFlow` against an unhealthy connection is the
-  reconnect path; the auth-flow tests cover the recovery side.
-  Scenario 11 only asserts that revocation is *detected* and the
-  unhealthy state sticks.
+  reconnect path; the auth-flow tests cover the recovery side. This
+  file only asserts that revocation is *detected* and the unhealthy
+  state sticks.
 
 ## Components
 
 | Lever | What it controls |
 | --- | --- |
-| `proxyRefreshRig` + `completeAuthFlow` | Standard fixture used by scenarios 6, 7, 8, 9, 10, 13. Drives the auth flow to Ready and exposes `rig.userID` and `rig.provider`. |
+| `proxyRefreshRig` + `completeAuthFlow` | Shared refresh fixture. Drives the auth flow to Ready and exposes `rig.userID` and `rig.provider`. |
 | `provider.RevokeUser(userID)` | Test-mode control plane: revokes all access + refresh tokens for the user. Models a user revoking access at the provider's UI. |
 | `provider.RevokeToken(plaintext)` | Test-mode control plane: revokes just that token. Access plaintext → access-only revoke (no cascade). Refresh plaintext → cascade to all access tokens for the same client+user. |
 | `env.DecryptOAuth2AccessToken(t, token)` | Plaintext of the encrypted access_token column — required to call `RevokeToken` on the access leg. |

@@ -1,10 +1,10 @@
-# OAuth2 Provider Timeouts (scenario 18)
+# OAuth2 Provider Timeouts
 
-Companion specification for `provider_timeouts_test.go`. Covers issue
-#177 scenario 18 — when a provider endpoint hangs (or, more broadly,
-when the connection terminates mid-flight), the proxy must classify the
-failure as a transient transport error, retry on the legs where retry
-is policy, and never silently overwrite credentials.
+Companion specification for `provider_timeouts_test.go`. Covers the
+provider transport-failure surface: when a provider endpoint hangs (or,
+more broadly, when the connection terminates mid-flight), the proxy
+must classify the failure as a transient transport error, retry on the
+legs where retry is policy, and never silently overwrite credentials.
 
 ## Scope
 
@@ -45,7 +45,7 @@ calls `Close()` on the underlying conn, producing an `EOF` /
 From the proxy's perspective, a server-side timeout, a TCP reset, and
 a process crash are all the same failure: a transport error on the
 pending request, with no HTTP status to classify. That is the
-observable surface scenario 18 is about.
+observable surface this file is about.
 
 If and when the proxy adds an HTTP client timeout, the same tests
 should still cover the property — the failure surfaces the same way
@@ -116,11 +116,11 @@ should still cover the property — the failure surfaces the same way
 
 | Property | Where else covered |
 | --- | --- |
-| Token-exchange retry budget on 5xx | `callback_token_exchange_retry_test.go` (PR for #168). Same retry helper as the timeout case; 5xx exhaustion and timeout exhaustion both produce `attempts=tokenExchangeMaxAttempts`. |
-| Refresh retry budget on 5xx | `proxy_refresh_retry_test.go` (PR for scenario 8). Asserts the parallel observable shape against 5xx; the 5xx test is the canonical case and this scenario is the transport-layer companion. |
+| Token-exchange retry budget on 5xx | `callback_token_exchange_retry_test.go`. Same retry helper as the timeout case; 5xx exhaustion and timeout exhaustion both produce `attempts=tokenExchangeMaxAttempts`. |
+| Refresh retry budget on 5xx | `proxy_refresh_retry_test.go`. Asserts the parallel observable shape against 5xx; the 5xx test is the canonical case and this timeout spec is the transport-layer companion. |
 | Transport-error retry at the helper level | `internal/auth_methods/oauth2/proxy_test.go::TestPostRefreshWithRetry_TransportErrorRetried` and `internal/auth_methods/oauth2/callback_test.go::TestPostTokenExchangeWithRetry_TransportErrorRetried`. Unit-level coverage of the same retry branch this scenario drives end-to-end. |
-| Permanent vs transient health flip | `proxy_refresh_failure_test.go` (scenario 7) for the permanent categories; this file for the transient `network_error` category. |
-| Wire-format response parsing on the refresh leg | `proxy_refresh_failure_test.go::MalformedResponse` row and `callback_token_exchange_malformed_test.go` (scenario 17). |
+| Permanent vs transient health flip | `proxy_refresh_failure_test.go` covers the permanent categories; this file covers the transient `network_error` category. |
+| Wire-format response parsing on the refresh leg | `proxy_refresh_failure_test.go::MalformedResponse` row and `callback_token_exchange_malformed_test.go`. |
 
 ## What is *not* covered here
 
@@ -128,13 +128,13 @@ should still cover the property — the failure surfaces the same way
   authorize endpoint — the user's browser hits it directly. A hung
   authorize page manifests as a UI failure (the user sees a spinner
   forever, then closes the tab) and never reaches any proxy code path
-  that scenario 18 could cover. The state row would expire on TTL.
+  this timeout suite could cover. The state row would expire on TTL.
 - **Revocation endpoint timeouts.** Revocation is fired from the
   background `disconnect_connection` Asynq task in
   `internal/auth_methods/oauth2/revocation.go`; the integration-test
   harness doesn't run the worker by default, so reproducing a
   revoke-timeout end-to-end requires standing one up. The P2
-  disconnect tests (issue #181) cover the disconnect path including
+  disconnect tests cover the disconnect path including
   revocation failure modes. The unit test
   `revocation_test.go::TestRevokeRefreshToken_*` pins the per-call
   classifier behavior.
@@ -146,7 +146,7 @@ should still cover the property — the failure surfaces the same way
   the response body is written, so the body-parser path is not
   exercised here. A drop mid-body would surface as an `io.ErrUnexpectedEOF`
   on the read; that is a different code path that the malformed-
-  response scenario (#176) is the natural home for if needed.
+  malformed-response tests are the natural home for if needed.
 
 ## Components
 

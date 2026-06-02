@@ -1,17 +1,17 @@
 # OAuth2 Proxy-Time Refresh Cases
 
 Companion specification for `proxy_refresh_test.go`. Covers the
-proxy-time refresh leg of issue #169 and the clock-skew buffer case
-from issue #185. At request time the proxy detects that the persisted
+proxy-time refresh behavior and the clock-skew expiry-buffer case. At
+request time the proxy detects that the persisted
 access token is expired or inside the configured expiry buffer, and
 either exchanges the persisted `refresh_token` for a new access token
-(scenario 6 / #185) or, if no `refresh_token` was issued, flips the
+or, if no `refresh_token` was issued, flips the
 connection's `health_state` to unhealthy without making any HTTP call
-(scenario 13).
+when refresh is impossible.
 
 The initial code → token exchange leg lives in
 `callback_token_exchange_failure_test.go` / `callback_token_exchange_retry_test.go`
-(issue #168). Refresh-call 4xx/5xx rejection cases (invalid_grant,
+Refresh-call 4xx/5xx rejection cases (invalid_grant,
 invalid_client, provider 4xx-other, 5xx) and the
 retry-once-after-401 path are deliberately not included here — see
 "What is *not* covered" below.
@@ -37,7 +37,8 @@ Source: `internal/auth_methods/oauth2/proxy.go:31-132, 166-189`.
 - On a successful refresh, `MarkHealthState(healthy, "refresh_succeeded")`
   is called unconditionally. `MarkHealthState` is idempotent — if the
   connection was already healthy, no `connection health state changed`
-  event is emitted. This is what the scenario-6 assertion pins.
+  event is emitted. The expired-token refresh test pins this no-op
+  transition behavior.
 
 The health-state flip is the load-bearing signal the marketplace UI
 keys off to render its reconnect prompt. A refresh failure that
@@ -46,7 +47,7 @@ over-eager flip on a transient blip would spam reconnect prompts.
 
 ## What is asserted
 
-### Scenario 6 — expired access token refreshes
+### Expired access token refreshes
 
 - **200 from the proxy.** The customer's app sees the request succeed
   modulo the fresh token. End-to-end proof that the refresh round-trip
@@ -73,7 +74,7 @@ over-eager flip on a transient blip would spam reconnect prompts.
   healthy → healthy would render the dashboard's "unhealthy →
   healthy recovery" alert useless.
 
-### Scenario 30 — clock skew / expiry buffer
+### Clock skew / expiry buffer
 
 - **Inside the buffer refreshes.** `TestProxyRefresh_NearlyExpiredAccessTokenRefreshesWithinBuffer`
   forges an active token whose expiry is one second inside
@@ -86,7 +87,7 @@ over-eager flip on a transient blip would spam reconnect prompts.
   proxy request should succeed using the existing token row and should
   not call the refresh endpoint.
 
-### Scenario 13 — no refresh token flips unhealthy
+### No refresh token flips unhealthy
 
 - **Non-200 from the proxy.** The proxy cannot obtain a new access
   token without user interaction, so the customer's request fails.
@@ -116,16 +117,16 @@ over-eager flip on a transient blip would spam reconnect prompts.
 
 ## Test plan
 
-| Test | Pre-expiry refresh_token? | Expected proxy response | Expected health state | Issue case(s) covered |
+| Test | Pre-expiry refresh_token? | Expected proxy response | Expected health state | Behavior covered |
 | ---- | ------------------------- | ----------------------- | --------------------- | -------------------------- |
-| `TestProxyRefresh_ExpiredAccessTokenRefreshes` | yes | 200 (request succeeds) | healthy (no transition) | 6 — expired access token, valid refresh_token |
-| `TestProxyRefresh_NearlyExpiredAccessTokenRefreshesWithinBuffer` | yes | 200 (request succeeds after refresh) | healthy | #185 — token inside expiry buffer |
-| `TestProxyRefresh_TokenOutsideExpiryBufferDoesNotRefreshAggressively` | yes | 200 (request succeeds without refresh) | healthy | #185 — token outside expiry buffer |
-| `TestProxyRefresh_NoRefreshTokenFlipsUnhealthy` | no (cleared) | non-200 (refresh impossible) | unhealthy (transition emitted) | 13 — expired access token, no refresh_token |
+| `TestProxyRefresh_ExpiredAccessTokenRefreshes` | yes | 200 (request succeeds) | healthy (no transition) | Expired access token with a valid refresh token |
+| `TestProxyRefresh_NearlyExpiredAccessTokenRefreshesWithinBuffer` | yes | 200 (request succeeds after refresh) | healthy | Token inside expiry buffer |
+| `TestProxyRefresh_TokenOutsideExpiryBufferDoesNotRefreshAggressively` | yes | 200 (request succeeds without refresh) | healthy | Token outside expiry buffer |
+| `TestProxyRefresh_NoRefreshTokenFlipsUnhealthy` | no (cleared) | non-200 (refresh impossible) | unhealthy (transition emitted) | Expired access token with no refresh token |
 
 ## Why direct HTTP + DB-level expiry forge, not chromedp
 
-Same rationale as the issue #168 tests: the user-flow leg (Connect →
+Same rationale as the token-endpoint behavior tests: the user-flow leg (Connect →
 login → consent) is irrelevant to these cases. The failure mode is
 purely at the persisted-token level — once the auth flow has minted a
 real token, the test forces the expiry condition and exercises the
@@ -159,7 +160,7 @@ Two reasons:
   decrypts and POSTs it, the provider accepts it and returns a fresh
   grant.
 
-For scenario 13, `encfield.EncryptedField{}` (zero value) is passed
+For the no-refresh-token case, `encfield.EncryptedField{}` (zero value) is passed
 instead. `EncryptedRefreshToken.IsZero()` returns true → the
 `errNoRefreshToken` short-circuit fires.
 
@@ -177,9 +178,9 @@ EndpointAuthorize  = "authorize"
 
 Both `EndpointToken` and `EndpointRefresh` map to the same HTTP path
 on the provider, but the inspector classifies by `grant_type` so
-tests can filter cleanly without scanning form bodies. The scenario-6
-refresh assertion filters by `EndpointRefresh`; scenario 13 asserts
-zero `EndpointRefresh` calls.
+tests can filter cleanly without scanning form bodies. The
+expired-token refresh assertion filters by `EndpointRefresh`; the
+no-refresh-token test asserts zero `EndpointRefresh` calls.
 
 ## What is *not* covered here
 
@@ -220,10 +221,10 @@ zero `EndpointRefresh` calls.
 | `completeAuthFlow(t)` (test-local helper)                   | One-call auth flow: `InitiateOAuth2Connection` → `provider.Authorize` → `DeliverOAuth2Callback`. Returns a `connection_id` with a real provider-issued token persisted. |
 | `forceTokenExpired(t, connectionID, clearRefreshToken)`     | Insert a replacement `oauth2_tokens` row with `AccessTokenExpiresAt` 1 hour in the past, optionally with a zero-value `EncryptedRefreshToken`. Reuses the existing encrypted access-token field — the expiry check fires before any decrypt. |
 | `env.DoProxyRequest(t, connectionID, url, method)`          | In-process POST to `/api/v1/connections/<id>/_proxy`. Exercises `oAuth2Connection.ProxyRequest` end to end, including the refresh path triggered by `getValidToken`. |
-| `provider.Requests(RequestsFilter{Endpoint: EndpointRefresh, ClientID})` | Count refresh-token grants observed at the provider. The load-bearing assertion that proves the refresh round-trip ran (scenario 6) or did not (scenario 13). |
+| `provider.Requests(RequestsFilter{Endpoint: EndpointRefresh, ClientID})` | Count refresh-token grants observed at the provider. The load-bearing assertion that proves the refresh round-trip ran or did not when refresh is impossible. |
 | `logCapture.RecordsWithMessage(t, tokenRefreshSuccessMessage / FailureMessage / connectionHealthStateChangedMessage)` | Surface the three structured events the tests pin: refresh success/failure (`oauth token refresh succeeded` / `failed`) and the health transition (`connection health state changed`). Message strings are duplicated as constants at the top of `proxy_refresh_test.go` and fail-fast if either drifts from the production source. |
 
-## Sequence (scenario 6 — successful refresh)
+## Sequence — Successful Refresh
 
 ```mermaid
 sequenceDiagram
@@ -257,7 +258,7 @@ sequenceDiagram
     API-->>T: 200
 ```
 
-## Sequence (scenario 13 — no refresh token, flip unhealthy)
+## Sequence — No Refresh Token, Flip Unhealthy
 
 ```mermaid
 sequenceDiagram

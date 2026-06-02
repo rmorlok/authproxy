@@ -1,7 +1,7 @@
 # Provider Auth Method Compatibility
 
 Companion notes for `provider_auth_method_compatibility_test.go`.
-Covers issue #178 / scenario 19 from #159.
+Covers OAuth provider token-endpoint client authentication compatibility.
 
 ## Scope
 

@@ -1,8 +1,7 @@
 # OAuth multiple connections
 
-Companion specification for `multiple_connections_test.go`. Covers issue
-#183 / #159 scenario 28: multiple independent OAuth connections to the same
-provider.
+Companion specification for `multiple_connections_test.go`. It covers
+multiple independent OAuth connections to the same provider.
 
 ## Coverage
 

@@ -1,6 +1,6 @@
 # OAuth disconnect revocation
 
-Scenario for issue #181. The test uses the provider `/test/*` control plane to complete authorization without a browser, then calls the AuthProxy disconnect API and drains the queued `core:disconnect_connection` task with an in-test Asynq worker.
+This test verifies proxy-initiated OAuth disconnect and revocation. It uses the provider `/test/*` control plane to complete authorization without a browser, then calls the AuthProxy disconnect API and drains the queued `core:disconnect_connection` task with an in-test Asynq worker.
 
 The fixture connector enables OAuth revocation and configures the provider's expected revoke form credentials. It revokes the refresh token, which is sufficient to invalidate provider-side credentials while exercising AuthProxy's local token cleanup path.
 

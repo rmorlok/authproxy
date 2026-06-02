@@ -1,7 +1,7 @@
 # OAuth2 Callback State Security — Cross-Actor Case
 
 Companion specification for `callback_actor_mismatch_test.go`. Covers
-case 5 of #167: an attacker initiates a connection, drives the
+the cross-actor callback attack: an attacker initiates a connection, drives the
 provider's authorize step to mint a code, and sends the resulting
 `/oauth2/callback?state=…&code=…` URL to a different actor (the
 victim). When the victim's browser follows the link, the public
@@ -10,9 +10,10 @@ state record carries the attacker's actor id. State validation must
 reject with `actor_mismatch` and redirect to the configured error
 page; no token must be exchanged or persisted.
 
-The four direct-HTTP cases (1–4) live in
-`callback_state_security_test.go`. The cross-tenant + cross-connection
-cases (6–7) are PR 5.
+The direct-HTTP callback-shape and state-envelope rejection cases live in
+`callback_state_security_test.go`. The cross-tenant and cross-connection
+namespace defenses live in `callback_cross_namespace_test.go` and
+`callback_namespace_mismatch_test.go`.
 
 ## Threat model
 

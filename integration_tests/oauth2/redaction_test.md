@@ -1,7 +1,7 @@
-# OAuth2 Sensitive-Value Redaction (scenario 12)
+# OAuth2 Sensitive-Value Redaction
 
-Companion specification for `redaction_test.go`. Covers issue #173
-scenario 12 — logs, errors, and metrics emitted by any OAuth flow must
+Companion specification for `redaction_test.go`. Logs, errors, and
+metrics emitted by any OAuth flow must
 not contain access tokens, refresh tokens, authorization codes, client
 secrets, PKCE code verifiers, or raw provider credentials.
 
@@ -65,12 +65,12 @@ slog emitted.
 
 ## What is *not* covered here
 
-- **PKCE code verifiers.** The proxy does not implement PKCE
-  (`internal/auth_methods/oauth2` has no `code_verifier` reference; issue
-  #174 / scenario 14 is P1). When PKCE lands, the test should add a
-  `CodeVerifier` field to `flowSecrets` and a per-flow capture point.
-  Adding PKCE without adding it to this test is the silent-leak
-  failure mode this scenario exists to catch.
+- **PKCE code verifiers.** `pkce_test.go` exercises verifier handling,
+  but this redaction suite does not currently capture the verifier
+  plaintext. Add a `CodeVerifier` field to `flowSecrets` and a
+  per-flow capture point if the verifier becomes observable from the
+  integration boundary. Adding new secret material without adding it to
+  this test is the silent-leak failure mode this suite exists to catch.
 - **Gin HTTP access log.** Gin writes its `[api] ... | 200 | ... |
   POST /...` line directly to stdout, not through the configured slog
   handler, so `LogCapture` does not see it. The access log already
@@ -102,13 +102,13 @@ slog emitted.
 ## Why substring scan against decrypted plaintext
 
 The wire-format redaction tests in `request_log` are about checking
-specific known keys (`Authorization`, `client_secret`, etc.).
-Scenario 12 is about catching *any* leak path, including ones that
-emit the value under an unexpected key. The strongest test against
-that class of bug is: the bytes that the provider actually emitted
-must not appear anywhere in the captured log stream. Decrypting the
-persisted row gives us the exact plaintext the proxy held in memory
-and is the only source for the post-rotation refresh_token value.
+specific known keys (`Authorization`, `client_secret`, etc.). This
+suite is about catching *any* leak path, including ones that emit the
+value under an unexpected key. The strongest test against that class of
+bug is: the bytes that the provider actually emitted must not appear
+anywhere in the captured log stream. Decrypting the persisted row gives
+us the exact plaintext the proxy held in memory and is the only source
+for the post-rotation refresh_token value.
 
 A weaker version of this test would scan for keys like `access_token`
 or `refresh_token` in record maps. That misses leaks via different

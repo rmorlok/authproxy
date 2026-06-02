@@ -1,17 +1,17 @@
-# OAuth2 Refresh Token Rotation (scenario 9)
+# OAuth2 Refresh Token Rotation
 
 Companion specification for `proxy_refresh_rotation_test.go`. Covers
-issue #171 scenario 9 — refresh-token rotation. RFC 6749 §6 allows but
-does not require the provider to issue a new `refresh_token` on every
+refresh-token rotation. RFC 6749 §6 allows but does not require the
+provider to issue a new `refresh_token` on every
 refresh response. The proxy must persist any rotated value, carry the
 prior value forward when the provider chooses not to rotate, and send
 the *current* `refresh_token` on every subsequent refresh.
 
-The "old refresh token is not restored by stale writes" property listed
-in scenario 9 is a concurrency property — the redis mutex around
-`refreshAccessToken` prevents a slow concurrent refresh from writing
-back a stale value after a faster one has rotated. That is exercised in
-scenario 10 (PR B for #171).
+The "old refresh token is not restored by stale writes" property is a
+concurrency property — the redis mutex around `refreshAccessToken`
+prevents a slow concurrent refresh from writing back a stale value after
+a faster one has rotated. That is exercised in
+`proxy_refresh_concurrent_test.go`.
 
 ## Cases covered
 
@@ -40,7 +40,7 @@ For every case:
   invalidate the rotation chain assertions and is itself a regression.
 - **Structured events.** One `oauth token refresh succeeded` event per
   successful refresh, zero `oauth token refresh failed` events. A
-  failure event in the rotation chain test would mean refresh #2 sent
+  failure event in the rotation chain test would mean the second refresh sent
   the rotated-away RT and the provider rejected it.
 
 ### Why the forward-chain test relies on the provider's revocation behaviour
@@ -50,15 +50,15 @@ refresh_token revoked
 (`UPDATE oauth_refresh_tokens SET revoked_at = now() WHERE id = ? AND revoked_at IS NULL`),
 and `GetValidRefreshToken` returns `invalid_grant` on a revoked replay.
 So if a regression caused the proxy to keep sending the original RT
-after refresh #1, refresh #2 would 400, the proxy would emit a
+after the first refresh, the second refresh would 400, the proxy would emit a
 refresh-failed event, and the connection would flip unhealthy. The
 chain succeeding twice is therefore proof-by-survival that the proxy is
 reading the rotated value and sending it.
 
 ## Why direct DB-level expiry forge + real rotation, not scripts
 
-Scripting refresh responses (the technique used by scenarios 7 and 8)
-fails for rotation tests because:
+Scripting refresh responses (the technique used by refresh failure and
+retry tests) fails for rotation tests because:
 
 - the test provider redacts `refresh_token` values in the recorded
   request log (`recorder.go:redactedFormFields`), so pinning wire-level
@@ -127,15 +127,16 @@ sequenceDiagram
     API->>DB: InsertOAuth2Token (encrypted RT-C)
     API-->>T: 200
 
-    note over T: chain survives because the proxy sent RT-B on refresh #2,<br/>not the rotated-away RT-A
+    note over T: chain survives because the proxy sent RT-B on the second refresh,<br/>not the rotated-away RT-A
 ```
 
 ## What is *not* covered here
 
 - **Concurrent refresh safety.** The mutex around `refreshAccessToken`
   serializes concurrent refreshes; a slow goroutine must not write back
-  a stale RT after a faster one rotated. Scenario 10 — PR B for #171,
-  driven by a `DelayMs`-padded scripted refresh.
+  a stale RT after a faster one rotated. Covered by
+  `proxy_refresh_concurrent_test.go`, driven by a `DelayMs`-padded
+  scripted refresh.
 - **`response omits refresh_token` carry-forward branch.** The proxy's
   `createDbTokenFromResponse` has a branch that copies
   `refreshFrom.EncryptedRefreshToken` byte-for-byte when the response
@@ -150,14 +151,14 @@ sequenceDiagram
 - **Wire-level refresh_token value.** Redacted by the test provider's
   request recorder; we read the persisted (decrypted) column instead.
 - **Rotation under provider 5xx / transient retry.** Covered by
-  scenario 8 (`proxy_refresh_retry_test.go`); the rotation tests assume
+  `proxy_refresh_retry_test.go`; the rotation tests assume
   the happy path on the refresh response itself.
 
 ## Components
 
 | Lever                                                       | What it controls |
 | ----------------------------------------------------------- | ---------------- |
-| `proxyRefreshRig` + `completeAuthFlow` / `forceTokenExpired` | Same fixture used by scenarios 6, 7, 8, 13. Drives the standard auth flow to Ready, then advances `access_token_expires_at` into the past via a DB-level forge so the proxy's expiry check fires immediately. |
+| `proxyRefreshRig` + `completeAuthFlow` / `forceTokenExpired` | Shared refresh fixture. Drives the standard auth flow to Ready, then advances `access_token_expires_at` into the past via a DB-level forge so the proxy's expiry check fires immediately. |
 | `provider.SetRefreshRotation(bool)` (+ `t.Cleanup` restore)  | Toggle the provider's rotation policy at runtime. Test mode defaults to **on**; the no-rotation test disables and restores. |
 | `env.DoProxyRequest(t, connID, …)`                          | Triggers the expired-token → refresh path in-process. The retry loop is driven entirely server-side; the test never has to wait for real TTLs. |
 | `env.GetOAuth2Token(t, connID)`                             | Read the current token row out of the database. |

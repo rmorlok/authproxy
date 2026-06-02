@@ -1,21 +1,21 @@
-# OAuth2 Refresh Failure Modes (scenario 7)
+# OAuth2 Refresh Failure Modes
 
 Companion specification for `proxy_refresh_failure_test.go`. Covers
-issue #170 scenario 7 — the *deterministic* refresh failure cases that
-must flip the connection unhealthy on the first failed POST.
+the *deterministic* refresh failure cases that must flip the connection
+unhealthy on the first failed POST.
 
-The scenario 8 transient/retry cases (5xx-then-success, exhausted retry
-budget) are PR C and live in a separate file. The auth-flow leg uses the
+The transient/retry cases (5xx-then-success, exhausted retry budget) live
+in `proxy_refresh_retry_test.md`. The auth-flow leg uses the
 `/test/authorize` shortcut rather than chromedp because the failure
 point under test is the refresh endpoint, not the consent screen — same
 reasoning as `callback_token_exchange_failure_test.md`.
 
 ## Cases covered
 
-Scenario 7 in issue #170 lists six observable failure modes for the
+The deterministic refresh-failure matrix covers six observable failure modes for the
 refresh leg:
 
-| Case (issue #170)                        | Test                       | Scripted refresh response                              | Category            |
+| Refresh failure case                     | Test                       | Scripted refresh response                              | Category            |
 | ---------------------------------------- | -------------------------- | ------------------------------------------------------ | ------------------- |
 | Refresh token expired / revoked / invalid; provider returns `invalid_grant` | `InvalidGrant`             | `400 {"error":"invalid_grant"}`                       | `invalid_grant`     |
 | Provider returns `invalid_client`         | `InvalidClient`            | `401 {"error":"invalid_client"}`                      | `invalid_client`    |
@@ -23,7 +23,7 @@ refresh leg:
 | Provider returns malformed refresh response | `MalformedResponse`        | `200` with unparseable JSON body                       | `malformed_response`|
 | Provider returns success without an access token | `NoAccessTokenInResponse`  | `200 {"token_type":"Bearer","expires_in":3600}`        | `malformed_response`|
 
-### Why `invalid_grant` collapses three issue-#170 cases
+### Why `invalid_grant` Collapses Three Provider Cases
 
 RFC 6749 §5.2 deliberately folds *refresh-token expired*, *refresh-token
 revoked*, and *refresh-token invalid* into the single `error=invalid_grant`
@@ -45,9 +45,9 @@ A 200 with a well-formed JSON envelope that omits `access_token` is
 indistinguishable from a 200 with unparseable JSON from the proxy's
 recovery perspective — both leave it with no usable credential and no
 useful information about *why*. `createDbTokenFromResponse` rejects both
-into `tokenRefreshMalformedResponse`. Issue #189 (an endless-refresh-loop
-symptom report) folded into this case once #170's MarkHealthState wiring
-landed in PR #265.
+into `tokenRefreshMalformedResponse`. This case also guards against an
+endless reconnect loop: malformed refresh success responses must mark the
+connection unhealthy instead of repeatedly trying to use a bad token row.
 
 ## What is asserted
 
@@ -75,15 +75,15 @@ For every case:
   — a malformed refresh response must not overwrite the row with
   garbage, because the next refresh attempt would then run against
   corrupted state.
-- **Exactly one refresh POST.** Scenario 7 cases are non-retryable, so
-  the retry loop must short-circuit on the first response. Filtered on
+- **Exactly one refresh POST.** These cases are non-retryable, so the
+  retry loop must short-circuit on the first response. Filtered on
   `grant_type=refresh_token` so the authorization-code POST from the
   initial auth flow doesn't count.
 
 ## What is *not* covered here
 
 - **5xx / transport-error retry behavior.** Bounded retry policy + the
-  "exhausted-budget" failure shape are scenario 8 (PR C) — see
+  "exhausted-budget" failure shape live in
   `proxy_refresh_retry_test.md`.
 - **No-refresh-token short-circuit.** That case never hits the refresh
   endpoint; it's covered by `TestProxyRefresh_NoRefreshTokenFlipsUnhealthy`

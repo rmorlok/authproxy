@@ -1,8 +1,7 @@
 # OAuth open redirect protection
 
-Companion specification for `open_redirect_test.go`. Covers issue #184 /
-#159 scenario 29: OAuth callback and post-auth redirect behavior must not send
-users to arbitrary external URLs.
+Companion specification for `open_redirect_test.go`. OAuth callback and
+post-auth redirect behavior must not send users to arbitrary external URLs.
 
 ## Coverage
 
