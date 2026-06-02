@@ -37,6 +37,8 @@ jobs:
       RELEASE_NAME: dev
       CHART_PATH: deploy/charts/authproxy-demo
       DEV_DOMAIN: ${{ vars.DEV_DOMAIN || 'dev.authproxy.net' }}
+      DEV_CLUSTER_ISSUER: ${{ vars.DEV_CLUSTER_ISSUER || 'letsencrypt-prod' }}
+      DEV_TLS_WILDCARD_SUBDOMAINS: ${{ vars.DEV_TLS_WILDCARD_SUBDOMAINS || 'false' }}
       REGISTRY: ghcr.io
       PR_NUMBER: ${{ github.event.pull_request.number }}
       BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
@@ -300,6 +302,8 @@ jobs:
             --atomic \
             --wait --timeout 10m \
             --set "global.hostname=${{ steps.env.outputs.hostname }}" \
+            --set "global.clusterIssuer=${DEV_CLUSTER_ISSUER}" \
+            --set "ingress.wildcardSubdomains=${DEV_TLS_WILDCARD_SUBDOMAINS}" \
             --set "authproxy.image.tag=${{ steps.env.outputs.image_tag }}" \
             --set "demoShell.image.tag=${{ steps.env.outputs.image_tag }}" \
             --set "seed.image.tag=${{ steps.env.outputs.image_tag }}" \

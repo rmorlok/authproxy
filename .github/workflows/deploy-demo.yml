@@ -215,12 +215,16 @@ jobs:
         id: upgrade
         env:
           GRAFANA_PLUGIN_INSTALL: ${{ vars.GRAFANA_AUTHPROXY_PLUGIN_INSTALL }}
+          DEMO_CLUSTER_ISSUER: ${{ vars.DEMO_CLUSTER_ISSUER || 'letsencrypt-prod' }}
+          DEMO_TLS_WILDCARD_SUBDOMAINS: ${{ vars.DEMO_TLS_WILDCARD_SUBDOMAINS || 'false' }}
         run: |
           set -euo pipefail
           helm_args=(
             --namespace "${RELEASE_NS}" --create-namespace
             --wait --timeout 10m
             --set "global.hostname=${{ vars.DEMO_HOSTNAME }}"
+            --set "global.clusterIssuer=${DEMO_CLUSTER_ISSUER}"
+            --set "ingress.wildcardSubdomains=${DEMO_TLS_WILDCARD_SUBDOMAINS}"
             --set "authproxy.image.tag=${{ steps.tag.outputs.tag }}"
             --set "demoShell.image.tag=${{ steps.tag.outputs.tag }}"
             --set "seed.image.tag=${{ steps.tag.outputs.tag }}"

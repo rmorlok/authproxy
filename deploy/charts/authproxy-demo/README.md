@@ -160,6 +160,22 @@ The OAuth test provider is path-routed because it is not a SPA. The
 marketplace and admin UIs use subdomains so their root-relative Vite
 assets resolve correctly.
 
+## Wildcard TLS
+
+For per-branch dev environments, use a DNS-01 ClusterIssuer and set:
+
+```bash
+--set global.clusterIssuer=letsencrypt-prod-dns01 \
+--set ingress.wildcardSubdomains=true
+```
+
+The rendered Certificate will request `<hostname>` and `*.<hostname>`.
+For a branch hostname like `feature.dev.authproxy.net`, that covers
+`feature.dev.authproxy.net`, `admin.feature.dev.authproxy.net`, and
+`marketplace.feature.dev.authproxy.net` without creating HTTP-01 solver
+pods. The wildcard mode requires DNS-01; HTTP-01 issuers cannot issue
+wildcard certificates.
+
 ## Smoke test
 
 After install, open `https://<hostname>` — the demo-shell page loads.
