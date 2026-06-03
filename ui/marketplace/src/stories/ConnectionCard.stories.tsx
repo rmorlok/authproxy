@@ -7,6 +7,13 @@ import {configureStore} from '@reduxjs/toolkit';
 import connectorsReducer from '../store/connectorsSlice';
 import connectionsReducer from '../store/connectionsSlice';
 
+const logoDataUri = (label: string, background: string) => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="280" height="140" viewBox="0 0 280 140" role="img" aria-label="${label} logo"><rect width="280" height="140" rx="8" fill="${background}"/><text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="700">GC</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+};
+
+const googleCalendarLogo = logoDataUri('Google Calendar', '#1a73e8');
+
 // Create a mock store with connectors and connections
 const mockStore = configureStore({
   reducer: {
@@ -20,7 +27,7 @@ const mockStore = configureStore({
           id: 'google-calendar',
           display_name: 'Google Calendar',
           description: 'Connect to your Google Calendar to manage events and appointments.',
-          logo: 'https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg',
+          logo: googleCalendarLogo,
         },
       ],
       status: 'succeeded',
@@ -69,7 +76,7 @@ const mockConnection: Connection = {
       state: ConnectorVersionState.PRIMARY,
       display_name: "Google Calendar",
       description: "A google calendar connector",
-      logo: "https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg"
+      logo: googleCalendarLogo
   },
   state: ConnectionState.CONFIGURED,
   health_state: ConnectionHealthState.HEALTHY,
@@ -174,7 +181,7 @@ export const WithTaskInProgress: Story = {
                 id: 'google-calendar',
                 display_name: 'Google Calendar',
                 description: 'Connect to your Google Calendar to manage events and appointments.',
-                logo: 'https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg',
+                logo: googleCalendarLogo,
               },
             ],
             status: 'succeeded',

@@ -21,6 +21,17 @@ import connectorsReducer from '../store/connectorsSlice';
 import connectionsReducer from '../store/connectionsSlice';
 import toastsReducer from '../store/toastsSlice';
 
+const logoDataUri = (label: string, background: string, foreground = '#ffffff') => {
+  const initials = label
+    .split(/\s+/)
+    .map((part) => part[0])
+    .join('')
+    .slice(0, 2)
+    .toUpperCase();
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="280" height="140" viewBox="0 0 280 140" role="img" aria-label="${label} logo"><rect width="280" height="140" rx="8" fill="${background}"/><text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" fill="${foreground}" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="700">${initials}</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+};
+
 const connectors: Connector[] = [
   {
     id: 'google-drive',
@@ -30,7 +41,7 @@ const connectors: Connector[] = [
     display_name: 'Google Drive',
     description: 'Have the agent track your work in Google Drive.',
     highlight: 'Have the agent track your work in Google Drive.',
-    logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/1/12/Google_Drive_icon_%282020%29.svg/3840px-Google_Drive_icon_%282020%29.svg.png',
+    logo: logoDataUri('Google Drive', '#188038'),
     has_configure: false,
     versions: 1,
     states: [ConnectorVersionState.ACTIVE],
@@ -45,7 +56,7 @@ const connectors: Connector[] = [
     display_name: 'Greenhouse',
     description: 'This integration pushes candidates to greenhouse.',
     highlight: 'This integration pushes candidates to greenhouse.',
-    logo: 'https://placehold.co/280x140/24a47f/ffffff?text=Greenhouse',
+    logo: logoDataUri('Greenhouse', '#24a47f'),
     has_configure: false,
     versions: 1,
     states: [ConnectorVersionState.ACTIVE],
@@ -60,7 +71,7 @@ const connectors: Connector[] = [
     display_name: 'Google Calendar',
     description: "Allow the agent to manage your calendar on your behalf. It's like having your own personal assistant!!",
     highlight: "Allow the agent to manage your calendar on your behalf. It's like having your own personal assistant!!",
-    logo: 'https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg',
+    logo: logoDataUri('Google Calendar', '#1a73e8'),
     has_configure: true,
     versions: 1,
     states: [ConnectorVersionState.ACTIVE],
@@ -75,7 +86,7 @@ const connectors: Connector[] = [
     display_name: 'GMail',
     description: 'Have the agent respond to your emails without you needing to be involved. Like magic.',
     highlight: 'Have the agent respond to your emails without you needing to be involved. Like magic.',
-    logo: 'https://upload.wikimedia.org/wikipedia/commons/thumb/7/7e/Gmail_icon_%282020%29.svg/3840px-Gmail_icon_%282020%29.svg.png',
+    logo: logoDataUri('GMail', '#d93025'),
     has_configure: false,
     versions: 1,
     states: [ConnectorVersionState.ACTIVE],
@@ -90,7 +101,7 @@ const connectors: Connector[] = [
     display_name: 'pipedrive',
     description: 'Allow our agent to handle your sales support.',
     highlight: 'Allow our agent to handle your sales support.',
-    logo: 'https://placehold.co/280x140/017a5e/ffffff?text=pipedrive',
+    logo: logoDataUri('pipedrive', '#017a5e'),
     has_configure: false,
     versions: 1,
     states: [ConnectorVersionState.ACTIVE],
@@ -105,7 +116,7 @@ const connectors: Connector[] = [
     display_name: 'Asana',
     description: 'Allow our agent organize your work.',
     highlight: 'Allow our agent organize your work.',
-    logo: 'https://assets.asana.biz/m/5f083bc48e06e1e2/original/asana-logo-1200x1200.png',
+    logo: logoDataUri('Asana', '#f06a6a'),
     has_configure: false,
     versions: 1,
     states: [ConnectorVersionState.ACTIVE],
@@ -228,6 +239,18 @@ const meta: Meta<typeof MarketplaceStory> = {
 export default meta;
 type Story = StoryObj<typeof MarketplaceStory>;
 
+const mobileViewport = {
+  viewport: {
+    defaultViewport: 'marketplaceMobile',
+  },
+};
+
+const tabletViewport = {
+  viewport: {
+    defaultViewport: 'marketplaceTablet',
+  },
+};
+
 export const AvailableConnectors: Story = {
   args: {
     route: '/connectors',
@@ -251,11 +274,14 @@ export const ConnectionsPopulatedMobile: Story = {
   args: {
     route: '/connections',
   },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
+  parameters: mobileViewport,
+};
+
+export const ConnectionsPopulatedTablet: Story = {
+  args: {
+    route: '/connections',
   },
+  parameters: tabletViewport,
 };
 
 export const ConnectionsNeedsAttention: Story = {
@@ -297,11 +323,15 @@ export const ConnectionsEmptyMobile: Story = {
     route: '/connections',
     connectionsState: { ...baseConnectionsState, items: [] },
   },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
+  parameters: mobileViewport,
+};
+
+export const ConnectionsEmptyTablet: Story = {
+  args: {
+    route: '/connections',
+    connectionsState: { ...baseConnectionsState, items: [] },
   },
+  parameters: tabletViewport,
 };
 
 export const ConnectionsEmptyLoadingConnectors: Story = {
@@ -316,11 +346,14 @@ export const AvailableConnectorsMobile: Story = {
   args: {
     route: '/connectors',
   },
-  parameters: {
-    viewport: {
-      defaultViewport: 'mobile1',
-    },
+  parameters: mobileViewport,
+};
+
+export const AvailableConnectorsTablet: Story = {
+  args: {
+    route: '/connectors',
   },
+  parameters: tabletViewport,
 };
 
 export const ConnectionSetupDialog: Story = {
@@ -331,6 +364,17 @@ export const ConnectionSetupDialog: Story = {
       currentFormStep: setupStep,
     },
   },
+};
+
+export const ConnectionSetupDialogTablet: Story = {
+  args: {
+    route: '/connections',
+    connectionsState: {
+      ...baseConnectionsState,
+      currentFormStep: setupStep,
+    },
+  },
+  parameters: tabletViewport,
 };
 
 export const ConnectionSetupSubmitting: Story = {
@@ -366,6 +410,21 @@ export const VerificationFailedDialog: Story = {
       },
     },
   },
+};
+
+export const VerificationFailedDialogTablet: Story = {
+  args: {
+    route: '/connections',
+    connectionsState: {
+      ...baseConnectionsState,
+      verifyError: {
+        connectionId: 'cxn_google-calendar',
+        message: 'Calendar API rejected the saved credentials.',
+        canRetry: true,
+      },
+    },
+  },
+  parameters: tabletViewport,
 };
 
 export const VerificationRetryingDialog: Story = {
