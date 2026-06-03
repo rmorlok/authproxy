@@ -12,6 +12,7 @@ import {
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Connector } from '@authproxy/api';
+import { marketplaceTokens } from '../theme';
 
 interface ConnectorCardProps {
   connector: Connector;
@@ -39,10 +40,19 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
   const displayText = connector.highlight || truncateText(connector.description);
 
   return (
-    <Card sx={{ width: '100%', height: '100%', display: 'flex', flexDirection: 'column' }}>
+    <Card
+      sx={{
+        width: '100%',
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        borderRadius: marketplaceTokens.radius.card,
+        boxShadow: marketplaceTokens.card.shadow,
+      }}
+    >
       <CardMedia
         component="img"
-        height="140"
+        height={marketplaceTokens.card.mediaHeight}
         image={connector.logo}
         alt={`${connector.display_name} logo`}
       />
@@ -51,14 +61,14 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
           {connector.display_name}
         </Typography>
         <Box sx={{ 
-          '& p': { margin: 0, fontSize: '0.875rem', color: 'text.secondary' },
+          '& p': { margin: 0, fontSize: marketplaceTokens.markdown.bodyFontSize, color: 'text.secondary' },
           '& strong': { color: 'text.primary' },
           '& em': { color: 'text.secondary' },
           '& code': { 
             backgroundColor: 'action.hover', 
-            padding: '2px 4px', 
-            borderRadius: '4px',
-            fontSize: '0.8rem'
+            padding: marketplaceTokens.markdown.codePadding,
+            borderRadius: marketplaceTokens.radius.control,
+            fontSize: marketplaceTokens.markdown.codeFontSize
           }
         }}>
           <ReactMarkdown 
@@ -73,9 +83,9 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
               // Override code to use custom styling
               code: ({ children }) => <Typography component="code" sx={{ 
                 backgroundColor: 'action.hover', 
-                padding: '2px 4px', 
-                borderRadius: '4px',
-                fontSize: '0.8rem',
+                padding: marketplaceTokens.markdown.codePadding,
+                borderRadius: marketplaceTokens.radius.control,
+                fontSize: marketplaceTokens.markdown.codeFontSize,
                 fontFamily: 'monospace'
               }}>{children}</Typography>
             }}
@@ -103,8 +113,16 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
  */
 export const ConnectorCardSkeleton: React.FC = () => {
   return (
-    <Card sx={{ maxWidth: 345, height: '100%', display: 'flex', flexDirection: 'column' }}>
-      <Skeleton variant="rectangular" height={140} />
+    <Card
+      sx={{
+        maxWidth: 345,
+        height: '100%',
+        display: 'flex',
+        flexDirection: 'column',
+        borderRadius: marketplaceTokens.radius.card,
+      }}
+    >
+      <Skeleton variant="rectangular" height={marketplaceTokens.card.mediaHeight} />
       <CardContent sx={{ flexGrow: 1 }}>
         <Skeleton variant="text" height={32} width="80%" />
         <Box sx={{ mt: 1 }}>

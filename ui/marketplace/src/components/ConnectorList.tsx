@@ -7,9 +7,6 @@ import {
   Alert,
   Box,
   CircularProgress,
-  Dialog,
-  DialogTitle,
-  DialogContent,
   Button,
 } from '@mui/material';
 import { isRedirectResponse } from '@authproxy/api';
@@ -27,11 +24,12 @@ import {
   abortConnectionAsync,
 } from '../store';
 import ConnectorCard, { ConnectorCardSkeleton } from './ConnectorCard';
-import ConnectionFormStep from './ConnectionFormStep';
+import ConnectionSetupDialog from './ConnectionSetupDialog';
 import { AppDispatch } from '../store';
 import { initiateConnectionAsync } from '../store';
 import { Link } from 'react-router-dom';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
+import { marketplaceTokens } from '../theme';
 
 /**
  * Component to display a list of available connectors
@@ -96,7 +94,7 @@ const ConnectorList: React.FC = () => {
 
   if (status === 'loading') {
     content = (
-      <Grid container spacing={4}>
+      <Grid container spacing={marketplaceTokens.spacing.gridGap}>
         {[1, 2, 3, 4].map((item) => (
           <Grid key={item} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
             <ConnectorCardSkeleton />
@@ -108,7 +106,7 @@ const ConnectorList: React.FC = () => {
     content = <Alert severity="error">{error}</Alert>;
   } else if (connectors.length === 0) {
     content = (
-      <Box sx={{ textAlign: 'center', py: 4 }}>
+      <Box sx={{ textAlign: 'center', py: marketplaceTokens.spacing.pageY }}>
         <Typography variant="h6" color="text.secondary">
           No connectors available
         </Typography>
@@ -116,7 +114,7 @@ const ConnectorList: React.FC = () => {
     );
   } else {
     content = (
-      <Grid container spacing={4}>
+      <Grid container spacing={marketplaceTokens.spacing.gridGap}>
         {connectors.map((connector) => (
           <Grid key={connector.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
             <ConnectorCard
@@ -131,21 +129,21 @@ const ConnectorList: React.FC = () => {
   }
 
   return (
-    <Container sx={{ py: 4 }}>
+    <Container sx={{ py: marketplaceTokens.spacing.pageY }}>
       <Box
         sx={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: { xs: 'flex-start', sm: 'center' },
           flexDirection: { xs: 'column', sm: 'row' },
-          gap: 2,
-          mb: 4,
+          gap: marketplaceTokens.spacing.headerGap,
+          mb: marketplaceTokens.spacing.sectionGap,
         }}
       >
         <Typography variant="h4" component="h1">
           Available Connectors
         </Typography>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: marketplaceTokens.spacing.headerGap }}>
           {isConnecting && (
             <Box sx={{ display: 'flex', alignItems: 'center' }}>
               <CircularProgress size={24} sx={{ mr: 1 }} />
@@ -166,31 +164,13 @@ const ConnectorList: React.FC = () => {
       </Box>
       {content}
 
-      <Dialog
-        open={currentFormStep !== null}
-        onClose={handleFormCancel}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle>Connection Setup</DialogTitle>
-        <DialogContent>
-          {formSubmitError && (
-            <Alert severity="error" sx={{ mb: 2 }}>{formSubmitError}</Alert>
-          )}
-          {currentFormStep && (
-            <ConnectionFormStep
-              connectionId={currentFormStep.connectionId}
-              stepTitle={currentFormStep.stepTitle}
-              stepDescription={currentFormStep.stepDescription}
-              jsonSchema={currentFormStep.jsonSchema}
-              uiSchema={currentFormStep.uiSchema}
-              onSubmit={handleFormSubmit}
-              onCancel={handleFormCancel}
-              isSubmitting={isSubmittingForm}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <ConnectionSetupDialog
+        currentFormStep={currentFormStep}
+        formSubmitError={formSubmitError}
+        isSubmittingForm={isSubmittingForm}
+        onCancel={handleFormCancel}
+        onSubmit={handleFormSubmit}
+      />
     </Container>
   );
 };

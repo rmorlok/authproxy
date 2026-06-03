@@ -43,12 +43,13 @@ import {
 } from '../store';
 import ConnectionCard, { ConnectionCardSkeleton } from './ConnectionCard';
 import ConnectorCard, { ConnectorCardSkeleton } from './ConnectorCard';
-import ConnectionFormStep from './ConnectionFormStep';
+import ConnectionSetupDialog from './ConnectionSetupDialog';
 import { AppDispatch } from '../store';
 import { Link, useSearchParams } from 'react-router-dom';
 import AddIcon from '@mui/icons-material/Add';
 import ErrorOutlineIcon from '@mui/icons-material/ErrorOutline';
 import HourglassEmptyIcon from '@mui/icons-material/HourglassEmpty';
+import { marketplaceTokens } from '../theme';
 
 /**
  * Component to display a list of connections
@@ -176,7 +177,7 @@ const ConnectionList: React.FC = () => {
   const renderConnectorDiscovery = () => {
     if (connectorsStatus === 'loading' || connectorsStatus === 'idle') {
       return (
-        <Grid container spacing={4}>
+        <Grid container spacing={marketplaceTokens.spacing.gridGap}>
           {[1, 2, 3, 4].map((i) => (
             <Grid key={`connector-skeleton-${i}`} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
               <ConnectorCardSkeleton />
@@ -201,7 +202,7 @@ const ConnectionList: React.FC = () => {
     }
 
     return (
-      <Grid container spacing={4}>
+      <Grid container spacing={marketplaceTokens.spacing.gridGap}>
         {connectors.map((connector) => (
           <Grid key={connector.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
             <ConnectorCard
@@ -219,7 +220,7 @@ const ConnectionList: React.FC = () => {
 
   if (status === 'loading') {
     content = (
-      <Grid container spacing={4}>
+      <Grid container spacing={marketplaceTokens.spacing.gridGap}>
         {[1, 2, 3, 4].map((i) => (
           <Grid key={`connection-skeleton-${i}`} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
             <ConnectionCardSkeleton />
@@ -235,11 +236,11 @@ const ConnectionList: React.FC = () => {
         <Box
           sx={{
             border: 1,
-            borderColor: 'divider',
-            borderRadius: 2,
-            bgcolor: 'background.paper',
-            mb: 4,
-            p: { xs: 3, sm: 4 },
+            borderColor: marketplaceTokens.card.borderColor,
+            borderRadius: marketplaceTokens.radius.panel,
+            bgcolor: marketplaceTokens.card.surface,
+            mb: marketplaceTokens.spacing.sectionGap,
+            p: marketplaceTokens.spacing.panelPadding,
           }}
         >
           <Typography variant="h5" component="h2" gutterBottom>
@@ -268,7 +269,7 @@ const ConnectionList: React.FC = () => {
     );
   } else {
     content = (
-      <Grid container spacing={4}>
+      <Grid container spacing={marketplaceTokens.spacing.gridGap}>
         {connections.map((connection) => (
           <Grid key={connection.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
             <ConnectionCard connection={connection} />
@@ -279,15 +280,15 @@ const ConnectionList: React.FC = () => {
   }
 
   return (
-    <Container sx={{ py: 4 }}>
+    <Container sx={{ py: marketplaceTokens.spacing.pageY }}>
       <Box
         sx={{
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: { xs: 'flex-start', sm: 'center' },
           flexDirection: { xs: 'column', sm: 'row' },
-          gap: 2,
-          mb: 4,
+          gap: marketplaceTokens.spacing.headerGap,
+          mb: marketplaceTokens.spacing.sectionGap,
         }}
       >
         <Typography variant="h4" component="h1">
@@ -307,48 +308,18 @@ const ConnectionList: React.FC = () => {
       </Box>
       {content}
 
-      <Dialog
-        open={currentFormStep !== null}
-        onClose={handleFormCancel}
-        maxWidth="sm"
-        fullWidth
-      >
-        <DialogTitle sx={{ pb: 1 }}>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 0.5 }}>
-            <Typography variant="h6" component="span">
-              Complete setup
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {currentFormStep?.stepTitle ?? 'Provide the details needed to finish this connection.'}
-            </Typography>
-          </Box>
-        </DialogTitle>
-        <DialogContent dividers>
-          {formSubmitError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              <AlertTitle>Setup could not be saved</AlertTitle>
-              {formSubmitError}
-            </Alert>
-          )}
-          {currentFormStep && (
-            <ConnectionFormStep
-              connectionId={currentFormStep.connectionId}
-              stepTitle={currentFormStep.stepTitle}
-              stepDescription={currentFormStep.stepDescription}
-              jsonSchema={currentFormStep.jsonSchema}
-              uiSchema={currentFormStep.uiSchema}
-              onSubmit={handleFormSubmit}
-              onCancel={handleFormCancel}
-              isSubmitting={isSubmittingForm}
-            />
-          )}
-        </DialogContent>
-      </Dialog>
+      <ConnectionSetupDialog
+        currentFormStep={currentFormStep}
+        formSubmitError={formSubmitError}
+        isSubmittingForm={isSubmittingForm}
+        onCancel={handleFormCancel}
+        onSubmit={handleFormSubmit}
+      />
 
       <Dialog open={verifyingConnectionId !== null} maxWidth="xs" fullWidth>
         <DialogTitle sx={{ pb: 1 }}>Verifying connection</DialogTitle>
         <DialogContent dividers>
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 2, py: 3 }}>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: marketplaceTokens.spacing.headerGap, py: 3 }}>
             <HourglassEmptyIcon color="primary" sx={{ fontSize: 40 }} />
             <Box sx={{ textAlign: 'center' }}>
               <Typography variant="subtitle1" component="p">

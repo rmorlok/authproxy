@@ -5,6 +5,7 @@ import type { JsonFormsCore, UISchemaElement } from '@jsonforms/core';
 import type { JsonSchema } from '@jsonforms/core';
 import { Box, Button, CircularProgress, Typography } from '@mui/material';
 import { connections, DataSourceOption } from '@authproxy/api';
+import { marketplaceTokens } from '../theme';
 
 export interface ConnectionFormStepProps {
     connectionId: string;
@@ -142,7 +143,7 @@ const ConnectionFormStep: React.FC<ConnectionFormStepProps> = ({
                         flexDirection: 'column',
                         alignItems: 'center',
                         gap: 1.5,
-                        py: 4,
+                        py: marketplaceTokens.spacing.pageY,
                     }}
                 >
                     <CircularProgress />
@@ -160,7 +161,7 @@ const ConnectionFormStep: React.FC<ConnectionFormStepProps> = ({
                     onChange={handleChange}
                 />
             )}
-            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: 3 }}>
+            <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: marketplaceTokens.spacing.headerGap + 1 }}>
                 <Button
                     variant="text"
                     onClick={onCancel}
