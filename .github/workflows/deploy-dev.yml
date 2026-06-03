@@ -54,6 +54,11 @@ jobs:
         with:
           version: v3.16.4
 
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
       - name: Resolve environment names
         id: env
         run: |
@@ -347,22 +352,92 @@ jobs:
           kubectl -n "${RELEASE_NS}" get certificate,order,challenge || true
           exit 1
 
-      - name: Smoke test
-        timeout-minutes: 5
+      - name: Smoke test (OAuth flow)
+        id: smoke
+        timeout-minutes: 10
+        env:
+          RELEASE_NS: ${{ steps.env.outputs.namespace }}
+          SMOKE_BASE_URL: https://${{ steps.env.outputs.hostname }}
         run: |
           set -euo pipefail
-          url="https://${{ steps.env.outputs.hostname }}/"
-          echo "Smoke-testing ${url}"
-          for i in $(seq 1 12); do
-            if curl -fsS --max-time 10 -o /dev/null "${url}"; then
-              echo "OK"
-              exit 0
-            fi
-            echo "attempt ${i}: not ready yet, sleeping 5s"
-            sleep 5
-          done
-          echo "Smoke test failed after 60s" >&2
-          exit 1
+          workdir="$(mktemp -d)"
+          trap 'rm -rf "${workdir}"' EXIT
+
+          kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-demo-shell-key" \
+            -o jsonpath='{.data.private}' \
+            | base64 -d > "${workdir}/demo-shell.private"
+          chmod 600 "${workdir}/demo-shell.private"
+
+          log_path="${RUNNER_TEMP}/authproxy-smoke.log"
+          echo "log_path=${log_path}" >> "$GITHUB_OUTPUT"
+          {
+            echo "Smoke-testing ${SMOKE_BASE_URL}"
+            cd integration_tests
+            SMOKE_ADMIN_KEY="${workdir}/demo-shell.private" \
+              go test -tags smoke ./smoke -run TestRemoteOAuth2ProxySmoke -count=1 -v
+          } 2>&1 | tee "${log_path}"
+
+      - name: Post smoke failure comment
+        if: failure() && steps.smoke.outcome == 'failure'
+        uses: actions/github-script@v7
+        env:
+          SMOKE_LOG_PATH: ${{ steps.smoke.outputs.log_path }}
+          DEV_URL: https://${{ steps.env.outputs.hostname }}/
+          RELEASE_NS: ${{ steps.env.outputs.namespace }}
+        with:
+          script: |
+            const fs = require('fs');
+            const marker = '<!-- authproxy-dev-smoke-failure -->';
+            const issue_number = context.payload.pull_request.number;
+            const { owner, repo } = context.repo;
+            const raw = fs.existsSync(process.env.SMOKE_LOG_PATH)
+              ? fs.readFileSync(process.env.SMOKE_LOG_PATH, 'utf8')
+              : 'Smoke log was not found on the runner.';
+            const log = raw.length > 6000 ? raw.slice(raw.length - 6000) : raw;
+            const body = [
+              marker,
+              '## Dev environment smoke test failed',
+              '',
+              '| Item | Value |',
+              '| --- | --- |',
+              `| URL | ${process.env.DEV_URL} |`,
+              `| Namespace | \`${process.env.RELEASE_NS}\` |`,
+              '',
+              'The environment was left running for debugging.',
+              '',
+              '<details><summary>Smoke log</summary>',
+              '',
+              '```text',
+              log,
+              '```',
+              '',
+              '</details>',
+            ].join('\n');
+
+            const comments = await github.paginate(github.rest.issues.listComments, {
+              owner,
+              repo,
+              issue_number,
+              per_page: 100,
+            });
+            const existing = comments.find((comment) =>
+              comment.user?.type === 'Bot' && comment.body?.includes(marker)
+            );
+            if (existing) {
+              await github.rest.issues.updateComment({
+                owner,
+                repo,
+                comment_id: existing.id,
+                body,
+              });
+            } else {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number,
+                body,
+              });
+            }
 
       - name: Post dev environment comment
         uses: actions/github-script@v7
