@@ -3,6 +3,11 @@ import { Meta, StoryObj } from '@storybook/react';
 import ConnectorCard, { ConnectorCardSkeleton } from '../components/ConnectorCard';
 import { Connector, ConnectorVersionState } from '@authproxy/api';
 
+const logoDataUri = (label: string, background: string) => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="280" height="140" viewBox="0 0 280 140" role="img" aria-label="${label} logo"><rect width="280" height="140" rx="8" fill="${background}"/><text x="50%" y="54%" text-anchor="middle" dominant-baseline="middle" fill="#fff" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="700">GC</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+};
+
 const meta: Meta<typeof ConnectorCard> = {
   title: 'Components/ConnectorCard',
   component: ConnectorCard,
@@ -22,7 +27,7 @@ const mockConnector: Connector = {
   type: 'oauth',
   display_name: 'Google Calendar',
   description: 'Connect to your Google Calendar to manage events and appointments.',
-  logo: 'https://upload.wikimedia.org/wikipedia/commons/a/a5/Google_Calendar_icon_%282020%29.svg',
+  logo: logoDataUri('Google Calendar', '#1a73e8'),
   versions: 1,
   states: [ConnectorVersionState.ACTIVE],
 };
