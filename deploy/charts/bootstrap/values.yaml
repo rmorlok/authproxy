@@ -125,6 +125,16 @@ clusterIssuer:
   enabled: true
   name: letsencrypt-prod
   server: https://acme-v02.api.letsencrypt.org/directory
-  # solverIngressClass matches the ingress-nginx IngressClass above so
-  # cert-manager can complete HTTP-01 challenges via the same controller.
+  # -- ACME solver to render. `http01` preserves the original nginx
+  # challenge-pod flow. `route53` enables DNS-01, which is required for
+  # wildcard certificates like `*.branch.dev.authproxy.net`.
+  solver: http01
+  # -- HTTP-01 ingress class. Matches the ingress-nginx IngressClass above.
   solverIngressClass: nginx
+  route53:
+    # -- AWS region for Route53 DNS-01. Defaults to the cluster region.
+    region: us-east-1
+    # -- Hosted zone id to update. Defaults to global.hostedZoneId.
+    hostedZoneId: ""
+    # -- Optional solver selector. Defaults to global.domain when set.
+    dnsZones: []

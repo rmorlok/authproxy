@@ -48,7 +48,8 @@
       "properties": {
         "enabled":     { "type": "boolean" },
         "annotations": { "type": "object", "additionalProperties": { "type": "string" } },
-        "tls":         { "type": "boolean" }
+        "tls":         { "type": "boolean" },
+        "wildcardSubdomains": { "type": "boolean" }
       }
     },
     "grafanaAuthProxy": {

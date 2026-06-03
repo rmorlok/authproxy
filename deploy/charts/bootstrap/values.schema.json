@@ -20,7 +20,20 @@
         "enabled":             { "type": "boolean" },
         "name":                { "type": "string", "minLength": 1 },
         "server":              { "type": "string", "format": "uri" },
-        "solverIngressClass":  { "type": "string", "minLength": 1 }
+        "solver":              { "type": "string", "enum": ["http01", "route53"] },
+        "solverIngressClass":  { "type": "string", "minLength": 1 },
+        "route53": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "region":       { "type": "string", "minLength": 1 },
+            "hostedZoneId": { "type": "string" },
+            "dnsZones": {
+              "type": "array",
+              "items": { "type": "string", "minLength": 1 }
+            }
+          }
+        }
       }
     }
   }
