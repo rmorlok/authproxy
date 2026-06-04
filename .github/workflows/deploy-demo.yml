@@ -262,27 +262,41 @@ jobs:
             kubectl -n "${RELEASE_NS}" rollout status "deployment/$d" --timeout=5m
           done
 
-      - name: Smoke test (HTTP 200 + TLS)
-        # Until A17 lands a real smoke suite, a curl to the demo's
-        # landing page is the minimum signal: DNS resolves, ingress +
-        # cert work, demo-shell serves something.
-        timeout-minutes: 5
+      - name: Wait for TLS certificate
+        timeout-minutes: 20
         run: |
           set -euo pipefail
-          url="https://${{ vars.DEMO_HOSTNAME }}/"
-          echo "Smoke-testing ${url}"
-          # Retry up to 12 times (60s) — external-dns + nginx-ingress
-          # may need a moment to converge after rollout.
-          for i in $(seq 1 12); do
-            if curl -fsS --max-time 10 -o /dev/null "${url}"; then
-              echo "OK"
-              exit 0
-            fi
-            echo "attempt ${i}: not ready yet, sleeping 5s"
-            sleep 5
-          done
-          echo "Smoke test failed after 60s" >&2
+          cert_name="${RELEASE_NAME}-demo-tls"
+          if kubectl -n "${RELEASE_NS}" wait \
+            --for=condition=Ready \
+            "certificate/${cert_name}" \
+            --timeout=18m; then
+            exit 0
+          fi
+
+          kubectl -n "${RELEASE_NS}" describe "certificate/${cert_name}" || true
+          kubectl -n "${RELEASE_NS}" get certificate,order,challenge || true
           exit 1
+
+      - name: Smoke test (OAuth flow)
+        id: smoke
+        timeout-minutes: 10
+        env:
+          SMOKE_BASE_URL: https://${{ vars.DEMO_HOSTNAME }}
+        run: |
+          set -euo pipefail
+          workdir="$(mktemp -d)"
+          trap 'rm -rf "${workdir}"' EXIT
+
+          kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-demo-shell-key" \
+            -o jsonpath='{.data.private}' \
+            | base64 -d > "${workdir}/demo-shell.private"
+          chmod 600 "${workdir}/demo-shell.private"
+
+          echo "Smoke-testing ${SMOKE_BASE_URL}"
+          cd integration_tests
+          SMOKE_ADMIN_KEY="${workdir}/demo-shell.private" \
+            go test -tags smoke ./smoke -run TestRemoteOAuth2ProxySmoke -count=1 -v
 
       - name: helm rollback (on failure)
         if: failure() && steps.pre.outputs.previous_revision != ''
