@@ -181,6 +181,27 @@ seed:
       labels:
         demo: "true"
         role: datasource
+  # -- Connectors to seed into the Marketplace catalog. Each entry gets
+  # created through the AuthProxy admin API, then forced to `primary` so
+  # fresh demo environments show the catalog immediately. `key` is the
+  # stable seed identity used for idempotent upgrades; the AuthProxy API
+  # still owns the generated connector id.
+  connectors:
+    - key: demo-readme-noauth
+      namespace: root
+      labels:
+        demo: "true"
+        auth_method: no_auth
+        showcase: catalog
+      definition:
+        display_name: "Demo README Resource"
+        highlight: "A no-auth catalog entry used to verify demo seeding."
+        description: "This connector is intentionally simple: it demonstrates that the demo-seed job can publish connector definitions into the Marketplace catalog during install and upgrade. Follow-up demo connectors show OAuth, API key auth, pre-connect tenant selection, and post-connect configuration."
+        labels:
+          type: demo-readme-noauth
+          demo: "true"
+        auth:
+          type: no-auth
 
 # ---------------------------------------------------------------------------
 # Subchart passthroughs — see each upstream's values.yaml for the full
