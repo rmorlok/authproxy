@@ -195,6 +195,9 @@ seed:
         showcase: catalog
       definition:
         display_name: "Demo README Resource"
+        logo:
+          mime_type: image/svg+xml
+          base64: PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyODAiIGhlaWdodD0iMTQwIiB2aWV3Qm94PSIwIDAgMjgwIDE0MCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJEZW1vIFJFQURNRSBSZXNvdXJjZSBsb2dvIj48cmVjdCB3aWR0aD0iMjgwIiBoZWlnaHQ9IjE0MCIgcng9IjEyIiBmaWxsPSIjMEIzRDJFIi8+PHBhdGggZD0iTTYyIDk2VjQ0aDM1YzE3IDAgMjggMTAgMjggMjZzLTExIDI2LTI4IDI2SDYyWm0yMC0xN2gxNGM2IDAgMTAtMyAxMC05cy00LTktMTAtOUg4MnYxOFptNjQgMTdWNDRoMjB2MzVoMzV2MTdoLTU1WiIgZmlsbD0iI0ZGRkZGRiIvPjwvc3ZnPg==
         highlight: "A no-auth catalog entry used to verify demo seeding."
         description: "This connector is intentionally simple: it demonstrates that the demo-seed job can publish connector definitions into the Marketplace catalog during install and upgrade. Follow-up demo connectors show OAuth, API key auth, pre-connect tenant selection, and post-connect configuration."
         labels:
