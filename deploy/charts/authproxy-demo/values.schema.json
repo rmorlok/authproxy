@@ -107,6 +107,26 @@
             "required": ["external_id"]
           }
         },
+        "oauth2TestProvider": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "base_url": { "type": "string", "minLength": 1 },
+            "clients": {
+              "type": "array",
+              "items": { "type": "object", "additionalProperties": true }
+            },
+            "users": {
+              "type": "array",
+              "items": { "type": "object", "additionalProperties": true }
+            },
+            "resource_policies": {
+              "type": "array",
+              "items": { "type": "object", "additionalProperties": true }
+            }
+          },
+          "required": ["base_url"]
+        },
         "connectors": {
           "type": "array",
           "items": {

@@ -101,6 +101,10 @@ data:
 {{-     end }}
 {{-   end }}
 {{- end }}
+{{- with .Values.seed.oauth2TestProvider }}
+    oauth2_test_provider:
+{{- tpl (toYaml .) $ | nindent 6 }}
+{{- end }}
     connectors:
 {{- with .Values.seed.connectors }}
 {{- tpl (toYaml .) $ | nindent 6 }}

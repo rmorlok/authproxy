@@ -181,6 +181,37 @@ seed:
       labels:
         demo: "true"
         role: datasource
+  # -- Test-mode state to seed into go-oauth2-server before the OAuth
+  # connectors are published. These clients use the public AuthProxy
+  # callback URL, while connector token/resource calls can stay inside
+  # the cluster via the go-oauth2-server Service.
+  oauth2TestProvider:
+    base_url: "http://{{ include \"authproxy-demo.goOauth2Server.name\" . }}"
+    clients:
+      - key: demo-oauth-simple
+        secret: demo-oauth-simple-secret
+        redirect_uri: "https://marketplace.{{ .Values.global.hostname }}/oauth2/callback"
+        token_endpoint_auth_method: client_secret_post
+        scope: "read profile resources"
+      - key: demo-oauth-tenant
+        secret: demo-oauth-tenant-secret
+        redirect_uri: "https://marketplace.{{ .Values.global.hostname }}/oauth2/callback"
+        token_endpoint_auth_method: client_secret_post
+        scope: "read profile resources"
+      - key: demo-oauth-configure
+        secret: demo-oauth-configure-secret
+        redirect_uri: "https://marketplace.{{ .Values.global.hostname }}/oauth2/callback"
+        token_endpoint_auth_method: client_secret_post
+        scope: "read profile resources"
+    users:
+      - username: demo-oauth-user@example.test
+        password: demo-password
+        email: demo-oauth-user@example.test
+        display_name: Demo OAuth User
+        sub: demo-oauth-user
+    resource_policies:
+      - path: /demo-resources
+        required_scope: resources
   # -- Connectors to seed into the Marketplace catalog. Each entry gets
   # created through the AuthProxy admin API, then forced to `primary` so
   # fresh demo environments show the catalog immediately. `key` is the
@@ -205,6 +236,145 @@ seed:
           demo: "true"
         auth:
           type: no-auth
+    - key: demo-oauth-simple
+      namespace: root
+      labels:
+        demo: "true"
+        auth_method: oauth2
+        showcase: simple-oauth
+      definition:
+        display_name: "Demo OAuth: Basic Authorization"
+        logo:
+          mime_type: image/svg+xml
+          base64: PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyODAiIGhlaWdodD0iMTQwIiB2aWV3Qm94PSIwIDAgMjgwIDE0MCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJTdHJhaWdodCBPQXV0aCBEZW1vIGxvZ28iPjxyZWN0IHdpZHRoPSIyODAiIGhlaWdodD0iMTQwIiByeD0iMTIiIGZpbGw9IiMxNjVERkYiLz48Y2lyY2xlIGN4PSI3NiIgY3k9IjcwIiByPSIzNCIgZmlsbD0icmdiYSgyNTUsMjU1LDI1NSwwLjE4KSIvPjxwYXRoIGQ9Ik0xOTAgNDhjMTIgMCAyMiAxMCAyMiAyMnMtMTAgMjItMjIgMjJoLTQ4Yy0xMiAwLTIyLTEwLTIyLTIyczEwLTIyIDIyLTIyaDQ4Wm0tNDggMTZhNiA2IDAgMCAwIDAgMTJoNDhhNiA2IDAgMCAwIDAtMTJoLTQ4WiIgZmlsbD0iI2ZmZiIgb3BhY2l0eT0iMC45NSIvPjx0ZXh0IHg9Ijc2IiB5PSI4MiIgdGV4dC1hbmNob3I9Im1pZGRsZSIgZmlsbD0iI2ZmZiIgZm9udC1mYW1pbHk9IkludGVyLCBBcmlhbCwgc2Fucy1zZXJpZiIgZm9udC1zaXplPSIzNCIgZm9udC13ZWlnaHQ9IjgwMCI+U088L3RleHQ+PC9zdmc+
+        highlight: "A plain OAuth authorization-code connection with no extra setup."
+        description: "This connector demonstrates AuthProxy's simplest OAuth path: the user clicks Connect, approves access in the demo OAuth provider, and AuthProxy stores the resulting tokens for proxy requests. Use provider username `demo-oauth-user@example.test` and password `demo-password` when the consent screen asks you to sign in."
+        labels:
+          type: demo-oauth-simple
+          demo: "true"
+        auth:
+          type: OAuth2
+          client_id: demo-oauth-simple
+          client_secret: demo-oauth-simple-secret
+          authorization:
+            endpoint: "https://{{ .Values.global.hostname }}/oauth2/web/authorize"
+          token:
+            endpoint: "http://{{ include \"authproxy-demo.goOauth2Server.name\" . }}/v1/oauth/tokens"
+          scopes:
+            - id: read
+              reason: "Read basic profile information from the demo provider."
+            - id: profile
+              reason: "Show how connectors explain why each requested OAuth scope is needed."
+    - key: demo-oauth-tenant
+      namespace: root
+      labels:
+        demo: "true"
+        auth_method: oauth2
+        showcase: preconnect
+      definition:
+        display_name: "Demo OAuth: Tenant Selection"
+        logo:
+          mime_type: image/svg+xml
+          base64: PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyODAiIGhlaWdodD0iMTQwIiB2aWV3Qm94PSIwIDAgMjgwIDE0MCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJUZW5hbnQgU2VsZWN0aW9uIE9BdXRoIERlbW8gbG9nbyI+PHJlY3Qgd2lkdGg9IjI4MCIgaGVpZ2h0PSIxNDAiIHJ4PSIxMiIgZmlsbD0iIzdBM0U5RCIvPjxjaXJjbGUgY3g9Ijc2IiBjeT0iNzAiIHI9IjM0IiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMTgpIi8+PHBhdGggZD0iTTE5MCA0OGMxMiAwIDIyIDEwIDIyIDIycy0xMCAyMi0yMiAyMmgtNDhjLTEyIDAtMjItMTAtMjItMjJzMTAtMjIgMjItMjJoNDhabS00OCAxNmE2IDYgMCAwIDAgMCAxMmg0OGE2IDYgMCAwIDAgMC0xMmgtNDhaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIwLjk1Ii8+PHRleHQgeD0iNzYiIHk9IjgyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmIiBmb250LWZhbWlseT0iSW50ZXIsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjM0IiBmb250LXdlaWdodD0iODAwIj5UUzwvdGV4dD48L3N2Zz4=
+        highlight: "Collects a pretend tenant before starting OAuth."
+        description: "This connector demonstrates pre-connect setup. AuthProxy asks for a pretend tenant before redirecting to OAuth, then makes that value available to OAuth endpoint templates. In a real connector this pattern selects the customer's regional login host or tenant-specific authorization parameters before credentials are requested."
+        labels:
+          type: demo-oauth-tenant
+          demo: "true"
+        auth:
+          type: OAuth2
+          client_id: demo-oauth-tenant
+          client_secret: demo-oauth-tenant-secret
+          authorization:
+            endpoint: "https://{{ .Values.global.hostname }}/oauth2/web/authorize"
+            query_overrides:
+              tenant: "{{`{{cfg.tenant}}`}}"
+          token:
+            endpoint: "http://{{ include \"authproxy-demo.goOauth2Server.name\" . }}/v1/oauth/tokens"
+          scopes:
+            - id: read
+              reason: "Read access after the selected tenant has authorized the app."
+            - id: profile
+              reason: "Display which demo user approved the tenant-scoped connection."
+        setup_flow:
+          preconnect:
+            steps:
+              - id: tenant
+                title: "Choose a pretend tenant"
+                description: "This pre-connect step runs before OAuth. The value is saved into connection configuration and can be used to shape provider-specific OAuth URLs."
+                json_schema:
+                  type: object
+                  required:
+                    - tenant
+                  properties:
+                    tenant:
+                      type: string
+                      title: Demo tenant
+                      description: "Try `northwind`, `globex`, or any short tenant slug. The demo provider accepts all values; the field exists to show pre-auth configuration."
+                      minLength: 2
+                ui_schema:
+                  type: VerticalLayout
+                  elements:
+                    - type: Control
+                      scope: "#/properties/tenant"
+    - key: demo-oauth-configure
+      namespace: root
+      labels:
+        demo: "true"
+        auth_method: oauth2
+        showcase: postconnect-configure
+      definition:
+        display_name: "Demo OAuth: Resource Configuration"
+        logo:
+          mime_type: image/svg+xml
+          base64: PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyODAiIGhlaWdodD0iMTQwIiB2aWV3Qm94PSIwIDAgMjgwIDE0MCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJSZXNvdXJjZSBDb25maWd1cmF0aW9uIE9BdXRoIERlbW8gbG9nbyI+PHJlY3Qgd2lkdGg9IjI4MCIgaGVpZ2h0PSIxNDAiIHJ4PSIxMiIgZmlsbD0iIzBCN0E1QSIvPjxjaXJjbGUgY3g9Ijc2IiBjeT0iNzAiIHI9IjM0IiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMTgpIi8+PHBhdGggZD0iTTE5MCA0OGMxMiAwIDIyIDEwIDIyIDIycy0xMCAyMi0yMiAyMmgtNDhjLTEyIDAtMjItMTAtMjItMjJzMTAtMjIgMjItMjJoNDhabS00OCAxNmE2IDYgMCAwIDAgMCAxMmg0OGE2IDYgMCAwIDAgMC0xMmgtNDhaIiBmaWxsPSIjZmZmIiBvcGFjaXR5PSIwLjk1Ii8+PHRleHQgeD0iNzYiIHk9IjgyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmIiBmb250LWZhbWlseT0iSW50ZXIsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjM0IiBmb250LXdlaWdodD0iODAwIj5SQzwvdGV4dD48L3N2Zz4=
+        highlight: "Uses OAuth first, then fetches configuration choices through the proxy."
+        description: "This connector demonstrates post-connect configuration. After OAuth succeeds, AuthProxy calls a demo provider resource endpoint through the new connection and turns the response into selectable pretend resources. This is the pattern for connectors that must discover workspaces, projects, calendars, or folders after credentials exist."
+        labels:
+          type: demo-oauth-configure
+          demo: "true"
+        auth:
+          type: OAuth2
+          client_id: demo-oauth-configure
+          client_secret: demo-oauth-configure-secret
+          authorization:
+            endpoint: "https://{{ .Values.global.hostname }}/oauth2/web/authorize"
+          token:
+            endpoint: "http://{{ include \"authproxy-demo.goOauth2Server.name\" . }}/v1/oauth/tokens"
+          scopes:
+            - id: read
+              reason: "Complete the OAuth flow against the demo provider."
+            - id: resources
+              reason: "Fetch the pretend resource list used by the post-connect configuration step."
+        setup_flow:
+          configure:
+            steps:
+              - id: select_resource
+                title: "Select a pretend resource"
+                description: "This post-connect step is populated by a data source request through the authenticated proxy. The options stand in for provider resources such as projects, calendars, or workspaces."
+                json_schema:
+                  type: object
+                  required:
+                    - resource_id
+                  properties:
+                    resource_id:
+                      type: string
+                      title: Demo resource
+                      description: "Options are loaded after OAuth using the new connection's credentials."
+                      x-data-source: demo_resources
+                ui_schema:
+                  type: VerticalLayout
+                  elements:
+                    - type: Control
+                      scope: "#/properties/resource_id"
+                data_sources:
+                  demo_resources:
+                    proxy_request:
+                      method: GET
+                      url: "http://{{ include \"authproxy-demo.goOauth2Server.name\" . }}/test/resource/demo-resources"
+                      headers:
+                        Accept: application/json
+                    transform: "Array.isArray(data.resources) ? data.resources.map(r => ({ value: r.id || r.value, label: r.name || r.label || r.id || r.value })) : [{ value: 'project-alpha', label: 'Project Alpha (demo)' }, { value: 'workspace-north', label: 'North Workspace (demo)' }, { value: 'reports-folder', label: 'Reports Folder (demo)' }]"
 
 # ---------------------------------------------------------------------------
 # Subchart passthroughs — see each upstream's values.yaml for the full

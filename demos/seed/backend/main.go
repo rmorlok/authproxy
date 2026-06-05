@@ -35,8 +35,9 @@ import (
 
 // SeedConfig is the YAML shape the binary consumes.
 type SeedConfig struct {
-	Actors     []ActorSeed     `yaml:"actors"`
-	Connectors []ConnectorSeed `yaml:"connectors"`
+	Actors             []ActorSeed             `yaml:"actors"`
+	OAuth2TestProvider *OAuth2TestProviderSeed `yaml:"oauth2_test_provider"`
+	Connectors         []ConnectorSeed         `yaml:"connectors"`
 }
 
 type ActorSeed struct {
@@ -57,6 +58,36 @@ type ConnectorSeed struct {
 	Annotations map[string]string `yaml:"annotations,omitempty"`
 }
 
+type OAuth2TestProviderSeed struct {
+	BaseUrl          string                     `yaml:"base_url"`
+	Clients          []OAuth2TestProviderClient `yaml:"clients,omitempty"`
+	Users            []OAuth2TestProviderUser   `yaml:"users,omitempty"`
+	ResourcePolicies []OAuth2ResourcePolicy     `yaml:"resource_policies,omitempty"`
+}
+
+type OAuth2TestProviderClient struct {
+	Key                     string `json:"key" yaml:"key"`
+	Secret                  string `json:"secret,omitempty" yaml:"secret,omitempty"`
+	RedirectURI             string `json:"redirect_uri,omitempty" yaml:"redirect_uri,omitempty"`
+	TokenEndpointAuthMethod string `json:"token_endpoint_auth_method,omitempty" yaml:"token_endpoint_auth_method,omitempty"`
+	RequirePKCE             bool   `json:"require_pkce,omitempty" yaml:"require_pkce,omitempty"`
+	Scope                   string `json:"scope,omitempty" yaml:"scope,omitempty"`
+}
+
+type OAuth2TestProviderUser struct {
+	Username    string `json:"username" yaml:"username"`
+	Password    string `json:"password,omitempty" yaml:"password,omitempty"`
+	Role        string `json:"role,omitempty" yaml:"role,omitempty"`
+	Email       string `json:"email,omitempty" yaml:"email,omitempty"`
+	DisplayName string `json:"display_name,omitempty" yaml:"display_name,omitempty"`
+	Sub         string `json:"sub,omitempty" yaml:"sub,omitempty"`
+}
+
+type OAuth2ResourcePolicy struct {
+	Path          string `json:"path" yaml:"path"`
+	RequiredScope string `json:"required_scope" yaml:"required_scope"`
+}
+
 type settings struct {
 	adminApiUrl         string
 	adminUsername       string
@@ -69,6 +100,13 @@ const (
 	seedRetryInterval = 5 * time.Second
 	seedLabelKey      = "demo.authproxy.net/seed-key"
 	defaultNamespace  = "root"
+)
+
+type seedAction string
+
+const (
+	seedCreated        seedAction = "created"
+	seedAlreadyPresent seedAction = "already-present"
 )
 
 func mustGetenv(key string) string {
@@ -163,6 +201,69 @@ func upsertActor(c *resty.Client, baseUrl string, a ActorSeed) (created bool, er
 		return false, fmt.Errorf("POST actor %q returned %d: %s", a.ExternalId, postResp.StatusCode(), postResp.String())
 	}
 	return true, nil
+}
+
+func seedOAuth2TestProvider(c *resty.Client, seed OAuth2TestProviderSeed) error {
+	baseUrl := strings.TrimRight(seed.BaseUrl, "/")
+	if baseUrl == "" {
+		return fmt.Errorf("oauth2 test provider base_url is required")
+	}
+
+	for _, client := range seed.Clients {
+		if client.Key == "" {
+			return fmt.Errorf("oauth2 test provider client key is required")
+		}
+		if _, err := postOAuth2TestProvider(c, baseUrl, "/test/clients", client); err != nil {
+			return fmt.Errorf("seed oauth2 client %q: %w", client.Key, err)
+		}
+	}
+
+	for _, user := range seed.Users {
+		if user.Username == "" {
+			return fmt.Errorf("oauth2 test provider username is required")
+		}
+		if _, err := postOAuth2TestProvider(c, baseUrl, "/test/users", user); err != nil {
+			return fmt.Errorf("seed oauth2 user %q: %w", user.Username, err)
+		}
+	}
+
+	for _, policy := range seed.ResourcePolicies {
+		if policy.Path == "" {
+			return fmt.Errorf("oauth2 test provider resource policy path is required")
+		}
+		if _, err := postOAuth2TestProvider(c, baseUrl, "/test/resource-policy", policy); err != nil {
+			return fmt.Errorf("seed oauth2 resource policy %q: %w", policy.Path, err)
+		}
+	}
+
+	return nil
+}
+
+func postOAuth2TestProvider(c *resty.Client, baseUrl, path string, body any) (seedAction, error) {
+	resp, err := c.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(body).
+		Post(baseUrl + path)
+	if err != nil {
+		return "", fmt.Errorf("POST %s: %w", path, err)
+	}
+
+	switch resp.StatusCode() {
+	case http.StatusOK, http.StatusCreated, http.StatusNoContent:
+		return seedCreated, nil
+	case http.StatusConflict:
+		return seedAlreadyPresent, nil
+	default:
+		body := strings.ToLower(resp.String())
+		if resp.StatusCode() == http.StatusBadRequest &&
+			(strings.Contains(body, "already") ||
+				strings.Contains(body, "exists") ||
+				strings.Contains(body, "duplicate") ||
+				strings.Contains(body, "unique")) {
+			return seedAlreadyPresent, nil
+		}
+		return "", fmt.Errorf("POST %s returned %d: %s", path, resp.StatusCode(), resp.String())
+	}
 }
 
 type connectorAction string
@@ -389,6 +490,7 @@ func run(logger *slog.Logger) error {
 	if err != nil {
 		return err
 	}
+	providerClient := resty.New().SetTimeout(30 * time.Second)
 
 	for _, a := range cfg.Actors {
 		deadline := time.Now().Add(seedRetryTimeout)
@@ -414,6 +516,31 @@ func run(logger *slog.Logger) error {
 		} else {
 			logger.Info("actor already present", "external_id", a.ExternalId, "namespace", a.Namespace)
 		}
+	}
+
+	if cfg.OAuth2TestProvider != nil {
+		deadline := time.Now().Add(seedRetryTimeout)
+		for attempt := 1; ; attempt++ {
+			err = seedOAuth2TestProvider(providerClient, *cfg.OAuth2TestProvider)
+			if err == nil {
+				break
+			}
+			if time.Now().After(deadline) {
+				return fmt.Errorf("seed oauth2 test provider after %s: %w", seedRetryTimeout, err)
+			}
+			logger.Warn("oauth2 test provider seed attempt failed; retrying",
+				"base_url", cfg.OAuth2TestProvider.BaseUrl,
+				"attempt", attempt,
+				"err", err,
+			)
+			time.Sleep(seedRetryInterval)
+		}
+		logger.Info("oauth2 test provider seeded",
+			"base_url", cfg.OAuth2TestProvider.BaseUrl,
+			"clients", len(cfg.OAuth2TestProvider.Clients),
+			"users", len(cfg.OAuth2TestProvider.Users),
+			"resource_policies", len(cfg.OAuth2TestProvider.ResourcePolicies),
+		)
 	}
 
 	for _, connector := range cfg.Connectors {
