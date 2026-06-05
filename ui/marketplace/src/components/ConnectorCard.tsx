@@ -1,10 +1,10 @@
 import React from 'react';
-import { 
-  Card, 
-  CardContent, 
-  CardMedia, 
-  Typography, 
-  Button, 
+import {
+  Card,
+  CardContent,
+  CardMedia,
+  Typography,
+  Button,
   CardActions,
   Box,
   Skeleton
@@ -28,11 +28,67 @@ const truncateText = (text: string, maxLength: number = 120): string => {
   return text.substring(0, maxLength).trim() + '...';
 };
 
+const connectorInitials = (displayName: string): string => {
+  const words = displayName
+    .split(/[^a-zA-Z0-9]+/)
+    .filter(Boolean);
+
+  if (words.length === 0) {
+    return 'AP';
+  }
+
+  return words.slice(0, 2).map((word) => word[0].toUpperCase()).join('');
+};
+
+const ConnectorLogoMedia: React.FC<{connector: Connector}> = ({connector}) => {
+  const [logoFailed, setLogoFailed] = React.useState(false);
+
+  React.useEffect(() => {
+    setLogoFailed(false);
+  }, [connector.logo]);
+
+  if (connector.logo && !logoFailed) {
+    return (
+      <CardMedia
+        component="img"
+        image={connector.logo}
+        alt={`${connector.display_name} logo`}
+        onError={() => setLogoFailed(true)}
+        sx={{
+          height: marketplaceTokens.card.mediaHeight,
+          objectFit: 'contain',
+          bgcolor: 'background.default',
+          p: 2,
+        }}
+      />
+    );
+  }
+
+  return (
+    <Box
+      role="img"
+      aria-label={`${connector.display_name} logo`}
+      sx={{
+        height: marketplaceTokens.card.mediaHeight,
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        bgcolor: 'primary.dark',
+        color: 'primary.contrastText',
+      }}
+    >
+      <Typography variant="h3" component="span" sx={{ fontWeight: 700 }}>
+        {connectorInitials(connector.display_name)}
+      </Typography>
+    </Box>
+  );
+};
+
 /**
  * Component to display a single connector with its details
  */
-const ConnectorCard: React.FC<ConnectorCardProps> = ({ 
-  connector, 
+const ConnectorCard: React.FC<ConnectorCardProps> = ({
+  connector,
   onConnect,
   isConnecting
 }) => {
@@ -50,28 +106,23 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
         boxShadow: marketplaceTokens.card.shadow,
       }}
     >
-      <CardMedia
-        component="img"
-        height={marketplaceTokens.card.mediaHeight}
-        image={connector.logo}
-        alt={`${connector.display_name} logo`}
-      />
+      <ConnectorLogoMedia connector={connector} />
       <CardContent sx={{ flexGrow: 1 }}>
         <Typography gutterBottom variant="h5" component="div">
           {connector.display_name}
         </Typography>
-        <Box sx={{ 
+        <Box sx={{
           '& p': { margin: 0, fontSize: marketplaceTokens.markdown.bodyFontSize, color: 'text.secondary' },
           '& strong': { color: 'text.primary' },
           '& em': { color: 'text.secondary' },
-          '& code': { 
-            backgroundColor: 'action.hover', 
+          '& code': {
+            backgroundColor: 'action.hover',
             padding: marketplaceTokens.markdown.codePadding,
             borderRadius: marketplaceTokens.radius.control,
             fontSize: marketplaceTokens.markdown.codeFontSize
           }
         }}>
-          <ReactMarkdown 
+          <ReactMarkdown
             remarkPlugins={[remarkGfm]}
             components={{
               // Override paragraph to remove default margins
@@ -81,8 +132,8 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
               // Override em to use secondary color
               em: ({ children }) => <Typography component="span" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>{children}</Typography>,
               // Override code to use custom styling
-              code: ({ children }) => <Typography component="code" sx={{ 
-                backgroundColor: 'action.hover', 
+              code: ({ children }) => <Typography component="code" sx={{
+                backgroundColor: 'action.hover',
                 padding: marketplaceTokens.markdown.codePadding,
                 borderRadius: marketplaceTokens.radius.control,
                 fontSize: marketplaceTokens.markdown.codeFontSize,

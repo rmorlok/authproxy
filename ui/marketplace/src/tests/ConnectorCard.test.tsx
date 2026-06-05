@@ -89,6 +89,33 @@ describe('ConnectorCard', () => {
         expect(mockOnConnect).not.toHaveBeenCalled();
     });
 
+    test('renders initials when the connector has no logo', () => {
+        render(
+            <ConnectorCard
+                connector={{...mockConnector, display_name: 'No Logo Connector', logo: ''}}
+                onConnect={mockOnConnect}
+                isConnecting={false}
+            />
+        );
+
+        expect(screen.getByLabelText('No Logo Connector logo')).toHaveTextContent('NL');
+    });
+
+    test('falls back to initials when the connector logo fails to load', () => {
+        render(
+            <ConnectorCard
+                connector={mockConnector}
+                onConnect={mockOnConnect}
+                isConnecting={false}
+            />
+        );
+
+        const logoImg = screen.getByAltText('Google Calendar logo');
+        fireEvent.error(logoImg);
+
+        expect(screen.getByLabelText('Google Calendar logo')).toHaveTextContent('GC');
+    });
+
     test('renders skeleton correctly', () => {
         render(<ConnectorCardSkeleton/>);
 
