@@ -2,9 +2,11 @@
 // against a running AuthProxy admin API. Run as a Helm post-install /
 // post-upgrade hook from the authproxy-demo umbrella chart.
 //
-// Idempotency model: for each desired entity, first GET it by
-// external_id; if AuthProxy returns 404, POST it. Re-running the seed
-// job is a no-op once the state matches.
+// Idempotency model: for each desired actor, first GET it by
+// external_id; if AuthProxy returns 404, POST it. For each desired
+// connector, list by the stable demo seed label, create it when absent,
+// or publish a new version when the definition changes. Re-running the
+// seed job is a no-op once the state matches.
 //
 // Auth: signs requests as the demo-shell admin actor using the same
 // keypair the demo-shell itself uses. AuthProxy already trusts that
@@ -12,11 +14,14 @@
 package main
 
 import (
+	"bytes"
+	"encoding/json"
 	"flag"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
+	"reflect"
 	"strings"
 	"time"
 
@@ -30,12 +35,24 @@ import (
 
 // SeedConfig is the YAML shape the binary consumes.
 type SeedConfig struct {
-	Actors []ActorSeed `yaml:"actors"`
+	Actors     []ActorSeed     `yaml:"actors"`
+	Connectors []ConnectorSeed `yaml:"connectors"`
 }
 
 type ActorSeed struct {
 	ExternalId  string            `yaml:"external_id"`
 	Namespace   string            `yaml:"namespace,omitempty"`
+	Labels      map[string]string `yaml:"labels,omitempty"`
+	Annotations map[string]string `yaml:"annotations,omitempty"`
+}
+
+type ConnectorSeed struct {
+	// Key is the stable seed identity. AuthProxy generates connector IDs
+	// for API-created connectors, so the seed job stores this key as an
+	// API label and uses it for future idempotent upgrades.
+	Key         string            `yaml:"key"`
+	Namespace   string            `yaml:"namespace,omitempty"`
+	Definition  config.Connector  `yaml:"definition"`
 	Labels      map[string]string `yaml:"labels,omitempty"`
 	Annotations map[string]string `yaml:"annotations,omitempty"`
 }
@@ -48,8 +65,10 @@ type settings struct {
 }
 
 const (
-	actorRetryTimeout  = 5 * time.Minute
-	actorRetryInterval = 5 * time.Second
+	seedRetryTimeout  = 5 * time.Minute
+	seedRetryInterval = 5 * time.Second
+	seedLabelKey      = "demo.authproxy.net/seed-key"
+	defaultNamespace  = "root"
 )
 
 func mustGetenv(key string) string {
@@ -146,6 +165,220 @@ func upsertActor(c *resty.Client, baseUrl string, a ActorSeed) (created bool, er
 	return true, nil
 }
 
+type connectorAction string
+
+const (
+	connectorCreated        connectorAction = "created"
+	connectorAlreadyPresent connectorAction = "already-present"
+	connectorUpdated        connectorAction = "updated"
+)
+
+func connectorNamespace(seed ConnectorSeed) string {
+	if seed.Namespace != "" {
+		return seed.Namespace
+	}
+	if seed.Definition.Namespace != nil && *seed.Definition.Namespace != "" {
+		return *seed.Definition.Namespace
+	}
+	return defaultNamespace
+}
+
+func connectorLabels(seed ConnectorSeed) map[string]string {
+	labels := make(map[string]string, len(seed.Labels)+1)
+	for k, v := range seed.Labels {
+		labels[k] = v
+	}
+	labels[seedLabelKey] = seed.Key
+	return labels
+}
+
+func connectorDefinitionsEqual(want config.Connector, got api.ConnectorVersionJson) bool {
+	namespace := got.Namespace
+	normalizedWant := want
+	normalizedWant.Id = got.Id
+	normalizedWant.Version = got.Version
+	normalizedWant.Namespace = &namespace
+	normalizedWant.State = string(got.State)
+
+	normalizedGot := got.Definition
+	normalizedGot.Id = got.Id
+	normalizedGot.Version = got.Version
+	normalizedGot.Namespace = &namespace
+	normalizedGot.State = string(got.State)
+
+	return reflect.DeepEqual(normalizeForJSON(normalizedWant), normalizeForJSON(normalizedGot))
+}
+
+func stringMapsEqual(a, b map[string]string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for k, v := range a {
+		if b[k] != v {
+			return false
+		}
+	}
+	return true
+}
+
+func normalizeForJSON(v any) any {
+	data, err := json.Marshal(v)
+	if err != nil {
+		return v
+	}
+	decoder := json.NewDecoder(bytes.NewReader(data))
+	decoder.UseNumber()
+	var out any
+	if err := decoder.Decode(&out); err != nil {
+		return v
+	}
+	return out
+}
+
+func listSeededConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (*api.ConnectorJson, error) {
+	var list api.ListConnectorsResponseJson
+	resp, err := c.R().
+		SetHeader("Accept", "application/json").
+		SetQueryParam("namespace", connectorNamespace(seed)).
+		SetQueryParam("label_selector", fmt.Sprintf("%s=%s", seedLabelKey, seed.Key)).
+		SetQueryParam("limit", "1").
+		SetResult(&list).
+		Get(fmt.Sprintf("%s/api/v1/connectors", baseUrl))
+	if err != nil {
+		return nil, fmt.Errorf("GET connector seed %q: %w", seed.Key, err)
+	}
+	if resp.StatusCode() >= 400 {
+		return nil, fmt.Errorf("GET connector seed %q returned %d: %s", seed.Key, resp.StatusCode(), resp.String())
+	}
+	if len(list.Items) == 0 {
+		return nil, nil
+	}
+	return &list.Items[0], nil
+}
+
+func getConnectorVersion(c *resty.Client, baseUrl string, connector api.ConnectorJson) (*api.ConnectorVersionJson, error) {
+	var version api.ConnectorVersionJson
+	resp, err := c.R().
+		SetHeader("Accept", "application/json").
+		SetResult(&version).
+		Get(fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d", baseUrl, connector.Id, connector.Version))
+	if err != nil {
+		return nil, fmt.Errorf("GET connector version %s:%d: %w", connector.Id, connector.Version, err)
+	}
+	if resp.StatusCode() >= 400 {
+		return nil, fmt.Errorf("GET connector version %s:%d returned %d: %s", connector.Id, connector.Version, resp.StatusCode(), resp.String())
+	}
+	return &version, nil
+}
+
+func createConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (*api.ConnectorVersionJson, error) {
+	body := api.CreateConnectorRequestJson{
+		Namespace:   connectorNamespace(seed),
+		Definition:  seed.Definition,
+		Labels:      connectorLabels(seed),
+		Annotations: seed.Annotations,
+	}
+	var created api.ConnectorVersionJson
+	resp, err := c.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(body).
+		SetResult(&created).
+		Post(fmt.Sprintf("%s/api/v1/connectors", baseUrl))
+	if err != nil {
+		return nil, fmt.Errorf("POST connector seed %q: %w", seed.Key, err)
+	}
+	if resp.StatusCode() >= 400 {
+		return nil, fmt.Errorf("POST connector seed %q returned %d: %s", seed.Key, resp.StatusCode(), resp.String())
+	}
+	return &created, nil
+}
+
+func createConnectorDraft(c *resty.Client, baseUrl string, connector api.ConnectorJson, seed ConnectorSeed) (*api.ConnectorVersionJson, error) {
+	labels := connectorLabels(seed)
+	body := api.CreateConnectorVersionRequestJson{
+		Definition:  &seed.Definition,
+		Labels:      &labels,
+		Annotations: &seed.Annotations,
+	}
+	var created api.ConnectorVersionJson
+	resp, err := c.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(body).
+		SetResult(&created).
+		Post(fmt.Sprintf("%s/api/v1/connectors/%s/versions", baseUrl, connector.Id))
+	if err != nil {
+		return nil, fmt.Errorf("POST connector seed %q version: %w", seed.Key, err)
+	}
+	if resp.StatusCode() >= 400 {
+		return nil, fmt.Errorf("POST connector seed %q version returned %d: %s", seed.Key, resp.StatusCode(), resp.String())
+	}
+	return &created, nil
+}
+
+func forceConnectorPrimary(c *resty.Client, baseUrl string, version api.ConnectorVersionJson) error {
+	resp, err := c.R().
+		SetHeader("Content-Type", "application/json").
+		SetBody(api.ForceConnectorVersionStateRequestJson{State: string(api.ConnectorVersionStatePrimary)}).
+		Put(fmt.Sprintf("%s/api/v1/connectors/%s/versions/%d/_force_state", baseUrl, version.Id, version.Version))
+	if err != nil {
+		return fmt.Errorf("PUT connector seed %s:%d primary: %w", version.Id, version.Version, err)
+	}
+	if resp.StatusCode() >= 400 {
+		return fmt.Errorf("PUT connector seed %s:%d primary returned %d: %s", version.Id, version.Version, resp.StatusCode(), resp.String())
+	}
+	return nil
+}
+
+func upsertConnector(c *resty.Client, baseUrl string, seed ConnectorSeed) (connectorAction, error) {
+	if seed.Key == "" {
+		return "", fmt.Errorf("connector seed key is required")
+	}
+
+	existing, err := listSeededConnector(c, baseUrl, seed)
+	if err != nil {
+		return "", err
+	}
+
+	if existing == nil {
+		created, err := createConnector(c, baseUrl, seed)
+		if err != nil {
+			return "", err
+		}
+		if created.State != api.ConnectorVersionStatePrimary {
+			if err := forceConnectorPrimary(c, baseUrl, *created); err != nil {
+				return "", err
+			}
+		}
+		return connectorCreated, nil
+	}
+
+	version, err := getConnectorVersion(c, baseUrl, *existing)
+	if err != nil {
+		return "", err
+	}
+
+	if connectorDefinitionsEqual(seed.Definition, *version) &&
+		stringMapsEqual(connectorLabels(seed), version.Labels) &&
+		stringMapsEqual(seed.Annotations, version.Annotations) {
+		if version.State != api.ConnectorVersionStatePrimary {
+			if err := forceConnectorPrimary(c, baseUrl, *version); err != nil {
+				return "", err
+			}
+			return connectorUpdated, nil
+		}
+		return connectorAlreadyPresent, nil
+	}
+
+	created, err := createConnectorDraft(c, baseUrl, *existing, seed)
+	if err != nil {
+		return "", err
+	}
+	if err := forceConnectorPrimary(c, baseUrl, *created); err != nil {
+		return "", err
+	}
+	return connectorUpdated, nil
+}
+
 func run(logger *slog.Logger) error {
 	s := loadSettings()
 	cfg, err := loadConfig(s.configPath)
@@ -158,7 +391,7 @@ func run(logger *slog.Logger) error {
 	}
 
 	for _, a := range cfg.Actors {
-		deadline := time.Now().Add(actorRetryTimeout)
+		deadline := time.Now().Add(seedRetryTimeout)
 		var created bool
 		for attempt := 1; ; attempt++ {
 			created, err = upsertActor(client, s.adminApiUrl, a)
@@ -166,7 +399,7 @@ func run(logger *slog.Logger) error {
 				break
 			}
 			if time.Now().After(deadline) {
-				return fmt.Errorf("upsert actor %q after %s: %w", a.ExternalId, actorRetryTimeout, err)
+				return fmt.Errorf("upsert actor %q after %s: %w", a.ExternalId, seedRetryTimeout, err)
 			}
 			logger.Warn("actor seed attempt failed; retrying",
 				"external_id", a.ExternalId,
@@ -174,12 +407,42 @@ func run(logger *slog.Logger) error {
 				"attempt", attempt,
 				"err", err,
 			)
-			time.Sleep(actorRetryInterval)
+			time.Sleep(seedRetryInterval)
 		}
 		if created {
 			logger.Info("actor created", "external_id", a.ExternalId, "namespace", a.Namespace)
 		} else {
 			logger.Info("actor already present", "external_id", a.ExternalId, "namespace", a.Namespace)
+		}
+	}
+
+	for _, connector := range cfg.Connectors {
+		deadline := time.Now().Add(seedRetryTimeout)
+		var action connectorAction
+		for attempt := 1; ; attempt++ {
+			action, err = upsertConnector(client, s.adminApiUrl, connector)
+			if err == nil {
+				break
+			}
+			if time.Now().After(deadline) {
+				return fmt.Errorf("upsert connector %q after %s: %w", connector.Key, seedRetryTimeout, err)
+			}
+			logger.Warn("connector seed attempt failed; retrying",
+				"key", connector.Key,
+				"namespace", connectorNamespace(connector),
+				"attempt", attempt,
+				"err", err,
+			)
+			time.Sleep(seedRetryInterval)
+		}
+
+		switch action {
+		case connectorCreated:
+			logger.Info("connector created", "key", connector.Key, "namespace", connectorNamespace(connector))
+		case connectorUpdated:
+			logger.Info("connector updated", "key", connector.Key, "namespace", connectorNamespace(connector))
+		case connectorAlreadyPresent:
+			logger.Info("connector already present", "key", connector.Key, "namespace", connectorNamespace(connector))
 		}
 	}
 	return nil

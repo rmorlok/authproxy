@@ -1,9 +1,11 @@
 {{- if .Values.seed.enabled }}
-# Post-install / post-upgrade hook Job that seeds the demo actors.
+# Post-install / post-upgrade hook Job that seeds the demo actors and
+# Marketplace connector catalog.
 #
 # Idempotency: the demo-seed binary GETs each actor by external_id
-# and skips creation when AuthProxy returns 200, so re-running on
-# every helm upgrade is a no-op once the state matches.
+# and skips creation when AuthProxy returns 200. Connectors are tracked
+# by a stable seed label and promoted to primary after create/update.
+# Re-running on every helm upgrade is a no-op once the state matches.
 #
 # Hook ordering: seed-job runs AFTER the inner authproxy chart is up
 # (helm sequences post-install hooks after the main release applies).
@@ -65,8 +67,8 @@ spec:
           configMap:
             name: {{ printf "%s-seed-config" .Release.Name | quote }}
 ---
-# ConfigMap with the actor list the Job reads. Rendered from
-# `.Values.seed.actors` so customers can extend or override it.
+# ConfigMap with the actor and connector lists the Job reads. Rendered
+# from `.Values.seed` so customers can extend or override it.
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -98,5 +100,11 @@ data:
           {{ $k }}: {{ $v | quote }}
 {{-     end }}
 {{-   end }}
+{{- end }}
+    connectors:
+{{- with .Values.seed.connectors }}
+{{- tpl (toYaml .) $ | nindent 6 }}
+{{- else }}
+      []
 {{- end }}
 {{- end }}

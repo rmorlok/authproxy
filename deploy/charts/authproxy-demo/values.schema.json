@@ -106,6 +106,21 @@
             },
             "required": ["external_id"]
           }
+        },
+        "connectors": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "additionalProperties": false,
+            "properties": {
+              "key":         { "type": "string", "minLength": 1 },
+              "namespace":   { "type": "string" },
+              "definition":  { "type": "object", "additionalProperties": true },
+              "labels":      { "type": "object", "additionalProperties": { "type": "string" } },
+              "annotations": { "type": "object", "additionalProperties": { "type": "string" } }
+            },
+            "required": ["key", "definition"]
+          }
         }
       }
     }
