@@ -3,19 +3,20 @@
 package oauth2
 
 import (
-	"context"
+	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"testing"
 	"time"
 
-	"github.com/chromedp/chromedp"
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
+	coreIface "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
@@ -35,8 +36,10 @@ type incrementalAuthRig struct {
 	clientSecret string
 	userEmail    string
 	userPassword string
+	userID       string
 	connectorID  apid.ID
 	resourcePath string
+	returnToURL  string
 }
 
 func newIncrementalAuthRig(t *testing.T, name string) *incrementalAuthRig {
@@ -88,65 +91,27 @@ func newIncrementalAuthRig(t *testing.T, name string) *incrementalAuthRig {
 		clientSecret: clientSecret,
 		userEmail:    userEmail,
 		userPassword: userPassword,
+		userID:       user.ID,
 		connectorID:  connectorID,
 		resourcePath: "/echo",
+		returnToURL:  env.Cfg.GetRoot().Public.GetBaseUrl() + "/connections",
 	}
 }
 
-func (r *incrementalAuthRig) startBrowser(t *testing.T) context.Context {
-	t.Helper()
-
-	authToken, err := r.env.PublicAuthUtil.GenerateBearerToken(
-		context.Background(),
-		"test-actor",
-		sconfig.RootNamespace,
-		aschema.AllPermissions(),
-	)
-	require.NoError(t, err)
-
-	browserCtx, _ := helpers.NewBrowser(t)
-	connectorsURL := r.env.PublicURL + "/connectors?auth_token=" + url.QueryEscape(authToken)
-	require.NoError(t, chromedp.Run(browserCtx,
-		chromedp.Navigate(connectorsURL),
-		chromedp.WaitVisible(`//button[normalize-space()='Connect']`, chromedp.BySearch),
-	))
-	return browserCtx
-}
-
-func (r *incrementalAuthRig) connectReadOnly(t *testing.T, browserCtx context.Context) string {
+func (r *incrementalAuthRig) connectReadOnly(t *testing.T) string {
 	t.Helper()
 
 	r.provider.Script(r.clientKey, helpers.EndpointToken, helpers.ScriptAction{
 		ScopeOverride: ptr("read"),
 	})
 
-	require.NoError(t, chromedp.Run(browserCtx,
-		chromedp.Click(`//button[normalize-space()='Connect']`, chromedp.BySearch),
-	))
-	require.NoError(t, waitVisibleOrDump(t, browserCtx, `input[name="email"]`, chromedp.ByQuery))
+	connID, redirectURL := r.env.InitiateOAuth2Connection(t, r.connectorID, r.returnToURL)
+	r.approveOAuthRedirect(t, redirectURL, ptr("read"))
 
-	require.NoError(t, chromedp.Run(browserCtx,
-		chromedp.SendKeys(`input[name="email"]`, r.userEmail, chromedp.ByQuery),
-		chromedp.SendKeys(`input[name="password"]`, r.userPassword, chromedp.ByQuery),
-		chromedp.Submit(`input[name="email"]`, chromedp.ByQuery),
-	))
-	require.NoError(t, waitVisibleOrDump(t, browserCtx, `input[name="allow"]`, chromedp.ByQuery))
-
-	require.NoError(t, chromedp.Run(browserCtx,
-		chromedp.Click(`input[name="allow"]`, chromedp.ByQuery),
-	))
-	require.NoError(t, waitVisibleOrDump(t, browserCtx, `//h1[normalize-space()='Your Connections']`, chromedp.BySearch))
-
-	page := r.env.Db.ListConnectionsBuilder().
-		ForNamespaceMatcher(sconfig.RootNamespace).
-		Limit(10).
-		FetchPage(context.Background())
-	require.NoError(t, page.Error)
-	require.Lenf(t, page.Results, 1, "expected exactly one connection after Connect; got %d", len(page.Results))
-	return page.Results[0].Id.String()
+	return connID
 }
 
-func (r *incrementalAuthRig) startReauthAndWaitForConsent(t *testing.T, browserCtx context.Context, scopeOverride *string, failure *helpers.ScriptAction) {
+func (r *incrementalAuthRig) startReauth(t *testing.T, connectionID string, scopeOverride *string, failure *helpers.ScriptAction) string {
 	t.Helper()
 	if scopeOverride != nil {
 		r.provider.Script(r.clientKey, helpers.EndpointToken, helpers.ScriptAction{
@@ -157,18 +122,73 @@ func (r *incrementalAuthRig) startReauthAndWaitForConsent(t *testing.T, browserC
 		r.provider.Script(r.clientKey, helpers.EndpointToken, *failure)
 	}
 
-	require.NoError(t, chromedp.Run(browserCtx,
-		chromedp.Click(`//button[normalize-space()='Re-authenticate']`, chromedp.BySearch),
-	))
-	require.NoError(t, waitVisibleOrDump(t, browserCtx, `input[name="allow"]`, chromedp.ByQuery))
+	body, err := json.Marshal(struct {
+		ReturnToUrl string `json:"return_to_url,omitempty"`
+	}{
+		ReturnToUrl: r.returnToURL,
+	})
+	require.NoError(t, err)
+
+	path := "/api/v1/connections/" + connectionID + "/_reauth"
+	req, err := r.env.ApiAuthUtil.NewSignedRequestForActorExternalId(
+		http.MethodPost,
+		path,
+		bytes.NewReader(body),
+		sconfig.RootNamespace,
+		"test-actor",
+		aschema.AllPermissions(),
+	)
+	require.NoError(t, err)
+
+	abs, err := url.Parse(r.env.ServerURL + path)
+	require.NoError(t, err)
+	req.URL = abs
+	req.Host = abs.Host
+	req.RequestURI = ""
+
+	resp, err := http.DefaultClient.Do(req)
+	require.NoError(t, err)
+	defer resp.Body.Close()
+
+	respBody, err := io.ReadAll(resp.Body)
+	require.NoError(t, err)
+	require.Equalf(t, http.StatusOK, resp.StatusCode, "reauth failed: %s", string(respBody))
+
+	var out coreIface.ConnectionSetupRedirect
+	require.NoErrorf(t, json.Unmarshal(respBody, &out), "decode reauth body: %s", string(respBody))
+	require.Equal(t, coreIface.ConnectionSetupResponseTypeRedirect, out.Type)
+	require.NotEmpty(t, out.RedirectUrl)
+	return out.RedirectUrl
 }
 
-func (r *incrementalAuthRig) approveReauth(t *testing.T, browserCtx context.Context) {
+func (r *incrementalAuthRig) approveOAuthRedirect(t *testing.T, redirectURL string, scopeOverride *string) {
 	t.Helper()
-	require.NoError(t, chromedp.Run(browserCtx,
-		chromedp.Click(`input[name="allow"]`, chromedp.ByQuery),
-		chromedp.WaitVisible(`//h1[normalize-space()='Your Connections']`, chromedp.BySearch),
-	))
+
+	parsed, err := url.Parse(redirectURL)
+	require.NoError(t, err)
+	stateID := parsed.Query().Get("state_id")
+	require.NotEmpty(t, stateID, "redirect should embed state_id: %s", redirectURL)
+
+	scope := "read_write"
+	if scopeOverride != nil {
+		scope = *scopeOverride
+	}
+	authResp := r.provider.Authorize(helpers.AuthorizeRequest{
+		ClientID:    r.clientKey,
+		UserID:      r.userID,
+		RedirectURI: r.env.PublicOAuthCallbackURL(),
+		Scope:       scope,
+		State:       stateID,
+		Decision:    helpers.AuthorizeApprove,
+	})
+	callback, err := url.Parse(authResp.RedirectURL)
+	require.NoError(t, err)
+	code := callback.Query().Get("code")
+	require.NotEmpty(t, code)
+
+	loc := r.env.DeliverOAuth2Callback(t, r.env.ForgeOAuth2CallbackURL(stateID, code))
+	require.Truef(t, strings.HasPrefix(loc, r.returnToURL),
+		"auth flow should land on return_to_url; got %q", loc)
 }
 
 func (r *incrementalAuthRig) proxyResourceStatus(t *testing.T, connectionID, path string) int {
@@ -221,32 +241,15 @@ func (r *incrementalAuthRig) requireConnectionScopes(t *testing.T, connectionID 
 	assert.ElementsMatch(t, wantGranted, out["granted"])
 }
 
-func waitVisibleOrDump(t *testing.T, ctx context.Context, sel any, opts ...chromedp.QueryOption) error {
-	t.Helper()
-	waitCtx, cancel := context.WithTimeout(ctx, 10*time.Second)
-	defer cancel()
-	if err := chromedp.Run(waitCtx, chromedp.WaitVisible(sel, opts...)); err != nil {
-		var location, body string
-		_ = chromedp.Run(ctx,
-			chromedp.Location(&location),
-			chromedp.OuterHTML("body", &body, chromedp.ByQuery),
-		)
-		t.Logf("timed out waiting for %v at %s; body=%s", sel, location, body)
-		return err
-	}
-	return nil
-}
-
 func TestIncrementalAuthorization_ReauthUpgradesScopes(t *testing.T) {
 	rig := newIncrementalAuthRig(t, "incremental-success")
-	browserCtx := rig.startBrowser(t)
-	connID := rig.connectReadOnly(t, browserCtx)
+	connID := rig.connectReadOnly(t)
 
 	originalTokenID := rig.requireTokenScopes(t, connID, "read")
 	rig.requireConnectionScopes(t, connID, []string{"read_write"}, []string{"read"})
 	assert.Equal(t, http.StatusOK, rig.proxyResourceStatus(t, connID, rig.resourcePath))
 
-	rig.startReauthAndWaitForConsent(t, browserCtx, ptr("read_write"), nil)
+	reauthRedirectURL := rig.startReauth(t, connID, ptr("read_write"), nil)
 
 	connDuring := rig.env.GetConnection(t, connID)
 	assert.Equal(t, database.ConnectionStateConfigured, connDuring.State)
@@ -256,7 +259,7 @@ func TestIncrementalAuthorization_ReauthUpgradesScopes(t *testing.T) {
 		"pending upgrade must not replace the stored token")
 	rig.requireConnectionScopes(t, connID, []string{"read_write"}, []string{"read"})
 
-	rig.approveReauth(t, browserCtx)
+	rig.approveOAuthRedirect(t, reauthRedirectURL, ptr("read_write"))
 
 	newTokenID := rig.requireTokenScopes(t, connID, "read_write")
 	assert.NotEqual(t, originalTokenID, newTokenID,
@@ -272,8 +275,7 @@ func TestIncrementalAuthorization_ReauthUpgradesScopes(t *testing.T) {
 
 func TestIncrementalAuthorization_FailedReauthPreservesExistingCredentials(t *testing.T) {
 	rig := newIncrementalAuthRig(t, "incremental-fail")
-	browserCtx := rig.startBrowser(t)
-	connID := rig.connectReadOnly(t, browserCtx)
+	connID := rig.connectReadOnly(t)
 
 	originalTokenID := rig.requireTokenScopes(t, connID, "read")
 	rig.requireConnectionScopes(t, connID, []string{"read_write"}, []string{"read"})
@@ -283,11 +285,11 @@ func TestIncrementalAuthorization_FailedReauthPreservesExistingCredentials(t *te
 		Status: 400,
 		Body:   rfc6749Error("invalid_grant"),
 	}
-	rig.startReauthAndWaitForConsent(t, browserCtx, nil, &failure)
+	reauthRedirectURL := rig.startReauth(t, connID, nil, &failure)
 	assert.Equal(t, http.StatusOK, rig.proxyResourceStatus(t, connID, rig.resourcePath),
 		"existing credential should remain usable while failed upgrade is still pending")
 
-	rig.approveReauth(t, browserCtx)
+	rig.approveOAuthRedirect(t, reauthRedirectURL, ptr("read_write"))
 
 	assert.Equal(t, originalTokenID, rig.requireTokenScopes(t, connID, "read"),
 		"failed incremental auth must not replace the existing token row")

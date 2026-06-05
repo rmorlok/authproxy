@@ -52,6 +52,7 @@ type proxyRefreshRig struct {
 func newProxyRefreshRig(t *testing.T, name string) *proxyRefreshRig {
 	t.Helper()
 	provider := helpers.NewOAuth2TestProvider(t)
+	provider.SetRefreshRotation(true)
 
 	suffix := fmt.Sprintf("%d", time.Now().UnixNano())
 	clientKey := name + "-client-" + suffix

@@ -24,10 +24,11 @@ import (
 
 func TestOAuth2MultipleConnections_SameTenantRefreshIsolation(t *testing.T) {
 	rig := newProxyRefreshRig(t, "multiple-connections-same-tenant")
+	secondUserEmail := "multiple-connections-second-user-" + apid.New(apid.PrefixActor).String() + "@example.com"
 	secondUser := rig.provider.CreateUser(helpers.CreateUserRequest{
-		Username:    "multiple-connections-second-user@example.com",
+		Username:    secondUserEmail,
 		Password:    "p4ssw0rd-second-user",
-		Email:       "multiple-connections-second-user@example.com",
+		Email:       secondUserEmail,
 		DisplayName: "Second OAuth User",
 	})
 
@@ -71,6 +72,7 @@ func TestOAuth2MultipleConnections_SameTenantRefreshIsolation(t *testing.T) {
 func TestOAuth2MultipleConnections_DifferentTenantsSameProviderAccount(t *testing.T) {
 	rig := newProxyRefreshRig(t, "multiple-connections-tenants")
 	rig.provider.SetRefreshRotation(false)
+	t.Cleanup(func() { rig.provider.SetRefreshRotation(true) })
 
 	tenantA := uniqueTenantNamespace("tenant-a")
 	tenantB := uniqueTenantNamespace("tenant-b")

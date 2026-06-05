@@ -3,7 +3,6 @@
 package oauth2
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -13,7 +12,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/chromedp/chromedp"
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -35,7 +33,11 @@ type scopeMismatchSetup struct {
 	clientKey    string
 	userEmail    string
 	userPassword string
+	userID       string
+	connectorID  apid.ID
+	scopes       []string
 	connector    sconfig.Connector
+	returnToURL  string
 }
 
 // newScopeMismatchSetup builds the test rig. Required scopes are appended to
@@ -53,6 +55,8 @@ func newScopeMismatchSetup(t *testing.T, name string, required, optional []strin
 	clientSecret := name + "-secret-" + suffix
 	userPassword := "p4ssw0rd-" + suffix
 	userEmail := name + "-" + suffix + "@example.com"
+	scopes := append([]string{}, required...)
+	scopes = append(scopes, optional...)
 
 	connectorID := apid.New(apid.PrefixConnectorVersion)
 	connector := helpers.NewOAuth2Connector(connectorID, name, provider, helpers.OAuth2ConnectorOptions{
@@ -63,11 +67,10 @@ func newScopeMismatchSetup(t *testing.T, name string, required, optional []strin
 	})
 
 	env := helpers.Setup(t, helpers.SetupOptions{
-		Service:            helpers.ServiceTypeAPI,
-		StartHTTPServer:    true,
-		IncludePublic:      true,
-		ServeMarketplaceUI: true,
-		Connectors:         []sconfig.Connector{connector},
+		Service:         helpers.ServiceTypeAPI,
+		StartHTTPServer: true,
+		IncludePublic:   true,
+		Connectors:      []sconfig.Connector{connector},
 	})
 	t.Cleanup(env.Cleanup)
 
@@ -93,57 +96,44 @@ func newScopeMismatchSetup(t *testing.T, name string, required, optional []strin
 		clientKey:    clientKey,
 		userEmail:    userEmail,
 		userPassword: userPassword,
+		userID:       user.ID,
+		connectorID:  connectorID,
+		scopes:       scopes,
 		connector:    connector,
+		returnToURL:  env.Cfg.GetRoot().Public.GetBaseUrl() + "/connections",
 	}
 }
 
-// driveApprovalAndGetConnectionId walks chromedp from the marketplace's
-// /connectors page through provider login + Allow, waits for the SPA's
-// /connections page to render (proof the callback completed regardless of
-// success or auth_failed), and returns the new connection's ID.
+// driveApprovalAndGetConnectionId performs the OAuth approval and callback
+// against the real provider without the marketplace UI. These tests assert
+// server-side scope reconciliation, so using the test provider's authorize
+// control plane keeps the integration focused and avoids browser/CDP flake.
 func (s *scopeMismatchSetup) driveApprovalAndGetConnectionId(t *testing.T) string {
 	t.Helper()
 
-	authToken, err := s.env.PublicAuthUtil.GenerateBearerToken(
-		context.Background(),
-		"test-actor",
-		sconfig.RootNamespace,
-		aschema.AllPermissions(),
-	)
+	connID, redirectURL := s.env.InitiateOAuth2Connection(t, s.connectorID, s.returnToURL)
+	parsed, err := url.Parse(redirectURL)
 	require.NoError(t, err)
+	stateID := parsed.Query().Get("state_id")
+	require.NotEmpty(t, stateID, "InitiateOAuth2Connection should embed state_id: %s", redirectURL)
 
-	browserCtx, _ := helpers.NewBrowser(t)
+	authResp := s.provider.Authorize(helpers.AuthorizeRequest{
+		ClientID:    s.clientKey,
+		UserID:      s.userID,
+		RedirectURI: s.env.PublicOAuthCallbackURL(),
+		Scope:       s.scopes[0],
+		State:       stateID,
+		Decision:    helpers.AuthorizeApprove,
+	})
+	callback, err := url.Parse(authResp.RedirectURL)
+	require.NoError(t, err)
+	code := callback.Query().Get("code")
+	require.NotEmpty(t, code)
 
-	connectorsURL := s.env.PublicURL + "/connectors?auth_token=" + url.QueryEscape(authToken)
-	require.NoError(t, chromedp.Run(browserCtx,
-		chromedp.Navigate(connectorsURL),
-		chromedp.WaitVisible(`//button[normalize-space()='Connect']`, chromedp.BySearch),
-	))
-
-	require.NoError(t, chromedp.Run(browserCtx,
-		chromedp.Click(`//button[normalize-space()='Connect']`, chromedp.BySearch),
-		chromedp.WaitVisible(`input[name="email"]`, chromedp.ByQuery),
-	))
-
-	require.NoError(t, chromedp.Run(browserCtx,
-		chromedp.SendKeys(`input[name="email"]`, s.userEmail, chromedp.ByQuery),
-		chromedp.SendKeys(`input[name="password"]`, s.userPassword, chromedp.ByQuery),
-		chromedp.Submit(`input[name="email"]`, chromedp.ByQuery),
-		chromedp.WaitVisible(`input[name="allow"]`, chromedp.ByQuery),
-	))
-
-	require.NoError(t, chromedp.Run(browserCtx,
-		chromedp.Click(`input[name="allow"]`, chromedp.ByQuery),
-		chromedp.WaitVisible(`//h1[normalize-space()='Your Connections']`, chromedp.BySearch),
-	))
-
-	page := s.env.Db.ListConnectionsBuilder().
-		ForNamespaceMatcher(sconfig.RootNamespace).
-		Limit(10).
-		FetchPage(context.Background())
-	require.NoError(t, page.Error)
-	require.Lenf(t, page.Results, 1, "expected exactly one connection after Connect; got %d", len(page.Results))
-	return page.Results[0].Id.String()
+	loc := s.env.DeliverOAuth2Callback(t, s.env.ForgeOAuth2CallbackURL(stateID, code))
+	require.Truef(t, strings.HasPrefix(loc, s.returnToURL),
+		"auth flow should land on return_to_url; got %q", loc)
+	return connID
 }
 
 // fetchConnectionScopes hits GET /api/v1/connections/{id}/scopes through the
