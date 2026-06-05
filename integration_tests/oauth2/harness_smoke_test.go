@@ -6,8 +6,10 @@ package oauth2
 
 import (
 	"net/url"
+	"strconv"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/stretchr/testify/assert"
@@ -20,14 +22,15 @@ import (
 func TestHarness_HealthAndClientRegistration(t *testing.T) {
 	provider := helpers.NewOAuth2TestProvider(t)
 
+	clientKey := smokeClientKey(t, "confidential")
 	client := provider.CreateClient(helpers.CreateClientRequest{
-		Key:         "smoke-client-confidential",
+		Key:         clientKey,
 		Secret:      "shhh",
 		RedirectURI: "https://app.example.com/cb",
 	})
 
 	require.NotEmpty(t, client.ID)
-	assert.Equal(t, "smoke-client-confidential", client.Key)
+	assert.Equal(t, clientKey, client.Key)
 	assert.Equal(t, "https://app.example.com/cb", client.RedirectURI)
 	// Default auth method per RFC 7591 §2.
 	assert.Equal(t, helpers.TokenEndpointAuthBasic, client.TokenEndpointAuthMethod)
@@ -41,15 +44,16 @@ func TestHarness_DriveAuthorizeApprove(t *testing.T) {
 
 	const redirectURI = "https://app.example.com/cb"
 	client := provider.CreateClient(helpers.CreateClientRequest{
-		Key:         "smoke-authorize",
+		Key:         smokeClientKey(t, "authorize"),
 		Secret:      "s3cret",
 		RedirectURI: redirectURI,
 	})
+	userEmail := smokeUserEmail(t, "alice")
 
 	user := provider.CreateUser(helpers.CreateUserRequest{
-		Username: "alice@example.com",
+		Username: userEmail,
 		Password: "p4ssw0rd",
-		Email:    "alice@example.com",
+		Email:    userEmail,
 	})
 
 	resp := provider.Authorize(helpers.AuthorizeRequest{
@@ -79,7 +83,7 @@ func TestHarness_DriveAuthorizeDeny(t *testing.T) {
 	provider := helpers.NewOAuth2TestProvider(t)
 
 	client := provider.CreateClient(helpers.CreateClientRequest{
-		Key:         "smoke-deny",
+		Key:         smokeClientKey(t, "deny"),
 		Secret:      "s",
 		RedirectURI: "https://app.example.com/cb",
 	})
@@ -107,7 +111,7 @@ func TestHarness_ScriptAndInspect(t *testing.T) {
 	provider := helpers.NewOAuth2TestProvider(t)
 
 	client := provider.CreateClient(helpers.CreateClientRequest{
-		Key:         "smoke-script",
+		Key:         smokeClientKey(t, "script"),
 		Secret:      "s",
 		RedirectURI: "https://app.example.com/cb",
 	})
@@ -125,4 +129,15 @@ func TestHarness_ScriptAndInspect(t *testing.T) {
 	// /test/requests should be reachable and return a slice (possibly empty).
 	got := provider.Requests(helpers.RequestsFilter{ClientID: client.Key})
 	assert.NotNil(t, got, "Requests should always return a slice (empty or otherwise)")
+}
+
+func smokeClientKey(t *testing.T, suffix string) string {
+	t.Helper()
+	testName := strings.NewReplacer("/", "-", " ", "-").Replace(t.Name())
+	return "smoke-" + suffix + "-" + strings.ToLower(testName) + "-" + strconv.FormatInt(time.Now().UnixNano(), 10)
+}
+
+func smokeUserEmail(t *testing.T, prefix string) string {
+	t.Helper()
+	return prefix + "-" + strconv.FormatInt(time.Now().UnixNano(), 10) + "@example.com"
 }
