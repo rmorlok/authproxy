@@ -1,3 +1,12 @@
 [mcp_servers.chrome-devtools]
 args = ["chrome-devtools-mcp@latest"]
 command = "npx"
+
+[mcp_servers.chrome-devtools.tools.take_snapshot]
+approval_mode = "approve"
+
+[mcp_servers.chrome-devtools.tools.take_screenshot]
+approval_mode = "approve"
+
+[mcp_servers.chrome-devtools.tools.resize_page]
+approval_mode = "approve"
