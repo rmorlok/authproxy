@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 	"os"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -120,11 +121,115 @@ func TestRemoteOAuth2ProxySmoke(t *testing.T) {
 		"proxied resource call should use bearer auth, got %q", authHeader)
 }
 
+func TestRemoteSeededConnectorsSmoke(t *testing.T) {
+	if *smokeBaseURL == "" {
+		t.Skip("set SMOKE_BASE_URL or pass -base-url")
+	}
+	if *smokeAdminKey == "" {
+		t.Skip("set SMOKE_ADMIN_KEY or pass -admin-key")
+	}
+
+	rig := helpers.NewRemoteAuthProxy(t, helpers.RemoteAuthProxyOptions{
+		BaseURL:         *smokeBaseURL,
+		AdminPrivateKey: *smokeAdminKey,
+	})
+	provider := helpers.NewOAuth2TestProviderAt(t, rig.ProviderURL)
+
+	t.Run("catalog contains expected seeded connectors", func(t *testing.T) {
+		items := rig.ListConnectors(t, "demo=true")
+		bySeedKey := map[string]api.ConnectorJson{}
+		for _, item := range items {
+			if key := item.Labels["demo.authproxy.net/seed-key"]; key != "" {
+				bySeedKey[key] = item
+			}
+		}
+
+		expected := map[string]string{
+			"demo-readme-noauth":   "Demo README Resource",
+			"demo-api-key-bearer":  "Demo API Key: Bearer Token",
+			"demo-oauth-simple":    "Demo OAuth: Basic Authorization",
+			"demo-oauth-tenant":    "Demo OAuth: Tenant Selection",
+			"demo-oauth-configure": "Demo OAuth: Resource Configuration",
+		}
+		for seedKey, displayName := range expected {
+			connector, ok := bySeedKey[seedKey]
+			require.Truef(t, ok, "missing seeded connector %q (%s); present seed keys: %v", seedKey, displayName, sortedKeys(bySeedKey))
+			require.Equalf(t, displayName, connector.DisplayName, "seeded connector %q display name changed", seedKey)
+			require.Equalf(t, api.ConnectorVersionStatePrimary, connector.State, "seeded connector %q should be primary", seedKey)
+		}
+	})
+
+	t.Run("seeded basic OAuth connector completes and proxies", func(t *testing.T) {
+		startedAt := time.Now().Add(-1 * time.Second)
+		connector := rig.FindConnectorBySeedKey(t, "demo-oauth-simple")
+		connectionID, redirectURL := rig.InitiateOAuth2Connection(t, connector.Id, rig.PublicURL+"/connections")
+
+		authorizeURL := rig.FollowOAuth2Redirect(t, redirectURL)
+		authorizeParams := parseQuery(t, authorizeURL)
+		require.Equal(t, "demo-oauth-simple", authorizeParams.Get("client_id"))
+		require.Equal(t, rig.PublicURL+"/oauth2/callback", authorizeParams.Get("redirect_uri"))
+		require.NotEmpty(t, authorizeParams.Get("state"))
+
+		callback := provider.Authorize(helpers.AuthorizeRequest{
+			ClientID:    "demo-oauth-simple",
+			Username:    "demo-oauth-user@example.test",
+			RedirectURI: authorizeParams.Get("redirect_uri"),
+			Scope:       authorizeParams.Get("scope"),
+			State:       authorizeParams.Get("state"),
+			Decision:    helpers.AuthorizeApprove,
+		})
+		require.NotEmpty(t, callback.RedirectURL)
+
+		finalLocation := rig.DeliverOAuth2Callback(t, callback.RedirectURL)
+		assert.Truef(t, strings.HasPrefix(finalLocation, rig.PublicURL+"/connections"),
+			"expected callback to land on marketplace connections page, got %q", finalLocation)
+
+		proxyResp := rig.DoProxyRequest(t, connectionID, provider.ResourceURL("/echo"), http.MethodGet)
+		require.Equal(t, http.StatusOK, proxyResp.StatusCode)
+
+		tokenReqs := provider.Requests(helpers.RequestsFilter{
+			Endpoint: helpers.EndpointToken,
+			ClientID: "demo-oauth-simple",
+			Since:    startedAt,
+		})
+		require.NotEmpty(t, tokenReqs, "provider should record seeded OAuth token exchange")
+	})
+
+	t.Run("seeded API key connector completes and proxies", func(t *testing.T) {
+		connector := rig.FindConnectorBySeedKey(t, "demo-api-key-bearer")
+		connectionID, stepID := rig.InitiateAPIKeyConnection(t, connector.Id)
+		respType := rig.SubmitAPIKeyCredentials(t, connectionID, stepID, "demo-api-key")
+		switch respType {
+		case api.ConnectionSetupResponseTypeComplete:
+		case api.ConnectionSetupResponseTypeVerifying:
+			rig.WaitForSetupComplete(t, connectionID, 2*time.Minute)
+		default:
+			require.Failf(t, "unexpected API-key submit response", "got setup response type %q", respType)
+		}
+
+		proxyResp := rig.DoProxyRequest(t, connectionID, rig.ProviderURL+"/test/api-key-resource/demo-api-key", http.MethodGet)
+		require.Equal(t, http.StatusOK, proxyResp.StatusCode)
+		body, ok := proxyResp.BodyJson.(map[string]any)
+		require.Truef(t, ok, "expected JSON body from API-key resource, got %#v", proxyResp.BodyJson)
+		require.Equal(t, "api-key", body["auth"])
+		require.Equal(t, "/test/api-key-resource/demo-api-key", body["path"])
+	})
+}
+
 func parseQuery(t *testing.T, rawURL string) url.Values {
 	t.Helper()
 	parsed, err := url.Parse(rawURL)
 	require.NoError(t, err)
 	return parsed.Query()
+}
+
+func sortedKeys(connectors map[string]api.ConnectorJson) []string {
+	keys := make([]string, 0, len(connectors))
+	for key := range connectors {
+		keys = append(keys, key)
+	}
+	sort.Strings(keys)
+	return keys
 }
 
 func lastFormValue(form map[string][]string, key string) string {
