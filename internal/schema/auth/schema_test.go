@@ -74,6 +74,21 @@ func TestSchema(t *testing.T) {
 			data:  `{"test": {"namespace": "root.prod", "resources": ["connector"], "resource_ids": ["conn-1"], "verbs": ["read"]}}`,
 		},
 		{
+			name:  "valid permission with external_id namespace template",
+			valid: true,
+			data:  `{"test": {"namespace": "root.{{external_id}}.**", "resources": ["connector"], "verbs": ["read"]}}`,
+		},
+		{
+			name:  "valid permission with label and annotation namespace templates",
+			valid: true,
+			data:  `{"test": {"namespace": "root.{{labels.tenant}}.{{annotations.region}}", "resources": ["connector"], "verbs": ["read"]}}`,
+		},
+		{
+			name:  "invalid permission with unsupported namespace template",
+			valid: false,
+			data:  `{"test": {"namespace": "root.{{email}}", "resources": ["connector"], "verbs": ["read"]}}`,
+		},
+		{
 			name:  "missing namespace",
 			valid: false,
 			data:  `{"test": {"resources": ["connector"], "verbs": ["read"]}}`,

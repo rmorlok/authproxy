@@ -31,8 +31,10 @@ type ClaimsBuilder interface {
 	WithNamespace(namespace string) ClaimsBuilder
 	WithActor(actor core.IActorData) ClaimsBuilder
 	WithPermissions(permissions []aschema.Permission) ClaimsBuilder
-	WithLabels(labels map[string]string) ClaimsBuilder
-	WithLabel(key, value string) ClaimsBuilder
+	WithActorLabels(labels map[string]string) ClaimsBuilder
+	WithActorLabel(key, value string) ClaimsBuilder
+	WithActorAnnotations(annotations map[string]string) ClaimsBuilder
+	WithActorAnnotation(key, value string) ClaimsBuilder
 	WithNonce() ClaimsBuilder
 	BuildCtx(context.Context) (*AuthProxyClaims, error)
 	Build() (*AuthProxyClaims, error)
@@ -50,6 +52,7 @@ type claimsBuilder struct {
 	actor        *core.Actor
 	permissions  []aschema.Permission
 	labels       map[string]string
+	annotations  map[string]string
 	systemSigned bool
 	actorSigned  bool
 	nonce        *apid.ID
@@ -124,16 +127,29 @@ func (b *claimsBuilder) WithPermissions(permissions []aschema.Permission) Claims
 	return b
 }
 
-func (b *claimsBuilder) WithLabels(labels map[string]string) ClaimsBuilder {
+func (b *claimsBuilder) WithActorLabels(labels map[string]string) ClaimsBuilder {
 	b.labels = labels
 	return b
 }
 
-func (b *claimsBuilder) WithLabel(key, value string) ClaimsBuilder {
+func (b *claimsBuilder) WithActorLabel(key, value string) ClaimsBuilder {
 	if b.labels == nil {
 		b.labels = make(map[string]string)
 	}
 	b.labels[key] = value
+	return b
+}
+
+func (b *claimsBuilder) WithActorAnnotations(annotations map[string]string) ClaimsBuilder {
+	b.annotations = annotations
+	return b
+}
+
+func (b *claimsBuilder) WithActorAnnotation(key, value string) ClaimsBuilder {
+	if b.annotations == nil {
+		b.annotations = make(map[string]string)
+	}
+	b.annotations[key] = value
 	return b
 }
 
@@ -173,11 +189,21 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 				b.actor.Labels[k] = v
 			}
 		}
+
+		if len(b.annotations) > 0 {
+			if b.actor.Annotations == nil {
+				b.actor.Annotations = make(map[string]string)
+			}
+			for k, v := range b.annotations {
+				b.actor.Annotations[k] = v
+			}
+		}
 	}
 
-	if b.actor == nil && len(b.labels) > 0 {
+	if b.actor == nil && (len(b.labels) > 0 || len(b.annotations) > 0) {
 		b.actor = &core.Actor{
-			Labels: b.labels,
+			Labels:      b.labels,
+			Annotations: b.annotations,
 		}
 	}
 

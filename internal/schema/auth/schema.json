@@ -6,8 +6,9 @@
       "type": "object",
       "properties": {
         "namespace": {
-          "$ref": "../resources/namespace/schema.json#/$defs/NamespaceMatcher",
-          "description": "The namespace pattern this permission applies to."
+          "type": "string",
+          "pattern": "^root(?:\\.(?:(?:[A-Za-z0-9_][A-Za-z0-9_-]*)|(?:\\{\\{\\s*(?:external_id|labels\\.[^{}]+|annotations\\.[^{}]+)\\s*\\}\\})))*(?:\\.\\*\\*)?$",
+          "description": "The namespace pattern this permission applies to. Supports normal namespace matchers and actor templates: {{external_id}}, {{labels.<label>}}, and {{annotations.<annotation>}}."
         },
         "resources": {
           "type": "array",

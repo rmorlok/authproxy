@@ -43,8 +43,10 @@ type TokenBuilder interface {
 	WithNamespace(namespace string) TokenBuilder
 	WithActor(actor core.IActorData) TokenBuilder
 	WithPermissions(permissions []aschema.Permission) TokenBuilder
-	WithLabels(labels map[string]string) TokenBuilder
-	WithLabel(key, value string) TokenBuilder
+	WithActorLabels(labels map[string]string) TokenBuilder
+	WithActorLabel(key, value string) TokenBuilder
+	WithActorAnnotations(annotations map[string]string) TokenBuilder
+	WithActorAnnotation(key, value string) TokenBuilder
 	WithNonce() TokenBuilder
 
 	WithConfigKey(ctx context.Context, cfgKey *config.Key) (TokenBuilder, error)
@@ -147,13 +149,23 @@ func (tb *tokenBuilder) WithPermissions(permissions []aschema.Permission) TokenB
 	return tb
 }
 
-func (tb *tokenBuilder) WithLabels(labels map[string]string) TokenBuilder {
-	tb.jwtBuilder.WithLabels(labels)
+func (tb *tokenBuilder) WithActorLabels(labels map[string]string) TokenBuilder {
+	tb.jwtBuilder.WithActorLabels(labels)
 	return tb
 }
 
-func (tb *tokenBuilder) WithLabel(key, value string) TokenBuilder {
-	tb.jwtBuilder.WithLabel(key, value)
+func (tb *tokenBuilder) WithActorLabel(key, value string) TokenBuilder {
+	tb.jwtBuilder.WithActorLabel(key, value)
+	return tb
+}
+
+func (tb *tokenBuilder) WithActorAnnotations(annotations map[string]string) TokenBuilder {
+	tb.jwtBuilder.WithActorAnnotations(annotations)
+	return tb
+}
+
+func (tb *tokenBuilder) WithActorAnnotation(key, value string) TokenBuilder {
+	tb.jwtBuilder.WithActorAnnotation(key, value)
 	return tb
 }
 

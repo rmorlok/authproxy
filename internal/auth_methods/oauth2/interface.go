@@ -15,6 +15,7 @@ type IActorData interface {
 	GetId() apid.ID
 	GetExternalId() string
 	GetLabels() map[string]string
+	GetAnnotations() map[string]string
 	GetPermissions() []aschema.Permission
 	GetNamespace() string
 }

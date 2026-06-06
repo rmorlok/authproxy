@@ -191,6 +191,98 @@ func TestRequestAuth_Allows(t *testing.T) {
 			resourceId: "xyz-789",
 			allowed:    false,
 		},
+		{
+			name: "actor with external id namespace template",
+			ra: NewAuthenticatedRequestAuth(&Actor{
+				Id:         apid.New(apid.PrefixActor),
+				ExternalId: "tenant-a",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.{{external_id}}.**",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			}),
+			namespace: "root.tenant-a.project",
+			resource:  "connections",
+			verb:      "get",
+			allowed:   true,
+		},
+		{
+			name: "actor with label namespace template",
+			ra: NewAuthenticatedRequestAuth(&Actor{
+				Id:         apid.New(apid.PrefixActor),
+				ExternalId: "user",
+				Labels:     map[string]string{"tenant": "tenant-b"},
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.{{labels.tenant}}",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			}),
+			namespace: "root.tenant-b",
+			resource:  "connections",
+			verb:      "get",
+			allowed:   true,
+		},
+		{
+			name: "actor with annotation namespace template",
+			ra: NewAuthenticatedRequestAuth(&Actor{
+				Id:          apid.New(apid.PrefixActor),
+				ExternalId:  "user",
+				Annotations: map[string]string{"tenant": "tenant-c"},
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.{{annotations.tenant}}",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			}),
+			namespace: "root.tenant-c",
+			resource:  "connections",
+			verb:      "get",
+			allowed:   true,
+		},
+		{
+			name: "actor missing label namespace template denies",
+			ra: NewAuthenticatedRequestAuth(&Actor{
+				Id:         apid.New(apid.PrefixActor),
+				ExternalId: "user",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.{{labels.tenant}}.**",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			}),
+			namespace: "root.tenant-a",
+			resource:  "connections",
+			verb:      "get",
+			allowed:   false,
+		},
+		{
+			name: "actor missing annotation namespace template denies",
+			ra: NewAuthenticatedRequestAuth(&Actor{
+				Id:         apid.New(apid.PrefixActor),
+				ExternalId: "user",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.{{annotations.tenant}}.**",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			}),
+			namespace: "root.tenant-a",
+			resource:  "connections",
+			verb:      "get",
+			allowed:   false,
+		},
 	}
 
 	for _, tt := range tests {
@@ -556,6 +648,42 @@ func TestRequestAuth_GetNamespacesAllowedForResource(t *testing.T) {
 			resource:   "connections",
 			verb:       "get",
 			namespaces: []string{"root.other"},
+		},
+		{
+			name: "templated permission",
+			ra: NewAuthenticatedRequestAuth(&Actor{
+				Id:          apid.New(apid.PrefixActor),
+				ExternalId:  "tenant-a",
+				Labels:      map[string]string{"team": "platform"},
+				Annotations: map[string]string{"region": "us-east"},
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.{{external_id}}.{{labels.team}}.{{annotations.region}}.**",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			}),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: []string{"root.tenant-a.platform.us-east.**"},
+		},
+		{
+			name: "templated permission missing label has no namespace",
+			ra: NewAuthenticatedRequestAuth(&Actor{
+				Id:         apid.New(apid.PrefixActor),
+				ExternalId: "tenant-a",
+				Permissions: []aschema.Permission{
+					{
+						Namespace: "root.{{labels.team}}.**",
+						Resources: []string{"connections"},
+						Verbs:     []string{"get"},
+					},
+				},
+			}),
+			resource:   "connections",
+			verb:       "get",
+			namespaces: []string{},
 		},
 		{
 			name: "multiple permissions",

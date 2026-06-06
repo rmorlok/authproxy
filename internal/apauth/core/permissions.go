@@ -3,10 +3,11 @@ package core
 import (
 	"slices"
 
+	"github.com/rmorlok/authproxy/internal/aptmpl"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
-// Allows checks if this permission allows the specified action.
+// allowsForActor checks if this permission allows the specified action for the given actor.
 //
 // Parameters:
 //   - namespace: The namespace where the action is being performed (e.g., "root.foo.bar").
@@ -23,8 +24,8 @@ import (
 //   - Verbs: Exact match with any verb in the permission, or permission contains "*".
 //   - ResourceIds: If permission has no ResourceIds, all IDs are allowed. If permission has
 //     ResourceIds, the requested ID must be in the list.
-func allows(p aschema.Permission, namespace, resource, verb, resourceId string) bool {
-	if !matchesNamespace(p, namespace) {
+func allowsForActor(actor *Actor, p aschema.Permission, namespace, resource, verb, resourceId string) bool {
+	if !matchesNamespace(actor, p, namespace) {
 		return false
 	}
 
@@ -45,7 +46,7 @@ func allows(p aschema.Permission, namespace, resource, verb, resourceId string) 
 
 // matchesNamespace checks if this permission's namespace matches the target namespace.
 // Supports wildcard matching with ".**" suffix.
-func matchesNamespace(p aschema.Permission, targetNamespace string) bool {
+func matchesNamespace(actor *Actor, p aschema.Permission, targetNamespace string) bool {
 	if p.Namespace == "" || targetNamespace == "" {
 		return false
 	}
@@ -54,7 +55,48 @@ func matchesNamespace(p aschema.Permission, targetNamespace string) bool {
 		return true
 	}
 
-	return aschema.NamespaceMatches(p.Namespace, targetNamespace)
+	matcher, ok := renderValidPermissionNamespace(actor, p.Namespace)
+	if !ok {
+		return false
+	}
+
+	return aschema.NamespaceMatches(matcher, targetNamespace)
+}
+
+// renderPermissionNamespace applies templating to a given namespace string and returns
+// the resulting string and whether the rendering was successful. If rendering was not
+// successful, the namespace should be considered invalid.
+func renderPermissionNamespace(actor *Actor, namespace string) (string, bool) {
+	if !aptmpl.ContainsMustache(namespace) {
+		return namespace, true
+	}
+
+	if actor == nil {
+		return "", false
+	}
+
+	rendered, err := aptmpl.RenderMustache(namespace, actor.GetPermissionTemplateData())
+	if err != nil {
+		return "", false
+	}
+
+	return rendered, true
+}
+
+// renderValidPermissionNamespace optionally renders a namespace with templating based on actor data
+// and validates that the resulting namespace is valid. If the templating cannot be fufulled, or the
+// resulting namespace is not valid, it returns false.
+func renderValidPermissionNamespace(actor *Actor, namespace string) (string, bool) {
+	rendered, ok := renderPermissionNamespace(actor, namespace)
+	if !ok {
+		return "", false
+	}
+
+	if err := aschema.ValidateNamespaceMatcher(rendered); err != nil {
+		return "", false
+	}
+
+	return rendered, true
 }
 
 // matchesResource checks if this permission allows access to the target resource.
@@ -108,13 +150,13 @@ func matchesResourceId(p aschema.Permission, targetResourceId string) bool {
 	return slices.Contains(p.ResourceIds, targetResourceId)
 }
 
-// permissionsAllow checks if any permission in the slice allows the specified action.
+// permissionsAllowForActor checks if any permission in the slice allows the specified action for the given actor.
 // Permissions are additive - if any single permission allows the action, it is permitted.
 //
 // This is the primary function for checking if an actor has permission to perform an action.
-func permissionsAllow(permissions []aschema.Permission, namespace, resource, verb, resourceId string) bool {
+func permissionsAllowForActor(actor *Actor, permissions []aschema.Permission, namespace, resource, verb, resourceId string) bool {
 	for _, p := range permissions {
-		if allows(p, namespace, resource, verb, resourceId) {
+		if allowsForActor(actor, p, namespace, resource, verb, resourceId) {
 			return true
 		}
 	}
@@ -122,7 +164,7 @@ func permissionsAllow(permissions []aschema.Permission, namespace, resource, ver
 	return false
 }
 
-// permissionsAllowWithRestrictions checks if an action is allowed by both the actor's permissions
+// permissionsAllowWithRestrictionsForActor checks if an action is allowed by both the actor's permissions
 // and any additional request-level restrictions.
 //
 // This implements the intersection of two permission sets:
@@ -136,13 +178,14 @@ func permissionsAllow(permissions []aschema.Permission, namespace, resource, ver
 //   - actorPermissions: The permissions granted to the actor (user/service).
 //   - restrictions: Optional additional restrictions. If nil or empty, only actor permissions are checked.
 //   - namespace, resource, verb, resourceId: The action being checked.
-func permissionsAllowWithRestrictions(
+func permissionsAllowWithRestrictionsForActor(
+	actor *Actor,
 	actorPermissions []aschema.Permission,
 	restrictions []aschema.Permission,
 	namespace, resource, verb, resourceId string,
 ) bool {
 	// First check if the actor's permissions allow the action
-	if !permissionsAllow(actorPermissions, namespace, resource, verb, resourceId) {
+	if !permissionsAllowForActor(actor, actorPermissions, namespace, resource, verb, resourceId) {
 		return false
 	}
 
@@ -152,5 +195,5 @@ func permissionsAllowWithRestrictions(
 	}
 
 	// Check if the restrictions also allow the action
-	return permissionsAllow(restrictions, namespace, resource, verb, resourceId)
+	return permissionsAllowForActor(actor, restrictions, namespace, resource, verb, resourceId)
 }

@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
 type IActorData interface {
@@ -11,6 +12,7 @@ type IActorData interface {
 	GetPermissions() []aschema.Permission
 	GetNamespace() string
 	GetLabels() map[string]string
+	GetAnnotations() map[string]string
 }
 
 // Actor is the information that identifies who is making a request. This can be an actor in the calling
@@ -23,6 +25,7 @@ type Actor struct {
 	ExternalId  string               `json:"external_id"`
 	Namespace   string               `json:"namespace,omitempty"`
 	Labels      map[string]string    `json:"labels,omitempty"`
+	Annotations map[string]string    `json:"annotations,omitempty"`
 	Permissions []aschema.Permission `json:"permissions"`
 }
 
@@ -44,10 +47,40 @@ func (a *Actor) GetNamespace() string {
 
 func (a *Actor) GetLabels() map[string]string { return a.Labels }
 
-// GetAnnotations always returns nil for JWT-derived actors. Annotations are
-// server-side metadata and do not propagate via JWT, so an upsert from a JWT
-// claim must not overwrite annotations on the stored actor.
-func (a *Actor) GetAnnotations() map[string]string { return nil }
+// GetAnnotations returns actor annotations from database state or JWT claims.
+func (a *Actor) GetAnnotations() map[string]string { return a.Annotations }
+
+func isValidValueForNamespaceTemplating(val string) bool {
+	return val != "" && val != namespace.NamespaceWildcard
+}
+
+func filterLabelOrAnnotationForPermission(vals map[string]string) map[string]string {
+	result := make(map[string]string, len(vals))
+
+	for k, v := range vals {
+		if isValidValueForNamespaceTemplating(v) {
+			result[k] = v
+		}
+	}
+
+	return result
+}
+
+// GetPermissionTemplateData returns actor data for permission template context. These are
+// the values that can be used in templated namespaces for permissions baed on actor data.
+// E.g. root.{{labels.team_id}}
+func (a *Actor) GetPermissionTemplateData() map[string]any {
+	result := map[string]any{
+		"labels":      filterLabelOrAnnotationForPermission(a.Labels),
+		"annotations": filterLabelOrAnnotationForPermission(a.Annotations),
+	}
+
+	if isValidValueForNamespaceTemplating(a.ExternalId) {
+		result["external_id"] = a.ExternalId
+	}
+
+	return result
+}
 
 func CreateActor(data IActorData) *Actor {
 	if a, ok := data.(*Actor); ok {
@@ -59,6 +92,7 @@ func CreateActor(data IActorData) *Actor {
 		ExternalId:  data.GetExternalId(),
 		Namespace:   data.GetNamespace(),
 		Labels:      data.GetLabels(),
+		Annotations: data.GetAnnotations(),
 		Permissions: data.GetPermissions(),
 	}
 }

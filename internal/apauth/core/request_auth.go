@@ -94,6 +94,10 @@ func (ra *RequestAuth) SetPermissions(permissions []aschema.Permission) {
 	ra.permissions = permissions
 }
 
+// GetNamespacesAllowed returns the set of namespaces allowed for the given resource and verb. This
+// function applies both actor permissions and request-level restrictions to determine the allowed namespaces.
+// For any namespaces that leverage templating, if the template cannot be applied from the actor's
+// data, that namespace is omitted.
 func (ra *RequestAuth) GetNamespacesAllowed(resource, verb string) []string {
 	if ra == nil || !ra.IsAuthenticated() {
 		return nil
@@ -107,7 +111,9 @@ func (ra *RequestAuth) GetNamespacesAllowed(resource, verb string) []string {
 			slices.Contains(permission.Verbs, aschema.PermissionWildcard)
 
 		if appliesToResource && appliesToVerb {
-			candidateNamespaces = append(candidateNamespaces, permission.Namespace)
+			if ns, ok := renderValidPermissionNamespace(ra.actor, permission.Namespace); ok {
+				candidateNamespaces = append(candidateNamespaces, ns)
+			}
 		}
 	}
 
@@ -123,8 +129,13 @@ func (ra *RequestAuth) GetNamespacesAllowed(resource, verb string) []string {
 				slices.Contains(permission.Verbs, aschema.PermissionWildcard)
 
 			if appliesToResource && appliesToVerb {
+				restrictionNamespace, ok := renderValidPermissionNamespace(ra.actor, permission.Namespace)
+				if !ok {
+					continue
+				}
+
 				for _, candidateNamespace := range candidateNamespaces {
-					if restricted, ok := aschema.NamespaceMatcherConstrained(permission.Namespace, candidateNamespace); ok {
+					if restricted, ok := aschema.NamespaceMatcherConstrained(restrictionNamespace, candidateNamespace); ok {
 						finalNamespaces = append(finalNamespaces, restricted)
 					}
 				}
@@ -159,7 +170,8 @@ func (ra *RequestAuth) Allows(namespace, resource, verb, resourceId string) bool
 	actor := ra.GetActor()
 
 	// Check actor permissions with optional request-level restrictions
-	return permissionsAllowWithRestrictions(
+	return permissionsAllowWithRestrictionsForActor(
+		actor,
 		actor.GetPermissions(),
 		ra.permissions,
 		namespace, resource, verb, resourceId,
@@ -180,13 +192,13 @@ func (ra *RequestAuth) AllowsReason(namespace, resource, verb, resourceId string
 	actor := ra.GetActor()
 
 	// Check actor permissions
-	if !permissionsAllow(actor.GetPermissions(), namespace, resource, verb, resourceId) {
+	if !permissionsAllowForActor(actor, actor.GetPermissions(), namespace, resource, verb, resourceId) {
 		return false, "actor permissions do not allow this action"
 	}
 
 	// Check request-level restrictions if present
 	if len(ra.permissions) > 0 {
-		if !permissionsAllow(ra.permissions, namespace, resource, verb, resourceId) {
+		if !permissionsAllowForActor(actor, ra.permissions, namespace, resource, verb, resourceId) {
 			return false, "request permissions do not allow this action"
 		}
 	}
