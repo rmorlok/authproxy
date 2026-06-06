@@ -27,6 +27,7 @@ const mockConnector: Connector = {
   type: 'oauth',
   display_name: 'Google Calendar',
   description: 'Connect to your Google Calendar to manage events and appointments.',
+  highlight: 'Manage events and appointments from Google Calendar.',
   logo: logoDataUri('Google Calendar', '#1a73e8'),
   versions: 1,
   states: [ConnectorVersionState.ACTIVE],
@@ -36,6 +37,7 @@ export const Default: Story = {
   args: {
     connector: mockConnector,
     onConnect: (id) => console.log(`Connect clicked for ${id}`),
+    onDetails: (id) => console.log(`Details clicked for ${id}`),
     isConnecting: false,
   },
 };
@@ -47,6 +49,7 @@ export const WithHighlight: Story = {
       highlight: '**Sync your calendar** with Google Calendar to manage events, appointments, and meetings. Features include:\n\n• Event creation and management\n• Meeting scheduling\n• Reminder notifications\n• Calendar sharing',
     },
     onConnect: (id) => console.log(`Connect clicked for ${id}`),
+    onDetails: (id) => console.log(`Details clicked for ${id}`),
     isConnecting: false,
   },
 };
@@ -55,6 +58,7 @@ export const Connecting: Story = {
   args: {
     connector: mockConnector,
     onConnect: (id) => console.log(`Connect clicked for ${id}`),
+    onDetails: (id) => console.log(`Details clicked for ${id}`),
     isConnecting: true,
   },
 };
@@ -64,8 +68,10 @@ export const LongDescription: Story = {
     connector: {
       ...mockConnector,
       description: 'This is a very long description that should wrap to multiple lines. Connect to your Google Calendar to manage events and appointments, schedule meetings, and get reminders about upcoming events.',
+      highlight: 'Short marketplace highlight stays on the card while the long description belongs on the overview page.',
     },
     onConnect: (id) => console.log(`Connect clicked for ${id}`),
+    onDetails: (id) => console.log(`Details clicked for ${id}`),
     isConnecting: false,
   },
 };

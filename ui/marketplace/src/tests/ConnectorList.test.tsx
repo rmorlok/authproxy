@@ -4,7 +4,7 @@ import '@testing-library/jest-dom';
 import userEvent from '@testing-library/user-event';
 import {Provider} from 'react-redux';
 import {combineReducers, configureStore} from '@reduxjs/toolkit';
-import {MemoryRouter} from 'react-router-dom';
+import {MemoryRouter, useLocation} from 'react-router-dom';
 import {beforeEach, describe, expect, test, vi} from 'vitest';
 import {
     Connector,
@@ -49,7 +49,7 @@ const connector: Connector = {
     state: ConnectorVersionState.ACTIVE,
     display_name: 'Google Calendar',
     description: 'Calendar app',
-    highlight: undefined,
+    highlight: 'Calendar highlight',
     logo: 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg"/%3E',
     has_configure: false,
     versions: 1,
@@ -86,11 +86,17 @@ function renderConnectorList(preloadedState: any) {
         <MemoryRouter>
             <Provider store={store}>
                 <ConnectorList/>
+                <LocationDisplay/>
             </Provider>
         </MemoryRouter>,
     );
 
     return store;
+}
+
+function LocationDisplay() {
+    const location = useLocation();
+    return <div data-testid="location">{location.pathname}</div>;
 }
 
 describe('ConnectorList', () => {
@@ -145,6 +151,18 @@ describe('ConnectorList', () => {
                 `${window.location.origin}/connections`,
             );
         });
+    });
+
+    test('navigates to the connector overview from details', async () => {
+        const user = userEvent.setup();
+        renderConnectorList({
+            connectors: {items: [connector], status: 'succeeded', error: null},
+            connections: baseConnectionsState,
+        });
+
+        await user.click(screen.getByRole('button', {name: /^Details$/i}));
+
+        expect(screen.getByTestId('location')).toHaveTextContent('/connectors/google-calendar');
     });
 
     test('renders setup dialog and aborts when setup is cancelled', async () => {

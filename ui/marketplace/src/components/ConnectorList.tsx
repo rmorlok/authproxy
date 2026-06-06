@@ -1,5 +1,6 @@
 import React, { useEffect, useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
+import { Link, useNavigate } from 'react-router-dom';
 import {
   Grid,
   Typography,
@@ -9,40 +10,37 @@ import {
   CircularProgress,
   Button,
 } from '@mui/material';
-import { isRedirectResponse } from '@authproxy/api';
 import {
   selectConnectors,
   selectConnectorsStatus,
   selectConnectorsError,
   fetchConnectorsAsync,
-  selectInitiatingConnection,
-  selectCurrentFormStep,
-  selectSubmittingForm,
-  selectFormSubmitError,
-  clearFormStep,
-  submitConnectionFormAsync,
-  abortConnectionAsync,
 } from '../store';
 import ConnectorCard, { ConnectorCardSkeleton } from './ConnectorCard';
 import ConnectionSetupDialog from './ConnectionSetupDialog';
 import { AppDispatch } from '../store';
-import { initiateConnectionAsync } from '../store';
-import { Link } from 'react-router-dom';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
 import { marketplaceTokens } from '../theme';
+import { useConnectorConnectionFlow } from './useConnectorConnectionFlow';
 
 /**
  * Component to display a list of available connectors
  */
 const ConnectorList: React.FC = () => {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   const connectors = useSelector(selectConnectors);
   const status = useSelector(selectConnectorsStatus);
   const error = useSelector(selectConnectorsError);
-  const isConnecting = useSelector(selectInitiatingConnection);
-  const currentFormStep = useSelector(selectCurrentFormStep);
-  const isSubmittingForm = useSelector(selectSubmittingForm);
-  const formSubmitError = useSelector(selectFormSubmitError);
+  const {
+    cancelForm: handleFormCancel,
+    connect: handleConnect,
+    currentFormStep,
+    formSubmitError,
+    isConnecting,
+    isSubmittingForm,
+    submitForm: handleFormSubmit,
+  } = useConnectorConnectionFlow();
 
   useEffect(() => {
     if (status === 'idle') {
@@ -50,50 +48,9 @@ const ConnectorList: React.FC = () => {
     }
   }, [status, dispatch]);
 
-  const handleConnect = (connectorId: string) => {
-    // Get the current URL to use as the return URL
-    const returnToUrl = `${window.location.origin}/connections`;
-
-    dispatch(initiateConnectionAsync({
-      connectorId,
-      returnToUrl
-    })).then((action) => {
-      if (action.meta.requestStatus === 'fulfilled') {
-        const response = action.payload as any;
-        if (isRedirectResponse(response)) {
-          window.location.href = response.redirect_url;
-        }
-        // If type === 'form', Redux state update triggers the form dialog
-      }
-    });
-  };
-
-  const handleFormSubmit = useCallback((connectionId: string, data: unknown) => {
-    const stepId = currentFormStep?.stepId ?? '';
-    dispatch(submitConnectionFormAsync({
-      connectionId,
-      stepId,
-      data,
-      returnToUrl: `${window.location.origin}/connections`,
-    })).then((action) => {
-      if (action.meta.requestStatus === 'fulfilled') {
-        const response = action.payload as any;
-        if (isRedirectResponse(response)) {
-          window.location.href = response.redirect_url;
-        }
-        // If type === 'form', Redux state update shows the next form step
-        // If type === 'complete', Redux state clears the form
-      }
-    });
-  }, [dispatch, currentFormStep]);
-
-  const handleFormCancel = useCallback(() => {
-    if (currentFormStep) {
-      dispatch(abortConnectionAsync(currentFormStep.connectionId));
-    } else {
-      dispatch(clearFormStep());
-    }
-  }, [dispatch, currentFormStep]);
+  const handleDetails = useCallback((connectorId: string) => {
+    navigate(`/connectors/${encodeURIComponent(connectorId)}`);
+  }, [navigate]);
 
   let content;
 
@@ -125,6 +82,7 @@ const ConnectorList: React.FC = () => {
             <ConnectorCard
               connector={connector}
               onConnect={handleConnect}
+              onDetails={handleDetails}
               isConnecting={isConnecting}
             />
           </Grid>
