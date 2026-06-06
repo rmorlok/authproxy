@@ -14,7 +14,7 @@ body {
 
 .shell {
   width: 100%;
-  max-width: 480px;
+  max-width: 560px;
 }
 
 h1 {
@@ -31,7 +31,7 @@ h1 {
 
 .card {
   background: light-dark(#fff, #2a2a2e);
-  border-radius: 12px;
+  border-radius: 8px;
   padding: 1.5rem;
   display: flex;
   flex-direction: column;
@@ -78,6 +78,43 @@ button[type='submit'] {
 
 button[type='submit']:hover {
   background: #1d4ed8;
+}
+
+.telemetry {
+  margin-top: 1.25rem;
+}
+
+h2 {
+  font-size: 1rem;
+  margin: 0 0 0.75rem;
+}
+
+.telemetry-links {
+  display: grid;
+  gap: 0.75rem;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+}
+
+.telemetry-link {
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  min-height: 5.5rem;
+  padding: 1rem;
+  border: 1px solid light-dark(#d8d8dc, #444);
+  border-radius: 8px;
+  background: light-dark(#fff, #242428);
+  color: inherit;
+  text-decoration: none;
+  box-sizing: border-box;
+}
+
+.telemetry-link:hover {
+  border-color: #2563eb;
+}
+
+.telemetry-link > span {
+  font-weight: 700;
 }
 
 footer {

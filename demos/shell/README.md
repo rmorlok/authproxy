@@ -76,6 +76,7 @@ ADMIN_PRIVATE_KEY_PATH=./demos/shell/dev_keys/demo-shell \
 AUTHPROXY_ADMIN_UI_URL=http://localhost:5174 \
 AUTHPROXY_MARKETPLACE_URL=http://localhost:5173 \
 AUTHPROXY_AUTH_URL=http://localhost:8080 \
+AUTHPROXY_GRAFANA_URL=http://localhost:3000 \
 DEV_FRONTEND_URL=http://localhost:5175 \
 go run ./demos/shell/backend
 # → listens on http://localhost:8888
@@ -126,8 +127,18 @@ The backend reads the following env vars:
 | `AUTHPROXY_ADMIN_UI_URL`  | ✅        | Base URL of the admin SPA                                                   |
 | `AUTHPROXY_MARKETPLACE_URL` | ✅      | Base URL of the marketplace SPA                                             |
 | `AUTHPROXY_AUTH_URL`      | ⛔        | Optional today; kept for future routes that call back into AuthProxy        |
+| `AUTHPROXY_GRAFANA_URL`   | ⛔        | Optional Grafana base URL; enables telemetry links in the shell             |
+| `AUTHPROXY_GRAFANA_APP_METRICS_URL` | ⛔ | Optional override for the app-metrics dashboard link                        |
+| `AUTHPROXY_GRAFANA_EXPLORE_URL` | ⛔   | Optional override for the Grafana Explore link                              |
 | `DEV_FRONTEND_URL`        | ⛔        | If set, `GET /` redirects here instead of serving the embedded build        |
 | `PORT`                    | ⛔        | Default `8888`                                                              |
+
+The frontend reads `/config.json` from the backend at runtime. When
+`AUTHPROXY_GRAFANA_URL` is set, the backend returns links to Grafana,
+the provisioned AuthProxy App Metrics dashboard, and Explore. In Vite
+dev mode, `/config.json` and `/sso` are proxied to the backend; override
+`AUTHPROXY_DEMO_SHELL_BACKEND_URL` if the backend is not on
+`http://localhost:8888`.
 
 ## Why one signing key, not three
 

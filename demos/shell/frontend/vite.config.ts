@@ -16,6 +16,7 @@ export default defineConfig(({ mode }) => {
 
   const port = Number(process.env.AUTHPROXY_DEMO_SHELL_UI_PORT) || 5175;
   const base = process.env.VITE_BASE_URL || '/';
+  const backendUrl = process.env.AUTHPROXY_DEMO_SHELL_BACKEND_URL || 'http://localhost:8888';
 
   return {
     base,
@@ -23,6 +24,10 @@ export default defineConfig(({ mode }) => {
     server: {
       port,
       strictPort: true,
+      proxy: {
+        '/config.json': backendUrl,
+        '/sso': backendUrl,
+      },
     },
     build: {
       // Output into ../backend/embed/dist so the Go //go:embed directive in
