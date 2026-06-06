@@ -151,14 +151,15 @@ The umbrella Ingress maps public hosts and paths to backend services:
 | Host / path                | Backend                                  |
 |----------------------------|------------------------------------------|
 | `<hostname>/`              | demo-shell                               |
-| `<hostname>/oauth2`        | go-oauth2-server                         |
 | `<hostname>/grafana`       | Grafana dashboards                       |
 | `marketplace.<hostname>/`  | AuthProxy public (marketplace UI + API)  |
 | `admin.<hostname>/`        | AuthProxy admin-api (admin UI + API)     |
+| `oauth2.<hostname>/`       | go-oauth2-server                         |
 
-The OAuth test provider is path-routed because it is not a SPA. The
-marketplace and admin UIs use subdomains so their root-relative Vite
-assets resolve correctly.
+The OAuth test provider uses its own subdomain because its browser UI
+redirects between root-relative `/web/*` paths. The marketplace and
+admin UIs also use subdomains so their root-relative Vite assets resolve
+correctly.
 
 ## Wildcard TLS
 
@@ -172,9 +173,10 @@ For per-branch dev environments, use a DNS-01 ClusterIssuer and set:
 The rendered Certificate will request `<hostname>` and `*.<hostname>`.
 For a branch hostname like `feature.dev.authproxy.net`, that covers
 `feature.dev.authproxy.net`, `admin.feature.dev.authproxy.net`, and
-`marketplace.feature.dev.authproxy.net` without creating HTTP-01 solver
-pods. The wildcard mode requires DNS-01; HTTP-01 issuers cannot issue
-wildcard certificates.
+`marketplace.feature.dev.authproxy.net`,
+`oauth2.feature.dev.authproxy.net` without creating HTTP-01 solver pods.
+The wildcard mode requires DNS-01; HTTP-01 issuers cannot issue wildcard
+certificates.
 
 ## Smoke test
 

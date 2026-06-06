@@ -70,7 +70,7 @@ func NewRemoteAuthProxy(t *testing.T, opts RemoteAuthProxyOptions) *RemoteAuthPr
 	}
 	providerURL := opts.ProviderURL
 	if providerURL == "" {
-		providerURL = mustDerivePathURL(t, opts.BaseURL, "/oauth2")
+		providerURL = mustDeriveSubdomainURL(t, opts.BaseURL, "oauth2")
 	}
 
 	adminActor := opts.AdminActorExternalID

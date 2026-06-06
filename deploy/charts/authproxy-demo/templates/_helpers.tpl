@@ -19,6 +19,10 @@ have their own helpers and aren't affected by these.
 {{- printf "%s-go-oauth2-server" .Release.Name | trunc 63 | trimSuffix "-" -}}
 {{- end -}}
 
+{{- define "authproxy-demo.goOauth2Server.publicHost" -}}
+{{- printf "oauth2.%s" .Values.global.hostname -}}
+{{- end -}}
+
 {{- define "authproxy-demo.authproxy.serviceName" -}}
 {{/* Matches the inner authproxy chart's fullname when installed under
      this release. The inner chart's _helpers.tpl `authproxy.fullname`

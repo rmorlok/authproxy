@@ -257,7 +257,7 @@ seed:
           client_id: demo-oauth-simple
           client_secret: demo-oauth-simple-secret
           authorization:
-            endpoint: "https://{{ .Values.global.hostname }}/oauth2/web/authorize"
+            endpoint: "https://{{ include \"authproxy-demo.goOauth2Server.publicHost\" . }}/web/authorize"
           token:
             endpoint: "http://{{ include \"authproxy-demo.goOauth2Server.name\" . }}/v1/oauth/tokens"
           scopes:
@@ -286,7 +286,7 @@ seed:
           client_id: demo-oauth-tenant
           client_secret: demo-oauth-tenant-secret
           authorization:
-            endpoint: "https://{{ .Values.global.hostname }}/oauth2/web/authorize"
+            endpoint: "https://{{ include \"authproxy-demo.goOauth2Server.publicHost\" . }}/web/authorize"
             query_overrides:
               tenant: "{{`{{cfg.tenant}}`}}"
           token:
@@ -338,7 +338,7 @@ seed:
           client_id: demo-oauth-configure
           client_secret: demo-oauth-configure-secret
           authorization:
-            endpoint: "https://{{ .Values.global.hostname }}/oauth2/web/authorize"
+            endpoint: "https://{{ include \"authproxy-demo.goOauth2Server.publicHost\" . }}/web/authorize"
           token:
             endpoint: "http://{{ include \"authproxy-demo.goOauth2Server.name\" . }}/v1/oauth/tokens"
           scopes:

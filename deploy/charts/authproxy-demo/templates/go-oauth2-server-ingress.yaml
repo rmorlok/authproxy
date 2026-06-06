@@ -1,8 +1,8 @@
 {{- if and .Values.ingress.enabled .Values.global.hostname .Values.goOauth2Server.enabled -}}
 {{/*
-  go-oauth2-server is reachable at https://<hostname>/oauth2 for
-  end-to-end smoke tests. Keep this on the apex host so cert-manager
-  only needs to solve the demo/admin/marketplace hostnames.
+  go-oauth2-server is reachable at https://oauth2.<hostname>. The
+  provider UI redirects between /web/* paths, so it needs to own its
+  host root instead of being path-routed under the demo shell.
 */}}
 apiVersion: networking.k8s.io/v1
 kind: Ingress
@@ -11,20 +11,24 @@ metadata:
   labels:
     {{- include "authproxy-demo.labels" . | nindent 4 }}
     app.kubernetes.io/component: go-oauth2-server
+  {{- with .Values.ingress.annotations }}
   annotations:
-    nginx.ingress.kubernetes.io/use-regex: "true"
-    nginx.ingress.kubernetes.io/rewrite-target: /$2
-    {{- with .Values.ingress.annotations }}
     {{- toYaml . | nindent 4 }}
-    {{- end }}
+  {{- end }}
 spec:
   ingressClassName: {{ .Values.global.ingressClassName | quote }}
+  {{- if .Values.ingress.tls }}
+  tls:
+    - hosts:
+        - {{ include "authproxy-demo.goOauth2Server.publicHost" . | quote }}
+      secretName: {{ printf "%s-tls" (include "authproxy-demo.fullname" .) | quote }}
+  {{- end }}
   rules:
-    - host: {{ .Values.global.hostname | quote }}
+    - host: {{ include "authproxy-demo.goOauth2Server.publicHost" . | quote }}
       http:
         paths:
-          - path: /oauth2(/|$)(.*)
-            pathType: ImplementationSpecific
+          - path: /
+            pathType: Prefix
             backend:
               service:
                 name: {{ include "authproxy-demo.goOauth2Server.name" . }}
