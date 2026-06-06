@@ -67,6 +67,18 @@
       }
     },
 
+    "worker": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "workflowPollers":          { "$ref": "#/definitions/workflowIntegerValue" },
+        "activityPollers":          { "$ref": "#/definitions/workflowIntegerValue" },
+        "maxParallelWorkflowTasks": { "$ref": "#/definitions/workflowIntegerValue" },
+        "maxParallelActivityTasks": { "$ref": "#/definitions/workflowIntegerValue" },
+        "workflowHeartbeatInterval": { "type": "string" }
+      }
+    },
+
     "service": {
       "type": "object",
       "additionalProperties": false,
@@ -292,6 +304,12 @@
       "type": "integer",
       "minimum": 1,
       "maximum": 65535
+    },
+    "workflowIntegerValue": {
+      "anyOf": [
+        { "type": "string" },
+        { "type": "integer" }
+      ]
     }
   }
 }

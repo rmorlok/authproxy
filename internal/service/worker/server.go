@@ -21,6 +21,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	dbTasks "github.com/rmorlok/authproxy/internal/database/tasks"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	schemaConfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/service"
 	apworkflows "github.com/rmorlok/authproxy/internal/workflows"
 )
@@ -145,16 +146,7 @@ func Serve(cfg config.C) {
 	workflowRuntime := dm.GetWorkflowRuntime()
 	workflowWorker, err := apworkflows.NewWorker(
 		workflowRuntime,
-		&workflowworker.Options{
-			WorkflowWorkerOptions: workflowworker.WorkflowWorkerOptions{
-				WorkflowPollers:          2,
-				MaxParallelWorkflowTasks: workerConfig.GetConcurrency(context.Background()),
-			},
-			ActivityWorkerOptions: workflowworker.ActivityWorkerOptions{
-				ActivityPollers:          2,
-				MaxParallelActivityTasks: workerConfig.GetConcurrency(context.Background()),
-			},
-		},
+		workflowOptionsFromConfig(context.Background(), &workerConfig),
 	)
 	if err != nil {
 		log.Fatalf("failed to construct workflow worker: %v", err)
@@ -280,4 +272,30 @@ func Serve(cfg config.C) {
 	wg.Wait()
 	logger.Info("Worker shutting down")
 	defer logger.Info("Worker shutdown complete")
+}
+
+func workflowOptionsFromConfig(ctx context.Context, workerConfig *schemaConfig.ServiceWorker) *workflowworker.Options {
+	options := workflowworker.DefaultOptions
+
+	if workerConfig == nil {
+		return &options
+	}
+
+	if workflowPollers := workerConfig.GetWorkflowPollers(ctx); workflowPollers != nil {
+		options.WorkflowPollers = *workflowPollers
+	}
+	if activityPollers := workerConfig.GetActivityPollers(ctx); activityPollers != nil {
+		options.ActivityPollers = *activityPollers
+	}
+	if maxParallelWorkflowTasks := workerConfig.GetMaxParallelWorkflowTasks(ctx); maxParallelWorkflowTasks != nil {
+		options.MaxParallelWorkflowTasks = *maxParallelWorkflowTasks
+	}
+	if maxParallelActivityTasks := workerConfig.GetMaxParallelActivityTasks(ctx); maxParallelActivityTasks != nil {
+		options.MaxParallelActivityTasks = *maxParallelActivityTasks
+	}
+	if workflowHeartbeatInterval := workerConfig.GetWorkflowHeartbeatInterval(); workflowHeartbeatInterval != nil {
+		options.WorkflowHeartbeatInterval = *workflowHeartbeatInterval
+	}
+
+	return &options
 }

@@ -107,6 +107,15 @@ ports:
   adminApi: 8082
   workerHealth: 8083
 
+# -- Workflow worker tuning. Empty values keep the go-workflows library
+# defaults. Numeric values may be supplied as YAML numbers or strings.
+worker:
+  workflowPollers: ""
+  activityPollers: ""
+  maxParallelWorkflowTasks: ""
+  maxParallelActivityTasks: ""
+  workflowHeartbeatInterval: ""
+
 service:
   # -- Service type.
   type: ClusterIP
