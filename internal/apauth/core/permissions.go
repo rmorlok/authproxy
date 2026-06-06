@@ -164,7 +164,7 @@ func permissionsAllowForActor(actor *Actor, permissions []aschema.Permission, na
 	return false
 }
 
-// permissionsAllowWithRestrictions checks if an action is allowed by both the actor's permissions
+// permissionsAllowWithRestrictionsForActor checks if an action is allowed by both the actor's permissions
 // and any additional request-level restrictions.
 //
 // This implements the intersection of two permission sets:
@@ -178,14 +178,6 @@ func permissionsAllowForActor(actor *Actor, permissions []aschema.Permission, na
 //   - actorPermissions: The permissions granted to the actor (user/service).
 //   - restrictions: Optional additional restrictions. If nil or empty, only actor permissions are checked.
 //   - namespace, resource, verb, resourceId: The action being checked.
-func permissionsAllowWithRestrictions(
-	actorPermissions []aschema.Permission,
-	restrictions []aschema.Permission,
-	namespace, resource, verb, resourceId string,
-) bool {
-	return permissionsAllowWithRestrictionsForActor(nil, actorPermissions, restrictions, namespace, resource, verb, resourceId)
-}
-
 func permissionsAllowWithRestrictionsForActor(
 	actor *Actor,
 	actorPermissions []aschema.Permission,

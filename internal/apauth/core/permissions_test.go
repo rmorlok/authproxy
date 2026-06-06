@@ -671,6 +671,7 @@ func TestPermissionsAllowWithRestrictions(t *testing.T) {
 		resource         string
 		verb             string
 		resourceId       string
+		actor            *Actor
 		allowed          bool
 	}{
 		{
@@ -868,11 +869,34 @@ func TestPermissionsAllowWithRestrictions(t *testing.T) {
 			resourceId: "xyz-789",
 			allowed:    false,
 		},
+		{
+			name: "actor allowed, restrictions deny different resource, both templated",
+			actorPermissions: []aschema.Permission{
+				{
+					Namespace: "root.{{external_id}}",
+					Resources: []string{"*"},
+					Verbs:     []string{"*"},
+				},
+			},
+			restrictions: []aschema.Permission{
+				{
+					Namespace: "root.{{external_id}}",
+					Resources: []string{"connections"},
+					Verbs:     []string{"get"},
+				},
+			},
+			namespace: "root.actor-123",
+			resource:  "connectors",
+			verb:      "get",
+			actor:     &Actor{ExternalId: "actor-123"},
+			allowed:   false,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := permissionsAllowWithRestrictions(
+			result := permissionsAllowWithRestrictionsForActor(
+				tt.actor,
 				tt.actorPermissions,
 				tt.restrictions,
 				tt.namespace,
