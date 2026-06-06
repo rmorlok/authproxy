@@ -32,6 +32,11 @@ func (s *service) DisconnectConnection(
 		return nil, err
 	}
 
-	s.logger.Info("disconnect connection workflow started", "id", id, "workflow_instance_id", instance.InstanceID, "workflow_execution_id", instance.ExecutionID)
+	s.logger.Info(
+		"disconnect connection workflow started",
+		"id", id,
+		"workflow_instance_id", instance.InstanceID,
+		"workflow_execution_id", instance.ExecutionID,
+		)
 	return tasks.FromWorkflowInstance(instance, WorkflowNameDisconnectConnectionV1, string(apworkflows.DefaultQueue)), nil
 }

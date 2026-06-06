@@ -39,8 +39,12 @@ func Serve(cfg config.C) {
 	defer dm.ShutdownTelemetry()
 
 	workerConfig := cfg.GetRoot().Worker
-	router := apgin.ForService(&workerConfig, logger, cfg.IsDebugMode(),
-		apgin.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry, dm.GetServiceId()))
+	router := apgin.ForService(
+		&workerConfig,
+		logger,
+		cfg.IsDebugMode(),
+		apgin.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry, dm.GetServiceId()),
+	)
 
 	router.GET("/ping", func(c *gin.Context) {
 		c.PureJSON(http.StatusOK, gin.H{
@@ -139,16 +143,19 @@ func Serve(cfg config.C) {
 	mux.Use(asynqTel.Middleware())
 
 	workflowRuntime := dm.GetWorkflowRuntime()
-	workflowWorker, err := apworkflows.NewWorker(workflowRuntime, &workflowworker.Options{
-		WorkflowWorkerOptions: workflowworker.WorkflowWorkerOptions{
-			WorkflowPollers:          2,
-			MaxParallelWorkflowTasks: workerConfig.GetConcurrency(context.Background()),
+	workflowWorker, err := apworkflows.NewWorker(
+		workflowRuntime,
+		&workflowworker.Options{
+			WorkflowWorkerOptions: workflowworker.WorkflowWorkerOptions{
+				WorkflowPollers:          2,
+				MaxParallelWorkflowTasks: workerConfig.GetConcurrency(context.Background()),
+			},
+			ActivityWorkerOptions: workflowworker.ActivityWorkerOptions{
+				ActivityPollers:          2,
+				MaxParallelActivityTasks: workerConfig.GetConcurrency(context.Background()),
+			},
 		},
-		ActivityWorkerOptions: workflowworker.ActivityWorkerOptions{
-			ActivityPollers:          2,
-			MaxParallelActivityTasks: workerConfig.GetConcurrency(context.Background()),
-		},
-	})
+	)
 	if err != nil {
 		log.Fatalf("failed to construct workflow worker: %v", err)
 	}
