@@ -27,11 +27,12 @@ type stateTestActor struct {
 	namespace string
 }
 
-func (a stateTestActor) GetId() apid.ID                      { return a.id }
-func (a stateTestActor) GetExternalId() string               { return "" }
-func (a stateTestActor) GetLabels() map[string]string        { return nil }
+func (a stateTestActor) GetId() apid.ID                       { return a.id }
+func (a stateTestActor) GetExternalId() string                { return "" }
+func (a stateTestActor) GetLabels() map[string]string         { return nil }
+func (a stateTestActor) GetAnnotations() map[string]string    { return nil }
 func (a stateTestActor) GetPermissions() []aschema.Permission { return nil }
-func (a stateTestActor) GetNamespace() string                { return a.namespace }
+func (a stateTestActor) GetNamespace() string                 { return a.namespace }
 
 // stateTestCore is a minimal coreIface.C that only implements GetConnection.
 // Other method calls will nil-panic, making accidental coupling obvious.

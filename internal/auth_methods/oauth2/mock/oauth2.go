@@ -83,6 +83,20 @@ func (mr *MockIActorDataMockRecorder) GetLabels() *gomock.Call {
 	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetLabels", reflect.TypeOf((*MockIActorData)(nil).GetLabels))
 }
 
+// GetAnnotations mocks base method.
+func (m *MockIActorData) GetAnnotations() map[string]string {
+	m.ctrl.T.Helper()
+	ret := m.ctrl.Call(m, "GetAnnotations")
+	ret0, _ := ret[0].(map[string]string)
+	return ret0
+}
+
+// GetAnnotations indicates an expected call of GetAnnotations.
+func (mr *MockIActorDataMockRecorder) GetAnnotations() *gomock.Call {
+	mr.mock.ctrl.T.Helper()
+	return mr.mock.ctrl.RecordCallWithMethodType(mr.mock, "GetAnnotations", reflect.TypeOf((*MockIActorData)(nil).GetAnnotations))
+}
+
 // GetNamespace mocks base method.
 func (m *MockIActorData) GetNamespace() string {
 	m.ctrl.T.Helper()

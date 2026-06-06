@@ -11,9 +11,6 @@ type IActorData interface {
 	GetPermissions() []aschema.Permission
 	GetNamespace() string
 	GetLabels() map[string]string
-}
-
-type actorAnnotationsData interface {
 	GetAnnotations() map[string]string
 }
 
@@ -57,17 +54,12 @@ func CreateActor(data IActorData) *Actor {
 		return a
 	}
 
-	var annotations map[string]string
-	if a, ok := data.(actorAnnotationsData); ok {
-		annotations = a.GetAnnotations()
-	}
-
 	return &Actor{
 		Id:          data.GetId(),
 		ExternalId:  data.GetExternalId(),
 		Namespace:   data.GetNamespace(),
 		Labels:      data.GetLabels(),
-		Annotations: annotations,
+		Annotations: data.GetAnnotations(),
 		Permissions: data.GetPermissions(),
 	}
 }
