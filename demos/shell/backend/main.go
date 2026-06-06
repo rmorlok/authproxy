@@ -15,6 +15,7 @@
 package main
 
 import (
+	"encoding/json"
 	"errors"
 	"flag"
 	"fmt"
@@ -47,6 +48,12 @@ var demoDestinations = map[string]string{
 	"marketplace": "AUTHPROXY_MARKETPLACE_URL",
 }
 
+type telemetryLink struct {
+	Label       string `json:"label"`
+	Description string `json:"description"`
+	URL         string `json:"url"`
+}
+
 type settings struct {
 	addr                string
 	adminPrivateKeyPath string
@@ -54,6 +61,7 @@ type settings struct {
 	authUrl             string
 	destinationUrls     map[string]string
 	devFrontendUrl      string
+	telemetryLinks      []telemetryLink
 	tokenTtl            time.Duration
 }
 
@@ -90,8 +98,49 @@ func loadSettings() settings {
 		// is served from the embedded FS.
 		devFrontendUrl:  os.Getenv("DEV_FRONTEND_URL"),
 		destinationUrls: destURLs,
+		telemetryLinks:  loadTelemetryLinks(),
 		tokenTtl:        15 * time.Minute,
 	}
+}
+
+func loadTelemetryLinks() []telemetryLink {
+	grafanaURL := strings.TrimRight(strings.TrimSpace(os.Getenv("AUTHPROXY_GRAFANA_URL")), "/")
+	appMetricsURL := strings.TrimSpace(os.Getenv("AUTHPROXY_GRAFANA_APP_METRICS_URL"))
+	exploreURL := strings.TrimSpace(os.Getenv("AUTHPROXY_GRAFANA_EXPLORE_URL"))
+
+	if grafanaURL != "" {
+		if appMetricsURL == "" {
+			appMetricsURL = grafanaURL + "/d/authproxy-app-metrics-demo/authproxy-app-metrics?orgId=1&from=now-1h&to=now"
+		}
+		if exploreURL == "" {
+			exploreURL = grafanaURL + "/explore?orgId=1"
+		}
+	}
+
+	links := make([]telemetryLink, 0, 3)
+	if grafanaURL != "" {
+		links = append(links, telemetryLink{
+			Label:       "Grafana",
+			Description: "Open the demo observability workspace.",
+			URL:         grafanaURL,
+		})
+	}
+	if appMetricsURL != "" {
+		links = append(links, telemetryLink{
+			Label:       "App metrics",
+			Description: "View request, resource, connection, and rate-limit telemetry.",
+			URL:         appMetricsURL,
+		})
+	}
+	if exploreURL != "" {
+		links = append(links, telemetryLink{
+			Label:       "Explore",
+			Description: "Query telemetry directly in Grafana.",
+			URL:         exploreURL,
+		})
+	}
+
+	return links
 }
 
 // signTokenFor mints a JWT signed by the admin keypair, claiming the
@@ -156,6 +205,24 @@ func ssoHandler(s settings, logger *slog.Logger) http.HandlerFunc {
 	}
 }
 
+func configHandler(s settings) http.HandlerFunc {
+	type response struct {
+		TelemetryLinks []telemetryLink `json:"telemetryLinks"`
+	}
+
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method != http.MethodGet {
+			http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		w.Header().Set("Content-Type", "application/json")
+		if err := json.NewEncoder(w).Encode(response{TelemetryLinks: s.telemetryLinks}); err != nil {
+			http.Error(w, "internal error", http.StatusInternalServerError)
+		}
+	}
+}
+
 // frontendHandler serves the SPA. In production, it serves the embedded
 // build at embed/dist/. In dev (DEV_FRONTEND_URL set), it 302-redirects
 // to the vite dev server so HMR + source maps work.
@@ -188,6 +255,7 @@ func main() {
 	s := loadSettings()
 
 	mux := http.NewServeMux()
+	mux.Handle("GET /config.json", configHandler(s))
 	mux.Handle("POST /sso", ssoHandler(s, logger))
 	mux.Handle("/healthz", http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusOK)

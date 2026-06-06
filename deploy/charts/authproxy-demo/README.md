@@ -191,7 +191,9 @@ admin UI as `demo-admin`. Pick **fresh-user** + **Marketplace UI** →
 empty marketplace, no connections.
 
 Grafana is available at `https://<hostname>/grafana` when
-`grafana.enabled=true` (the default). The chart provisions:
+`grafana.enabled=true` (the default). The demo shell receives that URL
+as `AUTHPROXY_GRAFANA_URL` and renders links to Grafana, the App Metrics
+dashboard, and Explore next to the SSO controls. The chart provisions:
 
 - `AuthProxy` datasource (`uid: authproxy-app-metrics`) pointed at the
   in-cluster AuthProxy API service.

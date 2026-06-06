@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 
 // Demo actor identities. The same three names are pre-created on the
 // AuthProxy side by the umbrella chart's seed job (A11 / #300); each maps
@@ -27,11 +27,49 @@ const DESTINATIONS: Array<{ id: 'admin' | 'marketplace'; label: string }> = [
   { id: 'admin', label: 'Admin UI' },
 ];
 
+type TelemetryLink = {
+  label: string;
+  description: string;
+  url: string;
+};
+
+type ShellConfig = {
+  telemetryLinks?: TelemetryLink[];
+};
+
 export function App() {
   const [actor, setActor] = useState(ACTORS[0]!.id);
   const [destination, setDestination] = useState<'admin' | 'marketplace'>('marketplace');
+  const [telemetryLinks, setTelemetryLinks] = useState<TelemetryLink[]>([]);
 
   const actorMeta = ACTORS.find((a) => a.id === actor)!;
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function loadConfig() {
+      try {
+        const response = await fetch('/config.json');
+        if (!response.ok) {
+          return;
+        }
+        const config = (await response.json()) as ShellConfig;
+        if (!cancelled) {
+          setTelemetryLinks(config.telemetryLinks ?? []);
+        }
+      } catch {
+        if (!cancelled) {
+          setTelemetryLinks([]);
+        }
+      }
+    }
+
+    void loadConfig();
+
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   return (
     <div className="shell">
@@ -71,6 +109,20 @@ export function App() {
 
         <button type="submit">Sign in</button>
       </form>
+
+      {telemetryLinks.length > 0 && (
+        <section className="telemetry" aria-labelledby="telemetry-heading">
+          <h2 id="telemetry-heading">Telemetry</h2>
+          <div className="telemetry-links">
+            {telemetryLinks.map((link) => (
+              <a key={link.url} href={link.url} className="telemetry-link">
+                <span>{link.label}</span>
+                <small>{link.description}</small>
+              </a>
+            ))}
+          </div>
+        </section>
+      )}
 
       <footer>
         Demo environment only — never ship this shell to customers.
