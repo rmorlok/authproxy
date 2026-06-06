@@ -153,6 +153,7 @@
       "type": "object",
       "additionalProperties": false,
       "properties": {
+        "provider":       { "type": "string", "enum": ["redis", "miniredis"] },
         "address":        { "type": "string" },
         "username":       { "type": "string" },
         "db":             { "type": "integer", "minimum": 0 },

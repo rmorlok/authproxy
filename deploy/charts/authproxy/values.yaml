@@ -166,6 +166,9 @@ database:
 # -- Redis connectivity. Required for sessions, async tasks, rate-limit
 # cache, and OAuth round-trip state.
 redis:
+  # -- Provider: `redis` for an external Redis server, or `miniredis`
+  # for an embedded in-process store suitable only for tests/disposable dev.
+  provider: redis
   # -- host:port (required).
   address: ""
   # -- Optional Redis username (Redis 6 ACLs).

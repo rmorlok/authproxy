@@ -99,12 +99,17 @@ template syntax.
 {{- $_ := set $cfg "database" $db -}}
 
 {{/* --- redis --- */}}
-{{- $redis := dict "provider" "redis" "address" (tpl .Values.redis.address $) "db" .Values.redis.db -}}
-{{- if .Values.redis.username -}}
-{{-   $_ := set $redis "username" (tpl .Values.redis.username $) -}}
-{{- end -}}
-{{- if .Values.redis.existingSecret -}}
-{{-   $_ := set $redis "password" (dict "env_var" "AUTHPROXY_REDIS_PASSWORD") -}}
+{{- $redisProvider := default "redis" .Values.redis.provider -}}
+{{- $redis := dict "provider" $redisProvider -}}
+{{- if eq $redisProvider "redis" -}}
+{{-   $_ := set $redis "address" (tpl .Values.redis.address $) -}}
+{{-   $_ := set $redis "db" .Values.redis.db -}}
+{{-   if .Values.redis.username -}}
+{{-     $_ := set $redis "username" (tpl .Values.redis.username $) -}}
+{{-   end -}}
+{{-   if .Values.redis.existingSecret -}}
+{{-     $_ := set $redis "password" (dict "env_var" "AUTHPROXY_REDIS_PASSWORD") -}}
+{{-   end -}}
 {{- end -}}
 {{- $_ := set $cfg "redis" $redis -}}
 
