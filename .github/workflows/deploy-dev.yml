@@ -1,9 +1,10 @@
 # schema: https://json.schemastore.org/github-workflow.json
 name: Deploy Dev
 
-# Deploys one isolated authproxy-demo environment per pull request.
-# The namespace is derived from the PR branch name and the image tag is
-# the Build Image workflow's PR tag: `pr-<number>`.
+# Deploys one isolated authproxy-demo environment for pull requests
+# labeled `deploy:demo`. The namespace is derived from the PR branch
+# name and the image tag is the Build Image workflow's PR tag:
+# `pr-<number>`.
 #
 # Fork PRs are skipped deliberately: the image workflow does not push
 # GHCR tags for forks, and deploying untrusted fork code with AWS OIDC
@@ -12,7 +13,7 @@ name: Deploy Dev
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened]
+    types: [opened, synchronize, reopened, labeled]
 
 permissions:
   actions: read
@@ -28,7 +29,9 @@ concurrency:
 
 jobs:
   deploy:
-    if: github.event.pull_request.head.repo.full_name == github.repository
+    if: >
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'deploy:demo')
     runs-on: ubuntu-latest
     environment: gha-eks
     timeout-minutes: 45
