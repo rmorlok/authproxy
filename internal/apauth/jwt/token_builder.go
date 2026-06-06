@@ -150,22 +150,22 @@ func (tb *tokenBuilder) WithPermissions(permissions []aschema.Permission) TokenB
 }
 
 func (tb *tokenBuilder) WithLabels(labels map[string]string) TokenBuilder {
-	tb.jwtBuilder.WithLabels(labels)
+	tb.jwtBuilder.WithActorLabels(labels)
 	return tb
 }
 
 func (tb *tokenBuilder) WithLabel(key, value string) TokenBuilder {
-	tb.jwtBuilder.WithLabel(key, value)
+	tb.jwtBuilder.WithActorLabel(key, value)
 	return tb
 }
 
 func (tb *tokenBuilder) WithAnnotations(annotations map[string]string) TokenBuilder {
-	tb.jwtBuilder.WithAnnotations(annotations)
+	tb.jwtBuilder.WithActorAnnotations(annotations)
 	return tb
 }
 
 func (tb *tokenBuilder) WithAnnotation(key, value string) TokenBuilder {
-	tb.jwtBuilder.WithAnnotation(key, value)
+	tb.jwtBuilder.WithActorAnnotation(key, value)
 	return tb
 }
 

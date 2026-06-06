@@ -31,10 +31,10 @@ type ClaimsBuilder interface {
 	WithNamespace(namespace string) ClaimsBuilder
 	WithActor(actor core.IActorData) ClaimsBuilder
 	WithPermissions(permissions []aschema.Permission) ClaimsBuilder
-	WithLabels(labels map[string]string) ClaimsBuilder
-	WithLabel(key, value string) ClaimsBuilder
-	WithAnnotations(annotations map[string]string) ClaimsBuilder
-	WithAnnotation(key, value string) ClaimsBuilder
+	WithActorLabels(labels map[string]string) ClaimsBuilder
+	WithActorLabel(key, value string) ClaimsBuilder
+	WithActorAnnotations(annotations map[string]string) ClaimsBuilder
+	WithActorAnnotation(key, value string) ClaimsBuilder
 	WithNonce() ClaimsBuilder
 	BuildCtx(context.Context) (*AuthProxyClaims, error)
 	Build() (*AuthProxyClaims, error)
@@ -127,12 +127,12 @@ func (b *claimsBuilder) WithPermissions(permissions []aschema.Permission) Claims
 	return b
 }
 
-func (b *claimsBuilder) WithLabels(labels map[string]string) ClaimsBuilder {
+func (b *claimsBuilder) WithActorLabels(labels map[string]string) ClaimsBuilder {
 	b.labels = labels
 	return b
 }
 
-func (b *claimsBuilder) WithLabel(key, value string) ClaimsBuilder {
+func (b *claimsBuilder) WithActorLabel(key, value string) ClaimsBuilder {
 	if b.labels == nil {
 		b.labels = make(map[string]string)
 	}
@@ -140,12 +140,12 @@ func (b *claimsBuilder) WithLabel(key, value string) ClaimsBuilder {
 	return b
 }
 
-func (b *claimsBuilder) WithAnnotations(annotations map[string]string) ClaimsBuilder {
+func (b *claimsBuilder) WithActorAnnotations(annotations map[string]string) ClaimsBuilder {
 	b.annotations = annotations
 	return b
 }
 
-func (b *claimsBuilder) WithAnnotation(key, value string) ClaimsBuilder {
+func (b *claimsBuilder) WithActorAnnotation(key, value string) ClaimsBuilder {
 	if b.annotations == nil {
 		b.annotations = make(map[string]string)
 	}

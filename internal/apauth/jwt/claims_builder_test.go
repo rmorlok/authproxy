@@ -235,8 +235,8 @@ func TestClaimsBuilder(t *testing.T) {
 			cb.WithServiceId(config.ServiceIdPublic).
 				WithActorExternalId("bob-dole").
 				WithNamespace("root.child").
-				WithLabel("foo", "bar").
-				WithLabel("baz", "qux").
+				WithActorLabel("foo", "bar").
+				WithActorLabel("baz", "qux").
 				WithExpiresIn(10 * time.Minute)
 
 			claims, err := cb.BuildCtx(ctx)
@@ -254,7 +254,7 @@ func TestClaimsBuilder(t *testing.T) {
 			cb.WithServiceId(config.ServiceIdPublic).
 				WithActorExternalId("bob-dole").
 				WithNamespace("root.child").
-				WithLabels(map[string]string{"foo": "bar", "baz": "qux"}).
+				WithActorLabels(map[string]string{"foo": "bar", "baz": "qux"}).
 				WithExpiresIn(10 * time.Minute)
 
 			claims, err := cb.BuildCtx(ctx)
@@ -275,7 +275,7 @@ func TestClaimsBuilder(t *testing.T) {
 					Namespace:  "root.child",
 					Labels:     map[string]string{"foo": "bar"},
 				}).
-				WithLabel("baz", "qux").
+				WithActorLabel("baz", "qux").
 				WithExpiresIn(10 * time.Minute)
 
 			claims, err := cb.BuildCtx(ctx)
@@ -295,8 +295,8 @@ func TestClaimsBuilder(t *testing.T) {
 			cb.WithServiceId(config.ServiceIdPublic).
 				WithActorExternalId("bob-dole").
 				WithNamespace("root.child").
-				WithAnnotation("foo", "bar").
-				WithAnnotation("baz", "qux").
+				WithActorAnnotation("foo", "bar").
+				WithActorAnnotation("baz", "qux").
 				WithExpiresIn(10 * time.Minute)
 
 			claims, err := cb.BuildCtx(ctx)
@@ -314,7 +314,7 @@ func TestClaimsBuilder(t *testing.T) {
 			cb.WithServiceId(config.ServiceIdPublic).
 				WithActorExternalId("bob-dole").
 				WithNamespace("root.child").
-				WithAnnotations(map[string]string{"foo": "bar", "baz": "qux"}).
+				WithActorAnnotations(map[string]string{"foo": "bar", "baz": "qux"}).
 				WithExpiresIn(10 * time.Minute)
 
 			claims, err := cb.BuildCtx(ctx)
@@ -335,7 +335,7 @@ func TestClaimsBuilder(t *testing.T) {
 					Namespace:   "root.child",
 					Annotations: map[string]string{"foo": "bar"},
 				}).
-				WithAnnotation("baz", "qux").
+				WithActorAnnotation("baz", "qux").
 				WithExpiresIn(10 * time.Minute)
 
 			claims, err := cb.BuildCtx(ctx)
