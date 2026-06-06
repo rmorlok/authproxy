@@ -24,6 +24,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/ratelimit"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
+	"github.com/rmorlok/authproxy/internal/workflows"
 )
 
 // PingFunc is a function that checks the health of a dependency.
@@ -43,6 +44,7 @@ type DependencyManager struct {
 	e                 encrypt.E
 	asynqClient       apasynq.Client
 	asynqInspector    *asynq.Inspector
+	workflowRuntime   *workflows.Runtime
 	c                 coreIface.C
 	pings             map[string]PingFunc
 
@@ -247,6 +249,13 @@ func (dm *DependencyManager) AutoMigrateDatabase() {
 			if err := dm.GetDatabase().Migrate(context.Background()); err != nil {
 				panic(err)
 			}
+
+			if err := workflows.Migrate(
+				dm.GetConfigRoot(),
+				dm.GetLogBuilder().WithComponent("workflows").Build(),
+			); err != nil {
+				panic(fmt.Errorf("failed to migrate workflow database: %w", err))
+			}
 		}()
 	}
 }
@@ -384,6 +393,39 @@ func (dm *DependencyManager) GetAsyncInspector() *asynq.Inspector {
 	}
 
 	return dm.asynqInspector
+}
+
+func (dm *DependencyManager) GetWorkflowRuntime() *workflows.Runtime {
+	if dm.workflowRuntime == nil {
+		r, err := workflows.NewRuntime(
+			dm.GetConfigRoot(),
+			dm.GetTelemetry(),
+			dm.GetLogBuilder().WithComponent("workflows").Build(),
+		)
+		if err != nil {
+			panic(fmt.Errorf("failed to construct workflow runtime: %w", err))
+		}
+
+		dm.workflowRuntime = r
+	}
+
+	return dm.workflowRuntime
+}
+
+func (dm *DependencyManager) RegisterWorkflowRuntimePing() {
+	dm.RegisterPing("workflowRuntime", func(ctx context.Context) bool {
+		return dm.GetWorkflowRuntime().Ping(ctx)
+	})
+}
+
+func (dm *DependencyManager) ShutdownWorkflowRuntime() {
+	if dm.workflowRuntime == nil {
+		return
+	}
+
+	if err := dm.workflowRuntime.Close(); err != nil {
+		dm.GetLogger().Warn("failed to close workflow runtime", "error", err)
+	}
 }
 
 // GetTelemetry returns the OTel providers for this service. When telemetry is

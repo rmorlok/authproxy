@@ -9,6 +9,7 @@ import (
 	"sync"
 	"time"
 
+	workflowworker "github.com/cschleiden/go-workflows/worker"
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/apasynq"
@@ -21,6 +22,7 @@ import (
 	dbTasks "github.com/rmorlok/authproxy/internal/database/tasks"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/service"
+	apworkflows "github.com/rmorlok/authproxy/internal/workflows"
 )
 
 func Serve(cfg config.C) {
@@ -50,6 +52,8 @@ func Serve(cfg config.C) {
 	asyncHasError := false
 	asyncRunning := false
 	asyncIsScheduler := false
+	workflowHasError := false
+	workflowRunning := false
 	asyncHealthChecker := func(err error) {
 		asyncHasError = asyncHasError || err != nil
 	}
@@ -65,8 +69,12 @@ func Serve(cfg config.C) {
 	dm.RegisterRedisPing()
 	dm.RegisterAsynqClientPing()
 	dm.RegisterAppMetricsPing()
+	dm.RegisterWorkflowRuntimePing()
 	dm.RegisterPing("asynqServer", func(ctx context.Context) bool {
 		return asyncRunning && !asyncHasError
+	})
+	dm.RegisterPing("workflowWorker", func(ctx context.Context) bool {
+		return workflowRunning && !workflowHasError
 	})
 
 	router.GET("/healthz", func(c *gin.Context) {
@@ -88,6 +96,7 @@ func Serve(cfg config.C) {
 
 	dm.AutoMigrateAll()
 	defer dm.GetEncryptService().Shutdown()
+	defer dm.ShutdownWorkflowRuntime()
 
 	ctx := context.Background()
 
@@ -128,6 +137,19 @@ func Serve(cfg config.C) {
 	// Telemetry middleware wraps every handler with a span + duration
 	// histogram observation. Identity wrapper when telemetry is disabled.
 	mux.Use(asynqTel.Middleware())
+
+	workflowRuntime := dm.GetWorkflowRuntime()
+	workflowWorker, err := apworkflows.NewWorker(workflowRuntime, &workflowworker.Options{
+		WorkflowWorkerOptions: workflowworker.WorkflowWorkerOptions{
+			MaxParallelWorkflowTasks: workerConfig.GetConcurrency(context.Background()),
+		},
+		ActivityWorkerOptions: workflowworker.ActivityWorkerOptions{
+			MaxParallelActivityTasks: workerConfig.GetConcurrency(context.Background()),
+		},
+	})
+	if err != nil {
+		log.Fatalf("failed to construct workflow worker: %v", err)
+	}
 
 	oauth2TaskHandler := oauth2.NewTaskHandler(
 		cfg,
@@ -177,6 +199,22 @@ func Serve(cfg config.C) {
 	appMetricsTaskHandler.RegisterTasks(mux)
 
 	var wg sync.WaitGroup
+
+	wg.Add(1)
+	go func() {
+		defer wg.Done()
+		workflowRunning = true
+		if err := workflowWorker.Start(ctx); err != nil {
+			workflowHasError = true
+			log.Fatalf("could not start workflow worker: %v", err)
+		}
+		if err := workflowWorker.WaitForCompletion(); err != nil {
+			workflowHasError = true
+			log.Fatalf("workflow worker failed while waiting for completion: %v", err)
+		}
+		workflowRunning = false
+		logger.Info("Workflow worker shutdown complete")
+	}()
 
 	wg.Add(1)
 	go func() {
