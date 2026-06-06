@@ -147,6 +147,19 @@ func TestPermission_AllowsForActor(t *testing.T) {
 			verb:      "get",
 			allowed:   false,
 		},
+		{
+			name: "rejects templates that render to invalid namespaces",
+			p: aschema.Permission{
+				Namespace: "root.{{labels.foo}}.**",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root.foo.bar",
+			resource:  "connections",
+			verb:      "get",
+			actor:     &Actor{Annotations: map[string]string{"foo": "**"}}, // Will render root.**.**
+			allowed:   false,
+		},
 
 		// Exact namespace matching
 		{

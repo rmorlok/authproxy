@@ -83,6 +83,9 @@ func renderPermissionNamespace(actor *Actor, namespace string) (string, bool) {
 	return rendered, true
 }
 
+// renderValidPermissionNamespace optionally renders a namespace with templating based on actor data
+// and validates that the resulting namespace is valid. If the templating cannot be fufulled, or the
+// resulting namespace is not valid, it returns false.
 func renderValidPermissionNamespace(actor *Actor, namespace string) (string, bool) {
 	rendered, ok := renderPermissionNamespace(actor, namespace)
 	if !ok {
