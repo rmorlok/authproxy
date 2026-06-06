@@ -8,7 +8,7 @@ import (
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
 
-// Allows checks if this permission allows the specified action.
+// allowsForActor checks if this permission allows the specified action for the given actor.
 //
 // Parameters:
 //   - namespace: The namespace where the action is being performed (e.g., "root.foo.bar").
@@ -25,10 +25,6 @@ import (
 //   - Verbs: Exact match with any verb in the permission, or permission contains "*".
 //   - ResourceIds: If permission has no ResourceIds, all IDs are allowed. If permission has
 //     ResourceIds, the requested ID must be in the list.
-func allows(p aschema.Permission, namespace, resource, verb, resourceId string) bool {
-	return allowsForActor(nil, p, namespace, resource, verb, resourceId)
-}
-
 func allowsForActor(actor *Actor, p aschema.Permission, namespace, resource, verb, resourceId string) bool {
 	if !matchesNamespace(actor, p, namespace) {
 		return false
@@ -196,14 +192,10 @@ func matchesResourceId(p aschema.Permission, targetResourceId string) bool {
 	return slices.Contains(p.ResourceIds, targetResourceId)
 }
 
-// permissionsAllow checks if any permission in the slice allows the specified action.
+// permissionsAllowForActor checks if any permission in the slice allows the specified action for the given actor.
 // Permissions are additive - if any single permission allows the action, it is permitted.
 //
 // This is the primary function for checking if an actor has permission to perform an action.
-func permissionsAllow(permissions []aschema.Permission, namespace, resource, verb, resourceId string) bool {
-	return permissionsAllowForActor(nil, permissions, namespace, resource, verb, resourceId)
-}
-
 func permissionsAllowForActor(actor *Actor, permissions []aschema.Permission, namespace, resource, verb, resourceId string) bool {
 	for _, p := range permissions {
 		if allowsForActor(actor, p, namespace, resource, verb, resourceId) {

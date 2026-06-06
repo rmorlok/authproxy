@@ -7,7 +7,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestPermission_Allows(t *testing.T) {
+func TestPermission_AllowsForActor(t *testing.T) {
 	tests := []struct {
 		name       string
 		p          aschema.Permission
@@ -15,8 +15,139 @@ func TestPermission_Allows(t *testing.T) {
 		resource   string
 		verb       string
 		resourceId string
+		actor      *Actor
 		allowed    bool
 	}{
+		// Templated namespace matching
+		{
+			name: "templated namespace match by external id",
+			p: aschema.Permission{
+				Namespace: "root.{{external_id}}",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root.actor-123",
+			resource:  "connections",
+			verb:      "get",
+			actor:     &Actor{ExternalId: "actor-123"},
+			allowed:   true,
+		},
+		{
+			name: "templated namespace mismatch by external id",
+			p: aschema.Permission{
+				Namespace: "root.{{external_id}}",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root.actor-999",
+			resource:  "connections",
+			verb:      "get",
+			actor:     &Actor{ExternalId: "actor-123"},
+			allowed:   false,
+		},
+		{
+			name: "templated namespace match by label",
+			p: aschema.Permission{
+				Namespace: "root.{{labels.team_id}}",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root.team-123",
+			resource:  "connections",
+			verb:      "get",
+			actor:     &Actor{Labels: map[string]string{"team_id": "team-123"}},
+			allowed:   true,
+		},
+		{
+			name: "templated namespace mismatch by label",
+			p: aschema.Permission{
+				Namespace: "root.{{labels.team_id}}",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root.team-999",
+			resource:  "connections",
+			verb:      "get",
+			actor:     &Actor{Labels: map[string]string{"team_id": "team-123"}},
+			allowed:   false,
+		},
+		{
+			name: "templated namespace mismatch by missing label",
+			p: aschema.Permission{
+				Namespace: "root.{{labels.team_id}}",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root.team-999",
+			resource:  "connections",
+			verb:      "get",
+			actor:     &Actor{Labels: map[string]string{"foo": "bar"}},
+			allowed:   false,
+		},
+		{
+			name: "templated namespace mismatch by missing label actor",
+			p: aschema.Permission{
+				Namespace: "root.{{labels.team_id}}",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root.team-999",
+			resource:  "connections",
+			verb:      "get",
+			allowed:   false,
+		},
+		{
+			name: "templated namespace match by annotation",
+			p: aschema.Permission{
+				Namespace: "root.{{annotations.team_id}}",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root.team-123",
+			resource:  "connections",
+			verb:      "get",
+			actor:     &Actor{Annotations: map[string]string{"team_id": "team-123"}},
+			allowed:   true,
+		},
+		{
+			name: "templated namespace mismatch by annotation",
+			p: aschema.Permission{
+				Namespace: "root.{{annotations.team_id}}",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root.team-999",
+			resource:  "connections",
+			verb:      "get",
+			actor:     &Actor{Annotations: map[string]string{"team_id": "team-123"}},
+			allowed:   false,
+		},
+		{
+			name: "templated namespace mismatch by missing annotation",
+			p: aschema.Permission{
+				Namespace: "root.{{annotations.team_id}}",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root.team-999",
+			resource:  "connections",
+			verb:      "get",
+			actor:     &Actor{Annotations: map[string]string{"foo": "bar"}},
+			allowed:   false,
+		},
+		{
+			name: "templated namespace mismatch by missing annotation actor",
+			p: aschema.Permission{
+				Namespace: "root.{{annotations.team_id}}",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root.team-999",
+			resource:  "connections",
+			verb:      "get",
+			allowed:   false,
+		},
+
 		// Exact namespace matching
 		{
 			name: "exact namespace match",
@@ -370,13 +501,13 @@ func TestPermission_Allows(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := allows(tt.p, tt.namespace, tt.resource, tt.verb, tt.resourceId)
+			result := allowsForActor(tt.actor, tt.p, tt.namespace, tt.resource, tt.verb, tt.resourceId)
 			require.Equal(t, tt.allowed, result)
 		})
 	}
 }
 
-func TestPermissionsAllow(t *testing.T) {
+func TestPermissionsAllowForActor(t *testing.T) {
 	tests := []struct {
 		name        string
 		permissions []aschema.Permission
@@ -384,6 +515,7 @@ func TestPermissionsAllow(t *testing.T) {
 		resource    string
 		verb        string
 		resourceId  string
+		actor       *Actor
 		allowed     bool
 	}{
 		{
@@ -492,11 +624,26 @@ func TestPermissionsAllow(t *testing.T) {
 			verb:      "get",
 			allowed:   true,
 		},
+		{
+			name: "templated namespace match",
+			permissions: []aschema.Permission{
+				{
+					Namespace: "root.{{external_id}}",
+					Resources: []string{"connections"},
+					Verbs:     []string{"get"},
+				},
+			},
+			namespace: "root.actor-123",
+			resource:  "connectors",
+			verb:      "get",
+			actor:     &Actor{ExternalId: "actor-123"},
+			allowed:   true,
+		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			result := permissionsAllow(tt.permissions, tt.namespace, tt.resource, tt.verb, tt.resourceId)
+			result := permissionsAllowForActor(tt.actor, tt.permissions, tt.namespace, tt.resource, tt.verb, tt.resourceId)
 			require.Equal(t, tt.allowed, result)
 		})
 	}
