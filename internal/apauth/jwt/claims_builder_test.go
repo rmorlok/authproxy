@@ -285,4 +285,64 @@ func TestClaimsBuilder(t *testing.T) {
 			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Labels)
 		})
 	})
+	t.Run("annotations", func(t *testing.T) {
+		t.Run("with individual annotations", func(t *testing.T) {
+			now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			cb := NewClaimsBuilder()
+
+			cb.WithServiceId(config.ServiceIdPublic).
+				WithActorExternalId("bob-dole").
+				WithNamespace("root.child").
+				WithAnnotation("foo", "bar").
+				WithAnnotation("baz", "qux").
+				WithExpiresIn(10 * time.Minute)
+
+			claims, err := cb.BuildCtx(ctx)
+			require.NoError(t, err)
+
+			require.NotNil(t, claims.Actor)
+			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Annotations)
+		})
+		t.Run("with map of annotations", func(t *testing.T) {
+			now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			cb := NewClaimsBuilder()
+
+			cb.WithServiceId(config.ServiceIdPublic).
+				WithActorExternalId("bob-dole").
+				WithNamespace("root.child").
+				WithAnnotations(map[string]string{"foo": "bar", "baz": "qux"}).
+				WithExpiresIn(10 * time.Minute)
+
+			claims, err := cb.BuildCtx(ctx)
+			require.NoError(t, err)
+
+			require.NotNil(t, claims.Actor)
+			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Annotations)
+		})
+		t.Run("merge annotations with actor", func(t *testing.T) {
+			now := time.Date(1955, time.November, 5, 6, 29, 0, 0, time.UTC)
+			ctx := apctx.NewBuilderBackground().WithClock(clock.NewFakeClock(now)).Build()
+
+			cb := NewClaimsBuilder()
+
+			cb.WithServiceId(config.ServiceIdPublic).
+				WithActor(&core.Actor{
+					ExternalId:  "bob-dole",
+					Namespace:   "root.child",
+					Annotations: map[string]string{"foo": "bar"},
+				}).
+				WithAnnotation("baz", "qux").
+				WithExpiresIn(10 * time.Minute)
+
+			claims, err := cb.BuildCtx(ctx)
+			require.NoError(t, err)
+
+			require.NotNil(t, claims.Actor)
+			require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Annotations)
+		})
+	})
 }

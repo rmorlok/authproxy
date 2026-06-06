@@ -21,6 +21,16 @@
     "permissions": {
       "type": "array",
       "description": "A list of permissions that the actor has. Required."
+    },
+    "labels": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Labels to carry on the actor."
+    },
+    "annotations": {
+      "type": "object",
+      "additionalProperties": { "type": "string" },
+      "description": "Annotations to carry on the actor."
     }
   },
   "additionalProperties": false,

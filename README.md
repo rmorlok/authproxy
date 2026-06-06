@@ -135,6 +135,8 @@ Permissions are defined as a combination of **namespace**, **resources**, and **
 
 Wildcards (`*`) are supported for resources and verbs. The `**` suffix on namespaces matches all descendants.
 
+Permission namespaces may also template fields from the authenticated actor: `{{external_id}}`, `{{labels.<label>}}`, and `{{annotations.<annotation>}}`. For example, `root.{{external_id}}.**` grants each actor access under a namespace named for its external ID. If a referenced label or annotation is missing, that permission does not match.
+
 ### JWT Authentication and Scoped Tokens
 
 AuthProxy uses JWTs for authentication with a flexible model designed for **least-privilege access**. Actors (users or service accounts) have a set of permissions stored in the database, but each JWT issued can carry a **subset** of those permissions.

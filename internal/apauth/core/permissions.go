@@ -1,14 +1,12 @@
 package core
 
 import (
-	"regexp"
 	"slices"
 	"strings"
 
+	"github.com/rmorlok/authproxy/internal/aptmpl"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
-
-var permissionNamespaceTemplateRegex = regexp.MustCompile(`{{\s*([^{}]+?)\s*}}`)
 
 // Allows checks if this permission allows the specified action.
 //
@@ -71,7 +69,7 @@ func matchesNamespace(actor *Actor, p aschema.Permission, targetNamespace string
 }
 
 func renderPermissionNamespace(actor *Actor, namespace string) (string, bool) {
-	if !strings.Contains(namespace, "{{") {
+	if !aptmpl.ContainsMustache(namespace) {
 		return namespace, true
 	}
 
@@ -79,33 +77,25 @@ func renderPermissionNamespace(actor *Actor, namespace string) (string, bool) {
 		return "", false
 	}
 
-	matches := permissionNamespaceTemplateRegex.FindAllStringSubmatchIndex(namespace, -1)
-	if len(matches) == 0 {
+	vars, err := aptmpl.ExtractVariables(namespace)
+	if err != nil {
 		return "", false
 	}
 
-	var rendered strings.Builder
-	last := 0
-	for _, match := range matches {
-		rendered.WriteString(namespace[last:match[0]])
-
-		name := strings.TrimSpace(namespace[match[2]:match[3]])
-		value, ok := actorPermissionTemplateValue(actor, name)
+	data := actorPermissionTemplateContext(actor)
+	for _, name := range vars {
+		_, ok := actorPermissionTemplateValue(data, name)
 		if !ok {
 			return "", false
 		}
-
-		rendered.WriteString(value)
-		last = match[1]
 	}
-	rendered.WriteString(namespace[last:])
 
-	result := rendered.String()
-	if strings.Contains(result, "{{") || strings.Contains(result, "}}") {
+	rendered, err := aptmpl.RenderMustache(namespace, data)
+	if err != nil {
 		return "", false
 	}
 
-	return result, true
+	return rendered, true
 }
 
 func renderValidPermissionNamespace(actor *Actor, namespace string) (string, bool) {
@@ -121,23 +111,34 @@ func renderValidPermissionNamespace(actor *Actor, namespace string) (string, boo
 	return rendered, true
 }
 
-func actorPermissionTemplateValue(actor *Actor, name string) (string, bool) {
+func actorPermissionTemplateContext(actor *Actor) map[string]any {
+	return map[string]any{
+		"external_id": actor.ExternalId,
+		"labels":      actor.Labels,
+		"annotations": actor.Annotations,
+	}
+}
+
+func actorPermissionTemplateValue(data map[string]any, name string) (string, bool) {
 	switch {
 	case name == "external_id":
-		return actor.ExternalId, true
+		value, ok := data["external_id"].(string)
+		return value, ok
 	case strings.HasPrefix(name, "labels."):
 		key := strings.TrimPrefix(name, "labels.")
-		if key == "" || actor.Labels == nil {
+		labels, _ := data["labels"].(map[string]string)
+		if key == "" || labels == nil {
 			return "", false
 		}
-		value, ok := actor.Labels[key]
+		value, ok := labels[key]
 		return value, ok
 	case strings.HasPrefix(name, "annotations."):
 		key := strings.TrimPrefix(name, "annotations.")
-		if key == "" || actor.Annotations == nil {
+		annotations, _ := data["annotations"].(map[string]string)
+		if key == "" || annotations == nil {
 			return "", false
 		}
-		value, ok := actor.Annotations[key]
+		value, ok := annotations[key]
 		return value, ok
 	default:
 		return "", false

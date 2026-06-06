@@ -33,6 +33,8 @@ type ClaimsBuilder interface {
 	WithPermissions(permissions []aschema.Permission) ClaimsBuilder
 	WithLabels(labels map[string]string) ClaimsBuilder
 	WithLabel(key, value string) ClaimsBuilder
+	WithAnnotations(annotations map[string]string) ClaimsBuilder
+	WithAnnotation(key, value string) ClaimsBuilder
 	WithNonce() ClaimsBuilder
 	BuildCtx(context.Context) (*AuthProxyClaims, error)
 	Build() (*AuthProxyClaims, error)
@@ -50,6 +52,7 @@ type claimsBuilder struct {
 	actor        *core.Actor
 	permissions  []aschema.Permission
 	labels       map[string]string
+	annotations  map[string]string
 	systemSigned bool
 	actorSigned  bool
 	nonce        *apid.ID
@@ -137,6 +140,19 @@ func (b *claimsBuilder) WithLabel(key, value string) ClaimsBuilder {
 	return b
 }
 
+func (b *claimsBuilder) WithAnnotations(annotations map[string]string) ClaimsBuilder {
+	b.annotations = annotations
+	return b
+}
+
+func (b *claimsBuilder) WithAnnotation(key, value string) ClaimsBuilder {
+	if b.annotations == nil {
+		b.annotations = make(map[string]string)
+	}
+	b.annotations[key] = value
+	return b
+}
+
 func (b *claimsBuilder) WithNonce() ClaimsBuilder {
 	id := apid.New(apid.PrefixNonce)
 	b.nonce = &id
@@ -173,11 +189,21 @@ func (b *claimsBuilder) BuildCtx(ctx context.Context) (*AuthProxyClaims, error) 
 				b.actor.Labels[k] = v
 			}
 		}
+
+		if len(b.annotations) > 0 {
+			if b.actor.Annotations == nil {
+				b.actor.Annotations = make(map[string]string)
+			}
+			for k, v := range b.annotations {
+				b.actor.Annotations[k] = v
+			}
+		}
 	}
 
-	if b.actor == nil && len(b.labels) > 0 {
+	if b.actor == nil && (len(b.labels) > 0 || len(b.annotations) > 0) {
 		b.actor = &core.Actor{
-			Labels: b.labels,
+			Labels:      b.labels,
+			Annotations: b.annotations,
 		}
 	}
 

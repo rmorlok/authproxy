@@ -86,4 +86,17 @@ func TestJwtTokenBuilder(t *testing.T) {
 		require.NotNil(t, claims.Actor)
 		require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Labels)
 	})
+	t.Run("annotations", func(t *testing.T) {
+		tb := NewJwtTokenBuilder().
+			WithActorExternalId("bob-dole").
+			WithNamespace("root.child").
+			WithAnnotations(map[string]string{"foo": "bar"}).
+			WithAnnotation("baz", "qux")
+
+		x := tb.(*tokenBuilder)
+		claims, err := x.jwtBuilder.Build()
+		require.NoError(t, err)
+		require.NotNil(t, claims.Actor)
+		require.Equal(t, map[string]string{"foo": "bar", "baz": "qux"}, claims.Actor.Annotations)
+	})
 }

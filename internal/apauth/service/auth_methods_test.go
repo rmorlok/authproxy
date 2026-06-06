@@ -602,6 +602,53 @@ func TestAuth_establishAuthFromRequest(t *testing.T) {
 				require.Equal(t, dbActorId, retrieved.Id, "should preserve original database ID")
 				require.Equal(t, database.Permissions(newPerms), retrieved.Permissions, "permissions should be updated in database")
 			})
+
+			t.Run("actor annotations updated in database", func(t *testing.T) {
+				setup(t)
+
+				dbActorId := apid.New(apid.PrefixActor)
+				externalId := "annotation-test-actor"
+				dbActor := &database.Actor{
+					Id:          dbActorId,
+					Namespace:   "root",
+					ExternalId:  externalId,
+					Annotations: database.Annotations{"old": "value"},
+				}
+				require.NoError(t, db.CreateActor(testContext, dbActor))
+
+				claims := &jwt2.AuthProxyClaims{
+					RegisteredClaims: jwt.RegisteredClaims{
+						ID:        "random id",
+						Subject:   externalId,
+						Issuer:    "remark42",
+						Audience:  []string{string(sconfig.ServiceIdAdminApi)},
+						ExpiresAt: &jwt.NumericDate{time.Date(2058, 5, 21, 7, 30, 22, 0, time.UTC)},
+						NotBefore: &jwt.NumericDate{time.Date(2018, 5, 21, 6, 30, 22, 0, time.UTC)},
+						IssuedAt:  &jwt.NumericDate{apctx.GetClock(testContext).Now()},
+					},
+					Actor: &core.Actor{
+						ExternalId:  externalId,
+						Namespace:   "root",
+						Annotations: map[string]string{"tenant": "acme"},
+					},
+				}
+
+				tok, err := a.Token(testContext, claims)
+				require.NoError(t, err)
+
+				req := httptest.NewRequest("GET", "/", nil)
+				req.Header.Add(JwtHeaderKey, fmt.Sprintf("Bearer %s", tok))
+				w := httptest.NewRecorder()
+				ra, err := raw.establishAuthFromRequest(testContext, true, req, w)
+				require.NoError(t, err)
+				require.True(t, ra.IsAuthenticated())
+				require.Equal(t, map[string]string{"tenant": "acme"}, ra.MustGetActor().Annotations)
+
+				retrieved, err := db.GetActorByExternalId(testContext, "root", externalId)
+				require.NoError(t, err)
+				require.Equal(t, dbActorId, retrieved.Id, "should preserve original database ID")
+				require.Equal(t, database.Annotations{"tenant": "acme"}, retrieved.Annotations, "annotations should be updated in database")
+			})
 		})
 
 		t.Run("expired", func(t *testing.T) {

@@ -27,7 +27,7 @@ type Actor struct {
 	ExternalId  string               `json:"external_id"`
 	Namespace   string               `json:"namespace,omitempty"`
 	Labels      map[string]string    `json:"labels,omitempty"`
-	Annotations map[string]string    `json:"-"`
+	Annotations map[string]string    `json:"annotations,omitempty"`
 	Permissions []aschema.Permission `json:"permissions"`
 }
 
@@ -49,9 +49,7 @@ func (a *Actor) GetNamespace() string {
 
 func (a *Actor) GetLabels() map[string]string { return a.Labels }
 
-// GetAnnotations returns server-side actor annotations when this actor was
-// built from database state. The field is not deserialized from JWT actor
-// claims, so upserts from claims preserve existing annotations.
+// GetAnnotations returns actor annotations from database state or JWT claims.
 func (a *Actor) GetAnnotations() map[string]string { return a.Annotations }
 
 func CreateActor(data IActorData) *Actor {

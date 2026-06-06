@@ -45,6 +45,8 @@ type TokenBuilder interface {
 	WithPermissions(permissions []aschema.Permission) TokenBuilder
 	WithLabels(labels map[string]string) TokenBuilder
 	WithLabel(key, value string) TokenBuilder
+	WithAnnotations(annotations map[string]string) TokenBuilder
+	WithAnnotation(key, value string) TokenBuilder
 	WithNonce() TokenBuilder
 
 	WithConfigKey(ctx context.Context, cfgKey *config.Key) (TokenBuilder, error)
@@ -154,6 +156,16 @@ func (tb *tokenBuilder) WithLabels(labels map[string]string) TokenBuilder {
 
 func (tb *tokenBuilder) WithLabel(key, value string) TokenBuilder {
 	tb.jwtBuilder.WithLabel(key, value)
+	return tb
+}
+
+func (tb *tokenBuilder) WithAnnotations(annotations map[string]string) TokenBuilder {
+	tb.jwtBuilder.WithAnnotations(annotations)
+	return tb
+}
+
+func (tb *tokenBuilder) WithAnnotation(key, value string) TokenBuilder {
+	tb.jwtBuilder.WithAnnotation(key, value)
 	return tb
 }
 
