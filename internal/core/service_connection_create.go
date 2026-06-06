@@ -5,12 +5,12 @@ import (
 	"errors"
 
 	"github.com/rmorlok/authproxy/internal/apctx"
-	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
-	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/httperr"
+	ns "github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
 func (s *service) CreateConnection(
@@ -25,7 +25,7 @@ func (s *service) CreateConnection(
 		"connector_version", cv.GetVersion(),
 	)
 
-	if !aschema.NamespaceIsSameOrChild(cv.GetNamespace(), namespace) {
+	if !ns.NamespaceIsSameOrChild(cv.GetNamespace(), namespace) {
 		return nil, httperr.BadRequestErr(errors.New("connections must be created in the same or child namespace of the connector"))
 	}
 

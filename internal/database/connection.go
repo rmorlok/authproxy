@@ -13,6 +13,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -206,7 +207,7 @@ func (c *Connection) Validate() error {
 		result = multierror.Append(result, fmt.Errorf("invalid connection id: %w", err))
 	}
 
-	if err := ValidateNamespacePath(c.Namespace); err != nil {
+	if err := namespace.ValidateNamespacePath(c.Namespace); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid connection namespace path: %w", err))
 	}
 
@@ -611,7 +612,7 @@ func (l *listConnectionsFilters) ForConnectorId(id apid.ID) ListConnectionsBuild
 }
 
 func (l *listConnectionsFilters) ForNamespaceMatcher(matcher string) ListConnectionsBuilder {
-	if err := ValidateNamespaceMatcher(matcher); err != nil {
+	if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
 		return l.addError(err)
 	} else {
 		l.NamespaceMatchers = []string{matcher}
@@ -622,7 +623,7 @@ func (l *listConnectionsFilters) ForNamespaceMatcher(matcher string) ListConnect
 
 func (l *listConnectionsFilters) ForNamespaceMatchers(matchers []string) ListConnectionsBuilder {
 	for _, matcher := range matchers {
-		if err := ValidateNamespaceMatcher(matcher); err != nil {
+		if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
 			return l.addError(err)
 		}
 	}

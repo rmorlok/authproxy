@@ -17,7 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/httpf"
 	sapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
-	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -726,7 +726,7 @@ func (r *RequestEventsRoutes) queryMetrics(gctx *gin.Context) {
 		return
 	}
 	if req.Namespace != nil {
-		if err := aschema.ValidateNamespaceMatcher(*req.Namespace); err != nil {
+		if err := namespace.ValidateNamespaceMatcher(*req.Namespace); err != nil {
 			apgin.WriteError(gctx, nil, httperr.BadRequest("invalid namespace matcher", httperr.WithInternalErr(err)))
 			val.MarkErrorReturn()
 			return

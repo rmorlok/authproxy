@@ -11,9 +11,9 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apctx"
-	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
-	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/httperr"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -84,13 +84,13 @@ func (ns *Namespace) normalize() {
 		ns.State = NamespaceStateActive
 	}
 
-	ns.depth = DepthOfNamespacePath(ns.Path)
+	ns.depth = namespace.DepthOfNamespacePath(ns.Path)
 }
 
 func (ns *Namespace) Validate() error {
 	result := &multierror.Error{}
 
-	if err := ValidateNamespacePath(ns.Path); err != nil {
+	if err := namespace.ValidateNamespacePath(ns.Path); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid namespace path: %w", err))
 	}
 
@@ -108,13 +108,6 @@ func (ns *Namespace) Validate() error {
 
 	return result.ErrorOrNil()
 }
-
-var (
-	ValidateNamespacePath        = aschema.ValidateNamespacePath
-	ValidateNamespaceMatcher     = aschema.ValidateNamespaceMatcher
-	SplitNamespacePathToPrefixes = aschema.SplitNamespacePathToPrefixes
-	DepthOfNamespacePath         = aschema.DepthOfNamespacePath
-)
 
 // restrictToNamespaceMatcher applies a restriction where the query must match the namespace matcher.
 func restrictToNamespaceMatcher(q sq.SelectBuilder, field string, matcher string) sq.SelectBuilder {
@@ -239,7 +232,7 @@ func (s *service) getNamespaceByPath(ctx context.Context, tx sq.BaseRunner, path
 }
 
 func (s *service) createNamespace(ctx context.Context, tx *sql.Tx, ns *Namespace) error {
-	prefixes := SplitNamespacePathToPrefixes(ns.Path)
+	prefixes := namespace.SplitNamespacePathToPrefixes(ns.Path)
 	state := ns.State
 
 	for i := 0; i < len(prefixes)-1; i++ {
@@ -327,12 +320,12 @@ func (s *service) CreateNamespace(ctx context.Context, ns *Namespace) error {
 // EnsureNamespaceByPath ensures that a namespace exists with the given path, creating it if necessary. It will
 // recursively create all parent namespaces if they do not exist. If any parent is not active, it will return an error.
 func (s *service) EnsureNamespaceByPath(ctx context.Context, path string) error {
-	if err := aschema.ValidateNamespacePath(path); err != nil {
+	if err := namespace.ValidateNamespacePath(path); err != nil {
 		return err
 	}
 
 	err := s.transaction(func(tx *sql.Tx) error {
-		prefixes := SplitNamespacePathToPrefixes(path)
+		prefixes := namespace.SplitNamespacePathToPrefixes(path)
 
 		for i := 0; i < len(prefixes); i++ {
 			ns, err := s.getNamespaceByPath(ctx, tx, prefixes[i])
@@ -402,7 +395,7 @@ func (s *service) SetNamespaceEncryptionKeyId(ctx context.Context, path string, 
 			return nil, fmt.Errorf("failed to look up encryption key: %w", err)
 		}
 
-		prefixes := aschema.SplitNamespacePathToPrefixes(path)
+		prefixes := namespace.SplitNamespacePathToPrefixes(path)
 		// Strict ancestors: all prefixes except the last (self)
 		var strictAncestors []string
 		if len(prefixes) > 1 {
@@ -538,10 +531,10 @@ func (l *listNamespacesFilters) ForDepth(depth uint64) ListNamespacesBuilder {
 }
 
 func (l *listNamespacesFilters) ForChildrenOf(path string) ListNamespacesBuilder {
-	if err := ValidateNamespacePath(path); err != nil {
+	if err := namespace.ValidateNamespacePath(path); err != nil {
 		return l.addError(err)
 	} else {
-		currDepth := DepthOfNamespacePath(path)
+		currDepth := namespace.DepthOfNamespacePath(path)
 		return l.
 			ForDepth(currDepth + 1).
 			ForPathPrefix(path)
@@ -549,7 +542,7 @@ func (l *listNamespacesFilters) ForChildrenOf(path string) ListNamespacesBuilder
 }
 
 func (l *listNamespacesFilters) ForNamespaceMatcher(matcher string) ListNamespacesBuilder {
-	if err := ValidateNamespaceMatcher(matcher); err != nil {
+	if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
 		return l.addError(err)
 	} else {
 		l.NamespaceMatchers = []string{matcher}
@@ -560,7 +553,7 @@ func (l *listNamespacesFilters) ForNamespaceMatcher(matcher string) ListNamespac
 
 func (l *listNamespacesFilters) ForNamespaceMatchers(matchers []string) ListNamespacesBuilder {
 	for _, matcher := range matchers {
-		if err := ValidateNamespaceMatcher(matcher); err != nil {
+		if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
 			return l.addError(err)
 		}
 	}
@@ -617,10 +610,10 @@ func (l *listNamespacesFilters) applyRestrictions(ctx context.Context) sq.Select
 	}
 
 	if l.PathPrefixVal != "" {
-		if len(l.PathPrefixVal) >= 2 && string(l.PathPrefixVal[len(l.PathPrefixVal)-1]) == aschema.NamespacePathSeparator {
+		if len(l.PathPrefixVal) >= 2 && string(l.PathPrefixVal[len(l.PathPrefixVal)-1]) == namespace.NamespacePathSeparator {
 			q = q.Where("(path = ? OR path LIKE ?)", l.PathPrefixVal[:len(l.PathPrefixVal)-2], l.PathPrefixVal+"%")
 		} else {
-			q = q.Where("(path = ? OR path LIKE ?)", l.PathPrefixVal, l.PathPrefixVal+aschema.NamespacePathSeparator+"%")
+			q = q.Where("(path = ? OR path LIKE ?)", l.PathPrefixVal, l.PathPrefixVal+namespace.NamespacePathSeparator+"%")
 		}
 	}
 

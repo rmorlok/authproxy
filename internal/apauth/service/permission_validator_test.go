@@ -17,6 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -271,7 +272,7 @@ func TestGetEffectiveNamespaceMatchers(t *testing.T) {
 			resource:      "connections",
 			verb:          "list",
 			queryMatcher:  nil,
-			expected:      []string{aschema.NamespaceNoMatchSentinel},
+			expected:      []string{namespace.NamespaceNoMatchSentinel},
 		},
 		{
 			name:          "authenticated with no matching permissions returns empty",
@@ -337,7 +338,7 @@ func TestGetEffectiveNamespaceMatchers(t *testing.T) {
 			resource:      "connections",
 			verb:          "list",
 			queryMatcher:  strPtr("root.staging"),
-			expected:      []string{aschema.NamespaceNoMatchSentinel},
+			expected:      []string{namespace.NamespaceNoMatchSentinel},
 		},
 		{
 			name:          "wildcard resource permission",

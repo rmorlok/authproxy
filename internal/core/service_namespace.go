@@ -9,7 +9,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	dbtasks "github.com/rmorlok/authproxy/internal/database/tasks"
-	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -30,13 +30,13 @@ func (s *service) enqueueNamespaceLabelPropagation(ctx context.Context, nsPath s
 }
 
 func (s *service) EnsureNamespaceAncestorPath(ctx context.Context, targetNamespace string, labels map[string]string) (iface.Namespace, error) {
-	if err := aschema.ValidateNamespacePath(targetNamespace); err != nil {
+	if err := namespace.ValidateNamespacePath(targetNamespace); err != nil {
 		return nil, err
 	}
 
 	var err error
 	var final *database.Namespace
-	for _, ns := range aschema.SplitNamespacePathToPrefixes(targetNamespace) {
+	for _, ns := range namespace.SplitNamespacePathToPrefixes(targetNamespace) {
 		final, err = s.db.GetNamespace(ctx, ns)
 		if err != nil {
 			if errors.Is(err, database.ErrNotFound) {

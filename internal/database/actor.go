@@ -16,6 +16,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -267,7 +268,7 @@ func (a *Actor) validate() error {
 		result = multierror.Append(result, fmt.Errorf("invalid actor id: %w", err))
 	}
 
-	if err := ValidateNamespacePath(a.Namespace); err != nil {
+	if err := namespace.ValidateNamespacePath(a.Namespace); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid actor namespace: %w", err))
 	}
 
@@ -454,7 +455,7 @@ func (s *service) UpsertActor(ctx context.Context, d IActorData) (*Actor, error)
 			return nil, errors.New("actor external id is empty")
 		}
 
-		if err := ValidateNamespacePath(d.GetNamespace()); err != nil {
+		if err := namespace.ValidateNamespacePath(d.GetNamespace()); err != nil {
 			return nil, fmt.Errorf("invalid actor namespace: %w", err)
 		}
 	}
@@ -667,7 +668,7 @@ func (l *listActorsFilters) addError(e error) ListActorsBuilder {
 }
 
 func (l *listActorsFilters) ForNamespaceMatcher(matcher string) ListActorsBuilder {
-	if err := ValidateNamespaceMatcher(matcher); err != nil {
+	if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
 		return l.addError(err)
 	}
 	l.NamespaceMatchers = []string{matcher}
@@ -676,7 +677,7 @@ func (l *listActorsFilters) ForNamespaceMatcher(matcher string) ListActorsBuilde
 
 func (l *listActorsFilters) ForNamespaceMatchers(matchers []string) ListActorsBuilder {
 	for _, matcher := range matchers {
-		if err := ValidateNamespaceMatcher(matcher); err != nil {
+		if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
 			return l.addError(err)
 		}
 	}

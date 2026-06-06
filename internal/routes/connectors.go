@@ -20,6 +20,7 @@ import (
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -526,7 +527,7 @@ func (r *ConnectorsRoutes) createConnector(gctx *gin.Context) {
 		return
 	}
 
-	if err := database.ValidateNamespacePath(req.Namespace); err != nil {
+	if err := namespace.ValidateNamespacePath(req.Namespace); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestf("invalid namespace '%s': %s", req.Namespace, err.Error()))
 		val.MarkErrorReturn()
 		return

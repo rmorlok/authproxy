@@ -15,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/encfield"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -212,7 +213,7 @@ func (cv *ConnectorVersion) Validate() error {
 		result = multierror.Append(result, errors.New("version is required"))
 	}
 
-	if err := ValidateNamespacePath(cv.Namespace); err != nil {
+	if err := namespace.ValidateNamespacePath(cv.Namespace); err != nil {
 		result = multierror.Append(result, fmt.Errorf("invalid connector namespace path: %w", err))
 	}
 
@@ -806,7 +807,7 @@ func (l *listConnectorVersionsFilters) ForStates(states []ConnectorVersionState)
 }
 
 func (l *listConnectorVersionsFilters) ForNamespaceMatcher(matcher string) ListConnectorVersionsBuilder {
-	if err := ValidateNamespaceMatcher(matcher); err != nil {
+	if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
 		return l.addError(err)
 	} else {
 		l.NamespaceMatchers = []string{matcher}
@@ -817,7 +818,7 @@ func (l *listConnectorVersionsFilters) ForNamespaceMatcher(matcher string) ListC
 
 func (l *listConnectorVersionsFilters) ForNamespaceMatchers(matchers []string) ListConnectorVersionsBuilder {
 	for _, matcher := range matchers {
-		if err := ValidateNamespaceMatcher(matcher); err != nil {
+		if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
 			return l.addError(err)
 		}
 	}

@@ -13,6 +13,7 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
@@ -584,7 +585,7 @@ func (l *listRateLimitsFilters) Limit(limit int32) ListRateLimitsBuilder {
 }
 
 func (l *listRateLimitsFilters) ForNamespaceMatcher(matcher string) ListRateLimitsBuilder {
-	if err := ValidateNamespaceMatcher(matcher); err != nil {
+	if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
 		return l.addError(err)
 	}
 	l.NamespaceMatchers = []string{matcher}
@@ -593,7 +594,7 @@ func (l *listRateLimitsFilters) ForNamespaceMatcher(matcher string) ListRateLimi
 
 func (l *listRateLimitsFilters) ForNamespaceMatchers(matchers []string) ListRateLimitsBuilder {
 	for _, matcher := range matchers {
-		if err := ValidateNamespaceMatcher(matcher); err != nil {
+		if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
 			return l.addError(err)
 		}
 	}

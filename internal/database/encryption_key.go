@@ -12,6 +12,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -655,7 +656,7 @@ func (l *listEncryptionKeysFilters) ForState(state EncryptionKeyState) ListEncry
 }
 
 func (l *listEncryptionKeysFilters) ForNamespaceMatcher(matcher string) ListEncryptionKeysBuilder {
-	if err := ValidateNamespaceMatcher(matcher); err != nil {
+	if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
 		return l.addError(err)
 	}
 	l.NamespaceMatchers = []string{matcher}
@@ -664,7 +665,7 @@ func (l *listEncryptionKeysFilters) ForNamespaceMatcher(matcher string) ListEncr
 
 func (l *listEncryptionKeysFilters) ForNamespaceMatchers(matchers []string) ListEncryptionKeysBuilder {
 	for _, matcher := range matchers {
-		if err := ValidateNamespaceMatcher(matcher); err != nil {
+		if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
 			return l.addError(err)
 		}
 	}

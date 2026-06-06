@@ -11,7 +11,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/httpf"
-	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -136,7 +136,7 @@ func (l *ListFilters) SetOrderBy(field RequestOrderByField, by pagination.OrderB
 }
 
 func (l *ListFilters) SetNamespaceMatcher(matcher string) error {
-	if err := aschema.ValidateNamespaceMatcher(matcher); err != nil {
+	if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
 		return err
 	}
 	l.NamespaceMatchers = []string{matcher}
@@ -145,7 +145,7 @@ func (l *ListFilters) SetNamespaceMatcher(matcher string) error {
 
 func (l *ListFilters) SetNamespaceMatchers(matchers []string) error {
 	for _, matcher := range matchers {
-		if err := aschema.ValidateNamespaceMatcher(matcher); err != nil {
+		if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
 			return err
 		}
 	}

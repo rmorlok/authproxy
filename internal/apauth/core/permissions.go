@@ -5,6 +5,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/aptmpl"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
 // allowsForActor checks if this permission allows the specified action for the given actor.
@@ -51,7 +52,7 @@ func matchesNamespace(actor *Actor, p aschema.Permission, targetNamespace string
 		return false
 	}
 
-	if targetNamespace == aschema.NamespaceSkipNamespacePermissionChecks {
+	if targetNamespace == namespace.NamespaceSkipNamespacePermissionChecks {
 		return true
 	}
 
@@ -60,7 +61,7 @@ func matchesNamespace(actor *Actor, p aschema.Permission, targetNamespace string
 		return false
 	}
 
-	return aschema.NamespaceMatches(matcher, targetNamespace)
+	return namespace.NamespaceMatches(matcher, targetNamespace)
 }
 
 // renderPermissionNamespace applies templating to a given namespace string and returns
@@ -86,13 +87,13 @@ func renderPermissionNamespace(actor *Actor, namespace string) (string, bool) {
 // renderValidPermissionNamespace optionally renders a namespace with templating based on actor data
 // and validates that the resulting namespace is valid. If the templating cannot be fufulled, or the
 // resulting namespace is not valid, it returns false.
-func renderValidPermissionNamespace(actor *Actor, namespace string) (string, bool) {
-	rendered, ok := renderPermissionNamespace(actor, namespace)
+func renderValidPermissionNamespace(actor *Actor, ns string) (string, bool) {
+	rendered, ok := renderPermissionNamespace(actor, ns)
 	if !ok {
 		return "", false
 	}
 
-	if err := aschema.ValidateNamespaceMatcher(rendered); err != nil {
+	if err := namespace.ValidateNamespaceMatcher(rendered); err != nil {
 		return "", false
 	}
 

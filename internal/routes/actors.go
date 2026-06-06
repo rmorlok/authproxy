@@ -18,6 +18,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 
@@ -439,7 +440,7 @@ func (r *ActorsRoutes) create(gctx *gin.Context) {
 	}
 
 	// Validate namespace path
-	if err := database.ValidateNamespacePath(req.Namespace); err != nil {
+	if err := namespace.ValidateNamespacePath(req.Namespace); err != nil {
 		apgin.WriteError(gctx, r.logger, httperr.BadRequest(fmt.Sprintf("invalid namespace '%s': %s", req.Namespace, err.Error()), httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
