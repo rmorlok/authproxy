@@ -280,7 +280,7 @@ jobs:
           kubectl -n "${RELEASE_NS}" get certificate,order,challenge || true
           exit 1
 
-      - name: Smoke test (OAuth flow)
+      - name: Smoke test (demo connectors)
         id: smoke
         timeout-minutes: 10
         env:
@@ -298,7 +298,7 @@ jobs:
           echo "Smoke-testing ${SMOKE_BASE_URL}"
           cd integration_tests
           SMOKE_ADMIN_KEY="${workdir}/demo-shell.private" \
-            go test -tags smoke ./smoke -run TestRemoteOAuth2ProxySmoke -count=1 -v
+            go test -tags smoke ./smoke -run TestRemote -count=1 -v
 
       - name: helm rollback (on failure)
         if: failure() && steps.pre.outputs.previous_revision != ''
