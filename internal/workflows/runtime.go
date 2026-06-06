@@ -15,6 +15,7 @@ import (
 	wfworker "github.com/cschleiden/go-workflows/worker"
 	wflib "github.com/cschleiden/go-workflows/workflow"
 	"github.com/rmorlok/authproxy/internal/aptelemetry"
+	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
 
@@ -57,7 +58,12 @@ func NewRuntime(root *sconfig.Root, telemetry *aptelemetry.Providers, logger *sl
 		)
 	case *sconfig.DatabasePostgres:
 		var err error
-		db, err = sql.Open("pgx", cfg.GetDsn())
+		db, err = database.OpenInstrumentedSQL(
+			"pgx",
+			cfg.GetDsn(),
+			database.DBSystemPostgreSQL,
+			database.WithTelemetry(telemetry, root.Telemetry),
+		)
 		if err != nil {
 			return nil, fmt.Errorf("open workflow postgres database: %w", err)
 		}
@@ -101,7 +107,7 @@ func Migrate(root *sconfig.Root, logger *slog.Logger) error {
 		defer b.Close()
 		return b.Migrate()
 	case *sconfig.DatabasePostgres:
-		db, err := sql.Open("pgx", cfg.GetDsn())
+		db, err := database.OpenInstrumentedSQL("pgx", cfg.GetDsn(), database.DBSystemPostgreSQL)
 		if err != nil {
 			return fmt.Errorf("open workflow postgres database: %w", err)
 		}
