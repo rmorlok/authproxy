@@ -15,8 +15,9 @@ import {
   DialogContent,
   LinearProgress,
 } from '@mui/material';
-import { ConnectionState, isRedirectResponse } from '@authproxy/api';
+import { ConnectionState, isCompleteResponse, isRedirectResponse } from '@authproxy/api';
 import {
+  clearRecentlyCompletedConnection,
   selectConnections,
   selectConnectionsStatus,
   selectConnectionsError,
@@ -40,6 +41,7 @@ import {
   clearVerifyState,
   selectInitiatingConnection,
   initiateConnectionAsync,
+  selectRecentlyCompletedConnectionId,
 } from '../store';
 import ConnectionCard, { ConnectionCardSkeleton } from './ConnectionCard';
 import ConnectorCard, { ConnectorCardSkeleton } from './ConnectorCard';
@@ -70,6 +72,7 @@ const ConnectionList: React.FC = () => {
   const verifyingConnectionId = useSelector(selectVerifyingConnectionId);
   const verifyError = useSelector(selectVerifyError);
   const isRetrying = useSelector(selectRetryingConnection);
+  const recentlyCompletedConnectionId = useSelector(selectRecentlyCompletedConnectionId);
 
   useEffect(() => {
     if (status === 'idle') {
@@ -108,6 +111,19 @@ const ConnectionList: React.FC = () => {
     return () => window.clearInterval(interval);
   }, [verifyingConnectionId, dispatch]);
 
+  useEffect(() => {
+    if (!recentlyCompletedConnectionId) {
+      return;
+    }
+
+    dispatch(fetchConnectionsAsync());
+    const timeout = window.setTimeout(() => {
+      dispatch(clearRecentlyCompletedConnection());
+    }, 3500);
+
+    return () => window.clearTimeout(timeout);
+  }, [dispatch, recentlyCompletedConnectionId]);
+
   const handleFormSubmit = useCallback((connectionId: string, data: unknown) => {
     const stepId = currentFormStep?.stepId ?? '';
     dispatch(submitConnectionFormAsync({
@@ -120,6 +136,8 @@ const ConnectionList: React.FC = () => {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
           window.location.href = response.redirect_url;
+        } else if (isCompleteResponse(response)) {
+          dispatch(fetchConnectionsAsync());
         } else {
           // Refresh connections list to reflect updated state
           dispatch(fetchConnectionsAsync());
@@ -174,6 +192,8 @@ const ConnectionList: React.FC = () => {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
           window.location.href = response.redirect_url;
+        } else if (isCompleteResponse(response)) {
+          dispatch(fetchConnectionsAsync());
         }
       }
     });
@@ -277,7 +297,10 @@ const ConnectionList: React.FC = () => {
       <Grid container spacing={marketplaceTokens.spacing.gridGap}>
         {connections.map((connection) => (
           <Grid key={connection.id} size={{ xs: 12, sm: 6, md: 4, lg: 3 }}>
-            <ConnectionCard connection={connection} />
+            <ConnectionCard
+              connection={connection}
+              highlightNew={connection.id === recentlyCompletedConnectionId}
+            />
           </Grid>
         ))}
       </Grid>

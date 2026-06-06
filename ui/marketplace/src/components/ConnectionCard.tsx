@@ -39,6 +39,7 @@ import remarkGfm from "remark-gfm";
 import { marketplaceTokens } from '../theme';
 interface ConnectionCardProps {
   connection: Connection;
+  highlightNew?: boolean;
 }
 
 const truncateText = (text: string, maxLength: number = 120): string => {
@@ -49,7 +50,7 @@ const truncateText = (text: string, maxLength: number = 120): string => {
 /**
  * Component to display a single connection with its details
  */
-const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
+const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNew = false }) => {
   const dispatch = useDispatch<AppDispatch>();
   const connector = connection.connector;
 
@@ -223,18 +224,25 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection }) => {
 
   return (
     <Card
+      data-testid={`connection-card-${connection.id}`}
+      data-highlight-new={highlightNew ? 'true' : undefined}
       sx={{
         width: '100%',
         height: '100%',
         display: 'flex',
         flexDirection: 'column',
         border: 1,
-        borderColor: isUnhealthy ? 'warning.main' : marketplaceTokens.card.borderColor,
+        borderColor: isUnhealthy ? 'warning.main' : highlightNew ? 'primary.main' : marketplaceTokens.card.borderColor,
         borderRadius: marketplaceTokens.radius.card,
         bgcolor: (theme) => (
-          isUnhealthy ? alpha(theme.palette.warning.main, 0.08) : theme.palette.background.paper
+          isUnhealthy
+            ? alpha(theme.palette.warning.main, 0.08)
+            : highlightNew
+              ? alpha(theme.palette.primary.main, 0.06)
+              : theme.palette.background.paper
         ),
-        boxShadow: isUnhealthy ? marketplaceTokens.card.attentionShadow : marketplaceTokens.card.shadow,
+        boxShadow: isUnhealthy || highlightNew ? marketplaceTokens.card.attentionShadow : marketplaceTokens.card.shadow,
+        transition: 'background-color 500ms ease, border-color 500ms ease, box-shadow 500ms ease',
       }}
     >
       <CardHeader
