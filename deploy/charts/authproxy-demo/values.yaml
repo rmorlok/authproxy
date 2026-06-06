@@ -210,7 +210,7 @@ seed:
         display_name: Demo OAuth User
         sub: demo-oauth-user
     resource_policies:
-      - path: /demo-resources
+      - path: /test/resource/demo-resources
         required_scope: resources
   # -- Connectors to seed into the Marketplace catalog. Each entry gets
   # created through the AuthProxy admin API, then forced to `primary` so

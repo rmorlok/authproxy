@@ -144,7 +144,7 @@ func TestSeedOAuth2TestProviderSeedsClientsUsersAndPolicies(t *testing.T) {
 		case "POST /test/resource-policy":
 			var req OAuth2ResourcePolicy
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
-			require.Equal(t, "/demo-resources", req.Path)
+			require.Equal(t, "/test/resource/demo-resources", req.Path)
 			w.WriteHeader(http.StatusNoContent)
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
@@ -165,7 +165,7 @@ func TestSeedOAuth2TestProviderSeedsClientsUsersAndPolicies(t *testing.T) {
 			Password: "demo-password",
 		}},
 		ResourcePolicies: []OAuth2ResourcePolicy{{
-			Path:          "/demo-resources",
+			Path:          "/test/resource/demo-resources",
 			RequiredScope: "read",
 		}},
 	})

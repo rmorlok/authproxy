@@ -310,8 +310,11 @@ jobs:
             --set "global.clusterIssuer=${DEV_CLUSTER_ISSUER}" \
             --set "ingress.wildcardSubdomains=${DEV_TLS_WILDCARD_SUBDOMAINS}" \
             --set "authproxy.image.tag=${{ steps.env.outputs.image_tag }}" \
+            --set "authproxy.image.pullPolicy=Always" \
             --set "demoShell.image.tag=${{ steps.env.outputs.image_tag }}" \
+            --set "demoShell.image.pullPolicy=Always" \
             --set "seed.image.tag=${{ steps.env.outputs.image_tag }}" \
+            --set "seed.image.pullPolicy=Always" \
             --set "grafana.enabled=false" \
             --set "grafanaAuthProxy.enabled=false"
 
