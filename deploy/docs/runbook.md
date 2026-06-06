@@ -206,6 +206,19 @@ image tag pinned to that commit's `sha-<short>`. One-time setup:
    Once green, every subsequent merge to `main` deploys automatically
    within ~5 min.
 
+### 1.11 PR dev demo environments
+
+The `Deploy Dev` workflow (`.github/workflows/deploy-dev.yml`) creates
+an isolated `authproxy-demo` environment for same-repository pull
+requests that carry the `deploy:demo` label. Add the label when opening
+the PR, or add it to an existing PR later; either path triggers the dev
+deployment. Subsequent pushes to a labeled PR redeploy the same
+environment with the `pr-<number>` image tag.
+
+The `Teardown Dev` workflow still runs on PR close regardless of labels,
+so merged or closed PRs tear down any previously-created dev demo
+environment even if the opt-in label has since been removed.
+
 ## 2. Granting kubectl access
 
 The cluster uses the **modern EKS access-entry model**
