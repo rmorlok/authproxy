@@ -180,6 +180,15 @@ func GetGinServer(
 		dm.GetAsyncInspector(),
 		dm.GetEncryptService(),
 	)
+	workflowDiagnostics, err := dm.GetWorkflowRuntime().DiagnosticBackend()
+	if err != nil {
+		return nil, nil, err
+	}
+	routesWorkflowMonitoring := common_routes.NewWorkflowMonitoringRoutes(
+		authService,
+		workflowDiagnostics,
+		dm.GetEncryptService(),
+	)
 
 	api := server.Group("/api/v1")
 
@@ -191,6 +200,7 @@ func GetGinServer(
 	routesRequestEvents.Register(api)
 	routesActors.Register(api)
 	routesTaskMonitoring.Register(api)
+	routesWorkflowMonitoring.Register(api)
 
 	if service.SupportsSession() && service.SupportsUi() {
 		routesSession := common_routes.NewSessionRoutes(
