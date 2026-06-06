@@ -25,6 +25,7 @@ vi.mock('@authproxy/api', async () => {
             ...actual.connections,
             abort: vi.fn(),
             initiate: vi.fn(),
+            list: vi.fn(),
             submit: vi.fn(),
         },
     };
@@ -103,10 +104,12 @@ describe('ConnectorList', () => {
     beforeEach(() => {
         vi.mocked(connections.abort).mockReset();
         vi.mocked(connections.initiate).mockReset();
+        vi.mocked(connections.list).mockReset();
         vi.mocked(connections.submit).mockReset();
         vi.mocked(connections.abort).mockResolvedValue({} as any);
-        vi.mocked(connections.initiate).mockResolvedValue({data: {type: 'complete'}} as any);
-        vi.mocked(connections.submit).mockResolvedValue({data: {type: 'complete'}} as any);
+        vi.mocked(connections.initiate).mockResolvedValue({data: {id: 'c-new', type: 'complete'}} as any);
+        vi.mocked(connections.list).mockResolvedValue({status: 200, data: {items: [], cursor: ''}} as any);
+        vi.mocked(connections.submit).mockResolvedValue({data: {id: 'c-setup', type: 'complete'}} as any);
     });
 
     test('renders skeletons while connectors load', () => {
@@ -151,6 +154,21 @@ describe('ConnectorList', () => {
                 `${window.location.origin}/connections`,
             );
         });
+    });
+
+    test('returns to the connections page when connect completes without setup steps', async () => {
+        const user = userEvent.setup();
+        renderConnectorList({
+            connectors: {items: [connector], status: 'succeeded', error: null},
+            connections: baseConnectionsState,
+        });
+
+        await user.click(screen.getByRole('button', {name: /Connect/i}));
+
+        await waitFor(() => {
+            expect(screen.getByTestId('location')).toHaveTextContent('/connections');
+        });
+        expect(connections.list).toHaveBeenCalledWith({limit: 100});
     });
 
     test('navigates to the connector overview from details', async () => {

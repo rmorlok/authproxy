@@ -1,9 +1,11 @@
 import { useCallback } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { isRedirectResponse } from '@authproxy/api';
+import { useNavigate } from 'react-router-dom';
+import { isCompleteResponse, isRedirectResponse } from '@authproxy/api';
 import {
   abortConnectionAsync,
   clearFormStep,
+  fetchConnectionsAsync,
   initiateConnectionAsync,
   selectCurrentFormStep,
   selectFormSubmitError,
@@ -15,6 +17,7 @@ import { AppDispatch } from '../store';
 
 export function useConnectorConnectionFlow() {
   const dispatch = useDispatch<AppDispatch>();
+  const navigate = useNavigate();
   const isConnecting = useSelector(selectInitiatingConnection);
   const currentFormStep = useSelector(selectCurrentFormStep);
   const isSubmittingForm = useSelector(selectSubmittingForm);
@@ -31,10 +34,13 @@ export function useConnectorConnectionFlow() {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
           window.location.href = response.redirect_url;
+        } else if (isCompleteResponse(response)) {
+          navigate('/connections');
+          dispatch(fetchConnectionsAsync());
         }
       }
     });
-  }, [dispatch, returnToUrl]);
+  }, [dispatch, navigate, returnToUrl]);
 
   const submitForm = useCallback((connectionId: string, data: unknown) => {
     const stepId = currentFormStep?.stepId ?? '';
@@ -48,10 +54,13 @@ export function useConnectorConnectionFlow() {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {
           window.location.href = response.redirect_url;
+        } else if (isCompleteResponse(response)) {
+          navigate('/connections');
+          dispatch(fetchConnectionsAsync());
         }
       }
     });
-  }, [dispatch, currentFormStep, returnToUrl]);
+  }, [dispatch, currentFormStep, navigate, returnToUrl]);
 
   const cancelForm = useCallback(() => {
     if (currentFormStep) {

@@ -25,6 +25,7 @@ vi.mock('@authproxy/api', async () => {
       ...actual.connections,
       abort: vi.fn(),
       initiate: vi.fn(),
+      list: vi.fn(),
       submit: vi.fn(),
     },
   };
@@ -98,10 +99,12 @@ describe('ConnectorDetail', () => {
   beforeEach(() => {
     vi.mocked(connections.abort).mockReset();
     vi.mocked(connections.initiate).mockReset();
+    vi.mocked(connections.list).mockReset();
     vi.mocked(connections.submit).mockReset();
     vi.mocked(connections.abort).mockResolvedValue({} as any);
-    vi.mocked(connections.initiate).mockResolvedValue({ data: { type: 'complete' } } as any);
-    vi.mocked(connections.submit).mockResolvedValue({ data: { type: 'complete' } } as any);
+    vi.mocked(connections.initiate).mockResolvedValue({ data: { id: 'c-new', type: 'complete' } } as any);
+    vi.mocked(connections.list).mockResolvedValue({ status: 200, data: { items: [], cursor: '' } } as any);
+    vi.mocked(connections.submit).mockResolvedValue({ data: { id: 'c-setup', type: 'complete' } } as any);
   });
 
   test('renders the connector overview with full markdown description', () => {

@@ -90,6 +90,13 @@ export const Connected: Story = {
   },
 };
 
+export const NewlyConnected: Story = {
+  args: {
+    connection: mockConnection,
+    highlightNew: true,
+  },
+};
+
 export const ConnectedConfigurable: Story = {
   args: {
     connection: {

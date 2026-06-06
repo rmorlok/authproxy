@@ -20,6 +20,7 @@ vi.mock('@authproxy/api', async () => {
         connections: {
             ...actual.connections,
             abort: vi.fn(),
+            initiate: vi.fn(),
             list: vi.fn(),
             retry: vi.fn(),
         },
@@ -82,9 +83,11 @@ describe('ConnectionList', () => {
 
     beforeEach(() => {
         vi.mocked(connections.abort).mockReset();
+        vi.mocked(connections.initiate).mockReset();
         vi.mocked(connections.list).mockReset();
         vi.mocked(connections.retry).mockReset();
         vi.mocked(connections.abort).mockResolvedValue({} as any);
+        vi.mocked(connections.initiate).mockResolvedValue({data: {id: 'c-new', type: 'complete'}} as any);
         vi.mocked(connections.list).mockResolvedValue({
             status: 200,
             data: {items: [], cursor: ''},
@@ -162,6 +165,42 @@ describe('ConnectionList', () => {
         expect(screen.getByText('Available connectors')).toBeInTheDocument();
         expect(screen.getByText('Google Calendar')).toBeInTheDocument();
         expect(screen.getByRole('button', {name: /Connect/i})).toBeInTheDocument();
+    });
+
+    test('refreshes the list and highlights the new connection after no-step connect completes', async () => {
+        const user = userEvent.setup();
+        vi.mocked(connections.list).mockResolvedValue({
+            status: 200,
+            data: {items: [makeConnection({id: 'c-new'})], cursor: ''},
+        } as any);
+        const store = createStore({
+            connectors: {items: [connector], status: 'succeeded', error: null},
+            connections: {
+                ...baseConnectionsState,
+                items: [],
+                status: 'succeeded',
+                error: null,
+            },
+            toasts: {items: []},
+        });
+
+        render(
+            <MemoryRouter>
+                <Provider store={store}>
+                    <ConnectionList/>
+                </Provider>
+            </MemoryRouter>
+        );
+
+        await user.click(screen.getByRole('button', {name: /Connect/i}));
+
+        const newCard = await screen.findByTestId('connection-card-c-new');
+        expect(newCard).toHaveAttribute('data-highlight-new', 'true');
+        expect(screen.getByRole('link', {name: /Connect More/i})).toBeInTheDocument();
+        expect(connections.initiate).toHaveBeenCalledWith(
+            'google-calendar',
+            `${window.location.origin}/connections`,
+        );
     });
 
     test('renders list of connections when present', () => {
