@@ -5,6 +5,8 @@ import (
 	"net/http"
 	"time"
 
+	wfbackend "github.com/cschleiden/go-workflows/backend"
+	wfcore "github.com/cschleiden/go-workflows/core"
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/apasynq"
@@ -17,6 +19,7 @@ import (
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	schemaapiopenapi "github.com/rmorlok/authproxy/internal/schema/api/openapi"
 	"github.com/rmorlok/authproxy/internal/tasks"
+	apworkflows "github.com/rmorlok/authproxy/internal/workflows"
 )
 
 type TaskRoutes struct {
@@ -24,6 +27,7 @@ type TaskRoutes struct {
 	auth           auth.A
 	encrypt        encrypt.E
 	asynqInspector apasynq.Inspector
+	workflowClient apworkflows.Client
 }
 
 type TaskState = schemaapi.TaskState
@@ -83,6 +87,22 @@ func TaskInfoToJson(encryptedId string, ti *asynq.TaskInfo) *TaskInfoJson {
 	}
 }
 
+func WorkflowTaskInfoToJson(encryptedId string, ti *tasks.TaskInfo, state wfcore.WorkflowInstanceState) *TaskInfoJson {
+	ts := TaskStateUnknown
+	switch state {
+	case wfcore.WorkflowInstanceStateActive:
+		ts = TaskStateActive
+	case wfcore.WorkflowInstanceStateContinuedAsNew, wfcore.WorkflowInstanceStateFinished:
+		ts = TaskStateCompleted
+	}
+
+	return &TaskInfoJson{
+		Id:    encryptedId,
+		Type:  ti.WorkflowName,
+		State: ts,
+	}
+}
+
 // @Summary		Get task status
 // @Description	Get the status of a background task by its encrypted task info
 // @Tags			tasks
@@ -123,6 +143,37 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 		return
 	}
 
+	if ti.ActorId != apid.Nil && ti.ActorId != ra.MustGetActor().Id {
+		apgin.WriteError(gctx, nil, httperr.Forbidden("not authorized to view task"))
+		return
+	}
+
+	if ti.TrackedVia == tasks.TrackedViaWorkflow {
+		if r.workflowClient == nil {
+			apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("workflow task tracking is not configured"))
+			return
+		}
+		if ti.WorkflowInstanceId == "" || ti.WorkflowExecutionId == "" || ti.WorkflowName == "" {
+			apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("invalid task info: data missing"))
+			return
+		}
+
+		instance := wfcore.NewWorkflowInstance(ti.WorkflowInstanceId, ti.WorkflowExecutionId)
+		state, err := r.workflowClient.GetWorkflowInstanceState(ctx, instance)
+		if err != nil {
+			if errors.Is(err, wfbackend.ErrInstanceNotFound) {
+				apgin.WriteError(gctx, nil, httperr.NotFound("task not found"))
+				return
+			}
+
+			apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to load task", httperr.WithInternalErr(err)))
+			return
+		}
+
+		gctx.PureJSON(http.StatusOK, WorkflowTaskInfoToJson(encryptedTaskInfo, ti, state))
+		return
+	}
+
 	if ti.TrackedVia != tasks.TrackedViaAsynq {
 		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("invalid task info: bad type"))
 		return
@@ -130,11 +181,6 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 
 	if ti.AsynqQueue == "" || ti.AsynqId == "" {
 		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("invalid task info: data missing"))
-		return
-	}
-
-	if ti.ActorId != apid.Nil && ti.ActorId != ra.MustGetActor().Id {
-		apgin.WriteError(gctx, nil, httperr.Forbidden("not authorized to view task"))
 		return
 	}
 
@@ -165,11 +211,13 @@ func NewTaskRoutes(
 	authService auth.A,
 	encrypt encrypt.E,
 	asynqInspector apasynq.Inspector,
+	workflowClient apworkflows.Client,
 ) *TaskRoutes {
 	return &TaskRoutes{
 		cfg:            cfg,
 		auth:           authService,
 		encrypt:        encrypt,
 		asynqInspector: asynqInspector,
+		workflowClient: workflowClient,
 	}
 }

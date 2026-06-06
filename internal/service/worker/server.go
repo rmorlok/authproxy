@@ -141,14 +141,19 @@ func Serve(cfg config.C) {
 	workflowRuntime := dm.GetWorkflowRuntime()
 	workflowWorker, err := apworkflows.NewWorker(workflowRuntime, &workflowworker.Options{
 		WorkflowWorkerOptions: workflowworker.WorkflowWorkerOptions{
+			WorkflowPollers:          2,
 			MaxParallelWorkflowTasks: workerConfig.GetConcurrency(context.Background()),
 		},
 		ActivityWorkerOptions: workflowworker.ActivityWorkerOptions{
+			ActivityPollers:          2,
 			MaxParallelActivityTasks: workerConfig.GetConcurrency(context.Background()),
 		},
 	})
 	if err != nil {
 		log.Fatalf("failed to construct workflow worker: %v", err)
+	}
+	if err := dm.GetCoreService().RegisterWorkflows(workflowWorker); err != nil {
+		log.Fatalf("failed to register core workflows: %v", err)
 	}
 
 	oauth2TaskHandler := oauth2.NewTaskHandler(

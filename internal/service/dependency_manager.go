@@ -484,6 +484,7 @@ func (dm *DependencyManager) GetCoreService() coreIface.C {
 			dm.GetLogger(),
 			core.WithRateLimitCache(dm.GetRateLimitCache()),
 			core.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry),
+			core.WithWorkflowClient(dm.GetWorkflowRuntime().Client()),
 		)
 	}
 

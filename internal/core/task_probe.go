@@ -51,11 +51,11 @@ func (s *service) runProbeForConnection(ctx context.Context, t *asynq.Task) erro
 
 	var p probeTaskPayload
 	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		return fmt.Errorf("%s json.Unmarshal failed: %v: %w", taskTypeDisconnectConnection, err, asynq.SkipRetry)
+		return fmt.Errorf("%s json.Unmarshal failed: %v: %w", taskTypeProbe, err, asynq.SkipRetry)
 	}
 
 	if p.ConnectionId == apid.Nil {
-		return fmt.Errorf("%s connection id not specified: %w", taskTypeDisconnectConnection, asynq.SkipRetry)
+		return fmt.Errorf("%s connection id not specified: %w", taskTypeProbe, asynq.SkipRetry)
 	}
 
 	logger = aplog.NewBuilder(logger).

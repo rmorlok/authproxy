@@ -10,6 +10,7 @@ import (
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	rlschema "github.com/rmorlok/authproxy/internal/schema/resources/rate_limit"
 	"github.com/rmorlok/authproxy/internal/tasks"
+	apworkflows "github.com/rmorlok/authproxy/internal/workflows"
 )
 
 type ConnectorVersionId = database.ConnectorVersionId
@@ -285,5 +286,6 @@ type C interface {
 	 */
 
 	RegisterTasks(mux *asynq.ServeMux)
+	RegisterWorkflows(worker *apworkflows.Worker) error
 	GetCronTasks() []*asynq.PeriodicTaskConfig
 }
