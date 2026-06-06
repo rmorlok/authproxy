@@ -118,6 +118,8 @@ ap sign-jwt --actorId grafana --apis api,admin-api --grafana-preset logs --no-ex
 
 Grafana presets use top-level JWT permissions. Those permissions only restrict the token; the backing actor still needs matching normal permissions.
 
+Permission namespaces in a permissions file support the same actor templates as normal actor permissions: `{{external_id}}`, `{{labels.<label>}}`, and `{{annotations.<annotation>}}`. These render against the backing actor, and missing label or annotation values make the permission fail to match.
+
 ### `ap verify-jwt`
 
 Reads a JWT on stdin and verifies it against the supplied public/secret key.
