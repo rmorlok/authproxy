@@ -13,7 +13,7 @@ describe('ConnectorCard', () => {
         state: ConnectorVersionState.ACTIVE,
         display_name: 'Google Calendar',
         description: 'Connect to your Google Calendar to manage events and appointments.',
-        highlight: undefined,
+        highlight: 'Manage events and appointments from Google Calendar.',
         logo: 'https://example.com/google-calendar-logo.png',
         has_configure: false,
         versions: 1,
@@ -23,9 +23,11 @@ describe('ConnectorCard', () => {
     };
 
     const mockOnConnect = vi.fn();
+    const mockOnDetails = vi.fn();
 
     beforeEach(() => {
         mockOnConnect.mockClear();
+        mockOnDetails.mockClear();
     });
 
     test('renders connector information correctly', () => {
@@ -40,8 +42,8 @@ describe('ConnectorCard', () => {
         // Check if the connector name is displayed
         expect(screen.getByText('Google Calendar')).toBeInTheDocument();
 
-        // Check if the description is displayed
-        expect(screen.getByText('Connect to your Google Calendar to manage events and appointments.')).toBeInTheDocument();
+        expect(screen.getByText('Manage events and appointments from Google Calendar.')).toBeInTheDocument();
+        expect(screen.queryByText('Connect to your Google Calendar to manage events and appointments.')).not.toBeInTheDocument();
 
         // Check if the logo is displayed with the correct alt text
         const logoImg = screen.getByAltText('Google Calendar logo');
@@ -50,6 +52,36 @@ describe('ConnectorCard', () => {
 
         // Check if the connect button is displayed
         expect(screen.getByText('Connect')).toBeInTheDocument();
+    });
+
+    test('calls onDetails when the card or details button is clicked', () => {
+        render(
+            <ConnectorCard
+                connector={mockConnector}
+                onConnect={mockOnConnect}
+                onDetails={mockOnDetails}
+                isConnecting={false}
+            />
+        );
+
+        fireEvent.click(screen.getByRole('button', {name: /View Google Calendar details/i}));
+        expect(mockOnDetails).toHaveBeenCalledWith('google-calendar');
+
+        fireEvent.click(screen.getByRole('button', {name: /^Details$/i}));
+        expect(mockOnDetails).toHaveBeenCalledTimes(2);
+    });
+
+    test('does not fall back to the full description when the highlight is absent', () => {
+        render(
+            <ConnectorCard
+                connector={{...mockConnector, highlight: undefined}}
+                onConnect={mockOnConnect}
+                isConnecting={false}
+            />
+        );
+
+        expect(screen.getByText('Google Calendar')).toBeInTheDocument();
+        expect(screen.queryByText('Connect to your Google Calendar to manage events and appointments.')).not.toBeInTheDocument();
     });
 
     test('calls onConnect when the connect button is clicked', () => {

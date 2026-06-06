@@ -7,7 +7,8 @@ import {
   Button,
   CardActions,
   Box,
-  Skeleton
+  Skeleton,
+  CardActionArea,
 } from '@mui/material';
 import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
@@ -17,16 +18,9 @@ import { marketplaceTokens } from '../theme';
 interface ConnectorCardProps {
   connector: Connector;
   onConnect: (connectorId: string) => void;
+  onDetails?: (connectorId: string) => void;
   isConnecting: boolean;
 }
-
-/**
- * Truncate text to fit in card design
- */
-const truncateText = (text: string, maxLength: number = 120): string => {
-  if (text.length <= maxLength) return text;
-  return text.substring(0, maxLength).trim() + '...';
-};
 
 const connectorInitials = (displayName: string): string => {
   const words = displayName
@@ -90,10 +84,51 @@ const ConnectorLogoMedia: React.FC<{connector: Connector}> = ({connector}) => {
 const ConnectorCard: React.FC<ConnectorCardProps> = ({
   connector,
   onConnect,
+  onDetails,
   isConnecting
 }) => {
-  // Use highlight field if available, otherwise use truncated description
-  const displayText = connector.highlight || truncateText(connector.description);
+  const displayText = connector.highlight;
+  const cardBody = (
+    <>
+      <ConnectorLogoMedia connector={connector} />
+      <CardContent sx={{ flexGrow: 1, width: '100%' }}>
+        <Typography gutterBottom variant="h5" component="div">
+          {connector.display_name}
+        </Typography>
+        {displayText && (
+          <Box sx={{
+            '& p': { margin: 0, fontSize: marketplaceTokens.markdown.bodyFontSize, color: 'text.secondary' },
+            '& strong': { color: 'text.primary' },
+            '& em': { color: 'text.secondary' },
+            '& code': {
+              backgroundColor: 'action.hover',
+              padding: marketplaceTokens.markdown.codePadding,
+              borderRadius: marketplaceTokens.radius.control,
+              fontSize: marketplaceTokens.markdown.codeFontSize
+            }
+          }}>
+            <ReactMarkdown
+              remarkPlugins={[remarkGfm]}
+              components={{
+                p: ({ children }) => <Typography variant="body2" color="text.secondary">{children}</Typography>,
+                strong: ({ children }) => <Typography component="span" sx={{ fontWeight: 'bold', color: 'text.primary' }}>{children}</Typography>,
+                em: ({ children }) => <Typography component="span" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>{children}</Typography>,
+                code: ({ children }) => <Typography component="code" sx={{
+                  backgroundColor: 'action.hover',
+                  padding: marketplaceTokens.markdown.codePadding,
+                  borderRadius: marketplaceTokens.radius.control,
+                  fontSize: marketplaceTokens.markdown.codeFontSize,
+                  fontFamily: 'monospace'
+                }}>{children}</Typography>
+              }}
+            >
+              {displayText}
+            </ReactMarkdown>
+          </Box>
+        )}
+      </CardContent>
+    </>
+  );
 
   return (
     <Card
@@ -106,51 +141,42 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
         boxShadow: marketplaceTokens.card.shadow,
       }}
     >
-      <ConnectorLogoMedia connector={connector} />
-      <CardContent sx={{ flexGrow: 1 }}>
-        <Typography gutterBottom variant="h5" component="div">
-          {connector.display_name}
-        </Typography>
-        <Box sx={{
-          '& p': { margin: 0, fontSize: marketplaceTokens.markdown.bodyFontSize, color: 'text.secondary' },
-          '& strong': { color: 'text.primary' },
-          '& em': { color: 'text.secondary' },
-          '& code': {
-            backgroundColor: 'action.hover',
-            padding: marketplaceTokens.markdown.codePadding,
-            borderRadius: marketplaceTokens.radius.control,
-            fontSize: marketplaceTokens.markdown.codeFontSize
-          }
-        }}>
-          <ReactMarkdown
-            remarkPlugins={[remarkGfm]}
-            components={{
-              // Override paragraph to remove default margins
-              p: ({ children }) => <Typography variant="body2" color="text.secondary">{children}</Typography>,
-              // Override strong to use primary color
-              strong: ({ children }) => <Typography component="span" sx={{ fontWeight: 'bold', color: 'text.primary' }}>{children}</Typography>,
-              // Override em to use secondary color
-              em: ({ children }) => <Typography component="span" sx={{ fontStyle: 'italic', color: 'text.secondary' }}>{children}</Typography>,
-              // Override code to use custom styling
-              code: ({ children }) => <Typography component="code" sx={{
-                backgroundColor: 'action.hover',
-                padding: marketplaceTokens.markdown.codePadding,
-                borderRadius: marketplaceTokens.radius.control,
-                fontSize: marketplaceTokens.markdown.codeFontSize,
-                fontFamily: 'monospace'
-              }}>{children}</Typography>
+      {onDetails ? (
+        <CardActionArea
+          onClick={() => onDetails(connector.id)}
+          sx={{ flexGrow: 1, alignItems: 'stretch', display: 'flex', flexDirection: 'column' }}
+          aria-label={`View ${connector.display_name} details`}
+        >
+          {cardBody}
+        </CardActionArea>
+      ) : (
+        <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column' }}>
+          {cardBody}
+        </Box>
+      )}
+      <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
+        {onDetails && (
+          <Button
+            size="small"
+            color="inherit"
+            onClick={() => onDetails(connector.id)}
+            sx={{
+              color: 'text.secondary',
+              '&:hover': {
+                bgcolor: 'action.hover',
+                color: 'text.primary',
+              },
             }}
           >
-            {displayText}
-          </ReactMarkdown>
-        </Box>
-      </CardContent>
-      <CardActions>
+            Details
+          </Button>
+        )}
         <Button 
           size="small" 
           color="primary" 
           onClick={() => onConnect(connector.id)}
           disabled={isConnecting}
+          sx={{ ml: 'auto' }}
         >
           Connect
         </Button>

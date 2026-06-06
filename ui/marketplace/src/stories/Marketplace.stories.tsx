@@ -14,6 +14,7 @@ import {
 } from '@authproxy/api';
 import theme from '../theme';
 import Layout from '../components/Layout';
+import ConnectorDetail from '../components/ConnectorDetail';
 import ConnectorList from '../components/ConnectorList';
 import ConnectionList from '../components/ConnectionList';
 import authReducer from '../store/sessionSlice';
@@ -69,8 +70,21 @@ const connectors: Connector[] = [
     version: 1,
     state: ConnectorVersionState.ACTIVE,
     display_name: 'Google Calendar',
-    description: "Allow the agent to manage your calendar on your behalf. It's like having your own personal assistant!!",
-    highlight: "Allow the agent to manage your calendar on your behalf. It's like having your own personal assistant!!",
+    description: `Google Calendar lets agents coordinate scheduling work without needing direct access to your primary app.
+
+![Calendar workflow preview](/calendar-workflow-preview.svg)
+
+### What agents can do
+
+| Capability | Supported |
+| --- | --- |
+| Find open time | Yes |
+| Create and update events | Yes |
+| Read attendee responses | Yes |
+| Manage private event details | No |
+
+Use this connector when the assistant should propose meeting times, create holds, or keep follow-up work attached to calendar events.`,
+    highlight: 'Coordinate meetings, availability, and follow-up from Google Calendar.',
     logo: logoDataUri('Google Calendar', '#1a73e8'),
     has_configure: true,
     versions: 1,
@@ -192,7 +206,7 @@ function MarketplaceStory({
   connectorsState = { items: connectors, status: 'succeeded', error: null },
   connectionsState = baseConnectionsState,
 }: {
-  route: '/connectors' | '/connections';
+  route: '/connectors' | '/connector-detail' | '/connections';
   connectorsState?: Record<string, unknown>;
   connectionsState?: Record<string, unknown>;
 }) {
@@ -219,7 +233,13 @@ function MarketplaceStory({
           <Route element={<Layout />}>
             <Route
               path="*"
-              element={route === '/connectors' ? <ConnectorList /> : <ConnectionList />}
+              element={
+                route === '/connectors'
+                  ? <ConnectorList />
+                  : route === '/connector-detail'
+                    ? <ConnectorDetail connectorId="google-calendar" />
+                    : <ConnectionList />
+              }
             />
           </Route>
         </Routes>
@@ -255,6 +275,19 @@ export const AvailableConnectors: Story = {
   args: {
     route: '/connectors',
   },
+};
+
+export const ConnectorOverview: Story = {
+  args: {
+    route: '/connector-detail',
+  },
+};
+
+export const ConnectorOverviewMobile: Story = {
+  args: {
+    route: '/connector-detail',
+  },
+  parameters: mobileViewport,
 };
 
 export const AvailableConnectorsLoading: Story = {

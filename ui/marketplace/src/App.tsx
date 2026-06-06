@@ -5,6 +5,7 @@ import { useSelector } from "react-redux";
 import { selectAuthStatus } from "./store";
 import Layout from './components/Layout';
 import ConnectorList from './components/ConnectorList';
+import ConnectorDetail from './components/ConnectorDetail';
 import ConnectionList from './components/ConnectionList';
 import Dev from './components/Dev';
 import { Error } from "./Error";
@@ -46,6 +47,7 @@ export function Router() {
               <Route element={<ProtectedRoutes />}>
                   <Route element={<Layout />}>
                       <Route path={'/'} element={<Navigate to="/connections" replace />} />
+                      <Route path={'/connectors/:connectorId'} Component={ConnectorDetail}/>
                       <Route path={'/connectors'} Component={ConnectorList}/>
                       <Route path={'/connections'} Component={ConnectionList}/>
                   </Route>
