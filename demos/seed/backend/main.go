@@ -259,6 +259,7 @@ func postOAuth2TestProvider(c *resty.Client, baseUrl, path string, body any) (se
 			(strings.Contains(body, "already") ||
 				strings.Contains(body, "exists") ||
 				strings.Contains(body, "duplicate") ||
+				strings.Contains(body, "taken") ||
 				strings.Contains(body, "unique")) {
 			return seedAlreadyPresent, nil
 		}

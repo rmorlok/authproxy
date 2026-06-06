@@ -183,6 +183,7 @@ func TestPostOAuth2TestProviderTreatsDuplicateAsAlreadyPresent(t *testing.T) {
 	}{
 		{name: "conflict", status: http.StatusConflict},
 		{name: "bad request already exists", status: http.StatusBadRequest, body: `{"error":"client already exists"}`},
+		{name: "bad request client id taken", status: http.StatusBadRequest, body: `{"error":"Client ID taken"}`},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
