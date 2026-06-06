@@ -713,7 +713,7 @@ func TestPermissionsAllowForActor(t *testing.T) {
 				},
 			},
 			namespace: "root.actor-123",
-			resource:  "connectors",
+			resource:  "connections",
 			verb:      "get",
 			actor:     &Actor{ExternalId: "actor-123"},
 			allowed:   true,
