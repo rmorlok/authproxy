@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import { JsonForms } from '@jsonforms/react';
 import { materialCells, materialRenderers } from '@jsonforms/material-renderers';
 import type { JsonFormsCore, UISchemaElement } from '@jsonforms/core';
@@ -71,6 +71,14 @@ function applyDataSourcesToSchema(
     return { ...schema, properties: newProperties };
 }
 
+function hasMeaningfulValue(value: unknown): boolean {
+    if (value == null) return false;
+    if (typeof value === 'string') return value.length > 0;
+    if (Array.isArray(value)) return value.some(hasMeaningfulValue);
+    if (typeof value === 'object') return Object.values(value).some(hasMeaningfulValue);
+    return true;
+}
+
 const ConnectionFormStep: React.FC<ConnectionFormStepProps> = ({
     connectionId,
     stepTitle,
@@ -82,9 +90,12 @@ const ConnectionFormStep: React.FC<ConnectionFormStepProps> = ({
     isSubmitting,
 }) => {
     const [data, setData] = useState<unknown>({});
-    const [hasErrors, setHasErrors] = useState(false);
+    const [hasErrors, setHasErrors] = useState(true);
+    const [shouldShowValidation, setShouldShowValidation] = useState(false);
     const [dataSourceOptions, setDataSourceOptions] = useState<Record<string, DataSourceOption[]>>({});
     const [loadingDataSources, setLoadingDataSources] = useState(false);
+    const hasUserInteracted = useRef(false);
+    const hasEnteredValue = useRef(false);
 
     const dataSources = useMemo(() => findDataSources(jsonSchema), [jsonSchema]);
     const hasDataSources = Object.keys(dataSources).length > 0;
@@ -116,8 +127,25 @@ const ConnectionFormStep: React.FC<ConnectionFormStepProps> = ({
     );
 
     const handleChange = useCallback((state: Pick<JsonFormsCore, 'data' | 'errors'>) => {
+        const hasCurrentErrors = (state.errors?.length ?? 0) > 0;
         setData(state.data);
-        setHasErrors((state.errors?.length ?? 0) > 0);
+        setHasErrors(hasCurrentErrors);
+        if (hasUserInteracted.current && hasMeaningfulValue(state.data)) {
+            hasEnteredValue.current = true;
+        }
+        if (hasUserInteracted.current && hasEnteredValue.current && hasCurrentErrors) {
+            setShouldShowValidation(true);
+        }
+    }, []);
+
+    const handleUserInteraction = useCallback(() => {
+        hasUserInteracted.current = true;
+    }, []);
+
+    const handleBlur = useCallback(() => {
+        if (hasUserInteracted.current) {
+            setShouldShowValidation(true);
+        }
     }, []);
 
     const handleSubmit = useCallback(() => {
@@ -152,14 +180,21 @@ const ConnectionFormStep: React.FC<ConnectionFormStepProps> = ({
                     </Typography>
                 </Box>
             ) : (
-                <JsonForms
-                    schema={resolvedSchema as JsonSchema}
-                    uischema={uiSchema as unknown as UISchemaElement}
-                    data={data}
-                    renderers={materialRenderers}
-                    cells={materialCells}
-                    onChange={handleChange}
-                />
+                <Box
+                    onInputCapture={handleUserInteraction}
+                    onChangeCapture={handleUserInteraction}
+                    onBlurCapture={handleBlur}
+                >
+                    <JsonForms
+                        schema={resolvedSchema as JsonSchema}
+                        uischema={uiSchema as unknown as UISchemaElement}
+                        data={data}
+                        renderers={materialRenderers}
+                        cells={materialCells}
+                        validationMode={shouldShowValidation ? 'ValidateAndShow' : 'ValidateAndHide'}
+                        onChange={handleChange}
+                    />
+                </Box>
             )}
             <Box sx={{ display: 'flex', justifyContent: 'flex-end', gap: 1, mt: marketplaceTokens.spacing.headerGap + 1 }}>
                 <Button
