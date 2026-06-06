@@ -77,8 +77,8 @@ func TestJwtTokenBuilder(t *testing.T) {
 		tb := NewJwtTokenBuilder().
 			WithActorExternalId("bob-dole").
 			WithNamespace("root.child").
-			WithLabels(map[string]string{"foo": "bar"}).
-			WithLabel("baz", "qux")
+			WithActorLabels(map[string]string{"foo": "bar"}).
+			WithActorLabel("baz", "qux")
 
 		x := tb.(*tokenBuilder)
 		claims, err := x.jwtBuilder.Build()
@@ -90,8 +90,8 @@ func TestJwtTokenBuilder(t *testing.T) {
 		tb := NewJwtTokenBuilder().
 			WithActorExternalId("bob-dole").
 			WithNamespace("root.child").
-			WithAnnotations(map[string]string{"foo": "bar"}).
-			WithAnnotation("baz", "qux")
+			WithActorAnnotations(map[string]string{"foo": "bar"}).
+			WithActorAnnotation("baz", "qux")
 
 		x := tb.(*tokenBuilder)
 		claims, err := x.jwtBuilder.Build()
