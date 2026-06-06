@@ -199,6 +199,7 @@ describe('ConnectorList', () => {
                     stepDescription: 'Select the tenant before OAuth.',
                     jsonSchema: {
                         type: 'object',
+                        required: ['tenant'],
                         properties: {
                             tenant: {
                                 type: 'string',
@@ -214,7 +215,12 @@ describe('ConnectorList', () => {
             },
         });
 
-        await user.click(screen.getByRole('button', {name: /Save and verify/i}));
+        await user.type(screen.getByRole('textbox', {name: /Tenant/i}), 'northwind');
+        const submitButton = screen.getByRole('button', {name: /Save and verify/i});
+        await waitFor(() => {
+            expect(submitButton).toBeEnabled();
+        });
+        await user.click(submitButton);
 
         await waitFor(() => {
             expect(connections.submit).toHaveBeenCalledWith(
