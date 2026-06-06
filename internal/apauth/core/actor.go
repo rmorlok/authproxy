@@ -3,6 +3,7 @@ package core
 import (
 	"github.com/rmorlok/authproxy/internal/apid"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
 type IActorData interface {
@@ -49,15 +50,36 @@ func (a *Actor) GetLabels() map[string]string { return a.Labels }
 // GetAnnotations returns actor annotations from database state or JWT claims.
 func (a *Actor) GetAnnotations() map[string]string { return a.Annotations }
 
+func isValidValueForNamespaceTemplating(val string) bool {
+	return val != "" && val != namespace.NamespaceWildcard
+}
+
+func filterLabelOrAnnotationForPermission(vals map[string]string) map[string]string {
+	result := make(map[string]string, len(vals))
+
+	for k, v := range vals {
+		if isValidValueForNamespaceTemplating(v) {
+			result[k] = v
+		}
+	}
+
+	return result
+}
+
 // GetPermissionTemplateData returns actor data for permission template context. These are
 // the values that can be used in templated namespaces for permissions baed on actor data.
 // E.g. root.{{labels.team_id}}
 func (a *Actor) GetPermissionTemplateData() map[string]any {
-	return map[string]any{
-		"external_id": a.ExternalId,
-		"labels":      a.Labels,
-		"annotations": a.Annotations,
+	result := map[string]any{
+		"labels":      filterLabelOrAnnotationForPermission(a.Labels),
+		"annotations": filterLabelOrAnnotationForPermission(a.Annotations),
 	}
+
+	if isValidValueForNamespaceTemplating(a.ExternalId) {
+		result["external_id"] = a.ExternalId
+	}
+
+	return result
 }
 
 func CreateActor(data IActorData) *Actor {

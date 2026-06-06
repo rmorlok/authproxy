@@ -4,6 +4,7 @@ import (
 	"testing"
 
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/stretchr/testify/require"
 )
 
@@ -46,6 +47,19 @@ func TestPermission_AllowsForActor(t *testing.T) {
 			allowed:   false,
 		},
 		{
+			name: "templated namespace does not allow wildcards by external id",
+			p: aschema.Permission{
+				Namespace: "root.{{external_id}}",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root.actor-999",
+			resource:  "connections",
+			verb:      "get",
+			actor:     &Actor{ExternalId: namespace.NamespaceWildcard},
+			allowed:   false,
+		},
+		{
 			name: "templated namespace match by label",
 			p: aschema.Permission{
 				Namespace: "root.{{labels.team_id}}",
@@ -69,6 +83,19 @@ func TestPermission_AllowsForActor(t *testing.T) {
 			resource:  "connections",
 			verb:      "get",
 			actor:     &Actor{Labels: map[string]string{"team_id": "team-123"}},
+			allowed:   false,
+		},
+		{
+			name: "templated namespace does not allow wildcard by label",
+			p: aschema.Permission{
+				Namespace: "root.{{labels.team_id}}",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root.team-999",
+			resource:  "connections",
+			verb:      "get",
+			actor:     &Actor{Labels: map[string]string{"team_id": namespace.NamespaceWildcard}},
 			allowed:   false,
 		},
 		{
@@ -123,6 +150,19 @@ func TestPermission_AllowsForActor(t *testing.T) {
 			allowed:   false,
 		},
 		{
+			name: "templated namespace does not allow wildcard by annotation",
+			p: aschema.Permission{
+				Namespace: "root.{{annotations.team_id}}",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root.team-999",
+			resource:  "connections",
+			verb:      "get",
+			actor:     &Actor{Annotations: map[string]string{"team_id": namespace.NamespaceWildcard}},
+			allowed:   false,
+		},
+		{
 			name: "templated namespace mismatch by missing annotation",
 			p: aschema.Permission{
 				Namespace: "root.{{annotations.team_id}}",
@@ -157,7 +197,33 @@ func TestPermission_AllowsForActor(t *testing.T) {
 			namespace: "root.foo.bar",
 			resource:  "connections",
 			verb:      "get",
-			actor:     &Actor{Annotations: map[string]string{"foo": "**"}}, // Will render root.**.**
+			actor:     &Actor{Annotations: map[string]string{"foo": "."}}, // Will render root...**
+			allowed:   false,
+		},
+		{
+			name: "templated namespace rejects invalid templates",
+			p: aschema.Permission{
+				Namespace: "root.{{invalid}}",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root",
+			resource:  "connections",
+			verb:      "get",
+			actor:     &Actor{},
+			allowed:   false,
+		},
+		{
+			name: "templated namespace rejects nested invalid templates",
+			p: aschema.Permission{
+				Namespace: "root.{{nested.invalid}}",
+				Resources: []string{"connections"},
+				Verbs:     []string{"get"},
+			},
+			namespace: "root",
+			resource:  "connections",
+			verb:      "get",
+			actor:     &Actor{},
 			allowed:   false,
 		},
 

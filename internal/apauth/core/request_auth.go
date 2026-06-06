@@ -94,6 +94,10 @@ func (ra *RequestAuth) SetPermissions(permissions []aschema.Permission) {
 	ra.permissions = permissions
 }
 
+// GetNamespacesAllowed returns the set of namespaces allowed for the given resource and verb. This
+// function applies both actor permissions and request-level restrictions to determine the allowed namespaces.
+// For any namespaces that leverage templating, if the template cannot be applied from the actor's
+// data, that namespace is omitted.
 func (ra *RequestAuth) GetNamespacesAllowed(resource, verb string) []string {
 	if ra == nil || !ra.IsAuthenticated() {
 		return nil

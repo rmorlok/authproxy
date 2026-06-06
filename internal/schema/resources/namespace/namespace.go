@@ -27,7 +27,7 @@ const NamespaceWildcardSuffix = NamespacePathSeparator + NamespaceWildcard
 
 // NamespaceSkipNamespacePermissionChecks is a sentinel value used to indicate that the namespace is not currently
 // known at the time of permission checking. During permission checking, at the API layer namespace won't generally be
-// known, so permission checking starts with resource and  verb. This essential value is used to indicate that
+// known, so permission checking starts with resource and verb. This value is used to indicate that
 // namespace checking for permissions should be ignored.
 const NamespaceSkipNamespacePermissionChecks = "<SKIP_NAMESPACE_PERMISSION_CHECK>"
 
