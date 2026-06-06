@@ -124,6 +124,10 @@
             "resource_policies": {
               "type": "array",
               "items": { "type": "object", "additionalProperties": true }
+            },
+            "api_key_resource_policies": {
+              "type": "array",
+              "items": { "type": "object", "additionalProperties": true }
             }
           },
           "required": ["base_url"]

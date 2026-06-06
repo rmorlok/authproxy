@@ -146,6 +146,13 @@ func TestSeedOAuth2TestProviderSeedsClientsUsersAndPolicies(t *testing.T) {
 			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
 			require.Equal(t, "/test/resource/demo-resources", req.Path)
 			w.WriteHeader(http.StatusNoContent)
+		case "POST /test/api-key-resource-policy":
+			var req APIKeyResourcePolicy
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+			require.Equal(t, "/test/api-key-resource/demo-api-key", req.Path)
+			require.Equal(t, "demo-api-key", req.Key)
+			require.Equal(t, "bearer", req.Placement)
+			w.WriteHeader(http.StatusNoContent)
 		default:
 			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
 		}
@@ -168,11 +175,17 @@ func TestSeedOAuth2TestProviderSeedsClientsUsersAndPolicies(t *testing.T) {
 			Path:          "/test/resource/demo-resources",
 			RequiredScope: "read",
 		}},
+		APIKeyResourcePolicies: []APIKeyResourcePolicy{{
+			Path:      "/test/api-key-resource/demo-api-key",
+			Key:       "demo-api-key",
+			Placement: "bearer",
+		}},
 	})
 	require.NoError(t, err)
 	require.Equal(t, 1, seen["POST /test/clients"])
 	require.Equal(t, 1, seen["POST /test/users"])
 	require.Equal(t, 1, seen["POST /test/resource-policy"])
+	require.Equal(t, 1, seen["POST /test/api-key-resource-policy"])
 }
 
 func TestPostOAuth2TestProviderTreatsDuplicateAsAlreadyPresent(t *testing.T) {
@@ -257,6 +270,40 @@ connectors:
 	require.Len(t, cfg.Connectors, 1)
 	require.NoError(t, cfg.Connectors[0].Definition.Validate(&common.ValidationContext{}))
 	require.True(t, cfg.Connectors[0].Definition.SetupFlow.HasPreconnect())
+}
+
+func TestSeedConfigParsesAPIKeyConnector(t *testing.T) {
+	data := []byte(`
+oauth2_test_provider:
+  base_url: http://go-oauth2-server
+  api_key_resource_policies:
+    - path: /test/api-key-resource/demo-api-key
+      key: demo-api-key
+      placement: bearer
+connectors:
+  - key: demo-api-key
+    namespace: root
+    definition:
+      display_name: Demo API Key
+      description: Demo API key connector
+      labels:
+        type: demo-api-key
+      auth:
+        type: api-key
+        placement:
+          type: bearer
+      probes:
+        - id: verify-api-key
+          proxy_http:
+            method: GET
+            url: http://go-oauth2-server/test/api-key-resource/demo-api-key
+`)
+	var cfg SeedConfig
+	require.NoError(t, yaml.Unmarshal(data, &cfg))
+	require.NotNil(t, cfg.OAuth2TestProvider)
+	require.Len(t, cfg.OAuth2TestProvider.APIKeyResourcePolicies, 1)
+	require.Len(t, cfg.Connectors, 1)
+	require.NoError(t, cfg.Connectors[0].Definition.Validate(&common.ValidationContext{}))
 }
 
 func mustConnector(t *testing.T, displayName string) config.Connector {

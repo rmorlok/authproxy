@@ -215,6 +215,10 @@ seed:
     resource_policies:
       - path: /test/resource/demo-resources
         required_scope: resources
+    api_key_resource_policies:
+      - path: /test/api-key-resource/demo-api-key
+        key: demo-api-key
+        placement: bearer
   # -- Connectors to seed into the Marketplace catalog. Each entry gets
   # created through the AuthProxy admin API, then forced to `primary` so
   # fresh demo environments show the catalog immediately. `key` is the
@@ -239,6 +243,32 @@ seed:
           demo: "true"
         auth:
           type: no-auth
+    - key: demo-api-key-bearer
+      namespace: root
+      labels:
+        demo: "true"
+        auth_method: api-key
+        showcase: api-key
+      definition:
+        display_name: "Demo API Key: Bearer Token"
+        logo:
+          mime_type: image/svg+xml
+          base64: PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyODAiIGhlaWdodD0iMTQwIiB2aWV3Qm94PSIwIDAgMjgwIDE0MCIgcm9sZT0iaW1nIiBhcmlhLWxhYmVsPSJBUEkgS2V5IERlbW8gbG9nbyI+PHJlY3Qgd2lkdGg9IjI4MCIgaGVpZ2h0PSIxNDAiIHJ4PSIxMiIgZmlsbD0iI0M4NDYzMCIvPjxjaXJjbGUgY3g9Ijc2IiBjeT0iNzAiIHI9IjM0IiBmaWxsPSJyZ2JhKDI1NSwyNTUsMjU1LDAuMTgpIi8+PHBhdGggZD0iTTExNiA3MGg3NG0tMjAtMTYgMTYgMTYtMTYgMTYiIGZpbGw9Im5vbmUiIHN0cm9rZT0iI2ZmZiIgc3Ryb2tlLXdpZHRoPSIxNCIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIi8+PHRleHQgeD0iNzYiIHk9IjgyIiB0ZXh0LWFuY2hvcj0ibWlkZGxlIiBmaWxsPSIjZmZmIiBmb250LWZhbWlseT0iSW50ZXIsIEFyaWFsLCBzYW5zLXNlcmlmIiBmb250LXNpemU9IjM0IiBmb250LXdlaWdodD0iODAwIj5BSzwvdGV4dD48L3N2Zz4=
+        highlight: "Creates a connection from a static demo API key."
+        description: "This connector demonstrates AuthProxy API-key setup and proxying. Enter `demo-api-key` when prompted; it is an intentionally fake key accepted only by the demo provider. AuthProxy stores the key as an encrypted credential, injects it as `Authorization: Bearer demo-api-key` on proxy requests, and verifies it with a probe so wrong keys are easy to spot."
+        labels:
+          type: demo-api-key-bearer
+          demo: "true"
+        auth:
+          type: api-key
+          placement:
+            type: bearer
+        probes:
+          - id: verify-api-key
+            proxy_http:
+              method: GET
+              url: "http://{{ include \"authproxy-demo.goOauth2Server.name\" . }}/test/api-key-resource/demo-api-key"
+            failure_threshold: 1
     - key: demo-oauth-simple
       namespace: root
       labels:

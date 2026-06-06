@@ -59,10 +59,11 @@ type ConnectorSeed struct {
 }
 
 type OAuth2TestProviderSeed struct {
-	BaseUrl          string                     `yaml:"base_url"`
-	Clients          []OAuth2TestProviderClient `yaml:"clients,omitempty"`
-	Users            []OAuth2TestProviderUser   `yaml:"users,omitempty"`
-	ResourcePolicies []OAuth2ResourcePolicy     `yaml:"resource_policies,omitempty"`
+	BaseUrl                string                     `yaml:"base_url"`
+	Clients                []OAuth2TestProviderClient `yaml:"clients,omitempty"`
+	Users                  []OAuth2TestProviderUser   `yaml:"users,omitempty"`
+	ResourcePolicies       []OAuth2ResourcePolicy     `yaml:"resource_policies,omitempty"`
+	APIKeyResourcePolicies []APIKeyResourcePolicy     `yaml:"api_key_resource_policies,omitempty"`
 }
 
 type OAuth2TestProviderClient struct {
@@ -86,6 +87,14 @@ type OAuth2TestProviderUser struct {
 type OAuth2ResourcePolicy struct {
 	Path          string `json:"path" yaml:"path"`
 	RequiredScope string `json:"required_scope" yaml:"required_scope"`
+}
+
+type APIKeyResourcePolicy struct {
+	Path       string `json:"path" yaml:"path"`
+	Key        string `json:"key" yaml:"key"`
+	Placement  string `json:"placement,omitempty" yaml:"placement,omitempty"`
+	HeaderName string `json:"header_name,omitempty" yaml:"header_name,omitempty"`
+	Prefix     string `json:"prefix,omitempty" yaml:"prefix,omitempty"`
 }
 
 type settings struct {
@@ -233,6 +242,18 @@ func seedOAuth2TestProvider(c *resty.Client, seed OAuth2TestProviderSeed) error 
 		}
 		if _, err := postOAuth2TestProvider(c, baseUrl, "/test/resource-policy", policy); err != nil {
 			return fmt.Errorf("seed oauth2 resource policy %q: %w", policy.Path, err)
+		}
+	}
+
+	for _, policy := range seed.APIKeyResourcePolicies {
+		if policy.Path == "" {
+			return fmt.Errorf("oauth2 test provider api-key resource policy path is required")
+		}
+		if policy.Key == "" {
+			return fmt.Errorf("oauth2 test provider api-key resource policy %q key is required", policy.Path)
+		}
+		if _, err := postOAuth2TestProvider(c, baseUrl, "/test/api-key-resource-policy", policy); err != nil {
+			return fmt.Errorf("seed oauth2 test provider api-key resource policy %q: %w", policy.Path, err)
 		}
 	}
 
@@ -541,6 +562,7 @@ func run(logger *slog.Logger) error {
 			"clients", len(cfg.OAuth2TestProvider.Clients),
 			"users", len(cfg.OAuth2TestProvider.Users),
 			"resource_policies", len(cfg.OAuth2TestProvider.ResourcePolicies),
+			"api_key_resource_policies", len(cfg.OAuth2TestProvider.APIKeyResourcePolicies),
 		)
 	}
 
