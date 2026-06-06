@@ -2,7 +2,6 @@ import React from 'react';
 import {
   Card,
   CardContent,
-  CardMedia,
   Typography,
   Button,
   CardActions,
@@ -14,6 +13,7 @@ import ReactMarkdown from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import { Connector } from '@authproxy/api';
 import { marketplaceTokens } from '../theme';
+import ConnectorLogo from './ConnectorLogo';
 
 interface ConnectorCardProps {
   connector: Connector;
@@ -21,62 +21,6 @@ interface ConnectorCardProps {
   onDetails?: (connectorId: string) => void;
   isConnecting: boolean;
 }
-
-const connectorInitials = (displayName: string): string => {
-  const words = displayName
-    .split(/[^a-zA-Z0-9]+/)
-    .filter(Boolean);
-
-  if (words.length === 0) {
-    return 'AP';
-  }
-
-  return words.slice(0, 2).map((word) => word[0].toUpperCase()).join('');
-};
-
-const ConnectorLogoMedia: React.FC<{connector: Connector}> = ({connector}) => {
-  const [logoFailed, setLogoFailed] = React.useState(false);
-
-  React.useEffect(() => {
-    setLogoFailed(false);
-  }, [connector.logo]);
-
-  if (connector.logo && !logoFailed) {
-    return (
-      <CardMedia
-        component="img"
-        image={connector.logo}
-        alt={`${connector.display_name} logo`}
-        onError={() => setLogoFailed(true)}
-        sx={{
-          height: marketplaceTokens.card.mediaHeight,
-          objectFit: 'contain',
-          bgcolor: 'background.default',
-          p: 2,
-        }}
-      />
-    );
-  }
-
-  return (
-    <Box
-      role="img"
-      aria-label={`${connector.display_name} logo`}
-      sx={{
-        height: marketplaceTokens.card.mediaHeight,
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        bgcolor: 'primary.dark',
-        color: 'primary.contrastText',
-      }}
-    >
-      <Typography variant="h3" component="span" sx={{ fontWeight: 700 }}>
-        {connectorInitials(connector.display_name)}
-      </Typography>
-    </Box>
-  );
-};
 
 /**
  * Component to display a single connector with its details
@@ -90,7 +34,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
   const displayText = connector.highlight;
   const cardBody = (
     <>
-      <ConnectorLogoMedia connector={connector} />
+      <ConnectorLogo connector={connector} variant="media" />
       <CardContent sx={{ flexGrow: 1, width: '100%' }}>
         <Typography gutterBottom variant="h5" component="div">
           {connector.display_name}

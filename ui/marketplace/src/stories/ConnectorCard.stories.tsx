@@ -8,6 +8,11 @@ const logoDataUri = (label: string, background: string) => {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 };
 
+const wideLogoDataUri = (label: string) => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="120" viewBox="0 0 640 120" role="img" aria-label="${label} logo"><rect width="640" height="120" rx="18" fill="#111827"/><circle cx="66" cy="60" r="34" fill="#34d399"/><text x="118" y="66" fill="#f9fafb" font-family="Inter, Arial, sans-serif" font-size="44" font-weight="800">Wide Format Systems</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+};
+
 const meta: Meta<typeof ConnectorCard> = {
   title: 'Components/ConnectorCard',
   component: ConnectorCard,
@@ -69,6 +74,20 @@ export const LongDescription: Story = {
       ...mockConnector,
       description: 'This is a very long description that should wrap to multiple lines. Connect to your Google Calendar to manage events and appointments, schedule meetings, and get reminders about upcoming events.',
       highlight: 'Short marketplace highlight stays on the card while the long description belongs on the overview page.',
+    },
+    onConnect: (id) => console.log(`Connect clicked for ${id}`),
+    onDetails: (id) => console.log(`Details clicked for ${id}`),
+    isConnecting: false,
+  },
+};
+
+export const WideLogo: Story = {
+  args: {
+    connector: {
+      ...mockConnector,
+      display_name: 'Wide Format Systems',
+      highlight: 'A wide logo should scale down inside the card without being cut off.',
+      logo: wideLogoDataUri('Wide Format Systems'),
     },
     onConnect: (id) => console.log(`Connect clicked for ${id}`),
     onDetails: (id) => console.log(`Details clicked for ${id}`),

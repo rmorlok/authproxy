@@ -12,7 +12,13 @@ const logoDataUri = (label: string, background: string) => {
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 };
 
+const wideLogoDataUri = (label: string) => {
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="120" viewBox="0 0 640 120" role="img" aria-label="${label} logo"><rect width="640" height="120" rx="18" fill="#111827"/><circle cx="66" cy="60" r="34" fill="#34d399"/><text x="118" y="66" fill="#f9fafb" font-family="Inter, Arial, sans-serif" font-size="44" font-weight="800">Wide Format Systems</text></svg>`;
+  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
+};
+
 const googleCalendarLogo = logoDataUri('Google Calendar', '#1a73e8');
+const wideFormatLogo = wideLogoDataUri('Wide Format Systems');
 
 // Create a mock store with connectors and connections
 const mockStore = configureStore({
@@ -104,6 +110,20 @@ export const ConnectedConfigurable: Story = {
       connector: {
         ...mockConnection.connector,
         has_configure: true,
+      },
+    },
+  },
+};
+
+export const WideLogo: Story = {
+  args: {
+    connection: {
+      ...mockConnection,
+      connector: {
+        ...mockConnection.connector,
+        display_name: 'Wide Format Systems',
+        highlight: 'A wide logo should scale down inside the header without being cut off.',
+        logo: wideFormatLogo,
       },
     },
   },
