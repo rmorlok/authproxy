@@ -41,6 +41,9 @@ demoShell:
       memory: 32Mi
     limits:
       memory: 128Mi
+  # -- Annotations applied to each demo-shell pod. Useful for forcing a
+  # rollout when using stable image tags like `main` or `pr-123`.
+  podAnnotations: {}
   # -- Container port the backend listens on (matches PORT env, default 8888).
   port: 8888
 

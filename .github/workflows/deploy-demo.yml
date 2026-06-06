@@ -226,7 +226,9 @@ jobs:
             --set "global.clusterIssuer=${DEMO_CLUSTER_ISSUER}"
             --set "ingress.wildcardSubdomains=${DEMO_TLS_WILDCARD_SUBDOMAINS}"
             --set "authproxy.image.tag=${{ steps.tag.outputs.tag }}"
+            --set-string "authproxy.podAnnotations.demo\.authproxy\.net/image-revision=${{ github.sha }}"
             --set "demoShell.image.tag=${{ steps.tag.outputs.tag }}"
+            --set-string "demoShell.podAnnotations.demo\.authproxy\.net/image-revision=${{ github.sha }}"
             --set "seed.image.tag=${{ steps.tag.outputs.tag }}"
           )
 

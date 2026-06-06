@@ -28,6 +28,7 @@
         "image":        { "type": "object" },
         "replicaCount": { "type": "integer", "minimum": 1 },
         "resources":    { "type": "object" },
+        "podAnnotations": { "type": "object", "additionalProperties": { "type": "string" } },
         "port":         { "type": "integer", "minimum": 1, "maximum": 65535 }
       }
     },
