@@ -13,7 +13,7 @@ import {
   Typography,
 } from '@mui/material';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
-import ReactMarkdown from 'react-markdown';
+import ReactMarkdown, { defaultUrlTransform } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 import ConnectionSetupDialog from './ConnectionSetupDialog';
 import { AppDispatch, fetchConnectorsAsync } from '../store';
@@ -92,6 +92,10 @@ const markdownComponents = {
     </Typography>
   ),
 };
+
+const markdownUrlTransform = (url: string) => (
+  url.startsWith('data:image/') ? url : defaultUrlTransform(url)
+);
 
 const connectorInitials = (displayName: string): string => {
   const words = displayName.split(/[^a-zA-Z0-9]+/).filter(Boolean);
@@ -236,7 +240,11 @@ const ConnectorDetail: React.FC<ConnectorDetailProps> = ({ connectorId }) => {
             },
           }}
         >
-          <ReactMarkdown remarkPlugins={[remarkGfm]} components={markdownComponents}>
+          <ReactMarkdown
+            remarkPlugins={[remarkGfm]}
+            components={markdownComponents}
+            urlTransform={markdownUrlTransform}
+          >
             {body}
           </ReactMarkdown>
         </Paper>

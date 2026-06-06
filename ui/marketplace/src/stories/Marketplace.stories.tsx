@@ -33,11 +33,6 @@ const logoDataUri = (label: string, background: string, foreground = '#ffffff') 
   return `data:image/svg+xml,${encodeURIComponent(svg)}`;
 };
 
-const detailImageDataUri = () => {
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="960" height="360" viewBox="0 0 960 360" role="img" aria-label="Calendar workflow preview"><rect width="960" height="360" rx="12" fill="#f8fafc"/><rect x="48" y="56" width="260" height="248" rx="10" fill="#ffffff" stroke="#cbd5e1"/><rect x="356" y="56" width="260" height="248" rx="10" fill="#ffffff" stroke="#cbd5e1"/><rect x="664" y="56" width="248" height="248" rx="10" fill="#ffffff" stroke="#cbd5e1"/><text x="78" y="104" fill="#1f2937" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Availability</text><text x="386" y="104" fill="#1f2937" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Scheduling</text><text x="694" y="104" fill="#1f2937" font-family="Inter, Arial, sans-serif" font-size="24" font-weight="700">Follow-up</text><path d="M312 180H352" stroke="#2563eb" stroke-width="6" stroke-linecap="round"/><path d="M620 180H660" stroke="#2563eb" stroke-width="6" stroke-linecap="round"/><rect x="78" y="136" width="180" height="18" rx="9" fill="#bfdbfe"/><rect x="78" y="174" width="130" height="18" rx="9" fill="#bbf7d0"/><rect x="386" y="136" width="198" height="18" rx="9" fill="#bfdbfe"/><rect x="386" y="174" width="156" height="18" rx="9" fill="#fde68a"/><rect x="694" y="136" width="168" height="18" rx="9" fill="#bfdbfe"/><rect x="694" y="174" width="126" height="18" rx="9" fill="#bbf7d0"/></svg>`;
-  return `data:image/svg+xml,${encodeURIComponent(svg)}`;
-};
-
 const connectors: Connector[] = [
   {
     id: 'google-drive',
@@ -77,7 +72,7 @@ const connectors: Connector[] = [
     display_name: 'Google Calendar',
     description: `Google Calendar lets agents coordinate scheduling work without needing direct access to your primary app.
 
-![Calendar workflow preview](${detailImageDataUri()})
+![Calendar workflow preview](/calendar-workflow-preview.svg)
 
 ### What agents can do
 

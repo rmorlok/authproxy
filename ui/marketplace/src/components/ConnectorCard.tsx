@@ -154,12 +154,19 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
           {cardBody}
         </Box>
       )}
-      <CardActions>
+      <CardActions sx={{ justifyContent: 'space-between', px: 2, pb: 2 }}>
         {onDetails && (
           <Button
             size="small"
-            color="primary"
+            color="inherit"
             onClick={() => onDetails(connector.id)}
+            sx={{
+              color: 'text.secondary',
+              '&:hover': {
+                bgcolor: 'action.hover',
+                color: 'text.primary',
+              },
+            }}
           >
             Details
           </Button>
@@ -169,6 +176,7 @@ const ConnectorCard: React.FC<ConnectorCardProps> = ({
           color="primary" 
           onClick={() => onConnect(connector.id)}
           disabled={isConnecting}
+          sx={{ ml: 'auto' }}
         >
           Connect
         </Button>
