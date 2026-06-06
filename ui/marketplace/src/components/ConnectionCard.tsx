@@ -7,7 +7,6 @@ import {
   Box,
   Skeleton,
   CardHeader,
-  Avatar,
   Button,
   CardActions,
   Dialog,
@@ -37,6 +36,7 @@ import DeleteOutlineIcon from '@mui/icons-material/DeleteOutline';
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { marketplaceTokens } from '../theme';
+import ConnectorLogo from './ConnectorLogo';
 interface ConnectionCardProps {
   connection: Connection;
   highlightNew?: boolean;
@@ -258,15 +258,7 @@ const ConnectionCard: React.FC<ConnectionCardProps> = ({ connection, highlightNe
           },
         }}
         avatar={
-          connector ? (
-            <Avatar 
-              src={connector.logo} 
-              alt={`${connector.display_name} logo`}
-              sx={{ width: 40, height: 40 }}
-            />
-          ) : (
-            <Avatar>?</Avatar>
-          )
+          <ConnectorLogo connector={connector} variant="compact" />
         }
         title={connector ? connector.display_name : 'Unknown Connector'}
         action={(
@@ -422,7 +414,7 @@ export const ConnectionCardSkeleton: React.FC = () => {
   return (
     <Card sx={{ maxWidth: 345, height: '100%', display: 'flex', flexDirection: 'column' }}>
       <CardHeader
-        avatar={<Skeleton variant="circular" width={40} height={40} />}
+        avatar={<Skeleton variant="rounded" width={96} height={48} />}
         title={<Skeleton variant="text" width="80%" />}
         subheader={<Skeleton variant="text" width="60%" />}
       />
