@@ -1,10 +1,14 @@
 package core
 
 import (
+	"regexp"
 	"slices"
+	"strings"
 
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 )
+
+var permissionNamespaceTemplateRegex = regexp.MustCompile(`{{\s*([^{}]+?)\s*}}`)
 
 // Allows checks if this permission allows the specified action.
 //
@@ -24,7 +28,11 @@ import (
 //   - ResourceIds: If permission has no ResourceIds, all IDs are allowed. If permission has
 //     ResourceIds, the requested ID must be in the list.
 func allows(p aschema.Permission, namespace, resource, verb, resourceId string) bool {
-	if !matchesNamespace(p, namespace) {
+	return allowsForActor(nil, p, namespace, resource, verb, resourceId)
+}
+
+func allowsForActor(actor *Actor, p aschema.Permission, namespace, resource, verb, resourceId string) bool {
+	if !matchesNamespace(actor, p, namespace) {
 		return false
 	}
 
@@ -45,7 +53,7 @@ func allows(p aschema.Permission, namespace, resource, verb, resourceId string) 
 
 // matchesNamespace checks if this permission's namespace matches the target namespace.
 // Supports wildcard matching with ".**" suffix.
-func matchesNamespace(p aschema.Permission, targetNamespace string) bool {
+func matchesNamespace(actor *Actor, p aschema.Permission, targetNamespace string) bool {
 	if p.Namespace == "" || targetNamespace == "" {
 		return false
 	}
@@ -54,7 +62,86 @@ func matchesNamespace(p aschema.Permission, targetNamespace string) bool {
 		return true
 	}
 
-	return aschema.NamespaceMatches(p.Namespace, targetNamespace)
+	matcher, ok := renderValidPermissionNamespace(actor, p.Namespace)
+	if !ok {
+		return false
+	}
+
+	return aschema.NamespaceMatches(matcher, targetNamespace)
+}
+
+func renderPermissionNamespace(actor *Actor, namespace string) (string, bool) {
+	if !strings.Contains(namespace, "{{") {
+		return namespace, true
+	}
+
+	if actor == nil {
+		return "", false
+	}
+
+	matches := permissionNamespaceTemplateRegex.FindAllStringSubmatchIndex(namespace, -1)
+	if len(matches) == 0 {
+		return "", false
+	}
+
+	var rendered strings.Builder
+	last := 0
+	for _, match := range matches {
+		rendered.WriteString(namespace[last:match[0]])
+
+		name := strings.TrimSpace(namespace[match[2]:match[3]])
+		value, ok := actorPermissionTemplateValue(actor, name)
+		if !ok {
+			return "", false
+		}
+
+		rendered.WriteString(value)
+		last = match[1]
+	}
+	rendered.WriteString(namespace[last:])
+
+	result := rendered.String()
+	if strings.Contains(result, "{{") || strings.Contains(result, "}}") {
+		return "", false
+	}
+
+	return result, true
+}
+
+func renderValidPermissionNamespace(actor *Actor, namespace string) (string, bool) {
+	rendered, ok := renderPermissionNamespace(actor, namespace)
+	if !ok {
+		return "", false
+	}
+
+	if err := aschema.ValidateNamespaceMatcher(rendered); err != nil {
+		return "", false
+	}
+
+	return rendered, true
+}
+
+func actorPermissionTemplateValue(actor *Actor, name string) (string, bool) {
+	switch {
+	case name == "external_id":
+		return actor.ExternalId, true
+	case strings.HasPrefix(name, "labels."):
+		key := strings.TrimPrefix(name, "labels.")
+		if key == "" || actor.Labels == nil {
+			return "", false
+		}
+		value, ok := actor.Labels[key]
+		return value, ok
+	case strings.HasPrefix(name, "annotations."):
+		key := strings.TrimPrefix(name, "annotations.")
+		if key == "" || actor.Annotations == nil {
+			return "", false
+		}
+		value, ok := actor.Annotations[key]
+		return value, ok
+	default:
+		return "", false
+	}
 }
 
 // matchesResource checks if this permission allows access to the target resource.
@@ -113,8 +200,12 @@ func matchesResourceId(p aschema.Permission, targetResourceId string) bool {
 //
 // This is the primary function for checking if an actor has permission to perform an action.
 func permissionsAllow(permissions []aschema.Permission, namespace, resource, verb, resourceId string) bool {
+	return permissionsAllowForActor(nil, permissions, namespace, resource, verb, resourceId)
+}
+
+func permissionsAllowForActor(actor *Actor, permissions []aschema.Permission, namespace, resource, verb, resourceId string) bool {
 	for _, p := range permissions {
-		if allows(p, namespace, resource, verb, resourceId) {
+		if allowsForActor(actor, p, namespace, resource, verb, resourceId) {
 			return true
 		}
 	}
@@ -141,8 +232,17 @@ func permissionsAllowWithRestrictions(
 	restrictions []aschema.Permission,
 	namespace, resource, verb, resourceId string,
 ) bool {
+	return permissionsAllowWithRestrictionsForActor(nil, actorPermissions, restrictions, namespace, resource, verb, resourceId)
+}
+
+func permissionsAllowWithRestrictionsForActor(
+	actor *Actor,
+	actorPermissions []aschema.Permission,
+	restrictions []aschema.Permission,
+	namespace, resource, verb, resourceId string,
+) bool {
 	// First check if the actor's permissions allow the action
-	if !permissionsAllow(actorPermissions, namespace, resource, verb, resourceId) {
+	if !permissionsAllowForActor(actor, actorPermissions, namespace, resource, verb, resourceId) {
 		return false
 	}
 
@@ -152,5 +252,5 @@ func permissionsAllowWithRestrictions(
 	}
 
 	// Check if the restrictions also allow the action
-	return permissionsAllow(restrictions, namespace, resource, verb, resourceId)
+	return permissionsAllowForActor(actor, restrictions, namespace, resource, verb, resourceId)
 }
