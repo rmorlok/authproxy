@@ -8,7 +8,6 @@ import (
 
 	"github.com/golang/mock/gomock"
 	"github.com/rmorlok/authproxy/internal/apasynq"
-	mockAsynq "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	mockLog "github.com/rmorlok/authproxy/internal/aplog/mock"
@@ -21,7 +20,6 @@ import (
 	mockEncrypt "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 	tclock "k8s.io/utils/clock/testing"
 )
 
@@ -37,10 +35,9 @@ func TestTaskDisconnectConnection(t *testing.T) {
 		Auth:        &cschema.Auth{InnerVal: &cschema.AuthApiKey{Type: cschema.AuthTypeAPIKey}},
 	}
 
-	setupWithMocks := func(t *testing.T) (*service, *mockDb.MockDB, *mockAsynq.MockClient, *mockEncrypt.MockE, *gomock.Controller) {
+	setupWithMocks := func(t *testing.T) (*service, *mockDb.MockDB, *mockEncrypt.MockE, *gomock.Controller) {
 		ctrl := gomock.NewController(t)
 		db := mockDb.NewMockDB(ctrl)
-		ac := mockAsynq.NewMockClient(ctrl)
 		encrypt := mockEncrypt.NewMockE(ctrl)
 		logger, _ := mockLog.NewTestLogger(t)
 
@@ -48,14 +45,13 @@ func TestTaskDisconnectConnection(t *testing.T) {
 			cfg:                 nil,
 			db:                  db,
 			encrypt:             encrypt,
-			ac:                  ac,
 			logger:              logger,
 			authMethodFactories: map[cschema.AuthType]auth_methods.Factory{},
-		}, db, ac, encrypt, ctrl
+		}, db, encrypt, ctrl
 	}
 
 	t.Run("successfully disconnect connection", func(t *testing.T) {
-		svc, dbMock, _, e, ctrl := setupWithMocks(t)
+		svc, dbMock, e, ctrl := setupWithMocks(t)
 		defer ctrl.Finish()
 
 		mock.MockConnectionRetrieval(context.Background(), dbMock, e, connectionId, apiKeyConnector)
@@ -70,16 +66,13 @@ func TestTaskDisconnectConnection(t *testing.T) {
 			DeleteConnection(gomock.Any(), connectionId).
 			Return(nil)
 
-		task, err := newDisconnectConnectionTask(connectionId)
-		require.NoError(t, err)
-
-		err = svc.disconnectConnection(ctx, task)
+		err := svc.finalizeDisconnectConnectionV1(ctx, connectionId.String())
 
 		assert.NoError(t, err)
 	})
 
 	t.Run("is retriable on database state update error", func(t *testing.T) {
-		svc, dbMock, _, e, ctrl := setupWithMocks(t)
+		svc, dbMock, e, ctrl := setupWithMocks(t)
 		defer ctrl.Finish()
 
 		mock.MockConnectionRetrieval(context.Background(), dbMock, e, connectionId, apiKeyConnector)
@@ -89,10 +82,7 @@ func TestTaskDisconnectConnection(t *testing.T) {
 			SetConnectionState(gomock.Any(), connectionId, database.ConnectionStateDisconnected).
 			Return(errors.New("some error"))
 
-		task, err := newDisconnectConnectionTask(connectionId)
-		require.NoError(t, err)
-
-		err = svc.disconnectConnection(ctx, task)
+		err := svc.finalizeDisconnectConnectionV1(ctx, connectionId.String())
 		assert.Error(t, err)
 		assert.True(t, apasynq.IsRetriable(err))
 	})
@@ -110,7 +100,7 @@ func TestTaskDisconnectConnection(t *testing.T) {
 			}},
 		}
 
-		svc, dbMock, _, e, ctrl := setupWithMocks(t)
+		svc, dbMock, e, ctrl := setupWithMocks(t)
 		defer ctrl.Finish()
 
 		// Swap the OAuth2 factory in the auth-method registry with a mock that
@@ -126,19 +116,6 @@ func TestTaskDisconnectConnection(t *testing.T) {
 		authMock.EXPECT().Revoke(gomock.Any()).Return(errors.New("3rd party 400")).Times(maxRevokeAttempts)
 
 		mock.MockConnectionRetrieval(context.Background(), dbMock, e, connectionId, oauthConnector)
-
-		dbMock.
-			EXPECT().
-			SetConnectionState(gomock.Any(), connectionId, database.ConnectionStateDisconnected).
-			Return(nil)
-
-		dbMock.
-			EXPECT().
-			DeleteConnection(gomock.Any(), connectionId).
-			Return(nil)
-
-		task, err := newDisconnectConnectionTask(connectionId)
-		require.NoError(t, err)
 
 		// Use a fake clock so the inter-attempt backoff doesn't burn real
 		// time. The retry helper sleeps via clk.After + select, which is not
@@ -162,12 +139,12 @@ func TestTaskDisconnectConnection(t *testing.T) {
 			}
 		}()
 
-		err = svc.disconnectConnection(retryCtx, task)
+		err := svc.revokeDisconnectConnectionCredentialsV1(retryCtx, connectionId.String())
 		assert.NoError(t, err, "disconnect should succeed even when revocation fails")
 	})
 
 	t.Run("is retriable on database delete error", func(t *testing.T) {
-		svc, dbMock, _, e, ctrl := setupWithMocks(t)
+		svc, dbMock, e, ctrl := setupWithMocks(t)
 		defer ctrl.Finish()
 
 		mock.MockConnectionRetrieval(context.Background(), dbMock, e, connectionId, apiKeyConnector)
@@ -182,10 +159,7 @@ func TestTaskDisconnectConnection(t *testing.T) {
 			DeleteConnection(gomock.Any(), connectionId).
 			Return(errors.New("some error"))
 
-		task, err := newDisconnectConnectionTask(connectionId)
-		require.NoError(t, err)
-
-		err = svc.disconnectConnection(ctx, task)
+		err := svc.finalizeDisconnectConnectionV1(ctx, connectionId.String())
 		assert.Error(t, err)
 		assert.True(t, apasynq.IsRetriable(err))
 	})

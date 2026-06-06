@@ -2,14 +2,14 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"testing"
-	"time"
 
+	"github.com/cschleiden/go-workflows/client"
+	wflib "github.com/cschleiden/go-workflows/workflow"
 	"github.com/golang/mock/gomock"
-	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/tasks"
 	"github.com/stretchr/testify/require"
 
 	mockAsynq "github.com/rmorlok/authproxy/internal/apasynq/mock"
@@ -20,28 +20,51 @@ import (
 	"github.com/stretchr/testify/assert"
 )
 
+type fakeDisconnectWorkflowClient struct {
+	instance *wflib.Instance
+	err      error
+
+	options  client.WorkflowInstanceOptions
+	workflow wflib.Workflow
+	args     []any
+}
+
+func (f *fakeDisconnectWorkflowClient) CreateWorkflowInstance(ctx context.Context, options client.WorkflowInstanceOptions, workflow wflib.Workflow, args ...any) (*wflib.Instance, error) {
+	f.options = options
+	f.workflow = workflow
+	f.args = args
+	return f.instance, f.err
+}
+
 func TestDisconnectConnection(t *testing.T) {
 	ctx := context.Background()
-	connectionId := apid.New(apid.PrefixActor)
+	connectionId := apid.New(apid.PrefixConnection)
 
-	setup := func(t *testing.T) (*service, *mockDb.MockDB, *mockAsynq.MockClient, *gomock.Controller) {
+	setup := func(t *testing.T) (*service, *mockDb.MockDB, *fakeDisconnectWorkflowClient, *gomock.Controller) {
 		ctrl := gomock.NewController(t)
 		db := mockDb.NewMockDB(ctrl)
 		ac := mockAsynq.NewMockClient(ctrl)
 		encrypt := mockEncrypt.NewMockE(ctrl)
 		logger, _ := mockLog.NewTestLogger(t)
+		wc := &fakeDisconnectWorkflowClient{
+			instance: &wflib.Instance{
+				InstanceID:  "workflow-instance-id",
+				ExecutionID: "workflow-execution-id",
+			},
+		}
 
 		return &service{
 			cfg:     nil,
 			db:      db,
 			encrypt: encrypt,
 			ac:      ac,
+			wc:      wc,
 			logger:  logger,
-		}, db, ac, ctrl
+		}, db, wc, ctrl
 	}
 
 	t.Run("successfully disconnect connection", func(t *testing.T) {
-		svc, dbMock, asynqMock, ctrl := setup(t)
+		svc, dbMock, workflowClient, ctrl := setup(t)
 		defer ctrl.Finish()
 
 		dbMock.
@@ -49,33 +72,17 @@ func TestDisconnectConnection(t *testing.T) {
 			SetConnectionState(gomock.Any(), connectionId, database.ConnectionStateDisconnecting).
 			Return(nil)
 
-		taskMatcher := gomock.AssignableToTypeOf(&asynq.Task{})
-		asynqMock.
-			EXPECT().
-			EnqueueContext(gomock.Any(), taskMatcher, asynq.Retention(10*time.Minute)).
-			DoAndReturn(func(_ context.Context, task *asynq.Task, _ ...asynq.Option) (*asynq.TaskInfo, error) {
-				// Verify the task type
-				assert.Equal(t, "core:disconnect_connection", task.Type())
-
-				// Parse the payload to verify the connection ID
-				var payload struct {
-					ConnectionId apid.ID `json:"connection_id"`
-				}
-				err := json.Unmarshal(task.Payload(), &payload)
-				require.NoError(t, err)
-
-				// Verify the connection ID matches what we expect
-				assert.Equal(t, connectionId, payload.ConnectionId)
-
-				// Return a mock TaskInfo
-				return &asynq.TaskInfo{ID: "mock-task-id"}, nil
-
-			})
-
 		taskInfo, err := svc.DisconnectConnection(ctx, connectionId)
 
 		assert.NoError(t, err)
-		assert.Equal(t, "mock-task-id", taskInfo.AsynqId)
+		require.NotNil(t, taskInfo)
+		assert.Equal(t, tasks.TrackedViaWorkflow, taskInfo.TrackedVia)
+		assert.Equal(t, "workflow-instance-id", taskInfo.WorkflowInstanceId)
+		assert.Equal(t, "workflow-execution-id", taskInfo.WorkflowExecutionId)
+		assert.Equal(t, WorkflowNameDisconnectConnectionV1, taskInfo.WorkflowName)
+		assert.Equal(t, WorkflowNameDisconnectConnectionV1, workflowClient.workflow)
+		assert.Equal(t, []any{connectionId.String()}, workflowClient.args)
+		assert.Contains(t, workflowClient.options.InstanceID, connectionId.String())
 	})
 
 	t.Run("database not found error", func(t *testing.T) {
@@ -106,18 +113,15 @@ func TestDisconnectConnection(t *testing.T) {
 		assert.Nil(t, taskInfo)
 	})
 
-	t.Run("task creation error", func(t *testing.T) {
-		svc, dbMock, asynqMock, ctrl := setup(t)
+	t.Run("workflow start error", func(t *testing.T) {
+		svc, dbMock, workflowClient, ctrl := setup(t)
 		defer ctrl.Finish()
 
 		dbMock.EXPECT().
 			SetConnectionState(gomock.Any(), connectionId, database.ConnectionStateDisconnecting).
 			Return(nil)
 
-		asynqMock.
-			EXPECT().
-			EnqueueContext(gomock.Any(), gomock.Any(), asynq.Retention(10*time.Minute)).
-			Return((*asynq.TaskInfo)(nil), errors.New("enqueue error"))
+		workflowClient.err = errors.New("workflow error")
 
 		taskInfo, err := svc.DisconnectConnection(ctx, connectionId)
 

@@ -1,8 +1,11 @@
 package core
 
 import (
+	"context"
 	"log/slog"
 
+	"github.com/cschleiden/go-workflows/client"
+	wflib "github.com/cschleiden/go-workflows/workflow"
 	"github.com/rmorlok/authproxy/internal/apasynq"
 	"github.com/rmorlok/authproxy/internal/apredis"
 	"github.com/rmorlok/authproxy/internal/aptelemetry"
@@ -27,6 +30,7 @@ type service struct {
 	r       apredis.Client
 	httpf   httpf.F
 	ac      apasynq.Client
+	wc      workflowClient
 	logger  *slog.Logger
 
 	// rlCache is the enforcer-shared rate-limit cache. Optional —
@@ -53,6 +57,10 @@ type service struct {
 // need the new dependency change.
 type Option func(*service)
 
+type workflowClient interface {
+	CreateWorkflowInstance(ctx context.Context, options client.WorkflowInstanceOptions, workflow wflib.Workflow, args ...any) (*wflib.Instance, error)
+}
+
 // WithRateLimitCache wires the in-memory rate-limit rule cache the
 // enforcer reads. Required by C.DryRunRateLimit; harmless to omit when
 // the dry-run path isn't exercised.
@@ -69,6 +77,10 @@ func WithTelemetry(providers *aptelemetry.Providers, cfg *sconfig.Telemetry) Opt
 		s.telProviders = providers
 		s.telCfg = cfg
 	}
+}
+
+func WithWorkflowClient(c workflowClient) Option {
+	return func(s *service) { s.wc = c }
 }
 
 // NewCoreService creates a new core service

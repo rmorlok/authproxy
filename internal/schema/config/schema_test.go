@@ -1070,6 +1070,39 @@ func TestSchemaDefinitions(t *testing.T) {
 			},
 		},
 		{
+			Name: "ServiceWorker workflow options",
+			Schema: `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/config/test.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["test"],
+  "properties": {
+	"test": {
+		"$ref": "./schema.json#/$defs/ServiceWorker"
+    }
+  }
+}`,
+			Tests: []test{
+				{
+					Name:  "workflow options as strings",
+					Valid: true,
+					Data:  `{"test": {"workflow_pollers": "3", "activity_pollers": "4", "max_parallel_workflow_tasks": "5", "max_parallel_activity_tasks": "6", "workflow_heartbeat_interval": "7s"}}`,
+				},
+				{
+					Name:  "workflow options as integer equivalents",
+					Valid: true,
+					Data:  `{"test": {"workflow_pollers": 3, "activity_pollers": 4, "max_parallel_workflow_tasks": 5, "max_parallel_activity_tasks": 6}}`,
+				},
+				{
+					Name:  "extra property",
+					Valid: false,
+					Data:  `{"test": {"workflow_pollers": "3", "extra": "field"}}`,
+				},
+			},
+		},
+		{
 			Name: "HostApplication",
 			Schema: `
 {

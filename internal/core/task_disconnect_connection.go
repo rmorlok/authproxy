@@ -2,18 +2,24 @@ package core
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"time"
 
-	"github.com/hibiken/asynq"
+	"github.com/cschleiden/go-workflows/client"
+	"github.com/cschleiden/go-workflows/registry"
+	wflib "github.com/cschleiden/go-workflows/workflow"
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/aplog"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/util/retry"
+	apworkflows "github.com/rmorlok/authproxy/internal/workflows"
 )
 
-const taskTypeDisconnectConnection = "core:disconnect_connection"
+const (
+	WorkflowNameDisconnectConnectionV1 = "core.connection.disconnect.v1"
+
+	ActivityNameDisconnectConnectionRevokeCredentialsV1 = "core.connection.disconnect.revoke_credentials.v1"
+	ActivityNameDisconnectConnectionFinalizeV1          = "core.connection.disconnect.finalize.v1"
+)
 
 // maxRevokeAttempts caps the number of times a revoke operation is retried
 // inside a single disconnect task invocation. After exhausting attempts, the
@@ -21,36 +27,101 @@ const taskTypeDisconnectConnection = "core:disconnect_connection"
 // because a 3rd-party revoke endpoint is misbehaving.
 const maxRevokeAttempts = 3
 
-func newDisconnectConnectionTask(connectionId apid.ID) (*asynq.Task, error) {
-	payload, err := json.Marshal(disconnectConnectionTaskPayload{connectionId})
+func disconnectConnectionWorkflowV1(ctx wflib.Context, connectionId string) error {
+	if _, err := wflib.ExecuteActivity[any](
+		ctx,
+		disconnectConnectionRevokeActivityOptions(),
+		ActivityNameDisconnectConnectionRevokeCredentialsV1,
+		connectionId,
+	).Get(ctx); err != nil {
+		return err
+	}
+
+	_, err := wflib.ExecuteActivity[any](
+		ctx,
+		wflib.DefaultActivityOptions,
+		ActivityNameDisconnectConnectionFinalizeV1,
+		connectionId,
+	).Get(ctx)
+	return err
+}
+
+func disconnectConnectionRevokeActivityOptions() wflib.ActivityOptions {
+	opts := wflib.DefaultActivityOptions
+	opts.RetryOptions = wflib.RetryOptions{
+		MaxAttempts:        maxRevokeAttempts,
+		FirstRetryInterval: 1 * time.Second,
+		BackoffCoefficient: 1,
+	}
+	return opts
+}
+
+func (s *service) registerDisconnectConnectionWorkflow(worker *apworkflows.Worker) error {
+	if err := worker.RegisterWorkflow(
+		disconnectConnectionWorkflowV1,
+		registry.WithName(WorkflowNameDisconnectConnectionV1),
+	); err != nil {
+		return err
+	}
+	if err := worker.RegisterActivity(
+		s.revokeDisconnectConnectionCredentialsV1,
+		registry.WithName(ActivityNameDisconnectConnectionRevokeCredentialsV1),
+	); err != nil {
+		return err
+	}
+	return worker.RegisterActivity(
+		s.finalizeDisconnectConnectionV1,
+		registry.WithName(ActivityNameDisconnectConnectionFinalizeV1),
+	)
+}
+
+func (s *service) RegisterWorkflows(worker *apworkflows.Worker) error {
+	return s.registerDisconnectConnectionWorkflow(worker)
+}
+
+func disconnectConnectionWorkflowInstanceID(connectionId apid.ID) string {
+	return fmt.Sprintf("%s:%s", WorkflowNameDisconnectConnectionV1, connectionId)
+}
+
+func (s *service) startDisconnectConnectionWorkflow(ctx context.Context, connectionId apid.ID) (*wflib.Instance, error) {
+	if s.wc == nil {
+		return nil, fmt.Errorf("workflow client is not configured")
+	}
+	return s.wc.CreateWorkflowInstance(ctx, client.WorkflowInstanceOptions{
+		InstanceID: disconnectConnectionWorkflowInstanceID(connectionId),
+		Queue:      apworkflows.DefaultQueue,
+	}, WorkflowNameDisconnectConnectionV1, connectionId.String())
+}
+
+func parseDisconnectConnectionWorkflowConnectionID(connectionId string) (apid.ID, error) {
+	id, err := apid.Parse(connectionId)
 	if err != nil {
-		return nil, err
+		return apid.Nil, fmt.Errorf("invalid connection id: %w", err)
 	}
-	return asynq.NewTask(taskTypeDisconnectConnection, payload), nil
+	if id == apid.Nil {
+		return apid.Nil, fmt.Errorf("connection id not specified")
+	}
+	if err := id.ValidatePrefix(apid.PrefixConnection); err != nil {
+		return apid.Nil, err
+	}
+	return id, nil
 }
 
-type disconnectConnectionTaskPayload struct {
-	ConnectionId apid.ID `json:"connection_id"`
-}
-
-func (s *service) disconnectConnection(ctx context.Context, t *asynq.Task) error {
-	logger := aplog.NewBuilder(s.logger).
-		WithTask(t).
-		WithCtx(ctx).
-		Build()
-	logger.Info("disconnect connection task started")
-	defer logger.Info("disconnect connection task completed")
-
-	var p disconnectConnectionTaskPayload
-	if err := json.Unmarshal(t.Payload(), &p); err != nil {
-		return fmt.Errorf("%s json.Unmarshal failed: %v: %w", taskTypeDisconnectConnection, err, asynq.SkipRetry)
+func (s *service) revokeDisconnectConnectionCredentialsV1(ctx context.Context, connectionId string) error {
+	id, err := parseDisconnectConnectionWorkflowConnectionID(connectionId)
+	if err != nil {
+		return err
 	}
 
-	if p.ConnectionId == apid.Nil {
-		return fmt.Errorf("%s connection id not specified: %w", taskTypeDisconnectConnection, asynq.SkipRetry)
-	}
+	logger := s.logger.With(
+		"workflow", WorkflowNameDisconnectConnectionV1,
+		"activity", ActivityNameDisconnectConnectionRevokeCredentialsV1,
+		"connection_id", id,
+	)
+	logger.Info("disconnect connection revoke activity started")
+	defer logger.Info("disconnect connection revoke activity completed")
 
-	conn, err := s.getConnection(ctx, p.ConnectionId)
+	conn, err := s.getConnection(ctx, id)
 	if err != nil {
 		return fmt.Errorf("failed to get connection to disconnect connection: %w", err)
 	}
@@ -98,6 +169,24 @@ func (s *service) disconnectConnection(ctx context.Context, t *asynq.Task) error
 		}
 	}
 
+	return nil
+}
+
+func (s *service) finalizeDisconnectConnectionV1(ctx context.Context, connectionId string) error {
+	id, err := parseDisconnectConnectionWorkflowConnectionID(connectionId)
+	if err != nil {
+		return err
+	}
+
+	logger := s.logger.With("workflow", WorkflowNameDisconnectConnectionV1, "activity", ActivityNameDisconnectConnectionFinalizeV1, "connection_id", id)
+	logger.Info("disconnect connection finalize activity started")
+	defer logger.Info("disconnect connection finalize activity completed")
+
+	conn, err := s.getConnection(ctx, id)
+	if err != nil {
+		return fmt.Errorf("failed to get connection to disconnect connection: %w", err)
+	}
+
 	logger.Debug("marking connection as disconnected")
 	err = conn.SetState(ctx, database.ConnectionStateDisconnected)
 	if err != nil {
@@ -106,7 +195,7 @@ func (s *service) disconnectConnection(ctx context.Context, t *asynq.Task) error
 	}
 
 	logger.Debug("deleting connection")
-	err = s.db.DeleteConnection(ctx, p.ConnectionId)
+	err = s.db.DeleteConnection(ctx, id)
 	if err != nil {
 		logger.Error("failed to delete connection", "error", err)
 		return err

@@ -12,7 +12,6 @@ import (
 
 func (s *service) RegisterTasks(mux *asynq.ServeMux) {
 	mux.HandleFunc(taskTypeMigrateConnectionsBetweenConnectorVersions, s.migrateConnectionsBetweenConnectorVersions)
-	mux.HandleFunc(taskTypeDisconnectConnection, s.disconnectConnection)
 	mux.HandleFunc(taskTypeProbe, s.runProbeForConnection)
 	mux.HandleFunc(taskTypeVerifyConnection, s.verifyConnection)
 	mux.HandleFunc(taskTypeProbeOutcomeCleanup, s.runProbeOutcomeCleanup)

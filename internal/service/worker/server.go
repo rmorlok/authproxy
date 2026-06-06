@@ -21,6 +21,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	dbTasks "github.com/rmorlok/authproxy/internal/database/tasks"
 	"github.com/rmorlok/authproxy/internal/encrypt"
+	schemaConfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/service"
 	apworkflows "github.com/rmorlok/authproxy/internal/workflows"
 )
@@ -39,8 +40,12 @@ func Serve(cfg config.C) {
 	defer dm.ShutdownTelemetry()
 
 	workerConfig := cfg.GetRoot().Worker
-	router := apgin.ForService(&workerConfig, logger, cfg.IsDebugMode(),
-		apgin.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry, dm.GetServiceId()))
+	router := apgin.ForService(
+		&workerConfig,
+		logger,
+		cfg.IsDebugMode(),
+		apgin.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry, dm.GetServiceId()),
+	)
 
 	router.GET("/ping", func(c *gin.Context) {
 		c.PureJSON(http.StatusOK, gin.H{
@@ -139,16 +144,15 @@ func Serve(cfg config.C) {
 	mux.Use(asynqTel.Middleware())
 
 	workflowRuntime := dm.GetWorkflowRuntime()
-	workflowWorker, err := apworkflows.NewWorker(workflowRuntime, &workflowworker.Options{
-		WorkflowWorkerOptions: workflowworker.WorkflowWorkerOptions{
-			MaxParallelWorkflowTasks: workerConfig.GetConcurrency(context.Background()),
-		},
-		ActivityWorkerOptions: workflowworker.ActivityWorkerOptions{
-			MaxParallelActivityTasks: workerConfig.GetConcurrency(context.Background()),
-		},
-	})
+	workflowWorker, err := apworkflows.NewWorker(
+		workflowRuntime,
+		workflowOptionsFromConfig(context.Background(), &workerConfig),
+	)
 	if err != nil {
 		log.Fatalf("failed to construct workflow worker: %v", err)
+	}
+	if err := dm.GetCoreService().RegisterWorkflows(workflowWorker); err != nil {
+		log.Fatalf("failed to register core workflows: %v", err)
 	}
 
 	oauth2TaskHandler := oauth2.NewTaskHandler(
@@ -268,4 +272,30 @@ func Serve(cfg config.C) {
 	wg.Wait()
 	logger.Info("Worker shutting down")
 	defer logger.Info("Worker shutdown complete")
+}
+
+func workflowOptionsFromConfig(ctx context.Context, workerConfig *schemaConfig.ServiceWorker) *workflowworker.Options {
+	options := workflowworker.DefaultOptions
+
+	if workerConfig == nil {
+		return &options
+	}
+
+	if workflowPollers := workerConfig.GetWorkflowPollers(ctx); workflowPollers != nil {
+		options.WorkflowPollers = *workflowPollers
+	}
+	if activityPollers := workerConfig.GetActivityPollers(ctx); activityPollers != nil {
+		options.ActivityPollers = *activityPollers
+	}
+	if maxParallelWorkflowTasks := workerConfig.GetMaxParallelWorkflowTasks(ctx); maxParallelWorkflowTasks != nil {
+		options.MaxParallelWorkflowTasks = *maxParallelWorkflowTasks
+	}
+	if maxParallelActivityTasks := workerConfig.GetMaxParallelActivityTasks(ctx); maxParallelActivityTasks != nil {
+		options.MaxParallelActivityTasks = *maxParallelActivityTasks
+	}
+	if workflowHeartbeatInterval := workerConfig.GetWorkflowHeartbeatInterval(); workflowHeartbeatInterval != nil {
+		options.WorkflowHeartbeatInterval = *workflowHeartbeatInterval
+	}
+
+	return &options
 }

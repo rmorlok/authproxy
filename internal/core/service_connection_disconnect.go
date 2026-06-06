@@ -3,13 +3,12 @@ package core
 import (
 	"context"
 	"errors"
-	"time"
 
-	"github.com/hibiken/asynq"
-	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/tasks"
+	apworkflows "github.com/rmorlok/authproxy/internal/workflows"
 )
 
 func (s *service) DisconnectConnection(
@@ -27,17 +26,17 @@ func (s *service) DisconnectConnection(
 		return nil, err
 	}
 
-	s.logger.Info("queueing disconnect connection task", "id", id)
-	t, err := newDisconnectConnectionTask(id)
+	s.logger.Info("starting disconnect connection workflow", "id", id)
+	instance, err := s.startDisconnectConnectionWorkflow(ctx, id)
 	if err != nil {
 		return nil, err
 	}
 
-	ti, err := s.ac.EnqueueContext(ctx, t, asynq.Retention(10*time.Minute))
-	if err != nil {
-		return nil, err
-	}
-
-	s.logger.Info("disconnect connection task queued", "id", id, "task_id", ti.ID)
-	return tasks.FromAsynqTask(ti), nil
+	s.logger.Info(
+		"disconnect connection workflow started",
+		"id", id,
+		"workflow_instance_id", instance.InstanceID,
+		"workflow_execution_id", instance.ExecutionID,
+		)
+	return tasks.FromWorkflowInstance(instance, WorkflowNameDisconnectConnectionV1, string(apworkflows.DefaultQueue)), nil
 }

@@ -192,6 +192,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 			authService,
 			dm.GetEncryptService(),
 			dm.GetAsyncInspector(),
+			dm.GetWorkflowRuntime().Client(),
 		)
 		routesTasks.Register(api)
 	}

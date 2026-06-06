@@ -30,6 +30,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/service/admin_api"
 	api_service "github.com/rmorlok/authproxy/internal/service/api"
 	public_service "github.com/rmorlok/authproxy/internal/service/public"
+	"github.com/rmorlok/authproxy/internal/workflows"
 	"github.com/stretchr/testify/require"
 )
 
@@ -213,6 +214,7 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 	// MustApplyBlankTestDbConfig reads connection info from POSTGRES_TEST_* env vars
 	// and updates cfg.GetRoot().Database to point at the new isolated database.
 	cfg, _ = database.MustApplyBlankTestDbConfig(t, cfg)
+	require.NoError(t, workflows.Migrate(cfg.GetRoot(), cfg.GetRoot().GetRootLogger()))
 
 	// Merge test-specific connectors into config
 	if len(opts.Connectors) > 0 {

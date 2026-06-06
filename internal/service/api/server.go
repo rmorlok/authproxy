@@ -126,6 +126,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		authService,
 		dm.GetEncryptService(),
 		dm.GetAsyncInspector(),
+		dm.GetWorkflowRuntime().Client(),
 	)
 	routesRequestEvents := common_routes.NewRequestEventsRoutes(
 		dm.GetConfig(),

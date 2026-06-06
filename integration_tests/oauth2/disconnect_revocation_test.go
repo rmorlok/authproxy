@@ -12,13 +12,14 @@ import (
 	"testing"
 	"time"
 
-	"github.com/hibiken/asynq"
+	workflowworker "github.com/cschleiden/go-workflows/worker"
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	apworkflows "github.com/rmorlok/authproxy/internal/workflows"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -148,27 +149,42 @@ func (r *disconnectRevocationRig) disconnect(t *testing.T, connectionID string) 
 	assert.NotEmpty(t, body.TaskID)
 }
 
-func startCoreTaskWorker(t *testing.T, rig *disconnectRevocationRig) {
+func startCoreWorkflowWorker(t *testing.T, rig *disconnectRevocationRig) {
 	t.Helper()
 
-	srv := asynq.NewServerFromRedisClient(
-		rig.env.DM.GetRedisClient(),
-		asynq.Config{
-			Concurrency: 1,
-			Queues: map[string]int{
-				"default": 1,
-			},
+	workflowRuntime := rig.env.DM.GetWorkflowRuntime()
+	workflowWorker, err := apworkflows.NewWorker(workflowRuntime, &workflowworker.Options{
+		WorkflowWorkerOptions: workflowworker.WorkflowWorkerOptions{
+			WorkflowPollers:          2,
+			MaxParallelWorkflowTasks: 1,
 		},
-	)
-	mux := asynq.NewServeMux()
-	rig.env.Core.RegisterTasks(mux)
+		ActivityWorkerOptions: workflowworker.ActivityWorkerOptions{
+			ActivityPollers:          2,
+			MaxParallelActivityTasks: 1,
+		},
+	})
+	require.NoError(t, err)
+	require.NoError(t, rig.env.Core.RegisterWorkflows(workflowWorker))
+
+	ctx, cancel := context.WithCancel(context.Background())
+	errCh := make(chan error, 1)
 
 	go func() {
-		_ = srv.Run(mux)
+		if err := workflowWorker.Start(ctx); err != nil {
+			errCh <- err
+			return
+		}
+		errCh <- workflowWorker.WaitForCompletion()
 	}()
 
 	t.Cleanup(func() {
-		srv.Shutdown()
+		cancel()
+		select {
+		case err := <-errCh:
+			require.NoError(t, err)
+		case <-time.After(5 * time.Second):
+			t.Fatal("workflow worker did not stop")
+		}
 	})
 }
 
@@ -181,7 +197,7 @@ func requireConnectionDeleted(t *testing.T, rig *disconnectRevocationRig, connec
 	require.Eventually(t, func() bool {
 		_, err := rig.env.Db.GetConnection(context.Background(), id)
 		return errors.Is(err, database.ErrNotFound)
-	}, 10*time.Second, 100*time.Millisecond, "connection should be soft-deleted after disconnect task")
+	}, 10*time.Second, 100*time.Millisecond, "connection should be soft-deleted after disconnect workflow")
 }
 
 func requireProxyBlockedAfterDisconnect(t *testing.T, rig *disconnectRevocationRig, connectionID string) {
@@ -204,8 +220,8 @@ func TestDisconnectRevocation_RevokesProviderTokensAndBlocksFutureProxy(t *testi
 	w := rig.env.DoProxyRequest(t, connID, rig.provider.ResourceURL("/echo"), http.MethodGet)
 	require.Equal(t, http.StatusOK, parseRevocationProxyResponse(t, w).StatusCode)
 
+	startCoreWorkflowWorker(t, rig)
 	rig.disconnect(t, connID)
-	startCoreTaskWorker(t, rig)
 	requireConnectionDeleted(t, rig, connID)
 
 	assert.Nil(t, rig.env.GetOAuth2Token(t, connID), "successful disconnect should tombstone the local OAuth token row")
@@ -233,8 +249,8 @@ func TestDisconnectRevocation_RevocationFailureStillCompletesDisconnect(t *testi
 		FailCount: 10,
 	})
 
+	startCoreWorkflowWorker(t, rig)
 	rig.disconnect(t, connID)
-	startCoreTaskWorker(t, rig)
 	requireConnectionDeleted(t, rig, connID)
 	requireProxyBlockedAfterDisconnect(t, rig, connID)
 

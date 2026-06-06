@@ -9,6 +9,10 @@ import (
 	"testing"
 	"time"
 
+	"github.com/cschleiden/go-workflows/backend"
+	"github.com/cschleiden/go-workflows/client"
+	wfcore "github.com/cschleiden/go-workflows/core"
+	wflib "github.com/cschleiden/go-workflows/workflow"
 	"github.com/rmorlok/authproxy/internal/apgin"
 
 	"github.com/gin-gonic/gin"
@@ -26,12 +30,29 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+type fakeTaskWorkflowClient struct {
+	state wfcore.WorkflowInstanceState
+	err   error
+
+	requestedInstance *wflib.Instance
+}
+
+func (f *fakeTaskWorkflowClient) CreateWorkflowInstance(ctx context.Context, options client.WorkflowInstanceOptions, workflow wflib.Workflow, args ...any) (*wflib.Instance, error) {
+	return nil, errors.New("not implemented")
+}
+
+func (f *fakeTaskWorkflowClient) GetWorkflowInstanceState(ctx context.Context, instance *wflib.Instance) (wfcore.WorkflowInstanceState, error) {
+	f.requestedInstance = instance
+	return f.state, f.err
+}
+
 func TestTasks(t *testing.T) {
 	type TestSetup struct {
 		Gin            *gin.Engine
 		Cfg            config.C
 		AuthUtil       *auth2.AuthTestUtil
 		MockInspector  *mock.MockInspector
+		WorkflowClient *fakeTaskWorkflowClient
 		EncryptService encrypt.E
 	}
 
@@ -46,8 +67,9 @@ func TestTasks(t *testing.T) {
 		// Use fake encryption service with doBase64Encode set to false
 		e := encrypt.NewFakeEncryptService(false)
 		cfg, auth, authUtil := auth2.TestAuthServiceWithDb(sconfig.ServiceIdApi, cfg, db)
+		workflowClient := &fakeTaskWorkflowClient{state: wfcore.WorkflowInstanceStateActive}
 
-		tr := NewTaskRoutes(cfg, auth, e, mockInspector)
+		tr := NewTaskRoutes(cfg, auth, e, mockInspector, workflowClient)
 
 		r := apgin.ForTest(nil)
 		tr.Register(r)
@@ -57,6 +79,7 @@ func TestTasks(t *testing.T) {
 			Cfg:            cfg,
 			AuthUtil:       authUtil,
 			MockInspector:  mockInspector,
+			WorkflowClient: workflowClient,
 			EncryptService: e,
 		}
 	}
@@ -291,6 +314,62 @@ func TestTasks(t *testing.T) {
 			require.Equal(t, "test-type", resp.Type)
 			require.Equal(t, string(TaskStateRetry), string(resp.State))
 			require.Equal(t, now.UTC().Format(time.RFC3339), resp.UpdatedAt.UTC().Format(time.RFC3339))
+		})
+
+		t.Run("workflow success", func(t *testing.T) {
+			tu := setup(t, nil)
+			taskInfo := &tasks.TaskInfo{
+				TrackedVia:          tasks.TrackedViaWorkflow,
+				WorkflowInstanceId:  "workflow-instance-id",
+				WorkflowExecutionId: "workflow-execution-id",
+				WorkflowName:        "core.connection.disconnect.v1",
+				WorkflowQueue:       "default",
+			}
+
+			ctx := context.Background()
+			encryptedTaskInfo, err := taskInfo.ToSecureEncryptedString(ctx, tu.EncryptService)
+			require.NoError(t, err)
+
+			tu.WorkflowClient.state = wfcore.WorkflowInstanceStateFinished
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "root", "some-actor", aschema.NoPermissions())
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp TaskInfoJson
+			err = json.Unmarshal(w.Body.Bytes(), &resp)
+			require.NoError(t, err)
+			require.Equal(t, encryptedTaskInfo, resp.Id)
+			require.Equal(t, "core.connection.disconnect.v1", resp.Type)
+			require.Equal(t, string(TaskStateCompleted), string(resp.State))
+			require.Equal(t, "workflow-instance-id", tu.WorkflowClient.requestedInstance.InstanceID)
+			require.Equal(t, "workflow-execution-id", tu.WorkflowClient.requestedInstance.ExecutionID)
+		})
+
+		t.Run("workflow not found", func(t *testing.T) {
+			tu := setup(t, nil)
+			taskInfo := &tasks.TaskInfo{
+				TrackedVia:          tasks.TrackedViaWorkflow,
+				WorkflowInstanceId:  "workflow-instance-id",
+				WorkflowExecutionId: "workflow-execution-id",
+				WorkflowName:        "core.connection.disconnect.v1",
+			}
+
+			ctx := context.Background()
+			encryptedTaskInfo, err := taskInfo.ToSecureEncryptedString(ctx, tu.EncryptService)
+			require.NoError(t, err)
+
+			tu.WorkflowClient.err = backend.ErrInstanceNotFound
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "root", "some-actor", aschema.NoPermissions())
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusNotFound, w.Code)
 		})
 	})
 }

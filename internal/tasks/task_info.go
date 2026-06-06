@@ -5,6 +5,7 @@ import (
 	"encoding/base64"
 	"encoding/json"
 
+	wflib "github.com/cschleiden/go-workflows/workflow"
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/encfield"
@@ -14,15 +15,20 @@ import (
 type TrackedVia string
 
 const (
-	TrackedViaAsynq = "asynq"
+	TrackedViaAsynq    TrackedVia = "asynq"
+	TrackedViaWorkflow TrackedVia = "workflow"
 )
 
 type TaskInfo struct {
-	TrackedVia TrackedVia `json:"tracked_via"`
-	ActorId    apid.ID    `json:"actor_id,omitempty"`
-	AsynqId    string     `json:"asynq_id,omitempty"`
-	AsynqQueue string     `json:"asynq_queue,omitempty"`
-	AsynqType  string     `json:"asynq_type,omitempty"`
+	TrackedVia          TrackedVia `json:"tracked_via"`
+	ActorId             apid.ID    `json:"actor_id,omitempty"`
+	AsynqId             string     `json:"asynq_id,omitempty"`
+	AsynqQueue          string     `json:"asynq_queue,omitempty"`
+	AsynqType           string     `json:"asynq_type,omitempty"`
+	WorkflowInstanceId  string     `json:"workflow_instance_id,omitempty"`
+	WorkflowExecutionId string     `json:"workflow_execution_id,omitempty"`
+	WorkflowName        string     `json:"workflow_name,omitempty"`
+	WorkflowQueue       string     `json:"workflow_queue,omitempty"`
 }
 
 type Actor interface {
@@ -68,6 +74,20 @@ func FromAsynqTask(task *asynq.TaskInfo) *TaskInfo {
 		AsynqId:    task.ID,
 		AsynqQueue: task.Queue,
 		AsynqType:  task.Type,
+	}
+}
+
+func FromWorkflowInstance(instance *wflib.Instance, name string, queue string) *TaskInfo {
+	if instance == nil {
+		return nil
+	}
+
+	return &TaskInfo{
+		TrackedVia:          TrackedViaWorkflow,
+		WorkflowInstanceId:  instance.InstanceID,
+		WorkflowExecutionId: instance.ExecutionID,
+		WorkflowName:        name,
+		WorkflowQueue:       queue,
 	}
 }
 

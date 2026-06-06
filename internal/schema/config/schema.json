@@ -745,6 +745,26 @@
         "cron_sync_interval": {
           "$ref": "../common/schema.json#/$defs/HumanDuration",
           "description": "The interval at which the the system will sync the list of cron tasks. Cron tasks are both global and connection specific. If not set, the default is every 5 minutes."
+        },
+        "workflow_pollers": {
+          "$ref": "../common/schema.json#/$defs/StringValue",
+          "description": "The number of workflow task pollers to start for go-workflows. If not set, the go-workflows library default is used."
+        },
+        "activity_pollers": {
+          "$ref": "../common/schema.json#/$defs/StringValue",
+          "description": "The number of activity task pollers to start for go-workflows. If not set, the go-workflows library default is used."
+        },
+        "max_parallel_workflow_tasks": {
+          "$ref": "../common/schema.json#/$defs/StringValue",
+          "description": "The maximum number of concurrent workflow tasks processed by the worker. If not set, the go-workflows library default is used."
+        },
+        "max_parallel_activity_tasks": {
+          "$ref": "../common/schema.json#/$defs/StringValue",
+          "description": "The maximum number of concurrent activity tasks processed by the worker. If not set, the go-workflows library default is used."
+        },
+        "workflow_heartbeat_interval": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration",
+          "description": "The interval between heartbeat attempts on workflow tasks. If not set, the go-workflows library default is used."
         }
       },
       "additionalProperties": false,

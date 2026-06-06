@@ -55,7 +55,23 @@ Secrets, not in this ConfigMap.
 {{- $_ := set $cfg "admin_api" $adminApi -}}
 {{- end -}}
 {{- if .Values.services.worker.enabled -}}
-{{- $_ := set $cfg "worker" (dict "health_check_port" .Values.ports.workerHealth) -}}
+{{- $worker := dict "health_check_port" .Values.ports.workerHealth -}}
+{{- if .Values.worker.workflowPollers -}}
+{{-   $_ := set $worker "workflow_pollers" .Values.worker.workflowPollers -}}
+{{- end -}}
+{{- if .Values.worker.activityPollers -}}
+{{-   $_ := set $worker "activity_pollers" .Values.worker.activityPollers -}}
+{{- end -}}
+{{- if .Values.worker.maxParallelWorkflowTasks -}}
+{{-   $_ := set $worker "max_parallel_workflow_tasks" .Values.worker.maxParallelWorkflowTasks -}}
+{{- end -}}
+{{- if .Values.worker.maxParallelActivityTasks -}}
+{{-   $_ := set $worker "max_parallel_activity_tasks" .Values.worker.maxParallelActivityTasks -}}
+{{- end -}}
+{{- if .Values.worker.workflowHeartbeatInterval -}}
+{{-   $_ := set $worker "workflow_heartbeat_interval" .Values.worker.workflowHeartbeatInterval -}}
+{{- end -}}
+{{- $_ := set $cfg "worker" $worker -}}
 {{- end -}}
 
 {{/*
