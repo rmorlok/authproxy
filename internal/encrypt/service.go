@@ -19,8 +19,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encfield"
-	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -339,7 +339,7 @@ func (s *service) syncLoop() {
 // getKeyIdForNamespace returns the ek_ for the given namespace. If that namespace is not configured it falls
 // back to parent namespaces until reaching the global encryption key.
 func (s *service) getKeyIdForNamespace(namespacePath string) (apid.ID, error) {
-	paths := aschema.SplitNamespacePathToPrefixes(namespacePath)
+	paths := namespace.SplitNamespacePathToPrefixes(namespacePath)
 
 	s.mu.RLock()
 	defer s.mu.RUnlock()

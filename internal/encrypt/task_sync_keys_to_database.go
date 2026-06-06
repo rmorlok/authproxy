@@ -18,6 +18,7 @@ import (
 	iconfig "github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -259,7 +260,7 @@ func syncKeysVersionsToDatabase(
 					resolvedEKVID = currentEKV.Id
 				} else {
 					// Inherit from nearest ancestor with a resolved EKV
-					prefixes := database.SplitNamespacePathToPrefixes(target.Path)
+					prefixes := namespace.SplitNamespacePathToPrefixes(target.Path)
 					found := false
 					for i := len(prefixes) - 2; i >= 0; i-- {
 						if ekvID, ok := effectiveEKV[prefixes[i]]; ok {

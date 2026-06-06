@@ -10,8 +10,8 @@ import (
 	sq "github.com/Masterminds/squirrel"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
-	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
 var connectionResourceSampleColumns = []string{
@@ -993,7 +993,7 @@ func applyResourceSampleQuery(builder sq.SelectBuilder, provider config.Database
 	}
 	if len(query.NamespaceMatchers) > 0 {
 		for _, matcher := range query.NamespaceMatchers {
-			if err := aschema.ValidateNamespaceMatcher(matcher); err != nil {
+			if err := namespace.ValidateNamespaceMatcher(matcher); err != nil {
 				return builder, err
 			}
 		}

@@ -6,6 +6,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
 const authContextKey = "auth"
@@ -135,7 +136,7 @@ func (ra *RequestAuth) GetNamespacesAllowed(resource, verb string) []string {
 				}
 
 				for _, candidateNamespace := range candidateNamespaces {
-					if restricted, ok := aschema.NamespaceMatcherConstrained(restrictionNamespace, candidateNamespace); ok {
+					if restricted, ok := namespace.NamespaceMatcherConstrained(restrictionNamespace, candidateNamespace); ok {
 						finalNamespaces = append(finalNamespaces, restricted)
 					}
 				}

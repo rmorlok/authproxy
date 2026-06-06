@@ -6,9 +6,9 @@ import (
 
 	"github.com/gin-gonic/gin"
 	"github.com/rmorlok/authproxy/internal/apauth/core"
-	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/apid"
-	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
+	"github.com/rmorlok/authproxy/internal/httperr"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 )
 
 type hasId interface {
@@ -147,7 +147,7 @@ func (rpv *ResourcePermissionValidator) ValidateHttpStatusError(obj interface{})
 // - a slice with NamespaceNoMatchSentinel if no namespaces can be matched
 func (rpv *ResourcePermissionValidator) GetEffectiveNamespaceMatchers(queryMatcher *string) []string {
 	if rpv.ra == nil || !rpv.ra.IsAuthenticated() {
-		return []string{aschema.NamespaceNoMatchSentinel} // No access if not authenticated
+		return []string{namespace.NamespaceNoMatchSentinel} // No access if not authenticated
 	}
 
 	// Get the namespaces this actor can access for this resource and any of the configured verbs.
@@ -176,7 +176,7 @@ func (rpv *ResourcePermissionValidator) GetEffectiveNamespaceMatchers(queryMatch
 	// Intersect each allowed namespace with the query matcher
 	result := make([]string, 0, len(allowedNamespaces))
 	for _, allowed := range allowedNamespaces {
-		if constrained, ok := aschema.NamespaceMatcherConstrained(allowed, *queryMatcher); ok {
+		if constrained, ok := namespace.NamespaceMatcherConstrained(allowed, *queryMatcher); ok {
 			result = append(result, constrained)
 		}
 	}
@@ -184,7 +184,7 @@ func (rpv *ResourcePermissionValidator) GetEffectiveNamespaceMatchers(queryMatch
 	if len(result) == 0 {
 		// Return a set that indicates that no resources can be matched because the intersection of the allowed
 		// namespaces and the requested namespaces is an empty set.
-		return []string{aschema.NamespaceNoMatchSentinel}
+		return []string{namespace.NamespaceNoMatchSentinel}
 	}
 
 	return result
@@ -316,7 +316,7 @@ func (pb *PermissionValidatorBuilder) getNamespace(c *gin.Context) string {
 	}
 
 	// Default to skipping permission check at the namespace level
-	return aschema.NamespaceSkipNamespacePermissionChecks
+	return namespace.NamespaceSkipNamespacePermissionChecks
 }
 
 // getResourceId extracts the resource ID from the request if an ID field is configured.

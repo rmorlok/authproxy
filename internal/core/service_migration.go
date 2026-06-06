@@ -10,8 +10,8 @@ import (
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
-	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 
@@ -47,7 +47,7 @@ func (s *service) Migrate(ctx context.Context) error {
 }
 
 func (s *service) MigrateNamespaces(ctx context.Context) error {
-	namespaces := []string{aschema.RootNamespace}
+	namespaces := []string{namespace.RootNamespace}
 
 	cfgRoot := s.cfg.GetRoot()
 	if cfgRoot == nil {
@@ -58,7 +58,7 @@ func (s *service) MigrateNamespaces(ctx context.Context) error {
 		namespaces = append(namespaces, configConnector.GetNamespace())
 	}
 
-	prefixOrderedList := aschema.SplitNamespacePathsToPrefixes(namespaces)
+	prefixOrderedList := namespace.SplitNamespacePathsToPrefixes(namespaces)
 
 	// Because prefixOrderedList is in the appropriate order, this list will also be in the appropriate order
 	toCreatePaths := make([]string, 0)
