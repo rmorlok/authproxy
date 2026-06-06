@@ -7,6 +7,7 @@ on:
     tags: ['v*.*.*']
   pull_request:
     branches: [main]
+    types: [opened, synchronize, reopened, labeled]
   workflow_dispatch:
 
 permissions:
@@ -21,26 +22,15 @@ env:
   REGISTRY: ghcr.io
 
 jobs:
-  build-and-push:
+  build-authproxy:
+    name: build-and-push (authproxy, Dockerfile)
     runs-on: ubuntu-latest
     timeout-minutes: 60
 
-    strategy:
-      # Don't cancel one image's build if the other fails — both images
-      # share the same shape and one breaking shouldn't keep the other
-      # from publishing.
-      fail-fast: false
-      matrix:
-        image:
-          - name: authproxy
-            dockerfile: Dockerfile
-          - name: authproxy-demo-shell
-            dockerfile: demos/shell/Dockerfile
-          - name: authproxy-demo-seed
-            dockerfile: demos/seed/Dockerfile
-
     steps:
       - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
 
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v3
@@ -49,7 +39,7 @@ jobs:
         uses: docker/setup-buildx-action@v3
 
       - name: Log in to GHCR
-        if: github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository
+        if: github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.labels.*.name, 'deploy:demo'))
         uses: docker/login-action@v3
         with:
           registry: ${{ env.REGISTRY }}
@@ -57,6 +47,82 @@ jobs:
           password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ github.repository_owner }}/authproxy
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr,prefix=pr-
+            type=sha,prefix=sha-,format=short
+            type=semver,pattern={{version}}
+            type=semver,pattern={{major}}.{{minor}}
+            type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: Dockerfile
+          # arm64 builds run under QEMU emulation on GH-hosted amd64 runners,
+          # which is ~5x slower than native — fine for the merge/tag path
+          # where we ship the multi-arch manifest. PRs build amd64 only.
+          platforms: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
+          # Unlabeled PRs get a simple Dockerfile verification build. The
+          # pr-<number> tag is only pushed when the PR opts into demo deploys.
+          push: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.labels.*.name, 'deploy:demo')) }}
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha,scope=authproxy
+          cache-to: type=gha,scope=authproxy,mode=max
+
+  build-demo-images:
+    name: build-and-push (${{ matrix.image.name }}, ${{ matrix.image.dockerfile }})
+    runs-on: ubuntu-latest
+    timeout-minutes: 60
+    env:
+      SHOULD_BUILD: ${{ github.event_name != 'pull_request' || (github.event.pull_request.head.repo.full_name == github.repository && contains(github.event.pull_request.labels.*.name, 'deploy:demo')) }}
+
+    strategy:
+      # Don't cancel one image's build if the other fails — both images
+      # share the same shape and one breaking shouldn't keep the other
+      # from publishing.
+      fail-fast: false
+      matrix:
+        image:
+          - name: authproxy-demo-shell
+            dockerfile: demos/shell/Dockerfile
+          - name: authproxy-demo-seed
+            dockerfile: demos/seed/Dockerfile
+
+    steps:
+      - name: Skip demo image build
+        if: env.SHOULD_BUILD != 'true'
+        run: echo "Skipping demo-only image build because this PR is not labeled deploy:demo."
+
+      - uses: actions/checkout@v4
+        if: env.SHOULD_BUILD == 'true'
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.event.pull_request.head.sha || github.sha }}
+
+      - name: Set up QEMU
+        if: env.SHOULD_BUILD == 'true'
+        uses: docker/setup-qemu-action@v3
+
+      - name: Set up Docker Buildx
+        if: env.SHOULD_BUILD == 'true'
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        if: env.SHOULD_BUILD == 'true'
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        if: env.SHOULD_BUILD == 'true'
         id: meta
         uses: docker/metadata-action@v5
         with:
@@ -70,14 +136,14 @@ jobs:
             type=raw,value=latest,enable=${{ startsWith(github.ref, 'refs/tags/v') }}
 
       - name: Build and push
+        if: env.SHOULD_BUILD == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
           file: ${{ matrix.image.dockerfile }}
-          # arm64 builds run under QEMU emulation on GH-hosted amd64 runners,
-          # which is ~5x slower than native — fine for the merge/tag path
-          # where we ship the multi-arch manifest, but it pushes PR builds
-          # past the job timeout. PRs build amd64 only for verification.
+          # Demo-only images are skipped on ordinary PRs. When a PR opts
+          # into demo deploys, build the branch Dockerfile and publish the
+          # pr-<number> tag that Deploy Dev consumes.
           platforms: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && 'linux/amd64,linux/arm64' || 'linux/amd64' }}
           push: ${{ github.event_name != 'pull_request' || github.event.pull_request.head.repo.full_name == github.repository }}
           tags: ${{ steps.meta.outputs.tags }}

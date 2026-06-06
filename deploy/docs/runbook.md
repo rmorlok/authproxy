@@ -215,6 +215,12 @@ the PR, or add it to an existing PR later; either path triggers the dev
 deployment. Subsequent pushes to a labeled PR redeploy the same
 environment with the `pr-<number>` image tag.
 
+The `Build Image` workflow always runs a simple PR Docker build for the
+main `authproxy` image. It only publishes the PR image tag and builds the
+demo-only `authproxy-demo-shell` / `authproxy-demo-seed` images when the
+PR carries `deploy:demo`; merges and release tags still publish the full
+image set.
+
 The `Teardown Dev` workflow still runs on PR close regardless of labels,
 so merged or closed PRs tear down any previously-created dev demo
 environment even if the opt-in label has since been removed.
