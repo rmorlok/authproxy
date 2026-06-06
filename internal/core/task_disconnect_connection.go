@@ -56,7 +56,7 @@ func disconnectConnectionRevokeActivityOptions() wflib.ActivityOptions {
 	return opts
 }
 
-func (s *service) RegisterWorkflows(worker *apworkflows.Worker) error {
+func (s *service) registerDisconnectConnectionWorkflow(worker *apworkflows.Worker) error {
 	if err := worker.RegisterWorkflow(
 		disconnectConnectionWorkflowV1,
 		registry.WithName(WorkflowNameDisconnectConnectionV1),
@@ -75,8 +75,12 @@ func (s *service) RegisterWorkflows(worker *apworkflows.Worker) error {
 	)
 }
 
+func (s *service) RegisterWorkflows(worker *apworkflows.Worker) error {
+	return s.registerDisconnectConnectionWorkflow(worker)
+}
+
 func disconnectConnectionWorkflowInstanceID(connectionId apid.ID) string {
-	return fmt.Sprintf("%s:%s:%s", WorkflowNameDisconnectConnectionV1, connectionId, apid.New(apid.PrefixNonce))
+	return fmt.Sprintf("%s:%s", WorkflowNameDisconnectConnectionV1, connectionId)
 }
 
 func (s *service) startDisconnectConnectionWorkflow(ctx context.Context, connectionId apid.ID) (*wflib.Instance, error) {
@@ -109,7 +113,11 @@ func (s *service) revokeDisconnectConnectionCredentialsV1(ctx context.Context, c
 		return err
 	}
 
-	logger := s.logger.With("workflow", WorkflowNameDisconnectConnectionV1, "activity", ActivityNameDisconnectConnectionRevokeCredentialsV1, "connection_id", id)
+	logger := s.logger.With(
+		"workflow", WorkflowNameDisconnectConnectionV1,
+		"activity", ActivityNameDisconnectConnectionRevokeCredentialsV1,
+		"connection_id", id,
+	)
 	logger.Info("disconnect connection revoke activity started")
 	defer logger.Info("disconnect connection revoke activity completed")
 
