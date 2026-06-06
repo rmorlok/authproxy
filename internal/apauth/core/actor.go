@@ -49,6 +49,17 @@ func (a *Actor) GetLabels() map[string]string { return a.Labels }
 // GetAnnotations returns actor annotations from database state or JWT claims.
 func (a *Actor) GetAnnotations() map[string]string { return a.Annotations }
 
+// GetPermissionTemplateData returns actor data for permission template context. These are
+// the values that can be used in templated namespaces for permissions baed on actor data.
+// E.g. root.{{labels.team_id}}
+func (a *Actor) GetPermissionTemplateData() map[string]any {
+	return map[string]any{
+		"external_id": a.ExternalId,
+		"labels":      a.Labels,
+		"annotations": a.Annotations,
+	}
+}
+
 func CreateActor(data IActorData) *Actor {
 	if a, ok := data.(*Actor); ok {
 		return a

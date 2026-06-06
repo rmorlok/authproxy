@@ -2,7 +2,6 @@ package core
 
 import (
 	"slices"
-	"strings"
 
 	"github.com/rmorlok/authproxy/internal/aptmpl"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
@@ -64,6 +63,9 @@ func matchesNamespace(actor *Actor, p aschema.Permission, targetNamespace string
 	return aschema.NamespaceMatches(matcher, targetNamespace)
 }
 
+// renderPermissionNamespace applies templating to a given namespace string and returns
+// the resulting string and whether the rendering was successful. If rendering was not
+// successful, the namespace should be considered invalid.
 func renderPermissionNamespace(actor *Actor, namespace string) (string, bool) {
 	if !aptmpl.ContainsMustache(namespace) {
 		return namespace, true
@@ -73,20 +75,7 @@ func renderPermissionNamespace(actor *Actor, namespace string) (string, bool) {
 		return "", false
 	}
 
-	vars, err := aptmpl.ExtractVariables(namespace)
-	if err != nil {
-		return "", false
-	}
-
-	data := actorPermissionTemplateContext(actor)
-	for _, name := range vars {
-		_, ok := actorPermissionTemplateValue(data, name)
-		if !ok {
-			return "", false
-		}
-	}
-
-	rendered, err := aptmpl.RenderMustache(namespace, data)
+	rendered, err := aptmpl.RenderMustache(namespace, actor.GetPermissionTemplateData())
 	if err != nil {
 		return "", false
 	}
@@ -105,40 +94,6 @@ func renderValidPermissionNamespace(actor *Actor, namespace string) (string, boo
 	}
 
 	return rendered, true
-}
-
-func actorPermissionTemplateContext(actor *Actor) map[string]any {
-	return map[string]any{
-		"external_id": actor.ExternalId,
-		"labels":      actor.Labels,
-		"annotations": actor.Annotations,
-	}
-}
-
-func actorPermissionTemplateValue(data map[string]any, name string) (string, bool) {
-	switch {
-	case name == "external_id":
-		value, ok := data["external_id"].(string)
-		return value, ok
-	case strings.HasPrefix(name, "labels."):
-		key := strings.TrimPrefix(name, "labels.")
-		labels, _ := data["labels"].(map[string]string)
-		if key == "" || labels == nil {
-			return "", false
-		}
-		value, ok := labels[key]
-		return value, ok
-	case strings.HasPrefix(name, "annotations."):
-		key := strings.TrimPrefix(name, "annotations.")
-		annotations, _ := data["annotations"].(map[string]string)
-		if key == "" || annotations == nil {
-			return "", false
-		}
-		value, ok := annotations[key]
-		return value, ok
-	default:
-		return "", false
-	}
 }
 
 // matchesResource checks if this permission allows access to the target resource.
