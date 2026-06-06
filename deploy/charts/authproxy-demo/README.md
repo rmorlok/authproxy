@@ -139,10 +139,15 @@ no-op once the state matches. Toggle off with `--set seed.enabled=false`
 or extend via `seed.actors[*]` to seed customer-specific identities
 alongside the defaults.
 
-> **Currently NOT seeded:** per-actor pre-existing connections + the
-> demo connector itself. The connector pattern needs a dedicated
-> connector-management admin API surface that isn't fully there yet;
-> tracked as a follow-up to A11.
+The same seed job publishes the demo Marketplace catalog and configures
+the test-mode go-oauth2-server backing resources. The default catalog
+includes no-auth, OAuth, and API-key examples. The API-key connector uses
+the intentionally fake key `demo-api-key`; the provider accepts it only
+on `/test/api-key-resource/*`, and the connector probe makes bad-key
+setup failures visible during connection verification.
+
+> **Currently NOT seeded:** per-actor pre-existing connections. Demo
+> visitors create their own connections through the Marketplace UI.
 
 ## Routing
 
