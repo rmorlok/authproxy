@@ -139,8 +139,13 @@ export const initiateConnectionAsync = createAsyncThunk(
 
 export const submitConnectionFormAsync = createAsyncThunk(
     'connections/submitConnectionForm',
-    async ({connectionId, stepId, data}: { connectionId: string, stepId: string, data: unknown }) => {
-        const response = await connections.submit(connectionId, stepId, data);
+    async ({connectionId, stepId, data, returnToUrl}: {
+        connectionId: string,
+        stepId: string,
+        data: unknown,
+        returnToUrl?: string,
+    }) => {
+        const response = await connections.submit(connectionId, stepId, data, returnToUrl);
         return response.data;
     }
 );

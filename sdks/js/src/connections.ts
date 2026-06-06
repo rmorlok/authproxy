@@ -139,6 +139,7 @@ export function isErrorResponse(response: ConnectionSetupResponse): response is 
 export interface SubmitConnectionRequest {
     step_id: string;
     data: unknown;
+    return_to_url?: string;
 }
 
 export interface RetryConnectionRequest {
@@ -215,8 +216,17 @@ export const initiateConnection = (
 /**
  * Submit form data for a connection setup step
  */
-export const submitConnection = (connectionId: string, stepId: string, data: unknown) => {
-    const request: SubmitConnectionRequest = { step_id: stepId, data };
+export const submitConnection = (
+    connectionId: string,
+    stepId: string,
+    data: unknown,
+    returnToUrl?: string
+) => {
+    const request: SubmitConnectionRequest = {
+        step_id: stepId,
+        data,
+        return_to_url: returnToUrl,
+    };
 
     return client.post<ConnectionSetupResponse>(
         `/api/v1/connections/${connectionId}/_submit`,

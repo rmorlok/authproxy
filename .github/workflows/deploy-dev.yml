@@ -313,8 +313,13 @@ jobs:
             --set "global.clusterIssuer=${DEV_CLUSTER_ISSUER}" \
             --set "ingress.wildcardSubdomains=${DEV_TLS_WILDCARD_SUBDOMAINS}" \
             --set "authproxy.image.tag=${{ steps.env.outputs.image_tag }}" \
+            --set "authproxy.image.pullPolicy=Always" \
+            --set-string "authproxy.podAnnotations.demo\.authproxy\.net/image-revision=${{ github.sha }}" \
             --set "demoShell.image.tag=${{ steps.env.outputs.image_tag }}" \
+            --set "demoShell.image.pullPolicy=Always" \
+            --set-string "demoShell.podAnnotations.demo\.authproxy\.net/image-revision=${{ github.sha }}" \
             --set "seed.image.tag=${{ steps.env.outputs.image_tag }}" \
+            --set "seed.image.pullPolicy=Always" \
             --set "grafana.enabled=false" \
             --set "grafanaAuthProxy.enabled=false"
 

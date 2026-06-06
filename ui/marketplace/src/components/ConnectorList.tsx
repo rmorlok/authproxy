@@ -70,7 +70,12 @@ const ConnectorList: React.FC = () => {
 
   const handleFormSubmit = useCallback((connectionId: string, data: unknown) => {
     const stepId = currentFormStep?.stepId ?? '';
-    dispatch(submitConnectionFormAsync({ connectionId, stepId, data })).then((action) => {
+    dispatch(submitConnectionFormAsync({
+      connectionId,
+      stepId,
+      data,
+      returnToUrl: `${window.location.origin}/connections`,
+    })).then((action) => {
       if (action.meta.requestStatus === 'fulfilled') {
         const response = action.payload as any;
         if (isRedirectResponse(response)) {

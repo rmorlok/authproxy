@@ -12,6 +12,7 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/schema/api"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 )
 
@@ -122,6 +123,140 @@ func TestUpsertConnectorPublishesNewVersionWhenDefinitionChanges(t *testing.T) {
 	require.NoError(t, err)
 	require.Equal(t, connectorUpdated, action)
 	require.True(t, forcedPrimary)
+}
+
+func TestSeedOAuth2TestProviderSeedsClientsUsersAndPolicies(t *testing.T) {
+	seen := map[string]int{}
+	client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		seen[r.Method+" "+r.URL.Path]++
+		switch r.Method + " " + r.URL.Path {
+		case "POST /test/clients":
+			var req OAuth2TestProviderClient
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+			require.Equal(t, "demo-oauth-simple", req.Key)
+			require.Equal(t, "https://marketplace.example.test/oauth2/callback", req.RedirectURI)
+			w.WriteHeader(http.StatusCreated)
+		case "POST /test/users":
+			var req OAuth2TestProviderUser
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+			require.Equal(t, "demo-oauth-user@example.test", req.Username)
+			w.WriteHeader(http.StatusCreated)
+		case "POST /test/resource-policy":
+			var req OAuth2ResourcePolicy
+			require.NoError(t, json.NewDecoder(r.Body).Decode(&req))
+			require.Equal(t, "/test/resource/demo-resources", req.Path)
+			w.WriteHeader(http.StatusNoContent)
+		default:
+			t.Fatalf("unexpected request %s %s", r.Method, r.URL.String())
+		}
+	}))
+
+	err := seedOAuth2TestProvider(client, OAuth2TestProviderSeed{
+		BaseUrl: testBaseURL,
+		Clients: []OAuth2TestProviderClient{{
+			Key:                     "demo-oauth-simple",
+			Secret:                  "secret",
+			RedirectURI:             "https://marketplace.example.test/oauth2/callback",
+			TokenEndpointAuthMethod: "client_secret_post",
+			Scope:                   "read",
+		}},
+		Users: []OAuth2TestProviderUser{{
+			Username: "demo-oauth-user@example.test",
+			Password: "demo-password",
+		}},
+		ResourcePolicies: []OAuth2ResourcePolicy{{
+			Path:          "/test/resource/demo-resources",
+			RequiredScope: "read",
+		}},
+	})
+	require.NoError(t, err)
+	require.Equal(t, 1, seen["POST /test/clients"])
+	require.Equal(t, 1, seen["POST /test/users"])
+	require.Equal(t, 1, seen["POST /test/resource-policy"])
+}
+
+func TestPostOAuth2TestProviderTreatsDuplicateAsAlreadyPresent(t *testing.T) {
+	for _, tc := range []struct {
+		name   string
+		status int
+		body   string
+	}{
+		{name: "conflict", status: http.StatusConflict},
+		{name: "bad request already exists", status: http.StatusBadRequest, body: `{"error":"client already exists"}`},
+		{name: "bad request client id taken", status: http.StatusBadRequest, body: `{"error":"Client ID taken"}`},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			client := newTestClient(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+				w.WriteHeader(tc.status)
+				_, _ = w.Write([]byte(tc.body))
+			}))
+
+			action, err := postOAuth2TestProvider(client, testBaseURL, "/test/clients", OAuth2TestProviderClient{Key: "demo"})
+			require.NoError(t, err)
+			require.Equal(t, seedAlreadyPresent, action)
+		})
+	}
+}
+
+func TestSeedConfigParsesOAuthConnectorSetupVariants(t *testing.T) {
+	data := []byte(`
+oauth2_test_provider:
+  base_url: http://go-oauth2-server
+  clients:
+    - key: demo-oauth-simple
+      secret: demo-oauth-simple-secret
+      redirect_uri: https://marketplace.example.test/oauth2/callback
+      token_endpoint_auth_method: client_secret_post
+      scope: read profile resources
+  users:
+    - username: demo-oauth-user@example.test
+      password: demo-password
+connectors:
+  - key: demo-oauth-tenant
+    namespace: root
+    definition:
+      display_name: Demo OAuth Tenant
+      description: Demo OAuth connector with pre-connect config
+      labels:
+        type: demo-oauth-tenant
+      auth:
+        type: OAuth2
+        client_id: demo-oauth-tenant
+        client_secret: demo-oauth-tenant-secret
+        authorization:
+          endpoint: https://example.test/oauth2/web/authorize
+          query_overrides:
+            tenant: "{{cfg.tenant}}"
+        token:
+          endpoint: http://go-oauth2-server/v1/oauth/tokens
+        scopes:
+          - id: read
+            reason: Read demo data
+      setup_flow:
+        preconnect:
+          steps:
+            - id: tenant
+              title: Choose tenant
+              json_schema:
+                type: object
+                required:
+                  - tenant
+                properties:
+                  tenant:
+                    type: string
+              ui_schema:
+                type: VerticalLayout
+                elements:
+                  - type: Control
+                    scope: "#/properties/tenant"
+`)
+	var cfg SeedConfig
+	require.NoError(t, yaml.Unmarshal(data, &cfg))
+	require.NotNil(t, cfg.OAuth2TestProvider)
+	require.Len(t, cfg.OAuth2TestProvider.Clients, 1)
+	require.Len(t, cfg.Connectors, 1)
+	require.NoError(t, cfg.Connectors[0].Definition.Validate(&common.ValidationContext{}))
+	require.True(t, cfg.Connectors[0].Definition.SetupFlow.HasPreconnect())
 }
 
 func mustConnector(t *testing.T, displayName string) config.Connector {

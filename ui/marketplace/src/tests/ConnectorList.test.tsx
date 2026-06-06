@@ -185,4 +185,50 @@ describe('ConnectorList', () => {
             expect(connections.abort).toHaveBeenCalledWith('c-setup');
         });
     });
+
+    test('submits setup form with return URL for OAuth redirects after preconnect', async () => {
+        const user = userEvent.setup();
+        renderConnectorList({
+            connectors: {items: [connector], status: 'succeeded', error: null},
+            connections: {
+                ...baseConnectionsState,
+                currentFormStep: {
+                    connectionId: 'c-setup',
+                    stepId: 'tenant',
+                    stepTitle: 'Choose a tenant',
+                    stepDescription: 'Select the tenant before OAuth.',
+                    jsonSchema: {
+                        type: 'object',
+                        required: ['tenant'],
+                        properties: {
+                            tenant: {
+                                type: 'string',
+                                title: 'Tenant',
+                            },
+                        },
+                    },
+                    uiSchema: {
+                        type: 'VerticalLayout',
+                        elements: [{type: 'Control', scope: '#/properties/tenant'}],
+                    },
+                },
+            },
+        });
+
+        await user.type(screen.getByRole('textbox', {name: /Tenant/i}), 'northwind');
+        const submitButton = screen.getByRole('button', {name: /Save and verify/i});
+        await waitFor(() => {
+            expect(submitButton).toBeEnabled();
+        });
+        await user.click(submitButton);
+
+        await waitFor(() => {
+            expect(connections.submit).toHaveBeenCalledWith(
+                'c-setup',
+                'tenant',
+                expect.any(Object),
+                `${window.location.origin}/connections`,
+            );
+        });
+    });
 });
