@@ -26,7 +26,11 @@ spec:
     spec:
       containers:
         - name: go-oauth2-server
+          {{- if .Values.goOauth2Server.image.digest }}
+          image: "{{ .Values.goOauth2Server.image.repository }}@{{ .Values.goOauth2Server.image.digest }}"
+          {{- else }}
           image: "{{ .Values.goOauth2Server.image.repository }}:{{ .Values.goOauth2Server.image.tag }}"
+          {{- end }}
           imagePullPolicy: {{ .Values.goOauth2Server.image.pullPolicy }}
           command: ["go-oauth2-server"]
           # go-oauth2-server's entrypoint is a CLI; test mode uses an
