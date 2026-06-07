@@ -10,6 +10,7 @@ import (
 	"time"
 
 	"github.com/cschleiden/go-workflows/backend"
+	"github.com/cschleiden/go-workflows/backend/history"
 	"github.com/cschleiden/go-workflows/client"
 	wfcore "github.com/cschleiden/go-workflows/core"
 	wflib "github.com/cschleiden/go-workflows/workflow"
@@ -31,8 +32,10 @@ import (
 )
 
 type fakeTaskWorkflowClient struct {
-	state wfcore.WorkflowInstanceState
-	err   error
+	state      wfcore.WorkflowInstanceState
+	history    []*history.Event
+	err        error
+	historyErr error
 
 	requestedInstance *wflib.Instance
 }
@@ -46,10 +49,16 @@ func (f *fakeTaskWorkflowClient) GetWorkflowInstanceState(ctx context.Context, i
 	return f.state, f.err
 }
 
+func (f *fakeTaskWorkflowClient) GetWorkflowInstanceHistory(ctx context.Context, instance *wflib.Instance, lastSequenceID *int64) ([]*history.Event, error) {
+	f.requestedInstance = instance
+	return f.history, f.historyErr
+}
+
 func TestTasks(t *testing.T) {
 	type TestSetup struct {
 		Gin            *gin.Engine
 		Cfg            config.C
+		AuthService    auth2.A
 		AuthUtil       *auth2.AuthTestUtil
 		MockInspector  *mock.MockInspector
 		WorkflowClient *fakeTaskWorkflowClient
@@ -77,6 +86,7 @@ func TestTasks(t *testing.T) {
 		return &TestSetup{
 			Gin:            r,
 			Cfg:            cfg,
+			AuthService:    auth,
 			AuthUtil:       authUtil,
 			MockInspector:  mockInspector,
 			WorkflowClient: workflowClient,
@@ -86,6 +96,26 @@ func TestTasks(t *testing.T) {
 
 	t.Run("get task", func(t *testing.T) {
 		tu := setup(t, nil)
+
+		workflowToken := func(t *testing.T, tu *TestSetup, mutate func(*tasks.TaskInfo)) string {
+			t.Helper()
+
+			taskInfo := &tasks.TaskInfo{
+				TrackedVia:          tasks.TrackedViaWorkflow,
+				WorkflowInstanceId:  "workflow-instance-id",
+				WorkflowExecutionId: "workflow-execution-id",
+				WorkflowName:        "core.connection.disconnect.v1",
+				WorkflowQueue:       "default",
+			}
+			if mutate != nil {
+				mutate(taskInfo)
+			}
+
+			ctx := context.Background()
+			encryptedTaskInfo, err := taskInfo.ToSecureEncryptedString(ctx, tu.EncryptService)
+			require.NoError(t, err)
+			return encryptedTaskInfo
+		}
 
 		t.Run("unauthorized", func(t *testing.T) {
 			w := httptest.NewRecorder()
@@ -317,51 +347,92 @@ func TestTasks(t *testing.T) {
 		})
 
 		t.Run("workflow success", func(t *testing.T) {
-			tu := setup(t, nil)
-			taskInfo := &tasks.TaskInfo{
-				TrackedVia:          tasks.TrackedViaWorkflow,
-				WorkflowInstanceId:  "workflow-instance-id",
-				WorkflowExecutionId: "workflow-execution-id",
-				WorkflowName:        "core.connection.disconnect.v1",
-				WorkflowQueue:       "default",
+			tests := []struct {
+				name      string
+				state     wfcore.WorkflowInstanceState
+				history   []*history.Event
+				wantState TaskState
+			}{
+				{
+					name:      "active",
+					state:     wfcore.WorkflowInstanceStateActive,
+					wantState: TaskStateActive,
+				},
+				{
+					name:      "continued as new",
+					state:     wfcore.WorkflowInstanceStateContinuedAsNew,
+					wantState: TaskStateCompleted,
+				},
+				{
+					name:  "finished",
+					state: wfcore.WorkflowInstanceStateFinished,
+					history: []*history.Event{
+						{
+							Type:       history.EventType_WorkflowExecutionFinished,
+							Attributes: &history.ExecutionCompletedAttributes{},
+						},
+					},
+					wantState: TaskStateCompleted,
+				},
+				{
+					name:  "finished with error",
+					state: wfcore.WorkflowInstanceStateFinished,
+					history: []*history.Event{
+						{
+							Type: history.EventType_WorkflowExecutionFinished,
+							Attributes: &struct {
+								Error string
+							}{Error: "workflow failed"},
+						},
+					},
+					wantState: TaskStateFailed,
+				},
+				{
+					name:  "canceled",
+					state: wfcore.WorkflowInstanceStateFinished,
+					history: []*history.Event{
+						{
+							Type: history.EventType_WorkflowExecutionCanceled,
+						},
+					},
+					wantState: TaskStateFailed,
+				},
+				{
+					name:      "unknown workflow state",
+					state:     wfcore.WorkflowInstanceState(99),
+					wantState: TaskStateUnknown,
+				},
 			}
 
-			ctx := context.Background()
-			encryptedTaskInfo, err := taskInfo.ToSecureEncryptedString(ctx, tu.EncryptService)
-			require.NoError(t, err)
+			for _, tc := range tests {
+				t.Run(tc.name, func(t *testing.T) {
+					tu := setup(t, nil)
+					encryptedTaskInfo := workflowToken(t, tu, nil)
+					tu.WorkflowClient.state = tc.state
+					tu.WorkflowClient.history = tc.history
 
-			tu.WorkflowClient.state = wfcore.WorkflowInstanceStateFinished
+					w := httptest.NewRecorder()
+					req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "root", "some-actor", aschema.NoPermissions())
+					require.NoError(t, err)
 
-			w := httptest.NewRecorder()
-			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "root", "some-actor", aschema.NoPermissions())
-			require.NoError(t, err)
+					tu.Gin.ServeHTTP(w, req)
+					require.Equal(t, http.StatusOK, w.Code)
 
-			tu.Gin.ServeHTTP(w, req)
-			require.Equal(t, http.StatusOK, w.Code)
-
-			var resp TaskInfoJson
-			err = json.Unmarshal(w.Body.Bytes(), &resp)
-			require.NoError(t, err)
-			require.Equal(t, encryptedTaskInfo, resp.Id)
-			require.Equal(t, "core.connection.disconnect.v1", resp.Type)
-			require.Equal(t, string(TaskStateCompleted), string(resp.State))
-			require.Equal(t, "workflow-instance-id", tu.WorkflowClient.requestedInstance.InstanceID)
-			require.Equal(t, "workflow-execution-id", tu.WorkflowClient.requestedInstance.ExecutionID)
+					var resp TaskInfoJson
+					err = json.Unmarshal(w.Body.Bytes(), &resp)
+					require.NoError(t, err)
+					require.Equal(t, encryptedTaskInfo, resp.Id)
+					require.Equal(t, "core.connection.disconnect.v1", resp.Type)
+					require.Equal(t, string(tc.wantState), string(resp.State))
+					require.Equal(t, "workflow-instance-id", tu.WorkflowClient.requestedInstance.InstanceID)
+					require.Equal(t, "workflow-execution-id", tu.WorkflowClient.requestedInstance.ExecutionID)
+				})
+			}
 		})
 
 		t.Run("workflow not found", func(t *testing.T) {
 			tu := setup(t, nil)
-			taskInfo := &tasks.TaskInfo{
-				TrackedVia:          tasks.TrackedViaWorkflow,
-				WorkflowInstanceId:  "workflow-instance-id",
-				WorkflowExecutionId: "workflow-execution-id",
-				WorkflowName:        "core.connection.disconnect.v1",
-			}
-
-			ctx := context.Background()
-			encryptedTaskInfo, err := taskInfo.ToSecureEncryptedString(ctx, tu.EncryptService)
-			require.NoError(t, err)
-
+			encryptedTaskInfo := workflowToken(t, tu, nil)
 			tu.WorkflowClient.err = backend.ErrInstanceNotFound
 
 			w := httptest.NewRecorder()
@@ -370,6 +441,63 @@ func TestTasks(t *testing.T) {
 
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusNotFound, w.Code)
+		})
+
+		t.Run("workflow client error", func(t *testing.T) {
+			tu := setup(t, nil)
+			encryptedTaskInfo := workflowToken(t, tu, nil)
+			tu.WorkflowClient.err = errors.New("workflow backend unavailable")
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "root", "some-actor", aschema.NoPermissions())
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusInternalServerError, w.Code)
+		})
+
+		t.Run("workflow history error", func(t *testing.T) {
+			tu := setup(t, nil)
+			encryptedTaskInfo := workflowToken(t, tu, nil)
+			tu.WorkflowClient.state = wfcore.WorkflowInstanceStateFinished
+			tu.WorkflowClient.historyErr = errors.New("workflow history unavailable")
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "root", "some-actor", aschema.NoPermissions())
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusInternalServerError, w.Code)
+		})
+
+		t.Run("workflow tracking not configured", func(t *testing.T) {
+			tu := setup(t, nil)
+			tr := NewTaskRoutes(tu.Cfg, tu.AuthService, tu.EncryptService, tu.MockInspector, nil)
+			tu.Gin = apgin.ForTest(nil)
+			tr.Register(tu.Gin)
+
+			encryptedTaskInfo := workflowToken(t, tu, nil)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "root", "some-actor", aschema.NoPermissions())
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusInternalServerError, w.Code)
+		})
+
+		t.Run("missing workflow data", func(t *testing.T) {
+			tu := setup(t, nil)
+			encryptedTaskInfo := workflowToken(t, tu, func(taskInfo *tasks.TaskInfo) {
+				taskInfo.WorkflowInstanceId = ""
+			})
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(http.MethodGet, "/tasks/"+encryptedTaskInfo, nil, "root", "some-actor", aschema.NoPermissions())
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusInternalServerError, w.Code)
 		})
 	})
 }

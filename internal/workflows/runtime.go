@@ -10,6 +10,7 @@ import (
 	"time"
 
 	wfbackend "github.com/cschleiden/go-workflows/backend"
+	"github.com/cschleiden/go-workflows/backend/history"
 	"github.com/cschleiden/go-workflows/backend/postgres"
 	"github.com/cschleiden/go-workflows/backend/sqlite"
 	"github.com/cschleiden/go-workflows/client"
@@ -46,6 +47,7 @@ type Runtime struct {
 type Client interface {
 	CreateWorkflowInstance(ctx context.Context, options client.WorkflowInstanceOptions, workflow wflib.Workflow, args ...any) (*wflib.Instance, error)
 	GetWorkflowInstanceState(ctx context.Context, instance *wflib.Instance) (wfcore.WorkflowInstanceState, error)
+	GetWorkflowInstanceHistory(ctx context.Context, instance *wflib.Instance, lastSequenceID *int64) ([]*history.Event, error)
 }
 
 func NewRuntime(root *sconfig.Root, telemetry *aptelemetry.Providers, logger *slog.Logger) (*Runtime, error) {
@@ -187,8 +189,20 @@ func (r *Runtime) DiagnosticBackend() (diag.Backend, error) {
 	return backend, nil
 }
 
-func (r *Runtime) Client() *client.Client {
-	return r.client
+func (r *Runtime) Client() Client {
+	return r
+}
+
+func (r *Runtime) CreateWorkflowInstance(ctx context.Context, options client.WorkflowInstanceOptions, workflow wflib.Workflow, args ...any) (*wflib.Instance, error) {
+	return r.client.CreateWorkflowInstance(ctx, options, workflow, args...)
+}
+
+func (r *Runtime) GetWorkflowInstanceState(ctx context.Context, instance *wflib.Instance) (wfcore.WorkflowInstanceState, error) {
+	return r.client.GetWorkflowInstanceState(ctx, instance)
+}
+
+func (r *Runtime) GetWorkflowInstanceHistory(ctx context.Context, instance *wflib.Instance, lastSequenceID *int64) ([]*history.Event, error) {
+	return r.backend.GetWorkflowInstanceHistory(ctx, instance, lastSequenceID)
 }
 
 func (r *Runtime) Ping(ctx context.Context) bool {
