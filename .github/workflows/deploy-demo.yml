@@ -70,12 +70,13 @@ jobs:
       RELEASE_NS:   demo
       CHART_PATH:   deploy/charts/authproxy-demo
       REGISTRY:     ghcr.io
+      DEPLOY_SHA:   ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0      # helm relies on the .git context for some chart hooks
-          ref: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+          ref: ${{ env.DEPLOY_SHA }}
 
       - name: Set up Helm
         uses: azure/setup-helm@v4
@@ -95,12 +96,14 @@ jobs:
             tag="${{ inputs.image_tag }}"
           elif [ "${{ github.event_name }}" = "workflow_run" ]; then
             # Deploy the exact commit whose Build Image run just completed.
-            tag="sha-$(printf '%s' "${{ github.event.workflow_run.head_sha }}" | cut -c1-7)"
+            tag="sha-$(printf '%s' "${DEPLOY_SHA}" | cut -c1-7)"
           else
             # Match docker/metadata-action's `type=sha,prefix=sha-,format=short`
             tag="sha-$(git rev-parse --short HEAD)"
           fi
+          echo "sha=${DEPLOY_SHA}" >> "$GITHUB_OUTPUT"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "Deploying commit: ${DEPLOY_SHA}"
           echo "Deploying image tag: ${tag}"
 
       - name: Verify image tag in GHCR
@@ -221,14 +224,14 @@ jobs:
           set -euo pipefail
           helm_args=(
             --namespace "${RELEASE_NS}" --create-namespace
-            --wait --timeout 10m
+            --wait --timeout 20m
             --set "global.hostname=${{ vars.DEMO_HOSTNAME }}"
             --set "global.clusterIssuer=${DEMO_CLUSTER_ISSUER}"
             --set "ingress.wildcardSubdomains=${DEMO_TLS_WILDCARD_SUBDOMAINS}"
             --set "authproxy.image.tag=${{ steps.tag.outputs.tag }}"
-            --set-string "authproxy.podAnnotations.demo\.authproxy\.net/image-revision=${{ github.sha }}"
+            --set-string "authproxy.podAnnotations.demo\.authproxy\.net/image-revision=${{ steps.tag.outputs.sha }}"
             --set "demoShell.image.tag=${{ steps.tag.outputs.tag }}"
-            --set-string "demoShell.podAnnotations.demo\.authproxy\.net/image-revision=${{ github.sha }}"
+            --set-string "demoShell.podAnnotations.demo\.authproxy\.net/image-revision=${{ steps.tag.outputs.sha }}"
             --set "seed.image.tag=${{ steps.tag.outputs.tag }}"
           )
 
@@ -241,6 +244,33 @@ jobs:
 
           helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \
             "${helm_args[@]}"
+
+      - name: Collect deploy diagnostics (on failure)
+        if: failure()
+        run: |
+          set +e
+          echo "## Helm status"
+          helm status "${RELEASE_NAME}" -n "${RELEASE_NS}"
+          echo
+          echo "## Hook jobs"
+          kubectl -n "${RELEASE_NS}" get jobs \
+            -l "app.kubernetes.io/instance=${RELEASE_NAME}" \
+            -o wide
+          echo
+          echo "## Seed job"
+          kubectl -n "${RELEASE_NS}" describe "job/${RELEASE_NAME}-seed"
+          echo
+          echo "## Seed logs"
+          kubectl -n "${RELEASE_NS}" logs "job/${RELEASE_NAME}-seed" \
+            --all-containers --tail=300
+          echo
+          echo "## Pods"
+          kubectl -n "${RELEASE_NS}" get pods -o wide
+          echo
+          echo "## Recent events"
+          kubectl -n "${RELEASE_NS}" get events \
+            --sort-by='.lastTimestamp' \
+            | tail -n 80
 
       - name: Wait for workload rollouts
         # `helm --wait` already blocks on the main release, but the
@@ -316,6 +346,7 @@ jobs:
             echo ""
             echo "- Result:      ${{ job.status }}"
             echo "- Image tag:   \`${{ steps.tag.outputs.tag }}\`"
+            echo "- Commit:      \`${{ steps.tag.outputs.sha }}\`"
             echo "- Hostname:    \`https://${{ vars.DEMO_HOSTNAME }}/\`"
             if kubectl -n "${RELEASE_NS}" get deployment "${RELEASE_NAME}-grafana" >/dev/null 2>&1; then
               echo "- Grafana:     \`https://${{ vars.DEMO_HOSTNAME }}/grafana\`"
