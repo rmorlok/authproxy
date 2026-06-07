@@ -54,10 +54,11 @@ goOauth2Server:
   enabled: true
   image:
     # go-oauth2-server image — see https://github.com/rmorlok/go-oauth2-server.
-    # Upstream's default branch is `master`, so that's the tag the Build
-    # Image workflow over there publishes.
+    # Upstream's default branch is `master`; pin the digest here so demo
+    # deploys advance only when AuthProxy explicitly updates this dependency.
     repository: ghcr.io/rmorlok/go-oauth2-server
     tag: "master"
+    digest: "sha256:d1e5bdae007259b0c02255f26efce595f23eb2142e7da8caa3dac544dd445cb3"
     pullPolicy: IfNotPresent
   replicaCount: 1
   resources:
