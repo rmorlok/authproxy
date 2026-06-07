@@ -14,6 +14,7 @@ import (
 	"github.com/cschleiden/go-workflows/backend/sqlite"
 	"github.com/cschleiden/go-workflows/client"
 	wfcore "github.com/cschleiden/go-workflows/core"
+	"github.com/cschleiden/go-workflows/diag"
 	"github.com/cschleiden/go-workflows/registry"
 	wfworker "github.com/cschleiden/go-workflows/worker"
 	wflib "github.com/cschleiden/go-workflows/workflow"
@@ -171,6 +172,19 @@ func migrateDB(db *sql.DB, driverName string, sourcePath string) error {
 
 func (r *Runtime) Backend() wfbackend.Backend {
 	return r.backend
+}
+
+func (r *Runtime) DiagnosticBackend() (diag.Backend, error) {
+	if r == nil || r.backend == nil {
+		return nil, fmt.Errorf("workflow runtime is required")
+	}
+
+	backend, ok := r.backend.(diag.Backend)
+	if !ok {
+		return nil, fmt.Errorf("workflow backend does not support diagnostics")
+	}
+
+	return backend, nil
 }
 
 func (r *Runtime) Client() *client.Client {

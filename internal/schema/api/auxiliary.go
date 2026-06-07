@@ -206,3 +206,50 @@ type ListSchedulerEntriesResponseJson struct {
 type ListQueueHistoryResponseJson struct {
 	Items []*DailyStatsJson `json:"items" yaml:"items"`
 }
+
+type WorkflowInstanceJson struct {
+	InstanceID  string                `json:"instance_id" yaml:"instance_id"`
+	ExecutionID string                `json:"execution_id" yaml:"execution_id"`
+	Parent      *WorkflowInstanceJson `json:"parent,omitempty" yaml:"parent,omitempty"`
+}
+
+type WorkflowInstanceRefJson struct {
+	Instance    *WorkflowInstanceJson `json:"instance,omitempty" yaml:"instance,omitempty"`
+	CreatedAt   time.Time             `json:"created_at,omitempty" yaml:"created_at,omitempty"`
+	CompletedAt *time.Time            `json:"completed_at,omitempty" yaml:"completed_at,omitempty"`
+	State       string                `json:"state" yaml:"state"`
+	Queue       string                `json:"queue" yaml:"queue"`
+}
+
+type WorkflowHistoryEventJson struct {
+	ID              string      `json:"id,omitempty" yaml:"id,omitempty"`
+	SequenceID      int64       `json:"sequence_id,omitempty" yaml:"sequence_id,omitempty"`
+	Type            string      `json:"type,omitempty" yaml:"type,omitempty"`
+	Timestamp       time.Time   `json:"timestamp,omitempty" yaml:"timestamp,omitempty"`
+	ScheduleEventID int64       `json:"schedule_event_id,omitempty" yaml:"schedule_event_id,omitempty"`
+	Attributes      interface{} `json:"attributes,omitempty" yaml:"attributes,omitempty"`
+	VisibleAt       *time.Time  `json:"visible_at,omitempty" yaml:"visible_at,omitempty"`
+}
+
+type WorkflowInstanceInfoJson struct {
+	*WorkflowInstanceRefJson
+
+	History []*WorkflowHistoryEventJson `json:"history,omitempty" yaml:"history,omitempty"`
+}
+
+type WorkflowInstanceTreeJson struct {
+	*WorkflowInstanceRefJson
+
+	WorkflowName string                      `json:"workflow_name,omitempty" yaml:"workflow_name,omitempty"`
+	Error        bool                        `json:"error,omitempty" yaml:"error,omitempty"`
+	Children     []*WorkflowInstanceTreeJson `json:"children,omitempty" yaml:"children,omitempty"`
+}
+
+type ListWorkflowInstancesResponseJson struct {
+	Items  []*WorkflowInstanceRefJson `json:"items" yaml:"items"`
+	Cursor string                     `json:"cursor,omitempty" yaml:"cursor,omitempty"`
+}
+
+type ListWorkflowHistoryResponseJson struct {
+	Items []*WorkflowHistoryEventJson `json:"items" yaml:"items"`
+}
