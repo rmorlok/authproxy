@@ -26,6 +26,7 @@ const mainListItems = [
   { text: 'Connections', icon: <LinkRoundedIcon />, link: '/connections' },
   { text: 'Requests', icon: <HttpRoundedIcon />, link: '/requests' },
   { text: 'Tasks', icon: <AssignmentRoundedIcon />, link: '/tasks' },
+  { text: 'Workflows', icon: <AccountTreeRoundedIcon />, link: '/workflows' },
   { text: 'Encryption Keys', icon: <KeyRoundedIcon />, link: '/encryption-keys' },
   { text: 'Rate Limits', icon: <SpeedRoundedIcon />, link: '/rate-limits' },
   { text: 'Actors', icon: <PeopleRoundedIcon />, link: '/actors' },

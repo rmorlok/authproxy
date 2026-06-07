@@ -16,3 +16,4 @@ export * from './requestEvents';
 export * from './session';
 export * from './tasks';
 export * from './taskMonitoring';
+export * from './workflowMonitoring';

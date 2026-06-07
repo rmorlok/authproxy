@@ -18,6 +18,8 @@ import RateLimitDetail from "./pages/RateLimitDetail";
 import RateLimitDryRunPage from "./pages/RateLimitDryRun";
 import TasksPage from "./pages/Tasks";
 import TaskQueueDetailPage from "./pages/TaskQueueDetail";
+import WorkflowsPage from "./pages/Workflows";
+import WorkflowDetailPage from "./pages/WorkflowDetail";
 import NamespaceDetailPage from "./pages/NamespaceDetail";
 import AboutPage from "./pages/About";
 import * as React from "react";
@@ -202,6 +204,25 @@ export const router = createBrowserRouter([
                     {
                         attr: 'queue',
                         path: (params: Params<string>) => `/tasks/queues/${params.queue}`,
+                    },
+                ],
+            },
+            {
+                path: 'workflows',
+                element: <WorkflowsPage />,
+                handle: { title: 'Workflows' }
+            },
+            {
+                path: 'workflows/:instanceId/:executionId',
+                element: <WorkflowDetailPage />,
+                handle: [
+                    {
+                        title: 'Workflows',
+                        path: (_params: Params<string>) => `/workflows`,
+                    },
+                    {
+                        attr: 'instanceId',
+                        path: (params: Params<string>) => `/workflows/${params.instanceId}/${params.executionId}`,
                     },
                 ],
             },
