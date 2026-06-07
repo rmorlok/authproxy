@@ -3,9 +3,11 @@ package routes
 import (
 	"errors"
 	"net/http"
+	"reflect"
 	"time"
 
 	wfbackend "github.com/cschleiden/go-workflows/backend"
+	wfhistory "github.com/cschleiden/go-workflows/backend/history"
 	wfcore "github.com/cschleiden/go-workflows/core"
 	"github.com/gin-gonic/gin"
 	"github.com/hibiken/asynq"
@@ -103,6 +105,53 @@ func WorkflowTaskInfoToJson(encryptedId string, ti *tasks.TaskInfo, state wfcore
 	}
 }
 
+func WorkflowTaskInfoStateFromHistory(state wfcore.WorkflowInstanceState, historyEvents []*wfhistory.Event) TaskState {
+	switch state {
+	case wfcore.WorkflowInstanceStateActive:
+		return TaskStateActive
+	case wfcore.WorkflowInstanceStateContinuedAsNew:
+		return TaskStateCompleted
+	case wfcore.WorkflowInstanceStateFinished:
+		for i := len(historyEvents) - 1; i >= 0; i-- {
+			event := historyEvents[i]
+			if event == nil {
+				continue
+			}
+			switch event.Type {
+			case wfhistory.EventType_WorkflowExecutionCanceled, wfhistory.EventType_WorkflowExecutionTerminated:
+				return TaskStateFailed
+			case wfhistory.EventType_WorkflowExecutionFinished:
+				if workflowCompletionHasError(event.Attributes) {
+					return TaskStateFailed
+				}
+				return TaskStateCompleted
+			}
+		}
+		return TaskStateCompleted
+	default:
+		return TaskStateUnknown
+	}
+}
+
+func workflowCompletionHasError(attrs any) bool {
+	v := reflect.ValueOf(attrs)
+	if !v.IsValid() {
+		return false
+	}
+	if v.Kind() == reflect.Ptr {
+		if v.IsNil() {
+			return false
+		}
+		v = v.Elem()
+	}
+	if v.Kind() != reflect.Struct {
+		return false
+	}
+
+	errorField := v.FieldByName("Error")
+	return errorField.IsValid() && !errorField.IsZero()
+}
+
 // @Summary		Get task status
 // @Description	Get the status of a background task by its encrypted task info
 // @Tags			tasks
@@ -170,7 +219,23 @@ func (r *TaskRoutes) get(gctx *gin.Context) {
 			return
 		}
 
-		gctx.PureJSON(http.StatusOK, WorkflowTaskInfoToJson(encryptedTaskInfo, ti, state))
+		var historyEvents []*wfhistory.Event
+		if state == wfcore.WorkflowInstanceStateFinished {
+			historyEvents, err = r.workflowClient.GetWorkflowInstanceHistory(ctx, instance, nil)
+			if err != nil {
+				if errors.Is(err, wfbackend.ErrInstanceNotFound) {
+					apgin.WriteError(gctx, nil, httperr.NotFound("task not found"))
+					return
+				}
+
+				apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("failed to load task", httperr.WithInternalErr(err)))
+				return
+			}
+		}
+
+		resp := WorkflowTaskInfoToJson(encryptedTaskInfo, ti, state)
+		resp.State = WorkflowTaskInfoStateFromHistory(state, historyEvents)
+		gctx.PureJSON(http.StatusOK, resp)
 		return
 	}
 
