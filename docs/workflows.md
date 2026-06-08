@@ -132,6 +132,18 @@ Before merging a workflow change:
 - Admin and task-monitoring surfaces can still resolve in-flight instances created before the change.
 - Documentation identifies when the old version can be retired.
 
+## Local Checks
+
+Run workflow guardrails locally before merging workflow changes:
+
+```bash
+./scripts/check-workflows.sh
+```
+
+This script runs focused workflow tests that exercise the disconnect pilot workflow with the go-workflows tester and verify its durable workflow/activity names remain registered. It is also called by `./scripts/preflight.sh`.
+
+The current pinned go-workflows release does not package the analyzer mentioned by newer go-workflows documentation, so AuthProxy relies on these local tests for now. When the dependency exposes an analyzer package that matches the pinned release, add it to this check or CI without replacing the registration tests; the tests protect AuthProxy's versioning convention directly.
+
 ## Retirement
 
 Old versions can be removed only when all of the following are true:

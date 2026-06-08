@@ -21,6 +21,11 @@ const (
 	ActivityNameDisconnectConnectionFinalizeV1          = "core.connection.disconnect.finalize.v1"
 )
 
+type workflowRegistrar interface {
+	RegisterWorkflow(workflow wflib.Workflow, opts ...registry.RegisterOption) error
+	RegisterActivity(activity wflib.Activity, opts ...registry.RegisterOption) error
+}
+
 // maxRevokeAttempts caps the number of times a revoke operation is retried
 // inside a single disconnect task invocation. After exhausting attempts, the
 // disconnect proceeds so a connection cannot get stuck in `disconnecting`
@@ -56,7 +61,7 @@ func disconnectConnectionRevokeActivityOptions() wflib.ActivityOptions {
 	return opts
 }
 
-func (s *service) registerDisconnectConnectionWorkflow(worker *apworkflows.Worker) error {
+func (s *service) registerDisconnectConnectionWorkflow(worker workflowRegistrar) error {
 	if err := worker.RegisterWorkflow(
 		disconnectConnectionWorkflowV1,
 		registry.WithName(WorkflowNameDisconnectConnectionV1),
