@@ -11,6 +11,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
+// This test asserts that the real workflow will invoke the activities that are part of it.
 func TestDisconnectConnectionWorkflowV1ExecutesRegisteredActivities(t *testing.T) {
 	connectionId := apid.New(apid.PrefixConnection).String()
 	workflowTester := tester.NewWorkflowTester[any](disconnectConnectionWorkflowV1)
@@ -50,6 +51,9 @@ func TestDisconnectConnectionWorkflowV1ExecutesRegisteredActivities(t *testing.T
 	workflowTester.AssertExpectations(t)
 }
 
+// This test just verifies that the workflow and activities are registered with the correct durable names. This
+// test can be removed once these names are removed, as part of the defined lifecycle for when workflow versions
+// must be maintained.
 func TestRegisterDisconnectConnectionWorkflowV1DurableNames(t *testing.T) {
 	reg := registry.New()
 	svc := &service{}
