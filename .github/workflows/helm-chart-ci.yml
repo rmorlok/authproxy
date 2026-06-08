@@ -75,6 +75,29 @@ jobs:
         if: steps.changed.outputs.found == 'true'
         run: ct lint --config .github/ct.yaml --target-branch main
 
+      - name: Verify demo slim storage render
+        if: steps.changed.outputs.found == 'true'
+        run: |
+          set -euo pipefail
+          helm dependency build deploy/charts/authproxy-demo
+          manifest="$(mktemp)"
+          helm template dev deploy/charts/authproxy-demo \
+            -f deploy/charts/authproxy-demo/dev-slim-values.yaml \
+            --set global.hostname=branch.dev.authproxy.net \
+            --set authproxy.image.repository=ghcr.io/rmorlok/authproxy \
+            --set authproxy.image.tag=test \
+            --set demoShell.image.tag=test \
+            --set seed.image.tag=test \
+            --set secrets.autoGenerate=true \
+            >"${manifest}"
+
+          grep -q "provider: miniredis" "${manifest}"
+
+          if grep -Eq "name: dev-(db|redis-creds|minio-creds|postgresql|redis|minio)|AUTHPROXY_(DB|REDIS)_PASSWORD|root-password|kind: StatefulSet" "${manifest}"; then
+            echo "Slim dev render leaked dependency credentials or workloads" >&2
+            exit 1
+          fi
+
   install:
     runs-on: ubuntu-latest
     needs: lint
