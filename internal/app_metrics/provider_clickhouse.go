@@ -15,9 +15,9 @@ import (
 	chmigrate "github.com/golang-migrate/migrate/v4/database/clickhouse"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -27,7 +27,7 @@ type clickhouseRecordStore struct {
 	logger *slog.Logger
 }
 
-func NewClickhouseRecordStore(cfg *config.Database, logger *slog.Logger, dbOpts ...database.Option) RecordStore {
+func NewClickhouseRecordStore(cfg *config.Database, logger *slog.Logger, dbOpts ...sqlh.Option) RecordStore {
 	chCfg, ok := cfg.InnerVal.(*config.DatabaseClickhouse)
 	if !ok {
 		panic(fmt.Sprintf("expected *config.DatabaseClickhouse, got %T", cfg))
@@ -38,7 +38,7 @@ func NewClickhouseRecordStore(cfg *config.Database, logger *slog.Logger, dbOpts 
 		panic(fmt.Errorf("failed to convert clickhouse config to options: %w", err))
 	}
 
-	db := database.OpenInstrumentedConnector(clickhouse.Connector(chOpts), database.DBSystemClickHouse, dbOpts...)
+	db := sqlh.OpenInstrumentedConnector(clickhouse.Connector(chOpts), sqlh.DBSystemClickHouse, dbOpts...)
 	s := &clickhouseRecordStore{
 		db:     db,
 		cfg:    chCfg,
@@ -198,7 +198,7 @@ type clickhouseRecordRetriever struct {
 	logger          *slog.Logger
 }
 
-func NewClickhouseRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorEncryptor, logger *slog.Logger, dbOpts ...database.Option) RecordRetriever {
+func NewClickhouseRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorEncryptor, logger *slog.Logger, dbOpts ...sqlh.Option) RecordRetriever {
 	chCfg, ok := cfg.InnerVal.(*config.DatabaseClickhouse)
 	if !ok {
 		panic(fmt.Sprintf("expected *config.DatabaseClickhouse, got %T", cfg))
@@ -209,7 +209,7 @@ func NewClickhouseRecordRetriever(cfg *config.Database, cursorEncryptor paginati
 		panic(fmt.Errorf("failed to convert clickhouse config to options: %w", err))
 	}
 
-	db := database.OpenInstrumentedConnector(clickhouse.Connector(options), database.DBSystemClickHouse, dbOpts...)
+	db := sqlh.OpenInstrumentedConnector(clickhouse.Connector(options), sqlh.DBSystemClickHouse, dbOpts...)
 	return &clickhouseRecordRetriever{
 		db:              db,
 		cfg:             chCfg,

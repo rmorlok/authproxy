@@ -2,12 +2,18 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"log/slog"
+	"math"
+	"os"
 	"sync"
 	"time"
 
 	"github.com/hibiken/asynq"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/mitchellh/go-homedir"
 	"github.com/rmorlok/authproxy/internal/apasynq"
 	"github.com/rmorlok/authproxy/internal/apauth/tasks"
 	authSync "github.com/rmorlok/authproxy/internal/apauth/tasks"
@@ -23,6 +29,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/ratelimit"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 	"github.com/rmorlok/authproxy/internal/workflows"
 )
@@ -37,6 +44,7 @@ type DependencyManager struct {
 	logBuilder        aplog.Builder
 	logger            *slog.Logger
 	r                 apredis.Client
+	sqlDB             *sql.DB
 	db                database.DB
 	httpf             httpf.F
 	logRetriever      app_metrics.LogRetriever
@@ -215,10 +223,10 @@ func (dm *DependencyManager) GetRedisClient() apredis.Client {
 func (dm *DependencyManager) GetDatabase() database.DB {
 	if dm.db == nil {
 		var err error
-		dm.db, err = database.NewConnectionForRoot(
-			dm.GetConfigRoot(),
+		dm.db, err = database.NewService(
+			dm.GetSQLDB(),
+			dm.GetConfigRoot().Database.InnerVal,
 			dm.GetLogger(),
-			database.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry),
 		)
 		if err != nil {
 			panic(err)
@@ -226,6 +234,129 @@ func (dm *DependencyManager) GetDatabase() database.DB {
 	}
 
 	return dm.db
+}
+
+func (dm *DependencyManager) GetSQLDB() *sql.DB {
+	if dm.sqlDB == nil {
+		db, err := dm.openConfiguredSQLDB()
+		if err != nil {
+			panic(err)
+		}
+		dm.sqlDB = db
+	}
+	return dm.sqlDB
+}
+
+func (dm *DependencyManager) openConfiguredSQLDB() (*sql.DB, error) {
+	root := dm.GetConfigRoot()
+	if root == nil || root.Database == nil || root.Database.InnerVal == nil {
+		return nil, fmt.Errorf("database configuration is required")
+	}
+
+	switch cfg := root.Database.InnerVal.(type) {
+	case *sconfig.DatabaseSqlite:
+		if err := ensureSqliteDatabaseFile(cfg.Path); err != nil {
+			return nil, err
+		}
+		return sqlh.OpenInstrumentedSQL(
+			"sqlite3",
+			cfg.GetDsn(),
+			sqlh.DBSystemSQLite,
+			sqlh.WithTelemetry(dm.GetTelemetry(), root.Telemetry),
+		)
+	case *sconfig.DatabasePostgres:
+		db, err := sqlh.OpenInstrumentedSQL(
+			"pgx",
+			cfg.GetDsn(),
+			sqlh.DBSystemPostgreSQL,
+			sqlh.WithTelemetry(dm.GetTelemetry(), root.Telemetry),
+		)
+		if err != nil {
+			return nil, fmt.Errorf("failed to open postgres database '%s': %w", cfg.GetDsn(), err)
+		}
+		if err := applyPostgresPoolSettings(db, cfg); err != nil {
+			_ = db.Close()
+			return nil, fmt.Errorf("failed to configure postgres database pool: %w", err)
+		}
+		return db, nil
+	default:
+		return nil, fmt.Errorf("database type not supported")
+	}
+}
+
+func ensureSqliteDatabaseFile(configPath string) error {
+	path := configPath
+	if _, err := os.Stat(path); err != nil {
+		expanded, expandErr := homedir.Expand(path)
+		if expandErr != nil {
+			return fmt.Errorf("failed to expand path; could not load sqlite database path '%s': %w", configPath, expandErr)
+		}
+		path = expanded
+	}
+
+	if _, err := os.Stat(path); err == nil {
+		return nil
+	}
+
+	file, err := os.Create(path)
+	if err != nil {
+		return fmt.Errorf("could not load sqlite database path '%s'; failed to create: %w", configPath, err)
+	}
+	return file.Close()
+}
+
+func applyPostgresPoolSettings(db *sql.DB, dbConfig *sconfig.DatabasePostgres) error {
+	if db == nil || dbConfig == nil {
+		return nil
+	}
+
+	ctx := context.Background()
+	if dbConfig.MaxOpenConns != nil {
+		value, err := databasePoolInt(ctx, "max_open_conns", dbConfig.MaxOpenConns)
+		if err != nil {
+			return err
+		}
+		db.SetMaxOpenConns(value)
+	}
+	if dbConfig.MaxIdleConns != nil {
+		value, err := databasePoolInt(ctx, "max_idle_conns", dbConfig.MaxIdleConns)
+		if err != nil {
+			return err
+		}
+		db.SetMaxIdleConns(value)
+	}
+	if dbConfig.ConnMaxLifetime != nil {
+		db.SetConnMaxLifetime(dbConfig.ConnMaxLifetime.Duration)
+	}
+	if dbConfig.ConnMaxIdleTime != nil {
+		db.SetConnMaxIdleTime(dbConfig.ConnMaxIdleTime.Duration)
+	}
+
+	return nil
+}
+
+func databasePoolInt(ctx context.Context, name string, value *sconfig.IntegerValue) (int, error) {
+	v, err := value.GetValue(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("%s: %w", name, err)
+	}
+	if v < 0 {
+		return 0, fmt.Errorf("%s must be greater than or equal to 0", name)
+	}
+	if v > int64(math.MaxInt) {
+		return 0, fmt.Errorf("%s is too large: %d", name, v)
+	}
+	return int(v), nil
+}
+
+func (dm *DependencyManager) ShutdownDatabase() {
+	if dm.sqlDB == nil {
+		return
+	}
+	if err := dm.sqlDB.Close(); err != nil {
+		dm.GetLogger().Warn("failed to close database", "error", err)
+	}
+	dm.sqlDB = nil
 }
 
 // AutoMigrateDatabase will attempt to migrate the database if the root config has auto migrate enabled.
@@ -253,6 +384,7 @@ func (dm *DependencyManager) AutoMigrateDatabase() {
 			if err := workflows.Migrate(
 				dm.GetConfigRoot(),
 				dm.GetLogBuilder().WithComponent("workflows").Build(),
+				workflows.WithPostgresMigrationDB(dm.GetSQLDB()),
 			); err != nil {
 				panic(fmt.Errorf("failed to migrate workflow database: %w", err))
 			}
@@ -270,7 +402,7 @@ func (dm *DependencyManager) GetAppMetricsService() *app_metrics.StorageService 
 			pagination.NewRandomCursorEncryptor(),
 			dm.GetEncryptService(),
 			dm.GetLogger(),
-			database.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry),
+			sqlh.WithTelemetry(dm.GetTelemetry(), dm.GetConfigRoot().Telemetry),
 		)
 
 		if err != nil {
@@ -401,6 +533,7 @@ func (dm *DependencyManager) GetWorkflowRuntime() *workflows.Runtime {
 			dm.GetConfigRoot(),
 			dm.GetTelemetry(),
 			dm.GetLogBuilder().WithComponent("workflows").Build(),
+			workflows.WithPostgresDB(dm.GetSQLDB()),
 		)
 		if err != nil {
 			panic(fmt.Errorf("failed to construct workflow runtime: %w", err))

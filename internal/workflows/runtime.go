@@ -25,7 +25,6 @@ import (
 	migratesqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/rmorlok/authproxy/internal/aptelemetry"
-	apdatabase "github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 )
 
@@ -42,6 +41,7 @@ type Runtime struct {
 	backend wfbackend.Backend
 	client  *client.Client
 	db      *sql.DB
+	closeDB bool
 }
 
 type Client interface {
@@ -50,9 +50,26 @@ type Client interface {
 	GetWorkflowInstanceHistory(ctx context.Context, instance *wflib.Instance, lastSequenceID *int64) ([]*history.Event, error)
 }
 
-func NewRuntime(root *sconfig.Root, telemetry *aptelemetry.Providers, logger *slog.Logger) (*Runtime, error) {
+type RuntimeOption func(*runtimeOptions)
+
+type runtimeOptions struct {
+	postgresDB *sql.DB
+}
+
+func WithPostgresDB(db *sql.DB) RuntimeOption {
+	return func(o *runtimeOptions) {
+		o.postgresDB = db
+	}
+}
+
+func NewRuntime(root *sconfig.Root, telemetry *aptelemetry.Providers, logger *slog.Logger, opts ...RuntimeOption) (*Runtime, error) {
 	if root == nil || root.Database == nil {
 		return nil, fmt.Errorf("database configuration is required")
+	}
+
+	runtimeOpts := &runtimeOptions{}
+	for _, opt := range opts {
+		opt(runtimeOpts)
 	}
 
 	backendOptions := []wfbackend.BackendOption{
@@ -63,8 +80,9 @@ func NewRuntime(root *sconfig.Root, telemetry *aptelemetry.Providers, logger *sl
 	}
 
 	var (
-		b  wfbackend.Backend
-		db *sql.DB
+		b       wfbackend.Backend
+		db      *sql.DB
+		closeDB bool
 	)
 
 	switch cfg := root.Database.InnerVal.(type) {
@@ -78,18 +96,11 @@ func NewRuntime(root *sconfig.Root, telemetry *aptelemetry.Providers, logger *sl
 			sqlite.WithBackendOptions(backendOptions...),
 		)
 	case *sconfig.DatabasePostgres:
-		var err error
-		db, err = apdatabase.OpenInstrumentedSQL(
-			"pgx",
-			cfg.GetDsn(),
-			apdatabase.DBSystemPostgreSQL,
-			apdatabase.WithTelemetry(telemetry, root.Telemetry),
-		)
-		if err != nil {
-			return nil, fmt.Errorf("open workflow postgres database: %w", err)
+		db = runtimeOpts.postgresDB
+		if db == nil {
+			return nil, fmt.Errorf("workflow postgres database handle is required")
 		}
 		if err := db.Ping(); err != nil {
-			_ = db.Close()
 			return nil, fmt.Errorf("ping workflow postgres database: %w", err)
 		}
 
@@ -106,12 +117,30 @@ func NewRuntime(root *sconfig.Root, telemetry *aptelemetry.Providers, logger *sl
 		backend: b,
 		client:  client.New(b),
 		db:      db,
+		closeDB: closeDB,
 	}, nil
 }
 
-func Migrate(root *sconfig.Root, logger *slog.Logger) error {
+type MigrateOption func(*migrateOptions)
+
+type migrateOptions struct {
+	postgresDB *sql.DB
+}
+
+func WithPostgresMigrationDB(db *sql.DB) MigrateOption {
+	return func(o *migrateOptions) {
+		o.postgresDB = db
+	}
+}
+
+func Migrate(root *sconfig.Root, logger *slog.Logger, opts ...MigrateOption) error {
 	if root == nil || root.Database == nil {
 		return fmt.Errorf("database configuration is required")
+	}
+
+	migrateOpts := &migrateOptions{}
+	for _, opt := range opts {
+		opt(migrateOpts)
 	}
 
 	switch cfg := root.Database.InnerVal.(type) {
@@ -123,11 +152,10 @@ func Migrate(root *sconfig.Root, logger *slog.Logger) error {
 		defer db.Close()
 		return migrateDB(db, "sqlite", "migrations/sqlite")
 	case *sconfig.DatabasePostgres:
-		db, err := apdatabase.OpenInstrumentedSQL("pgx", cfg.GetDsn(), apdatabase.DBSystemPostgreSQL)
-		if err != nil {
-			return fmt.Errorf("open workflow postgres database: %w", err)
+		db := migrateOpts.postgresDB
+		if db == nil {
+			return fmt.Errorf("workflow postgres database handle is required")
 		}
-		defer db.Close()
 
 		return migrateDB(db, "postgres", "migrations/postgres")
 	default:
@@ -226,7 +254,7 @@ func (r *Runtime) Close() error {
 	if r.backend != nil {
 		closeErr = r.backend.Close()
 	}
-	if r.db != nil {
+	if r.closeDB && r.db != nil {
 		if err := r.db.Close(); err != nil && closeErr == nil {
 			closeErr = err
 		}

@@ -100,6 +100,7 @@ func Serve(cfg config.C) {
 	})
 
 	dm.AutoMigrateAll()
+	defer dm.ShutdownDatabase()
 	defer dm.GetEncryptService().Shutdown()
 	defer dm.ShutdownWorkflowRuntime()
 

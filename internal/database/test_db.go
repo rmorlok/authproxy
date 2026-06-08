@@ -14,6 +14,8 @@ import (
 
 	sq "github.com/Masterminds/squirrel"
 	"github.com/google/uuid"
+	_ "github.com/jackc/pgx/v5/stdlib"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/peterldowns/pgtestdb"
 	"github.com/peterldowns/pgtestdb/migrators/golangmigrator"
 	"github.com/rmorlok/authproxy/internal/config"
@@ -119,13 +121,17 @@ func mustApplyBlankSqliteTestDbConfig(t testing.TB, cfg config.C) (config.C, DB,
 		Path: tempFilePath,
 	}}
 
-	db, err := NewConnectionForRoot(root, root.GetRootLogger())
+	rawDb, err := sql.Open("sqlite3", root.Database.GetDsn())
 	if err != nil {
 		t.Fatalf("failed to connect sqlite test database: %v", err)
 	}
 	t.Cleanup(func() {
-		_ = db.(*service).db.Close()
+		_ = rawDb.Close()
 	})
+	db, err := NewService(rawDb, root.Database.InnerVal, root.GetRootLogger())
+	if err != nil {
+		t.Fatalf("failed to construct sqlite test database: %v", err)
+	}
 
 	if err := db.Migrate(context.Background()); err != nil {
 		t.Fatalf("failed to migrate sqlite test database: %v", err)
@@ -138,7 +144,7 @@ func mustApplyBlankSqliteTestDbConfig(t testing.TB, cfg config.C) (config.C, DB,
 		t.Fatalf("failed to create root namespace: %v", err)
 	}
 
-	return cfg, db, db.(*service).db
+	return cfg, db, rawDb
 }
 
 func mustApplyBlankPostgresTestDbConfig(t testing.TB, cfg config.C) (config.C, DB, *sql.DB) {
@@ -150,14 +156,14 @@ func mustApplyBlankPostgresTestDbConfig(t testing.TB, cfg config.C) (config.C, D
 	defer func() { <-postgresTestLimiter }()
 
 	adminConfig := pgtestdb.Config{
-		DriverName:                  "pgx",
-		User:                        util.GetEnvDefault("POSTGRES_TEST_USER", "postgres"),
-		Password:                    util.GetEnvDefault("POSTGRES_TEST_PASSWORD", "postgres"),
-		Host:                        util.GetEnvDefault("POSTGRES_TEST_HOST", "localhost"),
-		Port:                        util.GetEnvDefault("POSTGRES_TEST_PORT", "5432"),
-		Database:                    util.GetEnvDefault("POSTGRES_TEST_DATABASE", "postgres"),
-		Options:                     util.GetEnvDefault("POSTGRES_TEST_OPTIONS", "sslmode=disable"),
-		ForceTerminateConnections:   true,
+		DriverName:                "pgx",
+		User:                      util.GetEnvDefault("POSTGRES_TEST_USER", "postgres"),
+		Password:                  util.GetEnvDefault("POSTGRES_TEST_PASSWORD", "postgres"),
+		Host:                      util.GetEnvDefault("POSTGRES_TEST_HOST", "localhost"),
+		Port:                      util.GetEnvDefault("POSTGRES_TEST_PORT", "5432"),
+		Database:                  util.GetEnvDefault("POSTGRES_TEST_DATABASE", "postgres"),
+		Options:                   util.GetEnvDefault("POSTGRES_TEST_OPTIONS", "sslmode=disable"),
+		ForceTerminateConnections: true,
 	}
 
 	migrator := golangmigrator.New(

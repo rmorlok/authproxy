@@ -20,6 +20,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -40,8 +41,8 @@ type sqlRecordStore struct {
 	placeholderFormat sq.PlaceholderFormat
 }
 
-func NewSqlRecordStore(cfg *config.Database, logger *slog.Logger, opts ...database.Option) RecordStore {
-	db, err := database.OpenInstrumentedSQL(cfg.GetDriver(), cfg.GetDsn(), dbSystemFor(cfg.GetProvider()), opts...)
+func NewSqlRecordStore(cfg *config.Database, logger *slog.Logger, opts ...sqlh.Option) RecordStore {
+	db, err := sqlh.OpenInstrumentedSQL(cfg.GetDriver(), cfg.GetDsn(), dbSystemFor(cfg.GetProvider()), opts...)
 	if err != nil {
 		panic(fmt.Errorf("failed to open app metrics database: %w", err))
 	}
@@ -217,8 +218,8 @@ type sqlRecordRetriever struct {
 	placeholderFormat sq.PlaceholderFormat
 }
 
-func NewSqlRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorEncryptor, logger *slog.Logger, opts ...database.Option) RecordRetriever {
-	db, err := database.OpenInstrumentedSQL(cfg.GetDriver(), cfg.GetDsn(), dbSystemFor(cfg.GetProvider()), opts...)
+func NewSqlRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorEncryptor, logger *slog.Logger, opts ...sqlh.Option) RecordRetriever {
+	db, err := sqlh.OpenInstrumentedSQL(cfg.GetDriver(), cfg.GetDsn(), dbSystemFor(cfg.GetProvider()), opts...)
 	if err != nil {
 		panic(fmt.Errorf("failed to open app metrics database for retrieval: %w", err))
 	}

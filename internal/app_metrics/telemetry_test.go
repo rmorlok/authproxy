@@ -13,8 +13,8 @@ import (
 	"go.opentelemetry.io/otel/sdk/trace/tracetest"
 
 	"github.com/rmorlok/authproxy/internal/aptelemetry"
-	"github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/sqlh"
 )
 
 // requestLogTelemetryFixture wires an OTel SDK with an in-memory span
@@ -93,7 +93,7 @@ func TestRequestEvents_SqlStoreEmitsSpansWhenTelemetryEnabled(t *testing.T) {
 	tel := &sconfig.Telemetry{Enabled: enabledPtr(true)}
 
 	cfg := newSqliteRequestEventsConfig(t)
-	store := NewSqlRecordStore(cfg, newNoopLogger(), database.WithTelemetry(fx.providers, tel))
+	store := NewSqlRecordStore(cfg, newNoopLogger(), sqlh.WithTelemetry(fx.providers, tel))
 
 	runProbeQuery(t, store)
 

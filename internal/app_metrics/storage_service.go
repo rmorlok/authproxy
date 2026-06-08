@@ -8,9 +8,9 @@ import (
 
 	"github.com/rmorlok/authproxy/internal/apblob"
 	"github.com/rmorlok/authproxy/internal/apid"
-	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/httpf"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -161,14 +161,14 @@ func (ss *StorageService) Migrate(ctx context.Context) error {
 
 // NewStorageService that will store app metrics records and full request/response details.
 // dbOpts are forwarded to the underlying DB constructors — pass
-// database.WithTelemetry(...) to instrument the request-events database tier.
+// sqlh.WithTelemetry(...) to instrument the request-events database tier.
 func NewStorageService(
 	ctx context.Context,
 	cfg *config.AppMetrics,
 	cursorEncryptor pagination.CursorEncryptor,
 	encryptor Encryptor,
 	logger *slog.Logger,
-	dbOpts ...database.Option,
+	dbOpts ...sqlh.Option,
 ) (*StorageService, error) {
 	logger = logger.With("service", "app_metrics")
 	if cfg == nil {

@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"log/slog"
 
-	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/schema/config"
+	"github.com/rmorlok/authproxy/internal/sqlh"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
@@ -15,11 +15,11 @@ import (
 func dbSystemFor(p config.DatabaseProvider) string {
 	switch p {
 	case config.DatabaseProviderPostgres:
-		return database.DBSystemPostgreSQL
+		return sqlh.DBSystemPostgreSQL
 	case config.DatabaseProviderSqlite:
-		return database.DBSystemSQLite
+		return sqlh.DBSystemSQLite
 	case config.DatabaseProviderClickhouse:
-		return database.DBSystemClickHouse
+		return sqlh.DBSystemClickHouse
 	default:
 		return ""
 	}
@@ -27,9 +27,9 @@ func dbSystemFor(p config.DatabaseProvider) string {
 
 // NewRecordStore creates a RecordStore based on the app metrics database configuration.
 // dbOpts are forwarded to the underlying instrumented DB constructor —
-// callers pass database.WithTelemetry(...) to enable spans + metrics on the
+// callers pass sqlh.WithTelemetry(...) to enable spans + metrics on the
 // request-events database tier.
-func NewRecordStore(cfg *config.Database, logger *slog.Logger, dbOpts ...database.Option) RecordStore {
+func NewRecordStore(cfg *config.Database, logger *slog.Logger, dbOpts ...sqlh.Option) RecordStore {
 	provider := cfg.GetProvider()
 
 	switch provider {
@@ -45,7 +45,7 @@ func NewRecordStore(cfg *config.Database, logger *slog.Logger, dbOpts ...databas
 }
 
 // NewRecordRetriever creates a RecordRetriever based on the app metrics database configuration.
-func NewRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorEncryptor, logger *slog.Logger, dbOpts ...database.Option) RecordRetriever {
+func NewRecordRetriever(cfg *config.Database, cursorEncryptor pagination.CursorEncryptor, logger *slog.Logger, dbOpts ...sqlh.Option) RecordRetriever {
 	provider := cfg.GetProvider()
 	switch provider {
 	case config.DatabaseProviderSqlite:

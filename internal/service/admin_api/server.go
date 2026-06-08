@@ -277,6 +277,8 @@ func Serve(cfg config.C) {
 
 	dm.AutoMigrateAll()
 
+	defer dm.ShutdownDatabase()
+	defer dm.ShutdownWorkflowRuntime()
 	defer dm.GetEncryptService().Shutdown()
 
 	server, healthChecker, err := GetGinServer(dm)

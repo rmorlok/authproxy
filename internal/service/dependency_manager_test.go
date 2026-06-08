@@ -2,10 +2,14 @@ package service
 
 import (
 	"context"
+	"database/sql"
 	"testing"
 	"time"
 
+	"github.com/rmorlok/authproxy/internal/schema/common"
+	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/require"
 )
 
 func TestRegisterPingAndRunPings_AllOk(t *testing.T) {
@@ -67,4 +71,32 @@ func TestRunPings_ContextCancellation(t *testing.T) {
 	results, allOk := dm.RunPings(ctx)
 	assert.False(t, allOk)
 	assert.False(t, results["slow"])
+}
+
+func TestApplyPostgresPoolSettings(t *testing.T) {
+	db, err := sql.Open("sqlite3", ":memory:")
+	require.NoError(t, err)
+	defer db.Close()
+
+	err = applyPostgresPoolSettings(db, &config.DatabasePostgres{
+		MaxOpenConns:    common.NewIntegerValueDirectInline(7),
+		MaxIdleConns:    common.NewIntegerValueDirectInline(3),
+		ConnMaxLifetime: &config.HumanDuration{Duration: 30 * time.Minute},
+		ConnMaxIdleTime: &config.HumanDuration{Duration: 5 * time.Minute},
+	})
+	require.NoError(t, err)
+
+	require.Equal(t, 7, db.Stats().MaxOpenConnections)
+}
+
+func TestApplyPostgresPoolSettingsRejectsInvalidValues(t *testing.T) {
+	db, err := sql.Open("sqlite3", ":memory:")
+	require.NoError(t, err)
+	defer db.Close()
+
+	err = applyPostgresPoolSettings(db, &config.DatabasePostgres{
+		MaxOpenConns: common.NewIntegerValueDirectInline(-1),
+	})
+	require.Error(t, err)
+	require.Contains(t, err.Error(), "max_open_conns")
 }

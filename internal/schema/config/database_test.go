@@ -2,6 +2,7 @@ package config
 
 import (
 	"testing"
+	"time"
 
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/stretchr/testify/assert"
@@ -34,19 +35,27 @@ func TestDatabase(t *testing.T) {
       password: secret
       database: authproxy
       sslmode: disable
+      max_open_conns: 25
+      max_idle_conns: 5
+      conn_max_lifetime: 30m
+      conn_max_idle_time: 5m
       params:
         application_name: authproxy-tests
 `
 			var db Database
 			assert.NoError(yaml.Unmarshal([]byte(data), &db))
 			assert.Equal(Database{InnerVal: &DatabasePostgres{
-				Provider: DatabaseProviderPostgres,
-				Host:     common.NewStringValueDirectInline("localhost"),
-				Port:     common.NewIntegerValueDirectInline(5432),
-				User:     common.NewStringValueDirectInline("test"),
-				Password: common.NewStringValueDirectInline("secret"),
-				Database: common.NewStringValueDirectInline("authproxy"),
-				SSLMode:  common.NewStringValueDirectInline("disable"),
+				Provider:        DatabaseProviderPostgres,
+				Host:            common.NewStringValueDirectInline("localhost"),
+				Port:            common.NewIntegerValueDirectInline(5432),
+				User:            common.NewStringValueDirectInline("test"),
+				Password:        common.NewStringValueDirectInline("secret"),
+				Database:        common.NewStringValueDirectInline("authproxy"),
+				SSLMode:         common.NewStringValueDirectInline("disable"),
+				MaxOpenConns:    common.NewIntegerValueDirectInline(25),
+				MaxIdleConns:    common.NewIntegerValueDirectInline(5),
+				ConnMaxLifetime: &HumanDuration{Duration: 30 * time.Minute},
+				ConnMaxIdleTime: &HumanDuration{Duration: 5 * time.Minute},
 				Params: map[string]string{
 					"application_name": "authproxy-tests",
 				},
