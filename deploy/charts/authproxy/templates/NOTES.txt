@@ -29,8 +29,8 @@ either enable `ingress.enabled` in your values or port-forward, e.g.:
 {{- end }}
 
 {{- $missing := list }}
-{{- if not .Values.database.existingSecret }}{{- $missing = append $missing "database.existingSecret" }}{{- end }}
-{{- if not .Values.redis.existingSecret }}{{- $missing = append $missing "redis.existingSecret" }}{{- end }}
+{{- if and (eq .Values.database.provider "postgres") (not .Values.database.existingSecret) }}{{- $missing = append $missing "database.existingSecret" }}{{- end }}
+{{- if and (eq (default "redis" .Values.redis.provider) "redis") (not .Values.redis.existingSecret) }}{{- $missing = append $missing "redis.existingSecret" }}{{- end }}
 {{- if not .Values.jwt.existingSecret }}{{- $missing = append $missing "jwt.existingSecret" }}{{- end }}
 {{- if not .Values.encryptionKeys.existingSecret }}{{- $missing = append $missing "encryptionKeys.existingSecret" }}{{- end }}
 {{- if not .Values.actors.existingSecret }}{{- $missing = append $missing "actors.existingSecret (admin actor keys; chart starts without it but admin API calls won't auth)" }}{{- end }}

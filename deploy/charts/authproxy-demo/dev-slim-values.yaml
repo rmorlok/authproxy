@@ -1,0 +1,37 @@
+# Dev-only profile for per-branch deployments.
+#
+# This intentionally trades durability for lower cluster footprint:
+# - SQLite files live in the AuthProxy pod's writable /tmp.
+# - Redis is replaced by the embedded miniredis provider.
+# - S3/MinIO blob storage is omitted; full request body capture should
+#   remain disabled for this profile.
+#
+# Do not use this profile for demo.authproxy.net or customer installs.
+
+secrets:
+  autoGenerate: false
+
+authproxy:
+  database:
+    provider: sqlite
+    path: /tmp/authproxy-dev.db
+    autoMigrate: true
+    existingSecret: ""
+  redis:
+    provider: miniredis
+    address: ""
+    existingSecret: ""
+  s3:
+    enabled: false
+  appMetrics:
+    shareMainDatabase: true
+    fullRequestRecording: never
+
+postgresql:
+  enabled: false
+
+redis:
+  enabled: false
+
+minio:
+  enabled: false

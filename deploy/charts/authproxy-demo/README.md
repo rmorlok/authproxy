@@ -166,6 +166,19 @@ redirects between root-relative `/web/*` paths. The marketplace and
 admin UIs also use subdomains so their root-relative Vite assets resolve
 correctly.
 
+## Per-branch dev storage profile
+
+The Deploy Dev workflow uses `dev-slim-values.yaml` to keep PR
+environments small. That profile disables the Postgres, Redis, and
+MinIO subcharts, then configures the embedded AuthProxy chart to use
+SQLite files under `/tmp`, the in-process `miniredis` provider, and no
+S3 blob store. This is intentionally disposable: a pod restart can lose
+database, queue, session, and full-request blob state, but the next dev
+deploy reseeds the catalog and actors.
+
+Do not use the slim profile for `demo.authproxy.net`. The persistent
+demo environment uses the chart defaults: Postgres, Redis, and MinIO.
+
 ## Wildcard TLS
 
 For per-branch dev environments, use a DNS-01 ClusterIssuer and set:

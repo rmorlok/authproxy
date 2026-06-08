@@ -306,6 +306,7 @@ jobs:
         run: |
           set -euo pipefail
           helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \
+            -f "${CHART_PATH}/dev-slim-values.yaml" \
             --namespace "${RELEASE_NS}" \
             --atomic \
             --wait --timeout 10m \
