@@ -220,3 +220,5 @@ require (
 )
 
 replace github.com/Masterminds/squirrel v1.5.4 => github.com/jack-t/squirrel v1.6.0
+
+replace github.com/cschleiden/go-workflows => github.com/rmorlok/go-workflows v0.0.0-20260606194005-c8be9ef9bb4e

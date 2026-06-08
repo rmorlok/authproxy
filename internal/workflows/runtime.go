@@ -3,8 +3,6 @@ package workflows
 import (
 	"context"
 	"database/sql"
-	"embed"
-	"errors"
 	"fmt"
 	"log/slog"
 	"time"
@@ -19,11 +17,6 @@ import (
 	"github.com/cschleiden/go-workflows/registry"
 	wfworker "github.com/cschleiden/go-workflows/worker"
 	wflib "github.com/cschleiden/go-workflows/workflow"
-	"github.com/golang-migrate/migrate/v4"
-	migratedatabase "github.com/golang-migrate/migrate/v4/database"
-	migratepostgres "github.com/golang-migrate/migrate/v4/database/postgres"
-	migratesqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
-	"github.com/golang-migrate/migrate/v4/source/iofs"
 	"github.com/rmorlok/authproxy/internal/aptelemetry"
 	apdatabase "github.com/rmorlok/authproxy/internal/database"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
@@ -34,9 +27,6 @@ const (
 
 	workflowMigrationsTable = "authproxy_workflows_schema_migrations"
 )
-
-//go:embed migrations/postgres/*.sql migrations/sqlite/*.sql
-var migrationsFS embed.FS
 
 type Runtime struct {
 	backend wfbackend.Backend
@@ -75,6 +65,7 @@ func NewRuntime(root *sconfig.Root, telemetry *aptelemetry.Providers, logger *sl
 		b = sqlite.NewSqliteBackend(
 			cfg.Path,
 			sqlite.WithApplyMigrations(false),
+			sqlite.WithMigrationsTable(workflowMigrationsTable),
 			sqlite.WithBackendOptions(backendOptions...),
 		)
 	case *sconfig.DatabasePostgres:
@@ -96,6 +87,7 @@ func NewRuntime(root *sconfig.Root, telemetry *aptelemetry.Providers, logger *sl
 		b = postgres.NewPostgresBackendWithDB(
 			db,
 			postgres.WithApplyMigrations(false),
+			postgres.WithMigrationsTable(workflowMigrationsTable),
 			postgres.WithBackendOptions(backendOptions...),
 		)
 	default:
@@ -116,12 +108,17 @@ func Migrate(root *sconfig.Root, logger *slog.Logger) error {
 
 	switch cfg := root.Database.InnerVal.(type) {
 	case *sconfig.DatabaseSqlite:
-		db, err := sql.Open("sqlite", fmt.Sprintf("file:%v?_txlock=immediate", cfg.Path))
-		if err != nil {
-			return fmt.Errorf("open workflow sqlite database: %w", err)
+		backend := sqlite.NewSqliteBackend(
+			cfg.Path,
+			sqlite.WithApplyMigrations(false),
+			sqlite.WithMigrationsTable(workflowMigrationsTable),
+		)
+		defer backend.Close()
+
+		if err := backend.Migrate(); err != nil {
+			return fmt.Errorf("running workflow sqlite migrations: %w", err)
 		}
-		defer db.Close()
-		return migrateDB(db, "sqlite", "migrations/sqlite")
+		return nil
 	case *sconfig.DatabasePostgres:
 		db, err := apdatabase.OpenInstrumentedSQL("pgx", cfg.GetDsn(), apdatabase.DBSystemPostgreSQL)
 		if err != nil {
@@ -129,47 +126,19 @@ func Migrate(root *sconfig.Root, logger *slog.Logger) error {
 		}
 		defer db.Close()
 
-		return migrateDB(db, "postgres", "migrations/postgres")
+		backend := postgres.NewPostgresBackendWithDB(
+			db,
+			postgres.WithApplyMigrations(false),
+			postgres.WithMigrationsTable(workflowMigrationsTable),
+		)
+
+		if err := backend.Migrate(); err != nil {
+			return fmt.Errorf("running workflow postgres migrations: %w", err)
+		}
+		return nil
 	default:
 		return fmt.Errorf("workflow database provider %q is not supported", root.Database.GetProvider())
 	}
-}
-
-func migrateDB(db *sql.DB, driverName string, sourcePath string) error {
-	var (
-		driver migratedatabase.Driver
-		err    error
-	)
-	switch driverName {
-	case "postgres":
-		driver, err = migratepostgres.WithInstance(db, &migratepostgres.Config{
-			MigrationsTable: workflowMigrationsTable,
-		})
-	case "sqlite":
-		driver, err = migratesqlite.WithInstance(db, &migratesqlite.Config{
-			MigrationsTable: workflowMigrationsTable,
-		})
-	default:
-		return fmt.Errorf("workflow migration driver %q is not supported", driverName)
-	}
-	if err != nil {
-		return fmt.Errorf("creating workflow migration instance: %w", err)
-	}
-
-	source, err := iofs.New(migrationsFS, sourcePath)
-	if err != nil {
-		return fmt.Errorf("creating workflow migration source: %w", err)
-	}
-
-	m, err := migrate.NewWithInstance("iofs", source, driverName, driver)
-	if err != nil {
-		return fmt.Errorf("creating workflow migration: %w", err)
-	}
-	if err := m.Up(); err != nil && !errors.Is(err, migrate.ErrNoChange) {
-		return fmt.Errorf("running workflow migrations: %w", err)
-	}
-
-	return nil
 }
 
 func (r *Runtime) Backend() wfbackend.Backend {
