@@ -585,10 +585,20 @@
       "required": ["provider"],
       "additionalProperties": false
     },
+    "BlobStorageFilesystem": {
+      "type": "object",
+      "properties": {
+        "provider": { "const": "filesystem" },
+        "path": { "type": "string" }
+      },
+      "required": ["provider", "path"],
+      "additionalProperties": false
+    },
     "BlobStorage": {
       "oneOf": [
         { "$ref": "#/$defs/BlobStorageS3" },
-        { "$ref": "#/$defs/BlobStorageMemory" }
+        { "$ref": "#/$defs/BlobStorageMemory" },
+        { "$ref": "#/$defs/BlobStorageFilesystem" }
       ]
     },
     "ServiceAdminApi": {

@@ -3,8 +3,9 @@ package config
 type BlobStorageProvider string
 
 const (
-	BlobStorageProviderS3     BlobStorageProvider = "s3"
-	BlobStorageProviderMemory BlobStorageProvider = "memory"
+	BlobStorageProviderS3         BlobStorageProvider = "s3"
+	BlobStorageProviderMemory     BlobStorageProvider = "memory"
+	BlobStorageProviderFilesystem BlobStorageProvider = "filesystem"
 )
 
 // BlobStorageImpl is the interface implemented by concrete blob storage configurations.

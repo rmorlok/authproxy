@@ -116,6 +116,10 @@ spec:
               mountPath: {{ $.Values.actors.mountPath }}
               readOnly: true
             {{- end }}
+            {{- if and (eq .Values.blobStorage.provider "filesystem") .Values.blobStorage.filesystem.emptyDir }}
+            - name: blob-storage
+              mountPath: {{ .Values.blobStorage.filesystem.path }}
+            {{- end }}
       volumes:
         - name: config
           configMap:
@@ -135,6 +139,10 @@ spec:
         - name: actors-keys
           secret:
             secretName: {{ tpl . $ }}
+        {{- end }}
+        {{- if and (eq .Values.blobStorage.provider "filesystem") .Values.blobStorage.filesystem.emptyDir }}
+        - name: blob-storage
+          emptyDir: {}
         {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

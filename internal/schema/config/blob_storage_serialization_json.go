@@ -26,6 +26,8 @@ func (b *BlobStorage) UnmarshalJSON(data []byte) error {
 		switch BlobStorageProvider(fmt.Sprintf("%v", provider)) {
 		case BlobStorageProviderMemory:
 			t = &BlobStorageMemory{}
+		case BlobStorageProviderFilesystem:
+			t = &BlobStorageFilesystem{}
 		case BlobStorageProviderS3:
 			t = &BlobStorageS3{}
 		default:
