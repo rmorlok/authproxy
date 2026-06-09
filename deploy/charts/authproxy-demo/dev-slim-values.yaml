@@ -3,8 +3,8 @@
 # This intentionally trades durability for lower cluster footprint:
 # - SQLite files live in the AuthProxy pod's writable /tmp.
 # - Redis is replaced by the embedded miniredis provider.
-# - S3/MinIO blob storage is omitted; full request body capture should
-#   remain disabled for this profile.
+# - S3/MinIO blob storage is replaced by a writable local directory
+#   under /tmp/authproxy-blobs.
 #
 # Do not use this profile for demo.authproxy.net or customer installs.
 
