@@ -225,6 +225,78 @@ The `Teardown Dev` workflow still runs on PR close regardless of labels,
 so merged or closed PRs tear down any previously-created dev demo
 environment even if the opt-in label has since been removed.
 
+#### 1.11.1 Dev storage profile
+
+Per-branch dev environments intentionally use a smaller, disposable
+storage profile than the persistent demo environment. `Deploy Dev`
+passes `deploy/charts/authproxy-demo/dev-slim-values.yaml` to Helm; the
+regular `Deploy Demo` workflow does **not** use that file.
+
+| Environment | Main DB | Session/task/rate-limit store | Blob storage | Backing workloads |
+|---|---|---|---|---|
+| `demo.authproxy.net` | Postgres subchart | Redis subchart | MinIO subchart | AuthProxy, demo shell, seed Job, go-oauth2-server, Postgres, Redis, MinIO, and optional Grafana |
+| per-branch dev | SQLite under `/tmp` in the AuthProxy pod | in-process `miniredis` | filesystem under `/tmp/authproxy-blobs` in the AuthProxy pod | AuthProxy, demo shell, seed Job, go-oauth2-server, and optional Grafana |
+
+This cuts the required stateful backing containers from three to zero
+for PR environments: no Postgres, Redis, or MinIO pods are rendered. The
+tradeoff is durability. A pod restart, reschedule, or redeploy can lose
+SQLite data, miniredis state, queue/session/OAuth round-trip state, and
+filesystem blobs. That is acceptable for PR demos because the next
+deploy reruns the seed Job and recreates the catalog and demo actors.
+
+Do not use `dev-slim-values.yaml` for `demo.authproxy.net`, customer
+installs, or any environment where users expect stored connections,
+sessions, queues, request logs, or metrics to survive pod replacement.
+
+To verify the rendered profile before deploying:
+
+```bash
+helm template dev deploy/charts/authproxy-demo \
+  -f deploy/charts/authproxy-demo/dev-slim-values.yaml \
+  --set global.hostname=branch.dev.authproxy.net \
+  --set authproxy.image.repository=ghcr.io/rmorlok/authproxy \
+  --set authproxy.image.tag=test \
+  --set demoShell.image.tag=test \
+  --set seed.image.tag=test \
+  >/tmp/authproxy-dev-slim.yaml
+
+rg -n "provider: (sqlite|miniredis|filesystem)|/tmp/authproxy-blobs|kind: (Deployment|Job|StatefulSet)|name: dev-(postgresql|redis|minio)" \
+  /tmp/authproxy-dev-slim.yaml
+```
+
+Expected result: the AuthProxy config contains `provider: sqlite`,
+`provider: miniredis`, and `provider: filesystem`; the AuthProxy pod
+mounts `/tmp/authproxy-blobs`; there are no `dev-postgresql`,
+`dev-redis`, `dev-minio`, or `StatefulSet` matches.
+
+To verify a live PR namespace:
+
+```bash
+NS=authproxy-dev-pr-123
+
+kubectl -n "$NS" get deploy,job,statefulset,pod
+kubectl -n "$NS" get pod -l app.kubernetes.io/name=postgresql
+kubectl -n "$NS" get pod -l app.kubernetes.io/name=redis
+kubectl -n "$NS" get pod -l app.kubernetes.io/name=minio
+kubectl -n "$NS" get configmap -o yaml | rg -n "provider: (sqlite|miniredis|filesystem)|/tmp/authproxy-blobs"
+```
+
+The dependency pod queries should return no resources. The rendered
+ConfigMap should show the slim storage providers.
+
+Rollback options:
+
+- For one dev deploy, remove `-f "${CHART_PATH}/dev-slim-values.yaml"`
+  from the `Deploy Dev` Helm command or override the slim values back to
+  the umbrella defaults.
+- To keep the slim file but re-enable specific dependencies, set
+  `postgresql.enabled=true`, `redis.enabled=true`, or `minio.enabled=true`
+  and restore the matching `authproxy.database`, `authproxy.redis`, or
+  `authproxy.blobStorage` values.
+- For an already-deployed PR namespace, rerun the workflow after
+  changing the Helm values; disposable data in the old AuthProxy pod
+  should be treated as lost.
+
 ## 2. Granting kubectl access
 
 The cluster uses the **modern EKS access-entry model**

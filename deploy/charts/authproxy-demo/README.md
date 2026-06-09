@@ -172,9 +172,10 @@ The Deploy Dev workflow uses `dev-slim-values.yaml` to keep PR
 environments small. That profile disables the Postgres, Redis, and
 MinIO subcharts, then configures the embedded AuthProxy chart to use
 SQLite files under `/tmp`, the in-process `miniredis` provider, and
-filesystem blob storage under `/tmp/authproxy-blobs`. This is intentionally disposable: a pod restart can lose
-database, queue, session, and full-request blob state, but the next dev
-deploy reseeds the catalog and actors.
+filesystem blob storage under `/tmp/authproxy-blobs`. This is
+intentionally disposable: a pod restart can lose database, queue,
+session, and full-request blob state, but the next dev deploy reseeds
+the catalog and actors.
 
 Do not use the slim profile for `demo.authproxy.net`. The persistent
 demo environment uses the chart defaults: Postgres, Redis, and MinIO.
