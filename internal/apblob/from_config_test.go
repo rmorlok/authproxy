@@ -42,3 +42,19 @@ func TestNewFromConfig_MemoryProvider(t *testing.T) {
 	_, ok := client.(*MemoryClient)
 	assert.True(t, ok, "memory provider should return *MemoryClient")
 }
+
+func TestNewFromConfig_FilesystemProvider(t *testing.T) {
+	cfg := &config.BlobStorage{
+		InnerVal: &config.BlobStorageFilesystem{
+			Provider: config.BlobStorageProviderFilesystem,
+			Path:     t.TempDir(),
+		},
+	}
+
+	client, err := NewFromConfig(context.Background(), cfg)
+	require.NoError(t, err)
+	require.NotNil(t, client)
+
+	_, ok := client.(*FilesystemClient)
+	assert.True(t, ok, "filesystem provider should return *FilesystemClient")
+}

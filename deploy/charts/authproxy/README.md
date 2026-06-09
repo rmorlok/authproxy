@@ -64,7 +64,8 @@ The chart exposes typed values for the common connectivity blocks. See
 | `ingress`        | Single Ingress with path → port-name routing                          |
 | `database`       | Postgres or SQLite connectivity (+ `existingSecret` for credentials)  |
 | `redis`          | Redis connectivity (+ optional `existingSecret`)                      |
-| `s3`             | Optional S3-compatible blob storage for request-log payloads          |
+| `s3`             | Legacy S3-compatible blob storage inputs                              |
+| `blobStorage`    | Request-log blob storage provider, including local filesystem mode    |
 | `jwt`            | Secret mount + key paths for JWT signing material                     |
 | `encryptionKeys` | Secret mount + path for the global AES key                            |
 | `actors`         | Secret mount + ACL permissions for admin actor keypairs               |
@@ -86,6 +87,10 @@ Secrets by name. You provision them once and pass the names via `existingSecret`
 | `database.existingSecret` *(optional)* | `AUTHPROXY_DB_PASSWORD`                            |
 | `redis.existingSecret` *(optional)* | `AUTHPROXY_REDIS_PASSWORD`                            |
 | `s3.existingSecret` *(optional)*    | `AWS_ACCESS_KEY_ID`, `AWS_SECRET_ACCESS_KEY`          |
+
+For disposable environments, set `blobStorage.provider=filesystem`; the chart
+mounts an `emptyDir` at `blobStorage.filesystem.path` by default. Persistent
+deployments should continue to use S3-compatible storage.
 
 ## Compatibility
 

@@ -36,6 +36,11 @@ fieldLoop:
 					Provider: BlobStorageProviderMemory,
 				}
 				break fieldLoop
+			case BlobStorageProviderFilesystem:
+				bs = &BlobStorageFilesystem{
+					Provider: BlobStorageProviderFilesystem,
+				}
+				break fieldLoop
 			case BlobStorageProviderS3:
 				bs = &BlobStorageS3{
 					Provider: BlobStorageProviderS3,

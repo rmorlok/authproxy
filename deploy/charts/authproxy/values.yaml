@@ -195,6 +195,19 @@ s3:
   # Leave empty when using IRSA (set `serviceAccount.annotations` instead).
   existingSecret: ""
 
+# -- Blob storage provider for request-log payloads. Leave provider empty to
+# preserve legacy behavior: S3 is rendered when `s3.enabled=true`, otherwise
+# blob storage is omitted and AuthProxy uses its in-memory fallback.
+blobStorage:
+  # -- Provider: `filesystem`, `memory`, or empty for legacy S3/omitted behavior.
+  provider: ""
+  filesystem:
+    # -- Local directory used when provider=filesystem.
+    path: /var/lib/authproxy/blob-storage
+    # -- Mount an emptyDir at `path`. Disable if the image already provides
+    # a writable directory or another volume is mounted through extra manifests.
+    emptyDir: true
+
 # -- JWT signing key pair, mounted into the container as files (paths are
 # substituted into the rendered config). The chart only references the
 # Secret; customers create it.

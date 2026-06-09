@@ -23,6 +23,11 @@ authproxy:
     existingSecret: ""
   s3:
     enabled: false
+  blobStorage:
+    provider: filesystem
+    filesystem:
+      path: /tmp/authproxy-blobs
+      emptyDir: true
   appMetrics:
     shareMainDatabase: true
     fullRequestRecording: never

@@ -161,23 +161,32 @@ template syntax.
 {{- else -}}
 {{-   $metricsDb = .Values.appMetrics.database -}}
 {{- end -}}
-{{- $appMetrics := dict
-      "auto_migrate" .Values.appMetrics.autoMigrate
-      "database" $metricsDb
-      "request_events" (dict
-        "full_request_recording" .Values.appMetrics.fullRequestRecording) -}}
-{{- $_ := set $cfg "app_metrics" $appMetrics -}}
-
-{{/* --- s3 (request-log blob storage) --- */}}
-{{- if .Values.s3.enabled -}}
+{{/* --- request-log blob storage --- */}}
+{{- $blobStorage := dict -}}
+{{- $blobProvider := default "" .Values.blobStorage.provider -}}
+{{- if eq $blobProvider "filesystem" -}}
+{{-   $blobStorage = dict "provider" "filesystem" "path" .Values.blobStorage.filesystem.path -}}
+{{- else if eq $blobProvider "memory" -}}
+{{-   $blobStorage = dict "provider" "memory" -}}
+{{- else if .Values.s3.enabled -}}
 {{-   $s3 := dict "provider" "s3" "bucket" .Values.s3.bucket "force_path_style" .Values.s3.forcePathStyle -}}
 {{-   if .Values.s3.region -}}{{- $_ := set $s3 "region" .Values.s3.region -}}{{- end -}}
 {{-   if .Values.s3.endpoint -}}{{- $_ := set $s3 "endpoint" .Values.s3.endpoint -}}{{- end -}}
 {{-   if .Values.s3.prefix -}}{{- $_ := set $s3 "prefix" .Values.s3.prefix -}}{{- end -}}
 {{-   $creds := dict "type" "implicit" -}}
 {{-   $_ := set $s3 "credentials" $creds -}}
-{{-   $_ := set $cfg "blob_storage" $s3 -}}
+{{-   $blobStorage = $s3 -}}
 {{- end -}}
+
+{{- $appMetrics := dict
+      "auto_migrate" .Values.appMetrics.autoMigrate
+      "database" $metricsDb
+      "request_events" (dict
+        "full_request_recording" .Values.appMetrics.fullRequestRecording) -}}
+{{- if $blobStorage -}}
+{{-   $_ := set $appMetrics "blob_storage" $blobStorage -}}
+{{- end -}}
+{{- $_ := set $cfg "app_metrics" $appMetrics -}}
 
 {{/* --- crypto material file paths --- */}}
 {{- if .Values.jwt.existingSecret -}}

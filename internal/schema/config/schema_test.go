@@ -635,6 +635,54 @@ func TestSchemaDefinitions(t *testing.T) {
 			},
 		},
 		{
+			Name: "BlobStorage",
+			Schema: `
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://raw.githubusercontent.com/rmorlok/authproxy/refs/heads/main/schema/config/test.json",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["test"],
+  "properties": {
+	"test": {
+		"$ref": "./schema.json#/$defs/BlobStorage"
+    }
+  }
+}`,
+			Tests: []test{
+				{
+					Name:  "s3 minimal",
+					Valid: true,
+					Data:  `{"test": {"provider": "s3", "bucket": "request-logs"}}`,
+				},
+				{
+					Name:  "memory",
+					Valid: true,
+					Data:  `{"test": {"provider": "memory"}}`,
+				},
+				{
+					Name:  "filesystem",
+					Valid: true,
+					Data:  `{"test": {"provider": "filesystem", "path": "/tmp/authproxy/blobs"}}`,
+				},
+				{
+					Name:  "filesystem missing path",
+					Valid: false,
+					Data:  `{"test": {"provider": "filesystem"}}`,
+				},
+				{
+					Name:  "filesystem extra property",
+					Valid: false,
+					Data:  `{"test": {"provider": "filesystem", "path": "/tmp/authproxy/blobs", "bucket": "x"}}`,
+				},
+				{
+					Name:  "unknown provider",
+					Valid: false,
+					Data:  `{"test": {"provider": "unknown"}}`,
+				},
+			},
+		},
+		{
 			Name: "ConfiguredActor",
 			Schema: `
 {

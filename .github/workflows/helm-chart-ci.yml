@@ -92,6 +92,8 @@ jobs:
             >"${manifest}"
 
           grep -q "provider: miniredis" "${manifest}"
+          grep -q "provider: filesystem" "${manifest}"
+          grep -q "mountPath: /tmp/authproxy-blobs" "${manifest}"
 
           if grep -Eq "name: dev-(db|redis-creds|minio-creds|postgresql|redis|minio)|AUTHPROXY_(DB|REDIS)_PASSWORD|root-password|kind: StatefulSet" "${manifest}"; then
             echo "Slim dev render leaked dependency credentials or workloads" >&2

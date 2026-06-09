@@ -175,6 +175,22 @@
       }
     },
 
+    "blobStorage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "provider": { "type": "string", "enum": ["", "filesystem", "memory"] },
+        "filesystem": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "path":     { "type": "string" },
+            "emptyDir": { "type": "boolean" }
+          }
+        }
+      }
+    },
+
     "jwt": {
       "type": "object",
       "additionalProperties": false,

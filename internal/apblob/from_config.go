@@ -17,6 +17,8 @@ func NewFromConfig(ctx context.Context, cfg *config.BlobStorage) (Client, error)
 	switch v := cfg.InnerVal.(type) {
 	case *config.BlobStorageMemory:
 		return NewMemoryClient(), nil
+	case *config.BlobStorageFilesystem:
+		return NewFilesystemClient(v)
 	case *config.BlobStorageS3:
 		return NewS3Client(ctx, v)
 	default:
