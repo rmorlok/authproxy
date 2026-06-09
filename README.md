@@ -16,6 +16,7 @@ This directory holds long-form documentation that supplements the [main repo REA
 - **[Workflow versioning](workflows.md)** — naming and evolution conventions for go-workflows-backed background work.
 - **[Blob storage](blob_storage.md)** — viewing data stored in MinIO / S3 (full request bodies, etc.).
 - **[Redis insight](redis_insight.md)** — viewing data stored in Redis (rate-limit counters, session state, etc.).
+- **[EKS deployment runbook](../deploy/docs/runbook.md)** — cluster setup, deploy workflows, per-branch dev environments, slim storage verification, and recovery operations.
 
 ## Reference
 
