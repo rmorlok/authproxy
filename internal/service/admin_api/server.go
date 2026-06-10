@@ -134,6 +134,7 @@ func GetGinServer(
 		dm.GetConfig(),
 		authService,
 		dm.GetCoreService(),
+		dm.GetEncryptService(),
 	)
 	routesConnections := common_routes.NewConnectionsRoutes(
 		dm.GetConfig(),

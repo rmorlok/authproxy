@@ -93,6 +93,8 @@ func TestSchemaSamples(t *testing.T) {
 		{name: "create connector", ref: "./schema.json#/$defs/CreateConnectorRequest", file: "valid-create-connector.json"},
 		{name: "update connector", ref: "./schema.json#/$defs/UpdateConnectorRequest", file: "valid-update-connector.json"},
 		{name: "create connector version", ref: "./schema.json#/$defs/CreateConnectorVersionRequest", file: "valid-create-connector-version.json"},
+		{name: "connector lifecycle request", ref: "./schema.json#/$defs/ConnectorLifecycleRequest", file: "valid-connector-lifecycle-request.json"},
+		{name: "connector lifecycle response", ref: "./schema.json#/$defs/ConnectorLifecycleResponse", file: "valid-connector-lifecycle-response.json"},
 		{name: "force connector version state", ref: "./schema.json#/$defs/ForceConnectorVersionStateRequest", file: "valid-force-connector-version-state.json"},
 		{name: "rate limit", ref: "./schema.json#/$defs/RateLimit", file: "valid-rate-limit.json"},
 		{name: "list rate limits", ref: "./schema.json#/$defs/ListRateLimitsResponse", file: "valid-list-rate-limits.json"},

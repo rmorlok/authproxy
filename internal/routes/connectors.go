@@ -5,6 +5,7 @@ import (
 	"errors"
 	"net/http"
 	"strconv"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
@@ -14,6 +15,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/core"
 	connIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
+	"github.com/rmorlok/authproxy/internal/encrypt"
 	"github.com/rmorlok/authproxy/internal/httperr"
 	"github.com/rmorlok/authproxy/internal/routes/key_value"
 	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
@@ -21,6 +23,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/schema/common"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
 	"github.com/rmorlok/authproxy/internal/schema/resources/namespace"
+	"github.com/rmorlok/authproxy/internal/tasks"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -33,6 +36,8 @@ type ListConnectorVersionsResponseJson = schemaapi.ListConnectorVersionsResponse
 type CreateConnectorRequestJson = schemaapi.CreateConnectorRequestJson
 type UpdateConnectorRequestJson = schemaapi.UpdateConnectorRequestJson
 type CreateConnectorVersionRequestJson = schemaapi.CreateConnectorVersionRequestJson
+type ConnectorLifecycleRequestJson = schemaapi.ConnectorLifecycleRequestJson
+type ConnectorLifecycleResponseJson = schemaapi.ConnectorLifecycleResponseJson
 type ForceConnectorVersionStateRequestJson = schemaapi.ForceConnectorVersionStateRequestJson
 
 type OpenAPIListConnectorsResponseJson = schemaapiopenapi.ListConnectorsResponseJson
@@ -41,6 +46,8 @@ type OpenAPIListConnectorVersionsResponseJson = schemaapiopenapi.ListConnectorVe
 type OpenAPICreateConnectorRequestJson = schemaapiopenapi.CreateConnectorRequestJson
 type OpenAPIUpdateConnectorRequestJson = schemaapiopenapi.UpdateConnectorRequestJson
 type OpenAPICreateConnectorVersionRequestJson = schemaapiopenapi.CreateConnectorVersionRequestJson
+type OpenAPIConnectorLifecycleRequestJson = schemaapiopenapi.ConnectorLifecycleRequestJson
+type OpenAPIConnectorLifecycleResponseJson = schemaapiopenapi.ConnectorLifecycleResponseJson
 
 func ConnectorToJson(c connIface.Connector) ConnectorJson {
 	result := ConnectorVersionToConnectorJson(c)
@@ -119,10 +126,28 @@ type ConnectorsRoutes struct {
 	cfg                  config.C
 	connectors           connIface.C
 	authService          auth.A
+	encrypt              encrypt.E
 	labelsAdapter        key_value.Adapter[apid.ID]
 	annotsAdapter        key_value.Adapter[apid.ID]
 	versionLabelsAdapter key_value.Adapter[connectorVersionID]
 	versionAnnotsAdapter key_value.Adapter[connectorVersionID]
+}
+
+const defaultConnectorLifecycleTimeout = 10 * time.Minute
+
+func parseConnectorID(gctx *gin.Context) (apid.ID, *httperr.Error) {
+	idStr := gctx.Param("id")
+	if idStr == "" {
+		return apid.Nil, httperr.BadRequest("id is required")
+	}
+	id, err := apid.Parse(idStr)
+	if err != nil {
+		return apid.Nil, httperr.BadRequest("invalid id format")
+	}
+	if id == apid.Nil {
+		return apid.Nil, httperr.BadRequest("id is required")
+	}
+	return id, nil
 }
 
 func connectorVersionStatesToAPI(states database.ConnectorVersionStates) schemaapi.ConnectorVersionStates {
@@ -1196,6 +1221,194 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 	gctx.PureJSON(http.StatusOK, ConnectorVersionToJson(cv))
 }
 
+func (r *ConnectorsRoutes) loadConnectorByID(ctx context.Context, connectorId apid.ID) (connIface.Connector, error) {
+	result := r.connectors.
+		ListConnectorsBuilder().
+		ForId(connectorId).
+		Limit(1).
+		FetchPage(ctx)
+	if result.Error != nil {
+		return nil, result.Error
+	}
+	if len(result.Results) == 0 {
+		return nil, core.ErrNotFound
+	}
+	return result.Results[0], nil
+}
+
+func (r *ConnectorsRoutes) parseLifecycleRequest(gctx *gin.Context) (connIface.ConnectorLifecycleOptions, bool) {
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	req := ConnectorLifecycleRequestJson{}
+	if gctx.Request.Body != http.NoBody && gctx.Request.ContentLength != 0 {
+		if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+			val.MarkErrorReturn()
+			return connIface.ConnectorLifecycleOptions{}, false
+		}
+	}
+
+	timeout := defaultConnectorLifecycleTimeout
+	if req.TimeoutSeconds != nil {
+		if *req.TimeoutSeconds <= 0 {
+			apgin.WriteError(gctx, nil, httperr.BadRequest("timeout_seconds must be greater than zero"))
+			val.MarkErrorReturn()
+			return connIface.ConnectorLifecycleOptions{}, false
+		}
+		timeout = time.Duration(*req.TimeoutSeconds) * time.Second
+	}
+
+	return connIface.ConnectorLifecycleOptions{Timeout: timeout}, true
+}
+
+func (r *ConnectorsRoutes) writeLifecycleTaskResponse(
+	gctx *gin.Context,
+	connectorID apid.ID,
+	taskInfo *tasks.TaskInfo,
+) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	if taskInfo == nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerErrorMsg("connector lifecycle task was not started"))
+		val.MarkErrorReturn()
+		return
+	}
+
+	ra := auth.MustGetAuthFromGinContext(gctx)
+	taskId, err := taskInfo.
+		BindToActor(ra.MustGetActor()).
+		ToSecureEncryptedString(ctx, r.encrypt)
+	if err != nil {
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+
+	gctx.PureJSON(http.StatusOK, ConnectorLifecycleResponseJson{
+		TaskId:      taskId,
+		ConnectorId: connectorID,
+	})
+}
+
+// @Summary		Disconnect all connector connections
+// @Description	Start a workflow that disconnects all connections for a connector
+// @Tags			connectors
+// @Accept			json
+// @Produce		json
+// @Param			id		path		string							true	"Connector UUID"
+// @Param			request	body		OpenAPIConnectorLifecycleRequestJson	false	"Lifecycle operation options"
+// @Success		200		{object}	OpenAPIConnectorLifecycleResponseJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Failure		501		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connectors/{id}/_disconnect_all [post]
+func (r *ConnectorsRoutes) disconnectAll(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	connectorId, httpErr := parseConnectorID(gctx)
+	if httpErr != nil {
+		apgin.WriteError(gctx, nil, httpErr)
+		val.MarkErrorReturn()
+		return
+	}
+
+	connector, err := r.loadConnectorByID(ctx, connectorId)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
+			val.MarkErrorReturn()
+			return
+		}
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(connector); httpErr != nil {
+		apgin.WriteError(gctx, nil, httpErr)
+		return
+	}
+
+	opts, ok := r.parseLifecycleRequest(gctx)
+	if !ok {
+		return
+	}
+
+	taskInfo, err := r.connectors.DisconnectConnectorConnections(ctx, connectorId, opts)
+	if err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
+		return
+	}
+
+	r.writeLifecycleTaskResponse(gctx, connectorId, taskInfo)
+}
+
+// @Summary		Archive connector
+// @Description	Start a workflow that archives a connector after disconnecting its connections
+// @Tags			connectors
+// @Accept			json
+// @Produce		json
+// @Param			id		path		string							true	"Connector UUID"
+// @Param			request	body		OpenAPIConnectorLifecycleRequestJson	false	"Lifecycle operation options"
+// @Success		200		{object}	OpenAPIConnectorLifecycleResponseJson
+// @Failure		400		{object}	ErrorResponse
+// @Failure		401		{object}	ErrorResponse
+// @Failure		403		{object}	ErrorResponse
+// @Failure		404		{object}	ErrorResponse
+// @Failure		500		{object}	ErrorResponse
+// @Failure		501		{object}	ErrorResponse
+// @Security		BearerAuth
+// @Router			/connectors/{id}/_archive [post]
+func (r *ConnectorsRoutes) archive(gctx *gin.Context) {
+	ctx := gctx.Request.Context()
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	connectorId, httpErr := parseConnectorID(gctx)
+	if httpErr != nil {
+		apgin.WriteError(gctx, nil, httpErr)
+		val.MarkErrorReturn()
+		return
+	}
+
+	connector, err := r.loadConnectorByID(ctx, connectorId)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
+			val.MarkErrorReturn()
+			return
+		}
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
+		val.MarkErrorReturn()
+		return
+	}
+
+	if httpErr := val.ValidateHttpStatusError(connector); httpErr != nil {
+		apgin.WriteError(gctx, nil, httpErr)
+		return
+	}
+
+	opts, ok := r.parseLifecycleRequest(gctx)
+	if !ok {
+		return
+	}
+
+	taskInfo, err := r.connectors.ArchiveConnector(ctx, connectorId, opts)
+	if err != nil {
+		apgin.WriteErr(gctx, nil, err)
+		val.MarkErrorReturn()
+		return
+	}
+
+	r.writeLifecycleTaskResponse(gctx, connectorId, taskInfo)
+}
+
 // @Summary		Get all annotations for a connector
 // @Description	Get all annotations associated with a connector's latest version
 // @Tags			connectors
@@ -1398,6 +1611,22 @@ func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 			Build(),
 		r.createVersion,
 	)
+	g.POST("/connectors/:id/_disconnect_all",
+		r.authService.NewRequiredBuilder().
+			ForResource("connectors").
+			ForIdField("id").
+			ForVerb("disconnect_all").
+			Build(),
+		r.disconnectAll,
+	)
+	g.POST("/connectors/:id/_archive",
+		r.authService.NewRequiredBuilder().
+			ForResource("connectors").
+			ForIdField("id").
+			ForVerb("archive").
+			Build(),
+		r.archive,
+	)
 	g.PATCH("/connectors/:id/versions/:version",
 		r.authService.NewRequiredBuilder().
 			ForResource("connectors").
@@ -1544,22 +1773,7 @@ func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 	)
 }
 
-func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *ConnectorsRoutes {
-	parseConnectorID := func(gctx *gin.Context) (apid.ID, *httperr.Error) {
-		idStr := gctx.Param("id")
-		if idStr == "" {
-			return apid.Nil, httperr.BadRequest("id is required")
-		}
-		id, err := apid.Parse(idStr)
-		if err != nil {
-			return apid.Nil, httperr.BadRequest("invalid id format")
-		}
-		if id == apid.Nil {
-			return apid.Nil, httperr.BadRequest("id is required")
-		}
-		return id, nil
-	}
-
+func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C, e encrypt.E) *ConnectorsRoutes {
 	parseConnectorVersionID := func(gctx *gin.Context) (connectorVersionID, *httperr.Error) {
 		id, herr := parseConnectorID(gctx)
 		if herr != nil {
@@ -1841,6 +2055,7 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C) *Conne
 		cfg:                  cfg,
 		authService:          authService,
 		connectors:           c,
+		encrypt:              e,
 		labelsAdapter:        labelsAdapter,
 		annotsAdapter:        annotsAdapter,
 		versionLabelsAdapter: versionLabelsAdapter,

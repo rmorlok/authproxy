@@ -636,6 +636,25 @@
       },
       "additionalProperties": false
     },
+    "ConnectorLifecycleRequest": {
+      "type": "object",
+      "properties": {
+        "timeout_seconds": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "additionalProperties": false
+    },
+    "ConnectorLifecycleResponse": {
+      "type": "object",
+      "properties": {
+        "task_id": { "type": "string" },
+        "connector_id": { "type": "string" }
+      },
+      "required": ["task_id", "connector_id"],
+      "additionalProperties": false
+    },
     "ForceConnectorVersionStateRequest": {
       "type": "object",
       "properties": {

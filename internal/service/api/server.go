@@ -95,6 +95,7 @@ func GetGinServer(dm *service.DependencyManager) (httpServer *http.Server, httpH
 		dm.GetConfig(),
 		authService,
 		dm.GetCoreService(),
+		dm.GetEncryptService(),
 	)
 	routesConnections := common_routes.NewConnectionsRoutes(
 		dm.GetConfig(),

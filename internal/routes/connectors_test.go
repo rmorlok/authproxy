@@ -8,7 +8,9 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"testing"
+	"time"
 
+	wflib "github.com/cschleiden/go-workflows/workflow"
 	"github.com/gin-gonic/gin"
 	"github.com/golang/mock/gomock"
 	asynqmock "github.com/rmorlok/authproxy/internal/apasynq/mock"
@@ -19,6 +21,7 @@ import (
 	"github.com/rmorlok/authproxy/internal/apredis/mock"
 	"github.com/rmorlok/authproxy/internal/config"
 	"github.com/rmorlok/authproxy/internal/core"
+	connIface "github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
 	"github.com/rmorlok/authproxy/internal/encrypt"
 	httpf2 "github.com/rmorlok/authproxy/internal/httpf"
@@ -26,16 +29,49 @@ import (
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
+	"github.com/rmorlok/authproxy/internal/tasks"
 	"github.com/rmorlok/authproxy/internal/test_utils"
 	"github.com/rmorlok/authproxy/internal/util"
+	apworkflows "github.com/rmorlok/authproxy/internal/workflows"
 	"github.com/stretchr/testify/require"
 )
 
+type fakeConnectorLifecycleCore struct {
+	connIface.C
+	disconnectOpts []connIface.ConnectorLifecycleOptions
+	archiveOpts    []connIface.ConnectorLifecycleOptions
+}
+
+func (f *fakeConnectorLifecycleCore) DisconnectConnectorConnections(
+	_ context.Context,
+	_ apid.ID,
+	opts connIface.ConnectorLifecycleOptions,
+) (*tasks.TaskInfo, error) {
+	f.disconnectOpts = append(f.disconnectOpts, opts)
+	return tasks.FromWorkflowInstance(&wflib.Instance{
+		InstanceID:  fmt.Sprintf("workflow-disconnect-%d", len(f.disconnectOpts)),
+		ExecutionID: fmt.Sprintf("workflow-execution-%d", len(f.disconnectOpts)),
+	}, core.WorkflowNameDisconnectConnectorConnectionsV1, string(apworkflows.DefaultQueue)), nil
+}
+
+func (f *fakeConnectorLifecycleCore) ArchiveConnector(
+	_ context.Context,
+	_ apid.ID,
+	opts connIface.ConnectorLifecycleOptions,
+) (*tasks.TaskInfo, error) {
+	f.archiveOpts = append(f.archiveOpts, opts)
+	return tasks.FromWorkflowInstance(&wflib.Instance{
+		InstanceID:  fmt.Sprintf("workflow-archive-%d", len(f.archiveOpts)),
+		ExecutionID: fmt.Sprintf("workflow-execution-%d", len(f.archiveOpts)),
+	}, core.WorkflowNameArchiveConnectorV1, string(apworkflows.DefaultQueue)), nil
+}
+
 func TestConnectors(t *testing.T) {
 	type TestSetup struct {
-		Gin      *gin.Engine
-		Cfg      config.C
-		AuthUtil *auth2.AuthTestUtil
+		Gin           *gin.Engine
+		Cfg           config.C
+		AuthUtil      *auth2.AuthTestUtil
+		LifecycleCore *fakeConnectorLifecycleCore
 	}
 
 	setup := func(t *testing.T, cfg config.C) *TestSetup {
@@ -82,18 +118,138 @@ func TestConnectors(t *testing.T) {
 		h := httpf2.CreateFactory(cfg, rs, nil, aplog.NewNoopLogger())
 		c := core.NewCoreService(cfg, db, e, rs, h, ac, test_utils.NewTestLogger())
 		require.NoError(t, c.Migrate(context.Background()))
+		lifecycleCore := &fakeConnectorLifecycleCore{C: c}
 
-		cr := NewConnectorsRoutes(cfg, auth, c)
+		cr := NewConnectorsRoutes(cfg, auth, lifecycleCore, e)
 
 		r := apgin.ForTest(nil)
 		cr.Register(r)
 
 		return &TestSetup{
-			Gin:      r,
-			Cfg:      cfg,
-			AuthUtil: authUtil,
+			Gin:           r,
+			Cfg:           cfg,
+			AuthUtil:      authUtil,
+			LifecycleCore: lifecycleCore,
 		}
 	}
+
+	t.Run("connector lifecycle operations", func(t *testing.T) {
+		t.Run("disconnect all unauthorized", func(t *testing.T) {
+			tu := setup(t, nil)
+
+			w := httptest.NewRecorder()
+			req, err := http.NewRequest(http.MethodPost, "/connectors/cxr_test0000000000001/_disconnect_all", nil)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusUnauthorized, w.Code)
+		})
+
+		t.Run("archive malformed id", func(t *testing.T) {
+			tu := setup(t, nil)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connectors/bad-connector/_archive",
+				nil,
+				"root",
+				"some-actor",
+				aschema.AllPermissions(),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("disconnect all forbidden without lifecycle permission", func(t *testing.T) {
+			tu := setup(t, nil)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connectors/cxr_test0000000000001/_disconnect_all",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connectors", "get"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusForbidden, w.Code)
+		})
+
+		t.Run("archive rejects invalid timeout", func(t *testing.T) {
+			tu := setup(t, nil)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connectors/cxr_test0000000000001/_archive",
+				util.JsonToReader(ConnectorLifecycleRequestJson{TimeoutSeconds: util.ToPtr(int64(0))}),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connectors", "archive"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+			require.Empty(t, tu.LifecycleCore.archiveOpts)
+		})
+
+		t.Run("disconnect all starts workflow task", func(t *testing.T) {
+			tu := setup(t, nil)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connectors/cxr_test0000000000001/_disconnect_all",
+				util.JsonToReader(ConnectorLifecycleRequestJson{TimeoutSeconds: util.ToPtr(int64(600))}),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connectors", "disconnect_all"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ConnectorLifecycleResponseJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.NotEmpty(t, resp.TaskId)
+			require.Equal(t, apid.MustParse("cxr_test0000000000001"), resp.ConnectorId)
+			require.Len(t, tu.LifecycleCore.disconnectOpts, 1)
+			require.Equal(t, 600*time.Second, tu.LifecycleCore.disconnectOpts[0].Timeout)
+		})
+
+		t.Run("archive starts workflow task with default timeout", func(t *testing.T) {
+			tu := setup(t, nil)
+
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connectors/cxr_test0000000000001/_archive",
+				nil,
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connectors", "archive"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusOK, w.Code)
+
+			var resp ConnectorLifecycleResponseJson
+			require.NoError(t, json.Unmarshal(w.Body.Bytes(), &resp))
+			require.NotEmpty(t, resp.TaskId)
+			require.Equal(t, apid.MustParse("cxr_test0000000000001"), resp.ConnectorId)
+			require.Len(t, tu.LifecycleCore.archiveOpts, 1)
+			require.Equal(t, 600*time.Second, tu.LifecycleCore.archiveOpts[0].Timeout)
+		})
+	})
 
 	t.Run("connectors", func(t *testing.T) {
 		t.Run("get", func(t *testing.T) {

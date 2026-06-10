@@ -94,6 +94,23 @@ type CreateConnectorVersionRequestJson struct {
 	Annotations *map[string]string `json:"annotations,omitempty" yaml:"annotations,omitempty"`
 }
 
+// ConnectorLifecycleRequestJson is the request body for connector-level
+// lifecycle operations that run asynchronously.
+//
+//	@Description	Request to run a connector lifecycle operation
+type ConnectorLifecycleRequestJson struct {
+	TimeoutSeconds *int64 `json:"timeout_seconds,omitempty" yaml:"timeout_seconds,omitempty" example:"600"`
+}
+
+// ConnectorLifecycleResponseJson is returned after starting a connector-level
+// lifecycle workflow.
+//
+//	@Description	Response for connector lifecycle operation
+type ConnectorLifecycleResponseJson struct {
+	TaskId      string  `json:"task_id" yaml:"task_id"`
+	ConnectorId apid.ID `json:"connector_id" yaml:"connector_id" swaggertype:"string" example:"cxr_test550e8400abcde"`
+}
+
 // ForceConnectorVersionStateRequestJson is the request body for
 // PUT /connectors/:id/versions/:version/_force_state.
 //
