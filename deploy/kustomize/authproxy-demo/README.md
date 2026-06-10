@@ -21,7 +21,9 @@ kubectl kustomize deploy/kustomize/authproxy-demo/overlays/dev
 
 `Deploy Demo` renders `overlays/demo`, rewrites the checked-out overlay with
 the selected image tag and configured hostname, and applies the resulting
-manifest with `kubectl apply`.
+manifest with `kubectl apply`. The demo overlay includes Grafana at
+`https://<hostname>/grafana` with the AuthProxy datasource and sample app
+metrics dashboard provisioned from Kustomize ConfigMaps.
 
 Secrets are still created by workflow/setup steps. The overlays expect names
 that match the existing release convention after `namePrefix` is applied:

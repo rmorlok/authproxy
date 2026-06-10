@@ -6,6 +6,7 @@ namePrefix: demo-
 
 resources:
   - ../../base
+  - grafana.yaml
   - ingress.yaml
   - minio.yaml
   - postgres.yaml
@@ -15,6 +16,9 @@ configMapGenerator:
   - name: authproxy-config
     files:
       - config.yaml=authproxy-config.yaml
+  - name: grafana-dashboards
+    files:
+      - authproxy-app-metrics.json=dashboards/authproxy-app-metrics.json
 
 generatorOptions:
   disableNameSuffixHash: true

@@ -16,6 +16,13 @@ spec:
     - host: demo.authproxy.net
       http:
         paths:
+          - path: /grafana
+            pathType: Prefix
+            backend:
+              service:
+                name: grafana
+                port:
+                  name: http
           - path: /
             pathType: Prefix
             backend:
