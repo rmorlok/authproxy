@@ -1,0 +1,61 @@
+public:
+  port: 8080
+  base_url: https://marketplace.demo.authproxy.net
+  enable_proxy: true
+  static: {}
+api:
+  port: 8081
+admin_api:
+  port: 8082
+  ui:
+    enabled: true
+    base_url: https://admin.demo.authproxy.net
+    initiate_session_url: https://demo.authproxy.net/
+  static: {}
+worker:
+  health_check_port: 8083
+database:
+  provider: postgres
+  auto_migrate: true
+  host: demo-postgresql
+  port: 5432
+  user: authproxy
+  database: authproxy
+  sslmode: disable
+  password:
+    env_var: AUTHPROXY_DB_PASSWORD
+redis:
+  provider: redis
+  address: demo-redis-master:6379
+  db: 0
+  password:
+    env_var: AUTHPROXY_REDIS_PASSWORD
+host_application:
+  initiate_session_url: https://demo.authproxy.net/
+connectors:
+  auto_migrate: true
+  load_from_list: []
+app_metrics:
+  auto_migrate: true
+  database:
+    provider: sqlite
+    path: /tmp/authproxy-app-metrics.db
+  request_events:
+    full_request_recording: never
+system_auth:
+  jwt_signing_key:
+    public_key:
+      path: /etc/authproxy/keys/jwt/system.pub
+    private_key:
+      path: /etc/authproxy/keys/jwt/system
+  global_aes_key:
+    path: /etc/authproxy/keys/encryption/global_aes.key
+  actors:
+    keys_path: /etc/authproxy/keys/actors
+    permissions:
+      root:
+        - act:*
+        - con:*
+        - conn:*
+        - ns:*
+        - px:*

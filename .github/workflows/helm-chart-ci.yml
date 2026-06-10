@@ -6,12 +6,14 @@ on:
     branches: [main]
     paths:
       - 'deploy/charts/**'
+      - 'deploy/kustomize/**'
       - '.github/workflows/helm-chart-ci.yml'
       - '.github/ct.yaml'
   pull_request:
     branches: [main]
     paths:
       - 'deploy/charts/**'
+      - 'deploy/kustomize/**'
       - '.github/workflows/helm-chart-ci.yml'
       - '.github/ct.yaml'
 
@@ -97,6 +99,29 @@ jobs:
 
           if grep -Eq "name: dev-(db|redis-creds|minio-creds|postgresql|redis|minio)|AUTHPROXY_(DB|REDIS)_PASSWORD|root-password|kind: StatefulSet" "${manifest}"; then
             echo "Slim dev render leaked dependency credentials or workloads" >&2
+            exit 1
+          fi
+
+      - name: Verify Kustomize demo/dev renders
+        run: |
+          set -euo pipefail
+          demo_manifest="$(mktemp)"
+          dev_manifest="$(mktemp)"
+
+          kubectl kustomize deploy/kustomize/authproxy-demo/overlays/demo >"${demo_manifest}"
+          kubectl kustomize deploy/kustomize/authproxy-demo/overlays/dev >"${dev_manifest}"
+
+          grep -q "name: demo-authproxy" "${demo_manifest}"
+          grep -q "host: demo-postgresql" "${demo_manifest}"
+          grep -q "address: demo-redis-master:6379" "${demo_manifest}"
+          grep -q "secretName: demo-jwt" "${demo_manifest}"
+
+          grep -q "name: dev-authproxy" "${dev_manifest}"
+          grep -q "provider: miniredis" "${dev_manifest}"
+          grep -q "provider: filesystem" "${dev_manifest}"
+
+          if grep -Eq "name: dev-(postgresql|redis-master|minio)$" "${dev_manifest}"; then
+            echo "Kustomize dev render leaked backing service workloads" >&2
             exit 1
           fi
 

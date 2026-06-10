@@ -1,0 +1,69 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: ingress
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod-dns01
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: demo-authproxy-tls
+      hosts:
+        - demo.authproxy.net
+        - marketplace.demo.authproxy.net
+        - admin.demo.authproxy.net
+  rules:
+    - host: demo.authproxy.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: demo-shell
+                port:
+                  name: http
+    - host: marketplace.demo.authproxy.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: authproxy
+                port:
+                  name: public
+    - host: admin.demo.authproxy.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: authproxy
+                port:
+                  name: admin-api
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: go-oauth2-server
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod-dns01
+spec:
+  ingressClassName: nginx
+  tls:
+    - secretName: demo-go-oauth2-server-tls
+      hosts:
+        - oauth2.demo.authproxy.net
+  rules:
+    - host: oauth2.demo.authproxy.net
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: go-oauth2-server
+                port:
+                  name: http
