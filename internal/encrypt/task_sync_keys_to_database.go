@@ -39,6 +39,19 @@ type versionWithCurrent struct {
 	isCurrent bool
 }
 
+func existingKeyVersionInfos(existing []*database.EncryptionKeyVersion) []config.ExistingKeyVersionInfo {
+	infos := make([]config.ExistingKeyVersionInfo, 0, len(existing))
+	for _, ekv := range existing {
+		infos = append(infos, config.ExistingKeyVersionInfo{
+			Provider:        config.ProviderType(ekv.Provider),
+			ProviderID:      ekv.ProviderID,
+			ProviderVersion: ekv.ProviderVersion,
+			ProtectedData:   ekv.ProtectedKeyData,
+		})
+	}
+	return infos
+}
+
 // syncKeyVersionsForKeyToDatabase reconciles all key versions for an encryption key against the database.
 // It takes all versions from all key datas for the encryption key at once, so that versions from
 // different key datas don't delete each other.
@@ -49,15 +62,16 @@ func syncKeyVersionsForKeyToDatabase(
 	encryptionKeyId apid.ID,
 	kd *config.KeyData,
 ) error {
-	vers, err := kd.ListVersions(ctx)
-	if err != nil {
-		return errors.Wrapf(err, "failed to get %s key versions", encryptionKeyId)
-	}
-
 	existing, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, encryptionKeyId)
 	if err != nil {
 		return errors.Wrap(err, "failed to list existing encryption key versions")
 	}
+
+	vers, err := kd.ListVersionsWithExisting(ctx, existingKeyVersionInfos(existing))
+	if err != nil {
+		return errors.Wrapf(err, "failed to get %s key versions", encryptionKeyId)
+	}
+
 	unused := util.NewSetFrom(existing)
 
 	for i, ver := range vers {
@@ -80,13 +94,14 @@ func syncKeyVersionsForKeyToDatabase(
 			}
 
 			ekv := &database.EncryptionKeyVersion{
-				Id:              apid.New(apid.PrefixEncryptionKeyVersion),
-				EncryptionKeyId: encryptionKeyId,
-				Provider:        string(ver.Provider),
-				ProviderID:      ver.ProviderID,
-				ProviderVersion: ver.ProviderVersion,
-				OrderedVersion:  maxVersion + 1,
-				IsCurrent:       ver.IsCurrent,
+				Id:               apid.New(apid.PrefixEncryptionKeyVersion),
+				EncryptionKeyId:  encryptionKeyId,
+				Provider:         string(ver.Provider),
+				ProviderID:       ver.ProviderID,
+				ProviderVersion:  ver.ProviderVersion,
+				ProtectedKeyData: ver.ProtectedData,
+				OrderedVersion:   maxVersion + 1,
+				IsCurrent:        ver.IsCurrent,
 			}
 
 			// Cache the information

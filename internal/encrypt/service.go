@@ -181,7 +181,7 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 							// The data for a given version is immutable, so we can just take old value
 							newEkvToVersionInfoCache[ekv.Id] = vi
 						} else {
-							kvi, err := keyData.GetVersion(ctx, ekv.ProviderVersion)
+							kvi, err := getKeyVersionInfoForDatabaseVersion(ctx, keyData, ekv)
 							if err != nil {
 								merr = multierror.Append(merr, fmt.Errorf("failed to get key version for encryption key %q for key version id %q: %w", ekv.EncryptionKeyId, ekv.Id, err))
 								continue
@@ -225,6 +225,32 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 	s.mu.Unlock()
 
 	return merr.ErrorOrNil()
+}
+
+func getKeyVersionInfoForDatabaseVersion(ctx context.Context, keyData *sconfig.KeyData, ekv *database.EncryptionKeyVersion) (sconfig.KeyVersionInfo, error) {
+	if withExisting, ok := keyData.InnerVal.(sconfig.KeyDataTypeWithExistingVersions); ok {
+		versions, err := withExisting.ListVersionsWithExisting(ctx, []sconfig.ExistingKeyVersionInfo{{
+			Provider:        sconfig.ProviderType(ekv.Provider),
+			ProviderID:      ekv.ProviderID,
+			ProviderVersion: ekv.ProviderVersion,
+			ProtectedData:   ekv.ProtectedKeyData,
+		}})
+		if err != nil {
+			return sconfig.KeyVersionInfo{}, err
+		}
+
+		for _, v := range versions {
+			if string(v.Provider) == ekv.Provider &&
+				v.ProviderID == ekv.ProviderID &&
+				v.ProviderVersion == ekv.ProviderVersion {
+				return v, nil
+			}
+		}
+
+		return sconfig.KeyVersionInfo{}, fmt.Errorf("version %q/%q/%q not returned by key data provider", ekv.Provider, ekv.ProviderID, ekv.ProviderVersion)
+	}
+
+	return keyData.GetVersion(ctx, ekv.ProviderVersion)
 }
 
 // ensureSynced blocks until the background goroutine has completed its first successful sync,

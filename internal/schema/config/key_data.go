@@ -21,6 +21,25 @@ type KeyDataType interface {
 	GetProviderType() ProviderType
 }
 
+// ExistingKeyVersionInfo is the database-visible metadata for a key version
+// that already exists. KMS-style providers use it to unwrap persisted DEKs
+// and keep old versions available even when the provider only exposes the
+// current wrapping key version.
+type ExistingKeyVersionInfo struct {
+	Provider        ProviderType
+	ProviderID      string
+	ProviderVersion string
+	ProtectedData   *KeyVersionProtectedData
+}
+
+// KeyDataTypeWithExistingVersions is implemented by providers that need
+// persisted version rows to resolve key bytes. Secret-backed providers can keep
+// implementing KeyDataType only because their key bytes come directly from the
+// provider version.
+type KeyDataTypeWithExistingVersions interface {
+	ListVersionsWithExisting(ctx context.Context, existing []ExistingKeyVersionInfo) ([]KeyVersionInfo, error)
+}
+
 type KeyData struct {
 	InnerVal KeyDataType `json:"-" yaml:"-"`
 }
@@ -44,6 +63,18 @@ func (kd *KeyData) GetVersion(ctx context.Context, version string) (KeyVersionIn
 func (kd *KeyData) ListVersions(ctx context.Context) ([]KeyVersionInfo, error) {
 	if kd == nil || kd.InnerVal == nil {
 		return nil, errors.New("key data is nil")
+	}
+
+	return kd.InnerVal.ListVersions(ctx)
+}
+
+func (kd *KeyData) ListVersionsWithExisting(ctx context.Context, existing []ExistingKeyVersionInfo) ([]KeyVersionInfo, error) {
+	if kd == nil || kd.InnerVal == nil {
+		return nil, errors.New("key data is nil")
+	}
+
+	if withExisting, ok := kd.InnerVal.(KeyDataTypeWithExistingVersions); ok {
+		return withExisting.ListVersionsWithExisting(ctx, existing)
 	}
 
 	return kd.InnerVal.ListVersions(ctx)
