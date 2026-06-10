@@ -1,13 +1,15 @@
-package database
+package sqlh
 
 import (
 	"context"
+	"database/sql"
 	"fmt"
 	"os"
 	"path/filepath"
 	"testing"
 
 	"github.com/google/uuid"
+	_ "github.com/mattn/go-sqlite3"
 	"github.com/stretchr/testify/require"
 	"go.opentelemetry.io/otel/propagation"
 	sdkmetric "go.opentelemetry.io/otel/sdk/metric"
@@ -63,7 +65,7 @@ func (f *dbTelemetryFixture) readMetrics(t *testing.T) metricdata.ResourceMetric
 // newSqliteDBWith opens a fresh SQLite-backed DB using the supplied
 // telemetry options and returns it ready for use. The DB file is cleaned up
 // at test end.
-func newSqliteDBWith(t *testing.T, opts ...Option) DB {
+func newSqliteDBWith(t *testing.T, opts ...Option) *sql.DB {
 	t.Helper()
 	tempPath := filepath.Join(
 		os.TempDir(),
@@ -73,11 +75,11 @@ func newSqliteDBWith(t *testing.T, opts ...Option) DB {
 	t.Cleanup(func() { _ = os.RemoveAll(filepath.Dir(tempPath)) })
 
 	cfg := &sconfig.DatabaseSqlite{Path: tempPath}
-	db, err := NewSqliteConnection(cfg, nil, opts...)
+	rawDB, err := openInstrumentedDB("sqlite3", cfg.GetDsn(), DBSystemSQLite, resolveOpts(opts))
 	require.NoError(t, err)
-	t.Cleanup(func() { _ = db.(*service).db.Close() })
+	t.Cleanup(func() { _ = rawDB.Close() })
 
-	return db
+	return rawDB
 }
 
 func boolPtr(b bool) *bool { return &b }
@@ -88,8 +90,8 @@ func TestDBTelemetry_QueryEmitsSpanAndMetric(t *testing.T) {
 
 	db := newSqliteDBWith(t, WithTelemetry(fx.providers, tel))
 
-	// Issue a trivial query that doesn't depend on migrations.
-	require.True(t, db.Ping(context.Background()))
+	_, err := db.ExecContext(context.Background(), "SELECT 1")
+	require.NoError(t, err)
 
 	gotSpans := fx.spans.Ended()
 	require.NotEmpty(t, gotSpans, "instrumented query must produce at least one span")
@@ -107,7 +109,8 @@ func TestDBTelemetry_NoOpWhenTelemetryDisabled(t *testing.T) {
 	// Disabled telemetry: no providers attached, so the constructor must
 	// fall through to plain sql.Open and emit nothing.
 	db := newSqliteDBWith(t /* no options */)
-	require.True(t, db.Ping(context.Background()))
+	_, err := db.ExecContext(context.Background(), "SELECT 1")
+	require.NoError(t, err)
 
 	require.Empty(t, fx.spans.Ended(), "no spans expected when telemetry isn't wired in")
 	rm := fx.readMetrics(t)
@@ -122,7 +125,8 @@ func TestDBTelemetry_NoOpWhenProvidersDisabled(t *testing.T) {
 	tel := &sconfig.Telemetry{} // Enabled is nil → IsEnabled() == false
 
 	db := newSqliteDBWith(t, WithTelemetry(aptelemetry.NoopProviders(), tel))
-	require.True(t, db.Ping(context.Background()))
+	_, err := db.ExecContext(context.Background(), "SELECT 1")
+	require.NoError(t, err)
 
 	require.Empty(t, fx.spans.Ended())
 	rm := fx.readMetrics(t)
@@ -140,7 +144,8 @@ func TestDBTelemetry_NoOpWhenBothSignalsOff(t *testing.T) {
 	}
 
 	db := newSqliteDBWith(t, WithTelemetry(fx.providers, tel))
-	require.True(t, db.Ping(context.Background()))
+	_, err := db.ExecContext(context.Background(), "SELECT 1")
+	require.NoError(t, err)
 
 	require.Empty(t, fx.spans.Ended())
 	rm := fx.readMetrics(t)

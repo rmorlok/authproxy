@@ -1,4 +1,4 @@
-package database
+package sqlh
 
 import (
 	"database/sql"

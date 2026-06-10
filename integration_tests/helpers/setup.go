@@ -213,8 +213,12 @@ func Setup(t *testing.T, opts SetupOptions) *IntegrationTestEnv {
 	// This ensures each test gets a fresh, clean database.
 	// MustApplyBlankTestDbConfig reads connection info from POSTGRES_TEST_* env vars
 	// and updates cfg.GetRoot().Database to point at the new isolated database.
-	cfg, _ = database.MustApplyBlankTestDbConfig(t, cfg)
-	require.NoError(t, workflows.Migrate(cfg.GetRoot(), cfg.GetRoot().GetRootLogger()))
+	cfg, _, rawDb := database.MustApplyBlankTestDbConfigRaw(t, cfg)
+	require.NoError(t, workflows.Migrate(
+		cfg.GetRoot(),
+		cfg.GetRoot().GetRootLogger(),
+		workflows.WithPostgresMigrationDB(rawDb),
+	))
 
 	// Merge test-specific connectors into config
 	if len(opts.Connectors) > 0 {

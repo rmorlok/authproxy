@@ -23,6 +23,10 @@ type DatabasePostgres struct {
 	Database                  *StringValue      `json:"database" yaml:"database"`
 	SSLMode                   *StringValue      `json:"sslmode,omitempty" yaml:"sslmode,omitempty"`
 	Params                    map[string]string `json:"params,omitempty" yaml:"params,omitempty"`
+	MaxOpenConns              *IntegerValue     `json:"max_open_conns,omitempty" yaml:"max_open_conns,omitempty"`
+	MaxIdleConns              *IntegerValue     `json:"max_idle_conns,omitempty" yaml:"max_idle_conns,omitempty"`
+	ConnMaxLifetime           *HumanDuration    `json:"conn_max_lifetime,omitempty" yaml:"conn_max_lifetime,omitempty"`
+	ConnMaxIdleTime           *HumanDuration    `json:"conn_max_idle_time,omitempty" yaml:"conn_max_idle_time,omitempty"`
 	AutoMigrate               bool              `json:"auto_migrate,omitempty" yaml:"auto_migrate,omitempty"`
 	AutoMigrationLockDuration *HumanDuration    `json:"auto_migration_lock_duration,omitempty" yaml:"auto_migration_lock_duration,omitempty"`
 	SoftDeleteRetention       *HumanDuration    `json:"soft_delete_retention,omitempty" yaml:"soft_delete_retention,omitempty"`
@@ -154,6 +158,34 @@ func (d *DatabasePostgres) Validate(vc *common.ValidationContext) error {
 			result = multierror.Append(result, vc.NewErrorfForField("port", "port must be between 1 and 65535, got %d", port))
 		}
 	}
+	result = multierror.Append(result, validateNonNegativeInteger(vc, "max_open_conns", d.MaxOpenConns))
+	result = multierror.Append(result, validateNonNegativeInteger(vc, "max_idle_conns", d.MaxIdleConns))
+	result = multierror.Append(result, validateNonNegativeDuration(vc, "conn_max_lifetime", d.ConnMaxLifetime))
+	result = multierror.Append(result, validateNonNegativeDuration(vc, "conn_max_idle_time", d.ConnMaxIdleTime))
 
 	return result.ErrorOrNil()
+}
+
+func validateNonNegativeInteger(vc *common.ValidationContext, field string, value *IntegerValue) error {
+	if value == nil {
+		return nil
+	}
+	v, err := value.GetValue(context.Background())
+	if err != nil {
+		return vc.NewErrorfForField(field, "invalid value: %v", err)
+	}
+	if v < 0 {
+		return vc.NewErrorfForField(field, "must be greater than or equal to 0, got %d", v)
+	}
+	return nil
+}
+
+func validateNonNegativeDuration(vc *common.ValidationContext, field string, value *HumanDuration) error {
+	if value == nil {
+		return nil
+	}
+	if value.Duration < 0 {
+		return vc.NewErrorfForField(field, "must be greater than or equal to 0, got %s", value.Duration)
+	}
+	return nil
 }

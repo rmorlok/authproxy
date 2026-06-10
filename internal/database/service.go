@@ -3,64 +3,27 @@ package database
 import (
 	"context"
 	"database/sql"
-	"errors"
 	"fmt"
 	"log"
 	"log/slog"
-	"os"
 
 	sq "github.com/Masterminds/squirrel"
-	_ "github.com/jackc/pgx/v5/stdlib"
-	_ "github.com/mattn/go-sqlite3"
-	"github.com/mitchellh/go-homedir"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
 
-// NewConnectionForRoot creates a new database connection from the specified configuration. The type of the database
-// returned will be determined by the configuration. Optional Options enable
-// telemetry instrumentation; without them the returned sql.DB is a plain,
-// uninstrumented driver connection identical to the historic behaviour.
-func NewConnectionForRoot(root *config.Root, logger *slog.Logger, opts ...Option) (DB, error) {
-	switch v := root.Database.InnerVal.(type) {
-	case *config.DatabaseSqlite:
-		return NewSqliteConnection(v, logger, opts...)
-	case *config.DatabasePostgres:
-		return NewPostgresConnection(v, logger, opts...)
-	default:
-		return nil, errors.New("database type not supported")
+// NewService creates the AuthProxy database service using an already-open and
+// fully configured database/sql handle. The caller owns the SQL handle and is
+// responsible for closing it.
+func NewService(db *sql.DB, dbConfig config.DatabaseImpl, logger *slog.Logger) (DB, error) {
+	if db == nil {
+		return nil, fmt.Errorf("database handle is required")
 	}
-}
-
-// NewSqliteConnection creates a new database connection to a SQLite database.
-func NewSqliteConnection(dbConfig *config.DatabaseSqlite, l *slog.Logger, opts ...Option) (DB, error) {
-	path := dbConfig.Path
-	_, err := os.Stat(path)
-	if err != nil {
-		// attempt home path expansion
-		path, err = homedir.Expand(path)
-		if err != nil {
-			return nil, fmt.Errorf("failed to expand path; could not load sqlite database path '%s': %w", dbConfig.Path, err)
-		}
+	if dbConfig == nil {
+		return nil, fmt.Errorf("database configuration is required")
 	}
-
-	_, err = os.Stat(path)
-	if err != nil {
-		// Attempt to create file
-		file, err := os.Create(path)
-		if err != nil {
-			return nil, fmt.Errorf("could not load sqlite database path '%s'; failed to create: %w", dbConfig.Path, err)
-		}
-		defer file.Close()
-	}
-
-	db, err := openInstrumentedDB("sqlite3", dbConfig.GetDsn(), DBSystemSQLite, resolveOpts(opts))
-	if err != nil {
-		return nil, fmt.Errorf("failed to open sqlite database '%s': %w", dbConfig.GetDsn(), err)
-	}
-
 	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping sqlite database '%s': %w", dbConfig.GetDsn(), err)
+		return nil, fmt.Errorf("failed to ping database '%s': %w", dbConfig.GetDsn(), err)
 	}
 
 	return &service{
@@ -68,27 +31,7 @@ func NewSqliteConnection(dbConfig *config.DatabaseSqlite, l *slog.Logger, opts .
 		sq:              sq.StatementBuilder.PlaceholderFormat(dbConfig.GetPlaceholderFormat()),
 		db:              db,
 		cursorEncryptor: pagination.NewRandomCursorEncryptor(),
-		logger:          l,
-	}, nil
-}
-
-// NewPostgresConnection creates a new database connection to a Postgres database.
-func NewPostgresConnection(dbConfig *config.DatabasePostgres, l *slog.Logger, opts ...Option) (DB, error) {
-	db, err := openInstrumentedDB("pgx", dbConfig.GetDsn(), DBSystemPostgreSQL, resolveOpts(opts))
-	if err != nil {
-		return nil, fmt.Errorf("failed to open postgres database '%s': %w", dbConfig.GetDsn(), err)
-	}
-
-	if err := db.Ping(); err != nil {
-		return nil, fmt.Errorf("failed to ping postgres database '%s': %w", dbConfig.GetDsn(), err)
-	}
-
-	return &service{
-		cfg:             dbConfig,
-		sq:              sq.StatementBuilder.PlaceholderFormat(dbConfig.GetPlaceholderFormat()),
-		db:              db,
-		cursorEncryptor: pagination.NewRandomCursorEncryptor(),
-		logger:          l,
+		logger:          logger,
 	}, nil
 }
 

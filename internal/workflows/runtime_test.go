@@ -7,6 +7,8 @@ import (
 	"path/filepath"
 	"testing"
 
+	_ "github.com/mattn/go-sqlite3"
+	"github.com/rmorlok/authproxy/internal/schema/common"
 	"github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/stretchr/testify/require"
 )
@@ -42,4 +44,30 @@ func TestMigrateSqliteAndRuntimePing(t *testing.T) {
 	defer runtime.Close()
 
 	require.True(t, runtime.Ping(context.Background()))
+}
+
+func TestNewRuntimePostgresBorrowedDBIsNotClosed(t *testing.T) {
+	root := &config.Root{
+		Database: &config.Database{
+			InnerVal: &config.DatabasePostgres{
+				Provider: config.DatabaseProviderPostgres,
+				Host:     common.NewStringValueDirectInline("localhost"),
+				Port:     common.NewIntegerValueDirectInline(5432),
+				User:     common.NewStringValueDirectInline("authproxy"),
+				Password: common.NewStringValueDirectInline("authproxy"),
+				Database: common.NewStringValueDirectInline("authproxy"),
+			},
+		},
+	}
+	logger := slog.New(slog.DiscardHandler)
+
+	db, err := sql.Open("sqlite3", ":memory:")
+	require.NoError(t, err)
+	defer db.Close()
+
+	runtime, err := NewRuntime(root, nil, logger, WithPostgresDB(db))
+	require.NoError(t, err)
+
+	require.NoError(t, runtime.Close())
+	require.NoError(t, db.Ping())
 }
