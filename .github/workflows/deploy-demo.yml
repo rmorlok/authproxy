@@ -18,6 +18,8 @@ name: Deploy Demo
 #     and demo-minio-creds.
 #   - Repo secret AWS_ROLE_ARN.
 #   - Repo variables AWS_REGION, EKS_CLUSTER, and DEMO_HOSTNAME.
+#   - Optional repo variable GRAFANA_AUTHPROXY_PLUGIN_INSTALL to override
+#     Grafana's GF_INSTALL_PLUGINS value.
 
 on:
   workflow_run:
@@ -136,11 +138,35 @@ jobs:
             --region "${{ vars.AWS_REGION }}"
           kubectl get nodes -o wide
 
+      - name: Provision Grafana datasource JWT
+        run: |
+          set -euo pipefail
+          workdir="$(mktemp -d)"
+          trap 'rm -rf "${workdir}"' EXIT
+
+          kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-encryption" \
+            -o jsonpath='{.data.global_aes\.key}' \
+            | base64 -d > "${workdir}/global_aes.key"
+          chmod 600 "${workdir}/global_aes.key"
+
+          go run ./cmd/cli sign-jwt \
+            --actorId grafana \
+            --apis api,admin-api \
+            --grafana-preset logs \
+            --secretKeyPath "${workdir}/global_aes.key" \
+            > "${workdir}/grafana.jwt"
+
+          kubectl -n "${RELEASE_NS}" create secret generic authproxy-grafana-jwt \
+            --from-file=jwt="${workdir}/grafana.jwt" \
+            --dry-run=client -o yaml \
+            | kubectl apply -f -
+
       - name: Render Kustomize overlay
         id: render
         env:
           DEMO_HOSTNAME: ${{ vars.DEMO_HOSTNAME || 'demo.authproxy.net' }}
           DEMO_CLUSTER_ISSUER: ${{ vars.DEMO_CLUSTER_ISSUER || 'letsencrypt-prod-dns01' }}
+          GRAFANA_PLUGIN_INSTALL: ${{ vars.GRAFANA_AUTHPROXY_PLUGIN_INSTALL || 'rmorlok-authproxy-datasource' }}
           IMAGE_TAG: ${{ steps.tag.outputs.tag }}
         run: |
           set -euo pipefail
@@ -151,13 +177,17 @@ jobs:
 
           perl -0pi -e 's|(name: ghcr\.io/rmorlok/authproxy\n\s+newTag: )main|${1}$ENV{IMAGE_TAG}|g; s|(name: ghcr\.io/rmorlok/authproxy-demo-shell\n\s+newTag: )main|${1}$ENV{IMAGE_TAG}|g' \
             "${KUSTOMIZE_OVERLAY}/kustomization.yaml"
+          perl -0pi -e '$r=$ENV{GRAFANA_PLUGIN_INSTALL}; s/__GRAFANA_PLUGIN_INSTALL__/$r/g' \
+            "${KUSTOMIZE_OVERLAY}/grafana.yaml"
 
           kubectl kustomize "${KUSTOMIZE_OVERLAY}" > "${manifest}"
           echo "manifest=${manifest}" >> "$GITHUB_OUTPUT"
 
-          grep -q "image: ghcr.io/rmorlok/authproxy:${IMAGE_TAG}" "${manifest}"
-          grep -q "image: ghcr.io/rmorlok/authproxy-demo-shell:${IMAGE_TAG}" "${manifest}"
-          grep -q "host: ${DEMO_HOSTNAME}" "${manifest}"
+          grep -Fq "image: ghcr.io/rmorlok/authproxy:${IMAGE_TAG}" "${manifest}"
+          grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-shell:${IMAGE_TAG}" "${manifest}"
+          grep -Fq "image: docker.io/grafana/grafana:11.5.2" "${manifest}"
+          grep -Fq "host: ${DEMO_HOSTNAME}" "${manifest}"
+          grep -Fq "value: ${GRAFANA_PLUGIN_INSTALL}" "${manifest}"
 
       - name: Apply Kustomize manifest
         run: |
@@ -168,7 +198,7 @@ jobs:
             | kubectl apply -f -
           kubectl -n "${RELEASE_NS}" apply -f "${manifest}"
 
-          for deployment in "${RELEASE_NAME}-authproxy" "${RELEASE_NAME}-demo-shell"; do
+          for deployment in "${RELEASE_NAME}-authproxy" "${RELEASE_NAME}-demo-shell" "${RELEASE_NAME}-grafana"; do
             kubectl -n "${RELEASE_NS}" patch "deployment/${deployment}" \
               --type merge \
               -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"demo.authproxy.net/image-revision\":\"${{ steps.tag.outputs.sha }}\"}}}}}"
@@ -189,12 +219,13 @@ jobs:
             "${RELEASE_NAME}-postgresql" \
             "${RELEASE_NAME}-redis-master" \
             "${RELEASE_NAME}-minio" \
+            "${RELEASE_NAME}-grafana" \
           ; do
             kubectl -n "${RELEASE_NS}" describe "deployment/$d"
             echo
           done
           echo "## Recent pod logs"
-          for selector in authproxy demo-shell go-oauth2-server; do
+          for selector in authproxy demo-shell go-oauth2-server grafana; do
             kubectl -n "${RELEASE_NS}" logs \
               -l "app.kubernetes.io/name=${selector}" \
               --all-containers --tail=120
@@ -216,6 +247,7 @@ jobs:
             "${RELEASE_NAME}-authproxy" \
             "${RELEASE_NAME}-demo-shell" \
             "${RELEASE_NAME}-go-oauth2-server" \
+            "${RELEASE_NAME}-grafana" \
           ; do
             echo "Waiting for $d..."
             kubectl -n "${RELEASE_NS}" rollout status "deployment/$d" --timeout=10m
@@ -269,6 +301,7 @@ jobs:
             echo "- Image tag:   \`${{ steps.tag.outputs.tag }}\`"
             echo "- Commit:      \`${{ steps.tag.outputs.sha }}\`"
             echo "- Hostname:    \`https://${{ vars.DEMO_HOSTNAME || 'demo.authproxy.net' }}/\`"
+            echo "- Grafana:     \`https://${{ vars.DEMO_HOSTNAME || 'demo.authproxy.net' }}/grafana\`"
             echo "- Renderer:    \`kubectl kustomize ${KUSTOMIZE_OVERLAY}\`"
             echo "- Seeding:     manual via \`Seed Demo\` workflow"
             echo "- Rollback:    rerun this workflow with a previous image tag"
