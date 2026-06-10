@@ -53,9 +53,8 @@ system_auth:
   actors:
     keys_path: /etc/authproxy/keys/actors
     permissions:
-      root:
-        - act:*
-        - con:*
-        - conn:*
-        - ns:*
-        - px:*
+      - namespace: root.**
+        resources:
+          - "*"
+        verbs:
+          - "*"

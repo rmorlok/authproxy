@@ -7,11 +7,12 @@ metadata:
 spec:
   ingressClassName: nginx
   tls:
-    - secretName: dev-authproxy-tls
+    - secretName: dev-branch-wildcard-tls
       hosts:
-        - branch.dev.authproxy.net
-        - marketplace.branch.dev.authproxy.net
-        - admin.branch.dev.authproxy.net
+        - "*.dev.authproxy.net"
+    - secretName: dev-subdomain-wildcard-tls
+      hosts:
+        - "*.branch.dev.authproxy.net"
   rules:
     - host: branch.dev.authproxy.net
       http:
@@ -48,12 +49,10 @@ apiVersion: networking.k8s.io/v1
 kind: Ingress
 metadata:
   name: go-oauth2-server
-  annotations:
-    cert-manager.io/cluster-issuer: letsencrypt-prod-dns01
 spec:
   ingressClassName: nginx
   tls:
-    - secretName: dev-go-oauth2-server-tls
+    - secretName: dev-subdomain-wildcard-tls
       hosts:
         - oauth2.branch.dev.authproxy.net
   rules:

@@ -16,6 +16,12 @@ configMapGenerator:
 generatorOptions:
   disableNameSuffixHash: true
 
+images:
+  - name: ghcr.io/rmorlok/authproxy
+    newTag: main
+  - name: ghcr.io/rmorlok/authproxy-demo-shell
+    newTag: main
+
 patches:
   - path: authproxy-secrets.yaml
   - path: demo-shell-env.yaml
