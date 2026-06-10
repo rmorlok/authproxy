@@ -1,0 +1,29 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: demo-shell
+spec:
+  template:
+    spec:
+      containers:
+        - name: demo-shell
+          env:
+            - name: PORT
+              value: "8888"
+            - name: ADMIN_USERNAME
+              value: demo-shell
+            - name: ADMIN_PRIVATE_KEY_PATH
+              value: /etc/authproxy/demo-shell/private
+            - name: AUTHPROXY_AUTH_URL
+              value: https://marketplace.demo.authproxy.net
+            - name: AUTHPROXY_MARKETPLACE_URL
+              value: https://marketplace.demo.authproxy.net
+            - name: AUTHPROXY_ADMIN_UI_URL
+              value: https://admin.demo.authproxy.net
+      volumes:
+        - name: admin-key
+          secret:
+            secretName: demo-demo-shell-key
+            items:
+              - key: private
+                path: private

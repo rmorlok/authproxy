@@ -1,0 +1,11 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+resources:
+  - authproxy.yaml
+  - demo-shell.yaml
+  - go-oauth2-server.yaml
+
+labels:
+  - pairs:
+      app.kubernetes.io/part-of: authproxy-demo

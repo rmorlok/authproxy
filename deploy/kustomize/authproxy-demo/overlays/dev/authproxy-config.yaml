@@ -1,0 +1,54 @@
+public:
+  port: 8080
+  base_url: https://marketplace.branch.dev.authproxy.net
+  enable_proxy: true
+  static: {}
+api:
+  port: 8081
+admin_api:
+  port: 8082
+  ui:
+    enabled: true
+    base_url: https://admin.branch.dev.authproxy.net
+    initiate_session_url: https://branch.dev.authproxy.net/
+  static: {}
+worker:
+  health_check_port: 8083
+database:
+  provider: sqlite
+  auto_migrate: true
+  path: /tmp/authproxy-dev.db
+redis:
+  provider: miniredis
+host_application:
+  initiate_session_url: https://branch.dev.authproxy.net/
+connectors:
+  auto_migrate: true
+  load_from_list: []
+app_metrics:
+  auto_migrate: true
+  database:
+    provider: sqlite
+    path: /tmp/authproxy-dev.db.app-metrics
+  request_events:
+    full_request_recording: never
+  blob_storage:
+    provider: filesystem
+    path: /tmp/authproxy-blobs
+system_auth:
+  jwt_signing_key:
+    public_key:
+      path: /etc/authproxy/keys/jwt/system.pub
+    private_key:
+      path: /etc/authproxy/keys/jwt/system
+  global_aes_key:
+    path: /etc/authproxy/keys/encryption/global_aes.key
+  actors:
+    keys_path: /etc/authproxy/keys/actors
+    permissions:
+      root:
+        - act:*
+        - con:*
+        - conn:*
+        - ns:*
+        - px:*
