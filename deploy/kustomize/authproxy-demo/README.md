@@ -28,6 +28,7 @@ that match the existing release convention after `namePrefix` is applied:
 - `<env>-demo-shell-key`
 - `<env>-db` and `<env>-redis-creds` for the demo overlay
 
-Seeding is intentionally not modeled here. Demo seeding will move to a manual
-workflow, while dev seeding will be run by the per-branch deploy workflow after
-the environment is applied.
+Seeding is intentionally not part of the Kustomize deployment apply. Run the
+`Seed Demo` GitHub Actions workflow to reseed the persistent demo environment
+on demand. Dev seeding will be run by the per-branch deploy workflow after the
+environment is applied.
