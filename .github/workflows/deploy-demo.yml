@@ -1,36 +1,23 @@
 # schema: https://json.schemastore.org/github-workflow.json
 name: Deploy Demo
 
-# Auto-deploys the authproxy-demo umbrella chart after Build Image
-# publishes the main-branch images. Image tag is pinned to `sha-<short>`
-# so the deploy targets the exact build produced for that commit.
+# Auto-deploys the hosted demo environment after Build Image publishes
+# main-branch images. Demo deploys are rendered with Kustomize; seeding is
+# intentionally handled by the manual Seed Demo workflow.
 #
 # Trust + auth: this workflow assumes the `authproxy-eks-gh-actions`
 # IAM role via OIDC. The role's trust policy (from
 # deploy/terraform/eks/iam_oidc.tf) only honors `sts:AssumeRoleWithWebIdentity`
 # when the JWT's `sub` claim contains `environment:gha-eks` (or matches
-# one of the release-tag patterns) — hence the `environment: gha-eks`
-# declaration on the deploy job. Add required reviewers to the `gha-eks`
-# environment in repo settings to gate deploys on approval; leaving it
-# empty makes deploys fully automatic.
+# one of the release-tag patterns), hence `environment: gha-eks`.
 #
-# Pre-requisites the workflow assumes (one-time operator setup;
-# documented in deploy/docs/runbook.md):
-#   - EKS cluster up (A7) + bootstrap chart installed (A8)
-#   - `demo` namespace exists, with the four keypair Secrets created
-#     manually (jwt, encryption, demo-shell-key, actors) — A10 README's
-#     openssl one-shot covers this
-#   - The workflow derives/refreshes authproxy-grafana-jwt from the
-#     existing encryption Secret before every deploy.
-#   - Repo secrets:
-#       AWS_ROLE_ARN  : the role from `terraform output gh_actions_role_arn`
-#   - Repo variables (Settings → Variables):
-#       AWS_REGION    : e.g. us-east-1
-#       EKS_CLUSTER   : e.g. authproxy-eks
-#       DEMO_HOSTNAME : e.g. demo.authproxy.net
-#       GRAFANA_AUTHPROXY_PLUGIN_INSTALL : GF_INSTALL_PLUGINS override
-#         required to enable Grafana until the plugin is catalog-published,
-#         e.g. https://.../plugin.zip;rmorlok-authproxy-datasource
+# Pre-requisites:
+#   - EKS cluster up and bootstrap chart installed.
+#   - `demo` namespace secrets exist: demo-jwt, demo-encryption,
+#     demo-demo-shell-key, demo-actors, demo-db, demo-redis-creds,
+#     and demo-minio-creds.
+#   - Repo secret AWS_ROLE_ARN.
+#   - Repo variables AWS_REGION, EKS_CLUSTER, and DEMO_HOSTNAME.
 
 on:
   workflow_run:
@@ -40,20 +27,16 @@ on:
   workflow_dispatch:
     inputs:
       image_tag:
-        description: 'Override image tag (default: sha-<short>)'
+        description: "Override image tag (default: sha-<short>)"
         required: false
         type: string
 
 permissions:
   contents: read
-  id-token: write    # OIDC token mint
-  packages: read     # Verify the image tag from Build Image exists in GHCR.
+  id-token: write
+  packages: read
 
 concurrency:
-  # One deploy at a time per branch — protects against racing pushes
-  # leaving the cluster in a torn state. cancel-in-progress: false so
-  # a newer push waits behind the in-flight rollout instead of
-  # interrupting it mid-helm.
   group: deploy-demo-${{ github.ref }}
   cancel-in-progress: false
 
@@ -61,27 +44,21 @@ jobs:
   deploy:
     if: github.event_name != 'workflow_run' || github.event.workflow_run.conclusion == 'success'
     runs-on: ubuntu-latest
-    # Required by the IAM role's trust policy — see header.
     environment: gha-eks
-    timeout-minutes: 45
+    timeout-minutes: 35
 
     env:
       RELEASE_NAME: demo
-      RELEASE_NS:   demo
-      CHART_PATH:   deploy/charts/authproxy-demo
-      REGISTRY:     ghcr.io
-      DEPLOY_SHA:   ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
+      RELEASE_NS: demo
+      KUSTOMIZE_OVERLAY: deploy/kustomize/authproxy-demo/overlays/demo
+      REGISTRY: ghcr.io
+      DEPLOY_SHA: ${{ github.event_name == 'workflow_run' && github.event.workflow_run.head_sha || github.sha }}
 
     steps:
       - uses: actions/checkout@v4
         with:
-          fetch-depth: 0      # helm relies on the .git context for some chart hooks
+          fetch-depth: 0
           ref: ${{ env.DEPLOY_SHA }}
-
-      - name: Set up Helm
-        uses: azure/setup-helm@v4
-        with:
-          version: v3.16.4
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -95,12 +72,11 @@ jobs:
           if [ -n "${{ inputs.image_tag }}" ]; then
             tag="${{ inputs.image_tag }}"
           elif [ "${{ github.event_name }}" = "workflow_run" ]; then
-            # Deploy the exact commit whose Build Image run just completed.
             tag="sha-$(printf '%s' "${DEPLOY_SHA}" | cut -c1-7)"
           else
-            # Match docker/metadata-action's `type=sha,prefix=sha-,format=short`
             tag="sha-$(git rev-parse --short HEAD)"
           fi
+
           echo "sha=${DEPLOY_SHA}" >> "$GITHUB_OUTPUT"
           echo "tag=${tag}" >> "$GITHUB_OUTPUT"
           echo "Deploying commit: ${DEPLOY_SHA}"
@@ -114,7 +90,6 @@ jobs:
           images=(
             authproxy
             authproxy-demo-shell
-            authproxy-demo-seed
           )
 
           echo "${{ secrets.GITHUB_TOKEN }}" \
@@ -155,166 +130,120 @@ jobs:
 
       - name: Wire kubeconfig
         run: |
+          set -euo pipefail
           aws eks update-kubeconfig \
             --name "${{ vars.EKS_CLUSTER }}" \
             --region "${{ vars.AWS_REGION }}"
           kubectl get nodes -o wide
 
-      - name: Register Helm repos for subcharts
-        run: |
-          # Same set the helm-chart-ci lint/install jobs use.
-          helm repo add bitnami        https://charts.bitnami.com/bitnami
-          helm repo add grafana        https://grafana.github.io/helm-charts
-          helm repo update
-
-      - name: helm dependency update
-        run: helm dependency update "${CHART_PATH}"
-
-      - name: Provision Grafana datasource JWT
-        run: |
-          set -euo pipefail
-          workdir="$(mktemp -d)"
-          trap 'rm -rf "${workdir}"' EXIT
-
-          # Database-backed actors without a self-signing key fall back to
-          # verifying actor-signed JWTs with the global AES key. The seeded
-          # `grafana` actor uses that path, and the token itself further
-          # restricts permissions via the Grafana logs preset.
-          kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-encryption" \
-            -o jsonpath='{.data.global_aes\.key}' \
-            | base64 -d > "${workdir}/global_aes.key"
-          chmod 600 "${workdir}/global_aes.key"
-
-          go run ./cmd/cli sign-jwt \
-            --actorId grafana \
-            --apis api,admin-api \
-            --grafana-preset logs \
-            --secretKeyPath "${workdir}/global_aes.key" \
-            > "${workdir}/grafana.jwt"
-
-          kubectl -n "${RELEASE_NS}" create secret generic authproxy-grafana-jwt \
-            --from-file=jwt="${workdir}/grafana.jwt" \
-            --dry-run=client -o yaml \
-            | kubectl apply -f -
-
-      - name: Capture pre-deploy revision (for rollback)
-        id: pre
-        run: |
-          set -euo pipefail
-          # Pre-existing revision, or empty when this is the first install.
-          # `helm history` exits non-zero when the release doesn't exist —
-          # with pipefail that aborts the whole step, so detect the
-          # missing-release case via `helm status` first.
-          if helm status "${RELEASE_NAME}" -n "${RELEASE_NS}" >/dev/null 2>&1; then
-            rev=$(helm history "${RELEASE_NAME}" -n "${RELEASE_NS}" -o json \
-                  | jq -r '[.[] | select(.status=="deployed")] | last | .revision // empty')
-          else
-            rev=""
-          fi
-          echo "previous_revision=${rev}" >> "$GITHUB_OUTPUT"
-          echo "Previous deployed revision: ${rev:-<none>}"
-
-      - name: helm upgrade --install
-        id: upgrade
+      - name: Render Kustomize overlay
+        id: render
         env:
-          GRAFANA_PLUGIN_INSTALL: ${{ vars.GRAFANA_AUTHPROXY_PLUGIN_INSTALL }}
-          DEMO_CLUSTER_ISSUER: ${{ vars.DEMO_CLUSTER_ISSUER || 'letsencrypt-prod' }}
-          DEMO_TLS_WILDCARD_SUBDOMAINS: ${{ vars.DEMO_TLS_WILDCARD_SUBDOMAINS || 'false' }}
+          DEMO_HOSTNAME: ${{ vars.DEMO_HOSTNAME || 'demo.authproxy.net' }}
+          DEMO_CLUSTER_ISSUER: ${{ vars.DEMO_CLUSTER_ISSUER || 'letsencrypt-prod-dns01' }}
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
         run: |
           set -euo pipefail
-          helm_args=(
-            --namespace "${RELEASE_NS}" --create-namespace
-            --wait --timeout 20m
-            --set "global.hostname=${{ vars.DEMO_HOSTNAME }}"
-            --set "global.clusterIssuer=${DEMO_CLUSTER_ISSUER}"
-            --set "ingress.wildcardSubdomains=${DEMO_TLS_WILDCARD_SUBDOMAINS}"
-            --set "authproxy.image.tag=${{ steps.tag.outputs.tag }}"
-            --set-string "authproxy.podAnnotations.demo\.authproxy\.net/image-revision=${{ steps.tag.outputs.sha }}"
-            --set "demoShell.image.tag=${{ steps.tag.outputs.tag }}"
-            --set-string "demoShell.podAnnotations.demo\.authproxy\.net/image-revision=${{ steps.tag.outputs.sha }}"
-            --set "seed.image.tag=${{ steps.tag.outputs.tag }}"
-          )
+          manifest="${RUNNER_TEMP}/demo-kustomize.yaml"
 
-          if [ -n "${GRAFANA_PLUGIN_INSTALL}" ]; then
-            helm_args+=(--set-string "grafana.plugins[0]=${GRAFANA_PLUGIN_INSTALL}")
-          else
-            echo "::warning::GRAFANA_AUTHPROXY_PLUGIN_INSTALL is unset; disabling Grafana for this demo deploy."
-            helm_args+=(--set "grafana.enabled=false" --set "grafanaAuthProxy.enabled=false")
-          fi
+          find "${KUSTOMIZE_OVERLAY}" -type f -name '*.yaml' -print0 \
+            | xargs -0 perl -0pi -e 's/demo\.authproxy\.net/$ENV{DEMO_HOSTNAME}/g; s/letsencrypt-prod-dns01/$ENV{DEMO_CLUSTER_ISSUER}/g'
 
-          helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \
-            "${helm_args[@]}"
+          perl -0pi -e 's|(name: ghcr\.io/rmorlok/authproxy\n\s+newTag: )main|${1}$ENV{IMAGE_TAG}|g; s|(name: ghcr\.io/rmorlok/authproxy-demo-shell\n\s+newTag: )main|${1}$ENV{IMAGE_TAG}|g' \
+            "${KUSTOMIZE_OVERLAY}/kustomization.yaml"
+
+          kubectl kustomize "${KUSTOMIZE_OVERLAY}" > "${manifest}"
+          echo "manifest=${manifest}" >> "$GITHUB_OUTPUT"
+
+          grep -q "image: ghcr.io/rmorlok/authproxy:${IMAGE_TAG}" "${manifest}"
+          grep -q "image: ghcr.io/rmorlok/authproxy-demo-shell:${IMAGE_TAG}" "${manifest}"
+          grep -q "host: ${DEMO_HOSTNAME}" "${manifest}"
+
+      - name: Apply Kustomize manifest
+        run: |
+          set -euo pipefail
+          manifest="${{ steps.render.outputs.manifest }}"
+
+          kubectl create namespace "${RELEASE_NS}" --dry-run=client -o yaml \
+            | kubectl apply -f -
+          kubectl -n "${RELEASE_NS}" apply -f "${manifest}"
+
+          for deployment in "${RELEASE_NAME}-authproxy" "${RELEASE_NAME}-demo-shell"; do
+            kubectl -n "${RELEASE_NS}" patch "deployment/${deployment}" \
+              --type merge \
+              -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"demo.authproxy.net/image-revision\":\"${{ steps.tag.outputs.sha }}\"}}}}}"
+          done
 
       - name: Collect deploy diagnostics (on failure)
         if: failure()
         run: |
           set +e
-          echo "## Helm status"
-          helm status "${RELEASE_NAME}" -n "${RELEASE_NS}"
+          echo "## Applied resources"
+          kubectl -n "${RELEASE_NS}" get all,ingress,certificate,order,challenge -o wide
           echo
-          echo "## Hook jobs"
-          kubectl -n "${RELEASE_NS}" get jobs \
-            -l "app.kubernetes.io/instance=${RELEASE_NAME}" \
-            -o wide
-          echo
-          echo "## Seed job"
-          kubectl -n "${RELEASE_NS}" describe "job/${RELEASE_NAME}-seed"
-          echo
-          echo "## Seed logs"
-          kubectl -n "${RELEASE_NS}" logs "job/${RELEASE_NAME}-seed" \
-            --all-containers --tail=300
-          echo
-          echo "## Pods"
-          kubectl -n "${RELEASE_NS}" get pods -o wide
-          echo
-          echo "## Recent events"
-          kubectl -n "${RELEASE_NS}" get events \
-            --sort-by='.lastTimestamp' \
-            | tail -n 80
-
-      - name: Wait for workload rollouts
-        # `helm --wait` already blocks on the main release, but the
-        # subchart + inline Deployments may need additional time. Skip
-        # disabled optional deployments so default-off workloads don't
-        # fail the deploy.
-        timeout-minutes: 5
-        run: |
-          set -euo pipefail
+          echo "## Deployments"
           for d in \
             "${RELEASE_NAME}-authproxy" \
             "${RELEASE_NAME}-demo-shell" \
-            "${RELEASE_NAME}-grafana" \
+            "${RELEASE_NAME}-go-oauth2-server" \
+            "${RELEASE_NAME}-postgresql" \
+            "${RELEASE_NAME}-redis-master" \
+            "${RELEASE_NAME}-minio" \
+          ; do
+            kubectl -n "${RELEASE_NS}" describe "deployment/$d"
+            echo
+          done
+          echo "## Recent pod logs"
+          for selector in authproxy demo-shell go-oauth2-server; do
+            kubectl -n "${RELEASE_NS}" logs \
+              -l "app.kubernetes.io/name=${selector}" \
+              --all-containers --tail=120
+            echo
+          done
+          echo "## Recent events"
+          kubectl -n "${RELEASE_NS}" get events \
+            --sort-by='.lastTimestamp' \
+            | tail -n 100
+
+      - name: Wait for workload rollouts
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          for d in \
+            "${RELEASE_NAME}-postgresql" \
+            "${RELEASE_NAME}-redis-master" \
+            "${RELEASE_NAME}-minio" \
+            "${RELEASE_NAME}-authproxy" \
+            "${RELEASE_NAME}-demo-shell" \
             "${RELEASE_NAME}-go-oauth2-server" \
           ; do
-            if ! kubectl -n "${RELEASE_NS}" get "deployment/$d" >/dev/null 2>&1; then
-              echo "Skipping $d; deployment is not rendered."
-              continue
-            fi
             echo "Waiting for $d..."
-            kubectl -n "${RELEASE_NS}" rollout status "deployment/$d" --timeout=5m
+            kubectl -n "${RELEASE_NS}" rollout status "deployment/$d" --timeout=10m
           done
 
-      - name: Wait for TLS certificate
+      - name: Wait for TLS certificates
         timeout-minutes: 20
         run: |
           set -euo pipefail
-          cert_name="${RELEASE_NAME}-demo-tls"
-          if kubectl -n "${RELEASE_NS}" wait \
-            --for=condition=Ready \
-            "certificate/${cert_name}" \
-            --timeout=18m; then
-            exit 0
-          fi
+          for cert_name in "${RELEASE_NAME}-authproxy-tls" "${RELEASE_NAME}-go-oauth2-server-tls"; do
+            echo "Waiting for certificate/${cert_name}..."
+            if kubectl -n "${RELEASE_NS}" wait \
+              --for=condition=Ready \
+              "certificate/${cert_name}" \
+              --timeout=18m; then
+              continue
+            fi
 
-          kubectl -n "${RELEASE_NS}" describe "certificate/${cert_name}" || true
-          kubectl -n "${RELEASE_NS}" get certificate,order,challenge || true
-          exit 1
+            kubectl -n "${RELEASE_NS}" describe "certificate/${cert_name}" || true
+            kubectl -n "${RELEASE_NS}" get certificate,order,challenge || true
+            exit 1
+          done
 
       - name: Smoke test (demo connectors)
         id: smoke
         timeout-minutes: 10
         env:
-          SMOKE_BASE_URL: https://${{ vars.DEMO_HOSTNAME }}
+          SMOKE_BASE_URL: https://${{ vars.DEMO_HOSTNAME || 'demo.authproxy.net' }}
         run: |
           set -euo pipefail
           workdir="$(mktemp -d)"
@@ -330,14 +259,6 @@ jobs:
           SMOKE_ADMIN_KEY="${workdir}/demo-shell.private" \
             go test -tags smoke ./smoke -run TestRemote -count=1 -v
 
-      - name: helm rollback (on failure)
-        if: failure() && steps.pre.outputs.previous_revision != ''
-        run: |
-          set -euo pipefail
-          rev="${{ steps.pre.outputs.previous_revision }}"
-          echo "Rolling back to revision ${rev}"
-          helm rollback "${RELEASE_NAME}" "${rev}" -n "${RELEASE_NS}" --wait --timeout 5m
-
       - name: Summary
         if: always()
         run: |
@@ -347,11 +268,8 @@ jobs:
             echo "- Result:      ${{ job.status }}"
             echo "- Image tag:   \`${{ steps.tag.outputs.tag }}\`"
             echo "- Commit:      \`${{ steps.tag.outputs.sha }}\`"
-            echo "- Hostname:    \`https://${{ vars.DEMO_HOSTNAME }}/\`"
-            if kubectl -n "${RELEASE_NS}" get deployment "${RELEASE_NAME}-grafana" >/dev/null 2>&1; then
-              echo "- Grafana:     \`https://${{ vars.DEMO_HOSTNAME }}/grafana\`"
-            else
-              echo "- Grafana:     disabled for this deploy"
-            fi
-            echo "- Helm rev:    \`$(helm history "${RELEASE_NAME}" -n "${RELEASE_NS}" -o json 2>/dev/null | jq -r '[.[] | select(.status=="deployed")] | last | .revision // "?"')\`"
+            echo "- Hostname:    \`https://${{ vars.DEMO_HOSTNAME || 'demo.authproxy.net' }}/\`"
+            echo "- Renderer:    \`kubectl kustomize ${KUSTOMIZE_OVERLAY}\`"
+            echo "- Seeding:     manual via \`Seed Demo\` workflow"
+            echo "- Rollback:    rerun this workflow with a previous image tag"
           } >> "$GITHUB_STEP_SUMMARY"
