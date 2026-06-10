@@ -1,0 +1,169 @@
+# schema: https://json.schemastore.org/github-workflow.json
+name: Seed Demo
+
+# Manually reseeds the persistent demo environment. This is intentionally
+# decoupled from Deploy Demo so demo data can be refreshed on demand
+# without rolling the application.
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: "Seed image tag (default: sha-<short> for the selected ref)"
+        required: false
+        type: string
+      namespace:
+        description: "Kubernetes namespace to seed"
+        required: false
+        default: demo
+        type: string
+      hostname:
+        description: "Demo hostname used in seeded callback URLs"
+        required: false
+        default: demo.authproxy.net
+        type: string
+      wait_timeout:
+        description: "kubectl wait timeout for the seed job"
+        required: false
+        default: 10m
+        type: string
+
+permissions:
+  contents: read
+  id-token: write
+  packages: read
+
+concurrency:
+  group: seed-demo-${{ inputs.namespace || 'demo' }}
+  cancel-in-progress: false
+
+jobs:
+  seed:
+    runs-on: ubuntu-latest
+    environment: gha-eks
+    timeout-minutes: 20
+
+    env:
+      RELEASE_NAME: demo
+      RELEASE_NS: ${{ inputs.namespace || 'demo' }}
+      DEMO_HOSTNAME: ${{ inputs.hostname || 'demo.authproxy.net' }}
+      WAIT_TIMEOUT: ${{ inputs.wait_timeout || '10m' }}
+      CHART_PATH: deploy/charts/authproxy-demo
+      REGISTRY: ghcr.io
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
+
+      - name: Resolve seed image tag
+        id: tag
+        run: |
+          set -euo pipefail
+          if [ -n "${{ inputs.image_tag }}" ]; then
+            tag="${{ inputs.image_tag }}"
+          else
+            tag="sha-$(git rev-parse --short HEAD)"
+          fi
+
+          echo "tag=${tag}" >> "$GITHUB_OUTPUT"
+          echo "Seeding namespace: ${RELEASE_NS}"
+          echo "Seeding hostname: ${DEMO_HOSTNAME}"
+          echo "Seed image tag: ${tag}"
+
+      - name: Verify seed image tag in GHCR
+        run: |
+          set -euo pipefail
+          tag="${{ steps.tag.outputs.tag }}"
+          owner="$(printf '%s' "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')"
+          ref="${REGISTRY}/${owner}/authproxy-demo-seed:${tag}"
+
+          echo "${{ secrets.GITHUB_TOKEN }}" \
+            | docker login "${REGISTRY}" -u "${{ github.actor }}" --password-stdin >/dev/null
+
+          deadline=$((SECONDS + 5 * 60))
+          until docker manifest inspect "${ref}" >/dev/null 2>&1; do
+            if [ "${SECONDS}" -ge "${deadline}" ]; then
+              echo "Timed out verifying seed image ${ref}" >&2
+              exit 1
+            fi
+            echo "Waiting for GHCR to expose ${ref}"
+            sleep 30
+          done
+
+          echo "Found ${ref}"
+
+      - name: Assume GH Actions role via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Wire kubeconfig
+        run: |
+          set -euo pipefail
+          aws eks update-kubeconfig \
+            --name "${{ vars.EKS_CLUSTER }}" \
+            --region "${{ vars.AWS_REGION }}"
+          kubectl get nodes -o wide
+
+      - name: Check demo deployment is ready
+        run: |
+          set -euo pipefail
+          kubectl -n "${RELEASE_NS}" get secret "${RELEASE_NAME}-demo-shell-key" >/dev/null
+          kubectl -n "${RELEASE_NS}" rollout status "deployment/${RELEASE_NAME}-authproxy" --timeout=5m
+          kubectl -n "${RELEASE_NS}" rollout status "deployment/${RELEASE_NAME}-go-oauth2-server" --timeout=5m
+
+      - name: Render seed job
+        id: render
+        run: |
+          set -euo pipefail
+          manifest="${RUNNER_TEMP}/demo-seed.yaml"
+
+          helm template "${RELEASE_NAME}" "${CHART_PATH}" \
+            --show-only templates/seed-job.yaml \
+            --set "global.hostname=${DEMO_HOSTNAME}" \
+            --set "seed.image.tag=${{ steps.tag.outputs.tag }}" \
+            --set "secrets.autoGenerate=false" \
+            > "${manifest}"
+
+          echo "manifest=${manifest}" >> "$GITHUB_OUTPUT"
+
+      - name: Run seed job
+        run: |
+          set -euo pipefail
+          manifest="${{ steps.render.outputs.manifest }}"
+
+          kubectl -n "${RELEASE_NS}" delete "job/${RELEASE_NAME}-seed" \
+            --ignore-not-found --wait=false
+
+          for _ in $(seq 1 24); do
+            if ! kubectl -n "${RELEASE_NS}" get "job/${RELEASE_NAME}-seed" >/dev/null 2>&1; then
+              break
+            fi
+            echo "Waiting for stale ${RELEASE_NAME}-seed Job to be deleted..."
+            sleep 5
+          done
+
+          if kubectl -n "${RELEASE_NS}" get "job/${RELEASE_NAME}-seed" >/dev/null 2>&1; then
+            echo "Timed out waiting for stale ${RELEASE_NAME}-seed Job to delete." >&2
+            exit 1
+          fi
+
+          kubectl -n "${RELEASE_NS}" apply -f "${manifest}"
+
+          if ! kubectl -n "${RELEASE_NS}" wait \
+            --for=condition=complete "job/${RELEASE_NAME}-seed" \
+            --timeout="${WAIT_TIMEOUT}"; then
+            kubectl -n "${RELEASE_NS}" describe "job/${RELEASE_NAME}-seed" || true
+            kubectl -n "${RELEASE_NS}" logs "job/${RELEASE_NAME}-seed" \
+              --all-containers --tail=-1 || true
+            exit 1
+          fi
+
+          kubectl -n "${RELEASE_NS}" logs "job/${RELEASE_NAME}-seed" \
+            --all-containers --tail=-1
