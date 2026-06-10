@@ -67,6 +67,15 @@ export interface ListConnectorVersionsParams {
     order_by?: string;
 }
 
+export interface ConnectorLifecycleRequest {
+    timeout_seconds?: number;
+}
+
+export interface ConnectorLifecycleResponse {
+    task_id: string;
+    connector_id: string;
+}
+
 /**
  * Get a list of all available connectors
  */
@@ -114,6 +123,26 @@ export const forceConnectorVersionState = (id: string, version: number, state: C
     const request: ForceConnectorVersionStateRequest = { state };
     return client.put<ForceConnectorVersionStateResponse>(
         `/api/v1/connectors/${id}/versions/${version}/_force_state`,
+        request
+    );
+};
+
+/**
+ * Disconnect all connections for a connector.
+ */
+export const disconnectAllConnectorConnections = (id: string, request?: ConnectorLifecycleRequest) => {
+    return client.post<ConnectorLifecycleResponse>(
+        `/api/v1/connectors/${id}/_disconnect_all`,
+        request
+    );
+};
+
+/**
+ * Archive a connector after disconnecting its connections.
+ */
+export const archiveConnector = (id: string, request?: ConnectorLifecycleRequest) => {
+    return client.post<ConnectorLifecycleResponse>(
+        `/api/v1/connectors/${id}/_archive`,
         request
     );
 };
@@ -180,6 +209,8 @@ export const connectors = {
     listVersions: listConnectorVersions,
     getVersion: getConnectorVersion,
     force_version_state: forceConnectorVersionState,
+    disconnectAll: disconnectAllConnectorConnections,
+    archive: archiveConnector,
     getAnnotations: getConnectorAnnotations,
     getAnnotation: getConnectorAnnotation,
     putAnnotation: putConnectorAnnotation,

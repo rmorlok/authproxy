@@ -124,6 +124,21 @@ type CreateConnectorVersionRequestJson struct {
 	Annotations *map[string]string `json:"annotations,omitempty"`
 }
 
+// ConnectorLifecycleRequestJson documents connector lifecycle operation bodies.
+//
+//	@Description	Request to run a connector lifecycle operation
+type ConnectorLifecycleRequestJson struct {
+	TimeoutSeconds *int64 `json:"timeout_seconds,omitempty" example:"600"`
+}
+
+// ConnectorLifecycleResponseJson documents connector lifecycle operation responses.
+//
+//	@Description	Response for connector lifecycle operation
+type ConnectorLifecycleResponseJson struct {
+	TaskId      string  `json:"task_id"`
+	ConnectorId apid.ID `json:"connector_id" swaggertype:"string" example:"cxr_test550e8400abcde"`
+}
+
 // ListEncryptionKeysResponseJson documents the paginated encryption-key list response.
 //
 //	@Description	Paginated list of encryption keys

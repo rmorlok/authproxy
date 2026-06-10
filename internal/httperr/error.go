@@ -115,6 +115,8 @@ func StatusText(status int) string {
 		return "Unprocessable Entity"
 	case 500:
 		return "Internal Server Error"
+	case 501:
+		return "Not Implemented"
 	case 502:
 		return "Bad Gateway"
 	case 503:

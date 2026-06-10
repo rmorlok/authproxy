@@ -2,6 +2,7 @@ package iface
 
 import (
 	"context"
+	"time"
 
 	"github.com/hibiken/asynq"
 	"github.com/rmorlok/authproxy/internal/apid"
@@ -14,6 +15,10 @@ import (
 )
 
 type ConnectorVersionId = database.ConnectorVersionId
+
+type ConnectorLifecycleOptions struct {
+	Timeout time.Duration
+}
 
 // C is the interface for the core service that implements primary business logic and binds the system together.
 type C interface {
@@ -74,6 +79,12 @@ type C interface {
 
 	// GetOrCreateDraftConnectorVersion returns the existing draft version, or creates a new one by cloning the latest version.
 	GetOrCreateDraftConnectorVersion(ctx context.Context, id apid.ID) (ConnectorVersion, error)
+
+	// DisconnectConnectorConnections starts a workflow that disconnects all connections for a connector.
+	DisconnectConnectorConnections(ctx context.Context, id apid.ID, opts ConnectorLifecycleOptions) (taskInfo *tasks.TaskInfo, err error)
+
+	// ArchiveConnector starts a workflow that archives a connector after disconnecting its connections.
+	ArchiveConnector(ctx context.Context, id apid.ID, opts ConnectorLifecycleOptions) (taskInfo *tasks.TaskInfo, err error)
 
 	/*
 	 *

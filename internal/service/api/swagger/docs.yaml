@@ -502,6 +502,22 @@ definitions:
       updated_at:
         type: string
     type: object
+  routes.OpenAPIConnectorLifecycleRequestJson:
+    description: Request to run a connector lifecycle operation
+    properties:
+      timeout_seconds:
+        example: 600
+        type: integer
+    type: object
+  routes.OpenAPIConnectorLifecycleResponseJson:
+    description: Response for connector lifecycle operation
+    properties:
+      connector_id:
+        example: cxr_test550e8400abcde
+        type: string
+      task_id:
+        type: string
+    type: object
   routes.OpenAPIConnectorVersionJson:
     description: Detailed connector version information
     properties:
@@ -2863,6 +2879,111 @@ paths:
       security:
       - BearerAuth: []
       summary: Update connector
+      tags:
+      - connectors
+  /connectors/{id}/_archive:
+    post:
+      consumes:
+      - application/json
+      description: Start a workflow that archives a connector after disconnecting
+        its connections
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Lifecycle operation options
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/routes.OpenAPIConnectorLifecycleRequestJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.OpenAPIConnectorLifecycleResponseJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Archive connector
+      tags:
+      - connectors
+  /connectors/{id}/_disconnect_all:
+    post:
+      consumes:
+      - application/json
+      description: Start a workflow that disconnects all connections for a connector
+      parameters:
+      - description: Connector UUID
+        in: path
+        name: id
+        required: true
+        type: string
+      - description: Lifecycle operation options
+        in: body
+        name: request
+        schema:
+          $ref: '#/definitions/routes.OpenAPIConnectorLifecycleRequestJson'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/routes.OpenAPIConnectorLifecycleResponseJson'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "401":
+          description: Unauthorized
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "403":
+          description: Forbidden
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+        "501":
+          description: Not Implemented
+          schema:
+            $ref: '#/definitions/routes.ErrorResponse'
+      security:
+      - BearerAuth: []
+      summary: Disconnect all connector connections
       tags:
       - connectors
   /connectors/{id}/annotations:
