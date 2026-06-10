@@ -19,6 +19,10 @@ kubectl kustomize deploy/kustomize/authproxy-demo/overlays/demo
 kubectl kustomize deploy/kustomize/authproxy-demo/overlays/dev
 ```
 
+`Deploy Demo` renders `overlays/demo`, rewrites the checked-out overlay with
+the selected image tag and configured hostname, and applies the resulting
+manifest with `kubectl apply`.
+
 Secrets are still created by workflow/setup steps. The overlays expect names
 that match the existing release convention after `namePrefix` is applied:
 
