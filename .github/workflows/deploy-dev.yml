@@ -13,7 +13,7 @@ name: Deploy Dev
 on:
   pull_request:
     branches: [main]
-    types: [opened, synchronize, reopened, labeled]
+    types: [opened, synchronize, reopened, labeled, closed]
 
 permissions:
   actions: read
@@ -30,6 +30,7 @@ concurrency:
 jobs:
   deploy:
     if: >
+      github.event.action != 'closed' &&
       github.event.pull_request.head.repo.full_name == github.repository &&
       contains(github.event.pull_request.labels.*.name, 'deploy:demo')
     runs-on: ubuntu-latest
@@ -38,10 +39,9 @@ jobs:
 
     env:
       RELEASE_NAME: dev
-      CHART_PATH: deploy/charts/authproxy-demo
+      KUSTOMIZE_OVERLAY: deploy/kustomize/authproxy-demo/overlays/dev
       DEV_DOMAIN: ${{ vars.DEV_DOMAIN || 'dev.authproxy.net' }}
-      DEV_CLUSTER_ISSUER: ${{ vars.DEV_CLUSTER_ISSUER || 'letsencrypt-prod' }}
-      DEV_TLS_WILDCARD_SUBDOMAINS: ${{ vars.DEV_TLS_WILDCARD_SUBDOMAINS || 'false' }}
+      DEV_CLUSTER_ISSUER: ${{ vars.DEV_CLUSTER_ISSUER || 'letsencrypt-prod-dns01' }}
       REGISTRY: ghcr.io
       PR_NUMBER: ${{ github.event.pull_request.number }}
       BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
@@ -51,11 +51,6 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Set up Helm
-        uses: azure/setup-helm@v4
-        with:
-          version: v3.16.4
 
       - name: Set up Go
         uses: actions/setup-go@v5
@@ -193,15 +188,6 @@ jobs:
             --region "${{ vars.AWS_REGION }}"
           kubectl get nodes -o wide
 
-      - name: Register Helm repos for subcharts
-        run: |
-          helm repo add bitnami https://charts.bitnami.com/bitnami
-          helm repo add grafana https://grafana.github.io/helm-charts
-          helm repo update
-
-      - name: helm dependency update
-        run: helm dependency update "${CHART_PATH}"
-
       - name: Provision dev namespace secrets
         env:
           RELEASE_NS: ${{ steps.env.outputs.namespace }}
@@ -255,15 +241,12 @@ jobs:
             echo "Reusing ${RELEASE_NAME}-actors"
           fi
 
-      - name: Recover stuck Helm release
+      - name: Clear stale seed job
         env:
           RELEASE_NS: ${{ steps.env.outputs.namespace }}
         run: |
           set -euo pipefail
 
-          # Helm hook Jobs can outlive an atomic uninstall / failed install.
-          # Dev environments are disposable, so clear stale hook resources
-          # before each install to avoid waiting on an old Job's pods.
           kubectl -n "${RELEASE_NS}" delete job "${RELEASE_NAME}-seed" \
             --ignore-not-found --wait=false
           kubectl -n "${RELEASE_NS}" delete configmap "${RELEASE_NAME}-seed-config" \
@@ -282,47 +265,50 @@ jobs:
             exit 1
           fi
 
-          if ! helm status "${RELEASE_NAME}" -n "${RELEASE_NS}" >/dev/null 2>&1; then
-            echo "No existing ${RELEASE_NAME} release in ${RELEASE_NS}."
-            exit 0
+      - name: Render Kustomize overlay
+        id: render
+        env:
+          RELEASE_NS: ${{ steps.env.outputs.namespace }}
+          DEV_HOSTNAME: ${{ steps.env.outputs.hostname }}
+          IMAGE_TAG: ${{ steps.env.outputs.image_tag }}
+        run: |
+          set -euo pipefail
+          manifest="${RUNNER_TEMP}/dev-kustomize.yaml"
+
+          find "${KUSTOMIZE_OVERLAY}" -type f -name '*.yaml' -print0 \
+            | xargs -0 perl -0pi -e 's/branch\.dev\.authproxy\.net/$ENV{DEV_HOSTNAME}/g; s/authproxy-dev-placeholder/$ENV{RELEASE_NS}/g; s/letsencrypt-prod-dns01/$ENV{DEV_CLUSTER_ISSUER}/g'
+
+          find "${KUSTOMIZE_OVERLAY}" -type f -name kustomization.yaml -print0 \
+            | xargs -0 perl -0pi -e 's#(name: ghcr\.io/rmorlok/(?:authproxy|authproxy-demo-shell|authproxy-demo-seed)\n\s+newTag: )main#${1}$ENV{IMAGE_TAG}#g'
+
+          kubectl kustomize "${KUSTOMIZE_OVERLAY}" > "${manifest}"
+          echo "manifest=${manifest}" >> "$GITHUB_OUTPUT"
+
+          grep -Fq "namespace: ${RELEASE_NS}" "${manifest}"
+          grep -Fq "host: ${DEV_HOSTNAME}" "${manifest}"
+          grep -Fq "image: ghcr.io/rmorlok/authproxy:${IMAGE_TAG}" "${manifest}"
+          grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-shell:${IMAGE_TAG}" "${manifest}"
+          grep -Fq "provider: miniredis" "${manifest}"
+          grep -Fq "provider: filesystem" "${manifest}"
+          if grep -Eq "name: dev-(postgresql|redis-master|minio)$" "${manifest}"; then
+            echo "Dev Kustomize render leaked backing service workloads" >&2
+            exit 1
           fi
 
-          status="$(helm status "${RELEASE_NAME}" -n "${RELEASE_NS}" -o json | jq -r '.info.status // ""')"
-          echo "Existing ${RELEASE_NAME} release status: ${status}"
-
-          case "${status}" in
-            deployed)
-              echo "Release is deployed; normal upgrade can proceed."
-              ;;
-            *)
-              echo "Resetting disposable dev release stuck in ${status:-unknown} state."
-              helm uninstall "${RELEASE_NAME}" -n "${RELEASE_NS}" --wait --timeout 5m || true
-              ;;
-          esac
-
-      - name: helm upgrade --install
+      - name: Apply Kustomize manifest
         env:
           RELEASE_NS: ${{ steps.env.outputs.namespace }}
         run: |
           set -euo pipefail
-          helm upgrade --install "${RELEASE_NAME}" "${CHART_PATH}" \
-            -f "${CHART_PATH}/dev-slim-values.yaml" \
-            --namespace "${RELEASE_NS}" \
-            --atomic \
-            --wait --timeout 10m \
-            --set "global.hostname=${{ steps.env.outputs.hostname }}" \
-            --set "global.clusterIssuer=${DEV_CLUSTER_ISSUER}" \
-            --set "ingress.wildcardSubdomains=${DEV_TLS_WILDCARD_SUBDOMAINS}" \
-            --set "authproxy.image.tag=${{ steps.env.outputs.image_tag }}" \
-            --set "authproxy.image.pullPolicy=Always" \
-            --set-string "authproxy.podAnnotations.demo\.authproxy\.net/image-revision=${{ github.sha }}" \
-            --set "demoShell.image.tag=${{ steps.env.outputs.image_tag }}" \
-            --set "demoShell.image.pullPolicy=Always" \
-            --set-string "demoShell.podAnnotations.demo\.authproxy\.net/image-revision=${{ github.sha }}" \
-            --set "seed.image.tag=${{ steps.env.outputs.image_tag }}" \
-            --set "seed.image.pullPolicy=Always" \
-            --set "grafana.enabled=false" \
-            --set "grafanaAuthProxy.enabled=false"
+          manifest="${{ steps.render.outputs.manifest }}"
+
+          kubectl -n "${RELEASE_NS}" apply -f "${manifest}"
+
+          for deployment in "${RELEASE_NAME}-authproxy" "${RELEASE_NAME}-demo-shell"; do
+            kubectl -n "${RELEASE_NS}" patch "deployment/${deployment}" \
+              --type merge \
+              -p "{\"spec\":{\"template\":{\"metadata\":{\"annotations\":{\"demo.authproxy.net/image-revision\":\"${PR_HEAD_SHA}\"}}}}}"
+          done
 
       - name: Wait for workload rollouts
         timeout-minutes: 5
@@ -333,33 +319,67 @@ jobs:
           for d in \
             "${RELEASE_NAME}-authproxy" \
             "${RELEASE_NAME}-demo-shell" \
-            "${RELEASE_NAME}-grafana" \
             "${RELEASE_NAME}-go-oauth2-server"
           do
-            if ! kubectl -n "${RELEASE_NS}" get "deployment/$d" >/dev/null 2>&1; then
-              echo "Skipping $d; deployment is not rendered."
-              continue
-            fi
             kubectl -n "${RELEASE_NS}" rollout status "deployment/$d" --timeout=5m
           done
 
-      - name: Wait for TLS certificate
+      - name: Wait for TLS certificates
         timeout-minutes: 20
         env:
           RELEASE_NS: ${{ steps.env.outputs.namespace }}
         run: |
           set -euo pipefail
-          cert_name="${RELEASE_NAME}-demo-tls"
-          if kubectl -n "${RELEASE_NS}" wait \
-            --for=condition=Ready \
-            "certificate/${cert_name}" \
-            --timeout=18m; then
-            exit 0
+          for cert_name in "${RELEASE_NAME}-branch-wildcard-tls" "${RELEASE_NAME}-subdomain-wildcard-tls"; do
+            echo "Waiting for certificate/${cert_name}..."
+            if kubectl -n "${RELEASE_NS}" wait \
+              --for=condition=Ready \
+              "certificate/${cert_name}" \
+              --timeout=18m; then
+              continue
+            fi
+
+            kubectl -n "${RELEASE_NS}" describe "certificate/${cert_name}" || true
+            kubectl -n "${RELEASE_NS}" get certificate,order,challenge || true
+            exit 1
+          done
+
+      - name: Render seed job
+        id: seed
+        env:
+          RELEASE_NS: ${{ steps.env.outputs.namespace }}
+        run: |
+          set -euo pipefail
+          manifest="${RUNNER_TEMP}/dev-seed.yaml"
+
+          kubectl kustomize "${KUSTOMIZE_OVERLAY}/seed" > "${manifest}"
+
+          echo "manifest=${manifest}" >> "$GITHUB_OUTPUT"
+          grep -Fq "namespace: ${RELEASE_NS}" "${manifest}"
+          grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-seed:${{ steps.env.outputs.image_tag }}" "${manifest}"
+          grep -Fq "value: http://dev-authproxy:8082" "${manifest}"
+          grep -Fq "base_url: http://dev-go-oauth2-server" "${manifest}"
+
+      - name: Run seed job
+        env:
+          RELEASE_NS: ${{ steps.env.outputs.namespace }}
+        run: |
+          set -euo pipefail
+          manifest="${{ steps.seed.outputs.manifest }}"
+
+          kubectl -n "${RELEASE_NS}" apply -f "${manifest}"
+
+          if ! kubectl -n "${RELEASE_NS}" wait \
+            --for=condition=complete "job/${RELEASE_NAME}-seed" \
+            --timeout=10m; then
+            kubectl -n "${RELEASE_NS}" describe "job/${RELEASE_NAME}-seed" || true
+            kubectl -n "${RELEASE_NS}" logs "job/${RELEASE_NAME}-seed" \
+              --all-containers --tail=-1 || true
+            exit 1
           fi
 
-          kubectl -n "${RELEASE_NS}" describe "certificate/${cert_name}" || true
-          kubectl -n "${RELEASE_NS}" get certificate,order,challenge || true
-          exit 1
+          kubectl -n "${RELEASE_NS}" logs "job/${RELEASE_NAME}-seed" \
+            --all-containers --tail=-1
 
       - name: Smoke test (demo connectors)
         id: smoke
@@ -505,13 +525,8 @@ jobs:
           RELEASE_NS: ${{ steps.env.outputs.namespace }}
         run: |
           set +e
-          echo "::group::Helm status"
-          helm status "${RELEASE_NAME}" -n "${RELEASE_NS}"
-          helm history "${RELEASE_NAME}" -n "${RELEASE_NS}"
-          echo "::endgroup::"
-
           echo "::group::Kubernetes resources"
-          kubectl -n "${RELEASE_NS}" get all,certificate,order,challenge -o wide
+          kubectl -n "${RELEASE_NS}" get all,ingress,certificate,order,challenge -o wide
           echo "::endgroup::"
 
           echo "::group::Pods"
@@ -543,4 +558,83 @@ jobs:
             echo "- Namespace: \`${{ steps.env.outputs.namespace }}\`"
             echo "- Hostname:  \`https://${{ steps.env.outputs.hostname }}/\`"
             echo "- Image tag: \`${{ steps.env.outputs.image_tag }}\`"
+            echo "- Renderer:  \`kubectl kustomize ${KUSTOMIZE_OVERLAY}\`"
+            echo "- Seeded:    \`kubectl kustomize ${KUSTOMIZE_OVERLAY}/seed\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  teardown:
+    if: >
+      github.event.action == 'closed' &&
+      github.event.pull_request.head.repo.full_name == github.repository &&
+      contains(github.event.pull_request.labels.*.name, 'deploy:demo')
+    runs-on: ubuntu-latest
+    environment: gha-eks
+    timeout-minutes: 15
+
+    env:
+      DEV_DOMAIN: ${{ vars.DEV_DOMAIN || 'dev.authproxy.net' }}
+      PR_NUMBER: ${{ github.event.pull_request.number }}
+      BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
+
+    steps:
+      - name: Resolve environment names
+        id: env
+        run: |
+          set -euo pipefail
+
+          # Keep this slugging in sync with the deploy job so closed PRs
+          # delete the same namespace they created.
+          label="$(printf '%s' "${BRANCH_NAME}" \
+            | tr '[:upper:]' '[:lower:]' \
+            | sed -E 's/[^a-z0-9]+/-/g; s/^-+//; s/-+$//; s/-+/-/g')"
+          if [ -z "${label}" ]; then
+            label="pr-${PR_NUMBER}"
+          fi
+
+          label="${label:0:59}"
+          label="$(printf '%s' "${label}" | sed -E 's/-+$//')"
+          if [ -z "${label}" ]; then
+            label="pr-${PR_NUMBER}"
+          fi
+
+          namespace="dev-${label}"
+          hostname="${label}.${DEV_DOMAIN}"
+
+          {
+            echo "label=${label}"
+            echo "namespace=${namespace}"
+            echo "hostname=${hostname}"
+          } >> "$GITHUB_OUTPUT"
+
+          echo "Namespace: ${namespace}"
+          echo "Hostname:  https://${hostname}/"
+
+      - name: Assume GH Actions role via OIDC
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
+          aws-region: ${{ vars.AWS_REGION }}
+
+      - name: Wire kubeconfig
+        run: |
+          aws eks update-kubeconfig \
+            --name "${{ vars.EKS_CLUSTER }}" \
+            --region "${{ vars.AWS_REGION }}"
+
+      - name: Delete dev namespace
+        run: |
+          kubectl delete namespace "${{ steps.env.outputs.namespace }}" \
+            --ignore-not-found \
+            --wait=true \
+            --timeout=10m
+
+      - name: Summary
+        if: always()
+        run: |
+          {
+            echo "## Dev teardown"
+            echo ""
+            echo "- Result:    ${{ job.status }}"
+            echo "- Namespace: \`${{ steps.env.outputs.namespace }}\`"
+            echo "- Hostname:  \`https://${{ steps.env.outputs.hostname }}/\`"
           } >> "$GITHUB_STEP_SUMMARY"
