@@ -36,5 +36,6 @@ that match the existing release convention after `namePrefix` is applied:
 
 Seeding is intentionally not part of the Kustomize deployment apply. Run the
 `Seed Demo` GitHub Actions workflow to reseed the persistent demo environment
-on demand. Dev seeding will be run by the per-branch deploy workflow after the
-environment is applied.
+on demand; it renders `overlays/demo/seed` and applies the resulting Job.
+Dev seeding will be run by the per-branch deploy workflow after the environment
+is applied.

@@ -47,18 +47,13 @@ jobs:
       RELEASE_NS: ${{ inputs.namespace || 'demo' }}
       DEMO_HOSTNAME: ${{ inputs.hostname || 'demo.authproxy.net' }}
       WAIT_TIMEOUT: ${{ inputs.wait_timeout || '10m' }}
-      CHART_PATH: deploy/charts/authproxy-demo
+      KUSTOMIZE_SEED_OVERLAY: deploy/kustomize/authproxy-demo/overlays/demo/seed
       REGISTRY: ghcr.io
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Set up Helm
-        uses: azure/setup-helm@v4
-        with:
-          version: v3.16.4
 
       - name: Resolve seed image tag
         id: tag
@@ -124,14 +119,25 @@ jobs:
           set -euo pipefail
           manifest="${RUNNER_TEMP}/demo-seed.yaml"
 
-          helm template "${RELEASE_NAME}" "${CHART_PATH}" \
-            --show-only templates/seed-job.yaml \
-            --set "global.hostname=${DEMO_HOSTNAME}" \
-            --set "seed.image.tag=${{ steps.tag.outputs.tag }}" \
-            --set "secrets.autoGenerate=false" \
-            > "${manifest}"
+          find "${KUSTOMIZE_SEED_OVERLAY}" -type f -name '*.yaml' -print0 \
+            | xargs -0 perl -0pi -e 's/demo\.authproxy\.net/$ENV{DEMO_HOSTNAME}/g'
+
+          perl -0pi -e 's/(?m)^namespace: demo$/namespace: $ENV{RELEASE_NS}/' \
+            "${KUSTOMIZE_SEED_OVERLAY}/kustomization.yaml"
+
+          perl -0pi -e 's#(name: ghcr\.io/rmorlok/authproxy-demo-seed\n\s+newTag: )main#${1}$ENV{IMAGE_TAG}#g' \
+            "${KUSTOMIZE_SEED_OVERLAY}/kustomization.yaml"
+
+          kubectl kustomize "${KUSTOMIZE_SEED_OVERLAY}" > "${manifest}"
 
           echo "manifest=${manifest}" >> "$GITHUB_OUTPUT"
+          grep -Fq "namespace: ${RELEASE_NS}" "${manifest}"
+          grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-seed:${IMAGE_TAG}" "${manifest}"
+          grep -Fq "value: http://${RELEASE_NAME}-authproxy:8082" "${manifest}"
+          grep -Fq "base_url: http://${RELEASE_NAME}-go-oauth2-server" "${manifest}"
+          grep -Fq "redirect_uri: https://marketplace.${DEMO_HOSTNAME}/oauth2/callback" "${manifest}"
+        env:
+          IMAGE_TAG: ${{ steps.tag.outputs.tag }}
 
       - name: Run seed job
         run: |

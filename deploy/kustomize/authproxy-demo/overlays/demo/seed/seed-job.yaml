@@ -1,0 +1,53 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  name: seed
+  labels:
+    app.kubernetes.io/name: authproxy-demo-seed
+    app.kubernetes.io/component: demo-seed
+spec:
+  backoffLimit: 3
+  ttlSecondsAfterFinished: 600
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: authproxy-demo-seed
+        app.kubernetes.io/component: demo-seed
+    spec:
+      restartPolicy: Never
+      containers:
+        - name: demo-seed
+          image: ghcr.io/rmorlok/authproxy-demo-seed:main
+          imagePullPolicy: Always
+          env:
+            - name: ADMIN_API_URL
+              value: "http://demo-authproxy:8082"
+            - name: ADMIN_USERNAME
+              value: "demo-shell"
+            - name: ADMIN_PRIVATE_KEY_PATH
+              value: "/etc/authproxy/demo-shell/private"
+            - name: SEED_CONFIG_PATH
+              value: "/etc/authproxy/seed/seed.yaml"
+          volumeMounts:
+            - name: admin-key
+              mountPath: /etc/authproxy/demo-shell
+              readOnly: true
+            - name: seed-config
+              mountPath: /etc/authproxy/seed
+              readOnly: true
+          resources:
+            limits:
+              memory: 128Mi
+            requests:
+              cpu: 10m
+              memory: 32Mi
+      volumes:
+        - name: admin-key
+          secret:
+            secretName: demo-demo-shell-key
+            items:
+              - key: private
+                path: private
+        - name: seed-config
+          configMap:
+            name: seed-config
