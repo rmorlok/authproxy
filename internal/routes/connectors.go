@@ -150,6 +150,22 @@ func parseConnectorID(gctx *gin.Context) (apid.ID, *httperr.Error) {
 	return id, nil
 }
 
+func parseConnectorVersionID(gctx *gin.Context) (connectorVersionID, *httperr.Error) {
+	id, herr := parseConnectorID(gctx)
+	if herr != nil {
+		return connectorVersionID{}, herr
+	}
+	versionStr := gctx.Param("version")
+	if versionStr == "" {
+		return connectorVersionID{}, httperr.BadRequest("version is required")
+	}
+	version, err := strconv.ParseUint(versionStr, 10, 64)
+	if err != nil {
+		return connectorVersionID{}, httperr.BadRequest("failed to parse version as an integer")
+	}
+	return connectorVersionID{ConnectorID: id, Version: version}, nil
+}
+
 func connectorVersionStatesToAPI(states database.ConnectorVersionStates) schemaapi.ConnectorVersionStates {
 	if states == nil {
 		return nil
@@ -178,45 +194,24 @@ func (r *ConnectorsRoutes) get(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
+	connectorId, httpErr := parseConnectorID(gctx)
+	if httpErr != nil {
+		apgin.WriteError(gctx, nil, httpErr)
 		val.MarkErrorReturn()
 		return
 	}
 
-	connectorId, err := apid.Parse(connectorIdStr)
+	c, err := r.loadConnectorByID(ctx, connectorId)
 	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
+		if errors.Is(err, core.ErrNotFound) {
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
+			val.MarkErrorReturn()
+			return
+		}
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	result := r.connectors.
-		ListConnectorsBuilder().
-		ForId(connectorId).
-		Limit(1).
-		FetchPage(ctx)
-
-	if result.Error != nil {
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(result.Error)))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if len(result.Results) == 0 {
-		apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
-		val.MarkErrorReturn()
-		return
-	}
-
-	c := result.Results[0]
 
 	if httpErr := val.ValidateHttpStatusError(c); httpErr != nil {
 		apgin.WriteError(gctx, nil, httpErr)
@@ -333,46 +328,19 @@ func (r *ConnectorsRoutes) getVersion(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	connectorIdStr := gctx.Param("id")
-
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
+	connectorVersionId, httpErr := parseConnectorVersionID(gctx)
+	if httpErr != nil {
+		apgin.WriteError(gctx, nil, httpErr)
 		val.MarkErrorReturn()
 		return
 	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
+	connectorId := connectorVersionId.ConnectorID
+	version := connectorVersionId.Version
 
 	b := r.connectors.
 		ListConnectorVersionsBuilder().
 		ForId(connectorId).
 		Limit(1)
-
-	versionStr := gctx.Param("version")
-
-	if versionStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	version, err := strconv.ParseUint(versionStr, 10, 64)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
-		val.MarkErrorReturn()
-		return
-	}
 
 	b = b.ForVersion(version)
 
@@ -426,23 +394,9 @@ func (r *ConnectorsRoutes) listVersions(gctx *gin.Context) {
 	var err error
 	var ex connIface.ListConnectorVersionsExecutor
 
-	connectorIdStr := gctx.Param("id")
-
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
+	connectorId, httpErr := parseConnectorID(gctx)
+	if httpErr != nil {
+		apgin.WriteError(gctx, nil, httpErr)
 		val.MarkErrorReturn()
 		return
 	}
@@ -610,22 +564,9 @@ func (r *ConnectorsRoutes) updateConnector(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
+	connectorId, httpErr := parseConnectorID(gctx)
+	if httpErr != nil {
+		apgin.WriteError(gctx, nil, httpErr)
 		val.MarkErrorReturn()
 		return
 	}
@@ -727,46 +668,25 @@ func (r *ConnectorsRoutes) createVersion(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
+	connectorId, httpErr := parseConnectorID(gctx)
+	if httpErr != nil {
+		apgin.WriteError(gctx, nil, httpErr)
 		val.MarkErrorReturn()
 		return
 	}
 
 	// Verify the connector exists and check auth
-	connectorResult := r.connectors.
-		ListConnectorsBuilder().
-		ForId(connectorId).
-		Limit(1).
-		FetchPage(ctx)
-
-	if connectorResult.Error != nil {
-		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(connectorResult.Error)))
+	connector, err := r.loadConnectorByID(ctx, connectorId)
+	if err != nil {
+		if errors.Is(err, core.ErrNotFound) {
+			apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
+			val.MarkErrorReturn()
+			return
+		}
+		apgin.WriteError(gctx, nil, httperr.InternalServerError(httperr.WithInternalErr(err)))
 		val.MarkErrorReturn()
 		return
 	}
-
-	if len(connectorResult.Results) == 0 {
-		apgin.WriteError(gctx, nil, httperr.NotFoundf("connector '%s' not found", connectorId))
-		val.MarkErrorReturn()
-		return
-	}
-
-	connector := connectorResult.Results[0]
 	if httpErr := val.ValidateHttpStatusError(connector); httpErr != nil {
 		apgin.WriteError(gctx, nil, httpErr)
 		return
@@ -851,39 +771,14 @@ func (r *ConnectorsRoutes) updateVersion(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
+	connectorVersionId, httpErr := parseConnectorVersionID(gctx)
+	if httpErr != nil {
+		apgin.WriteError(gctx, nil, httpErr)
 		val.MarkErrorReturn()
 		return
 	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	versionStr := gctx.Param("version")
-	if versionStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	version, err := strconv.ParseUint(versionStr, 10, 64)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
-		val.MarkErrorReturn()
-		return
-	}
+	connectorId := connectorVersionId.ConnectorID
+	version := connectorVersionId.Version
 
 	var req UpdateConnectorRequestJson
 	if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
@@ -1133,43 +1028,17 @@ func (r *ConnectorsRoutes) forceVersionState(gctx *gin.Context) {
 	ctx := gctx.Request.Context()
 	val := auth.MustGetValidatorFromGinContext(gctx)
 
-	connectorIdStr := gctx.Param("id")
-	if connectorIdStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
+	connectorVersionId, httpErr := parseConnectorVersionID(gctx)
+	if httpErr != nil {
+		apgin.WriteError(gctx, nil, httpErr)
 		val.MarkErrorReturn()
 		return
 	}
-
-	connectorId, err := apid.Parse(connectorIdStr)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("invalid id format"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	if connectorId == apid.Nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("id is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	versionStr := gctx.Param("version")
-	if versionStr == "" {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("version is required"))
-		val.MarkErrorReturn()
-		return
-	}
-
-	version, err := strconv.ParseUint(versionStr, 10, 64)
-	if err != nil {
-		apgin.WriteError(gctx, nil, httperr.BadRequest("failed to parse version as an integer"))
-		val.MarkErrorReturn()
-		return
-	}
+	connectorId := connectorVersionId.ConnectorID
+	version := connectorVersionId.Version
 
 	req := ForceConnectorVersionStateRequestJson{}
-	err = gctx.BindJSON(&req)
-	if err != nil {
+	if err := gctx.BindJSON(&req); err != nil {
 		apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
 		val.MarkErrorReturn()
 		return
@@ -1774,34 +1643,19 @@ func (r *ConnectorsRoutes) Register(g gin.IRouter) {
 }
 
 func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C, e encrypt.E) *ConnectorsRoutes {
-	parseConnectorVersionID := func(gctx *gin.Context) (connectorVersionID, *httperr.Error) {
-		id, herr := parseConnectorID(gctx)
-		if herr != nil {
-			return connectorVersionID{}, herr
-		}
-		versionStr := gctx.Param("version")
-		if versionStr == "" {
-			return connectorVersionID{}, httperr.BadRequest("version is required")
-		}
-		version, err := strconv.ParseUint(versionStr, 10, 64)
-		if err != nil {
-			return connectorVersionID{}, httperr.BadRequest("failed to parse version as an integer")
-		}
-		return connectorVersionID{ConnectorID: id, Version: version}, nil
+	routes := &ConnectorsRoutes{
+		cfg:         cfg,
+		authService: authService,
+		connectors:  c,
+		encrypt:     e,
 	}
 
 	getConnector := func(ctx context.Context, id apid.ID) (key_value.Resource, error) {
-		result := c.ListConnectorsBuilder().
-			ForId(id).
-			Limit(1).
-			FetchPage(ctx)
-		if result.Error != nil {
-			return nil, result.Error
-		}
-		if len(result.Results) == 0 {
+		connector, err := routes.loadConnectorByID(ctx, id)
+		if errors.Is(err, core.ErrNotFound) {
 			return nil, database.ErrNotFound
 		}
-		return result.Results[0], nil
+		return connector, err
 	}
 
 	getConnectorVersion := func(ctx context.Context, id connectorVersionID) (key_value.Resource, error) {
@@ -2051,14 +1905,10 @@ func NewConnectorsRoutes(cfg config.C, authService auth.A, c connIface.C, e encr
 		Delete:       deleteVersionAnnotations,
 	}
 
-	return &ConnectorsRoutes{
-		cfg:                  cfg,
-		authService:          authService,
-		connectors:           c,
-		encrypt:              e,
-		labelsAdapter:        labelsAdapter,
-		annotsAdapter:        annotsAdapter,
-		versionLabelsAdapter: versionLabelsAdapter,
-		versionAnnotsAdapter: versionAnnotsAdapter,
-	}
+	routes.labelsAdapter = labelsAdapter
+	routes.annotsAdapter = annotsAdapter
+	routes.versionLabelsAdapter = versionLabelsAdapter
+	routes.versionAnnotsAdapter = versionAnnotsAdapter
+
+	return routes
 }

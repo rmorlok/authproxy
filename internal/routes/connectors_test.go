@@ -66,12 +66,87 @@ func (f *fakeConnectorLifecycleCore) ArchiveConnector(
 	}, core.WorkflowNameArchiveConnectorV1, string(apworkflows.DefaultQueue)), nil
 }
 
+func TestParseConnectorID(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		gctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		gctx.Params = gin.Params{{Key: "id", Value: "cxr_test0000000000001"}}
+
+		id, httpErr := parseConnectorID(gctx)
+		require.Nil(t, httpErr)
+		require.Equal(t, apid.MustParse("cxr_test0000000000001"), id)
+	})
+
+	t.Run("missing", func(t *testing.T) {
+		gctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+
+		id, httpErr := parseConnectorID(gctx)
+		require.Equal(t, apid.Nil, id)
+		require.NotNil(t, httpErr)
+		require.Equal(t, http.StatusBadRequest, httpErr.Status)
+		require.Equal(t, "id is required", httpErr.Error())
+	})
+
+	t.Run("invalid", func(t *testing.T) {
+		gctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		gctx.Params = gin.Params{{Key: "id", Value: "bad-connector"}}
+
+		id, httpErr := parseConnectorID(gctx)
+		require.Equal(t, apid.Nil, id)
+		require.NotNil(t, httpErr)
+		require.Equal(t, http.StatusBadRequest, httpErr.Status)
+		require.Equal(t, "invalid id format", httpErr.Error())
+	})
+}
+
+func TestParseConnectorVersionID(t *testing.T) {
+	t.Run("valid", func(t *testing.T) {
+		gctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		gctx.Params = gin.Params{
+			{Key: "id", Value: "cxr_test0000000000001"},
+			{Key: "version", Value: "42"},
+		}
+
+		id, httpErr := parseConnectorVersionID(gctx)
+		require.Nil(t, httpErr)
+		require.Equal(t, connectorVersionID{
+			ConnectorID: apid.MustParse("cxr_test0000000000001"),
+			Version:     42,
+		}, id)
+	})
+
+	t.Run("missing version", func(t *testing.T) {
+		gctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		gctx.Params = gin.Params{{Key: "id", Value: "cxr_test0000000000001"}}
+
+		id, httpErr := parseConnectorVersionID(gctx)
+		require.Equal(t, connectorVersionID{}, id)
+		require.NotNil(t, httpErr)
+		require.Equal(t, http.StatusBadRequest, httpErr.Status)
+		require.Equal(t, "version is required", httpErr.Error())
+	})
+
+	t.Run("invalid version", func(t *testing.T) {
+		gctx, _ := gin.CreateTestContext(httptest.NewRecorder())
+		gctx.Params = gin.Params{
+			{Key: "id", Value: "cxr_test0000000000001"},
+			{Key: "version", Value: "latest"},
+		}
+
+		id, httpErr := parseConnectorVersionID(gctx)
+		require.Equal(t, connectorVersionID{}, id)
+		require.NotNil(t, httpErr)
+		require.Equal(t, http.StatusBadRequest, httpErr.Status)
+		require.Equal(t, "failed to parse version as an integer", httpErr.Error())
+	})
+}
+
 func TestConnectors(t *testing.T) {
 	type TestSetup struct {
 		Gin           *gin.Engine
 		Cfg           config.C
 		AuthUtil      *auth2.AuthTestUtil
 		LifecycleCore *fakeConnectorLifecycleCore
+		Routes        *ConnectorsRoutes
 	}
 
 	setup := func(t *testing.T, cfg config.C) *TestSetup {
@@ -130,8 +205,27 @@ func TestConnectors(t *testing.T) {
 			Cfg:           cfg,
 			AuthUtil:      authUtil,
 			LifecycleCore: lifecycleCore,
+			Routes:        cr,
 		}
 	}
+
+	t.Run("route helpers", func(t *testing.T) {
+		t.Run("load connector by id", func(t *testing.T) {
+			tu := setup(t, nil)
+
+			connector, err := tu.Routes.loadConnectorByID(context.Background(), apid.MustParse("cxr_test0000000000001"))
+			require.NoError(t, err)
+			require.Equal(t, apid.MustParse("cxr_test0000000000001"), connector.GetId())
+		})
+
+		t.Run("load connector by id not found", func(t *testing.T) {
+			tu := setup(t, nil)
+
+			connector, err := tu.Routes.loadConnectorByID(context.Background(), apid.MustParse("cxr_nonexistent00099"))
+			require.Nil(t, connector)
+			require.ErrorIs(t, err, core.ErrNotFound)
+		})
+	})
 
 	t.Run("connector lifecycle operations", func(t *testing.T) {
 		t.Run("disconnect all unauthorized", func(t *testing.T) {
