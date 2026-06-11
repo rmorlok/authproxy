@@ -18,8 +18,9 @@ name: Deploy Demo
 #     and demo-minio-creds.
 #   - Repo secret AWS_ROLE_ARN.
 #   - Repo variables AWS_REGION, EKS_CLUSTER, and DEMO_HOSTNAME.
-#   - Optional repo variable GRAFANA_AUTHPROXY_PLUGIN_INSTALL to override
-#     Grafana's GF_INSTALL_PLUGINS value.
+#   - Optional repo variable GRAFANA_AUTHPROXY_PLUGIN_INSTALL with Grafana's
+#     GF_INSTALL_PLUGINS value. Leave unset until the AuthProxy datasource
+#     plugin has a published install URL.
 
 on:
   workflow_run:
@@ -66,6 +67,11 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version-file: go.mod
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v4
+        with:
+          version: v3.16.4
 
       - name: Resolve image tag
         id: tag
@@ -138,6 +144,78 @@ jobs:
             --region "${{ vars.AWS_REGION }}"
           kubectl get nodes -o wide
 
+      - name: Preserve operator demo secrets
+        id: preserve
+        run: |
+          set -euo pipefail
+          secrets_manifest="${RUNNER_TEMP}/demo-preserved-secrets.json"
+
+          kubectl create namespace "${RELEASE_NS}" --dry-run=client -o yaml \
+            | kubectl apply -f -
+
+          secrets=(
+            "${RELEASE_NAME}-jwt"
+            "${RELEASE_NAME}-encryption"
+            "${RELEASE_NAME}-demo-shell-key"
+            "${RELEASE_NAME}-actors"
+            "${RELEASE_NAME}-db"
+            "${RELEASE_NAME}-redis-creds"
+            "${RELEASE_NAME}-minio-creds"
+          )
+
+          for secret in "${secrets[@]}"; do
+            if ! kubectl -n "${RELEASE_NS}" get "secret/${secret}" >/dev/null 2>&1; then
+              echo "Required demo secret ${secret} does not exist in namespace ${RELEASE_NS}" >&2
+              exit 1
+            fi
+          done
+
+          kubectl -n "${RELEASE_NS}" get secret "${secrets[@]}" -o json \
+            | jq 'del(
+                .metadata.resourceVersion,
+                .items[].metadata.annotations."kubectl.kubernetes.io/last-applied-configuration",
+                .items[].metadata.annotations."meta.helm.sh/release-name",
+                .items[].metadata.annotations."meta.helm.sh/release-namespace",
+                .items[].metadata.creationTimestamp,
+                .items[].metadata.labels."app.kubernetes.io/managed-by",
+                .items[].metadata.managedFields,
+                .items[].metadata.ownerReferences,
+                .items[].metadata.resourceVersion,
+                .items[].metadata.uid
+              )' \
+            > "${secrets_manifest}"
+
+          echo "manifest=${secrets_manifest}" >> "$GITHUB_OUTPUT"
+
+      - name: Remove legacy Helm release state
+        run: |
+          set -euo pipefail
+
+          for release in "${RELEASE_NAME}" authproxy-demo; do
+            if helm status "${release}" --namespace "${RELEASE_NS}" >/dev/null 2>&1; then
+              echo "Uninstalling legacy Helm release ${release} in namespace ${RELEASE_NS}"
+              helm uninstall "${release}" --namespace "${RELEASE_NS}" --wait --timeout 5m
+            else
+              echo "Legacy Helm release ${release} not present in namespace ${RELEASE_NS}"
+            fi
+          done
+
+          kubectl -n "${RELEASE_NS}" apply -f "${{ steps.preserve.outputs.manifest }}"
+
+          # These names come from the old demo Helm chart/subcharts. Removing
+          # them is safe after preserving secrets and prevents immutable
+          # selector and duplicate host/path conflicts during Kustomize apply.
+          kubectl -n "${RELEASE_NS}" delete deployment,statefulset,ingress \
+            -l "app.kubernetes.io/managed-by=Helm,app.kubernetes.io/instance=${RELEASE_NAME}" \
+            --ignore-not-found
+          kubectl -n "${RELEASE_NS}" delete ingress \
+            "${RELEASE_NAME}-demo-go-oauth2-server" \
+            --ignore-not-found
+          kubectl -n "${RELEASE_NS}" delete statefulset \
+            "${RELEASE_NAME}-postgresql" \
+            "${RELEASE_NAME}-redis-master" \
+            --ignore-not-found
+
       - name: Provision Grafana datasource JWT
         run: |
           set -euo pipefail
@@ -166,7 +244,7 @@ jobs:
         env:
           DEMO_HOSTNAME: ${{ vars.DEMO_HOSTNAME || 'demo.authproxy.net' }}
           DEMO_CLUSTER_ISSUER: ${{ vars.DEMO_CLUSTER_ISSUER || 'letsencrypt-prod-dns01' }}
-          GRAFANA_PLUGIN_INSTALL: ${{ vars.GRAFANA_AUTHPROXY_PLUGIN_INSTALL || 'rmorlok-authproxy-datasource' }}
+          GRAFANA_PLUGIN_INSTALL: ${{ vars.GRAFANA_AUTHPROXY_PLUGIN_INSTALL || '' }}
           IMAGE_TAG: ${{ steps.tag.outputs.tag }}
         run: |
           set -euo pipefail
@@ -187,7 +265,9 @@ jobs:
           grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-shell:${IMAGE_TAG}" "${manifest}"
           grep -Fq "image: docker.io/grafana/grafana:11.5.2" "${manifest}"
           grep -Fq "host: ${DEMO_HOSTNAME}" "${manifest}"
-          grep -Fq "value: ${GRAFANA_PLUGIN_INSTALL}" "${manifest}"
+          if [ -n "${GRAFANA_PLUGIN_INSTALL}" ]; then
+            grep -Fq "value: ${GRAFANA_PLUGIN_INSTALL}" "${manifest}"
+          fi
 
       - name: Apply Kustomize manifest
         run: |
@@ -247,11 +327,17 @@ jobs:
             "${RELEASE_NAME}-authproxy" \
             "${RELEASE_NAME}-demo-shell" \
             "${RELEASE_NAME}-go-oauth2-server" \
-            "${RELEASE_NAME}-grafana" \
           ; do
             echo "Waiting for $d..."
             kubectl -n "${RELEASE_NS}" rollout status "deployment/$d" --timeout=10m
           done
+
+      - name: Wait for Grafana rollout
+        if: vars.GRAFANA_AUTHPROXY_PLUGIN_INSTALL != ''
+        timeout-minutes: 10
+        run: |
+          set -euo pipefail
+          kubectl -n "${RELEASE_NS}" rollout status "deployment/${RELEASE_NAME}-grafana" --timeout=10m
 
       - name: Wait for TLS certificates
         timeout-minutes: 20
@@ -301,7 +387,7 @@ jobs:
             echo "- Image tag:   \`${{ steps.tag.outputs.tag }}\`"
             echo "- Commit:      \`${{ steps.tag.outputs.sha }}\`"
             echo "- Hostname:    \`https://${{ vars.DEMO_HOSTNAME || 'demo.authproxy.net' }}/\`"
-            echo "- Grafana:     \`https://${{ vars.DEMO_HOSTNAME || 'demo.authproxy.net' }}/grafana\`"
+            echo "- Grafana:     \`https://${{ vars.DEMO_HOSTNAME || 'demo.authproxy.net' }}/grafana\` (${{ vars.GRAFANA_AUTHPROXY_PLUGIN_INSTALL != '' && 'plugin install enabled' || 'plugin install not configured' }})"
             echo "- Renderer:    \`kubectl kustomize ${KUSTOMIZE_OVERLAY}\`"
             echo "- Seeding:     manual via \`Seed Demo\` workflow"
             echo "- Rollback:    rerun this workflow with a previous image tag"

@@ -25,6 +25,13 @@ manifest with `kubectl apply`. The demo overlay includes Grafana at
 `https://<hostname>/grafana` with the AuthProxy datasource and sample app
 metrics dashboard provisioned from Kustomize ConfigMaps.
 
+During the Helm-to-Kustomize cutover, `Deploy Demo` preserves the operator
+Secrets listed below, uninstalls any legacy `demo` / `authproxy-demo` Helm
+release in the `demo` namespace, reapplies the preserved Secrets, and removes
+old Helm-managed Deployments, StatefulSets, and Ingresses that can conflict with
+Kustomize's selectors and host rules. Later deploys are idempotent because the
+legacy Helm releases and Helm-managed resources are absent.
+
 Secrets are still created by workflow/setup steps. The overlays expect names
 that match the existing release convention after `namePrefix` is applied:
 
