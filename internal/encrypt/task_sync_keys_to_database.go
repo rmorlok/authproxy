@@ -39,9 +39,9 @@ type versionWithCurrent struct {
 	isCurrent bool
 }
 
-func existingKeyVersionInfos(existing []*database.EncryptionKeyVersion) []config.ExistingKeyVersionInfo {
-	infos := make([]config.ExistingKeyVersionInfo, 0, len(existing))
-	for _, ekv := range existing {
+func persistedKeyVersionInfos(persistedVersions []*database.EncryptionKeyVersion) []config.ExistingKeyVersionInfo {
+	infos := make([]config.ExistingKeyVersionInfo, 0, len(persistedVersions))
+	for _, ekv := range persistedVersions {
 		infos = append(infos, config.ExistingKeyVersionInfo{
 			Provider:        config.ProviderType(ekv.Provider),
 			ProviderID:      ekv.ProviderID,
@@ -62,17 +62,19 @@ func syncKeyVersionsForKeyToDatabase(
 	encryptionKeyId apid.ID,
 	kd *config.KeyData,
 ) error {
-	existing, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, encryptionKeyId)
+	persistedVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, encryptionKeyId)
 	if err != nil {
 		return errors.Wrap(err, "failed to list existing encryption key versions")
 	}
 
-	vers, err := kd.ListVersionsWithExisting(ctx, existingKeyVersionInfos(existing))
+	// KMS-style providers need already-persisted version rows so they can
+	// unwrap stored DEKs and keep old versions decryptable after rotation.
+	vers, err := kd.ListVersionsWithExisting(ctx, persistedKeyVersionInfos(persistedVersions))
 	if err != nil {
 		return errors.Wrapf(err, "failed to get %s key versions", encryptionKeyId)
 	}
 
-	unused := util.NewSetFrom(existing)
+	unused := util.NewSetFrom(persistedVersions)
 
 	for i, ver := range vers {
 		var found *database.EncryptionKeyVersion
