@@ -16,17 +16,17 @@ import (
 )
 
 func TestDisconnectConnectorConnectionsWorkflowV1ExecutesChildWorkflows(t *testing.T) {
-	connectorID := apid.New(apid.PrefixConnectorVersion).String()
-	connectionIDs := []string{
-		apid.New(apid.PrefixConnection).String(),
-		apid.New(apid.PrefixConnection).String(),
+	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectionIDs := []apid.ID{
+		apid.New(apid.PrefixConnection),
+		apid.New(apid.PrefixConnection),
 	}
 	workflowTester := tester.NewWorkflowTester[any](disconnectConnectorConnectionsWorkflowV1)
 
-	listActivity := func(context.Context, string) ([]string, error) {
+	listActivity := func(context.Context, apid.ID) ([]apid.ID, error) {
 		return connectionIDs, nil
 	}
-	forceActivity := func(context.Context, []string) error {
+	forceActivity := func(context.Context, []apid.ID) error {
 		return nil
 	}
 	childWorkflow := func(wflib.Context, string) error {
@@ -48,7 +48,7 @@ func TestDisconnectConnectorConnectionsWorkflowV1ExecutesChildWorkflows(t *testi
 				WorkflowNameDisconnectConnectionV1,
 				childWorkflow,
 				testifymock.Anything,
-				connectionID,
+				connectionID.String(),
 			).
 			Return(nil).
 			Once()
@@ -75,14 +75,14 @@ func TestDisconnectConnectorConnectionsWorkflowV1ExecutesChildWorkflows(t *testi
 }
 
 func TestDisconnectConnectorConnectionsWorkflowV1ForcesRemainingOnTimeout(t *testing.T) {
-	connectorID := apid.New(apid.PrefixConnectorVersion).String()
-	connectionID := apid.New(apid.PrefixConnection).String()
+	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectionID := apid.New(apid.PrefixConnection)
 	workflowTester := tester.NewWorkflowTester[any](disconnectConnectorConnectionsWorkflowV1)
 
-	listActivity := func(context.Context, string) ([]string, error) {
-		return []string{connectionID}, nil
+	listActivity := func(context.Context, apid.ID) ([]apid.ID, error) {
+		return []apid.ID{connectionID}, nil
 	}
-	forceActivity := func(context.Context, []string) error {
+	forceActivity := func(context.Context, []apid.ID) error {
 		return nil
 	}
 	childWorkflow := func(ctx wflib.Context, _ string) error {
@@ -96,7 +96,7 @@ func TestDisconnectConnectorConnectionsWorkflowV1ForcesRemainingOnTimeout(t *tes
 			testifymock.Anything,
 			connectorID,
 		).
-		Return([]string{connectionID}, nil).
+		Return([]apid.ID{connectionID}, nil).
 		Once()
 	require.NoError(t, workflowTester.Registry().RegisterWorkflow(childWorkflow, registry.WithName(WorkflowNameDisconnectConnectionV1)))
 	workflowTester.
@@ -104,7 +104,7 @@ func TestDisconnectConnectorConnectionsWorkflowV1ForcesRemainingOnTimeout(t *tes
 			ActivityNameDisconnectConnectorConnectionsForceRemainingV1,
 			forceActivity,
 			testifymock.Anything,
-			[]string{connectionID},
+			[]apid.ID{connectionID},
 		).
 		Return(nil).
 		Once()
@@ -121,11 +121,20 @@ func TestDisconnectConnectorConnectionsWorkflowV1ForcesRemainingOnTimeout(t *tes
 }
 
 func TestDisconnectConnectorConnectionChildWorkflowInstanceID(t *testing.T) {
-	connectionID := apid.New(apid.PrefixConnection).String()
+	connectionID := apid.New(apid.PrefixConnection)
 	require.Equal(
 		t,
-		"parent:"+connectionID,
+		"parent:"+connectionID.String(),
 		disconnectConnectorConnectionChildWorkflowInstanceID("parent", connectionID),
+	)
+}
+
+func TestDisconnectConnectorConnectionsWorkflowInstanceID(t *testing.T) {
+	connectorID := apid.New(apid.PrefixConnectorVersion)
+	require.Equal(
+		t,
+		WorkflowNameDisconnectConnectorConnectionsV1+":"+connectorID.String(),
+		disconnectConnectorConnectionsWorkflowInstanceID(connectorID),
 	)
 }
 
@@ -165,9 +174,10 @@ func TestDisconnectConnectorConnectionsStartsWorkflow(t *testing.T) {
 	require.Equal(t, apworkflows.DefaultQueue, workflowClient.options.Queue)
 	require.Equal(t, WorkflowNameDisconnectConnectorConnectionsV1, workflowClient.workflow)
 	require.Len(t, workflowClient.args, 1)
+	require.Equal(t, disconnectConnectorConnectionsWorkflowInstanceID(connectorID), workflowClient.options.InstanceID)
 
 	input, ok := workflowClient.args[0].(disconnectConnectorConnectionsWorkflowInputV1)
 	require.True(t, ok)
-	require.Equal(t, connectorID.String(), input.ConnectorID)
+	require.Equal(t, connectorID, input.ConnectorID)
 	require.Equal(t, 5*time.Minute, input.Timeout)
 }

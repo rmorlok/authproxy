@@ -10,7 +10,6 @@ import (
 	"github.com/cschleiden/go-workflows/client"
 	"github.com/cschleiden/go-workflows/registry"
 	wflib "github.com/cschleiden/go-workflows/workflow"
-	"github.com/google/uuid"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/core/iface"
 	"github.com/rmorlok/authproxy/internal/database"
@@ -29,7 +28,7 @@ const (
 )
 
 type disconnectConnectorConnectionsWorkflowInputV1 struct {
-	ConnectorID string        `json:"connector_id"`
+	ConnectorID apid.ID       `json:"connector_id"`
 	Timeout     time.Duration `json:"timeout"`
 }
 
@@ -67,24 +66,24 @@ func (s *service) startDisconnectConnectorConnectionsWorkflow(
 	opts iface.ConnectorLifecycleOptions,
 ) (*wflib.Instance, error) {
 	return s.wc.CreateWorkflowInstance(ctx, client.WorkflowInstanceOptions{
-		InstanceID: disconnectConnectorConnectionsWorkflowInstanceID(connectorID, uuid.NewString()),
+		InstanceID: disconnectConnectorConnectionsWorkflowInstanceID(connectorID),
 		Queue:      apworkflows.DefaultQueue,
 	}, WorkflowNameDisconnectConnectorConnectionsV1, disconnectConnectorConnectionsWorkflowInputV1{
-		ConnectorID: connectorID.String(),
+		ConnectorID: connectorID,
 		Timeout:     opts.Timeout,
 	})
 }
 
-func disconnectConnectorConnectionsWorkflowInstanceID(connectorID apid.ID, operationID string) string {
-	return fmt.Sprintf("%s:%s:%s", WorkflowNameDisconnectConnectorConnectionsV1, connectorID, operationID)
+func disconnectConnectorConnectionsWorkflowInstanceID(connectorID apid.ID) string {
+	return fmt.Sprintf("%s:%s", WorkflowNameDisconnectConnectorConnectionsV1, connectorID)
 }
 
-func disconnectConnectorConnectionChildWorkflowInstanceID(parentInstanceID string, connectionID string) string {
+func disconnectConnectorConnectionChildWorkflowInstanceID(parentInstanceID string, connectionID apid.ID) string {
 	return fmt.Sprintf("%s:%s", parentInstanceID, connectionID)
 }
 
 func disconnectConnectorConnectionsWorkflowV1(ctx wflib.Context, input disconnectConnectorConnectionsWorkflowInputV1) error {
-	connectionIDs, err := wflib.ExecuteActivity[[]string](
+	connectionIDs, err := wflib.ExecuteActivity[[]apid.ID](
 		ctx,
 		wflib.DefaultActivityOptions,
 		ActivityNameDisconnectConnectorConnectionsListConnectionsV1,
@@ -100,7 +99,7 @@ func disconnectConnectorConnectionsWorkflowV1(ctx wflib.Context, input disconnec
 	parentInstanceID := wflib.WorkflowInstance(ctx).InstanceID
 	childCtx, cancelChildren := wflib.WithCancel(ctx)
 	defer cancelChildren()
-	pending := make(map[string]wflib.Future[any], len(connectionIDs))
+	pending := make(map[apid.ID]wflib.Future[any], len(connectionIDs))
 	for _, connectionID := range connectionIDs {
 		pending[connectionID] = wflib.CreateSubWorkflowInstance[any](
 			childCtx,
@@ -109,7 +108,7 @@ func disconnectConnectorConnectionsWorkflowV1(ctx wflib.Context, input disconnec
 				Queue:      apworkflows.DefaultQueue,
 			},
 			WorkflowNameDisconnectConnectionV1,
-			connectionID,
+			connectionID.String(),
 		)
 	}
 
@@ -142,7 +141,7 @@ func disconnectConnectorConnectionsWorkflowV1(ctx wflib.Context, input disconnec
 		return nil
 	}
 
-	remaining := make([]string, 0, len(pending))
+	remaining := make([]apid.ID, 0, len(pending))
 	for connectionID, future := range pending {
 		_, _ = future.Get(ctx)
 		remaining = append(remaining, connectionID)
@@ -156,27 +155,18 @@ func disconnectConnectorConnectionsWorkflowV1(ctx wflib.Context, input disconnec
 	return err
 }
 
-func parseDisconnectConnectorConnectionsWorkflowConnectorID(connectorID string) (apid.ID, error) {
-	id, err := apid.Parse(connectorID)
-	if err != nil {
-		return apid.Nil, fmt.Errorf("invalid connector id: %w", err)
+func (s *service) listDisconnectConnectorConnectionsV1(ctx context.Context, connectorID apid.ID) ([]apid.ID, error) {
+	if connectorID == apid.Nil {
+		return nil, fmt.Errorf("connector id not specified")
 	}
-	if id == apid.Nil {
-		return apid.Nil, fmt.Errorf("connector id not specified")
-	}
-	return id, id.ValidatePrefix(apid.PrefixConnectorVersion)
-}
-
-func (s *service) listDisconnectConnectorConnectionsV1(ctx context.Context, connectorID string) ([]string, error) {
-	id, err := parseDisconnectConnectorConnectionsWorkflowConnectorID(connectorID)
-	if err != nil {
+	if err := connectorID.ValidatePrefix(apid.PrefixConnectorVersion); err != nil {
 		return nil, err
 	}
 
-	var connectionIDs []string
-	err = s.db.ListConnectionsBuilder().
+	var connectionIDs []apid.ID
+	err := s.db.ListConnectionsBuilder().
 		WithDeletedHandling(database.DeletedHandlingExclude).
-		ForConnectorId(id).
+		ForConnectorId(connectorID).
 		ForStates(disconnectConnectorConnectionsRelevantStates()).
 		Enumerate(ctx, func(page pagination.PageResult[database.Connection]) (pagination.KeepGoing, error) {
 			for _, conn := range page.Results {
@@ -185,7 +175,7 @@ func (s *service) listDisconnectConnectorConnectionsV1(ctx context.Context, conn
 						return pagination.Stop, err
 					}
 				}
-				connectionIDs = append(connectionIDs, conn.Id.String())
+				connectionIDs = append(connectionIDs, conn.Id)
 			}
 			return pagination.Continue, nil
 		})
@@ -195,10 +185,12 @@ func (s *service) listDisconnectConnectorConnectionsV1(ctx context.Context, conn
 	return connectionIDs, nil
 }
 
-func (s *service) forceRemainingDisconnectConnectorConnectionsV1(ctx context.Context, connectionIDs []string) error {
-	for _, connectionID := range connectionIDs {
-		id, err := parseDisconnectConnectionWorkflowConnectionID(connectionID)
-		if err != nil {
+func (s *service) forceRemainingDisconnectConnectorConnectionsV1(ctx context.Context, connectionIDs []apid.ID) error {
+	for _, id := range connectionIDs {
+		if id == apid.Nil {
+			return fmt.Errorf("connection id not specified")
+		}
+		if err := id.ValidatePrefix(apid.PrefixConnection); err != nil {
 			return err
 		}
 
