@@ -166,15 +166,19 @@ kubectl delete ns hello-echo
 ### 1.10 Wire the auto-deploy workflow
 
 The `Deploy Demo` workflow (`.github/workflows/deploy-demo.yml`)
-helm-upgrades the umbrella chart on every push to `main` with the
-image tag pinned to that commit's `sha-<short>`. One-time setup:
+applies the Kustomize demo overlay on every push to `main` with the
+image tag pinned to that commit's `sha-<short>`. Demo data is seeded
+separately through the manual `Seed Demo` workflow, so application
+rollouts and catalog refreshes can be run independently. One-time setup:
 
 1. **Create the demo namespace + keypair Secrets** (these are
    operator-provided, not auto-generated — see
-   [`deploy/charts/authproxy-demo/README.md`](../charts/authproxy-demo/README.md)
-   for the openssl one-shot). The workflow assumes
+   [`deploy/kustomize/authproxy-demo/README.md`](../kustomize/authproxy-demo/README.md)
+   for the required secret names). The workflow assumes
    `demo-jwt`, `demo-encryption`, `demo-demo-shell-key`, and
-   `demo-actors` already exist in the `demo` namespace.
+   `demo-actors` already exist in the `demo` namespace. Persistent
+   backing-store Secrets (`demo-db`, `demo-redis-creds`, and
+   `demo-minio-creds`) are also preserved across Kustomize applies.
 
 2. **Set repo Variables** (Settings → Variables → Actions):
 
@@ -203,8 +207,18 @@ image tag pinned to that commit's `sha-<short>`. One-time setup:
    gh run watch
    ```
 
-   Once green, every subsequent merge to `main` deploys automatically
-   within ~5 min.
+   Once green, every subsequent merge to `main` deploys automatically.
+
+5. **Seed or refresh demo catalog data manually** when needed:
+
+   ```bash
+   gh workflow run "Seed Demo" --ref main
+   gh run watch
+   ```
+
+   The seed workflow renders `deploy/kustomize/authproxy-demo/overlays/demo/seed`
+   and runs a one-shot Kubernetes Job against the already-deployed demo
+   services.
 
 ### 1.11 PR dev demo environments
 
@@ -229,12 +243,12 @@ environment even if the opt-in label has since been removed.
 
 Per-branch dev environments intentionally use a smaller, disposable
 storage profile than the persistent demo environment. `Deploy Dev`
-passes `deploy/charts/authproxy-demo/dev-slim-values.yaml` to Helm; the
-regular `Deploy Demo` workflow does **not** use that file.
+applies `deploy/kustomize/authproxy-demo/overlays/dev`; the regular
+`Deploy Demo` workflow applies `deploy/kustomize/authproxy-demo/overlays/demo`.
 
 | Environment | Main DB | Session/task/rate-limit store | Blob storage | Backing workloads |
 |---|---|---|---|---|
-| `demo.authproxy.net` | Postgres subchart | Redis subchart | MinIO subchart | AuthProxy, demo shell, seed Job, go-oauth2-server, Postgres, Redis, MinIO, and optional Grafana |
+| `demo.authproxy.net` | Postgres | Redis | MinIO | AuthProxy, demo shell, go-oauth2-server, Postgres, Redis, MinIO, optional Grafana, and manual seed Jobs |
 | per-branch dev | SQLite under `/tmp` in the AuthProxy pod | in-process `miniredis` | filesystem under `/tmp/authproxy-blobs` in the AuthProxy pod | AuthProxy, demo shell, seed Job, go-oauth2-server, and optional Grafana |
 
 This cuts the required stateful backing containers from three to zero
@@ -244,24 +258,18 @@ SQLite data, miniredis state, queue/session/OAuth round-trip state, and
 filesystem blobs. That is acceptable for PR demos because the next
 deploy reruns the seed Job and recreates the catalog and demo actors.
 
-Do not use `dev-slim-values.yaml` for `demo.authproxy.net`, customer
-installs, or any environment where users expect stored connections,
-sessions, queues, request logs, or metrics to survive pod replacement.
+Do not use the dev overlay for `demo.authproxy.net`, customer installs,
+or any environment where users expect stored connections, sessions,
+queues, request logs, or metrics to survive pod replacement.
 
 To verify the rendered profile before deploying:
 
 ```bash
-helm template dev deploy/charts/authproxy-demo \
-  -f deploy/charts/authproxy-demo/dev-slim-values.yaml \
-  --set global.hostname=branch.dev.authproxy.net \
-  --set authproxy.image.repository=ghcr.io/rmorlok/authproxy \
-  --set authproxy.image.tag=test \
-  --set demoShell.image.tag=test \
-  --set seed.image.tag=test \
-  >/tmp/authproxy-dev-slim.yaml
+kubectl kustomize deploy/kustomize/authproxy-demo/overlays/dev \
+  >/tmp/authproxy-dev.yaml
 
 rg -n "provider: (sqlite|miniredis|filesystem)|/tmp/authproxy-blobs|kind: (Deployment|Job|StatefulSet)|name: dev-(postgresql|redis|minio)" \
-  /tmp/authproxy-dev-slim.yaml
+  /tmp/authproxy-dev.yaml
 ```
 
 Expected result: the AuthProxy config contains `provider: sqlite`,
@@ -272,7 +280,7 @@ mounts `/tmp/authproxy-blobs`; there are no `dev-postgresql`,
 To verify a live PR namespace:
 
 ```bash
-NS=authproxy-dev-pr-123
+NS=dev-my-feature-branch
 
 kubectl -n "$NS" get deploy,job,statefulset,pod
 kubectl -n "$NS" get pod -l app.kubernetes.io/name=postgresql
@@ -284,18 +292,9 @@ kubectl -n "$NS" get configmap -o yaml | rg -n "provider: (sqlite|miniredis|file
 The dependency pod queries should return no resources. The rendered
 ConfigMap should show the slim storage providers.
 
-Rollback options:
-
-- For one dev deploy, remove `-f "${CHART_PATH}/dev-slim-values.yaml"`
-  from the `Deploy Dev` Helm command or override the slim values back to
-  the umbrella defaults.
-- To keep the slim file but re-enable specific dependencies, set
-  `postgresql.enabled=true`, `redis.enabled=true`, or `minio.enabled=true`
-  and restore the matching `authproxy.database`, `authproxy.redis`, or
-  `authproxy.blobStorage` values.
-- For an already-deployed PR namespace, rerun the workflow after
-  changing the Helm values; disposable data in the old AuthProxy pod
-  should be treated as lost.
+Rollback option: rerun the workflow after reverting the Kustomize
+overlay change. Disposable data in the old AuthProxy pod should be
+treated as lost.
 
 ## 2. Granting kubectl access
 
