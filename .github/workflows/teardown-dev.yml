@@ -2,8 +2,8 @@
 name: Teardown Dev
 
 # Deletes the isolated authproxy-demo environment created for a pull
-# request once that PR closes. Missing namespaces/releases are treated
-# as success so repeated cleanup attempts stay safe.
+# request once that PR closes. Missing namespaces are treated as success
+# so repeated cleanup attempts stay safe.
 
 on:
   pull_request:
@@ -28,16 +28,10 @@ jobs:
     timeout-minutes: 15
 
     env:
-      RELEASE_NAME: dev
       PR_NUMBER: ${{ github.event.pull_request.number }}
       BRANCH_NAME: ${{ github.event.pull_request.head.ref }}
 
     steps:
-      - name: Set up Helm
-        uses: azure/setup-helm@v4
-        with:
-          version: v3.16.4
-
       - name: Resolve environment names
         id: env
         run: |
@@ -73,23 +67,6 @@ jobs:
             --name "${{ vars.EKS_CLUSTER }}" \
             --region "${{ vars.AWS_REGION }}"
           kubectl get nodes -o wide
-
-      - name: Uninstall Helm release
-        env:
-          RELEASE_NS: ${{ steps.env.outputs.namespace }}
-        run: |
-          set -euo pipefail
-
-          if ! kubectl get namespace "${RELEASE_NS}" >/dev/null 2>&1; then
-            echo "Namespace ${RELEASE_NS} is already absent."
-            exit 0
-          fi
-
-          if helm status "${RELEASE_NAME}" -n "${RELEASE_NS}" >/dev/null 2>&1; then
-            helm uninstall "${RELEASE_NAME}" -n "${RELEASE_NS}" --wait --timeout 5m
-          else
-            echo "Release ${RELEASE_NAME} is already absent in ${RELEASE_NS}."
-          fi
 
       - name: Delete namespace
         env:
