@@ -2,6 +2,7 @@ package core
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 
@@ -62,6 +63,60 @@ func TestDisconnectConnectorConnectionsWorkflowV1ExecutesChildWorkflows(t *testi
 		).
 		Return(nil).
 		Maybe()
+
+	workflowTester.Execute(context.Background(), disconnectConnectorConnectionsWorkflowInputV1{
+		ConnectorID: connectorID,
+		Timeout:     time.Minute,
+	})
+
+	require.True(t, workflowTester.WorkflowFinished())
+	_, err := workflowTester.WorkflowResult()
+	require.NoError(t, err)
+	workflowTester.AssertExpectations(t)
+}
+
+func TestDisconnectConnectorConnectionsWorkflowV1ForcesFailedChildren(t *testing.T) {
+	connectorID := apid.New(apid.PrefixConnectorVersion)
+	connectionID := apid.New(apid.PrefixConnection)
+	workflowTester := tester.NewWorkflowTester[any](disconnectConnectorConnectionsWorkflowV1)
+
+	listActivity := func(context.Context, apid.ID) ([]apid.ID, error) {
+		return []apid.ID{connectionID}, nil
+	}
+	forceActivity := func(context.Context, []apid.ID) error {
+		return nil
+	}
+	childWorkflow := func(wflib.Context, string) error {
+		return errors.New("child failed")
+	}
+
+	workflowTester.
+		OnActivityByName(
+			ActivityNameDisconnectConnectorConnectionsListConnectionsV1,
+			listActivity,
+			testifymock.Anything,
+			connectorID,
+		).
+		Return([]apid.ID{connectionID}, nil).
+		Once()
+	workflowTester.
+		OnSubWorkflowByName(
+			WorkflowNameDisconnectConnectionV1,
+			childWorkflow,
+			testifymock.Anything,
+			connectionID.String(),
+		).
+		Return(nil, errors.New("child failed")).
+		Once()
+	workflowTester.
+		OnActivityByName(
+			ActivityNameDisconnectConnectorConnectionsForceRemainingV1,
+			forceActivity,
+			testifymock.Anything,
+			[]apid.ID{connectionID},
+		).
+		Return(nil).
+		Once()
 
 	workflowTester.Execute(context.Background(), disconnectConnectorConnectionsWorkflowInputV1{
 		ConnectorID: connectorID,

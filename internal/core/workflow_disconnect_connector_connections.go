@@ -87,14 +87,16 @@ func disconnectConnectorConnectionsWorkflowV1(ctx wflib.Context, input disconnec
 		wflib.WithTimerName("disconnect-all-timeout"),
 	)
 	defer cancelTimer()
-	forceRemaining := false
+
+	connectionsToForce := make([]apid.ID, 0)
+	timedOut := false
 
 	// Loop until all workflows resolve, the timer expires, or a child workflow errors.
-	for len(pending) > 0 && !forceRemaining {
+	for len(pending) > 0 && !timedOut {
 		// Add a select case for the time for this iteration
 		cases := make([]wflib.SelectCase, 0, len(pending)+1)
 		cases = append(cases, wflib.Await(timer, func(_ wflib.Context, _ wflib.Future[any]) {
-			forceRemaining = true
+			timedOut = true
 			cancelChildren()
 		}))
 
@@ -104,9 +106,7 @@ func disconnectConnectorConnectionsWorkflowV1(ctx wflib.Context, input disconnec
 			f := future
 			cases = append(cases, wflib.Await(f, func(ctx wflib.Context, future wflib.Future[any]) {
 				if _, err := future.Get(ctx); err != nil {
-					forceRemaining = true
-					cancelChildren()
-					return
+					connectionsToForce = append(connectionsToForce, id)
 				}
 				delete(pending, id)
 			}))
@@ -114,25 +114,27 @@ func disconnectConnectorConnectionsWorkflowV1(ctx wflib.Context, input disconnec
 		wflib.Select(ctx, cases...)
 	}
 
-	// Did everything finish in time?
-	if len(pending) == 0 {
-		// Yes, everything finished
+	// Did everything finish without needing forced finalization?
+	if len(pending) == 0 && len(connectionsToForce) == 0 {
 		cancelTimer()
 		return nil
 	}
 
 	// Not everything finished, force the remaining connections to the disconnected state
-	remaining := make([]apid.ID, 0, len(pending))
 	for connectionID, future := range pending {
 		_, _ = future.Get(ctx)
-		remaining = append(remaining, connectionID)
+		connectionsToForce = append(connectionsToForce, connectionID)
+	}
+	
+	if len(connectionsToForce) == 0 {
+		return nil
 	}
 
 	_, err = wflib.ExecuteActivity[any](
 		ctx,
 		wflib.DefaultActivityOptions,
 		ActivityNameDisconnectConnectorConnectionsForceRemainingV1,
-		remaining,
+		connectionsToForce,
 	).Get(ctx)
 	return err
 }
