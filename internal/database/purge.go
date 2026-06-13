@@ -13,6 +13,7 @@ var tablesToPurge = []string{
 	ActorTable,
 	ConnectionsTable,
 	ConnectorVersionsTable,
+	DataEncryptionKeysTable,
 	EncryptionKeyVersionsTable,
 	EncryptionKeysTable,
 	NamespacesTable,

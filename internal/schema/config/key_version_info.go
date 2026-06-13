@@ -79,7 +79,6 @@ type KeyVersionInfo struct {
 	ProviderID      string
 	ProviderVersion string
 	Data            []byte
-	ProtectedData   *KeyVersionProtectedData
 	IsCurrent       bool
 }
 

@@ -21,23 +21,24 @@ type KeyDataType interface {
 	GetProviderType() ProviderType
 }
 
-// ExistingKeyVersionInfo is the database-visible metadata for a key version
-// that already exists. KMS-style providers use it to unwrap persisted DEKs
-// and keep old versions available even when the provider only exposes the
-// current wrapping key version.
-type ExistingKeyVersionInfo struct {
+// DataEncryptionKeyInfo is the database-visible metadata for a persisted DEK.
+// KMS-style providers use these rows to unwrap DEKs and expose them as
+// application-facing encryption key versions.
+type DataEncryptionKeyInfo struct {
+	ID              string
+	EncryptionKeyID string
 	Provider        ProviderType
 	ProviderID      string
 	ProviderVersion string
 	ProtectedData   *KeyVersionProtectedData
+	IsCurrent       bool
 }
 
-// KeyDataTypeWithExistingVersions is implemented by providers that need
-// persisted version rows to resolve key bytes. Secret-backed providers can keep
-// implementing KeyDataType only because their key bytes come directly from the
-// provider version.
-type KeyDataTypeWithExistingVersions interface {
-	ListVersionsWithExisting(ctx context.Context, existing []ExistingKeyVersionInfo) ([]KeyVersionInfo, error)
+// KeyDataTypeWithDataEncryptionKeys is implemented by providers that resolve
+// key bytes from persisted DEK rows instead of directly listing key bytes from
+// the provider.
+type KeyDataTypeWithDataEncryptionKeys interface {
+	ListVersionsWithDataEncryptionKeys(ctx context.Context, deks []DataEncryptionKeyInfo) ([]KeyVersionInfo, error)
 }
 
 type KeyData struct {
@@ -68,13 +69,13 @@ func (kd *KeyData) ListVersions(ctx context.Context) ([]KeyVersionInfo, error) {
 	return kd.InnerVal.ListVersions(ctx)
 }
 
-func (kd *KeyData) ListVersionsWithExisting(ctx context.Context, existing []ExistingKeyVersionInfo) ([]KeyVersionInfo, error) {
+func (kd *KeyData) ListVersionsWithDataEncryptionKeys(ctx context.Context, deks []DataEncryptionKeyInfo) ([]KeyVersionInfo, error) {
 	if kd == nil || kd.InnerVal == nil {
 		return nil, errors.New("key data is nil")
 	}
 
-	if withExisting, ok := kd.InnerVal.(KeyDataTypeWithExistingVersions); ok {
-		return withExisting.ListVersionsWithExisting(ctx, existing)
+	if withDEKs, ok := kd.InnerVal.(KeyDataTypeWithDataEncryptionKeys); ok {
+		return withDEKs.ListVersionsWithDataEncryptionKeys(ctx, deks)
 	}
 
 	return kd.InnerVal.ListVersions(ctx)

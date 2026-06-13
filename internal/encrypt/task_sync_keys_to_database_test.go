@@ -51,6 +51,7 @@ type mockKMSSyncTestEnv struct {
 	logger    *slog.Logger
 	namespace string
 	ekID      apid.ID
+	dekV1ID   apid.ID
 }
 
 func setupMockKMSKeySyncTest(t *testing.T) mockKMSSyncTestEnv {
@@ -99,6 +100,7 @@ func setupMockKMSKeySyncTest(t *testing.T) mockKMSSyncTestEnv {
 		EncryptedKeyData: encryptKeyDataForTest(t, globalVersions[0].Id, globalKeyBytes, kmsKeyData),
 	}))
 
+	dekV1ID := createMockKMSDataEncryptionKey(t, ctx, db, ekID, "v1", true)
 	require.NoError(t, syncKeysVersionsToDatabase(ctx, cfg, db, logger, nil))
 	enc := newTestService(cfg, db)
 
@@ -110,20 +112,54 @@ func setupMockKMSKeySyncTest(t *testing.T) mockKMSSyncTestEnv {
 		logger:    logger,
 		namespace: namespace,
 		ekID:      ekID,
+		dekV1ID:   dekV1ID,
 	}
+}
+
+func createMockKMSDataEncryptionKey(
+	t *testing.T,
+	ctx context.Context,
+	db database.DB,
+	ekID apid.ID,
+	providerVersion string,
+	isCurrent bool,
+) apid.ID {
+	t.Helper()
+
+	dekBytes := util.MustGenerateSecureRandomKey(32)
+	protected, err := sconfig.KeyDataMockKMSWrap("namespace-kms", "mock-kms-key", providerVersion, dekBytes)
+	require.NoError(t, err)
+
+	dek := &database.DataEncryptionKey{
+		EncryptionKeyId: ekID,
+		Provider:        string(sconfig.ProviderTypeMockKMS),
+		ProviderID:      "mock-kms-key",
+		ProviderVersion: providerVersion,
+		ProtectedData:   &protected,
+		IsCurrent:       isCurrent,
+	}
+	require.NoError(t, db.CreateDataEncryptionKey(ctx, dek))
+	return dek.Id
 }
 
 func TestMockKMSKeySync(t *testing.T) {
 	t.Run("persists wrapped dek and decrypts after memory restart", func(t *testing.T) {
 		env := setupMockKMSKeySyncTest(t)
 
+		deks, err := env.db.ListDataEncryptionKeysForEncryptionKey(env.ctx, env.ekID)
+		require.NoError(t, err)
+		require.Len(t, deks, 1)
+		require.Equal(t, env.dekV1ID, deks[0].Id)
+		require.NotNil(t, deks[0].ProtectedData)
+		require.Equal(t, string(sconfig.ProviderTypeMockKMS), deks[0].ProtectedData.Type)
+		require.NotEmpty(t, deks[0].ProtectedData.WrappedData)
+
 		versions, err := env.db.ListEncryptionKeyVersionsForEncryptionKey(env.ctx, env.ekID)
 		require.NoError(t, err)
 		require.Len(t, versions, 1)
 		require.Equal(t, string(sconfig.ProviderTypeMockKMS), versions[0].Provider)
-		require.NotNil(t, versions[0].ProtectedKeyData)
-		require.Equal(t, string(sconfig.ProviderTypeMockKMS), versions[0].ProtectedKeyData.Type)
-		require.NotEmpty(t, versions[0].ProtectedKeyData.WrappedData)
+		require.Equal(t, string(env.dekV1ID), versions[0].ProviderID)
+		require.Equal(t, "v1", versions[0].ProviderVersion)
 
 		encrypted, err := env.enc.EncryptStringForNamespace(env.ctx, env.namespace, "kms plaintext")
 		require.NoError(t, err)
@@ -139,6 +175,34 @@ func TestMockKMSKeySync(t *testing.T) {
 		require.NoError(t, err)
 		require.Len(t, afterResync, 1, "resync with existing protected data should not generate a duplicate version")
 		require.Equal(t, versions[0].Id, afterResync[0].Id)
+	})
+
+	t.Run("sync does not create versions before dek generation", func(t *testing.T) {
+		env := setupMockKMSKeySyncTest(t)
+
+		ekID := apid.New(apid.PrefixEncryptionKey)
+		namespace := "root.kms.nodek"
+		require.NoError(t, env.db.CreateNamespace(env.ctx, &database.Namespace{
+			Path:            namespace,
+			EncryptionKeyId: &ekID,
+		}))
+
+		keyData := sconfig.NewKeyDataMockKMS("namespace-kms")
+		keyDataJSON, err := json.Marshal(keyData)
+		require.NoError(t, err)
+		encKeyData, err := env.enc.EncryptGlobal(env.ctx, keyDataJSON)
+		require.NoError(t, err)
+		require.NoError(t, env.db.CreateEncryptionKey(env.ctx, &database.EncryptionKey{
+			Id:               ekID,
+			Namespace:        namespace,
+			State:            database.EncryptionKeyStateActive,
+			EncryptedKeyData: &encKeyData,
+		}))
+
+		require.NoError(t, syncKeysVersionsToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
+		versions, err := env.db.ListEncryptionKeyVersionsForEncryptionKey(env.ctx, ekID)
+		require.NoError(t, err)
+		require.Empty(t, versions)
 	})
 
 	t.Run("rotation creates new protected dek and re-encrypts fields", func(t *testing.T) {
@@ -159,14 +223,15 @@ func TestMockKMSKeySync(t *testing.T) {
 		}))
 
 		sconfig.KeyDataMockKMSAddVersion("namespace-kms", "mock-kms-key", "v2", util.MustGenerateSecureRandomKey(32))
+		dekV2ID := createMockKMSDataEncryptionKey(t, env.ctx, env.db, env.ekID, "v2", true)
 		require.NoError(t, syncKeysVersionsToDatabase(env.ctx, env.cfg, env.db, env.logger, nil))
 		require.NoError(t, env.enc.SyncKeysFromDbToMemory(env.ctx))
 
 		currentV2, err := env.db.GetCurrentEncryptionKeyVersionForNamespace(env.ctx, env.namespace)
 		require.NoError(t, err)
 		require.NotEqual(t, currentV1.Id, currentV2.Id)
+		require.Equal(t, string(dekV2ID), currentV2.ProviderID)
 		require.Equal(t, "v2", currentV2.ProviderVersion)
-		require.NotNil(t, currentV2.ProtectedKeyData)
 
 		handler := NewEncryptServiceTaskHandler(env.cfg, env.db, env.enc, nil, env.logger)
 		require.NoError(t, handler.handleReencryptAll(env.ctx, asynq.NewTask(TaskTypeReencryptAll, nil)))

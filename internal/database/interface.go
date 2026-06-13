@@ -237,6 +237,14 @@ type DB interface {
 	) error
 
 	/*
+	 * Data Encryption Keys
+	 */
+
+	CreateDataEncryptionKey(ctx context.Context, dek *DataEncryptionKey) error
+	GetDataEncryptionKey(ctx context.Context, id apid.ID) (*DataEncryptionKey, error)
+	ListDataEncryptionKeysForEncryptionKey(ctx context.Context, encryptionKeyId apid.ID) ([]*DataEncryptionKey, error)
+
+	/*
 	 * Rate Limits
 	 */
 

@@ -33,6 +33,7 @@ const (
 	PrefixJwtId                Prefix = "jti_"
 	PrefixEncryptionKey        Prefix = "ek_"
 	PrefixEncryptionKeyVersion Prefix = "ekv_"
+	PrefixDataEncryptionKey    Prefix = "dek_"
 	PrefixSession              Prefix = "sess_"
 	PrefixRateLimit            Prefix = "rl_"
 	PrefixSetupToken           Prefix = "stk_"
@@ -54,6 +55,7 @@ var validPrefixes = map[Prefix]bool{
 	PrefixSession:              true,
 	PrefixEncryptionKey:        true,
 	PrefixEncryptionKeyVersion: true,
+	PrefixDataEncryptionKey:    true,
 	PrefixRateLimit:            true,
 	PrefixSetupToken:           true,
 }

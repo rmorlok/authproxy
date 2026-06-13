@@ -34,19 +34,17 @@ func NewSyncKeysToDatabaseTask() *asynq.Task {
 }
 
 // versionWithCurrent pairs a key version info with whether it belongs to the current (primary) key.
-type versionWithCurrent struct {
-	ver       config.KeyVersionInfo
-	isCurrent bool
-}
-
-func persistedKeyVersionInfos(persistedVersions []*database.EncryptionKeyVersion) []config.ExistingKeyVersionInfo {
-	infos := make([]config.ExistingKeyVersionInfo, 0, len(persistedVersions))
-	for _, ekv := range persistedVersions {
-		infos = append(infos, config.ExistingKeyVersionInfo{
-			Provider:        config.ProviderType(ekv.Provider),
-			ProviderID:      ekv.ProviderID,
-			ProviderVersion: ekv.ProviderVersion,
-			ProtectedData:   ekv.ProtectedKeyData,
+func dataEncryptionKeyInfos(deks []*database.DataEncryptionKey) []config.DataEncryptionKeyInfo {
+	infos := make([]config.DataEncryptionKeyInfo, 0, len(deks))
+	for _, dek := range deks {
+		infos = append(infos, config.DataEncryptionKeyInfo{
+			ID:              string(dek.Id),
+			EncryptionKeyID: string(dek.EncryptionKeyId),
+			Provider:        config.ProviderType(dek.Provider),
+			ProviderID:      dek.ProviderID,
+			ProviderVersion: dek.ProviderVersion,
+			ProtectedData:   dek.ProtectedData,
+			IsCurrent:       dek.IsCurrent,
 		})
 	}
 	return infos
@@ -67,9 +65,15 @@ func syncKeyVersionsForKeyToDatabase(
 		return errors.Wrap(err, "failed to list existing encryption key versions")
 	}
 
-	// KMS-style providers need already-persisted version rows so they can
-	// unwrap stored DEKs and keep old versions decryptable after rotation.
-	vers, err := kd.ListVersionsWithExisting(ctx, persistedKeyVersionInfos(persistedVersions))
+	deks, err := db.ListDataEncryptionKeysForEncryptionKey(ctx, encryptionKeyId)
+	if err != nil {
+		return errors.Wrap(err, "failed to list data encryption keys")
+	}
+
+	// KMS-style providers consume already-generated DEK rows. The sync task
+	// maps those rows into application-facing encryption_key_versions; it does
+	// not create DEKs as a side effect.
+	vers, err := kd.ListVersionsWithDataEncryptionKeys(ctx, dataEncryptionKeyInfos(deks))
 	if err != nil {
 		return errors.Wrapf(err, "failed to get %s key versions", encryptionKeyId)
 	}
@@ -96,14 +100,13 @@ func syncKeyVersionsForKeyToDatabase(
 			}
 
 			ekv := &database.EncryptionKeyVersion{
-				Id:               apid.New(apid.PrefixEncryptionKeyVersion),
-				EncryptionKeyId:  encryptionKeyId,
-				Provider:         string(ver.Provider),
-				ProviderID:       ver.ProviderID,
-				ProviderVersion:  ver.ProviderVersion,
-				ProtectedKeyData: ver.ProtectedData,
-				OrderedVersion:   maxVersion + 1,
-				IsCurrent:        ver.IsCurrent,
+				Id:              apid.New(apid.PrefixEncryptionKeyVersion),
+				EncryptionKeyId: encryptionKeyId,
+				Provider:        string(ver.Provider),
+				ProviderID:      ver.ProviderID,
+				ProviderVersion: ver.ProviderVersion,
+				OrderedVersion:  maxVersion + 1,
+				IsCurrent:       ver.IsCurrent,
 			}
 
 			// Cache the information

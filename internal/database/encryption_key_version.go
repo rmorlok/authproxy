@@ -11,7 +11,6 @@ import (
 	"github.com/hashicorp/go-multierror"
 	"github.com/rmorlok/authproxy/internal/apctx"
 	"github.com/rmorlok/authproxy/internal/apid"
-	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	"github.com/rmorlok/authproxy/internal/util"
 	"github.com/rmorlok/authproxy/internal/util/pagination"
 )
@@ -19,17 +18,16 @@ import (
 const EncryptionKeyVersionsTable = "encryption_key_versions"
 
 type EncryptionKeyVersion struct {
-	Id               apid.ID
-	EncryptionKeyId  apid.ID
-	Provider         string
-	ProviderID       string
-	ProviderVersion  string
-	ProtectedKeyData *sconfig.KeyVersionProtectedData
-	OrderedVersion   int64
-	IsCurrent        bool
-	CreatedAt        time.Time
-	UpdatedAt        time.Time
-	DeletedAt        *time.Time
+	Id              apid.ID
+	EncryptionKeyId apid.ID
+	Provider        string
+	ProviderID      string
+	ProviderVersion string
+	OrderedVersion  int64
+	IsCurrent       bool
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
+	DeletedAt       *time.Time
 }
 
 func (e *EncryptionKeyVersion) cols() []string {
@@ -39,7 +37,6 @@ func (e *EncryptionKeyVersion) cols() []string {
 		"provider",
 		"provider_id",
 		"provider_version",
-		"protected_key_data",
 		"ordered_version",
 		"is_current",
 		"created_at",
@@ -55,7 +52,6 @@ func (e *EncryptionKeyVersion) fields() []any {
 		&e.Provider,
 		&e.ProviderID,
 		&e.ProviderVersion,
-		&e.ProtectedKeyData,
 		&e.OrderedVersion,
 		&e.IsCurrent,
 		&e.CreatedAt,
@@ -71,7 +67,6 @@ func (e *EncryptionKeyVersion) values() []any {
 		e.Provider,
 		e.ProviderID,
 		e.ProviderVersion,
-		e.ProtectedKeyData,
 		e.OrderedVersion,
 		e.IsCurrent,
 		e.CreatedAt,

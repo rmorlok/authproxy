@@ -30,9 +30,8 @@ type keyDataMockKMSVersion struct {
 }
 
 // KeyDataMockKMS behaves like a KMS-backed KeyData provider for tests. It never
-// exposes the KEK as KeyVersionInfo.Data; instead, it generates local DEKs,
-// wraps them with the current mock KEK, and persists the wrapped DEK in
-// KeyVersionProtectedData.
+// exposes the KEK as KeyVersionInfo.Data; instead, it unwraps persisted DEKs
+// that were created separately from encryption key version sync.
 type KeyDataMockKMS struct {
 	MockKMSID string `json:"mock_kms_id" yaml:"mock_kms_id"`
 }
@@ -121,7 +120,7 @@ func (m *KeyDataMockKMS) version(providerID, providerVersion string) (keyDataMoc
 }
 
 func (m *KeyDataMockKMS) GetCurrentVersion(ctx context.Context) (KeyVersionInfo, error) {
-	versions, err := m.ListVersionsWithExisting(ctx, nil)
+	versions, err := m.ListVersionsWithDataEncryptionKeys(ctx, nil)
 	if err != nil {
 		return KeyVersionInfo{}, err
 	}
@@ -136,7 +135,7 @@ func (m *KeyDataMockKMS) GetCurrentVersion(ctx context.Context) (KeyVersionInfo,
 }
 
 func (m *KeyDataMockKMS) GetVersion(ctx context.Context, version string) (KeyVersionInfo, error) {
-	versions, err := m.ListVersionsWithExisting(ctx, nil)
+	versions, err := m.ListVersionsWithDataEncryptionKeys(ctx, nil)
 	if err != nil {
 		return KeyVersionInfo{}, err
 	}
@@ -151,72 +150,40 @@ func (m *KeyDataMockKMS) GetVersion(ctx context.Context, version string) (KeyVer
 }
 
 func (m *KeyDataMockKMS) ListVersions(ctx context.Context) ([]KeyVersionInfo, error) {
-	return m.ListVersionsWithExisting(ctx, nil)
+	return m.ListVersionsWithDataEncryptionKeys(ctx, nil)
 }
 
-func (m *KeyDataMockKMS) ListVersionsWithExisting(_ context.Context, existing []ExistingKeyVersionInfo) ([]KeyVersionInfo, error) {
-	current, err := m.currentVersion()
-	if err != nil {
-		return nil, err
-	}
-
+func (m *KeyDataMockKMS) ListVersionsWithDataEncryptionKeys(_ context.Context, deks []DataEncryptionKeyInfo) ([]KeyVersionInfo, error) {
 	var result []KeyVersionInfo
-	hasCurrent := false
-	for _, ex := range existing {
-		if ex.Provider != ProviderTypeMockKMS {
+	for _, dekInfo := range deks {
+		if dekInfo.Provider != ProviderTypeMockKMS {
 			continue
 		}
-		if ex.ProtectedData == nil || ex.ProtectedData.IsZero() {
+		if dekInfo.ProtectedData == nil || dekInfo.ProtectedData.IsZero() {
 			continue
 		}
 
-		kekVersion := ex.ProtectedData.Metadata["kek_version"]
+		kekVersion := dekInfo.ProtectedData.Metadata["kek_version"]
 		if kekVersion == "" {
-			kekVersion = ex.ProviderVersion
+			kekVersion = dekInfo.ProviderVersion
 		}
 
-		kek, err := m.version(ex.ProviderID, kekVersion)
+		kek, err := m.version(dekInfo.ProviderID, kekVersion)
 		if err != nil {
 			return nil, err
 		}
 
-		dek, err := mockKMSUnwrap(kek.KeyEncryptionKey, *ex.ProtectedData)
-		if err != nil {
-			return nil, err
-		}
-
-		isCurrent := ex.ProviderID == current.ProviderID && ex.ProviderVersion == current.ProviderVersion
-		if isCurrent {
-			hasCurrent = true
-		}
-		result = append(result, KeyVersionInfo{
-			Provider:        ProviderTypeMockKMS,
-			ProviderID:      ex.ProviderID,
-			ProviderVersion: ex.ProviderVersion,
-			Data:            dek,
-			ProtectedData:   ex.ProtectedData,
-			IsCurrent:       isCurrent,
-		})
-	}
-
-	if !hasCurrent {
-		dek := make([]byte, 32)
-		if _, err := io.ReadFull(rand.Reader, dek); err != nil {
-			return nil, fmt.Errorf("failed to generate mock kms data key: %w", err)
-		}
-
-		protected, err := mockKMSWrap(current.KeyEncryptionKey, current.ProviderVersion, dek)
+		dekBytes, err := mockKMSUnwrap(kek.KeyEncryptionKey, *dekInfo.ProtectedData)
 		if err != nil {
 			return nil, err
 		}
 
 		result = append(result, KeyVersionInfo{
 			Provider:        ProviderTypeMockKMS,
-			ProviderID:      current.ProviderID,
-			ProviderVersion: current.ProviderVersion,
-			Data:            dek,
-			ProtectedData:   &protected,
-			IsCurrent:       true,
+			ProviderID:      dekInfo.ID,
+			ProviderVersion: dekInfo.ProviderVersion,
+			Data:            dekBytes,
+			IsCurrent:       dekInfo.IsCurrent,
 		})
 	}
 
@@ -225,6 +192,15 @@ func (m *KeyDataMockKMS) ListVersionsWithExisting(_ context.Context, existing []
 
 func (m *KeyDataMockKMS) GetProviderType() ProviderType {
 	return ProviderTypeMockKMS
+}
+
+func KeyDataMockKMSWrap(mockID, providerID, providerVersion string, dek []byte) (KeyVersionProtectedData, error) {
+	kms := &KeyDataMockKMS{MockKMSID: mockID}
+	kek, err := kms.version(providerID, providerVersion)
+	if err != nil {
+		return KeyVersionProtectedData{}, err
+	}
+	return mockKMSWrap(kek.KeyEncryptionKey, providerVersion, dek)
 }
 
 func mockKMSWrap(kek []byte, kekVersion string, dek []byte) (KeyVersionProtectedData, error) {
@@ -294,4 +270,4 @@ func mockKMSDecrypt(key []byte, data []byte) ([]byte, error) {
 }
 
 var _ KeyDataType = (*KeyDataMockKMS)(nil)
-var _ KeyDataTypeWithExistingVersions = (*KeyDataMockKMS)(nil)
+var _ KeyDataTypeWithDataEncryptionKeys = (*KeyDataMockKMS)(nil)

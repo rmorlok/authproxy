@@ -181,7 +181,7 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 							// The data for a given version is immutable, so we can just take old value
 							newEkvToVersionInfoCache[ekv.Id] = vi
 						} else {
-							kvi, err := getKeyVersionInfoForDatabaseVersion(ctx, keyData, ekv)
+							kvi, err := s.getKeyVersionInfoForDatabaseVersion(ctx, keyData, ekv)
 							if err != nil {
 								merr = multierror.Append(merr, fmt.Errorf("failed to get key version for encryption key %q for key version id %q: %w", ekv.EncryptionKeyId, ekv.Id, err))
 								continue
@@ -227,14 +227,14 @@ func (s *service) syncKeysFromDbToMemory(ctx context.Context) error {
 	return merr.ErrorOrNil()
 }
 
-func getKeyVersionInfoForDatabaseVersion(ctx context.Context, keyData *sconfig.KeyData, ekv *database.EncryptionKeyVersion) (sconfig.KeyVersionInfo, error) {
-	if withExisting, ok := keyData.InnerVal.(sconfig.KeyDataTypeWithExistingVersions); ok {
-		versions, err := withExisting.ListVersionsWithExisting(ctx, []sconfig.ExistingKeyVersionInfo{{
-			Provider:        sconfig.ProviderType(ekv.Provider),
-			ProviderID:      ekv.ProviderID,
-			ProviderVersion: ekv.ProviderVersion,
-			ProtectedData:   ekv.ProtectedKeyData,
-		}})
+func (s *service) getKeyVersionInfoForDatabaseVersion(ctx context.Context, keyData *sconfig.KeyData, ekv *database.EncryptionKeyVersion) (sconfig.KeyVersionInfo, error) {
+	if withDEKs, ok := keyData.InnerVal.(sconfig.KeyDataTypeWithDataEncryptionKeys); ok {
+		dek, err := s.db.GetDataEncryptionKey(ctx, apid.ID(ekv.ProviderID))
+		if err != nil {
+			return sconfig.KeyVersionInfo{}, err
+		}
+
+		versions, err := withDEKs.ListVersionsWithDataEncryptionKeys(ctx, dataEncryptionKeyInfos([]*database.DataEncryptionKey{dek}))
 		if err != nil {
 			return sconfig.KeyVersionInfo{}, err
 		}
