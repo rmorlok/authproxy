@@ -20,6 +20,10 @@ type ConnectorLifecycleOptions struct {
 	Timeout time.Duration
 }
 
+type ConnectionDisconnectOptions struct {
+	Timeout time.Duration
+}
+
 // C is the interface for the core service that implements primary business logic and binds the system together.
 type C interface {
 	/*
@@ -94,7 +98,7 @@ type C interface {
 
 	// DisconnectConnection disconnects a connection. This is a state transition that queues work to do any cleanup
 	// with the 3rd party.
-	DisconnectConnection(ctx context.Context, id apid.ID) (taskInfo *tasks.TaskInfo, err error)
+	DisconnectConnection(ctx context.Context, id apid.ID, opts ConnectionDisconnectOptions) (taskInfo *tasks.TaskInfo, err error)
 
 	// AbortConnection aborts an in-progress connection setup, revoking any credentials and deleting the connection.
 	// Only valid for connections with a non-null setup_step.

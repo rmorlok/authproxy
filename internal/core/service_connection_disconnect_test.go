@@ -4,6 +4,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/cschleiden/go-workflows/client"
 	wflib "github.com/cschleiden/go-workflows/workflow"
@@ -15,6 +16,7 @@ import (
 	mockAsynq "github.com/rmorlok/authproxy/internal/apasynq/mock"
 	"github.com/rmorlok/authproxy/internal/apid"
 	mockLog "github.com/rmorlok/authproxy/internal/aplog/mock"
+	"github.com/rmorlok/authproxy/internal/core/iface"
 	mockDb "github.com/rmorlok/authproxy/internal/database/mock"
 	mockEncrypt "github.com/rmorlok/authproxy/internal/encrypt/mock"
 	"github.com/stretchr/testify/assert"
@@ -72,7 +74,9 @@ func TestDisconnectConnection(t *testing.T) {
 			SetConnectionState(gomock.Any(), connectionId, database.ConnectionStateDisconnecting).
 			Return(nil)
 
-		taskInfo, err := svc.DisconnectConnection(ctx, connectionId)
+		taskInfo, err := svc.DisconnectConnection(ctx, connectionId, iface.ConnectionDisconnectOptions{
+			Timeout: 5 * time.Minute,
+		})
 
 		assert.NoError(t, err)
 		require.NotNil(t, taskInfo)
@@ -81,7 +85,11 @@ func TestDisconnectConnection(t *testing.T) {
 		assert.Equal(t, "workflow-execution-id", taskInfo.WorkflowExecutionId)
 		assert.Equal(t, WorkflowNameDisconnectConnectionV1, taskInfo.WorkflowName)
 		assert.Equal(t, WorkflowNameDisconnectConnectionV1, workflowClient.workflow)
-		assert.Equal(t, []any{connectionId}, workflowClient.args)
+		require.Len(t, workflowClient.args, 1)
+		input, ok := workflowClient.args[0].(disconnectConnectionWorkflowInputV1)
+		require.True(t, ok)
+		assert.Equal(t, connectionId, input.ConnectionID)
+		assert.Equal(t, 5*time.Minute, input.Timeout)
 		assert.Contains(t, workflowClient.options.InstanceID, connectionId)
 	})
 
@@ -93,7 +101,7 @@ func TestDisconnectConnection(t *testing.T) {
 			SetConnectionState(gomock.Any(), connectionId, database.ConnectionStateDisconnecting).
 			Return(database.ErrNotFound)
 
-		taskInfo, err := svc.DisconnectConnection(ctx, connectionId)
+		taskInfo, err := svc.DisconnectConnection(ctx, connectionId, iface.ConnectionDisconnectOptions{})
 
 		assert.Error(t, err)
 		assert.Nil(t, taskInfo)
@@ -107,7 +115,7 @@ func TestDisconnectConnection(t *testing.T) {
 			SetConnectionState(gomock.Any(), connectionId, database.ConnectionStateDisconnecting).
 			Return(errors.New("some error"))
 
-		taskInfo, err := svc.DisconnectConnection(ctx, connectionId)
+		taskInfo, err := svc.DisconnectConnection(ctx, connectionId, iface.ConnectionDisconnectOptions{})
 
 		assert.Error(t, err)
 		assert.Nil(t, taskInfo)
@@ -123,7 +131,7 @@ func TestDisconnectConnection(t *testing.T) {
 
 		workflowClient.err = errors.New("workflow error")
 
-		taskInfo, err := svc.DisconnectConnection(ctx, connectionId)
+		taskInfo, err := svc.DisconnectConnection(ctx, connectionId, iface.ConnectionDisconnectOptions{})
 
 		assert.Error(t, err)
 		assert.Nil(t, taskInfo)

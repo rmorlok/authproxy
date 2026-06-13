@@ -21,6 +21,8 @@ const (
 
 	ActivityNameDisconnectConnectorConnectionsListConnectionsV1 = "core.connector.disconnect_all.list_connections.v1"
 	ActivityNameDisconnectConnectorConnectionsForceRemainingV1  = "core.connector.disconnect_all.force_remaining.v1"
+
+	disconnectConnectorConnectionsParentReserve = 5 * time.Second
 )
 
 type disconnectConnectorConnectionsWorkflowInputV1 struct {
@@ -68,6 +70,7 @@ func disconnectConnectorConnectionsWorkflowV1(ctx wflib.Context, input disconnec
 	defer cancelChildren()
 
 	pending := make(map[apid.ID]wflib.Future[any], len(connectionIDs))
+	childTimeout := disconnectConnectorConnectionChildTimeout(input.Timeout)
 	for _, connectionID := range connectionIDs {
 		pending[connectionID] = wflib.CreateSubWorkflowInstance[any](
 			childCtx,
@@ -76,7 +79,10 @@ func disconnectConnectorConnectionsWorkflowV1(ctx wflib.Context, input disconnec
 				Queue:      apworkflows.DefaultQueue,
 			},
 			WorkflowNameDisconnectConnectionV1,
-			connectionID,
+			disconnectConnectionWorkflowInputV1{
+				ConnectionID: connectionID,
+				Timeout:      childTimeout,
+			},
 		)
 	}
 
@@ -137,6 +143,13 @@ func disconnectConnectorConnectionsWorkflowV1(ctx wflib.Context, input disconnec
 		connectionsToForce,
 	).Get(ctx)
 	return err
+}
+
+func disconnectConnectorConnectionChildTimeout(parentTimeout time.Duration) time.Duration {
+	if parentTimeout <= disconnectConnectorConnectionsParentReserve {
+		return parentTimeout
+	}
+	return parentTimeout - disconnectConnectorConnectionsParentReserve
 }
 
 // listDisconnectConnectorConnectionsV1 is the activity to list all connections that are relevant to

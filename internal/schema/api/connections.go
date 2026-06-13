@@ -53,6 +53,13 @@ type DisconnectResponseJson struct {
 	Connection ConnectionJson `json:"connection" yaml:"connection"`
 }
 
+// DisconnectConnectionRequestJson is the optional request body for POST /connections/:id/_disconnect.
+//
+//	@Description	Request to disconnect a connection
+type DisconnectConnectionRequestJson struct {
+	TimeoutSeconds *int64 `json:"timeout_seconds,omitempty" yaml:"timeout_seconds,omitempty" example:"600"`
+}
+
 // ForceConnectionStateRequestJson is the request body for PUT /connections/:id/_force_state.
 //
 //	@Description	Request to force a connection state

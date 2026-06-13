@@ -30,7 +30,7 @@ func TestDisconnectConnectorConnectionsWorkflowV1ExecutesChildWorkflows(t *testi
 	forceActivity := func(context.Context, []apid.ID) error {
 		return nil
 	}
-	childWorkflow := func(wflib.Context, string) error {
+	childWorkflow := func(wflib.Context, disconnectConnectionWorkflowInputV1) error {
 		return nil
 	}
 
@@ -49,7 +49,10 @@ func TestDisconnectConnectorConnectionsWorkflowV1ExecutesChildWorkflows(t *testi
 				WorkflowNameDisconnectConnectionV1,
 				childWorkflow,
 				testifymock.Anything,
-				connectionID.String(),
+				disconnectConnectionWorkflowInputV1{
+					ConnectionID: connectionID,
+					Timeout:      time.Minute - disconnectConnectorConnectionsParentReserve,
+				},
 			).
 			Return(nil).
 			Once()
@@ -86,7 +89,7 @@ func TestDisconnectConnectorConnectionsWorkflowV1ForcesFailedChildren(t *testing
 	forceActivity := func(context.Context, []apid.ID) error {
 		return nil
 	}
-	childWorkflow := func(wflib.Context, string) error {
+	childWorkflow := func(wflib.Context, disconnectConnectionWorkflowInputV1) error {
 		return errors.New("child failed")
 	}
 
@@ -104,7 +107,10 @@ func TestDisconnectConnectorConnectionsWorkflowV1ForcesFailedChildren(t *testing
 			WorkflowNameDisconnectConnectionV1,
 			childWorkflow,
 			testifymock.Anything,
-			connectionID.String(),
+			disconnectConnectionWorkflowInputV1{
+				ConnectionID: connectionID,
+				Timeout:      time.Minute - disconnectConnectorConnectionsParentReserve,
+			},
 		).
 		Return(nil, errors.New("child failed")).
 		Once()
@@ -140,7 +146,7 @@ func TestDisconnectConnectorConnectionsWorkflowV1ForcesRemainingOnTimeout(t *tes
 	forceActivity := func(context.Context, []apid.ID) error {
 		return nil
 	}
-	childWorkflow := func(ctx wflib.Context, _ string) error {
+	childWorkflow := func(ctx wflib.Context, _ disconnectConnectionWorkflowInputV1) error {
 		return wflib.Sleep(ctx, time.Hour)
 	}
 
@@ -182,6 +188,12 @@ func TestDisconnectConnectorConnectionChildWorkflowInstanceIDUsesConnectionWorkf
 		WorkflowNameDisconnectConnectionV1+":"+connectionID.String(),
 		disconnectConnectionWorkflowInstanceID(connectionID),
 	)
+}
+
+func TestDisconnectConnectorConnectionChildTimeout(t *testing.T) {
+	require.Equal(t, 55*time.Second, disconnectConnectorConnectionChildTimeout(time.Minute))
+	require.Equal(t, 5*time.Second, disconnectConnectorConnectionChildTimeout(5*time.Second))
+	require.Equal(t, time.Second, disconnectConnectorConnectionChildTimeout(time.Second))
 }
 
 func TestDisconnectConnectorConnectionsWorkflowInstanceID(t *testing.T) {

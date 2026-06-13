@@ -3,6 +3,7 @@ package routes
 import (
 	"context"
 	"errors"
+	"time"
 
 	"github.com/gin-gonic/gin"
 	auth "github.com/rmorlok/authproxy/internal/apauth/service"
@@ -50,6 +51,7 @@ type ConnectionState = schemaapi.ConnectionState
 type ConnectionHealthState = schemaapi.ConnectionHealthState
 type ConnectionJson = schemaapi.ConnectionJson
 type ListConnectionResponseJson = schemaapi.ListConnectionResponseJson
+type DisconnectConnectionRequestJson = schemaapi.DisconnectConnectionRequestJson
 type DisconnectResponseJson = schemaapi.DisconnectResponseJson
 type ForceStateRequestJson = schemaapi.ForceConnectionStateRequestJson
 type UpdateConnectionRequestJson = schemaapi.UpdateConnectionRequestJson
@@ -57,6 +59,7 @@ type ProxyResponse = schemaapi.ProxyResponseJson
 
 type OpenAPIConnectionJson = schemaapiopenapi.ConnectionJson
 type OpenAPIListConnectionResponseJson = schemaapiopenapi.ListConnectionResponseJson
+type OpenAPIDisconnectConnectionRequestJson = schemaapiopenapi.DisconnectConnectionRequestJson
 type OpenAPIDisconnectResponseJson = schemaapiopenapi.DisconnectResponseJson
 type ProxyRequest = schemaapiopenapi.ProxyRequestJson
 type OpenAPIProxyResponseJson = schemaapiopenapi.ProxyResponseJson
@@ -469,6 +472,7 @@ func (r *ConnectionsRoutes) get(gctx *gin.Context) {
 // @Accept			json
 // @Produce		json
 // @Param			id	path		string	true	"Connection UUID"
+// @Param			request	body		OpenAPIDisconnectConnectionRequestJson	false	"Disconnect options"
 // @Success		200	{object}	OpenAPIDisconnectResponseJson
 // @Failure		400	{object}	ErrorResponse
 // @Failure		401	{object}	ErrorResponse
@@ -505,7 +509,12 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 		return
 	}
 
-	ti, err := r.core.DisconnectConnection(ctx, id)
+	opts, ok := r.parseConnectionDisconnectRequest(gctx)
+	if !ok {
+		return
+	}
+
+	ti, err := r.core.DisconnectConnection(ctx, id, opts)
 	if err != nil {
 		apgin.WriteErr(gctx, nil, err)
 		val.MarkErrorReturn()
@@ -533,6 +542,31 @@ func (r *ConnectionsRoutes) disconnect(gctx *gin.Context) {
 	}
 
 	gctx.PureJSON(http.StatusOK, response)
+}
+
+func (r *ConnectionsRoutes) parseConnectionDisconnectRequest(gctx *gin.Context) (coreIface.ConnectionDisconnectOptions, bool) {
+	val := auth.MustGetValidatorFromGinContext(gctx)
+
+	req := DisconnectConnectionRequestJson{}
+	if gctx.Request.Body != http.NoBody && gctx.Request.ContentLength != 0 {
+		if err := gctx.ShouldBindBodyWithJSON(&req); err != nil {
+			apgin.WriteError(gctx, nil, httperr.BadRequestErr(err))
+			val.MarkErrorReturn()
+			return coreIface.ConnectionDisconnectOptions{}, false
+		}
+	}
+
+	timeout := defaultConnectorLifecycleTimeout
+	if req.TimeoutSeconds != nil {
+		if *req.TimeoutSeconds <= 0 {
+			apgin.WriteError(gctx, nil, httperr.BadRequest("timeout_seconds must be greater than zero"))
+			val.MarkErrorReturn()
+			return coreIface.ConnectionDisconnectOptions{}, false
+		}
+		timeout = time.Duration(*req.TimeoutSeconds) * time.Second
+	}
+
+	return coreIface.ConnectionDisconnectOptions{Timeout: timeout}, true
 }
 
 // @Summary		Abort connection setup

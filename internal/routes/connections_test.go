@@ -484,6 +484,38 @@ func TestConnections(t *testing.T) {
 			tu.Gin.ServeHTTP(w, req)
 			require.Equal(t, http.StatusForbidden, w.Code)
 		})
+
+		t.Run("rejects invalid timeout", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connections/"+u.String()+"/_disconnect",
+				util.JsonToReader(DisconnectConnectionRequestJson{TimeoutSeconds: util.ToPtr(int64(0))}),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connections", "disconnect"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
+
+		t.Run("rejects invalid json", func(t *testing.T) {
+			w := httptest.NewRecorder()
+			req, err := tu.AuthUtil.NewSignedRequestForActorExternalId(
+				http.MethodPost,
+				"/connections/"+u.String()+"/_disconnect",
+				util.JsonToReader("{invalid json}"),
+				"root",
+				"some-actor",
+				aschema.PermissionsSingle("root.**", "connections", "disconnect"),
+			)
+			require.NoError(t, err)
+
+			tu.Gin.ServeHTTP(w, req)
+			require.Equal(t, http.StatusBadRequest, w.Code)
+		})
 	})
 
 	t.Run("initiate connection", func(t *testing.T) {

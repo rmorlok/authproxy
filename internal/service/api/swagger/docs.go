@@ -1561,6 +1561,14 @@ const docTemplateApi = `{
                         "name": "id",
                         "in": "path",
                         "required": true
+                    },
+                    {
+                        "description": "Disconnect options",
+                        "name": "request",
+                        "in": "body",
+                        "schema": {
+                            "$ref": "#/definitions/routes.OpenAPIDisconnectConnectionRequestJson"
+                        }
                     }
                 ],
                 "responses": {
@@ -8528,6 +8536,16 @@ const docTemplateApi = `{
                 "namespace": {
                     "type": "string",
                     "example": "root.acme"
+                }
+            }
+        },
+        "routes.OpenAPIDisconnectConnectionRequestJson": {
+            "description": "Request body for connection disconnect operations",
+            "type": "object",
+            "properties": {
+                "timeout_seconds": {
+                    "type": "integer",
+                    "example": 600
                 }
             }
         },

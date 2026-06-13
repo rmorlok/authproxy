@@ -96,6 +96,13 @@ type DisconnectResponseJson struct {
 	Connection interface{} `json:"connection"`
 }
 
+// DisconnectConnectionRequestJson documents connection disconnect operation bodies.
+//
+//	@Description	Request body for connection disconnect operations
+type DisconnectConnectionRequestJson struct {
+	TimeoutSeconds *int64 `json:"timeout_seconds,omitempty" example:"600"`
+}
+
 // CreateConnectorRequestJson documents the connector creation body.
 //
 //	@Description	Request to create a new connector
