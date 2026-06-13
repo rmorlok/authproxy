@@ -159,6 +159,76 @@ func syncKeyVersionsForKeyToDatabase(
 	return nil
 }
 
+func reconcileNamespaceEncryptionTargets(
+	ctx context.Context,
+	db database.DB,
+	logger *slog.Logger,
+) error {
+	// effectiveEKV maps namespace path -> resolved target EKV ID, declared outside the callback
+	// so it persists across pages (depth ordering ensures parents are processed first).
+	effectiveEKV := make(map[string]apid.ID)
+
+	return db.EnumerateNamespaceEncryptionTargets(ctx,
+		func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
+			var updates []database.NamespaceTargetEncryptionKeyVersionUpdate
+
+			for _, target := range targets {
+				var resolvedEKVID apid.ID
+
+				if target.EncryptionKeyId != nil {
+					// Namespace has its own encryption key; look up its current version
+					currentEKV, err := db.GetCurrentEncryptionKeyVersionForEncryptionKey(ctx, *target.EncryptionKeyId)
+					if err != nil {
+						logger.Warn("failed to get current encryption key version for namespace encryption key",
+							"namespace", target.Path,
+							"encryption_key_id", *target.EncryptionKeyId,
+							"error", err,
+						)
+						continue
+					}
+					resolvedEKVID = currentEKV.Id
+				} else {
+					// Inherit from nearest ancestor with a resolved EKV
+					prefixes := namespace.SplitNamespacePathToPrefixes(target.Path)
+					found := false
+					for i := len(prefixes) - 2; i >= 0; i-- {
+						if ekvID, ok := effectiveEKV[prefixes[i]]; ok {
+							resolvedEKVID = ekvID
+							found = true
+							break
+						}
+					}
+
+					if !found {
+						// Fall back to the global key's current version
+						globalEKV, err := db.GetCurrentEncryptionKeyVersionForEncryptionKey(ctx, globalEncryptionKeyID)
+						if err != nil {
+							logger.Warn("failed to get current encryption key version for global key",
+								"namespace", target.Path,
+								"error", err,
+							)
+							continue
+						}
+						resolvedEKVID = globalEKV.Id
+					}
+				}
+
+				effectiveEKV[target.Path] = resolvedEKVID
+
+				// Only emit an update if the value actually changed
+				if target.TargetEncryptionKeyVersionId == nil || *target.TargetEncryptionKeyVersionId != resolvedEKVID {
+					updates = append(updates, database.NamespaceTargetEncryptionKeyVersionUpdate{
+						Path:                         target.Path,
+						TargetEncryptionKeyVersionId: resolvedEKVID,
+					})
+				}
+			}
+
+			return updates, pagination.Continue, nil
+		},
+	)
+}
+
 // syncKeysVersionsToDatabase is the standalone function that syncs key versions into the database. It lists
 // all keys and makes sure the version for those keys are accurate. It can be called directly during startup
 // without constructing a task handler. When redis is provided, it uses a sentinel key to rate-limit syncs.
@@ -263,70 +333,7 @@ func syncKeysVersionsToDatabase(
 		result = multierror.Append(result, err)
 	}
 
-	// Update target encryption key version for each namespace.
-	// effectiveEKV maps namespace path -> resolved target EKV ID, declared outside the callback
-	// so it persists across pages (depth ordering ensures parents are processed first).
-	effectiveEKV := make(map[string]apid.ID)
-
-	err = db.EnumerateNamespaceEncryptionTargets(ctx,
-		func(targets []database.NamespaceEncryptionTarget, lastPage bool) ([]database.NamespaceTargetEncryptionKeyVersionUpdate, pagination.KeepGoing, error) {
-			var updates []database.NamespaceTargetEncryptionKeyVersionUpdate
-
-			for _, target := range targets {
-				var resolvedEKVID apid.ID
-
-				if target.EncryptionKeyId != nil {
-					// Namespace has its own encryption key; look up its current version
-					currentEKV, err := db.GetCurrentEncryptionKeyVersionForEncryptionKey(ctx, *target.EncryptionKeyId)
-					if err != nil {
-						logger.Warn("failed to get current encryption key version for namespace encryption key",
-							"namespace", target.Path,
-							"encryption_key_id", *target.EncryptionKeyId,
-							"error", err,
-						)
-						continue
-					}
-					resolvedEKVID = currentEKV.Id
-				} else {
-					// Inherit from nearest ancestor with a resolved EKV
-					prefixes := namespace.SplitNamespacePathToPrefixes(target.Path)
-					found := false
-					for i := len(prefixes) - 2; i >= 0; i-- {
-						if ekvID, ok := effectiveEKV[prefixes[i]]; ok {
-							resolvedEKVID = ekvID
-							found = true
-							break
-						}
-					}
-
-					if !found {
-						// Fall back to the global key's current version
-						globalEKV, err := db.GetCurrentEncryptionKeyVersionForEncryptionKey(ctx, globalEncryptionKeyID)
-						if err != nil {
-							logger.Warn("failed to get current encryption key version for global key",
-								"namespace", target.Path,
-								"error", err,
-							)
-							continue
-						}
-						resolvedEKVID = globalEKV.Id
-					}
-				}
-
-				effectiveEKV[target.Path] = resolvedEKVID
-
-				// Only emit an update if the value actually changed
-				if target.TargetEncryptionKeyVersionId == nil || *target.TargetEncryptionKeyVersionId != resolvedEKVID {
-					updates = append(updates, database.NamespaceTargetEncryptionKeyVersionUpdate{
-						Path:                         target.Path,
-						TargetEncryptionKeyVersionId: resolvedEKVID,
-					})
-				}
-			}
-
-			return updates, pagination.Continue, nil
-		},
-	)
+	err = reconcileNamespaceEncryptionTargets(ctx, db, logger)
 	if err != nil {
 		result = multierror.Append(result, errors.Wrap(err, "failed to update namespace target encryption key versions"))
 	}

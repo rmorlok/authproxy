@@ -901,6 +901,11 @@ func TestSchemaDefinitions(t *testing.T) {
 					Data:  `{"test": {"global_aes_key": {"env_var_base64": "GLOBAL_AES_KEY"}}}`,
 				},
 				{
+					Name:  "data encryption key policy",
+					Valid: true,
+					Data:  `{"test": {"data_encryption_keys": {"rotation_interval": "24h", "ensure_current": true}}}`,
+				},
+				{
 					Name:  "actors as external source",
 					Valid: true,
 					Data:  `{"test": {"actors": {"keys_path": "/keys/actors"}}}`,

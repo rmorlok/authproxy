@@ -793,10 +793,21 @@
           "type": "boolean"
         },
         "actors": { "$ref": "#/$defs/ConfiguredActors" },
-        "global_aes_key": { "$ref": "#/$defs/KeyData" }
+        "global_aes_key": { "$ref": "#/$defs/KeyData" },
+        "data_encryption_keys": { "$ref": "#/$defs/DataEncryptionKeys" }
       },
       "additionalProperties": false,
       "type": "object"
+    },
+    "DataEncryptionKeys": {
+      "type": "object",
+      "properties": {
+        "rotation_interval": {
+          "$ref": "../common/schema.json#/$defs/HumanDuration"
+        },
+        "ensure_current": { "type": "boolean" }
+      },
+      "additionalProperties": false
     },
     "Key": {
       "oneOf": [

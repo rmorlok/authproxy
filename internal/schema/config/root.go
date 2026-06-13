@@ -65,6 +65,10 @@ func (r *Root) Validate() error {
 		result = multierror.Append(result, err)
 	}
 
+	if err := r.SystemAuth.DataEncryptionKeys.Validate(vc.PushField("system_auth").PushField("data_encryption_keys")); err != nil {
+		result = multierror.Append(result, err)
+	}
+
 	return result.ErrorOrNil()
 }
 

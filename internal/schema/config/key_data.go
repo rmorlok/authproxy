@@ -34,12 +34,29 @@ type DataEncryptionKeyInfo struct {
 	IsCurrent       bool
 }
 
+// GeneratedDataEncryptionKey is protected DEK material produced by a KMS-style
+// provider. The plaintext DEK may be returned for tests, but callers should only
+// persist the provider metadata and ProtectedData.
+type GeneratedDataEncryptionKey struct {
+	Provider        ProviderType
+	ProviderID      string
+	ProviderVersion string
+	ProtectedData   KeyVersionProtectedData
+	Data            []byte
+}
+
 // KeyDataRequiresDataEncryptionKeys is implemented by providers that resolve
 // key bytes from persisted DEK rows instead of directly listing key bytes from
 // the provider. Implementing this interface on the provider signals to the
 // encryption service to do a pre-load of DEKs from the database.
 type KeyDataRequiresDataEncryptionKeys interface {
 	ListVersionsWithDataEncryptionKeys(ctx context.Context, deks []DataEncryptionKeyInfo) ([]KeyVersionInfo, error)
+}
+
+// KeyDataGeneratesDataEncryptionKeys is implemented by providers that can
+// generate and wrap a new DEK for persistence in data_encryption_keys.
+type KeyDataGeneratesDataEncryptionKeys interface {
+	GenerateDataEncryptionKey(ctx context.Context) (GeneratedDataEncryptionKey, error)
 }
 
 type KeyData struct {

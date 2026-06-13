@@ -190,6 +190,31 @@ func (m *KeyDataMockKMS) ListVersionsWithDataEncryptionKeys(_ context.Context, d
 	return result, nil
 }
 
+func (m *KeyDataMockKMS) GenerateDataEncryptionKey(_ context.Context) (GeneratedDataEncryptionKey, error) {
+	current, err := m.currentVersion()
+	if err != nil {
+		return GeneratedDataEncryptionKey{}, err
+	}
+
+	dek := make([]byte, 32)
+	if _, err := io.ReadFull(rand.Reader, dek); err != nil {
+		return GeneratedDataEncryptionKey{}, fmt.Errorf("failed to generate mock kms data key: %w", err)
+	}
+
+	protected, err := mockKMSWrap(current.KeyEncryptionKey, current.ProviderVersion, dek)
+	if err != nil {
+		return GeneratedDataEncryptionKey{}, err
+	}
+
+	return GeneratedDataEncryptionKey{
+		Provider:        ProviderTypeMockKMS,
+		ProviderID:      current.ProviderID,
+		ProviderVersion: current.ProviderVersion,
+		ProtectedData:   protected,
+		Data:            dek,
+	}, nil
+}
+
 func (m *KeyDataMockKMS) GetProviderType() ProviderType {
 	return ProviderTypeMockKMS
 }
@@ -271,3 +296,4 @@ func mockKMSDecrypt(key []byte, data []byte) ([]byte, error) {
 
 var _ KeyDataType = (*KeyDataMockKMS)(nil)
 var _ KeyDataRequiresDataEncryptionKeys = (*KeyDataMockKMS)(nil)
+var _ KeyDataGeneratesDataEncryptionKeys = (*KeyDataMockKMS)(nil)

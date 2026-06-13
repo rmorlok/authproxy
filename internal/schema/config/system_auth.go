@@ -5,12 +5,13 @@ import (
 )
 
 type SystemAuth struct {
-	JwtSigningKey       *Key              `json:"jwt_signing_key" yaml:"jwt_signing_key"`
-	JwtIssuerVal        string            `json:"jwt_issuer" yaml:"jwt_issuer"`
-	JwtTokenDurationVal time.Duration     `json:"jwt_token_duration" yaml:"jwt_token_duration"`
-	DisableXSRF         bool              `json:"disable_xsrf" yaml:"disable_xsrf"`
-	Actors              *ConfiguredActors `json:"actors" yaml:"actors"`
-	GlobalAESKey        *KeyData          `json:"global_aes_key" yaml:"global_aes_key"`
+	JwtSigningKey       *Key                `json:"jwt_signing_key" yaml:"jwt_signing_key"`
+	JwtIssuerVal        string              `json:"jwt_issuer" yaml:"jwt_issuer"`
+	JwtTokenDurationVal time.Duration       `json:"jwt_token_duration" yaml:"jwt_token_duration"`
+	DisableXSRF         bool                `json:"disable_xsrf" yaml:"disable_xsrf"`
+	Actors              *ConfiguredActors   `json:"actors" yaml:"actors"`
+	GlobalAESKey        *KeyData            `json:"global_aes_key" yaml:"global_aes_key"`
+	DataEncryptionKeys  *DataEncryptionKeys `json:"data_encryption_keys,omitempty" yaml:"data_encryption_keys,omitempty"`
 }
 
 func (sa *SystemAuth) JwtIssuer() string {
