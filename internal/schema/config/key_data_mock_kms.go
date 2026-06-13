@@ -270,4 +270,4 @@ func mockKMSDecrypt(key []byte, data []byte) ([]byte, error) {
 }
 
 var _ KeyDataType = (*KeyDataMockKMS)(nil)
-var _ KeyDataTypeWithDataEncryptionKeys = (*KeyDataMockKMS)(nil)
+var _ KeyDataRequiresDataEncryptionKeys = (*KeyDataMockKMS)(nil)

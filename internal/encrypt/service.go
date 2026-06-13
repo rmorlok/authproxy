@@ -234,7 +234,7 @@ func (s *service) getKeyVersionInfoForDatabaseVersion(
 ) (sconfig.KeyVersionInfo, error) {
 	// If this key type takes DEKs, we need to pull that data from the separate table
 	// to provide it with that context to allow it to create a key version info.
-	if withDEKs, ok := keyData.InnerVal.(sconfig.KeyDataTypeWithDataEncryptionKeys); ok {
+	if keyData.RequiresDataEncryptionKeys() {
 		// Get the DEK from the database
 		dek, err := s.db.GetDataEncryptionKey(ctx, apid.ID(ekv.ProviderID))
 		if err != nil {
@@ -242,7 +242,10 @@ func (s *service) getKeyVersionInfoForDatabaseVersion(
 		}
 
 		// Use the list method to get this single version
-		versions, err := withDEKs.ListVersionsWithDataEncryptionKeys(ctx, dataEncryptionKeyInfos([]*database.DataEncryptionKey{dek}))
+		versions, err := keyData.ListVersionsWithDataEncryptionKeys(
+			ctx,
+			dataEncryptionKeyInfos([]*database.DataEncryptionKey{dek}),
+		)
 		if err != nil {
 			return sconfig.KeyVersionInfo{}, err
 		}
