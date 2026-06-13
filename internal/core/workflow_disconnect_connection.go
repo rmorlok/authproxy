@@ -21,11 +21,6 @@ const (
 	ActivityNameDisconnectConnectionFinalizeV1          = "core.connection.disconnect.finalize.v1"
 )
 
-type workflowRegistrar interface {
-	RegisterWorkflow(workflow wflib.Workflow, opts ...registry.RegisterOption) error
-	RegisterActivity(activity wflib.Activity, opts ...registry.RegisterOption) error
-}
-
 // maxRevokeAttempts caps the number of times a revoke operation is retried
 // inside a single disconnect task invocation. After exhausting attempts, the
 // disconnect proceeds so a connection cannot get stuck in `disconnecting`
@@ -80,6 +75,10 @@ func (s *service) registerDisconnectConnectionWorkflow(worker workflowRegistrar)
 	)
 }
 
+// disconnectConnectionWorkflowInstanceID generates the id used for the disconnect connection workflow. This is
+// specific to the connection id, so multiple invocations will result in same id. If the workflow is already
+// running, this will return an error. If the workflow had finished previously and is then re-run, that will
+// be allowed and be a new execution id.
 func disconnectConnectionWorkflowInstanceID(connectionId apid.ID) string {
 	return fmt.Sprintf("%s:%s", WorkflowNameDisconnectConnectionV1, connectionId)
 }
@@ -91,7 +90,7 @@ func (s *service) startDisconnectConnectionWorkflow(ctx context.Context, connect
 	return s.wc.CreateWorkflowInstance(ctx, client.WorkflowInstanceOptions{
 		InstanceID: disconnectConnectionWorkflowInstanceID(connectionId),
 		Queue:      apworkflows.DefaultQueue,
-	}, WorkflowNameDisconnectConnectionV1, connectionId.String())
+	}, WorkflowNameDisconnectConnectionV1, connectionId)
 }
 
 // revokeDisconnectConnectionCredentialsV1 is the revoke activity for disconnect connection.

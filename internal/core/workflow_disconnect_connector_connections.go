@@ -24,8 +24,8 @@ const (
 )
 
 type disconnectConnectorConnectionsWorkflowInputV1 struct {
-	ConnectorID apid.ID       `json:"connector_id"`
-	Timeout     time.Duration `json:"timeout"`
+	ConnectorID apid.ID       `json:"connector_id"` // The connector id for which all connections will be disconnected
+	Timeout     time.Duration `json:"timeout"`      // ...
 }
 
 func (s *service) startDisconnectConnectorConnectionsWorkflow(
@@ -76,7 +76,7 @@ func disconnectConnectorConnectionsWorkflowV1(ctx wflib.Context, input disconnec
 				Queue:      apworkflows.DefaultQueue,
 			},
 			WorkflowNameDisconnectConnectionV1,
-			connectionID.String(),
+			connectionID,
 		)
 	}
 
@@ -125,7 +125,7 @@ func disconnectConnectorConnectionsWorkflowV1(ctx wflib.Context, input disconnec
 		_, _ = future.Get(ctx)
 		connectionsToForce = append(connectionsToForce, connectionID)
 	}
-	
+
 	if len(connectionsToForce) == 0 {
 		return nil
 	}
@@ -139,7 +139,16 @@ func disconnectConnectorConnectionsWorkflowV1(ctx wflib.Context, input disconnec
 	return err
 }
 
+// listDisconnectConnectorConnectionsV1 is the activity to list all connections that are relevant to
+// disconnecting a connector
 func (s *service) listDisconnectConnectorConnectionsV1(ctx context.Context, connectorID apid.ID) ([]apid.ID, error) {
+	log := s.logger.With(
+		"workflow", WorkflowNameDisconnectConnectorConnectionsV1,
+		"activity", ActivityNameDisconnectConnectorConnectionsListConnectionsV1,
+	)
+	log.Info("starting list connections to disconnect")
+	defer log.Info("finished list connections to disconnect")
+
 	if connectorID == apid.Nil {
 		return nil, fmt.Errorf("connector id not specified")
 	}
@@ -154,8 +163,10 @@ func (s *service) listDisconnectConnectorConnectionsV1(ctx context.Context, conn
 		ForStates(disconnectConnectorConnectionsRelevantStates()).
 		Enumerate(ctx, func(page pagination.PageResult[database.Connection]) (pagination.KeepGoing, error) {
 			for _, conn := range page.Results {
+				log.Info("enqueueing connection for disconnect then removal", "connectionID", conn.Id)
 				if conn.State != database.ConnectionStateDisconnecting {
 					if err := s.db.SetConnectionState(ctx, conn.Id, database.ConnectionStateDisconnecting); err != nil {
+						log.Error("failed to set connection state", "connectionID", conn.Id, "error", err)
 						return pagination.Stop, err
 					}
 				}
@@ -169,8 +180,19 @@ func (s *service) listDisconnectConnectorConnectionsV1(ctx context.Context, conn
 	return connectionIDs, nil
 }
 
+// forceRemainingDisconnectConnectorConnectionsV1 is the activity to force connections to the disconnected state
+// if they failed to disconnect within the time allowed.
 func (s *service) forceRemainingDisconnectConnectorConnectionsV1(ctx context.Context, connectionIDs []apid.ID) error {
+	log := s.logger.With(
+		"workflow", WorkflowNameDisconnectConnectorConnectionsV1,
+		"activity", ActivityNameDisconnectConnectorConnectionsForceRemainingV1,
+	)
+	log.Info("starting force connection disconnect")
+	defer log.Info("finished force connection disconnect")
+
 	for _, id := range connectionIDs {
+		log.Warn("forcing connection to disconnected state then deleting", "connectionID", id)
+
 		if id == apid.Nil {
 			return fmt.Errorf("connection id not specified")
 		}
@@ -179,15 +201,21 @@ func (s *service) forceRemainingDisconnectConnectorConnectionsV1(ctx context.Con
 		}
 
 		if err := s.db.SetConnectionState(ctx, id, database.ConnectionStateDisconnected); err != nil && !errors.Is(err, database.ErrNotFound) {
+			log.Error("failed to set connection state to disconnected", "connectionID", id, "error", err)
 			return err
 		}
 		if err := s.db.DeleteConnection(ctx, id); err != nil && !errors.Is(err, database.ErrNotFound) {
+			log.Error("failed to delete connection", "connectionID", id, "error", err)
 			return err
 		}
 	}
+
 	return nil
 }
 
+// disconnectConnectorConnectionsRelevantStates returns the states that are relevant to disconnecting a connector.
+// This includes connections that are in process of disconnecting. These can either finish during the workflow
+// or they will be forced state and deleted.
 func disconnectConnectorConnectionsRelevantStates() []database.ConnectionState {
 	return []database.ConnectionState{
 		database.ConnectionStateSetup,
