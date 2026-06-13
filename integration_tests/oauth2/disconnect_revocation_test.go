@@ -3,6 +3,7 @@
 package oauth2
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -16,6 +17,7 @@ import (
 	"github.com/rmorlok/authproxy/integration_tests/helpers"
 	"github.com/rmorlok/authproxy/internal/apid"
 	"github.com/rmorlok/authproxy/internal/database"
+	schemaapi "github.com/rmorlok/authproxy/internal/schema/api"
 	aschema "github.com/rmorlok/authproxy/internal/schema/auth"
 	sconfig "github.com/rmorlok/authproxy/internal/schema/config"
 	cschema "github.com/rmorlok/authproxy/internal/schema/resources/connectors"
@@ -123,11 +125,16 @@ func (r *disconnectRevocationRig) completeAuthFlow(t *testing.T) string {
 func (r *disconnectRevocationRig) disconnect(t *testing.T, connectionID string) {
 	t.Helper()
 
+	reqBody, err := json.Marshal(schemaapi.DisconnectConnectionRequestJson{
+		TimeoutSeconds: int64Ptr(10),
+	})
+	require.NoError(t, err)
+
 	path := "/api/v1/connections/" + connectionID + "/_disconnect"
 	req, err := r.env.ApiAuthUtil.NewSignedRequestForActorExternalId(
 		http.MethodPost,
 		path,
-		nil,
+		bytes.NewReader(reqBody),
 		sconfig.RootNamespace,
 		"test-actor",
 		aschema.AllPermissions(),
@@ -147,6 +154,57 @@ func (r *disconnectRevocationRig) disconnect(t *testing.T, connectionID string) 
 	require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
 	assert.Equal(t, string(database.ConnectionStateDisconnecting), body.Connection.State)
 	assert.NotEmpty(t, body.TaskID)
+
+	r.requireTaskCompleted(t, body.TaskID)
+}
+
+func (r *disconnectRevocationRig) requireTaskCompleted(t *testing.T, taskID string) {
+	t.Helper()
+
+	var lastStatus int
+	var lastBody string
+	var lastState schemaapi.TaskState
+	require.Eventually(t, func() bool {
+		req, err := r.env.ApiAuthUtil.NewSignedRequestForActorExternalId(
+			http.MethodGet,
+			"/api/v1/tasks/"+taskID,
+			nil,
+			sconfig.RootNamespace,
+			"test-actor",
+			aschema.NoPermissions(),
+		)
+		require.NoError(t, err)
+
+		w := httptest.NewRecorder()
+		r.env.ApiGin.ServeHTTP(w, req)
+		lastStatus = w.Code
+		lastBody = w.Body.String()
+		if w.Code != http.StatusOK {
+			return false
+		}
+
+		var body schemaapi.TaskInfoJson
+		require.NoError(t, json.Unmarshal(w.Body.Bytes(), &body))
+		lastState = body.State
+		require.Equal(t, taskID, body.Id)
+
+		switch body.State {
+		case schemaapi.TaskStateCompleted:
+			return true
+		case schemaapi.TaskStateFailed:
+			t.Fatalf("disconnect workflow task failed: %s", w.Body.String())
+		}
+		return false
+	}, 15*time.Second, 100*time.Millisecond,
+		"disconnect workflow task should complete; last status=%d state=%s body=%s",
+		lastStatus,
+		lastState,
+		lastBody,
+	)
+}
+
+func int64Ptr(v int64) *int64 {
+	return &v
 }
 
 func startCoreWorkflowWorker(t *testing.T, rig *disconnectRevocationRig) {
