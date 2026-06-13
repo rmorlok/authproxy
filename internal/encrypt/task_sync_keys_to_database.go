@@ -60,11 +60,6 @@ func syncKeyVersionsForKeyToDatabase(
 	encryptionKeyId apid.ID,
 	kd *config.KeyData,
 ) error {
-	persistedVersions, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, encryptionKeyId)
-	if err != nil {
-		return errors.Wrap(err, "failed to list existing encryption key versions")
-	}
-
 	var vers []config.KeyVersionInfo
 	if kd.RequiresDataEncryptionKeys() {
 		deks, err := db.ListDataEncryptionKeysForEncryptionKey(ctx, encryptionKeyId)
@@ -87,8 +82,11 @@ func syncKeyVersionsForKeyToDatabase(
 		}
 	}
 
-
-	unused := util.NewSetFrom(persistedVersions)
+	existing, err := db.ListEncryptionKeyVersionsForEncryptionKey(ctx, encryptionKeyId)
+	if err != nil {
+		return errors.Wrap(err, "failed to list existing encryption key versions")
+	}
+	unused := util.NewSetFrom(existing)
 
 	for i, ver := range vers {
 		var found *database.EncryptionKeyVersion
