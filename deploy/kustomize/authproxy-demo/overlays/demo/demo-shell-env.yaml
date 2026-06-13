@@ -20,6 +20,8 @@ spec:
               value: https://marketplace.demo.authproxy.net
             - name: AUTHPROXY_ADMIN_UI_URL
               value: https://admin.demo.authproxy.net
+            - name: AUTHPROXY_GRAFANA_URL
+              value: https://demo.authproxy.net/grafana
       volumes:
         - name: admin-key
           secret:

@@ -265,6 +265,7 @@ jobs:
           grep -Fq "image: ghcr.io/rmorlok/authproxy-demo-shell:${IMAGE_TAG}" "${manifest}"
           grep -Fq "image: docker.io/grafana/grafana:11.5.2" "${manifest}"
           grep -Fq "host: ${DEMO_HOSTNAME}" "${manifest}"
+          grep -Fq "value: https://${DEMO_HOSTNAME}/grafana" "${manifest}"
           if [ -n "${GRAFANA_PLUGIN_INSTALL}" ]; then
             grep -Fq "value: ${GRAFANA_PLUGIN_INSTALL}" "${manifest}"
           fi
