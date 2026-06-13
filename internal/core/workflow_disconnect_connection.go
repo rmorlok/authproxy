@@ -80,13 +80,6 @@ func (s *service) registerDisconnectConnectionWorkflow(worker workflowRegistrar)
 	)
 }
 
-func (s *service) RegisterWorkflows(worker *apworkflows.Worker) error {
-	if err := s.registerDisconnectConnectionWorkflow(worker); err != nil {
-		return err
-	}
-	return s.registerDisconnectConnectorConnectionsWorkflow(worker)
-}
-
 func disconnectConnectionWorkflowInstanceID(connectionId apid.ID) string {
 	return fmt.Sprintf("%s:%s", WorkflowNameDisconnectConnectionV1, connectionId)
 }
