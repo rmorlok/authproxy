@@ -155,28 +155,34 @@ func (r *disconnectRevocationRig) disconnect(t *testing.T, connectionID string) 
 	assert.Equal(t, string(database.ConnectionStateDisconnecting), body.Connection.State)
 	assert.NotEmpty(t, body.TaskID)
 
-	r.requireTaskCompleted(t, body.TaskID)
+	requireWorkflowTaskCompleted(t, r.env, body.TaskID, "test-actor", 15*time.Second)
 }
 
-func (r *disconnectRevocationRig) requireTaskCompleted(t *testing.T, taskID string) {
+func requireWorkflowTaskCompleted(
+	t *testing.T,
+	env *helpers.IntegrationTestEnv,
+	taskID string,
+	actorExternalID string,
+	timeout time.Duration,
+) {
 	t.Helper()
 
 	var lastStatus int
 	var lastBody string
 	var lastState schemaapi.TaskState
 	require.Eventually(t, func() bool {
-		req, err := r.env.ApiAuthUtil.NewSignedRequestForActorExternalId(
+		req, err := env.ApiAuthUtil.NewSignedRequestForActorExternalId(
 			http.MethodGet,
 			"/api/v1/tasks/"+taskID,
 			nil,
 			sconfig.RootNamespace,
-			"test-actor",
+			actorExternalID,
 			aschema.NoPermissions(),
 		)
 		require.NoError(t, err)
 
 		w := httptest.NewRecorder()
-		r.env.ApiGin.ServeHTTP(w, req)
+		env.ApiGin.ServeHTTP(w, req)
 		lastStatus = w.Code
 		lastBody = w.Body.String()
 		if w.Code != http.StatusOK {
@@ -195,7 +201,7 @@ func (r *disconnectRevocationRig) requireTaskCompleted(t *testing.T, taskID stri
 			t.Fatalf("disconnect workflow task failed: %s", w.Body.String())
 		}
 		return false
-	}, 15*time.Second, 100*time.Millisecond,
+	}, timeout, 100*time.Millisecond,
 		"disconnect workflow task should complete; last status=%d state=%s body=%s",
 		lastStatus,
 		lastState,
@@ -207,10 +213,10 @@ func int64Ptr(v int64) *int64 {
 	return &v
 }
 
-func startCoreWorkflowWorker(t *testing.T, rig *disconnectRevocationRig) {
+func startCoreWorkflowWorker(t *testing.T, env *helpers.IntegrationTestEnv) {
 	t.Helper()
 
-	workflowRuntime := rig.env.DM.GetWorkflowRuntime()
+	workflowRuntime := env.DM.GetWorkflowRuntime()
 	workflowWorker, err := apworkflows.NewWorker(workflowRuntime, &workflowworker.Options{
 		WorkflowWorkerOptions: workflowworker.WorkflowWorkerOptions{
 			WorkflowPollers:          2,
@@ -222,7 +228,7 @@ func startCoreWorkflowWorker(t *testing.T, rig *disconnectRevocationRig) {
 		},
 	})
 	require.NoError(t, err)
-	require.NoError(t, rig.env.Core.RegisterWorkflows(workflowWorker))
+	require.NoError(t, env.Core.RegisterWorkflows(workflowWorker))
 
 	ctx, cancel := context.WithCancel(context.Background())
 	errCh := make(chan error, 1)
@@ -261,7 +267,18 @@ func requireConnectionDeleted(t *testing.T, rig *disconnectRevocationRig, connec
 func requireProxyBlockedAfterDisconnect(t *testing.T, rig *disconnectRevocationRig, connectionID string) {
 	t.Helper()
 
-	w := rig.env.DoProxyRequest(t, connectionID, rig.provider.ResourceURL("/echo"), http.MethodGet)
+	requireProxyBlockedForProvider(t, rig.env, rig.provider, connectionID)
+}
+
+func requireProxyBlockedForProvider(
+	t *testing.T,
+	env *helpers.IntegrationTestEnv,
+	provider *helpers.OAuth2TestProvider,
+	connectionID string,
+) {
+	t.Helper()
+
+	w := env.DoProxyRequest(t, connectionID, provider.ResourceURL("/echo"), http.MethodGet)
 	assert.Equalf(t, http.StatusNotFound, w.Code,
 		"future proxied calls should require reconnect after disconnect; body=%s", w.Body.String())
 }
@@ -278,7 +295,7 @@ func TestDisconnectRevocation_RevokesProviderTokensAndBlocksFutureProxy(t *testi
 	w := rig.env.DoProxyRequest(t, connID, rig.provider.ResourceURL("/echo"), http.MethodGet)
 	require.Equal(t, http.StatusOK, parseRevocationProxyResponse(t, w).StatusCode)
 
-	startCoreWorkflowWorker(t, rig)
+	startCoreWorkflowWorker(t, rig.env)
 	rig.disconnect(t, connID)
 	requireConnectionDeleted(t, rig, connID)
 
@@ -307,7 +324,7 @@ func TestDisconnectRevocation_RevocationFailureStillCompletesDisconnect(t *testi
 		FailCount: 10,
 	})
 
-	startCoreWorkflowWorker(t, rig)
+	startCoreWorkflowWorker(t, rig.env)
 	rig.disconnect(t, connID)
 	requireConnectionDeleted(t, rig, connID)
 	requireProxyBlockedAfterDisconnect(t, rig, connID)
