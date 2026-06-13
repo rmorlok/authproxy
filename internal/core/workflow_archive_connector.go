@@ -42,7 +42,7 @@ func (s *service) startArchiveConnectorWorkflow(
 }
 
 // archiveConnectorWorkflowInstanceID returns a standardized identifier for the workflow instance. This name
-// guarantees tha only one instance of the workflow runs at a time.
+// guarantees that only one instance of the workflow runs at a time.
 func archiveConnectorWorkflowInstanceID(connectorID apid.ID) string {
 	return fmt.Sprintf("%s:%s", WorkflowNameArchiveConnectorV1, connectorID)
 }
